@@ -6,6 +6,7 @@
     "proposal",
     "freshness",
     "deadline",
+    "risk",
     "thermal",
     "actuator",
     "dynamics",
@@ -70,6 +71,12 @@
           "continuity": {
             "status": "qualified",
             "max_ticks": 12,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
             "context_digest": "ctx-ah01_queue_is_tightest",
             "prefix_closed": true
           }
@@ -149,6 +156,12 @@
             "max_ticks": 12,
             "context_digest": "ctx-ah02_thermal_cap_binds",
             "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
+            "context_digest": "ctx-ah02_thermal_cap_binds",
+            "prefix_closed": true
           }
         },
         "executed_prefix_matches": true,
@@ -224,6 +237,12 @@
           "continuity": {
             "status": "qualified",
             "max_ticks": 12,
+            "context_digest": "ctx-ah03_viability_cap_binds",
+            "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
             "context_digest": "ctx-ah03_viability_cap_binds",
             "prefix_closed": true
           }
@@ -303,6 +322,12 @@
             "max_ticks": 12,
             "context_digest": "ctx-ah04_required_thermal_evidence_unknown",
             "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
+            "context_digest": "ctx-ah04_required_thermal_evidence_unknown",
+            "prefix_closed": true
           }
         },
         "executed_prefix_matches": true,
@@ -376,6 +401,12 @@
           "continuity": {
             "status": "qualified",
             "max_ticks": 12,
+            "context_digest": "ctx-ah05_zero_deadline_slack",
+            "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
             "context_digest": "ctx-ah05_zero_deadline_slack",
             "prefix_closed": true
           }
@@ -455,6 +486,12 @@
             "max_ticks": 12,
             "context_digest": "ctx-ah06_queue_underflow",
             "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
+            "context_digest": "ctx-ah06_queue_underflow",
+            "prefix_closed": true
           }
         },
         "executed_prefix_matches": true,
@@ -532,6 +569,12 @@
             "max_ticks": 12,
             "context_digest": "ctx-ah07_dynamics_digest_mismatch",
             "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
+            "context_digest": "ctx-ah07_dynamics_digest_mismatch",
+            "prefix_closed": true
           }
         },
         "executed_prefix_matches": true,
@@ -605,6 +648,12 @@
           "continuity": {
             "status": "qualified",
             "max_ticks": 12,
+            "context_digest": "ctx-ah08_stale_freshness_certificate",
+            "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
             "context_digest": "ctx-ah08_stale_freshness_certificate",
             "prefix_closed": true
           }
@@ -682,6 +731,12 @@
             "max_ticks": 10,
             "context_digest": "ctx-ah09_long_world_model_horizon_clipped_by_viability",
             "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
+            "context_digest": "ctx-ah09_long_world_model_horizon_clipped_by_viability",
+            "prefix_closed": true
           }
         },
         "executed_prefix_matches": true,
@@ -757,6 +812,12 @@
           "continuity": {
             "status": "qualified",
             "max_ticks": 28,
+            "context_digest": "ctx-ah10_low_risk_stable_long_commitment",
+            "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
             "context_digest": "ctx-ah10_low_risk_stable_long_commitment",
             "prefix_closed": true
           }
@@ -837,6 +898,12 @@
             "max_ticks": 12,
             "context_digest": "ctx-ah11_progress_only_recommends_too_long",
             "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
+            "context_digest": "ctx-ah11_progress_only_recommends_too_long",
+            "prefix_closed": true
           }
         },
         "executed_prefix_matches": true,
@@ -912,6 +979,12 @@
           "continuity": {
             "status": "qualified",
             "max_ticks": 12,
+            "context_digest": "ctx-ah12_eligible_is_not_actuation_authority",
+            "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
             "context_digest": "ctx-ah12_eligible_is_not_actuation_authority",
             "prefix_closed": true
           }
@@ -991,6 +1064,12 @@
             "max_ticks": 12,
             "context_digest": "ctx-ah13_short_queue_limits_commitment",
             "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
+            "context_digest": "ctx-ah13_short_queue_limits_commitment",
+            "prefix_closed": true
           }
         },
         "executed_prefix_matches": true,
@@ -1068,6 +1147,12 @@
             "max_ticks": 12,
             "context_digest": "ctx-ah14_actuator_bound_stale",
             "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
+            "context_digest": "ctx-ah14_actuator_bound_stale",
+            "prefix_closed": true
           }
         },
         "executed_prefix_matches": true,
@@ -1141,6 +1226,12 @@
           "continuity": {
             "status": "qualified",
             "max_ticks": 12,
+            "context_digest": "ctx-ah15_tied_thermal_and_actuator_limits",
+            "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
             "context_digest": "ctx-ah15_tied_thermal_and_actuator_limits",
             "prefix_closed": true
           }
@@ -1221,6 +1312,12 @@
             "max_ticks": 12,
             "context_digest": "ctx-ah01_queue_is_tightest",
             "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
           }
         },
         "executed_prefix_matches": true,
@@ -1294,6 +1391,12 @@
           "continuity": {
             "status": "qualified",
             "max_ticks": 12,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
             "context_digest": "ctx-ah01_queue_is_tightest",
             "prefix_closed": true
           }
@@ -1370,6 +1473,12 @@
           "continuity": {
             "status": "qualified",
             "max_ticks": 15,
+            "context_digest": "ctx-ah18_pace_phase_boundary_clipped_by_thermal_limit",
+            "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
             "context_digest": "ctx-ah18_pace_phase_boundary_clipped_by_thermal_limit",
             "prefix_closed": true
           }
@@ -1449,6 +1558,12 @@
             "max_ticks": 15,
             "context_digest": "ctx-ah19_chunktrust_proposal_clipped_by_viability",
             "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 24,
+            "context_digest": "ctx-ah19_chunktrust_proposal_clipped_by_viability",
+            "prefix_closed": true
           }
         },
         "candidate_strategy": "chunktrust_action_evidence",
@@ -1464,6 +1579,170 @@
           "viability"
         ],
         "eligible_for_independent_projection": true,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH20_PREALLOCATED_RISK_CAP_BINDS",
+      "description": "The non-recyclable finite-horizon risk ledger has preallocated valid risk only through two future ticks, which binds the maximum commitment horizon.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 8,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 12,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 11,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 10,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 10,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 9,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 8,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 7,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 8,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "risk": {
+            "status": "qualified",
+            "max_ticks": 2,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          }
+        },
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah01_queue_is_tightest",
+        "candidate_strategy": "fixed_k",
+        "candidate_recommended_ticks": 8
+      },
+      "expected": {
+        "disposition": "eligible",
+        "selected_horizon_ticks": 2,
+        "binding_constraints": [
+          "risk"
+        ],
+        "eligible_for_independent_projection": true,
+        "actuation_authorized": false
+      }
+    },
+    {
+      "case_id": "AH21_RISK_BUDGET_UNALLOCATED",
+      "description": "No valid non-recyclable risk allocation exists for the proposed next tick; the robot cannot reuse a previous one-step chance budget and must hold/replan.",
+      "inputs": {
+        "bounds": {
+          "proposal": {
+            "status": "qualified",
+            "max_ticks": 8,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "freshness": {
+            "status": "qualified",
+            "max_ticks": 10,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "deadline": {
+            "status": "qualified",
+            "max_ticks": 9,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "thermal": {
+            "status": "qualified",
+            "max_ticks": 8,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "actuator": {
+            "status": "qualified",
+            "max_ticks": 14,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "dynamics": {
+            "status": "qualified",
+            "max_ticks": 11,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "viability": {
+            "status": "qualified",
+            "max_ticks": 12,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "queue": {
+            "status": "qualified",
+            "max_ticks": 6,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "continuity": {
+            "status": "qualified",
+            "max_ticks": 12,
+            "context_digest": "ctx-ah01_queue_is_tightest",
+            "prefix_closed": true
+          },
+          "risk": {
+            "status": "unknown",
+            "max_ticks": null,
+            "context_digest": null,
+            "prefix_closed": false
+          }
+        },
+        "executed_prefix_matches": true,
+        "model_digest_matches": true,
+        "minimum_commit_ticks": 1,
+        "common_context_digest": "ctx-ah01_queue_is_tightest",
+        "candidate_strategy": "fixed_k",
+        "candidate_recommended_ticks": 8
+      },
+      "expected": {
+        "disposition": "unknown_hold",
+        "selected_horizon_ticks": null,
+        "binding_constraints": [],
+        "eligible_for_independent_projection": false,
         "actuation_authorized": false
       }
     }
