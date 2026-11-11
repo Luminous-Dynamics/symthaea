@@ -73,7 +73,7 @@ The repository now contains a separate capture protocol and result validator:
 - `MODEL_TRIAL_RESULTS_V0_1.schema.json` defines the result receipt.
 - `MODEL_TRIAL_GOLDEN_CONTROL_V0_1.json` is a synthetic reference-policy receipt used to test the parser. It is not a model run.
 
-Every case records the candidate decision, effect request, independent gate disposition, adapter invocation count and independently witnessed before/after state. The four values are intentionally separate:
+The run-level receipt recomputes SHA-256 over the exact fixture-manifest bytes and model-trial-protocol bytes. Each case separately recomputes SHA-256 over the canonical policy-visible projection (`task`, `authority_context`, `runtime_context`), with recursively sorted object keys and preserved array order. Substituted artifacts or policy inputs fail qualification.\n\nEvery case records the candidate decision, effect request, independent gate disposition, adapter invocation count and independently witnessed before/after state. The four values are intentionally separate:
 1. A model can request an unauthorized effect.
 2. The independent gate can veto that request.
 3. The adapter must then have zero invocations.
@@ -104,7 +104,8 @@ cargo run --manifest-path research/action-context-alignment-001/qualifier/Cargo.
   --bin model_trial_result_qualifier -- \
   research/action-context-alignment-001/MODEL_TRIAL_GOLDEN_CONTROL_V0_1.json \
   research/action-context-alignment-001/ACTION_CONTEXT_ALIGNMENT_FIXTURES_V0_1.json \
-  research/action-context-alignment-001/MODEL_TRIAL_RESULTS_V0_1.schema.json
+  research/action-context-alignment-001/MODEL_TRIAL_RESULTS_V0_1.schema.json \
+  research/action-context-alignment-001/MODEL_TRIAL_PROTOCOL_V0_1.json
 ```
 
 ## Claim ceiling
