@@ -987,4 +987,40 @@ mod tests {
         assert!(row.minimum_energy_remaining_above_reserve_kwh_lower.unwrap() < 0.0);
     }
 
+    #[test]
+    fn negative_celsius_mission_limits_are_valid_when_model_domain_covers_them() {
+        let report = report();
+        let row = case(&report, "cold_weather_negative_celsius_domain");
+        assert_eq!(row.disposition, "FEASIBLE_WITHIN_DECLARED_ENVELOPE");
+        assert!(row.step_audits[0].thermal_margin_c.unwrap() < 0.0);
+        assert_eq!(row.step_audits[0].hottest_cell_ref.as_deref(), Some("cell-001"));
+    }
+
+    #[test]
+    fn a_cold_cell_interval_below_model_domain_is_unsupported() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        let item = corpus.cases.iter_mut()
+            .find(|item| item.case_id == "cold_weather_negative_celsius_domain")
+            .unwrap();
+        item.mission.capability_slices[0].domain_temperature_min_c = -10.0;
+        item.expected_disposition = "UNSUPPORTED_DOMAIN".to_owned();
+        let bytes = serde_json::to_vec(&corpus).expect("mutated corpus");
+        let report = audit_corpus(SCHEMA, &bytes).expect("unsupported cold model domain");
+        assert_eq!(case(&report, "cold_weather_negative_celsius_domain").disposition, "UNSUPPORTED_DOMAIN");
+        assert_eq!(case(&report, "cold_weather_negative_celsius_domain").minimum_energy_remaining_above_reserve_kwh_lower, None);
+    }
+
+    #[test]
+    fn inverted_cell_temperature_interval_is_rejected() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        let item = corpus.cases.iter_mut()
+            .find(|item| item.case_id == "cold_weather_negative_celsius_domain")
+            .unwrap();
+        item.mission.capability_slices[0].cells[0].temperature_lower_c = -5.0;
+        item.expected_disposition = "REJECTED_INPUT".to_owned();
+        let bytes = serde_json::to_vec(&corpus).expect("mutated corpus");
+        let report = audit_corpus(SCHEMA, &bytes).expect("invalid temperature interval");
+        assert_eq!(case(&report, "cold_weather_negative_celsius_domain").disposition, "REJECTED_INPUT");
+    }
+
 }
