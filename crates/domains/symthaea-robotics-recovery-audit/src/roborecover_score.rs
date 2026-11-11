@@ -128,7 +128,20 @@ pub struct RoboRecoverTrial {
 /// with a task completed by the evaluated policy.
 pub fn classify_policy_completion(trial: &RoboRecoverTrial) -> PolicyCompletion {
     if trial.source_status == "replay_already_done" {
-        return PolicyCompletion::ReplayPreempted;
+        return match trial.platform {
+            BenchmarkPlatform::RoboTwin => match (
+                trial.inference_steps,
+                trial.source_terminal_success,
+            ) {
+                (0, Some(true)) => PolicyCompletion::ReplayPreempted,
+                (0, None) => PolicyCompletion::Unknown,
+                _ => PolicyCompletion::Contradictory,
+            },
+            BenchmarkPlatform::Libero if trial.inference_steps == 0 => {
+                PolicyCompletion::ReplayPreempted
+            }
+            BenchmarkPlatform::Libero => PolicyCompletion::Contradictory,
+        };
     }
 
     if trial.platform == BenchmarkPlatform::RoboTwin {
@@ -146,10 +159,14 @@ pub fn classify_policy_completion(trial: &RoboRecoverTrial) -> PolicyCompletion 
             ("infer_ok", _, Some(false)) => PolicyCompletion::Contradictory,
             ("infer_ok", _, None) => PolicyCompletion::Unknown,
             ("infer_ok", 0, Some(true)) => PolicyCompletion::ReplayPreempted,
-            ("infer_failed" | "max_infer_steps_reached" | "state_mismatch" | "eval_crash" | "replay_ok", _, Some(true)) => {
+            ("replay_ok", 0, Some(true)) => PolicyCompletion::ReplayPreempted,
+            ("replay_ok", 0, None) => PolicyCompletion::Unknown,
+            ("replay_ok", 0, Some(false)) => PolicyCompletion::NotCompleted,
+            ("replay_ok", _, _) => PolicyCompletion::Contradictory,
+            ("infer_failed" | "max_infer_steps_reached" | "state_mismatch" | "eval_crash", _, Some(true)) => {
                 PolicyCompletion::Contradictory
             }
-            ("infer_failed" | "max_infer_steps_reached" | "state_mismatch" | "eval_crash" | "replay_ok", _, _) => {
+            ("infer_failed" | "max_infer_steps_reached" | "state_mismatch" | "eval_crash", _, _) => {
                 PolicyCompletion::NotCompleted
             }
             (_, 0, Some(true)) => PolicyCompletion::ReplayPreempted,
@@ -1387,6 +1404,47 @@ mod tests {
         assert_eq!(report.accepted_trial_rows, 0);
         assert_eq!(report.metadata_mismatch_rows, 1);
         assert_eq!(report.policy_recovery_successes, 0);
+    }
+
+
+    #[test]
+    fn replay_already_done_with_inference_actions_is_contradictory() {
+        let mut trial = sample(
+            0,
+            0,
+            TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        trial.source_status = "replay_already_done".to_owned();
+        trial.inference_steps = 1;
+        trial.source_terminal_success = Some(true);
+
+        assert_eq!(
+            classify_policy_completion(&trial),
+            PolicyCompletion::Contradictory
+        );
+    }
+
+    #[test]
+    fn replay_only_status_is_not_credited_as_policy_success() {
+        let mut trial = sample(
+            0,
+            0,
+            TerminalOutcome::TaskCompleted,
+            SafetyEvidence::VerifiedCompliant,
+            super::super::InterventionKind::DirectPolicy,
+            super::super::WorldStateContinuity::Preserved,
+        );
+        trial.source_status = "replay_ok".to_owned();
+        trial.inference_steps = 0;
+        trial.source_terminal_success = Some(true);
+
+        assert_eq!(
+            classify_policy_completion(&trial),
+            PolicyCompletion::ReplayPreempted
+        );
     }
 
 }
