@@ -1540,5 +1540,99 @@
         ]
       }
     }
-  ]
+  ],
+  "split_manifest": {
+    "manifest_ref": "synthetic-ev-physical-holdout-manifest/0.1",
+    "frozen_at_ms": 1799999980000,
+    "assignments": [
+      {
+        "vehicle_ref": "vehicle-abstained_out_of_domain",
+        "pack_ref": "pack-abstained_out_of_domain",
+        "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "physical_group_ref": "pack-abstained_out_of_domain",
+        "partition": "TEST_BLIND"
+      },
+      {
+        "vehicle_ref": "vehicle-completed_but_measurement_failed",
+        "pack_ref": "pack-completed_but_measurement_failed",
+        "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "physical_group_ref": "pack-completed_but_measurement_failed",
+        "partition": "TEST_BLIND"
+      },
+      {
+        "vehicle_ref": "vehicle-false_feasible_reserve",
+        "pack_ref": "pack-false_feasible_reserve",
+        "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "physical_group_ref": "pack-false_feasible_reserve",
+        "partition": "TEST_BLIND"
+      },
+      {
+        "vehicle_ref": "vehicle-false_feasible_thermal",
+        "pack_ref": "pack-false_feasible_thermal",
+        "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "physical_group_ref": "pack-false_feasible_thermal",
+        "partition": "TEST_BLIND"
+      },
+      {
+        "vehicle_ref": "vehicle-false_infeasible",
+        "pack_ref": "pack-false_infeasible",
+        "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "physical_group_ref": "pack-false_infeasible",
+        "partition": "TEST_BLIND"
+      },
+      {
+        "vehicle_ref": "vehicle-feasible_correct",
+        "pack_ref": "pack-feasible_correct",
+        "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "physical_group_ref": "pack-feasible_correct",
+        "partition": "TEST_BLIND"
+      },
+      {
+        "vehicle_ref": "vehicle-incomplete_reference_measurements",
+        "pack_ref": "pack-incomplete_reference_measurements",
+        "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "physical_group_ref": "pack-incomplete_reference_measurements",
+        "partition": "TEST_BLIND"
+      },
+      {
+        "vehicle_ref": "vehicle-inconclusive_reference",
+        "pack_ref": "pack-inconclusive_reference",
+        "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "physical_group_ref": "pack-inconclusive_reference",
+        "partition": "TEST_BLIND"
+      },
+      {
+        "vehicle_ref": "vehicle-infeasible_correct",
+        "pack_ref": "pack-infeasible_correct",
+        "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "physical_group_ref": "pack-infeasible_correct",
+        "partition": "TEST_BLIND"
+      },
+      {
+        "vehicle_ref": "vehicle-non_battery_abort",
+        "pack_ref": "pack-non_battery_abort",
+        "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "physical_group_ref": "pack-non_battery_abort",
+        "partition": "TEST_BLIND"
+      },
+      {
+        "vehicle_ref": "vehicle-reference_asset_mismatch",
+        "pack_ref": "pack-reference_asset_mismatch",
+        "configuration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "topology_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "physical_group_ref": "pack-reference_asset_mismatch",
+        "partition": "TEST_BLIND"
+      }
+    ]
+  }
 }
