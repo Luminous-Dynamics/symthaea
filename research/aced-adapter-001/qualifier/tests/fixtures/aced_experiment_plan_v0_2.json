@@ -40,7 +40,13 @@
     "outcome_taxonomy": [
       "positive",
       "negative"
-    ]
+    ],
+    "primary_outcome": {
+      "variable": "primary_objective",
+      "scale": "continuous",
+      "estimand": "difference_in_means",
+      "unit": "standardized_objective_units"
+    }
   },
   "sample": {
     "planned_units": 126,
