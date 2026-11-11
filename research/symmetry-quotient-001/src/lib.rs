@@ -773,8 +773,21 @@ mod tests {
         assert_eq!(compiled, exhaustive_oracle(&action, problem.candidate_ids.len()));
         assert_eq!(receipt.orbit_count, 2);
         assert_eq!(receipt.witnessed_member_count, 4);
-        let lifted = lift_representative_solution(&problem, &action, &certificate, 0, QualificationBudgetV1::default()).unwrap();
-        assert_eq!(lifted.iter().map(|member| member.candidate_id.as_str()).collect::<Vec<_>>(), vec!["A0", "A1"]);
+        let lifted = lift_representative_solution(
+            &problem,
+            &action,
+            &certificate,
+            0,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            lifted
+                .iter()
+                .map(|member| member.candidate_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["A0", "A1"]
+        );
         assert_eq!(
             lift_representative_solution(&problem, &action, &certificate, 1, QualificationBudgetV1::default()),
             Err(QuotientErrorV1::RequestedCandidateIsNotRepresentative)
@@ -870,7 +883,8 @@ mod tests {
             },
             permutations: vec![vec![0, 1, 2]],
         };
-        let outcome = compile_quotient(&problem, &action, QualificationBudgetV1::default()).unwrap();
+        let outcome =
+            compile_quotient(&problem, &action, QualificationBudgetV1::default()).unwrap();
         let CompileOutcomeV1::Authorized(certificate) = outcome else {
             panic!("expected trivial quotient");
         };
@@ -917,7 +931,13 @@ mod tests {
         };
         assert_eq!(certificate.orbits.len(), 1);
         assert_eq!(certificate.orbits[0].members.len(), 3);
-        verify_certificate(&problem, &action, &certificate, QualificationBudgetV1::default()).unwrap();
+        verify_certificate(
+            &problem,
+            &action,
+            &certificate,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
     }
 
     #[test]
