@@ -275,7 +275,7 @@ fn split_manifest_sha256(manifest: &SplitManifest) -> Result<String, String> {
     Ok(sha256(&bytes))
 }
 
-fn validate_split_manifest(corpus: &Corpus) -> Result<BTreeMap<String, &SplitAssignment>, String> {
+fn validate_split_manifest(corpus: &Corpus) -> Result<BTreeMap<String, SplitAssignment>, String> {
     let manifest = &corpus.split_manifest;
     if !nonempty(&manifest.manifest_ref) || manifest.assignments.is_empty() {
         return Err("split manifest identity or assignment set is empty".to_owned());
@@ -297,7 +297,7 @@ fn validate_split_manifest(corpus: &Corpus) -> Result<BTreeMap<String, &SplitAss
             ));
         }
         if assignments
-            .insert(assignment.pack_ref.clone(), assignment)
+            .insert(assignment.pack_ref.clone(), assignment.clone())
             .is_some()
         {
             return Err(format!(
