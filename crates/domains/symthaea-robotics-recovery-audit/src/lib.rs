@@ -235,6 +235,7 @@ pub fn audit_trials(
     report.duplicate_trial_rows = observed_id_counts
         .values()
         .filter(|count| **count > 1)
+        .map(|count| *count)
         .sum();
 
     // Raw adverse-event markers remain visible even when a row is excluded
@@ -526,6 +527,23 @@ mod tests {
         assert_eq!(report.invalid_identity_rows, 2);
         assert_eq!(report.simulator_rewind_rows, 1);
         assert_eq!(report.safety_violation_rows, 1);
+    }
+
+
+    #[test]
+    fn duplicate_trial_row_count_sums_all_rows_in_duplicate_groups() {
+        let rows = vec![
+            valid_trial("duplicate-a"),
+            valid_trial("duplicate-a"),
+            valid_trial("duplicate-b"),
+            valid_trial("duplicate-b"),
+            valid_trial("unique"),
+        ];
+        let report = audit_trials(&rows, None);
+        assert_eq!(report.duplicate_trial_ids.len(), 2);
+        assert_eq!(report.duplicate_trial_rows, 4);
+        assert_eq!(report.invalid_identity_rows, 4);
+        assert_eq!(report.valid_confirmatory_rows, 1);
     }
 
 }
