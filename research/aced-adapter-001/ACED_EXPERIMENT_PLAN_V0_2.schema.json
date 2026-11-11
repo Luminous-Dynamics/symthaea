@@ -188,13 +188,13 @@
         },
         "alpha": {
           "type": "number",
-          "exclusiveMinimum": 0,
-          "maximum": 0.2
+          "maximum": 0.2,
+          "minimum": 0.000001
         },
         "target_power": {
           "type": "number",
-          "exclusiveMinimum": 0.5,
-          "exclusiveMaximum": 1
+          "minimum": 0.5,
+          "maximum": 0.999999
         },
         "power_method": {
           "const": "two_sided_equal_allocation_independent_means_normal_approximation"
