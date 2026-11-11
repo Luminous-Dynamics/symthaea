@@ -1,7 +1,7 @@
 # OLI integration in Symthaea: evidence and experiment semantics
 
-**Status:** Symthaea-side adapter / research integration; v0.1  
-**Canonical fixture contract:** [Symtropy OLI M0 validator](https://github.com/Luminous-Dynamics/symtropy/tree/research/oli-m0-validator-v1/tools/oli-m0-validator)  
+**Status:** Symthaea-side adapter / research integration; v0.2.0  
+**Canonical fixture contract:** [Symtropy OLI M0 validator PR #4428](https://github.com/Luminous-Dynamics/symtropy/pull/4428)  
 **Research contract:** [LIFE-SUBSTRATE-001](https://github.com/Luminous-Dynamics/symtropy/blob/research/life-substrate-001-v0/docs/research/LIFE-SUBSTRATE-001.md)  
 **Experiment selection:** [Symthaea #11446](https://github.com/Luminous-Dynamics/symthaea/issues/11446)  
 **Adversarial confidence surfaces:** [Symthaea #11451](https://github.com/Luminous-Dynamics/symthaea/issues/11451)
