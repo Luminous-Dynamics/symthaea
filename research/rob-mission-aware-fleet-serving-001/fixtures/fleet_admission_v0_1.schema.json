@@ -294,7 +294,8 @@
           "minimum": 0
         },
         "poma_upper_bound": {
-          "$ref": "#/$defs/nullable_number"
+          "$ref": "#/$defs/nullable_number",
+          "maximum": 1
         },
         "poma_limit": {
           "type": "number",
