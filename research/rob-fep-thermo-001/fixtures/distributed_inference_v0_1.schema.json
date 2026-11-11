@@ -22,8 +22,8 @@
     },
     "cases": {
       "type": "array",
-      "minItems": 22,
-      "maxItems": 22,
+      "minItems": 24,
+      "maxItems": 24,
       "uniqueItems": true,
       "allOf": [
         {
@@ -355,6 +355,36 @@
           },
           "minContains": 1,
           "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI23_PO_MA_AND_MISSED_ACTUATION_COST"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI24_HETEROGENEOUS_FLEET_SCHEDULER_MATRIX"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
         }
       ],
       "items": {
@@ -430,7 +460,14 @@
         "foreground_deadline_misses_managed",
         "llm_throughput_retained_pct",
         "memory_bandwidth_pressure_pct",
-        "safe_suspension_points_available"
+        "safe_suspension_points_available",
+        "actuation_opportunity_count",
+        "missed_actuation_count",
+        "missed_actuation_cost_loss_units",
+        "fleet_scheduler_arms",
+        "fleet_per_robot_starvation_reported",
+        "fleet_per_tier_throughput_reported",
+        "fleet_safety_by_robot_reported"
       ],
       "properties": {
         "placement": {
@@ -661,6 +698,48 @@
             "boolean",
             "null"
           ]
+        },
+        "actuation_opportunity_count": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "missed_actuation_count": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "missed_actuation_cost_loss_units": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "fleet_scheduler_arms": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "round_robin",
+              "edf",
+              "armory_lookahead",
+              "luminous_candidate"
+            ]
+          }
+        },
+        "fleet_per_robot_starvation_reported": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "fleet_per_tier_throughput_reported": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "fleet_safety_by_robot_reported": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "allOf": [
@@ -757,7 +836,9 @@
         "whole_system_energy_claim",
         "actuation_aoi_gate",
         "decision_value_gate",
-        "foreground_deadline_gate"
+        "foreground_deadline_gate",
+        "poma_point_estimate",
+        "fleet_scheduler_matrix_gate"
       ],
       "properties": {
         "disposition": {
@@ -780,7 +861,9 @@
             "fleet_priority_admission_preserves_critical_deadline",
             "actuation_aoi_reject",
             "zero_evsi_no_update",
-            "foreground_deadlines_prioritized"
+            "foreground_deadlines_prioritized",
+            "poma_scored_with_miss_cost",
+            "fleet_baselines_matched_no_ranking_claim"
           ]
         },
         "selected_placement": {
@@ -791,7 +874,8 @@
             "edge_but_no_system_energy_claim",
             "local_or_abstain",
             "none",
-            "onboard_managed"
+            "onboard_managed",
+            "hybrid"
           ]
         },
         "fallback_required": {
@@ -829,6 +913,15 @@
           "enum": [
             "pass",
             "fail",
+            "not_evaluated"
+          ]
+        },
+        "poma_point_estimate": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "fleet_scheduler_matrix_gate": {
+          "enum": [
+            "complete",
             "not_evaluated"
           ]
         }
