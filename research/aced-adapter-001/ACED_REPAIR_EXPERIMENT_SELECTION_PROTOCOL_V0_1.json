@@ -356,5 +356,90 @@
       "Does not solve sequential multi-stage planning or general POMDPs.",
       "Synthetic module tests are not ACED results."
     ]
+  },
+  "query_track_extension": {
+    "status": "metadata_inventory_qualified_protocol_defined_no_query_model_trial",
+    "source_manifest": "ACED_QUERY_SOURCE_MANIFEST_V0_1.json",
+    "inventory": "upstream/aced_query_world_inventory.json",
+    "official_tracks": {
+      "core_struct": {
+        "worlds": 10,
+        "questions": 60
+      },
+      "core_decision": {
+        "worlds": 60,
+        "questions": 60
+      },
+      "guess_struct": {
+        "worlds": 30,
+        "questions": 180
+      },
+      "guess_decision": {
+        "worlds": 48,
+        "questions": 48
+      }
+    },
+    "official_candidate_arms": [
+      "active",
+      "active_code",
+      "modular"
+    ],
+    "official_comparator": "guess_only",
+    "official_budget": {
+      "outer_turns": 4,
+      "active_code_inner_rounds": 8,
+      "modular_code_rounds": 5
+    },
+    "official_score_preservation": {
+      "structural": [
+        "overall_accuracy",
+        "set_question_precision_recall_f1",
+        "by_category",
+        "by_question_type",
+        "by_difficulty",
+        "by_n_nodes"
+      ],
+      "decision": [
+        "overall_accuracy",
+        "by_archetype",
+        "by_sub_variant",
+        "safety_constraint_pass",
+        "subgroup_min_improvement",
+        "invalid_premise_judgment_and_alternative_quality"
+      ]
+    },
+    "evaluator_parser_sensitivity": {
+      "concern": "The official structural and decision evaluators use an LLM AnswerExtractor to map verbose output into answer types or JSON. Parser variance must not be conflated with agent reasoning quality.",
+      "requirements": [
+        "Pin the extraction-model ID/revision, prompt, temperature, output budget and provider for official reproduction.",
+        "Store the candidate raw answer and the extracted structured answer separately with independent digests.",
+        "For a strict-JSON diagnostic arm, use a deterministic schema parser and report parse failures separately; do not change the official score.",
+        "Re-score a stratified blinded sample with an independent parser/human adjudicator; report disagreement and adjudicator uncertainty.",
+        "Keep evaluator-only world and gold fields outside candidate context."
+      ]
+    },
+    "measurement_validity_diagnostic": {
+      "module": "qualifier/src/categorical_shift.rs",
+      "status": "implemented_reference_module_synthetic_tests_not_model_trial",
+      "method": "Wilson score intervals for each categorical proportion plus Newcombe score interval for the intervention-minus-reference proportion difference; total-variation distance is reported separately.",
+      "controls": [
+        "Equal absolute shifts at small and large sample sizes must produce different interval widths.",
+        "Use a preregistered familywise critical z value and preserve all variable/category comparisons.",
+        "Keep minimum practical effect size separate from interval exclusion of zero.",
+        "Do not call distribution shift causal without a valid randomized or otherwise identified intervention contrast.",
+        "For repeated/adaptive looks, use a sequentially valid method rather than reusing a fixed-look critical value."
+      ],
+      "claim_ceiling": "A shift diagnostic reports categorical sample differences and model-based intervals. It does not prove causal effects, intervention randomization or agent competence."
+    },
+    "split_and_analysis": {
+      "track_entries": 148,
+      "unique_payloads": 138,
+      "exact_structural_core_guess_overlap": 10,
+      "exact_decision_core_guess_overlap": 0,
+      "decision_basename_collisions_with_different_payloads": 2,
+      "analysis_unit": "Unique content-addressed world identity. Keep full track path and task identity; never infer content identity from filename alone.",
+      "reporting": "Report each official track separately and cluster paired uncertainty by content-addressed world. The 10 exact structural payload repeats must not count as independent worlds across core and guess tracks."
+    },
+    "claim_ceiling": "No Query agent trial or Query SOTA claim is made by this protocol or metadata inventory. This extension defines a controlled future comparison only."
   }
 }
