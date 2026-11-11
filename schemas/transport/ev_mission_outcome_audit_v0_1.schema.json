@@ -111,6 +111,10 @@
         "sensor_ref",
         "calibration_ref",
         "calibration_sha256",
+        "measured_at_ms",
+        "sensor_ref",
+        "calibration_ref",
+        "calibration_sha256",
         "measured_at_ms"
       ],
       "properties": {
@@ -173,6 +177,13 @@
         "evaluator_version",
         "disposition",
         "required_measurements",
+        "model_artifact_ref",
+        "model_artifact_sha256",
+        "split_manifest_ref",
+        "split_manifest_sha256",
+        "evaluation_partition",
+        "split_frozen_at_ms",
+        "prediction_frozen_at_ms",
         "model_artifact_ref",
         "model_artifact_sha256",
         "split_manifest_ref",
@@ -268,7 +279,8 @@
         "outcome",
         "outcome_reason",
         "observed_at_ms",
-        "measurements"
+        "measurements",
+        "admission"
       ],
       "properties": {
         "asset": {
@@ -325,6 +337,31 @@
           "items": {
             "$ref": "#/$defs/observation"
           }
+        },
+        "admission": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "authority_ref",
+                "signature_hex"
+              ],
+              "properties": {
+                "authority_ref": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "signature_hex": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{128}$"
+                }
+              }
+            }
+          ]
         }
       }
     },
