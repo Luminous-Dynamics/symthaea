@@ -33,6 +33,9 @@ pub enum AudioClockAlignmentStatusV1 {
     InsufficientOnsetDiversity,
     /// The WAV does not contain enough of the expected onset sequence to estimate one global offset.
     InsufficientAudioCoverage,
+    /// The strongest peak is at the edge of the configured search range.
+    /// The search may have been clipped; no offset is promoted.
+    SearchBoundaryCandidate,
     /// No positive onset evidence was measured in the WAV.
     NoPositiveEvidence,
 }
@@ -90,6 +93,8 @@ pub struct AudioClockAlignmentProfileV1 {
     pub note_event_count: u32,
     pub unique_expected_onset_count: u32,
     pub matched_expected_onset_count: u32,
+    /// Best diagnostic lag even when the estimator abstains, e.g. at a search boundary.
+    pub best_candidate_offset_frames: Option<i64>,
     /// Positive means the corresponding MIDI event is observed later in WAV time.
     /// This combines file origin/pre-roll and average renderer/detector attack delay.
     pub audio_minus_midi_offset_frames: Option<i64>,
@@ -118,6 +123,9 @@ pub enum AudioClockAlignmentIssueV1 {
     InvalidConfig {
         field: String,
     },
+    InvalidProfile {
+        field: String,
+    },
     TooFewAudioFrames,
     SerializationFailed,
 }
@@ -136,6 +144,7 @@ struct AudioClockAlignmentCommitmentV1<'a> {
     note_event_count: u32,
     unique_expected_onset_count: u32,
     matched_expected_onset_count: u32,
+    best_candidate_offset_frames: Option<i64>,
     audio_minus_midi_offset_frames: Option<i64>,
     audio_minus_midi_offset_ms: Option<f64>,
     best_peak_score: Option<f64>,
@@ -170,6 +179,7 @@ fn alignment_commitment(
         note_event_count: profile.note_event_count,
         unique_expected_onset_count: profile.unique_expected_onset_count,
         matched_expected_onset_count: profile.matched_expected_onset_count,
+        best_candidate_offset_frames: profile.best_candidate_offset_frames,
         audio_minus_midi_offset_frames: profile.audio_minus_midi_offset_frames,
         audio_minus_midi_offset_ms: profile.audio_minus_midi_offset_ms,
         best_peak_score: profile.best_peak_score,
@@ -396,6 +406,7 @@ fn profile_with_no_estimate(
     status: AudioClockAlignmentStatusV1,
     unique_onsets: &[u64],
     matched_onset_count: u32,
+    best_candidate_offset_frames: Option<i64>,
     best_peak_score: Option<f64>,
 ) -> Result<AudioClockAlignmentProfileV1, AudioClockAlignmentIssueV1> {
     let mut profile = AudioClockAlignmentProfileV1 {
@@ -411,6 +422,7 @@ fn profile_with_no_estimate(
         note_event_count: u32::try_from(midi.manifest.notes.len()).unwrap_or(u32::MAX),
         unique_expected_onset_count: u32::try_from(unique_onsets.len()).unwrap_or(u32::MAX),
         matched_expected_onset_count: matched_onset_count,
+        best_candidate_offset_frames,
         audio_minus_midi_offset_frames: None,
         audio_minus_midi_offset_ms: None,
         best_peak_score,
@@ -471,6 +483,7 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
             AudioClockAlignmentStatusV1::InsufficientOnsetDiversity,
             &expected_onsets,
             0,
+            None,
             None,
         )
         .map_err(|issue| vec![issue]);
@@ -548,6 +561,7 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
             AudioClockAlignmentStatusV1::InsufficientAudioCoverage,
             &expected_onsets,
             u32::try_from(matched_counts[best_index]).unwrap_or(u32::MAX),
+            Some(lags[best_index]),
             Some(scores[best_index]),
         )
         .map_err(|issue| vec![issue]);
@@ -562,6 +576,21 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
             AudioClockAlignmentStatusV1::NoPositiveEvidence,
             &expected_onsets,
             u32::try_from(matched_counts[best_index]).unwrap_or(u32::MAX),
+            Some(best_score),
+        )
+        .map_err(|issue| vec![issue]);
+    }
+    let best_is_search_boundary = best_index == 0 || best_index + 1 == scores.len();
+    if best_is_search_boundary {
+        return profile_with_no_estimate(
+            midi,
+            wav_bytes,
+            wav.info,
+            config,
+            AudioClockAlignmentStatusV1::SearchBoundaryCandidate,
+            &expected_onsets,
+            u32::try_from(matched_counts[best_index]).unwrap_or(u32::MAX),
+            Some(lags[best_index]),
             Some(best_score),
         )
         .map_err(|issue| vec![issue]);
@@ -621,6 +650,7 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
         note_event_count: u32::try_from(midi.manifest.notes.len()).unwrap_or(u32::MAX),
         unique_expected_onset_count: u32::try_from(expected_onsets.len()).unwrap_or(u32::MAX),
         matched_expected_onset_count: u32::try_from(matched_counts[best_index]).unwrap_or(u32::MAX),
+        best_candidate_offset_frames: Some(refined_offset),
         audio_minus_midi_offset_frames: Some(refined_offset),
         audio_minus_midi_offset_ms: Some(
             refined_offset as f64 * 1_000.0 / f64::from(sample_rate_hz),
@@ -651,15 +681,21 @@ pub fn validate_audio_clock_alignment_profile_v1(
         });
     }
     let wav = decode_wav(wav_bytes);
-    match &wav {
-        Ok(decoded) if decoded.info == profile.wav_info => {}
-        Ok(_) => issues.push(AudioClockAlignmentIssueV1::WavInvalid {
-            issue: AudioEventObservationIssueV1::ReceiptInputBindingMismatch,
-        }),
-        Err(issue) => issues.push(AudioClockAlignmentIssueV1::WavInvalid {
-            issue: issue.clone(),
-        }),
-    }
+    let wav_info = match &wav {
+        Ok(decoded) if decoded.info == profile.wav_info => Some(&decoded.info),
+        Ok(_) => {
+            issues.push(AudioClockAlignmentIssueV1::WavInvalid {
+                issue: AudioEventObservationIssueV1::ReceiptInputBindingMismatch,
+            });
+            None
+        }
+        Err(issue) => {
+            issues.push(AudioClockAlignmentIssueV1::WavInvalid {
+                issue: issue.clone(),
+            });
+            None
+        }
+    };
     if profile.schema != AUDIO_CLOCK_ALIGNMENT_SCHEMA_V1
         || profile.algorithm != AUDIO_CLOCK_ALIGNMENT_ALGORITHM_V1
         || profile.source_score_sha256 != midi.manifest.score_sha256
@@ -669,6 +705,133 @@ pub fn validate_audio_clock_alignment_profile_v1(
     {
         issues.push(AudioClockAlignmentIssueV1::SerializationFailed);
     }
+    if validate_config(&profile.config).is_err() {
+        issues.push(AudioClockAlignmentIssueV1::InvalidProfile {
+            field: "config".into(),
+        });
+    }
+
+    let expected_unique_onsets = wav_info.map(|info| {
+        midi.manifest
+            .notes
+            .iter()
+            .filter_map(|note| expected_frame(
+                note.start_tick,
+                midi.manifest.tempo_microseconds_per_quarter,
+                midi.manifest.ticks_per_quarter,
+                info.sample_rate_hz,
+            ))
+            .collect::<BTreeSet<_>>()
+            .len()
+    });
+    if profile.note_event_count as usize != midi.manifest.notes.len()
+        || expected_unique_onsets.is_some_and(|count| {
+            count != profile.unique_expected_onset_count as usize
+        })
+        || profile.matched_expected_onset_count > profile.unique_expected_onset_count
+    {
+        issues.push(AudioClockAlignmentIssueV1::InvalidProfile {
+            field: "event_counts".into(),
+        });
+    }
+
+    let finite_nonnegative = |value: Option<f64>| {
+        value.is_none_or(|value| value.is_finite() && value >= 0.0)
+    };
+    let has_accepted_offset = profile.audio_minus_midi_offset_frames.is_some()
+        && profile.audio_minus_midi_offset_ms.is_some();
+    let candidate_diagnostics_valid = profile.best_candidate_offset_frames.is_some()
+        && profile.best_peak_score.is_some_and(|value| value.is_finite() && value > 1e-12)
+        && finite_nonnegative(profile.competing_peak_score)
+        && finite_nonnegative(profile.peak_margin)
+        && finite_nonnegative(profile.competing_peak_ratio)
+        && profile.support_start_frames.is_some()
+        && profile.support_end_frames.is_some()
+        && profile.support_start_frames <= profile.support_end_frames
+        && profile.matched_expected_onset_count >= u32::from(profile.config.minimum_unique_onsets);
+
+    match profile.status {
+        AudioClockAlignmentStatusV1::Candidate
+        | AudioClockAlignmentStatusV1::AmbiguousCandidate => {
+            if !has_accepted_offset
+                || !candidate_diagnostics_valid
+                || profile.best_candidate_offset_frames != profile.audio_minus_midi_offset_frames
+                || profile.audio_minus_midi_offset_ms.is_some_and(|milliseconds| {
+                    !milliseconds.is_finite()
+                        || wav_info.is_none_or(|info| {
+                            (milliseconds
+                                - profile.audio_minus_midi_offset_frames.unwrap_or_default() as f64
+                                    * 1_000.0
+                                    / f64::from(info.sample_rate_hz))
+                                .abs()
+                                > 1e-9
+                        })
+                })
+            {
+                issues.push(AudioClockAlignmentIssueV1::InvalidProfile {
+                    field: "accepted_candidate".into(),
+                });
+            }
+        }
+        AudioClockAlignmentStatusV1::SearchBoundaryCandidate => {
+            if has_accepted_offset
+                || profile.best_candidate_offset_frames.is_none()
+                || !candidate_diagnostics_valid
+            {
+                issues.push(AudioClockAlignmentIssueV1::InvalidProfile {
+                    field: "search_boundary_candidate".into(),
+                });
+            }
+        }
+        AudioClockAlignmentStatusV1::InsufficientOnsetDiversity => {
+            if has_accepted_offset
+                || profile.unique_expected_onset_count >= u32::from(profile.config.minimum_unique_onsets)
+            {
+                issues.push(AudioClockAlignmentIssueV1::InvalidProfile {
+                    field: "insufficient_onset_diversity".into(),
+                });
+            }
+        }
+        AudioClockAlignmentStatusV1::InsufficientAudioCoverage => {
+            if has_accepted_offset
+                || profile.matched_expected_onset_count >= u32::from(profile.config.minimum_unique_onsets)
+                || profile.best_candidate_offset_frames.is_none()
+                || !finite_nonnegative(profile.best_peak_score)
+            {
+                issues.push(AudioClockAlignmentIssueV1::InvalidProfile {
+                    field: "insufficient_audio_coverage".into(),
+                });
+            }
+        }
+        AudioClockAlignmentStatusV1::NoPositiveEvidence => {
+            if has_accepted_offset
+                || profile.best_peak_score.is_none_or(|value| !value.is_finite() || value <= 1e-12)
+            {
+                issues.push(AudioClockAlignmentIssueV1::InvalidProfile {
+                    field: "no_positive_evidence".into(),
+                });
+            }
+        }
+    }
+
+    if let (Some(start), Some(end), Some(info)) = (
+        profile.support_start_frames,
+        profile.support_end_frames,
+        wav_info,
+    ) {
+        let min_frames = i64::from(profile.config.minimum_offset_ms)
+            .saturating_mul(i64::from(info.sample_rate_hz))
+            / 1_000;
+        let max_frames = i64::from(profile.config.maximum_offset_ms)
+            .saturating_mul(i64::from(info.sample_rate_hz))
+            / 1_000;
+        if start > end || start < min_frames || end > max_frames {
+            issues.push(AudioClockAlignmentIssueV1::InvalidProfile {
+                field: "support_range".into(),
+            });
+        }
+    }
+
     match alignment_commitment(profile) {
         Ok(actual) if actual == profile.profile_sha256 => {}
         _ => issues.push(AudioClockAlignmentIssueV1::SerializationFailed),
