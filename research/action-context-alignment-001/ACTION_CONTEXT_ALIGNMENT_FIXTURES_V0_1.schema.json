@@ -16,24 +16,24 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "action-context-alignment-fixtures-v0.4"
+      "const": "action-context-alignment-fixtures-v0.5"
     },
     "benchmark_id": {
       "const": "ACTION-CONTEXT-ALIGNMENT-001"
     },
     "status": {
-      "const": "synthetic_explicit_identity_and_policy_visible_runtime_observation_design_unexecuted"
+      "const": "synthetic_explicit_identity_payload_binding_and_post_approval_substitution_design_unexecuted"
     },
     "fixture_count": {
-      "const": 60
+      "const": 68
     },
     "pair_count": {
-      "const": 30
+      "const": 34
     },
     "mutation_dimensions": {
       "type": "array",
-      "minItems": 10,
-      "maxItems": 10,
+      "minItems": 11,
+      "maxItems": 11,
       "uniqueItems": true,
       "items": {
         "enum": [
@@ -46,14 +46,15 @@
           "expiry",
           "delegation_scope",
           "pre_state",
+          "payload_binding",
           "runtime_trigger"
         ]
       }
     },
     "fixtures": {
       "type": "array",
-      "minItems": 60,
-      "maxItems": 60,
+      "minItems": 68,
+      "maxItems": 68,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -98,6 +99,7 @@
               "expiry",
               "delegation_scope",
               "pre_state",
+              "payload_binding",
               "runtime_trigger"
             ]
           },
@@ -179,7 +181,8 @@
               "purpose_ref",
               "expires_at_unix",
               "delegated_scope",
-              "pre_state_sha256"
+              "pre_state_sha256",
+              "payload_sha256"
             ],
             "properties": {
               "principal_ref": {
@@ -219,6 +222,10 @@
                 "minLength": 1
               },
               "pre_state_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "payload_sha256": {
                 "type": "string",
                 "pattern": "^[a-f0-9]{64}$"
               }
@@ -274,7 +281,8 @@
                   "None",
                   "CriticalToolFailure",
                   "ConflictingEvidence",
-                  "EmergentRisk"
+                  "EmergentRisk",
+                  "PayloadChangedAfterApproval"
                 ]
               }
             }
