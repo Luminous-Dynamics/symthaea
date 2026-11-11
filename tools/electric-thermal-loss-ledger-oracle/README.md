@@ -18,7 +18,7 @@ Categories:
 - upstream distribution loss, where not already included in the downstream load readings;
 - battery-terminal total, when only the battery-terminal meter reading is available.
 
-A battery-terminal-total reading is exclusive: it cannot be added to any downstream branch loads. This prevents summing the battery total and its own consumers twice. When branch readings are used, each physical meter boundary must occur once. Total terminal power and energy are the sum of the supplied non-overlapping readings.
+A battery-terminal-total reading is exclusive: it cannot be added to any downstream branch loads. This prevents summing the battery total and its own consumers twice. When branch readings are used, each physical meter boundary must occur once. Total terminal power and energy are the sum of the supplied non-overlapping readings. Category subtotals are optional: a category with no meter is unknown, not zero. When only a battery-terminal-total meter is supplied, all branch category subtotals are unknown.
 
 Thermal-management electrical consumption remains a separate mission load. It is not automatically emitted as battery heat or component heat.
 
@@ -53,3 +53,8 @@ cargo clippy --locked --manifest-path tools/electric-thermal-loss-ledger-oracle/
 ```
 
 All included fixtures are synthetic. A passing ledger test proves only the declared accounting and identity semantics. It does not validate physical heat partition, component temperatures, cooling performance, battery safety, aircraft mission feasibility or airworthiness.
+
+
+## Unknown versus measured zero (v0.2)
+
+The electrical report carries an explicit metering mode. When only a battery-terminal-total reading exists, propulsion/TMS/auxiliary/distribution subtotals are `None`, not zero. In branch mode, a category with no supplied meter is also `None`; a physical zero is only reported as `Some(0.0)` when an identified meter explicitly reports zero. This prevents missing submeter evidence from being misrepresented as zero consumption.
