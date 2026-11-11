@@ -1,0 +1,651 @@
+{
+  "corpus_version": "ev-dynamic-diagnostic-corpus/0.1",
+  "problems": [
+    {
+      "problem_id": "long-test-crosses-service-threshold",
+      "loss_unit": "synthetic_decision_loss",
+      "states": [
+        "healthy",
+        "degraded"
+      ],
+      "actions": [
+        {
+          "action_id": "continue_monitoring",
+          "loss_by_state": [
+            0,
+            10
+          ]
+        },
+        {
+          "action_id": "qualified_service",
+          "loss_by_state": [
+            3,
+            3
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "test_id": "long-test",
+          "outcomes": [
+            "healthy_readout",
+            "degraded_readout"
+          ],
+          "duration_seconds": 600,
+          "protocol_ref": "synthetic-protocol:long-test",
+          "equipment_ref": "synthetic-equipment:long-test",
+          "calibration_evidence_ref": "synthetic-calibration:long-test",
+          "requires_prior_outcome_from": null,
+          "available_after_outcomes": [],
+          "test_cost": 0.1,
+          "downtime_cost": 0.1,
+          "safety_approved": true,
+          "calibration_valid": true,
+          "supported_domain": true,
+          "equipment_available": true
+        },
+        {
+          "test_id": "unsafe-high-information-scan",
+          "outcomes": [
+            "healthy_readout",
+            "degraded_readout"
+          ],
+          "duration_seconds": 15,
+          "protocol_ref": "synthetic-protocol:unsafe-high-information-scan",
+          "equipment_ref": "synthetic-equipment:unsafe-high-information-scan",
+          "calibration_evidence_ref": "synthetic-calibration:unsafe-high-information-scan",
+          "requires_prior_outcome_from": null,
+          "available_after_outcomes": [],
+          "test_cost": 0.01,
+          "downtime_cost": 0,
+          "safety_approved": false,
+          "calibration_valid": true,
+          "supported_domain": true,
+          "equipment_available": true
+        }
+      ],
+      "worlds": [
+        {
+          "model_id": "drift-world",
+          "model_version": "synthetic-known-truth/1",
+          "model_evidence_ref": "synthetic-model-receipt:drift-world",
+          "model_evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "domain_ref": "synthetic-two-state-domain/0.1",
+          "source_class": "SYNTHETIC_KNOWN_TRUTH",
+          "likelihood_assumption": "CONDITIONAL_INDEPENDENT_GIVEN_POST_STATE",
+          "shared_nuisance_factors": [],
+          "prior": [
+            0.5,
+            0.5
+          ],
+          "test_models": [
+            {
+              "test_id": "long-test",
+              "transition_duration_seconds": 600,
+              "time_transition": [
+                [
+                  0,
+                  1
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "perturbation_transition": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "observation_by_post_state": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ]
+            },
+            {
+              "test_id": "unsafe-high-information-scan",
+              "transition_duration_seconds": 15,
+              "time_transition": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "perturbation_transition": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "observation_by_post_state": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "problem_id": "pulse-perturbs-state",
+      "loss_unit": "synthetic_decision_loss",
+      "states": [
+        "healthy",
+        "degraded"
+      ],
+      "actions": [
+        {
+          "action_id": "continue_monitoring",
+          "loss_by_state": [
+            0,
+            10
+          ]
+        },
+        {
+          "action_id": "qualified_service",
+          "loss_by_state": [
+            3,
+            3
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "test_id": "diagnostic-pulse",
+          "outcomes": [
+            "low_response",
+            "high_response"
+          ],
+          "duration_seconds": 20,
+          "protocol_ref": "synthetic-protocol:diagnostic-pulse",
+          "equipment_ref": "synthetic-equipment:diagnostic-pulse",
+          "calibration_evidence_ref": "synthetic-calibration:diagnostic-pulse",
+          "requires_prior_outcome_from": null,
+          "available_after_outcomes": [],
+          "test_cost": 0.1,
+          "downtime_cost": 0.05,
+          "safety_approved": true,
+          "calibration_valid": true,
+          "supported_domain": true,
+          "equipment_available": true
+        }
+      ],
+      "worlds": [
+        {
+          "model_id": "pulse-world",
+          "model_version": "synthetic-known-truth/1",
+          "model_evidence_ref": "synthetic-model-receipt:pulse-world",
+          "model_evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "domain_ref": "synthetic-two-state-domain/0.1",
+          "source_class": "SYNTHETIC_KNOWN_TRUTH",
+          "likelihood_assumption": "CONDITIONAL_INDEPENDENT_GIVEN_POST_STATE",
+          "shared_nuisance_factors": [],
+          "prior": [
+            0.5,
+            0.5
+          ],
+          "test_models": [
+            {
+              "test_id": "diagnostic-pulse",
+              "transition_duration_seconds": 20,
+              "time_transition": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "perturbation_transition": [
+                [
+                  0,
+                  1
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "observation_by_post_state": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "problem_id": "likelihood-ambiguity",
+      "loss_unit": "synthetic_decision_loss",
+      "states": [
+        "healthy",
+        "degraded"
+      ],
+      "actions": [
+        {
+          "action_id": "continue_monitoring",
+          "loss_by_state": [
+            0,
+            10
+          ]
+        },
+        {
+          "action_id": "qualified_service",
+          "loss_by_state": [
+            3,
+            3
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "test_id": "screen",
+          "outcomes": [
+            "healthy_signal",
+            "degraded_signal"
+          ],
+          "duration_seconds": 2,
+          "protocol_ref": "synthetic-protocol:screen",
+          "equipment_ref": "synthetic-equipment:screen",
+          "calibration_evidence_ref": "synthetic-calibration:screen",
+          "requires_prior_outcome_from": null,
+          "available_after_outcomes": [],
+          "test_cost": 0.1,
+          "downtime_cost": 0,
+          "safety_approved": true,
+          "calibration_valid": true,
+          "supported_domain": true,
+          "equipment_available": true
+        }
+      ],
+      "worlds": [
+        {
+          "model_id": "nominal",
+          "model_version": "synthetic-known-truth/1",
+          "model_evidence_ref": "synthetic-model-receipt:nominal",
+          "model_evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "domain_ref": "synthetic-two-state-domain/0.1",
+          "source_class": "SYNTHETIC_KNOWN_TRUTH",
+          "likelihood_assumption": "CONDITIONAL_INDEPENDENT_GIVEN_POST_STATE",
+          "shared_nuisance_factors": [],
+          "prior": [
+            0.5,
+            0.5
+          ],
+          "test_models": [
+            {
+              "test_id": "screen",
+              "transition_duration_seconds": 2,
+              "time_transition": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "perturbation_transition": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "observation_by_post_state": [
+                [
+                  0.95,
+                  0.05
+                ],
+                [
+                  0.05,
+                  0.95
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "model_id": "weak",
+          "model_version": "synthetic-known-truth/1",
+          "model_evidence_ref": "synthetic-model-receipt:weak",
+          "model_evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "domain_ref": "synthetic-two-state-domain/0.1",
+          "source_class": "SYNTHETIC_KNOWN_TRUTH",
+          "likelihood_assumption": "CONDITIONAL_INDEPENDENT_GIVEN_POST_STATE",
+          "shared_nuisance_factors": [],
+          "prior": [
+            0.5,
+            0.5
+          ],
+          "test_models": [
+            {
+              "test_id": "screen",
+              "transition_duration_seconds": 2,
+              "time_transition": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "perturbation_transition": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "observation_by_post_state": [
+                [
+                  0.5,
+                  0.5
+                ],
+                [
+                  0.5,
+                  0.5
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "problem_id": "timeout-is-observed",
+      "loss_unit": "synthetic_decision_loss",
+      "states": [
+        "healthy",
+        "degraded"
+      ],
+      "actions": [
+        {
+          "action_id": "continue_monitoring",
+          "loss_by_state": [
+            0,
+            10
+          ]
+        },
+        {
+          "action_id": "qualified_service",
+          "loss_by_state": [
+            3,
+            3
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "test_id": "timeout-capable-inspection",
+          "outcomes": [
+            "diagnostic_ok",
+            "timeout"
+          ],
+          "duration_seconds": 5,
+          "protocol_ref": "synthetic-protocol:timeout-capable-inspection",
+          "equipment_ref": "synthetic-equipment:timeout-capable-inspection",
+          "calibration_evidence_ref": "synthetic-calibration:timeout-capable-inspection",
+          "requires_prior_outcome_from": null,
+          "available_after_outcomes": [],
+          "test_cost": 0.1,
+          "downtime_cost": 0.05,
+          "safety_approved": true,
+          "calibration_valid": true,
+          "supported_domain": true,
+          "equipment_available": true
+        }
+      ],
+      "worlds": [
+        {
+          "model_id": "timeout-world",
+          "model_version": "synthetic-known-truth/1",
+          "model_evidence_ref": "synthetic-model-receipt:timeout-world",
+          "model_evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "domain_ref": "synthetic-two-state-domain/0.1",
+          "source_class": "SYNTHETIC_KNOWN_TRUTH",
+          "likelihood_assumption": "CONDITIONAL_INDEPENDENT_GIVEN_POST_STATE",
+          "shared_nuisance_factors": [],
+          "prior": [
+            0.5,
+            0.5
+          ],
+          "test_models": [
+            {
+              "test_id": "timeout-capable-inspection",
+              "transition_duration_seconds": 5,
+              "time_transition": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "perturbation_transition": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "observation_by_post_state": [
+                [
+                  0.8,
+                  0.2
+                ],
+                [
+                  0.1,
+                  0.9
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "problem_id": "conditional-followup-after-flag",
+      "loss_unit": "synthetic_decision_loss",
+      "states": [
+        "healthy",
+        "degraded"
+      ],
+      "actions": [
+        {
+          "action_id": "continue_monitoring",
+          "loss_by_state": [
+            0,
+            10
+          ]
+        },
+        {
+          "action_id": "qualified_service",
+          "loss_by_state": [
+            3,
+            3
+          ]
+        }
+      ],
+      "tests": [
+        {
+          "test_id": "initial-screen",
+          "outcomes": [
+            "normal",
+            "flagged"
+          ],
+          "duration_seconds": 5,
+          "protocol_ref": "synthetic-protocol:initial-screen",
+          "equipment_ref": "synthetic-equipment:initial-screen",
+          "calibration_evidence_ref": "synthetic-calibration:initial-screen",
+          "requires_prior_outcome_from": null,
+          "available_after_outcomes": [],
+          "test_cost": 0.05,
+          "downtime_cost": 0,
+          "safety_approved": true,
+          "calibration_valid": true,
+          "supported_domain": true,
+          "equipment_available": true
+        },
+        {
+          "test_id": "followup-reference-test",
+          "outcomes": [
+            "within_limit",
+            "below_limit",
+            "timeout"
+          ],
+          "duration_seconds": 60,
+          "protocol_ref": "synthetic-protocol:followup-reference-test",
+          "equipment_ref": "synthetic-equipment:followup-reference-test",
+          "calibration_evidence_ref": "synthetic-calibration:followup-reference-test",
+          "requires_prior_outcome_from": "initial-screen",
+          "available_after_outcomes": [
+            "flagged"
+          ],
+          "test_cost": 0.2,
+          "downtime_cost": 0.1,
+          "safety_approved": true,
+          "calibration_valid": true,
+          "supported_domain": true,
+          "equipment_available": true
+        }
+      ],
+      "worlds": [
+        {
+          "model_id": "conditional-world",
+          "model_version": "synthetic-known-truth/1",
+          "model_evidence_ref": "synthetic-model-receipt:conditional-world",
+          "model_evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "domain_ref": "synthetic-two-state-domain/0.1",
+          "source_class": "SYNTHETIC_KNOWN_TRUTH",
+          "likelihood_assumption": "CONDITIONAL_INDEPENDENT_GIVEN_POST_STATE",
+          "shared_nuisance_factors": [],
+          "prior": [
+            0.5,
+            0.5
+          ],
+          "test_models": [
+            {
+              "test_id": "initial-screen",
+              "transition_duration_seconds": 5,
+              "time_transition": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "perturbation_transition": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "observation_by_post_state": [
+                [
+                  0.55,
+                  0.45
+                ],
+                [
+                  0.45,
+                  0.55
+                ]
+              ]
+            },
+            {
+              "test_id": "followup-reference-test",
+              "transition_duration_seconds": 60,
+              "time_transition": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "perturbation_transition": [
+                [
+                  1,
+                  0
+                ],
+                [
+                  0,
+                  1
+                ]
+              ],
+              "observation_by_post_state": [
+                [
+                  0.95,
+                  0.02,
+                  0.03
+                ],
+                [
+                  0.02,
+                  0.95,
+                  0.03
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
