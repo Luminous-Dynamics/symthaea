@@ -159,7 +159,9 @@ pub enum PartStemValidationStatusV1 {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum RendererExecutionEvidenceV1 {
-    DeclaredIdentityOnly,
+    /// Renderer/patch IDs and the declared single-track input method are
+    /// manifest claims; the actual renderer invocation has not been observed.
+    DeclaredMethodAndIdentityOnly,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -986,7 +988,7 @@ pub fn validate_part_stem_bundle_v1(
     let mut receipt = PartStemValidationReceiptV1 {
         schema: PART_STEM_RECEIPT_DIGEST_SCHEMA_V1.into(),
         status: PartStemValidationStatusV1::StructurallyConsistentUnattested,
-        renderer_execution_evidence: RendererExecutionEvidenceV1::DeclaredIdentityOnly,
+        renderer_execution_evidence: RendererExecutionEvidenceV1::DeclaredMethodAndIdentityOnly,
         bundle_sha256: bundle.bundle_sha256.clone(),
         score_sha256: bundle.score_sha256.clone(),
         midi_sha256: bundle.midi_sha256.clone(),
@@ -1779,7 +1781,7 @@ mod tests {
         );
         assert_eq!(
             receipt.renderer_execution_evidence,
-            RendererExecutionEvidenceV1::DeclaredIdentityOnly
+            RendererExecutionEvidenceV1::DeclaredMethodAndIdentityOnly
         );
         assert_eq!(receipt.stem_count, 1);
         assert!(valid_sha256(&receipt.receipt_sha256));
