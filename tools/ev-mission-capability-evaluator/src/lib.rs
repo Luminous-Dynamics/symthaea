@@ -849,6 +849,7 @@ mod tests {
     fn noncontiguous_mission_intervals_are_rejected() {
         let mut corpus: Value = serde_json::from_slice(CORPUS).expect("corpus");
         corpus["cases"][0]["mission"]["steps"][1]["start_time_seconds"] = Value::from(999.0);
+        corpus["cases"][0]["expected_disposition"] = Value::String("REJECTED_INPUT".into());
         let bytes = serde_json::to_vec(&corpus).expect("mutated corpus");
         let report = audit_corpus(SCHEMA, &bytes).expect("expected rejection");
         assert_eq!(report.rejected_input_count, 2);
