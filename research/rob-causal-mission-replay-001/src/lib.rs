@@ -128,6 +128,8 @@ pub enum AdmissionDisposition {
 pub struct RemoteInferenceRecord {
     /// Request identity.
     pub request_id: String,
+    /// Decision whose optional inference request is being served.
+    pub decision_id: String,
     /// Request event stamp.
     pub request_stamp: EventStamp,
     /// Upstream admission status.
@@ -717,6 +719,14 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         if let Some(request_id) = &chunk.request_id {
             match requests.get(request_id.as_str()) {
                 Some(request) => {
+                    if request.decision_id != chunk.decision_id {
+                        push_finding(
+                            &mut findings,
+                            FindingSeverity::Invalid,
+                            "REMOTE_REQUEST_DECISION_MISMATCH",
+                            &chunk.proposal_id,
+                        );
+                    }
                     match request.admission {
                         AdmissionDisposition::Admitted => {}
                         AdmissionDisposition::Rejected => push_finding(
@@ -977,6 +987,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             Some(request_id) => match requests.get(request_id.as_str()) {
                 Some(request) => {
                     if request.admission != AdmissionDisposition::Admitted
+                        || request.decision_id != decision.decision_id
                         || request.request_stamp.sequence <= decision.stamp.sequence
                     {
                         false
@@ -1047,6 +1058,14 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
 
     for transition in transitions {
         last_physical_sequence = last_physical_sequence.max(transition.stamp.sequence);
+        if let Some(previous) = last_physical_stamp {
+            check_time_order(
+                previous,
+                &transition.stamp,
+                &transition.transition_id,
+                &mut findings,
+            );
+        }
         if last_physical_stamp.is_none_or(|previous| previous.sequence < transition.stamp.sequence) {
             last_physical_stamp = Some(&transition.stamp);
         }
@@ -1375,6 +1394,7 @@ mod tests {
         let mut trace = valid_trace();
         trace.remote_requests.push(RemoteInferenceRecord {
             request_id: "request-1".to_owned(),
+            decision_id: "decision-1".to_owned(),
             request_stamp: stamp("event-r1", 3, 1, 112),
             admission: AdmissionDisposition::Rejected,
             response_stamp: Some(stamp("event-r2", 4, 2, 115)),
@@ -1400,10 +1420,42 @@ mod tests {
     }
 
     #[test]
+    fn remote_request_must_belong_to_the_same_decision_as_its_chunk() {
+        let mut trace = valid_trace();
+        trace.remote_requests.push(RemoteInferenceRecord {
+            request_id: "request-1".to_owned(),
+            decision_id: "another-decision".to_owned(),
+            request_stamp: stamp("event-r1", 3, 1, 112),
+            admission: AdmissionDisposition::Admitted,
+            response_stamp: Some(stamp("event-r2", 4, 2, 115)),
+            response_model_digest: "loss-model-sha256".to_owned(),
+            context_digest: "prefix-0".to_owned(),
+            expiry_tick: 8,
+        });
+        trace.chunks[0].request_id = Some("request-1".to_owned());
+        trace.chunks[0].stamp.sequence = 5;
+        trace.chunks[0].stamp.event_id = "event-3b".to_owned();
+        trace.assurance[0].stamp.sequence = 6;
+        trace.assurance[0].stamp.event_id = "event-4b".to_owned();
+        trace.applications[0].stamp.sequence = 7;
+        trace.applications[0].stamp.event_id = "event-5b".to_owned();
+        trace.applications[0].request_id = Some("request-1".to_owned());
+        trace.physical_transitions[0].stamp.sequence = 8;
+        trace.physical_transitions[0].stamp.event_id = "event-6b".to_owned();
+        trace.terminal.as_mut().unwrap().stamp.sequence = 9;
+        trace.terminal.as_mut().unwrap().stamp.event_id = "event-7b".to_owned();
+        let report = replay_mission(&trace);
+        assert_eq!(report.disposition, ReplayDisposition::Rejected);
+        assert!(has_finding(&report, "REMOTE_REQUEST_DECISION_MISMATCH"));
+        assert_eq!(report.applications_linked, 0);
+    }
+
+    #[test]
     fn remote_response_must_precede_chunk_and_be_unexpired() {
         let mut trace = valid_trace();
         trace.remote_requests.push(RemoteInferenceRecord {
             request_id: "request-1".to_owned(),
+            decision_id: "decision-1".to_owned(),
             request_stamp: stamp("event-r1", 3, 1, 112),
             admission: AdmissionDisposition::Admitted,
             response_stamp: Some(stamp("event-r2", 5, 2, 140)),
@@ -1433,6 +1485,7 @@ mod tests {
         let mut trace = valid_trace();
         trace.remote_requests.push(RemoteInferenceRecord {
             request_id: "request-1".to_owned(),
+            decision_id: "decision-1".to_owned(),
             request_stamp: stamp("event-r1", 3, 1, 112),
             admission: AdmissionDisposition::Admitted,
             response_stamp: Some(stamp("event-r2", 4, 2, 140)),
