@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://luminousdynamics.io/schemas/transport/ev_dynamic_robust_diagnostic_v0_1",
-  "title": "EV dynamic robust diagnostic model corpus v0.1",
+  "title": "Dynamic robust EV battery diagnostic corpus v0.1",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -15,22 +15,100 @@
     "problems": {
       "type": "array",
       "minItems": 1,
+      "maxItems": 32,
       "items": {
         "$ref": "#/$defs/problem"
       }
     }
   },
   "$defs": {
-    "probabilityRow": {
-      "type": "array",
-      "minItems": 2,
-      "items": {
-        "type": "number",
-        "minimum": 0,
-        "maximum": 1
+    "testSpec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "test_id",
+        "outcomes",
+        "duration_seconds",
+        "protocol_ref",
+        "equipment_ref",
+        "calibration_evidence_ref",
+        "requires_prior_outcome_from",
+        "available_after_outcomes",
+        "test_cost",
+        "downtime_cost",
+        "safety_approved",
+        "calibration_valid",
+        "supported_domain",
+        "equipment_available"
+      ],
+      "properties": {
+        "test_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 3,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "duration_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "protocol_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "equipment_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_evidence_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requires_prior_outcome_from": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "available_after_outcomes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "test_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "downtime_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "safety_approved": {
+          "type": "boolean"
+        },
+        "calibration_valid": {
+          "type": "boolean"
+        },
+        "supported_domain": {
+          "type": "boolean"
+        },
+        "equipment_available": {
+          "type": "boolean"
+        }
       }
     },
-    "matrix2x2": {
+    "transition": {
       "type": "array",
       "minItems": 2,
       "maxItems": 2,
@@ -42,6 +120,138 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        }
+      }
+    },
+    "testModel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "test_id",
+        "transition_duration_seconds",
+        "time_transition",
+        "perturbation_transition",
+        "observation_by_post_state"
+      ],
+      "properties": {
+        "test_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transition_duration_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "time_transition": {
+          "$ref": "#/$defs/transition"
+        },
+        "perturbation_transition": {
+          "$ref": "#/$defs/transition"
+        },
+        "observation_by_post_state": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 3,
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        }
+      }
+    },
+    "world": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_id",
+        "model_version",
+        "model_evidence_ref",
+        "model_evidence_sha256",
+        "domain_ref",
+        "source_class",
+        "likelihood_assumption",
+        "shared_nuisance_factors",
+        "prior",
+        "test_models"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_evidence_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_evidence_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "domain_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_class": {
+          "const": "SYNTHETIC_KNOWN_TRUTH"
+        },
+        "likelihood_assumption": {
+          "const": "CONDITIONAL_INDEPENDENT_GIVEN_POST_STATE"
+        },
+        "shared_nuisance_factors": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "prior": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "test_models": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/testModel"
+          }
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "loss_by_state"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "loss_by_state": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": 0
+          }
         }
       }
     },
@@ -79,85 +289,14 @@
           "minItems": 1,
           "maxItems": 2,
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "action_id",
-              "loss_by_state"
-            ],
-            "properties": {
-              "action_id": {
-                "type": "string",
-                "minLength": 1
-              },
-              "loss_by_state": {
-                "type": "array",
-                "minItems": 2,
-                "maxItems": 2,
-                "items": {
-                  "type": "number",
-                  "minimum": 0
-                }
-              }
-            }
+            "$ref": "#/$defs/action"
           }
         },
         "tests": {
           "type": "array",
           "maxItems": 2,
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "test_id",
-              "outcomes",
-              "duration_seconds",
-              "test_cost",
-              "downtime_cost",
-              "safety_approved",
-              "calibration_valid",
-              "supported_domain",
-              "equipment_available"
-            ],
-            "properties": {
-              "test_id": {
-                "type": "string",
-                "minLength": 1
-              },
-              "outcomes": {
-                "type": "array",
-                "minItems": 2,
-                "maxItems": 3,
-                "items": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              },
-              "duration_seconds": {
-                "type": "number",
-                "minimum": 0
-              },
-              "test_cost": {
-                "type": "number",
-                "minimum": 0
-              },
-              "downtime_cost": {
-                "type": "number",
-                "minimum": 0
-              },
-              "safety_approved": {
-                "type": "boolean"
-              },
-              "calibration_valid": {
-                "type": "boolean"
-              },
-              "supported_domain": {
-                "type": "boolean"
-              },
-              "equipment_available": {
-                "type": "boolean"
-              }
-            }
+            "$ref": "#/$defs/testSpec"
           }
         },
         "worlds": {
@@ -165,62 +304,7 @@
           "minItems": 1,
           "maxItems": 4,
           "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": [
-              "model_id",
-              "prior",
-              "test_models"
-            ],
-            "properties": {
-              "model_id": {
-                "type": "string",
-                "minLength": 1
-              },
-              "prior": {
-                "type": "array",
-                "minItems": 2,
-                "maxItems": 2,
-                "items": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1
-                }
-              },
-              "test_models": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "additionalProperties": false,
-                  "required": [
-                    "test_id",
-                    "time_transition",
-                    "perturbation_transition",
-                    "observation_by_post_state"
-                  ],
-                  "properties": {
-                    "test_id": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "time_transition": {
-                      "$ref": "#/$defs/matrix2x2"
-                    },
-                    "perturbation_transition": {
-                      "$ref": "#/$defs/matrix2x2"
-                    },
-                    "observation_by_post_state": {
-                      "type": "array",
-                      "minItems": 2,
-                      "maxItems": 2,
-                      "items": {
-                        "$ref": "#/$defs/probabilityRow"
-                      }
-                    }
-                  }
-                }
-              }
-            }
+            "$ref": "#/$defs/world"
           }
         }
       }
