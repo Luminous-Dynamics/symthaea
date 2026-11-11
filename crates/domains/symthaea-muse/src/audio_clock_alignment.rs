@@ -372,6 +372,8 @@ fn profile_with_no_estimate(
     config: AudioClockAlignmentConfigV1,
     status: AudioClockAlignmentStatusV1,
     unique_onsets: &[u64],
+    matched_onset_count: u32,
+    best_peak_score: Option<f64>,
 ) -> Result<AudioClockAlignmentProfileV1, AudioClockAlignmentIssueV1> {
     let mut profile = AudioClockAlignmentProfileV1 {
         schema: AUDIO_CLOCK_ALIGNMENT_SCHEMA_V1.into(),
@@ -385,10 +387,10 @@ fn profile_with_no_estimate(
         status,
         note_event_count: u32::try_from(midi.manifest.notes.len()).unwrap_or(u32::MAX),
         unique_expected_onset_count: u32::try_from(unique_onsets.len()).unwrap_or(u32::MAX),
-        matched_expected_onset_count: 0,
+        matched_expected_onset_count: matched_onset_count,
         audio_minus_midi_offset_frames: None,
         audio_minus_midi_offset_ms: None,
-        best_peak_score: None,
+        best_peak_score,
         competing_peak_score: None,
         peak_margin: None,
         competing_peak_ratio: None,
@@ -445,6 +447,8 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
             config,
             AudioClockAlignmentStatusV1::InsufficientOnsetDiversity,
             &expected_onsets,
+            0,
+            None,
         )
         .map_err(|issue| vec![issue]);
     }
@@ -516,6 +520,8 @@ pub fn estimate_audio_minus_midi_clock_offset_v1(
             config,
             AudioClockAlignmentStatusV1::InsufficientAudioCoverage,
             &expected_onsets,
+            u32::try_from(matched_counts[best_index]).unwrap_or(u32::MAX),
+            Some(scores[best_index]),
         )
         .map_err(|issue| vec![issue]);
     }
