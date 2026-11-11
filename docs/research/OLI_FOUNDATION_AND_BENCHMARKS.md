@@ -327,7 +327,7 @@ A source can claim independent sourcing only when:
 
 Different record IDs do not establish independence. Two sensor outputs that share sample preparation, calibration, acquisition, data processing or another common-cause group cannot be declared independent merely because they are stored as separate records.
 
-An unresolved conflict cannot accompany a definitive `SUPPORTED_WITHIN_SCOPE` or `CONTRADICTED_WITHIN_SCOPE` disposition. An adjudicated resolution must state which side prevailed, identify independently sourced evidence, and agree with the property's final assessment. The validator checks the declared provenance groups; scientific independence still requires audit of the actual acquisition and causal chain.
+An unresolved conflict cannot accompany a definitive `SUPPORTED_WITHIN_SCOPE` or `CONTRADICTED_WITHIN_SCOPE` disposition. An adjudicated resolution must state which side prevailed, identify independently sourced evidence, and agree with the property's final assessment. The validator checks the declared provenance groups and artifact digests; scientific independence still requires audit of the actual acquisition and causal chain.
 
 This is a structural/provenance safeguard, not an automated judge of which scientific source is correct.
 
