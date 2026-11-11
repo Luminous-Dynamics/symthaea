@@ -18,7 +18,7 @@ References:
 
 The corpus contains **40 synthetic decision scenarios**, covers five actions and four task families, and includes five matched low-/high-wrong-answer-penalty pairs. Those pairs hold probabilities, rewards and non-error costs constant while changing only the wrong-answer penalty.
 
-For each action, the fixture declares a probability of eventual correctness under that action and a scenario-specific cost. The independent Rust oracle recomputes:
+For each action, the fixture declares a probability of the scenario-defined success predicate under that action and a scenario-specific cost. These are not model-reported confidence values. The independent Rust oracle recomputes:
 
 `EU(a)=p_a U_c-(1-p_a)C_w-C_a`
 
