@@ -147,3 +147,25 @@ Reproducing a published benchmark is not a new SOTA result. Beating a published 
 ## Evidence boundary
 
 The CMU source is cell-level laboratory evidence, not a complete aircraft pack, aircraft installation, in-service fleet or certification dataset. It must not be promoted into pack-level power capability or aircraft reserve without separate pack characterization and validation.
+
+
+## Raw-pipeline reconstruction audit (required before model reproduction)
+
+The authors' public preprocessing specification adds important implementation details that must be preserved:
+
+- Required raw telemetry fields include `time_s`, `Ecell_V`, `I_mA`, `QDischarge_mA_h`, `QCharge_mA_h`, `Temperature__C`, `cycleNumber` and `Ns`.
+- The source convention uses positive current for charge and negative current for discharge. Do not infer a different sign convention from the feature tables.
+- `cycleNumber` is not globally unique after concatenation. Reconstruct cycle instances when the counter changes or the recording clock moves backwards; do not group all equal raw counters together.
+- The checked-in phase map assigns `Ns=4,5,6` to take-off, cruise and landing. A valid mission must contain that ordered subsequence.
+- Gaps greater than 60 seconds are flagged and excluded from duration, energy and coulomb integration; missing required/non-finite raw fields fail the cell rather than being silently imputed.
+- The capacity-test detector is protocol-based, not score-based: at least 70% of discharge time within 0.39–0.81 A; starting voltage at least 4.10 V; final/minimum voltage at most 2.55 V; voltage span at least 1.40 V; discharge capacity between 1.50 and 3.75 Ah; discharge duration at least 7,200 seconds. RPT cadence is audited against 50 ± 5 missions but must not be used to force an incomplete cycle into an RPT.
+- SOH is interpolated only between bracketing valid RPT anchors. It is not forward-filled, backward-filled or extrapolated beyond the final valid RPT.
+- RUL threshold crossings that are not observed remain right-censored; the final recorded mission is not an artificial failure.
+- SOC/health target-construction fields must remain outside the predictor allow-list.
+
+**Critical source-repository warning:** its README states that previously archived feature tables and metrics came from a different preprocessing path and are not evidence for the corrected raw pipeline. Therefore, do not copy checked-in legacy feature tables or archived score CSVs into the reproduction and call the result a reproduction. Rebuild from the public raw CMU archive using the pinned corrected pipeline, capture a new manifest, rerun every model, and compare results to the 2026 article. Record any discrepancy. This distinction is a required evidence gate, not a documentation nicety.
+
+Sources:
+- Study's preprocessing/target specification: https://github.com/MusaWiston/Mission-Phase-Feature-Learning-for-eVTOL-Battery-Prognostics-with-ML/blob/main/preprocessing_and_targets.md
+- Study repository and explicit legacy-artifact warning: https://github.com/MusaWiston/Mission-Phase-Feature-Learning-for-eVTOL-Battery-Prognostics-with-ML
+- Public raw dataset landing page (access may require following CMU KiltHub's download workflow): https://kilthub.cmu.edu/articles/dataset/eVTOL_Battery_Dataset/14226830
