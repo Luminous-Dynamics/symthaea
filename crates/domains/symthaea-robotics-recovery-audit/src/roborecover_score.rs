@@ -1013,7 +1013,7 @@ mod tests {
         let report = score_roborecover(&m, &[trial]).unwrap();
         assert_eq!(report.source_environment_completions, 1);
         assert!((report.source_environment_completion_overall_rsr - (1.0 / 9.0)).abs() < 1e-12);
-        assert!((report.source_environment_completion_macro9_rsr - (1.0 / 9.0)).abs() < 1e-12);
+        assert_eq!(report.source_environment_completion_macro9_rsr, Some(1.0 / 9.0));
         assert_eq!(report.replay_preempted_rows, 1);
         assert_eq!(report.policy_recovery_successes, 0);
         assert_eq!(report.source_environment_completion_macro9_rsr, Some(1.0 / 9.0));
