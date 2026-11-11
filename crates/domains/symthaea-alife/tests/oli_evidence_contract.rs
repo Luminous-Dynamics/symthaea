@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 use symthaea_alife::agnostic_evidence::{
-    EvidenceBasis, EvidenceOutcome, EvidenceRecord, FalseNegativeRisk, HypothesisClass, ObservationCoverage,
+    ConflictResolution, EvidenceBasis, EvidenceConflict, EvidenceOutcome, EvidenceRecord,
+    FalseNegativeRisk, HypothesisClass, ObservationCoverage,
     Property, PropertyAssessment, PropertyFinding, SystemProfile, SYMTHAEA_OLI_CONTEXT_VERSION,
 };
 
@@ -57,6 +58,7 @@ fn finding(property: Property, assessment: PropertyAssessment, evidence_ids: &[&
         assessment,
         evidence_ids: evidence_ids.iter().map(|id| (*id).to_owned()).collect(),
         coverage: None,
+        evidence_conflicts: Vec::new(),
         notes: "Scoped property assessment; not a global life verdict.".to_owned(),
     }
 }
@@ -344,6 +346,92 @@ fn legacy_coverage_defaults_missing_false_negative_modes_to_unknown() {
     property.coverage = Some(decoded);
     candidate.findings.push(property);
     assert!(candidate.validate().is_ok());
+}
+
+fn conflict(
+    independently_sourced: bool,
+    resolution: ConflictResolution,
+) -> EvidenceConflict {
+    EvidenceConflict {
+        proposition: "system demonstrates persistent information transfer".to_owned(),
+        supporting_evidence_ids: vec!["support-1".to_owned()],
+        contradicting_evidence_ids: vec!["contradict-1".to_owned()],
+        independently_sourced,
+        resolution,
+        rationale: "Compare independently documented measurement outcomes within the same declared scope.".to_owned(),
+    }
+}
+
+#[test]
+fn distinct_evidence_ids_with_shared_common_cause_are_not_independent() {
+    let mut candidate = profile();
+    candidate.evidence.push(measurement("support-1", EvidenceOutcome::SignalDetected));
+    candidate.evidence.push(measurement("contradict-1", EvidenceOutcome::NoDetection));
+    let mut property = finding(
+        Property::InformationTransfer,
+        PropertyAssessment::InsufficientEvidence,
+        &["support-1", "contradict-1"],
+    );
+    property.coverage = Some(coverage());
+    property.evidence_conflicts.push(conflict(
+        true,
+        ConflictResolution::Unresolved,
+    ));
+    candidate.findings.push(property);
+
+    let errors = candidate.validate().expect_err("shared common-cause group cannot be independent");
+    assert!(errors.iter().any(|error| error.contains("share a common-cause group")));
+}
+
+#[test]
+fn disjoint_declared_independence_groups_allow_independent_conflict_record() {
+    let mut candidate = profile();
+    let mut supporting = measurement("support-1", EvidenceOutcome::SignalDetected);
+    supporting.independence_group = Some("laboratory-replication-a".to_owned());
+    supporting.source_ref = Some("https://example.org/observation-a".to_owned());
+    let mut contradicting = measurement("contradict-1", EvidenceOutcome::NoDetection);
+    contradicting.independence_group = Some("laboratory-replication-b".to_owned());
+    contradicting.source_ref = Some("https://example.org/observation-b".to_owned());
+    candidate.evidence.extend([supporting, contradicting]);
+
+    let mut property = finding(
+        Property::InformationTransfer,
+        PropertyAssessment::InsufficientEvidence,
+        &["support-1", "contradict-1"],
+    );
+    property.coverage = Some(coverage());
+    property.evidence_conflicts.push(conflict(
+        true,
+        ConflictResolution::Unresolved,
+    ));
+    candidate.findings.push(property);
+
+    assert!(candidate.validate().is_ok());
+}
+
+#[test]
+fn unresolved_conflict_blocks_a_definitive_property_disposition() {
+    let mut candidate = profile();
+    let mut supporting = measurement("support-1", EvidenceOutcome::SignalDetected);
+    supporting.independence_group = Some("source-a".to_owned());
+    let mut contradicting = measurement("contradict-1", EvidenceOutcome::NoDetection);
+    contradicting.independence_group = Some("source-b".to_owned());
+    candidate.evidence.extend([supporting, contradicting]);
+
+    let mut property = finding(
+        Property::InformationTransfer,
+        PropertyAssessment::SupportedWithinScope,
+        &["support-1", "contradict-1"],
+    );
+    property.coverage = Some(coverage());
+    property.evidence_conflicts.push(conflict(
+        true,
+        ConflictResolution::Unresolved,
+    ));
+    candidate.findings.push(property);
+
+    let errors = candidate.validate().expect_err("unresolved conflict cannot be presented as definitive");
+    assert!(errors.iter().any(|error| error.contains("unresolved and cannot accompany a definitive")));
 }
 
 #[test]
