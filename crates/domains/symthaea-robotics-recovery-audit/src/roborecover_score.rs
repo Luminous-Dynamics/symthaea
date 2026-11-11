@@ -352,6 +352,29 @@ fn is_lower_or_upper_hex_digest(value: &str, expected_len: usize) -> bool {
     value.len() == expected_len && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
+fn valid_scenario_id(value: &str) -> bool {
+    !value.is_empty()
+        && value.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-'
+        })
+}
+
+fn expected_scenario_path(
+    platform: BenchmarkPlatform,
+    split: BenchmarkSplit,
+    scenario_id: &str,
+) -> String {
+    let platform = match platform {
+        BenchmarkPlatform::Libero => "libero",
+        BenchmarkPlatform::RoboTwin => "robotwin",
+    };
+    let split = match split {
+        BenchmarkSplit::Train => "train",
+        BenchmarkSplit::Test => "test",
+    };
+    format!("{platform}/{split}/{scenario_id}.json")
+}
+
 /// Validate source identity, split membership and scenario digests before scoring.
 pub fn validate_manifest(
     manifest: &RoboRecoverManifest,
@@ -409,11 +432,12 @@ pub fn validate_manifest(
                 scenario.scenario_id.clone(),
             ));
         }
-        if scenario.source_path.trim().is_empty()
-            || scenario.source_path.starts_with('/')
-            || scenario.source_path.contains('\\')
-            || scenario.source_path.split('/').any(|part| part == ".." || part == ".")
-            || !scenario.source_path.ends_with(&format!("/{}.json", scenario.scenario_id))
+        if !valid_scenario_id(&scenario.scenario_id)
+            || scenario.source_path != expected_scenario_path(
+                manifest.platform,
+                manifest.split,
+                &scenario.scenario_id,
+            )
         {
             issues.push(ManifestIssue::InvalidScenarioPath(
                 scenario.scenario_id.clone(),
@@ -1675,6 +1699,22 @@ mod tests {
             assert_eq!(report.metadata_mismatch_rows, 1);
             assert_eq!(report.policy_recovery_successes, 0);
         }
+    }
+
+
+    #[test]
+    fn scorer_manifest_requires_exact_platform_split_scenario_path() {
+        let mut m = manifest();
+        m.scenarios[0].source_path = "libero/test/scenario-0.json".to_owned();
+        assert!(validate_manifest(&m).unwrap_err().contains(
+            &ManifestIssue::InvalidScenarioPath("scenario-0".to_owned())
+        ));
+
+        let mut m = manifest();
+        m.scenarios[0].scenario_id = "../escape".to_owned();
+        assert!(validate_manifest(&m).unwrap_err().contains(
+            &ManifestIssue::InvalidScenarioPath("../escape".to_owned())
+        ));
     }
 
 }
