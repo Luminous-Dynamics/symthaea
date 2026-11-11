@@ -847,6 +847,21 @@ mod tests {
         assert_eq!(report.diagnostics.jacobi_triple_count, 1);
         assert!(report.diagnostics.maximum_bracket_closure_defect < 1.0e-12);
         assert!(report.diagnostics.maximum_jacobi_defect.unwrap() < 1.0e-12);
+
+        // Independent closed-form so(3) reference: [Jx, Jy] = Jz.
+        // The reported basis is Frobenius-normalized, hence the coefficient is
+        // 1/sqrt(2), not 1.0.
+        let xy = report
+            .brackets
+            .iter()
+            .find(|item| {
+                item.left_generator_id == "Jx" && item.right_generator_id == "Jy"
+            })
+            .expect("Jx/Jy bracket must be present");
+        let expected = 1.0 / 2.0_f64.sqrt();
+        assert!((xy.structure_constants[2] - expected).abs() < 1.0e-12);
+        assert!(xy.structure_constants[0].abs() < 1.0e-12);
+        assert!(xy.structure_constants[1].abs() < 1.0e-12);
     }
 
     #[test]
@@ -934,6 +949,22 @@ mod tests {
                 .abs()
                 < 1.0e-12
         );
+        for (canonical_bracket, transformed_bracket) in canonical_report
+            .brackets
+            .iter()
+            .zip(transformed_report.brackets.iter())
+        {
+            for (canonical_coefficient, transformed_coefficient) in canonical_bracket
+                .structure_constants
+                .iter()
+                .zip(transformed_bracket.structure_constants.iter())
+            {
+                assert!(
+                    (canonical_coefficient - transformed_coefficient).abs() < 1.0e-12,
+                    "structure constants changed under coordinate re-representation"
+                );
+            }
+        }
         for (left, right) in canonical_report
             .diagnostics
             .relative_rank_pivots
