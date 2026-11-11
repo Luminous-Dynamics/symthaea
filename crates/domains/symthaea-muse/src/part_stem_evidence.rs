@@ -1571,6 +1571,19 @@ mod tests {
         ).is_empty());
     }
 
+
+    #[test]
+    fn same_pitch_does_not_authorize_swapping_part_identity() {
+        let (mut bundle, midi, wavs) = two_part_same_pitch_fixture();
+        bundle.stems[0].part_id = 1;
+        bundle.bundle_sha256 = part_stem_bundle_commitment_v1(&bundle).unwrap();
+        let issues = validate_part_stem_bundle_v1(&bundle, &midi, &wavs).unwrap_err();
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            PartStemEvidenceIssueV1::StemIdentityMismatch { track_index: 1 }
+        )));
+    }
+
     #[test]
     fn exact_single_track_bundle_is_structurally_consistent() {
         let (bundle, midi, wavs) = fixture();
