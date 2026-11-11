@@ -84,6 +84,14 @@ fn parse_timestamp(value: Option<&str>) -> Option<DateTime<chrono::FixedOffset>>
     value.and_then(|text| DateTime::parse_from_rfc3339(text).ok())
 }
 
+fn valid_service_call_time(
+    service_call: &Value,
+    key: &str,
+) -> Option<DateTime<chrono::FixedOffset>> {
+    service_call.get(key).and_then(Value::as_str)
+        .and_then(|value| DateTime::parse_from_rfc3339(value).ok())
+}
+
 fn validate_schema(schema: &Value, instance: &Value, findings: &mut Findings) {
     if schema.get("$schema").and_then(Value::as_str) != Some(DRAFT_2020_12) {
         findings.push("/$schema", "INVALID", "only JSON Schema Draft 2020-12 is supported");
@@ -217,6 +225,18 @@ fn run_audit(schema: &Value, case: &Value) -> AuditReport {
     let arrival = parse_timestamp(berth.get("planned_arrival").and_then(Value::as_str));
     let departure = parse_timestamp(berth.get("planned_departure").and_then(Value::as_str));
 
+    let service_call = case.get("service_port_call").unwrap_or(&Value::Null);
+    if service_call.get("port_call_id").and_then(Value::as_str)
+        != case.get("port_call_id").and_then(Value::as_str)
+    {
+        findings.push(
+            "/service_port_call/port_call_id",
+            "INVALID",
+            "port-call identity must match the parent service call",
+        );
+    }
+
+
     let mut berth_duration_seconds = 0u64;
     match (berth_start, berth_end, arrival, departure) {
         (Some(start), Some(end), Some(arrive), Some(depart)) => {
@@ -243,6 +263,56 @@ fn run_audit(schema: &Value, case: &Value) -> AuditReport {
             "/berth_window",
             "INVALID",
             "all berth/arrival/departure timestamps must be valid RFC3339 values",
+        ),
+    }
+
+    match (
+        valid_service_call_time(service_call, "earliest_arrival"),
+        valid_service_call_time(service_call, "target_arrival"),
+        valid_service_call_time(service_call, "latest_arrival"),
+        valid_service_call_time(service_call, "latest_departure"),
+        arrival,
+        departure,
+    ) {
+        (Some(earliest), Some(target), Some(latest), Some(cutoff), Some(arrive), Some(depart)) => {
+            if earliest > target || target > latest {
+                findings.push(
+                    "/service_port_call",
+                    "INVALID",
+                    "service arrival window must satisfy earliest <= target <= latest",
+                );
+            }
+            if arrive < earliest || arrive > latest {
+                findings.push(
+                    "/berth_window/planned_arrival",
+                    "BLOCKED",
+                    "planned arrival falls outside the joined service-call arrival window",
+                );
+            }
+            let min_turnaround = service_call
+                .get("minimum_turnaround_seconds")
+                .and_then(Value::as_u64)
+                .unwrap_or(0);
+            let actual_turnaround = depart.signed_duration_since(arrive).num_seconds();
+            if actual_turnaround < 0 || (actual_turnaround as u64) < min_turnaround {
+                findings.push(
+                    "/berth_window/planned_departure",
+                    "BLOCKED",
+                    "planned departure violates the service-call minimum turnaround",
+                );
+            }
+            if depart > cutoff {
+                findings.push(
+                    "/berth_window/planned_departure",
+                    "BLOCKED",
+                    "planned departure exceeds the service-call latest departure cutoff",
+                );
+            }
+        }
+        _ => findings.push(
+            "/service_port_call",
+            "INVALID",
+            "service-call arrival/departure windows must be valid RFC3339 timestamps",
         ),
     }
 
@@ -563,6 +633,33 @@ mod tests {
         let mut findings = Findings::default();
         validate_schema(&schema, &case, &mut findings);
         assert!(!findings.invalid, "{:?}", findings.diagnostics);
+    }
+
+    #[test]
+    fn service_call_identity_must_match_port_call_identity() {
+        let (schema, mut case) = fixture();
+        case["service_port_call"]["port_call_id"] = serde_json::json!("PORT-B");
+        let report = run_audit(&schema, &case);
+        assert_eq!(report.disposition, "INVALID");
+    }
+
+    #[test]
+    fn arrival_after_service_window_blocks_ops_delivery() {
+        let (schema, mut case) = fixture();
+        case["berth_window"]["planned_arrival"] = serde_json::json!("2026-12-10T13:00:00Z");
+        case["berth_window"]["planned_departure"] = serde_json::json!("2026-12-10T16:00:00Z");
+        let report = run_audit(&schema, &case);
+        assert_eq!(report.delivered_energy_wh, 0);
+        assert_eq!(report.disposition, "BLOCKED");
+    }
+
+    #[test]
+    fn minimum_turnaround_is_inherited_from_service_flexibility_contract() {
+        let (schema, mut case) = fixture();
+        case["berth_window"]["planned_departure"] = serde_json::json!("2026-12-10T11:00:00Z");
+        let report = run_audit(&schema, &case);
+        assert_eq!(report.delivered_energy_wh, 0);
+        assert_eq!(report.disposition, "BLOCKED");
     }
 
     #[test]
