@@ -2773,6 +2773,27 @@ mod tests {
     }
 
     #[test]
+    fn vector_field_equivariance_relative_defect_is_stable_at_large_vector_scales() {
+        let scale = 4.0e307;
+        let vector_field = vec![
+            mul(Expr::Const(scale), var("x")),
+            mul(Expr::Const(scale), var("y")),
+        ];
+        let report = evaluate_metric_aware_vector_field_equivariance(
+            &vector_field,
+            &metric_aware_so2_action(),
+            &metric_sample_states(),
+            &[],
+            MetricAwareVectorFieldEquivarianceProfileV1::default(),
+        )
+        .unwrap();
+
+        assert!(report.equivariant_under_every_generator());
+        assert_eq!(report.generator_results[0].invalid_sample_count, 0);
+        assert!(report.generator_results[0].maximum_relative_defect < 1.0e-14);
+    }
+
+    #[test]
     fn vector_field_equivariance_rejects_unsupported_inputs_and_dimension_mismatches() {
         let unsupported = vec![
             Expr::Func(UnaryFn::Abs, Box::new(var("x"))),
