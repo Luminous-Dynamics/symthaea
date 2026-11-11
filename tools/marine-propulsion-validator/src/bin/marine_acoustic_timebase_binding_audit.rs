@@ -174,7 +174,7 @@ fn window_covers(channel: &Value, start: &DateTime<Utc>, end: &DateTime<Utc>) ->
         parse_time(channel.get("sample_window_start").and_then(Value::as_str)),
         parse_time(channel.get("sample_window_end").and_then(Value::as_str)),
     ) {
-        (Some(channel_start), Some(channel_end)) => channel_start <= *start && channel_end >= *end,
+        (Some(channel_start), Some(channel_end)) => channel_start <= start.clone() && channel_end >= end.clone(),
         _ => false,
     }
 }
@@ -274,6 +274,19 @@ fn check_channel(
         .flatten()
         .filter(|calibration| calibration.get("calibration_record_id").and_then(Value::as_str) == calibration_id)
         .collect();
+    match channel.pointer("/provenance/class").and_then(Value::as_str) {
+        Some("measured") => {}
+        Some("synthetic" | "assumed" | "vendor_nominal" | "published" | "derived") | None => findings.push(
+            format!("{path}/provenance/class"),
+            "INCOMPLETE",
+            "propulsion/acoustic channel is not a directly measured trial channel",
+        ),
+        _ => findings.push(
+            format!("{path}/provenance/class"),
+            "INVALID",
+            "unsupported channel provenance class",
+        ),
+    }
     if calibration_matches.len() != 1 {
         findings.push(
             format!("{path}/calibration_record_id"),
@@ -304,7 +317,7 @@ fn check_channel(
         let valid_from = parse_time(calibration.get("valid_from").and_then(Value::as_str));
         let valid_until = parse_time(calibration.get("valid_until").and_then(Value::as_str));
         match (valid_from, valid_until) {
-            (Some(from), Some(until)) if from <= *start && until >= *end && from < until => {}
+            (Some(from), Some(until)) if from <= start.clone() && until >= end.clone() && from < until => {}
             _ => findings.push(
                 format!("{path}/calibration_record_id"),
                 "INVALID",
@@ -577,7 +590,6 @@ fn check_binding(acoustic: &Value, case: &Value, findings: &mut Findings) -> (bo
         findings,
     );
 
-    let policy = trial.get("sample_completeness_policy").unwrap_or(&Value::Null);
     let mut matched_quantities = BTreeSet::new();
     let mut reference_clock = hydrophone_clock.clone();
     let mut synchronized_count = 1usize;
@@ -646,7 +658,6 @@ fn check_binding(acoustic: &Value, case: &Value, findings: &mut Findings) -> (bo
 
     let common_clock = reference_clock.take();
     let timebase_id = hydrophone_channel.get("timebase_id").and_then(Value::as_str).map(str::to_owned);
-    let _ = policy;
     (binding_valid, synchronized_count, common_clock, timebase_id)
 }
 
