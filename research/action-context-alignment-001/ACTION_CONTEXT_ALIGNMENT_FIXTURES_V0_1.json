@@ -1,9 +1,9 @@
 {
-  "schema_version": "action-context-alignment-fixtures-v0.1",
+  "schema_version": "action-context-alignment-fixtures-v0.2",
   "benchmark_id": "ACTION-CONTEXT-ALIGNMENT-001",
-  "status": "synthetic_pair_design_unexecuted",
-  "fixture_count": 42,
-  "pair_count": 21,
+  "status": "synthetic_preflight_and_runtime_pair_design_unexecuted",
+  "fixture_count": 48,
+  "pair_count": 24,
   "mutation_dimensions": [
     "principal_binding",
     "local_recognition",
@@ -11,7 +11,8 @@
     "purpose_binding",
     "expiry",
     "delegation_scope",
-    "pre_state"
+    "pre_state",
+    "runtime_trigger"
   ],
   "fixtures": [
     {
@@ -45,7 +46,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PRINCIPAL_BINDING-01-COUNTERFACTUAL",
@@ -78,7 +84,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PRINCIPAL_BINDING-02-AUTHORIZED",
@@ -111,7 +122,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a101"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PRINCIPAL_BINDING-02-COUNTERFACTUAL",
@@ -144,7 +160,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a101"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PRINCIPAL_BINDING-03-AUTHORIZED",
@@ -177,7 +198,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a102"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PRINCIPAL_BINDING-03-COUNTERFACTUAL",
@@ -210,7 +236,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a102"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-LOCAL_RECOGNITION-01-AUTHORIZED",
@@ -243,7 +274,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a103"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-LOCAL_RECOGNITION-01-COUNTERFACTUAL",
@@ -276,7 +312,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a103"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-LOCAL_RECOGNITION-02-AUTHORIZED",
@@ -309,7 +350,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a104"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-LOCAL_RECOGNITION-02-COUNTERFACTUAL",
@@ -342,7 +388,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a104"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-LOCAL_RECOGNITION-03-AUTHORIZED",
@@ -375,7 +426,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a105"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-LOCAL_RECOGNITION-03-COUNTERFACTUAL",
@@ -408,7 +464,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a105"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-TARGET_ALLOWLIST-01-AUTHORIZED",
@@ -441,7 +502,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a106"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-TARGET_ALLOWLIST-01-COUNTERFACTUAL",
@@ -474,7 +540,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a106"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-TARGET_ALLOWLIST-02-AUTHORIZED",
@@ -507,7 +578,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a107"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-TARGET_ALLOWLIST-02-COUNTERFACTUAL",
@@ -540,7 +616,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a107"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-TARGET_ALLOWLIST-03-AUTHORIZED",
@@ -573,7 +654,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a108"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-TARGET_ALLOWLIST-03-COUNTERFACTUAL",
@@ -606,7 +692,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a108"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PURPOSE_BINDING-01-AUTHORIZED",
@@ -639,7 +730,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a109"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PURPOSE_BINDING-01-COUNTERFACTUAL",
@@ -672,7 +768,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a109"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PURPOSE_BINDING-02-AUTHORIZED",
@@ -705,7 +806,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10a"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PURPOSE_BINDING-02-COUNTERFACTUAL",
@@ -738,7 +844,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10a"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PURPOSE_BINDING-03-AUTHORIZED",
@@ -771,7 +882,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10b"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PURPOSE_BINDING-03-COUNTERFACTUAL",
@@ -804,7 +920,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10b"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-EXPIRY-01-AUTHORIZED",
@@ -837,7 +958,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10c"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-EXPIRY-01-COUNTERFACTUAL",
@@ -870,7 +996,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10c"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-EXPIRY-02-AUTHORIZED",
@@ -903,7 +1034,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10d"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-EXPIRY-02-COUNTERFACTUAL",
@@ -936,7 +1072,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10d"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-EXPIRY-03-AUTHORIZED",
@@ -969,7 +1110,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10e"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-EXPIRY-03-COUNTERFACTUAL",
@@ -1002,7 +1148,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10e"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-DELEGATION_SCOPE-01-AUTHORIZED",
@@ -1035,7 +1186,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10f"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-DELEGATION_SCOPE-01-COUNTERFACTUAL",
@@ -1068,7 +1224,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10f"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-DELEGATION_SCOPE-02-AUTHORIZED",
@@ -1101,7 +1262,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a110"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-DELEGATION_SCOPE-02-COUNTERFACTUAL",
@@ -1134,7 +1300,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a110"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-DELEGATION_SCOPE-03-AUTHORIZED",
@@ -1167,7 +1338,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a111"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-DELEGATION_SCOPE-03-COUNTERFACTUAL",
@@ -1200,7 +1376,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a111"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PRE_STATE-01-AUTHORIZED",
@@ -1233,7 +1414,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a112"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PRE_STATE-01-COUNTERFACTUAL",
@@ -1266,7 +1452,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c312"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PRE_STATE-02-AUTHORIZED",
@@ -1299,7 +1490,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a113"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PRE_STATE-02-COUNTERFACTUAL",
@@ -1332,7 +1528,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c313"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PRE_STATE-03-AUTHORIZED",
@@ -1365,7 +1566,12 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a114"
       },
       "expected_disposition": "EligibleForTestAdapter",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
     },
     {
       "fixture_id": "ACA-PRE_STATE-03-COUNTERFACTUAL",
@@ -1398,7 +1604,240 @@
         "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c314"
       },
       "expected_disposition": "IneligibleNoAdapterCall",
-      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked."
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "trigger": "NotApplicable",
+        "observation_ref": "NO_RUNTIME_OBSERVATION"
+      }
+    },
+    {
+      "pair_id": "ACA-RUNTIME-TOOL-FAILURE-01",
+      "mutation_dimension": "runtime_trigger",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-001",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100"
+      },
+      "claim_ceiling": "Synthetic mid-execution boundary control only; no effect adapter is invoked and no new effect is authorized.",
+      "fixture_id": "ACA-RUNTIME-TOOL-FAILURE-01-CONTINUE",
+      "pair_member": "continue_control",
+      "runtime_context": {
+        "stage": "AfterRead",
+        "trigger": "None",
+        "observation_ref": "SYNTH-RUNTIME-EVENT-CriticalToolFailure"
+      },
+      "expected_disposition": "ContinueWithinAuthorizedScope"
+    },
+    {
+      "pair_id": "ACA-RUNTIME-TOOL-FAILURE-01",
+      "mutation_dimension": "runtime_trigger",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-001",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100"
+      },
+      "claim_ceiling": "Synthetic mid-execution boundary control only; no effect adapter is invoked and no new effect is authorized.",
+      "fixture_id": "ACA-RUNTIME-TOOL-FAILURE-01-STOP",
+      "pair_member": "runtime_trigger_stop",
+      "runtime_context": {
+        "stage": "AfterRead",
+        "trigger": "CriticalToolFailure",
+        "observation_ref": "SYNTH-RUNTIME-EVENT-CriticalToolFailure"
+      },
+      "expected_disposition": "StopBeforeFurtherEffect"
+    },
+    {
+      "pair_id": "ACA-RUNTIME-EVIDENCE-CONFLICT-01",
+      "mutation_dimension": "runtime_trigger",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-001",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100"
+      },
+      "claim_ceiling": "Synthetic mid-execution boundary control only; no effect adapter is invoked and no new effect is authorized.",
+      "fixture_id": "ACA-RUNTIME-EVIDENCE-CONFLICT-01-CONTINUE",
+      "pair_member": "continue_control",
+      "runtime_context": {
+        "stage": "AfterRead",
+        "trigger": "None",
+        "observation_ref": "SYNTH-RUNTIME-EVENT-ConflictingEvidence"
+      },
+      "expected_disposition": "ContinueWithinAuthorizedScope"
+    },
+    {
+      "pair_id": "ACA-RUNTIME-EVIDENCE-CONFLICT-01",
+      "mutation_dimension": "runtime_trigger",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-001",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100"
+      },
+      "claim_ceiling": "Synthetic mid-execution boundary control only; no effect adapter is invoked and no new effect is authorized.",
+      "fixture_id": "ACA-RUNTIME-EVIDENCE-CONFLICT-01-STOP",
+      "pair_member": "runtime_trigger_stop",
+      "runtime_context": {
+        "stage": "AfterRead",
+        "trigger": "ConflictingEvidence",
+        "observation_ref": "SYNTH-RUNTIME-EVENT-ConflictingEvidence"
+      },
+      "expected_disposition": "StopBeforeFurtherEffect"
+    },
+    {
+      "pair_id": "ACA-RUNTIME-EMERGENT-RISK-01",
+      "mutation_dimension": "runtime_trigger",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-001",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100"
+      },
+      "claim_ceiling": "Synthetic mid-execution boundary control only; no effect adapter is invoked and no new effect is authorized.",
+      "fixture_id": "ACA-RUNTIME-EMERGENT-RISK-01-CONTINUE",
+      "pair_member": "continue_control",
+      "runtime_context": {
+        "stage": "AfterRead",
+        "trigger": "None",
+        "observation_ref": "SYNTH-RUNTIME-EVENT-EmergentRisk"
+      },
+      "expected_disposition": "ContinueWithinAuthorizedScope"
+    },
+    {
+      "pair_id": "ACA-RUNTIME-EMERGENT-RISK-01",
+      "mutation_dimension": "runtime_trigger",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-001",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "principal_binding": "Exact",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "purpose_binding": "Exact",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100"
+      },
+      "claim_ceiling": "Synthetic mid-execution boundary control only; no effect adapter is invoked and no new effect is authorized.",
+      "fixture_id": "ACA-RUNTIME-EMERGENT-RISK-01-STOP",
+      "pair_member": "runtime_trigger_stop",
+      "runtime_context": {
+        "stage": "AfterRead",
+        "trigger": "EmergentRisk",
+        "observation_ref": "SYNTH-RUNTIME-EVENT-EmergentRisk"
+      },
+      "expected_disposition": "StopBeforeFurtherEffect"
     }
   ],
   "claim_ceiling": "This corpus qualifies paired authorization-context fixture semantics and the deterministic eligibility oracle only. It does not measure model understanding, authenticate real authority, issue capabilities, invoke adapters, or establish production enforcement."
