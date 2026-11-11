@@ -460,3 +460,12 @@ For fleet-shared inference, require:
 The candidate Luminous scheduler must consume existing qualified action-buffer, actuation-AoI, clock/freshness, EVSI, thermal, actuator and recovery evidence. It may schedule optional deliberation, not safety control. Compare matched workloads and model quality, and disclose model/hardware differences.
 
 Required metrics: throughput and safe-success by robot tier; per-robot starvation/control-step no-action rate; p50/p95/p99 request-to-actuator latency; actuation deadline miss probability and miss cost; fairness/service-floor violations; queue wait; useful result rate (fresh, decision-positive, locally admissible); energy by robot/network/edge/cloud; and recovery degradation. A fleet average cannot conceal a single robot that starves or loses its safe-stop path.
+
+
+## New actuation and fleet-serving evidence
+
+- **Age of Actuation / Probability of Missing Actuation (PoMA):** Nikkhah, Ephremides and Pappas, IEEE Transactions on Communications (2026), DOI 10.1109/TCOMM.2026.3663227. The paper studies timely use of status updates, AoA, violation probability and missed-actuation cost in a wireless-power-transfer model. This is a conceptual comparator; robot semantics require adaptation.
+- **Armory:** Bansal et al., arXiv:2608.00337. A cloud policy-serving system mirrors robot action queues and compares Round Robin, EDF and Lookahead. Its 10-PiPER / single-L40S heterogeneous fleet reports up to 18% higher total throughput in its tested workload.
+- **RED:** Li et al., arXiv:2605.24044. Adaptive deadline-aware DAG scheduling for multi-task robotic inference, evaluated on Jetson and Apple M-series platforms under the authors' scheduling assumptions.
+
+The Luminous target is to compare these methods under matched robot/task/model/network/compute conditions and go further by incorporating qualified action-buffer depletion, actuation-side AoI, PoMA-style deadline misses, EVSI, thermal/actuator state and recovery constraints. Keep hard local safety and safe-stop outside the shared scheduler.
