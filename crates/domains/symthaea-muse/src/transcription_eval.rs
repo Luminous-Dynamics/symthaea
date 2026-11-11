@@ -2181,7 +2181,16 @@ mod tests {
             predicted_eval_note_on_channel(0, 1, 48, 1),
         ];
         let summary =
-            part_separation_summary_v1(&reference, &predicted, &[(0, 0), (1, 1)]).unwrap();
+            part_separation_summary_v1(
+                &[1, 2],
+                &reference,
+                &predicted,
+                &[(0, 0), (1, 1)],
+                &[
+                    std::collections::BTreeSet::from([1]),
+                    std::collections::BTreeSet::from([2]),
+                ],
+            ).unwrap();
         assert_eq!(summary.matched_prediction_track_count, 1);
         assert_eq!(summary.mixed_prediction_track_count, 1);
         assert_eq!(summary.note_weighted_track_purity, Some(0.5));
@@ -2234,7 +2243,13 @@ mod tests {
         // Part 2 is declared in the reference manifest but has no note in
         // this excerpt. It must still be part of the coverage denominator.
         let summary =
-            part_separation_summary_v1(&[1, 2], &reference, &predicted, &[(0, 0)]).unwrap();
+            part_separation_summary_v1(
+                &[1, 2],
+                &reference,
+                &predicted,
+                &[(0, 0)],
+                &[std::collections::BTreeSet::from([1])],
+            ).unwrap();
         assert_eq!(summary.reference_part_count, 2);
         assert_eq!(summary.matched_reference_part_count, 1);
         assert_eq!(summary.reference_part_coverage, Some(0.5));
