@@ -653,4 +653,74 @@ mod tests {
         assert_eq!(result.selected.unwrap().policy_id, "infra-heavy");
         assert_eq!(result.assessments[0].attempts, Some(100));
     }
+
+    #[test]
+    fn action_interface_mismatch_is_rejected() {
+        let context = context();
+        let mut candidate = profile("wrong-action-schema", 100, 0, 0);
+        candidate.action_interface_sha256 = "9".repeat(64);
+        let result = route(&context, &[candidate], &permissive_config()).unwrap();
+        assert_eq!(
+            result.assessments[0].rejection,
+            Some(RejectionReason::ActionInterfaceMismatch)
+        );
+    }
+
+    #[test]
+    fn feature_space_mismatch_is_rejected() {
+        let context = context();
+        let mut candidate = profile("wrong-feature-space", 100, 0, 0);
+        candidate.feature_space_sha256 = "9".repeat(64);
+        let result = route(&context, &[candidate], &permissive_config()).unwrap();
+        assert_eq!(
+            result.assessments[0].rejection,
+            Some(RejectionReason::FeatureSpaceMismatch)
+        );
+    }
+
+    #[test]
+    fn safe_recovery_lower_bound_must_clear_the_declared_floor() {
+        let context = context();
+        let candidate = profile("weak-specialist", 50, 0, 50);
+        let result = route(&context, &[candidate], &permissive_config()).unwrap();
+        assert!(result.selected.is_none());
+        assert_eq!(
+            result.assessments[0].rejection,
+            Some(RejectionReason::SafeRecoveryLowerBoundTooLow)
+        );
+    }
+
+    #[test]
+    fn minimum_sample_gate_is_independent_of_confidence_bound_gates() {
+        let context = context();
+        let mut config = permissive_config();
+        config.min_attempts = 101;
+        let candidate = profile("ninety-nine", 100, 0, 0);
+        let result = route(&context, &[candidate], &config).unwrap();
+        assert_eq!(
+            result.assessments[0].rejection,
+            Some(RejectionReason::TooFewTrials)
+        );
+    }
+
+    #[test]
+    fn zero_classified_trials_and_count_overflow_fail_closed() {
+        let context = context();
+        let mut empty = profile("empty", 0, 0, 0);
+        empty.outcomes.declared_attempts = 0;
+        let result = route(&context, &[empty], &permissive_config()).unwrap();
+        assert_eq!(
+            result.assessments[0].rejection,
+            Some(RejectionReason::NoClassifiedTrials)
+        );
+
+        let mut overflow = profile("overflow", u64::MAX, 0, 1);
+        overflow.outcomes.declared_attempts = u64::MAX;
+        let result = route(&context, &[overflow], &permissive_config()).unwrap();
+        assert_eq!(
+            result.assessments[0].rejection,
+            Some(RejectionReason::OutcomeCountsDoNotPartitionAttempts)
+        );
+    }
+
 }
