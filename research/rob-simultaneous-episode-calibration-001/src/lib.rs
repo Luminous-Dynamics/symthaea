@@ -40,8 +40,12 @@ pub struct ObservedLossBound {
     pub action_id: String,
     /// Predicted interval for the action's expected task loss.
     pub predicted: LossInterval,
-    /// Independently evaluated realized task loss in the same fixed-point units.
-    pub realized_loss_units: u64,
+    /// Independently adjudicated expected-loss reference interval in the same fixed-point units.
+    ///
+    /// This must bound the target expected loss (for example, from an exact finite
+    /// oracle or a separately qualified reference estimator), not merely one noisy
+    /// realized outcome from the episode.
+    pub reference_expected_loss: LossInterval,
 }
 
 /// One complete held-out calibration episode.
@@ -305,7 +309,7 @@ fn validate_scope(scope: &CalibrationScope) -> Result<BTreeSet<&str>, Calibratio
     }
     scope
         .first_tick
-        .checked_add(scope.horizon_ticks - 1)
+        .checked_add(scope.horizon_ticks)
         .ok_or(CalibrationError::TickRangeOverflow)?;
 
     let mut action_ids = BTreeSet::new();
@@ -386,13 +390,28 @@ fn episode_nonconformity(
                 upper_units: observation.predicted.upper_units,
             });
         }
+        if observation.reference_expected_loss.lower_units
+            > observation.reference_expected_loss.upper_units
+        {
+            return Err(CalibrationError::InvalidLossInterval {
+                episode_id: episode.episode_id.clone(),
+                action_id: observation.action_id.clone(),
+                tick: observation.tick,
+                lower_units: observation.reference_expected_loss.lower_units,
+                upper_units: observation.reference_expected_loss.upper_units,
+            });
+        }
 
+        // The score expands the prediction until it contains the full
+        // independently adjudicated reference interval, not a noisy scalar
+        // realized outcome that may differ from the expected loss target.
         let residual_below = observation
             .predicted
             .lower_units
-            .saturating_sub(observation.realized_loss_units);
+            .saturating_sub(observation.reference_expected_loss.lower_units);
         let residual_above = observation
-            .realized_loss_units
+            .reference_expected_loss
+            .upper_units
             .saturating_sub(observation.predicted.upper_units);
         maximum_score = maximum_score.max(residual_below.max(residual_above));
     }
@@ -548,7 +567,10 @@ mod tests {
                     tick,
                     action_id: (*action).to_owned(),
                     predicted: LossInterval::new(lower, upper),
-                    realized_loss_units: upper.saturating_add(upper_error),
+                    reference_expected_loss: LossInterval::new(
+                        lower,
+                        upper.saturating_add(upper_error),
+                    ),
                 });
             }
         }
