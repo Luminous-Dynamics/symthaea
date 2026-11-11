@@ -84,6 +84,7 @@ pub enum AudioEventObservationIssueV1 {
     InvalidDigest { field: String },
     MidiBytesDigestMismatch,
     MidiManifestDigestMismatch,
+    MidiBytesDoNotMatchManifest,
     InvalidTempoOrResolution,
     EmptyNoteManifest,
     DuplicateSourceNoteOrdinal { ordinal: usize },
@@ -145,6 +146,173 @@ fn manifest_sha256(
     ))
 }
 
+
+fn midi_bytes_match_manifest(
+    midi_bytes: &[u8],
+    manifest: &crate::midi_performance::MidiPerformanceManifestV1,
+) -> bool {
+    use midly::{Format, MetaMessage, MidiMessage, Timing, TrackEventKind};
+
+    let Ok(smf) = midly::Smf::parse(midi_bytes) else {
+        return false;
+    };
+    if smf.header.format != Format::Parallel
+        || !matches!(
+            smf.header.timing,
+            Timing::Metrical(ppq) if ppq.as_int() == manifest.ticks_per_quarter
+        )
+        || smf.tracks.len() != manifest.tracks.len() + 1
+    {
+        return false;
+    }
+
+    type NoteOnKey = (u16, u64, u8, u8, u8);
+    type NoteOffKey = (u16, u64, u8, u8);
+    type ProgramKey = (u16, u64, u8, u8);
+    let mut expected_note_ons: BTreeMap<NoteOnKey, usize> = BTreeMap::new();
+    let mut expected_note_offs: BTreeMap<NoteOffKey, usize> = BTreeMap::new();
+    let mut expected_programs: BTreeMap<ProgramKey, usize> = BTreeMap::new();
+    let track_receipts: BTreeMap<_, _> = manifest
+        .tracks
+        .iter()
+        .map(|track| (track.track_index, track))
+        .collect();
+    if track_receipts.len() != manifest.tracks.len() {
+        return false;
+    }
+
+    for track in &manifest.tracks {
+        if track.track_index == 0
+            || usize::from(track.track_index) >= smf.tracks.len()
+            || track.midi_channel > 15
+            || track.gm_program > 127
+            || track.segment_end_tick <= track.segment_start_tick
+        {
+            return false;
+        }
+        *expected_programs
+            .entry((
+                track.track_index,
+                track.segment_start_tick,
+                track.midi_channel,
+                track.gm_program,
+            ))
+            .or_insert(0) += 1;
+    }
+
+    for note in &manifest.notes {
+        let Some(track) = track_receipts.get(&note.track_index) else {
+            return false;
+        };
+        if track.part_id != note.part_id
+            || track.segment_id != note.segment_id
+            || track.instrument_id != note.instrument_id
+            || note.start_tick < track.segment_start_tick
+            || note.end_tick > track.segment_end_tick
+            || note.end_tick <= note.start_tick
+        {
+            return false;
+        }
+        *expected_note_ons
+            .entry((
+                note.track_index,
+                note.start_tick,
+                track.midi_channel,
+                note.pitch_midi,
+                note.velocity_midi,
+            ))
+            .or_insert(0) += 1;
+        *expected_note_offs
+            .entry((
+                note.track_index,
+                note.end_tick,
+                track.midi_channel,
+                note.pitch_midi,
+            ))
+            .or_insert(0) += 1;
+    }
+
+    let mut actual_note_ons: BTreeMap<NoteOnKey, usize> = BTreeMap::new();
+    let mut actual_note_offs: BTreeMap<NoteOffKey, usize> = BTreeMap::new();
+    let mut actual_programs: BTreeMap<ProgramKey, usize> = BTreeMap::new();
+    let mut tempo_events = 0usize;
+    let mut meter_events = 0usize;
+
+    for (index, events) in smf.tracks.iter().enumerate() {
+        let Ok(track_index) = u16::try_from(index) else {
+            return false;
+        };
+        let mut tick = 0u64;
+        for event in events {
+            let Some(next_tick) = tick.checked_add(u64::from(event.delta.as_int())) else {
+                return false;
+            };
+            tick = next_tick;
+            match event.kind {
+                TrackEventKind::Meta(MetaMessage::Tempo(value)) => {
+                    if track_index != 0
+                        || tick != 0
+                        || value.as_int() != manifest.tempo_microseconds_per_quarter
+                    {
+                        return false;
+                    }
+                    tempo_events += 1;
+                }
+                TrackEventKind::Meta(MetaMessage::TimeSignature(numerator, denominator, _, _)) => {
+                    if track_index != 0
+                        || tick != 0
+                        || numerator != manifest.meter_numerator
+                        || denominator != 2
+                        || manifest.meter_denominator != 4
+                    {
+                        return false;
+                    }
+                    meter_events += 1;
+                }
+                TrackEventKind::Midi { channel, message } => {
+                    let channel = channel.as_int();
+                    match message {
+                        MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
+                            *actual_note_ons
+                                .entry((
+                                    track_index,
+                                    tick,
+                                    channel,
+                                    key.as_int(),
+                                    vel.as_int(),
+                                ))
+                                .or_insert(0) += 1;
+                        }
+                        MidiMessage::NoteOff { key, .. } => {
+                            *actual_note_offs
+                                .entry((track_index, tick, channel, key.as_int()))
+                                .or_insert(0) += 1;
+                        }
+                        MidiMessage::NoteOn { key, .. } => {
+                            *actual_note_offs
+                                .entry((track_index, tick, channel, key.as_int()))
+                                .or_insert(0) += 1;
+                        }
+                        MidiMessage::ProgramChange { program } => {
+                            *actual_programs
+                                .entry((track_index, tick, channel, program.as_int()))
+                                .or_insert(0) += 1;
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    tempo_events == 1
+        && meter_events == 1
+        && actual_note_ons == expected_note_ons
+        && actual_note_offs == expected_note_offs
+        && actual_programs == expected_programs
+}
+
 fn validate_midi_artifact(
     artifact: &MidiPerformanceArtifactV1,
 ) -> Vec<AudioEventObservationIssueV1> {
@@ -182,6 +350,9 @@ fn validate_midi_artifact(
     }
     if sha256_hex(&artifact.midi_bytes) != manifest.midi_sha256 {
         issues.push(AudioEventObservationIssueV1::MidiBytesDigestMismatch);
+    }
+    if !midi_bytes_match_manifest(&artifact.midi_bytes, manifest) {
+        issues.push(AudioEventObservationIssueV1::MidiBytesDoNotMatchManifest);
     }
     match manifest_sha256(artifact) {
         Ok(actual) if actual == artifact.manifest_sha256 => {}
