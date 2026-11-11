@@ -2,7 +2,7 @@
 
 A dependency-free, independent reference for validating and querying a two-dimensional motor efficiency map over a declared motor torque / speed grid.
 
-The v0.1 map is bound to one exact configuration digest, one exact operating-context digest and one exact evidence-manifest digest. The context digest must identify the frozen voltage, temperature, cooling, control/firmware, installation and environmental context for the map slice. The evidence-manifest digest identifies the source measurements, calibration and transformations. This crate does not calculate or verify those digests; the evidence-manifest owner supplies them. Every lookup result carries the evidence-manifest digest.
+The v0.1 map is bound to one exact map-content digest, one exact configuration digest, one exact operating-context digest and one exact evidence-manifest digest. The context digest must identify the frozen voltage, temperature, cooling, control/firmware, installation and environmental context for the map slice. The map-content digest identifies the exact serialized map artifact; the evidence-manifest digest identifies the source measurements, calibration and transformations. This crate does not calculate or verify these digests; the upstream evidence owner supplies them. Every lookup result carries both digests.
 
 ## Lookup contract
 
@@ -17,7 +17,7 @@ The v0.1 map is bound to one exact configuration digest, one exact operating-con
 
 The uncertainty result is a conservative absolute bound under the supplied nodal and systematic bounds: weighted nodal absolute bounds plus the systematic bound. It is not a Gaussian confidence interval and does not replace a covariance-aware uncertainty model. The reported physical interval is clipped to the physical efficiency range [0, 1]; the query coordinates and map support are never clipped.
 
-The map is one evidence-manifest- and context-specific motoring slice. This v0.1 does not interpolate across bus voltage, temperature, coolant flow, ageing, firmware or different hardware configurations. A separate map slice and context digest are required for each distinct characterized context.
+The map is one map-content-, evidence-manifest- and context-specific motoring slice. This v0.1 does not interpolate across bus voltage, temperature, coolant flow, ageing, firmware or different hardware configurations. A separate map slice and context digest are required for each distinct characterized context.
 
 ## Example
 
@@ -39,3 +39,10 @@ cargo clippy --locked --manifest-path tools/electric-propulsion-map-oracle/Cargo
 ```
 
 A passing synthetic test establishes only map data validation and interpolation semantics. It does not characterize a motor, validate a physical efficiency map, establish continuous/peak limits, or provide aircraft safety or airworthiness evidence.
+
+
+## Exact map artifact identity (v0.2)
+
+The map-content digest is distinct from the source evidence-manifest digest. The same raw observations and calibration evidence can yield different map artifacts after changes to filtering, fitting, grid selection or map-generation code. The map digest must identify the exact serialized axes, nodes, uncertainty values and map metadata. The source evidence-manifest digest must identify the underlying observations and transformations. The lookup result preserves both; the consumer must not substitute one for the other.
+
+This crate requires the caller to supply both exact digests. It does not calculate a canonical serialization or cryptographic hash internally.
