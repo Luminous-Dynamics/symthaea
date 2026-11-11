@@ -685,4 +685,69 @@ mod tests {
         check_join(&join, &acoustic, &bio, &mut findings);
         assert!(findings.incomparable);
     }
+
+    fn synthetic_binding_receipt(join: &Value, acoustic: &Value) -> Value {
+        serde_json::json!({
+            "acoustic_record_id": acoustic["record_id"],
+            "service_fingerprint": acoustic["service_fingerprint"],
+            "acoustic_raw_trace_sha256": acoustic["raw_trace_sha256"],
+            "common_reference_clock_id": "SYNTHETIC-UTC-REFERENCE-001",
+            "acoustic_timebase_id": "SYNTHETIC-ACOUSTIC-TIMEBASE-001",
+            "binding_valid": true,
+            "disposition": "INCOMPLETE",
+            "claim_ceiling": "Synthetic linkage fixture only."
+        })
+    }
+
+    #[test]
+    fn absent_shared_clock_receipt_is_incomplete() {
+        let (join, acoustic, _) = records();
+        let mut findings = Findings::default();
+        let valid = check_timebase_binding(None, &acoustic, &join, &mut findings);
+        assert!(!valid);
+        assert!(findings.incomplete);
+    }
+
+    #[test]
+    fn shared_clock_receipt_must_match_exact_acoustic_trace() {
+        let (join, acoustic, _) = records();
+        let mut receipt = synthetic_binding_receipt(&join, &acoustic);
+        receipt["acoustic_raw_trace_sha256"] = serde_json::json!("f".repeat(64));
+        let mut findings = Findings::default();
+        let valid = check_timebase_binding(Some(&receipt), &acoustic, &join, &mut findings);
+        assert!(!valid);
+        assert!(findings.incomparable);
+    }
+
+    #[test]
+    fn synthetic_shared_clock_receipt_resolves_context_without_qualifying_sources() {
+        let (join, acoustic, bio) = records();
+        let receipt = synthetic_binding_receipt(&join, &acoustic);
+        let mut findings = Findings::default();
+        let statuses = check_join(&join, &acoustic, &bio, &mut findings);
+        let binding_valid =
+            check_timebase_binding(Some(&receipt), &acoustic, &join, &mut findings);
+        assert!(binding_valid);
+        assert_eq!(
+            statuses,
+            vec!["acoustic:synthetic".to_owned(), "biofouling:synthetic".to_owned()]
+        );
+        assert!(!findings.invalid);
+        assert!(!findings.incomparable);
+        assert!(findings.incomplete);
+        assert_eq!(findings.disposition(), "INCOMPLETE");
+    }
+
+    #[test]
+    fn rejected_binding_receipt_cannot_resolve_timebase_join() {
+        let (join, acoustic, _) = records();
+        let mut receipt = synthetic_binding_receipt(&join, &acoustic);
+        receipt["binding_valid"] = serde_json::json!(false);
+        receipt["disposition"] = serde_json::json!("INCOMPARABLE");
+        let mut findings = Findings::default();
+        let valid = check_timebase_binding(Some(&receipt), &acoustic, &join, &mut findings);
+        assert!(!valid);
+        assert!(findings.incomparable);
+    }
+
 }
