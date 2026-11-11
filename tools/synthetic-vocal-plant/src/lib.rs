@@ -50,6 +50,7 @@ pub enum EditPatch {
     PitchShiftCents { delta_cents: f32 },
     FormantScale { scale: f32 },
     EnergyScale { scale: f32 },
+    UnsupportedControl { control_id: String },
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -97,6 +98,15 @@ pub struct ScenarioRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RejectedControlRecord {
+    pub case_id: String,
+    pub target_segment_id: String,
+    pub patch: EditPatch,
+    pub disposition: String,
+    pub rejection_reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SuiteManifest {
     pub schema_version: String,
     pub content_class: String,
@@ -113,6 +123,7 @@ pub struct SuiteManifest {
     pub parameter_manifest_sha256: String,
     pub baseline_pcm_sha256: String,
     pub scenarios: Vec<ScenarioRecord>,
+    pub unsupported_control_rejections: Vec<RejectedControlRecord>,
 }
 
 fn validate_segment(spec: &SyntheticSegmentSpec, sample_rate_hz: u32) -> Result<(), String> {
@@ -330,8 +341,8 @@ pub fn render_phrase(
     })
 }
 
-fn find_range<'a>(
-    ranges: &'a [(String, SampleRange)],
+fn find_range(
+    ranges: &[(String, SampleRange)],
     segment_id: &str,
 ) -> Result<SampleRange, String> {
     ranges
@@ -359,10 +370,10 @@ pub fn measure_locality(
 
     let mut compared = 0usize;
     let mut changed = 0usize;
-    for index in 0..baseline.len() {
+    for (index, (before, after)) in baseline.iter().zip(candidate.iter()).enumerate() {
         if index < allowed_dependency_cone.start || index >= allowed_dependency_cone.end {
             compared += 1;
-            if baseline[index].to_bits() != candidate[index].to_bits() {
+            if before.to_bits() != after.to_bits() {
                 changed += 1;
             }
         }
@@ -370,12 +381,16 @@ pub fn measure_locality(
 
     let mut square_sum = 0.0f64;
     let mut max_abs = 0.0f64;
-    let mut target_count = 0usize;
-    for index in allowed_dependency_cone.as_range() {
-        let delta = (candidate[index] - baseline[index]).abs() as f64;
+    let target_count = allowed_dependency_cone.end - allowed_dependency_cone.start;
+    for (before, after) in baseline
+        .iter()
+        .zip(candidate.iter())
+        .skip(allowed_dependency_cone.start)
+        .take(target_count)
+    {
+        let delta = (*after - *before).abs() as f64;
         square_sum += delta * delta;
         max_abs = max_abs.max(delta);
-        target_count += 1;
     }
     let exact_fraction = if compared == 0 {
         1.0
@@ -735,10 +750,10 @@ pub fn generate_suite(output_dir: &Path) -> Result<SuiteManifest, String> {
         sample_rate_hz,
     )?);
 
-    let mut collateral_specs =
+    let first_collateral_edit =
         apply_edit(&segments, target_id, &pitch_up_patch, sample_rate_hz)?;
-    collateral_specs = apply_edit(
-        &collateral_specs,
+    let collateral_specs = apply_edit(
+        &first_collateral_edit,
         "proxy-vowel-e",
         &pitch_up_patch,
         sample_rate_hz,
@@ -759,6 +774,24 @@ pub fn generate_suite(output_dir: &Path) -> Result<SuiteManifest, String> {
 
     let parameter_bytes = serde_json::to_vec(&segments)
         .map_err(|error| format!("failed to serialize parameters: {error}"))?;
+    let unsupported_patch = EditPatch::UnsupportedControl {
+        control_id: "vibrato_phase_offset".into(),
+    };
+    let unsupported_reason = apply_edit(
+        &segments,
+        target_id,
+        &unsupported_patch,
+        sample_rate_hz,
+    )
+    .expect_err("unsupported control must be rejected before rendering");
+    let unsupported_control_rejections = vec![RejectedControlRecord {
+        case_id: "unsupported_control".into(),
+        target_segment_id: target_id.into(),
+        patch: unsupported_patch,
+        disposition: "REJECTED_UNSUPPORTED".into(),
+        rejection_reason: unsupported_reason,
+    }];
+
     let manifest = SuiteManifest {
         schema_version: SCHEMA_VERSION.into(),
         content_class: "synthetic_only".into(),
@@ -776,6 +809,7 @@ pub fn generate_suite(output_dir: &Path) -> Result<SuiteManifest, String> {
         parameter_manifest_sha256: sha256_bytes(&parameter_bytes),
         baseline_pcm_sha256: sha256_pcm(&baseline.samples),
         scenarios,
+        unsupported_control_rejections,
     };
     let manifest_bytes = serde_json::to_vec_pretty(&manifest)
         .map_err(|error| format!("failed to serialize suite manifest: {error}"))?;
@@ -961,7 +995,7 @@ mod tests {
 
     #[test]
     fn independent_f0_rejects_silence_and_invalid_inputs() {
-        assert!(estimate_f0_hz(&vec![0.0; 2_000], 24_000, 80.0, 500.0).is_none());
+        assert!(estimate_f0_hz(&[0.0; 2_000], 24_000, 80.0, 500.0).is_none());
         assert!(estimate_f0_hz(&[0.0; 32], 24_000, 80.0, 500.0).is_none());
         assert!(estimate_f0_hz(&[0.0; 256], 0, 80.0, 500.0).is_none());
     }
@@ -978,6 +1012,20 @@ mod tests {
         let mut segments = base();
         segments[0].f2_hz = segments[0].f1_hz;
         assert!(render_phrase(&segments, DEFAULT_SAMPLE_RATE_HZ, 5).is_err());
+    }
+
+    #[test]
+    fn unsupported_renderer_control_is_rejected_without_fallback() {
+        let result = apply_edit(
+            &base(),
+            "proxy-vowel-c",
+            &EditPatch::UnsupportedControl {
+                control_id: "vibrato_phase_offset".into(),
+            },
+            DEFAULT_SAMPLE_RATE_HZ,
+        );
+        assert!(result.is_err());
+        assert!(result.expect_err("must reject").contains("unsupported renderer control"));
     }
 
     #[test]
@@ -1041,6 +1089,11 @@ mod tests {
             .scenarios
             .iter()
             .any(|case| case.case_id == "collateral_corruption"));
+        assert_eq!(manifest.unsupported_control_rejections.len(), 1);
+        assert_eq!(
+            manifest.unsupported_control_rejections[0].disposition,
+            "REJECTED_UNSUPPORTED"
+        );
         let no_op = manifest
             .scenarios
             .iter()
