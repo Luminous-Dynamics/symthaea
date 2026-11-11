@@ -681,4 +681,20 @@ mod tests {
         assert!(case.errors.iter().any(|error| error.contains("TARGET_EVIDENCE_BINDING_INVALID")));
     }
 
+    #[test]
+    fn exact_rdt_requires_measurement_uncertainty() {
+        let mut corpus: Value = serde_json::from_slice(CORPUS).expect("corpus");
+        let case = corpus["cases"].as_array_mut().unwrap()
+            .iter_mut().find(|case| case["case_id"] == "multioutput-30s-accepted")
+            .expect("multioutput case");
+        let rdt = case["targets"].as_array_mut().unwrap()
+            .iter_mut().find(|target| target["kind"] == "REMAINING_DISCHARGE_TIME")
+            .expect("RDT target");
+        rdt["uncertainty"] = Value::Null;
+        case["expected_disposition"] = Value::String("REJECT".into());
+        let bytes = serde_json::to_vec(&corpus).expect("mutated corpus");
+        let report = audit_corpus(SCHEMA, &bytes).expect("expected reject is audited");
+        assert_eq!(report.rejected_count, 10);
+    }
+
 }
