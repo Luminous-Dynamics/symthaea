@@ -222,6 +222,7 @@ fn process_episode(
             result.policy_input.as_slice(),
         )?;
         let policy_input_sha256 = sha256_hex(&policy_input_bytes);
+        let policy_input_byte_length = policy_input_bytes.len();
         if policy_input_sha256 != result.receipt.fused_policy_input_sha256 {
             return Err(format!(
                 "policy input artifact digest mismatch at sequence {}",
@@ -246,7 +247,7 @@ fn process_episode(
             upstream_observation_id: observation.upstream.observation_id.clone(),
             relative_path: relative_artifact_path,
             dimension: result.policy_input.dim(),
-            byte_length: policy_input_bytes.len(),
+            byte_length: policy_input_byte_length,
             sha256: policy_input_sha256,
         });
         receipts.push(result.receipt);
