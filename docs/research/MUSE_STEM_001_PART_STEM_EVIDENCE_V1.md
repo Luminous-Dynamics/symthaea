@@ -146,9 +146,10 @@ The V1 Rust validator in `part_stem_evidence.rs` implements these admission step
 3. **Track identity:** derive the expected `(PartId, segment_id, instrument_id, track_index)` set from the trusted MIDI manifest. Require exactly one stem record for every expected tuple, with no duplicates, omissions or extras.
 4. **Event coverage:** recompute the canonical event-set digest from the selected MIDI track; require the supplied sorted source-note ordinals to equal—not merely overlap—the manifest's ordinal set for that track.
 5. **Renderer identity:** require non-empty renderer/patch identifiers and valid digests for the renderer binary, patch assets and render configuration. A missing digest is `UNQUALIFIED`, not a pass.
-6. **WAV integrity:** hash the exact bytes, decode the WAV header and samples, reject malformed/non-finite audio, and compare decoded format and frame count with the common clock.
-7. **Cross-stem clock:** require every stem to share the exact sample clock. Any mismatch is a hard rejection; never silently resample or align during verification.
-8. **Receipt:** emit a deterministic, domain-separated commitment over the complete validated manifest and ordered stem records.
+6. **Timeline coverage:** convert every source note's end tick to an expected sample frame using checked integer arithmetic and the V1 tempo/PPQ; reject if any source event extends beyond the declared full-length audio clock.
+7. **WAV integrity:** hash the exact bytes, decode the WAV header and samples, reject malformed/non-finite audio, and compare decoded format and frame count with the common clock.
+8. **Cross-stem clock:** require every stem to share the exact sample clock. Any mismatch is a hard rejection; never silently resample or align during verification.
+9. **Receipt:** emit a deterministic, domain-separated commitment over the complete validated manifest and ordered stem records.
 
 The verifier should produce typed outcomes such as `PASS`, `REJECT`, `UNQUALIFIED`, and `NOT_ESTIMABLE`. Do not turn missing renderer evidence, unsupported formats, or invalid acoustic attribution into a boolean success.
 
@@ -169,6 +170,7 @@ Start with small deterministic, rights-cleared synthetic Scores and a pinned ren
 | Stale MIDI, manifest, WAV or asset digest | Reject: digest mismatch |
 | Same notes but wrong program-change event | Reject: track event-set mismatch |
 | Different sample rate, channel count or frame count | Reject: common-clock mismatch |
+| All stems share a clock but it ends before the final MIDI event | Reject: source timeline extends beyond full-length audio |
 | Truncated or malformed WAV | Reject: decode / clock validation failure |
 | Neural source-separated stem | Not admissible as V1 isolated-render evidence; may enter a separate separator study |
 | Reverb tail or same-part harmonic collision | Keep acoustic result ambiguous unless a separately calibrated method resolves it |
@@ -182,7 +184,8 @@ Keep artifact correctness separate from acoustic quality.
 - 100% exact track-set completeness on deterministic fixtures.
 - 100% exact source-note ordinal coverage.
 - 0 accepted duplicate, missing, extra, swapped, stale, or clock-incompatible stem records in the frozen negative-control suite.
-- 100% deterministic bundle commitment replay from frozen inputs.
+- 100% deterministic bundle and receipt replay from frozen inputs.
+- 100% source note end-frame coverage by the declared full-length WAV clock; no admitted score event may lie beyond the audio artifact.
 - Unsupported or uncalibrated renderer/patch combinations remain `UNQUALIFIED`.
 
 ### Acoustic evidence
