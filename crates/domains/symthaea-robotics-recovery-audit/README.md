@@ -18,8 +18,25 @@ It also rejects duplicate trial IDs, blank identity fields, malformed expected-t
     cargo test -p symthaea-robotics-recovery-audit
     cargo fmt --manifest-path crates/domains/symthaea-robotics-recovery-audit/Cargo.toml -- --check
 
-Forty-five unit tests are included across the audit kernel and RoboRecover scorer. They have not yet been executed in this environment. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
+Fifty-nine unit tests are included across the audit kernel, RoboRecover scorer and split-manifest importer. They have not yet been executed in this environment. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
 
+
+## Pinned split-manifest importer
+
+The `roborecover_manifest` module parses the exact upstream nine-column CSV schema at source revision
+`089b9420e8b7c303e2338a8212a8b6c27c26a79b`.
+
+It pins the Git blob identities for all four official split CSVs:
+- LIBERO train: `4b4caf53d03ccdad5883cf556aab8353bcdc6542`
+- LIBERO test: `925af3d5ab5e810cd65b86f6d4f35bbc3891d67f`
+- RoboTwin train: `b211728e96d4e6548d4d5353daf73346c37f5a4d`
+- RoboTwin test: `c9b40e12d6f8d2dab723815dfc2e966ea7e62cd5`
+
+It checks the exact header, row count (800 train / 200 test), unique sample IDs and paths, expected platform/split-relative path, both 64-hex SHA fields, positive action counts and the source invariant `actions == replay_prefix_steps`. For test splits it freezes not just the nine Macro-9 groups but their exact platform-specific row counts. Train is Macro-9-free and may contain the additional Move/Wrong Target group.
+
+The importer maps the CSV `sha256` to the scenario JSON digest and `original_sha256` to its original-trajectory lineage digest. It carries task name, relative source path, action count and replay-prefix length into the scenario and trial records; the scorer rejects any mismatch.
+
+The source CSV does not expose scenario construction source (Natural / ActionPerturbed / HumanConstructed), nor does the split record include the scenario JSON bytes. The importer therefore assigns `ScenarioSource::Unknown` and validates hash syntax only. It does not claim to fetch or re-hash the scenario artifacts. The caller must fetch the CSV from the exact pinned commit and supply the Git blob identity returned by that source fetch; this importer compares that supplied identity against the frozen expected blob SHA, but does not recompute Git's SHA-1 object hash from the CSV text.
 
 ## RoboRecover recovery scoring
 
