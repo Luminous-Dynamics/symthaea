@@ -368,14 +368,16 @@
     {
       "authority": "International Maritime Organization",
       "instrument": "MARPOL Annex VI amendment adopted at MEPC 84",
-      "revision_or_resolution": "Resolution MEPC.407(84)",
+      "revision_or_resolution": "Resolution MEPC.407(84); as checked 2026-11-11, the IMO MEPC resolution index labels it AWAITING CERTIFICATION.",
       "rule_status": "adopted",
       "legal_character": "adopted_amendment_future_application",
       "source_ids": [
-        "IMO-NE-ATLANTIC-ECA-2026"
+        "IMO-NE-ATLANTIC-ECA-2026",
+        "IMO-MEPC407-RESOLUTION-INDEX-2026"
       ],
       "limitations": [
-        "Adoption is distinct from entry into force and application. Route geometry alone does not establish ship/engine compliance; authoritative coordinates and certification evidence are required."
+        "Adoption is distinct from entry into force and application. Route geometry alone does not establish ship/engine compliance; authoritative coordinates and certification evidence are required.",
+        "As of 11 November 2026, the IMO resolution index marks MEPC.407(84) AWAITING CERTIFICATION and its linked PDF is only an awaiting-certification placeholder. The committee adoption outcome is known, but ship-specific interpretation, exceptions and geospatial classification must use the certified amendment and official Appendix VII coordinates."
       ],
       "rule_id": "NE-ATLANTIC-NOX-ECA-2026",
       "title": "North-East Atlantic NOx ECA — Tier III new-ship applicability",
@@ -386,7 +388,7 @@
       },
       "applicability": {
         "ship_scope": "Ships operating in the designated North-East Atlantic NOx ECA, with relevant marine diesel engines of more than 130 kW and qualifying construction/delivery dates.",
-        "geographic_scope": "Exclusive economic zones and territorial seas extending up to 200 nautical miles from baselines of Greenland, Iceland, the Faroe Islands, Ireland, the mainland United Kingdom, France, Spain and Portugal, as described in the MEPC 84 outcome; authoritative adopted coordinates/chart data are still required.",
+        "geographic_scope": "The North-East Atlantic ECA includes designated EEZs/territorial seas of Greenland, Iceland, Faroe Islands, Ireland, mainland United Kingdom, France, Spain and Portugal, but the EEZs around the Azores, Madeira and Canary Islands are excluded; exact legal applicability requires official Appendix VII coordinates.",
         "voyage_scope": "Operation of qualifying ships and engines within the ECA on or after 1 September 2027.",
         "engine_power_kw_min_exclusive": 130,
         "ship_construction_triggers": [
@@ -414,7 +416,9 @@
         "exclusions_or_unknowns": [
           "Do not apply Tier III to every existing ship merely because it enters the ECA.",
           "Confirm construction milestones, engine power, EIAPP certification and ship scope against MEPC.407(84) and flag/class records.",
-          "Official adopted ECA polygon coordinates are still required for geospatial classification."
+          "Official adopted ECA polygon coordinates are still required for geospatial classification.",
+          "The official IMO resolution index still marks MEPC.407(84) AWAITING CERTIFICATION as of 11 November 2026; obtain the certified amendment and official Appendix VII coordinates before compliance decisions.",
+          "The ECA excludes the EEZs around the Azores, Madeira and Canary Islands; do not implement the area as a simple country coastline buffer."
         ]
       },
       "output_scope": [
@@ -431,14 +435,16 @@
     {
       "authority": "International Maritime Organization",
       "instrument": "MARPOL Annex VI amendment adopted at MEPC 84",
-      "revision_or_resolution": "Resolution MEPC.407(84)",
+      "revision_or_resolution": "Resolution MEPC.407(84); as checked 2026-11-11, the IMO MEPC resolution index labels it AWAITING CERTIFICATION.",
       "rule_status": "adopted",
       "legal_character": "adopted_amendment_future_application",
       "source_ids": [
-        "IMO-NE-ATLANTIC-ECA-2026"
+        "IMO-NE-ATLANTIC-ECA-2026",
+        "IMO-MEPC407-RESOLUTION-INDEX-2026"
       ],
       "limitations": [
-        "Adoption is distinct from entry into force and application. Route geometry alone does not establish ship/engine compliance; authoritative coordinates and certification evidence are required."
+        "Adoption is distinct from entry into force and application. Route geometry alone does not establish ship/engine compliance; authoritative coordinates and certification evidence are required.",
+        "As of 11 November 2026, the IMO resolution index marks MEPC.407(84) AWAITING CERTIFICATION and its linked PDF is only an awaiting-certification placeholder. The committee adoption outcome is known, but ship-specific interpretation, exceptions and geospatial classification must use the certified amendment and official Appendix VII coordinates."
       ],
       "rule_id": "NE-ATLANTIC-SOX-PM-ECA-2026",
       "title": "North-East Atlantic SOx/PM ECA — 0.10% fuel sulphur limit",
@@ -449,7 +455,7 @@
       },
       "applicability": {
         "ship_scope": "Ships subject to MARPOL Annex VI regulation 14 fuel-sulphur requirements while operating within the designated North-East Atlantic SOx ECA.",
-        "geographic_scope": "Exclusive economic zones and territorial seas extending up to 200 nautical miles from baselines of Greenland, Iceland, the Faroe Islands, Ireland, the mainland United Kingdom, France, Spain and Portugal, as described in the MEPC 84 outcome; authoritative adopted coordinates/chart data are still required.",
+        "geographic_scope": "The North-East Atlantic ECA includes designated EEZs/territorial seas of Greenland, Iceland, Faroe Islands, Ireland, mainland United Kingdom, France, Spain and Portugal, but the EEZs around the Azores, Madeira and Canary Islands are excluded; exact legal applicability requires official Appendix VII coordinates.",
         "voyage_scope": "Use of fuel oil on operational/voyage segments within the ECA on or after 1 September 2028.",
         "conditions": [
           "The amendment enters into force on 1 September 2027.",
@@ -459,7 +465,8 @@
         "exclusions_or_unknowns": [
           "Do not apply the 0.10% sulphur limit from 1 September 2027; it applies from 1 September 2028.",
           "Confirm official ECA coordinates, permitted equivalent methods and applicable ship/operation scope from current MARPOL Annex VI.",
-          "This is a local air-pollution requirement, not a lifecycle-GHG factor."
+          "This is a local air-pollution requirement, not a lifecycle-GHG factor.",
+          "The official IMO resolution index still marks MEPC.407(84) AWAITING CERTIFICATION as of 11 November 2026; obtain the certified amendment and official Appendix VII coordinates before compliance decisions."
         ]
       },
       "output_scope": [
@@ -839,6 +846,19 @@
       },
       "limitations": [
         "Port infrastructure obligations depend on port category/activity and ship category; they are not a guarantee of live capacity at a particular berth."
+      ]
+    },
+    {
+      "source_id": "IMO-MEPC407-RESOLUTION-INDEX-2026",
+      "title": "IMO MEPC 2026-27 resolution index entry for MEPC.407(84)",
+      "publisher": "International Maritime Organization",
+      "uri": "https://www.imo.org/en/knowledgecentre/indexofimoresolutions/pages/mepc-2026-27.aspx",
+      "publication_date": "2026-05-01",
+      "evidence_class": "official_resolution_index_status_snapshot",
+      "limitations": [
+        "As checked on 11 November 2026, the IMO index labels MEPC.407(84) AWAITING CERTIFICATION and the linked PDF is a one-page awaiting-certification placeholder, not the complete certified amendment text.",
+        "The MEPC 84 meeting summary separately reports committee adoption of the North-East Atlantic ECA and states the 1 September 2027 entry-into-force date.",
+        "Do not claim ship-specific legal compliance or derive official coordinates from the summary; obtain the certified amendment and authoritative Appendix VII coordinates."
       ]
     }
   ]
