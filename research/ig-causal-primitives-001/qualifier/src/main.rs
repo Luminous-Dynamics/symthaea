@@ -495,7 +495,8 @@ mod tests {
     #[test]
     fn duplicate_task_identity_is_rejected() {
         let mut value = parsed();
-        value["tasks"][1]["task_id"] = value["tasks"][0]["task_id"].clone();
+        let duplicate = value["tasks"][0]["task_id"].clone();
+        value["tasks"][1]["task_id"] = duplicate;
         assert!(validate_manifest(&value).is_err());
     }
 
@@ -521,7 +522,7 @@ mod tests {
     #[test]
     fn posterior_oracle_must_use_exact_bayes_arithmetic() {
         let mut value = parsed();
-        value["tasks"][20]["belief_update"]["expected_posterior"]["numerator"] = Value::from(1);
+        value["tasks"][20]["belief_update"]["expected_posterior"]["numerator"] = Value::from(0);
         assert!(validate_manifest(&value).is_err());
     }
 
