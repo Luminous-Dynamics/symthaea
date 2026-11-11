@@ -143,6 +143,11 @@ pub struct CaseAudit {
 #[derive(Clone, Debug, Serialize)]
 pub struct AuditReport {
     pub corpus_version: String,
+    pub split_manifest_ref: String,
+    pub split_manifest_sha256: String,
+    pub split_assignment_count: usize,
+    pub test_blind_assignment_count: usize,
+    pub non_test_blind_assignment_count: usize,
     pub canonical_corpus_sha256: String,
     pub report_sha256: String,
     pub case_count: usize,
@@ -731,7 +736,15 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
 
     let canonical = serde_json::to_vec(&corpus)
         .map_err(|error| format!("canonical corpus serialization: {error}"))?;
-    let _split_assignments = validate_split_manifest(&corpus)?;
+    let split_assignments = validate_split_manifest(&corpus)?;
+    let split_manifest_sha256 = split_manifest_sha256(&corpus.split_manifest)?;
+    let split_assignment_count = split_assignments.len();
+    let test_blind_assignment_count = split_assignments
+        .values()
+        .filter(|assignment| assignment.partition == "TEST_BLIND")
+        .count();
+    let non_test_blind_assignment_count =
+        split_assignment_count.saturating_sub(test_blind_assignment_count);
     let mut case_ids = BTreeSet::new();
     let mut pack_ids = BTreeSet::new();
     let mut mission_report_ids = BTreeSet::new();
@@ -819,6 +832,11 @@ pub fn audit_corpus(schema_bytes: &[u8], corpus_bytes: &[u8]) -> Result<AuditRep
 
     let mut report = AuditReport {
         corpus_version: corpus.corpus_version,
+        split_manifest_ref: corpus.split_manifest.manifest_ref.clone(),
+        split_manifest_sha256,
+        split_assignment_count,
+        test_blind_assignment_count,
+        non_test_blind_assignment_count,
         canonical_corpus_sha256: sha256(&canonical),
         report_sha256: String::new(),
         case_count: cases.len(),
