@@ -813,9 +813,10 @@ mod tests {
                 .contains(&AudioEventObservationIssueV1::ReceiptInputBindingMismatch)
         );
         receipt.note_observations[0].pitch_midi = 70;
+        receipt.receipt_sha256 = audio_event_observation_commitment_v1(&receipt).unwrap();
         assert!(
             validate_audio_event_observation_v1(&receipt, &wav, &midi)
-                .contains(&AudioEventObservationIssueV1::ReceiptDigestMismatch)
+                .contains(&AudioEventObservationIssueV1::ReceiptEventMismatch { ordinal: 0 })
         );
     }
 
