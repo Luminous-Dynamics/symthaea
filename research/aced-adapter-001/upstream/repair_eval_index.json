@@ -1,0 +1,326 @@
+[
+ {
+  "file": "world_agronomy_collider_selection_53000152.json.gz",
+  "domain": "agronomy",
+  "archetype": "collider_selection",
+  "seed": 53000152
+ },
+ {
+  "file": "world_aquaculture_collider_selection_53000153.json.gz",
+  "domain": "aquaculture",
+  "archetype": "collider_selection",
+  "seed": 53000153
+ },
+ {
+  "file": "world_battery_collider_selection_53000082.json.gz",
+  "domain": "battery",
+  "archetype": "collider_selection",
+  "seed": 53000082
+ },
+ {
+  "file": "world_bioprocess_collider_selection_53000083.json.gz",
+  "domain": "bioprocess",
+  "archetype": "collider_selection",
+  "seed": 53000083
+ },
+ {
+  "file": "world_catalysis_collider_selection_53000084.json.gz",
+  "domain": "catalysis",
+  "archetype": "collider_selection",
+  "seed": 53000084
+ },
+ {
+  "file": "world_clinical_collider_selection_43000236.json.gz",
+  "domain": "clinical",
+  "archetype": "collider_selection",
+  "seed": 43000236
+ },
+ {
+  "file": "world_agronomy_competing_causes_53000256.json.gz",
+  "domain": "agronomy",
+  "archetype": "competing_causes",
+  "seed": 53000256
+ },
+ {
+  "file": "world_aquaculture_competing_causes_53000257.json.gz",
+  "domain": "aquaculture",
+  "archetype": "competing_causes",
+  "seed": 53000257
+ },
+ {
+  "file": "world_datacenter_competing_causes_53000045.json.gz",
+  "domain": "datacenter",
+  "archetype": "competing_causes",
+  "seed": 53000045
+ },
+ {
+  "file": "world_fermentation_competing_causes_43000047.json.gz",
+  "domain": "fermentation",
+  "archetype": "competing_causes",
+  "seed": 43000047
+ },
+ {
+  "file": "world_semiconductor_competing_causes_53000190.json.gz",
+  "domain": "semiconductor",
+  "archetype": "competing_causes",
+  "seed": 53000190
+ },
+ {
+  "file": "world_watertreatment_competing_causes_53000119.json.gz",
+  "domain": "watertreatment",
+  "archetype": "competing_causes",
+  "seed": 53000119
+ },
+ {
+  "file": "world_battery_confounded_chain_53000218.json.gz",
+  "domain": "battery",
+  "archetype": "confounded_chain",
+  "seed": 53000218
+ },
+ {
+  "file": "world_bioprocess_confounded_chain_53000003.json.gz",
+  "domain": "bioprocess",
+  "archetype": "confounded_chain",
+  "seed": 53000003
+ },
+ {
+  "file": "world_catalysis_confounded_chain_53000220.json.gz",
+  "domain": "catalysis",
+  "archetype": "confounded_chain",
+  "seed": 53000220
+ },
+ {
+  "file": "world_clinical_confounded_chain_43000270.json.gz",
+  "domain": "clinical",
+  "archetype": "confounded_chain",
+  "seed": 43000270
+ },
+ {
+  "file": "world_datacenter_confounded_chain_53000077.json.gz",
+  "domain": "datacenter",
+  "archetype": "confounded_chain",
+  "seed": 53000077
+ },
+ {
+  "file": "world_fermentation_confounded_chain_43000235.json.gz",
+  "domain": "fermentation",
+  "archetype": "confounded_chain",
+  "seed": 43000235
+ },
+ {
+  "file": "world_agronomy_confounded_reversal_53000208.json.gz",
+  "domain": "agronomy",
+  "archetype": "confounded_reversal",
+  "seed": 53000208
+ },
+ {
+  "file": "world_aquaculture_confounded_reversal_53000209.json.gz",
+  "domain": "aquaculture",
+  "archetype": "confounded_reversal",
+  "seed": 53000209
+ },
+ {
+  "file": "world_battery_confounded_reversal_53000210.json.gz",
+  "domain": "battery",
+  "archetype": "confounded_reversal",
+  "seed": 53000210
+ },
+ {
+  "file": "world_bioprocess_confounded_reversal_53000139.json.gz",
+  "domain": "bioprocess",
+  "archetype": "confounded_reversal",
+  "seed": 53000139
+ },
+ {
+  "file": "world_semiconductor_confounded_reversal_53000070.json.gz",
+  "domain": "semiconductor",
+  "archetype": "confounded_reversal",
+  "seed": 53000070
+ },
+ {
+  "file": "world_watertreatment_confounded_reversal_53000071.json.gz",
+  "domain": "watertreatment",
+  "archetype": "confounded_reversal",
+  "seed": 53000071
+ },
+ {
+  "file": "world_catalysis_dose_window_53000060.json.gz",
+  "domain": "catalysis",
+  "archetype": "dose_window",
+  "seed": 53000060
+ },
+ {
+  "file": "world_clinical_dose_window_43000176.json.gz",
+  "domain": "clinical",
+  "archetype": "dose_window",
+  "seed": 43000176
+ },
+ {
+  "file": "world_datacenter_dose_window_53000061.json.gz",
+  "domain": "datacenter",
+  "archetype": "dose_window",
+  "seed": 53000061
+ },
+ {
+  "file": "world_fermentation_dose_window_43000195.json.gz",
+  "domain": "fermentation",
+  "archetype": "dose_window",
+  "seed": 43000195
+ },
+ {
+  "file": "world_semiconductor_dose_window_53000062.json.gz",
+  "domain": "semiconductor",
+  "archetype": "dose_window",
+  "seed": 53000062
+ },
+ {
+  "file": "world_watertreatment_dose_window_53000279.json.gz",
+  "domain": "watertreatment",
+  "archetype": "dose_window",
+  "seed": 53000279
+ },
+ {
+  "file": "world_agronomy_hidden_subtype_53000016.json.gz",
+  "domain": "agronomy",
+  "archetype": "hidden_subtype",
+  "seed": 53000016
+ },
+ {
+  "file": "world_aquaculture_hidden_subtype_53000089.json.gz",
+  "domain": "aquaculture",
+  "archetype": "hidden_subtype",
+  "seed": 53000089
+ },
+ {
+  "file": "world_battery_hidden_subtype_53000018.json.gz",
+  "domain": "battery",
+  "archetype": "hidden_subtype",
+  "seed": 53000018
+ },
+ {
+  "file": "world_bioprocess_hidden_subtype_53000019.json.gz",
+  "domain": "bioprocess",
+  "archetype": "hidden_subtype",
+  "seed": 53000019
+ },
+ {
+  "file": "world_catalysis_hidden_subtype_53000092.json.gz",
+  "domain": "catalysis",
+  "archetype": "hidden_subtype",
+  "seed": 53000092
+ },
+ {
+  "file": "world_clinical_hidden_subtype_43000202.json.gz",
+  "domain": "clinical",
+  "archetype": "hidden_subtype",
+  "seed": 43000202
+ },
+ {
+  "file": "world_agronomy_instrument_only_53000104.json.gz",
+  "domain": "agronomy",
+  "archetype": "instrument_only",
+  "seed": 53000104
+ },
+ {
+  "file": "world_aquaculture_instrument_only_53000249.json.gz",
+  "domain": "aquaculture",
+  "archetype": "instrument_only",
+  "seed": 53000249
+ },
+ {
+  "file": "world_datacenter_instrument_only_53000181.json.gz",
+  "domain": "datacenter",
+  "archetype": "instrument_only",
+  "seed": 53000181
+ },
+ {
+  "file": "world_fermentation_instrument_only_43000243.json.gz",
+  "domain": "fermentation",
+  "archetype": "instrument_only",
+  "seed": 43000243
+ },
+ {
+  "file": "world_semiconductor_instrument_only_53000182.json.gz",
+  "domain": "semiconductor",
+  "archetype": "instrument_only",
+  "seed": 53000182
+ },
+ {
+  "file": "world_watertreatment_instrument_only_53000111.json.gz",
+  "domain": "watertreatment",
+  "archetype": "instrument_only",
+  "seed": 53000111
+ },
+ {
+  "file": "world_battery_surrogate_trap_53000242.json.gz",
+  "domain": "battery",
+  "archetype": "surrogate_trap",
+  "seed": 53000242
+ },
+ {
+  "file": "world_bioprocess_surrogate_trap_53000027.json.gz",
+  "domain": "bioprocess",
+  "archetype": "surrogate_trap",
+  "seed": 53000027
+ },
+ {
+  "file": "world_catalysis_surrogate_trap_53000100.json.gz",
+  "domain": "catalysis",
+  "archetype": "surrogate_trap",
+  "seed": 53000100
+ },
+ {
+  "file": "world_clinical_surrogate_trap_43000276.json.gz",
+  "domain": "clinical",
+  "archetype": "surrogate_trap",
+  "seed": 43000276
+ },
+ {
+  "file": "world_datacenter_surrogate_trap_53000101.json.gz",
+  "domain": "datacenter",
+  "archetype": "surrogate_trap",
+  "seed": 53000101
+ },
+ {
+  "file": "world_fermentation_surrogate_trap_43000223.json.gz",
+  "domain": "fermentation",
+  "archetype": "surrogate_trap",
+  "seed": 43000223
+ },
+ {
+  "file": "world_agronomy_synergy_pair_53000120.json.gz",
+  "domain": "agronomy",
+  "archetype": "synergy_pair",
+  "seed": 53000120
+ },
+ {
+  "file": "world_aquaculture_synergy_pair_53000265.json.gz",
+  "domain": "aquaculture",
+  "archetype": "synergy_pair",
+  "seed": 53000265
+ },
+ {
+  "file": "world_battery_synergy_pair_53000122.json.gz",
+  "domain": "battery",
+  "archetype": "synergy_pair",
+  "seed": 53000122
+ },
+ {
+  "file": "world_bioprocess_synergy_pair_53000267.json.gz",
+  "domain": "bioprocess",
+  "archetype": "synergy_pair",
+  "seed": 53000267
+ },
+ {
+  "file": "world_semiconductor_synergy_pair_53000126.json.gz",
+  "domain": "semiconductor",
+  "archetype": "synergy_pair",
+  "seed": 53000126
+ },
+ {
+  "file": "world_watertreatment_synergy_pair_53000271.json.gz",
+  "domain": "watertreatment",
+  "archetype": "synergy_pair",
+  "seed": 53000271
+ }
+]
