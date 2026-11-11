@@ -1,0 +1,17 @@
+{"$schema":"https://json-schema.org/draft/2020-12/schema",
+"$id":"https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/transport/battery_inverse_design_v0_1.schema.json",
+"title":"Battery inverse design manifest v0.1",
+"type":"object","additionalProperties":false,
+"required":["schema_version","manifest_id","mission","scenarios","objectives","evidence","candidates","experiment_options","selection_policy"],
+"properties":{
+"schema_version":{"const":"0.1.0"},
+"manifest_id":{"type":"string","minLength":1},
+"mission":{"type":"object","required":["mission_id","application","duty_cycle_ref","required_calendar_life_years","minimum_lifetime_energy_kwh","system_boundary"]},
+"scenarios":{"type":"array","minItems":1,"items":{"type":"object","required":["scenario_id","temperature_c","age_state","duty_cycle_ref"]}},
+"objectives":{"type":"array","minItems":1,"items":{"type":"object","required":["objective_id","unit","direction","boundary"]}},
+"evidence":{"type":"array","minItems":1,"items":{"type":"object","required":["evidence_id","evidence_class","source_digest","claim_scope","validity_domain","admission"]}},
+"candidates":{"type":"array","minItems":1,"items":{"type":"object","required":["candidate_id","revision","design_refs","scenario_metrics","hard_gates"]}},
+"experiment_options":{"type":"array","items":{"type":"object","required":["experiment_id","question","estimated_cost_usd","duration_hours","material_consumption_g","risk_class","expected_information_gain","estimate_evidence_id"]}},
+"selection_policy":{"type":"object","required":["max_cost_usd","max_duration_hours","max_material_g","allow_no_experiment"]}
+}
+}
