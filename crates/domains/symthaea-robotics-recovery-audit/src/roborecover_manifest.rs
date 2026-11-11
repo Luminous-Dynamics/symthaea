@@ -322,18 +322,21 @@ pub fn parse_pinned_split_csv(
             continue;
         };
 
-        if !sample_ids.insert(sample_id.to_owned()) {
+        let duplicate_sample_id = !sample_ids.insert(sample_id.to_owned());
+        let duplicate_path = !paths.insert(path.to_owned());
+        if duplicate_sample_id {
             issues.push(SplitManifestIssue::DuplicateSampleId {
                 line: line_number,
                 sample_id: sample_id.to_owned(),
             });
-            continue;
         }
-        if !paths.insert(path.to_owned()) {
+        if duplicate_path {
             issues.push(SplitManifestIssue::DuplicatePath {
                 line: line_number,
                 path: path.to_owned(),
             });
+        }
+        if duplicate_sample_id || duplicate_path {
             continue;
         }
 
