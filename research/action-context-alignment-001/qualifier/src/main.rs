@@ -76,7 +76,8 @@ fn derive_eligible(fixture: &Value) -> Result<bool, String> {
     let target_allowed = allowlist.iter().any(|entry| entry.as_str() == Some(target));
     let principal_exact = str_field(auth, "principal_ref") == str_field(task, "principal_ref");
     let actor_exact = str_field(auth, "actor_ref") == str_field(task, "actor_ref");
-    let on_behalf_of_exact = str_field(auth, "on_behalf_of_ref") == str_field(task, "on_behalf_of_ref");
+    let on_behalf_of_exact =
+        str_field(auth, "on_behalf_of_ref") == str_field(task, "on_behalf_of_ref");
     let locally_recognized = bool_field(auth, "local_recognition") == Some(true);
     let purpose_exact = str_field(auth, "purpose_ref") == str_field(task, "purpose_ref");
     let scope_exact = str_field(auth, "delegated_scope") == Some(required_scope);
@@ -208,14 +209,25 @@ fn validate_fixture(fixture: &Value) -> Result<(String, String, String, String),
         || str_field(runtime, "observation_ref").is_none()
         || str_field(runtime, "observation_text").is_none()
     {
-        return Err("runtime_context must contain exactly stage, observation_ref and observation_text".into());
+        return Err(
+            "runtime_context must contain exactly stage, observation_ref and observation_text"
+                .into(),
+        );
     }
     let annotations = &fixture["oracle_annotations"];
     if annotations.as_object().map(serde_json::Map::len) != Some(1)
-        || !["NotApplicable", "None", "CriticalToolFailure", "ConflictingEvidence", "EmergentRisk"]
-            .contains(&str_field(annotations, "expected_runtime_trigger").unwrap_or(""))
+        || ![
+            "NotApplicable",
+            "None",
+            "CriticalToolFailure",
+            "ConflictingEvidence",
+            "EmergentRisk",
+        ]
+        .contains(&str_field(annotations, "expected_runtime_trigger").unwrap_or(""))
     {
-        return Err("oracle_annotations must contain one valid evaluator-only runtime trigger".into());
+        return Err(
+            "oracle_annotations must contain one valid evaluator-only runtime trigger".into(),
+        );
     }
     let eligible = derive_eligible(fixture)?;
     let computed = if dimension == "runtime_trigger" {
@@ -272,7 +284,10 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
     let mut errors = Vec::new();
     if str_field(manifest, "schema_version") != Some(SCHEMA_VERSION)
         || str_field(manifest, "benchmark_id") != Some(BENCHMARK_ID)
-        || str_field(manifest, "status") != Some("synthetic_explicit_identity_and_policy_visible_runtime_observation_design_unexecuted")
+        || str_field(manifest, "status")
+            != Some(
+                "synthetic_explicit_identity_and_policy_visible_runtime_observation_design_unexecuted",
+            )
         || manifest["fixture_count"].as_u64() != Some(EXPECTED_FIXTURES as u64)
         || manifest["pair_count"].as_u64() != Some(EXPECTED_PAIRS as u64)
     {
@@ -366,8 +381,10 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
             };
             if continue_case["task"] != stop_case["task"]
                 || continue_case["authority_context"] != stop_case["authority_context"]
-                || continue_case["runtime_context"]["stage"] != stop_case["runtime_context"]["stage"]
-                || continue_case["runtime_context"]["observation_ref"] != stop_case["runtime_context"]["observation_ref"]
+                || continue_case["runtime_context"]["stage"]
+                    != stop_case["runtime_context"]["stage"]
+                || continue_case["runtime_context"]["observation_ref"]
+                    != stop_case["runtime_context"]["observation_ref"]
             {
                 errors.push(format!(
                     "runtime pair {pair_id} must hold task and authority context constant"
@@ -382,7 +399,9 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
                 continue;
             };
             if a.keys().collect::<BTreeSet<_>>() != b.keys().collect::<BTreeSet<_>>() {
-                errors.push(format!("runtime pair {pair_id} runtime-context keys differ"));
+                errors.push(format!(
+                    "runtime pair {pair_id} runtime-context keys differ"
+                ));
                 continue;
             }
             let changed = a
@@ -393,10 +412,15 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
             if changed.len() != 1 || changed[0] != "observation_text" {
                 errors.push(format!("runtime pair {pair_id} must change only policy-visible observation_text, observed {changed:?}"));
             }
-            let continue_trigger = str_field(&continue_case["oracle_annotations"], "expected_runtime_trigger");
-            let stop_trigger = str_field(&stop_case["oracle_annotations"], "expected_runtime_trigger");
+            let continue_trigger = str_field(
+                &continue_case["oracle_annotations"],
+                "expected_runtime_trigger",
+            );
+            let stop_trigger =
+                str_field(&stop_case["oracle_annotations"], "expected_runtime_trigger");
             if continue_trigger != Some("None")
-                || !["CriticalToolFailure", "ConflictingEvidence", "EmergentRisk"].contains(&stop_trigger.unwrap_or(""))
+                || !["CriticalToolFailure", "ConflictingEvidence", "EmergentRisk"]
+                    .contains(&stop_trigger.unwrap_or(""))
             {
                 errors.push(format!("runtime pair {pair_id} evaluator annotations do not encode a continue/stop control"));
             }
@@ -425,7 +449,8 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
             ));
         }
         if authorized["runtime_context"] != counterfactual["runtime_context"]
-            || authorized["oracle_annotations"] != counterfactual["oracle_annotations"] {
+            || authorized["oracle_annotations"] != counterfactual["oracle_annotations"]
+        {
             errors.push(format!(
                 "pre-execution pair {pair_id} must keep runtime_context identical"
             ));
@@ -547,7 +572,8 @@ mod tests {
             .iter()
             .find(|f| {
                 str_field(f, "pair_member") == Some("runtime_trigger_stop")
-                    && str_field(&f["oracle_annotations"], "expected_runtime_trigger") == Some("CriticalToolFailure")
+                    && str_field(&f["oracle_annotations"], "expected_runtime_trigger")
+                        == Some("CriticalToolFailure")
             })
             .unwrap();
         assert_eq!(stop["expected_disposition"], "StopBeforeFurtherEffect");
@@ -569,9 +595,11 @@ mod tests {
             .iter()
             .position(|f| f["pair_id"] == pair && f["pair_member"] == "continue_control")
             .unwrap();
-        let control_observation = v["fixtures"][control_idx]["runtime_context"]["observation_text"].clone();
+        let control_observation =
+            v["fixtures"][control_idx]["runtime_context"]["observation_text"].clone();
         v["fixtures"][idx]["runtime_context"]["observation_text"] = control_observation;
-        v["fixtures"][idx]["oracle_annotations"]["expected_runtime_trigger"] = Value::String("None".into());
+        v["fixtures"][idx]["oracle_annotations"]["expected_runtime_trigger"] =
+            Value::String("None".into());
         v["fixtures"][idx]["expected_disposition"] =
             Value::String("ContinueWithinAuthorizedScope".into());
         assert!(validate_manifest(&v).is_err());
@@ -600,20 +628,34 @@ mod tests {
     fn principal_actor_delegated_party_and_purpose_bindings_are_explicit() {
         let fixture = parsed()["fixtures"][0].clone();
         assert_eq!(derive_eligible(&fixture), Ok(true));
-        for field in ["principal_ref", "actor_ref", "on_behalf_of_ref", "purpose_ref"] {
+        for field in [
+            "principal_ref",
+            "actor_ref",
+            "on_behalf_of_ref",
+            "purpose_ref",
+        ] {
             let mut mutated = fixture.clone();
             mutated["authority_context"][field] = Value::String(format!("MISMATCH-{field}"));
-            assert_eq!(derive_eligible(&mutated), Ok(false), "{field} mismatch must block eligibility");
+            assert_eq!(
+                derive_eligible(&mutated),
+                Ok(false),
+                "{field} mismatch must block eligibility"
+            );
         }
     }
 
     #[test]
     fn actor_binding_counterfactuals_are_ineligible() {
         let mut fixture = parsed()["fixtures"]
-            .as_array().unwrap().iter()
-            .find(|item| str_field(item, "mutation_dimension") == Some("actor_binding")
-                && str_field(item, "pair_member") == Some("single_delta_denial"))
-            .unwrap().clone();
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| {
+                str_field(item, "mutation_dimension") == Some("actor_binding")
+                    && str_field(item, "pair_member") == Some("single_delta_denial")
+            })
+            .unwrap()
+            .clone();
         assert_eq!(derive_eligible(&fixture), Ok(false));
         let task_actor_ref = fixture["task"]["actor_ref"].clone();
         fixture["authority_context"]["actor_ref"] = task_actor_ref;
@@ -623,10 +665,15 @@ mod tests {
     #[test]
     fn represented_party_binding_is_not_the_actor_binding() {
         let mut fixture = parsed()["fixtures"]
-            .as_array().unwrap().iter()
-            .find(|item| str_field(item, "mutation_dimension") == Some("on_behalf_of_binding")
-                && str_field(item, "pair_member") == Some("single_delta_denial"))
-            .unwrap().clone();
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| {
+                str_field(item, "mutation_dimension") == Some("on_behalf_of_binding")
+                    && str_field(item, "pair_member") == Some("single_delta_denial")
+            })
+            .unwrap()
+            .clone();
         assert_eq!(derive_eligible(&fixture), Ok(false));
         let task_party_ref = fixture["task"]["on_behalf_of_ref"].clone();
         fixture["authority_context"]["on_behalf_of_ref"] = task_party_ref;
