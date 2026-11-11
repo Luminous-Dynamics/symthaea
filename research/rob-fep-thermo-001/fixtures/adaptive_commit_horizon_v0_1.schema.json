@@ -1,0 +1,512 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rob-fep-thermo-001/fixtures/adaptive_commit_horizon_v0_1.schema.json",
+  "title": "Adaptive commitment horizon synthetic known answers v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "status",
+    "required_bounds",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "protocol_id": {
+      "const": "ROB-ADAPTIVE-COMMIT-HORIZON-001"
+    },
+    "status": {
+      "const": "synthetic_known_answers_only"
+    },
+    "required_bounds": {
+      "const": [
+        "proposal",
+        "freshness",
+        "deadline",
+        "thermal",
+        "actuator",
+        "dynamics",
+        "viability",
+        "queue",
+        "continuity"
+      ]
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 15,
+      "maxItems": 15,
+      "uniqueItems": true,
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH01_QUEUE_IS_TIGHTEST"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH02_THERMAL_CAP_BINDS"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH03_VIABILITY_CAP_BINDS"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH04_REQUIRED_THERMAL_EVIDENCE_UNKNOWN"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH05_ZERO_DEADLINE_SLACK"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH06_QUEUE_UNDERFLOW"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH07_DYNAMICS_DIGEST_MISMATCH"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH08_STALE_FRESHNESS_CERTIFICATE"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH09_LONG_WORLD_MODEL_HORIZON_CLIPPED_BY_VIABILITY"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH10_LOW_RISK_STABLE_LONG_COMMITMENT"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH11_PROGRESS_ONLY_RECOMMENDS_TOO_LONG"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH12_ELIGIBLE_IS_NOT_ACTUATION_AUTHORITY"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH13_SHORT_QUEUE_LIMITS_COMMITMENT"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH14_ACTUATOR_BOUND_STALE"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AH15_TIED_THERMAL_AND_ACTUATOR_LIMITS"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ],
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "bound": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "max_ticks"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "qualified",
+            "unknown",
+            "stale",
+            "digest_mismatch"
+          ]
+        },
+        "max_ticks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "qualified"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "max_ticks": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "unknown",
+                  "stale",
+                  "digest_mismatch"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "max_ticks": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "bounds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "proposal",
+        "freshness",
+        "deadline",
+        "thermal",
+        "actuator",
+        "dynamics",
+        "viability",
+        "queue",
+        "continuity"
+      ],
+      "properties": {
+        "proposal": {
+          "$ref": "#/$defs/bound"
+        },
+        "freshness": {
+          "$ref": "#/$defs/bound"
+        },
+        "deadline": {
+          "$ref": "#/$defs/bound"
+        },
+        "thermal": {
+          "$ref": "#/$defs/bound"
+        },
+        "actuator": {
+          "$ref": "#/$defs/bound"
+        },
+        "dynamics": {
+          "$ref": "#/$defs/bound"
+        },
+        "viability": {
+          "$ref": "#/$defs/bound"
+        },
+        "queue": {
+          "$ref": "#/$defs/bound"
+        },
+        "continuity": {
+          "$ref": "#/$defs/bound"
+        }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bounds",
+        "progress_only_recommended_ticks",
+        "executed_prefix_matches",
+        "model_digest_matches",
+        "minimum_commit_ticks"
+      ],
+      "properties": {
+        "bounds": {
+          "$ref": "#/$defs/bounds"
+        },
+        "progress_only_recommended_ticks": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "executed_prefix_matches": {
+          "type": "boolean"
+        },
+        "model_digest_matches": {
+          "type": "boolean"
+        },
+        "minimum_commit_ticks": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "selected_horizon_ticks",
+        "binding_constraints",
+        "eligible_for_independent_projection",
+        "actuation_authorized"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "eligible",
+            "unknown_hold",
+            "zero_horizon_fallback",
+            "provenance_mismatch"
+          ]
+        },
+        "selected_horizon_ticks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "binding_constraints": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "proposal",
+              "freshness",
+              "deadline",
+              "thermal",
+              "actuator",
+              "dynamics",
+              "viability",
+              "queue",
+              "continuity"
+            ]
+          }
+        },
+        "eligible_for_independent_projection": {
+          "type": "boolean"
+        },
+        "actuation_authorized": {
+          "const": false
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "description",
+        "inputs",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "enum": [
+            "AH01_QUEUE_IS_TIGHTEST",
+            "AH02_THERMAL_CAP_BINDS",
+            "AH03_VIABILITY_CAP_BINDS",
+            "AH04_REQUIRED_THERMAL_EVIDENCE_UNKNOWN",
+            "AH05_ZERO_DEADLINE_SLACK",
+            "AH06_QUEUE_UNDERFLOW",
+            "AH07_DYNAMICS_DIGEST_MISMATCH",
+            "AH08_STALE_FRESHNESS_CERTIFICATE",
+            "AH09_LONG_WORLD_MODEL_HORIZON_CLIPPED_BY_VIABILITY",
+            "AH10_LOW_RISK_STABLE_LONG_COMMITMENT",
+            "AH11_PROGRESS_ONLY_RECOMMENDS_TOO_LONG",
+            "AH12_ELIGIBLE_IS_NOT_ACTUATION_AUTHORITY",
+            "AH13_SHORT_QUEUE_LIMITS_COMMITMENT",
+            "AH14_ACTUATOR_BOUND_STALE",
+            "AH15_TIED_THERMAL_AND_ACTUATOR_LIMITS"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputs": {
+          "$ref": "#/$defs/inputs"
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      }
+    }
+  }
+}
