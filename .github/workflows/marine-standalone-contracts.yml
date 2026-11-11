@@ -243,7 +243,7 @@ jobs:
           set -e
           cat "$RUNNER_TEMP/marine-biofouling-report.json"
           test "$status" -eq 2
-          jq -e '.disposition == "INCOMPLETE" and .hull_coverage_fraction == 0.9 and .zone_count == 3 and .confirmed_species_count == 0 and .performance_comparison_eligible == false' "$RUNNER_TEMP/marine-biofouling-report.json"
+          jq -e '.disposition == "INCOMPLETE" and .hull_coverage_fraction == 0.9 and .zone_count == 3 and .confirmed_species_count == 0 and .performance_pair_conditions_matched == true' "$RUNNER_TEMP/marine-biofouling-report.json"
 
       - name: Preserve generated lockfile and audit receipts
         if: always()
