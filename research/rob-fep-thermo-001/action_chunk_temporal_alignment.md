@@ -109,3 +109,10 @@ Do not pool raw scores across lanes. Standardize event/receipt semantics and wit
 ## Claim boundary
 
 The fixture corpus is synthetic. A successful eligibility disposition establishes only the deterministic arithmetic and precedence for this declared contract. It does not prove clock synchronization, model correctness, physical continuity, actuator tracking, safe projection, runtime-assurance validity or a physical robot result.
+
+
+## External experimental motivation
+
+The temporal-alignment contract is motivated by the 2026 study of asynchronous World Action Model deployment on a 10 Hz bimanual robot. It compared synchronous execution, asynchronous switching, post-hoc blending, denoising-time blending, inference-time velocity guidance and prefix-conditioned generation. Temporal misalignment between observations, predictions and executed commands produced persistent chunk-boundary discontinuities that blending did not repair; prefix-conditioned generation offered the best overall balance under that study's conditions. https://arxiv.org/abs/2608.01880
+
+LIBERO-Dynamic supplies a larger manipulation benchmark for action-horizon and queueing studies (40 tasks; 1,800 episodes; measured policy latency while the world moves; synchronous hold, async queueing, RTC and delay-aware VLASH reference; some real-robot conditions): https://github.com/renshaojie233/LIBERO-Dynamic
