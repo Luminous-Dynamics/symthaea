@@ -84,5 +84,26 @@
     "A gate pass is not evidence that the model understood intent; model correctness is not evidence that the gate enforced authority.",
     "The golden control is a synthetic oracle policy and must never be reported as a model result."
   ],
-  "claim_ceiling": "A qualified receipt establishes only internally consistent, complete model-trial capture records and independent gate/effect-witness consistency. It does not establish model superiority, production authorization safety or governance legitimacy."
+  "claim_ceiling": "A qualified receipt establishes only internally consistent, complete model-trial capture records and independent gate/effect-witness consistency. It does not establish model superiority, production authorization safety or governance legitimacy.",
+  "external_comparators": [
+    {
+      "name": "AgentAbstain",
+      "url": "https://agentabstain.github.io/",
+      "reported_contract": "263 paired tasks across 42 executable environments; latest public leaderboard top paired accuracy 59.5% across 17 model/harness configurations.",
+      "comparison_limit": "Not directly comparable until environment tools, task semantics, pair taxonomy and scoring are matched."
+    },
+    {
+      "name": "AuthGateBench",
+      "url": "https://arxiv.org/abs/2610.16426",
+      "reported_contract": "1,400 policy-guided authorization-context instances across five failure modes, including pairs with the same action/trajectory but different authorization context.",
+      "comparison_limit": "Published task and model contracts differ; use as a contrast-pair design comparator before any numeric comparison."
+    },
+    {
+      "name": "AuthorizationBench",
+      "url": "https://arxiv.org/abs/2610.27548",
+      "reported_contract": "286 executable tasks, 6,864 trajectories across four models, two reasoning effort settings and three agent harnesses; reported 19.2% out-of-authorization action rate across the tested mix.",
+      "comparison_limit": "Out-of-scope trajectory rate is not the same metric as paired context-flip accuracy or synthetic gate correctness."
+    }
+  ],
+  "model_trial_boundary": "The v0.4 fixture corpus has 30 pairs and validates the protocol/receipt path only. It is not statistically adequate for a public leaderboard. The confirmatory target and preregistered power analysis must be completed before comparative claims."
 }
