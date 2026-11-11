@@ -2005,6 +2005,105 @@ mod tests {
         MidiTranscriptionEvaluationConfigV1::default()
     }
 
+    fn reference_eval_note(part_id: u16, pitch_midi: u8) -> EvaluationNoteV1 {
+        EvaluationNoteV1 {
+            pitch_midi,
+            part_id,
+            gm_program: 40,
+            velocity_midi: 100,
+            onset_seconds: 0.0,
+            offset_seconds: Some(0.5),
+        }
+    }
+
+    fn predicted_eval_note(track_index: u16, pitch_midi: u8, ordinal: u32) -> MidiTranscribedNoteV1 {
+        MidiTranscribedNoteV1 {
+            track_index,
+            midi_channel: 0,
+            onset_tick: 0,
+            offset_tick: Some(480),
+            source_event_ordinal: ordinal,
+            gm_program: 40,
+            pitch_midi,
+            velocity_midi: 100,
+            onset_seconds: 0.0,
+            offset_seconds: Some(0.5),
+        }
+    }
+
+    #[test]
+    fn separate_prediction_tracks_preserve_reference_part_separation() {
+        let reference = vec![
+            reference_eval_note(1, 60),
+            reference_eval_note(2, 48),
+        ];
+        let predicted = vec![
+            predicted_eval_note(4, 60, 0),
+            predicted_eval_note(9, 48, 1),
+        ];
+        let summary =
+            part_separation_summary_v1(&reference, &predicted, &[(0, 0), (1, 1)]).unwrap();
+        assert_eq!(summary.reference_part_count, 2);
+        assert_eq!(summary.matched_reference_part_count, 2);
+        assert_eq!(summary.matched_prediction_track_count, 2);
+        assert_eq!(summary.mixed_prediction_track_count, 0);
+        assert_eq!(summary.matched_notes_in_mixed_tracks, 0);
+        assert_eq!(summary.note_weighted_track_purity, Some(1.0));
+        assert_eq!(summary.reference_part_coverage, Some(1.0));
+    }
+
+    #[test]
+    fn merged_prediction_track_reports_part_contamination_even_when_notes_are_correct() {
+        let reference = vec![
+            reference_eval_note(1, 60),
+            reference_eval_note(2, 48),
+        ];
+        let predicted = vec![
+            predicted_eval_note(4, 60, 0),
+            predicted_eval_note(4, 48, 1),
+        ];
+        let summary =
+            part_separation_summary_v1(&reference, &predicted, &[(0, 0), (1, 1)]).unwrap();
+        assert_eq!(summary.total_matched_notes, 2);
+        assert_eq!(summary.mixed_prediction_track_count, 1);
+        assert_eq!(summary.matched_notes_in_mixed_tracks, 2);
+        assert_eq!(summary.note_weighted_track_purity, Some(0.5));
+        assert_eq!(summary.reference_part_coverage, Some(1.0));
+    }
+
+    #[test]
+    fn part_coverage_exposes_a_missing_reference_part() {
+        let reference = vec![
+            reference_eval_note(1, 60),
+            reference_eval_note(2, 48),
+        ];
+        let predicted = vec![predicted_eval_note(4, 60, 0)];
+        let summary =
+            part_separation_summary_v1(&reference, &predicted, &[(0, 0)]).unwrap();
+        assert_eq!(summary.matched_reference_part_count, 1);
+        assert_eq!(summary.reference_part_coverage, Some(0.5));
+        assert_eq!(summary.note_weighted_track_purity, Some(1.0));
+    }
+
+    #[test]
+    fn part_separation_summary_is_bound_by_report_commitment() {
+        let notes = vec![(60, 0, 480)];
+        let reference = reference_artifact(&notes, 40);
+        let prediction = build_midi(&notes, 40, &[(0, 500_000)]);
+        let mut report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        let original = midi_transcription_evaluation_commitment_v1(&report).unwrap();
+        let mut summary = report.part_separation.clone().unwrap();
+        summary.note_weighted_track_purity = Some(0.0);
+        report.part_separation = Some(summary);
+        let tampered = midi_transcription_evaluation_commitment_v1(&report).unwrap();
+        assert_ne!(original, tampered);
+    }
+
     #[test]
     fn exact_prediction_has_perfect_instrument_agnostic_and_program_metrics() {
         let notes = vec![(60, 0, 480), (64, 960, 1_440), (67, 1_920, 2_400)];
