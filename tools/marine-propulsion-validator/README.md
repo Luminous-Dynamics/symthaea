@@ -290,3 +290,21 @@ The join audit checks same-vessel revision and service identity, source record I
 event-time alignment, acoustic-to-pre-intervention propulsion conditions and cleaning/post
 observation order. It reports contextual linkage only. Synthetic source records must leave
 the overall result INCOMPLETE and cannot be promoted to causal fuel/noise claims.
+
+
+Audit a cross-domain acoustic / hull-inspection / cleaning / propulsion evidence join:
+
+~~~sh
+cargo run --bin marine-hull-state-evidence-join-audit -- \
+  docs/research/marine/marine-hull-state-evidence-join-v0.1.0.schema.json \
+  docs/research/marine/fixtures/synthetic-marine-hull-state-evidence-join-v0.1.0.json \
+  docs/research/marine/marine-acoustic-evidence-v0.1.0.schema.json \
+  docs/research/marine/fixtures/synthetic-marine-acoustic-evidence-v0.1.0.json \
+  docs/research/marine/marine-biofouling-evidence-v0.1.0.schema.json \
+  docs/research/marine/fixtures/synthetic-marine-biofouling-evidence-v0.1.0.json
+~~~
+
+The join checks same-vessel revision/service identity, source record IDs and digests, event-time
+alignment, acoustic-to-pre-intervention propulsion conditions, and cleaning/post-observation
+order. A synthetic join may report context_links_valid=true while the overall disposition
+remains INCOMPLETE. The join does not establish causal or environmental benefit.
