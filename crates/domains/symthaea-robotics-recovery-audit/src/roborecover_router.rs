@@ -6,7 +6,7 @@
 //! policies with sufficient known support and acceptable conservative risk,
 //! and abstains when the predicted context or evidence is insufficient.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use super::roborecover_score::{
     BenchmarkSplit, StageTypeGroup,
@@ -79,6 +79,7 @@ pub struct PolicyCompetenceRecord {
 pub enum RouterRejection {
     HoldoutSplit,
     IdentityMismatch,
+    DuplicateCheckpointEvidence,
     InvalidPolicyIdentity,
     InvalidCounts,
     InsufficientKnownCoverage,
@@ -217,11 +218,31 @@ pub fn select_policy(
     }
 
     let mut rejected = BTreeMap::new();
+    let matching_records = records
+        .iter()
+        .filter(|record| record.group == group)
+        .collect::<Vec<_>>();
+    let mut checkpoint_counts = BTreeMap::<String, usize>::new();
+    for record in &matching_records {
+        *checkpoint_counts
+            .entry(record.policy_digest.clone())
+            .or_insert(0) += 1;
+    }
+    let duplicate_checkpoints = checkpoint_counts
+        .iter()
+        .filter_map(|(digest, count)| (*count > 1).then(|| digest.clone()))
+        .collect::<BTreeSet<_>>();
+
     let mut compatible_records_considered = 0;
     let mut eligible = Vec::<SelectedPolicy>::new();
 
-    for record in records.iter().filter(|record| record.group == group) {
+    for record in matching_records {
         compatible_records_considered += 1;
+
+        if duplicate_checkpoints.contains(&record.policy_digest) {
+            reject(&mut rejected, RouterRejection::DuplicateCheckpointEvidence);
+            continue;
+        }
 
         if record.split != BenchmarkSplit::Train {
             reject(&mut rejected, RouterRejection::HoldoutSplit);
@@ -323,6 +344,7 @@ pub fn select_policy(
                     .total_cmp(&right.p95_inference_latency_ms)
             })
             .then_with(|| left.policy_id.cmp(&right.policy_id))
+            .then_with(|| left.policy_digest.cmp(&right.policy_digest))
     });
 
     let selected = eligible.first().cloned();
@@ -627,4 +649,24 @@ mod tests {
             Some(AbstainReason::NoCompatibleTrainingEvidence)
         );
     }
+
+    #[test]
+    fn duplicate_checkpoint_evidence_is_not_counted_twice() {
+        let first = record("policy-a", 99, 0);
+        let mut second = record("policy-a-copy", 95, 0);
+        second.policy_digest = first.policy_digest.clone();
+        let decision = select_policy(
+            &context(),
+            &identity(),
+            &[first, second],
+            &RouterConfig::default(),
+        ).unwrap();
+
+        assert_eq!(decision.selected, None);
+        assert_eq!(
+            decision.rejected_records.get(&RouterRejection::DuplicateCheckpointEvidence),
+            Some(&2)
+        );
+    }
+
 }
