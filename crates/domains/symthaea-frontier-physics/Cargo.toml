@@ -11,4 +11,5 @@ keywords = ["path-integral", "information-geometry", "dmrg", "tqft", "consciousn
 categories = ["science", "simulation"]
 
 [dependencies]
+num-complex = { workspace = true }
 serde = { version = "1.0", features = ["derive"] }
