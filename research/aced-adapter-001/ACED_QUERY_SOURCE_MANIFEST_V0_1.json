@@ -118,7 +118,12 @@
     "core_decision_guess_decision_exact_content_overlap": 0,
     "total_track_entries": 148,
     "unique_payload_sha256_count": 138,
-    "uniqueness_note": "Track entries are not independent world samples. The 10 core structural payloads are also present in guess_struct; two core decision payloads are also present in guess_decision. Report overlap explicitly; do not pool as independent."
+    "uniqueness_note": "The 10 core_struct payloads are exact content duplicates in guess_struct. Two core_decision and guess_decision rows share a filename but have different Git blob and SHA-256 digests; they are distinct payloads and their full track paths must remain separate. There are 148 track entries and 138 unique payload digests. Do not infer identity from filename alone or pool overlapping track entries as independent.",
+    "core_decision_guess_decision_filename_collision_count": 2,
+    "core_decision_guess_decision_filename_collision_files": [
+      "world_safety_constrained_Hospital_data_n10_seed3202.json",
+      "world_safety_constrained_Screening_and_diagnosis_n10_seed3000.json"
+    ]
   },
   "candidate_data_boundary": {
     "copied_payloads": false,
