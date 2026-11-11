@@ -311,9 +311,16 @@ fn legacy_coverage_defaults_missing_false_negative_modes_to_unknown() {
         serde_json::from_str(legacy).expect("legacy coverage remains readable");
 
     assert_eq!(decoded.false_negative_risks, vec![FalseNegativeRisk::Unknown]);
-    let mut issues = Vec::new();
-    decoded.validate("coverage", &mut issues);
-    assert!(issues.is_empty(), "{issues:#?}");
+    let mut candidate = profile();
+    candidate.evidence.push(measurement("m1", EvidenceOutcome::NoDetection));
+    let mut property = finding(
+        Property::SelfMaintenance,
+        PropertyAssessment::InsufficientEvidence,
+        &["m1"],
+    );
+    property.coverage = Some(decoded);
+    candidate.findings.push(property);
+    assert!(candidate.validate().is_ok());
 }
 
 #[test]
