@@ -100,6 +100,11 @@ cargo test --manifest-path research/action-context-alignment-001/qualifier/Cargo
 cargo run --manifest-path research/action-context-alignment-001/qualifier/Cargo.toml -- \
   research/action-context-alignment-001/ACTION_CONTEXT_ALIGNMENT_FIXTURES_V0_1.json \
   research/action-context-alignment-001/ACTION_CONTEXT_ALIGNMENT_FIXTURES_V0_1.schema.json
+cargo run --manifest-path research/action-context-alignment-001/qualifier/Cargo.toml \
+  --bin model_trial_result_qualifier -- \
+  research/action-context-alignment-001/MODEL_TRIAL_GOLDEN_CONTROL_V0_1.json \
+  research/action-context-alignment-001/ACTION_CONTEXT_ALIGNMENT_FIXTURES_V0_1.json \
+  research/action-context-alignment-001/MODEL_TRIAL_RESULTS_V0_1.schema.json
 ```
 
 ## Claim ceiling
