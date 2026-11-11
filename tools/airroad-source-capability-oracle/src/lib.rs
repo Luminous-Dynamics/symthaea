@@ -977,11 +977,11 @@ mod tests {
         let report = qualify_source_capability(&input).unwrap();
         let failures = &report.buses[0].nominal.failures;
         assert!(failures.iter().any(|failure| matches!(
-            failure.kind,
+            &failure.kind,
             SourceCapabilityFailureKind::DemandExceedsPowerCapability { .. }
         )));
         assert!(failures.iter().any(|failure| matches!(
-            failure.kind,
+            &failure.kind,
             SourceCapabilityFailureKind::DemandExceedsCurrentCapability { .. }
         )));
     }
@@ -996,7 +996,7 @@ mod tests {
             SourceCapabilityDisposition::Infeasible
         );
         assert!(report.buses[0].nominal.failures.iter().any(|failure| matches!(
-            failure.kind,
+            &failure.kind,
             SourceCapabilityFailureKind::DeliverableVoltageBelowRequired { .. }
         )));
     }
@@ -1016,7 +1016,7 @@ mod tests {
             SourceCapabilityDisposition::Infeasible
         );
         assert!(report.buses[0].nominal.failures.iter().any(|failure| matches!(
-            failure.kind,
+            &failure.kind,
             SourceCapabilityFailureKind::MissionEnergyViolatesProtectedReserve { .. }
         )));
     }
@@ -1208,7 +1208,7 @@ mod tests {
             SourceCapabilityDisposition::Infeasible
         );
         assert!(matches!(
-            report.buses[0].nominal.failures[0].kind,
+            &report.buses[0].nominal.failures[0].kind,
             SourceCapabilityFailureKind::UpstreamBusScenarioInfeasible
         ));
     }
