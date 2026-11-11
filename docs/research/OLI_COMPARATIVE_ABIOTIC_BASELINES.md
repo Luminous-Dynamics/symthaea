@@ -62,6 +62,19 @@ A candidate whose context lies outside the observed qualified-control range is r
 - **Unseen system:** abstain without a calibrated system baseline.
 - **Unequal control counts:** the system-level prior center must not be dominated by systems with more sampled observations.
 
+## Alternative-model comparison and unknown unknowns
+
+The reference now accepts a separately supplied `AlternativeModelPrediction` and compares its Gaussian predictive score with the qualified abiotic baseline on the same held-out observation. This yields five outcomes:
+- abiotic baseline predictively preferred;
+- alternative model predictively preferred;
+- both models predictive but non-discriminating;
+- both models inadequate (unknown unknown);
+- inconclusive.
+
+The alternative model is not fitted or self-certified by this module. A predictive preference is not proof that the model's mechanism exists, and a better-fitting alternative is not automatically a biotic explanation. The module deliberately does not contain a "life detected" outcome.
+
+When both models miss the observation by more than the declared adequacy threshold, the case remains an unknown unknown. This is a critical distinction: an unexplained observation is evidence of model inadequacy, not automatic evidence of life.
+
 ## What this does and does not claim
 
 The result `ComparativeAnomaly` means only that a sample is an outlier relative to the declared qualified abiotic baseline under this model. It does not establish biology or life.
