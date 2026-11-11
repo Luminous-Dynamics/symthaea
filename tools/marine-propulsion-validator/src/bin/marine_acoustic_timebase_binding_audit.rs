@@ -154,11 +154,13 @@ fn uncertainty_is_known(quantity: &Value) -> bool {
 }
 
 fn check_quantity_uncertainty(quantity: &Value, path: &str, findings: &mut Findings) {
-    if quantity.get("value").and_then(Value::as_f64).is_none()
-        || quantity.get("unit").and_then(Value::as_str).is_none()
-    {
+    let numeric_value = quantity.get("value").and_then(Value::as_f64);
+    if numeric_value.is_none() || quantity.get("unit").and_then(Value::as_str).is_none() {
         findings.push(path, "INVALID", "quantity must carry a numeric value and explicit unit");
         return;
+    }
+    if numeric_value.is_some_and(|value| !value.is_finite() || value < 0.0) {
+        findings.push(path, "INVALID", "uncertainty bounds and magnitudes must be finite and non-negative");
     }
     if !uncertainty_is_known(quantity) {
         findings.push(
@@ -400,6 +402,13 @@ fn check_channel(
         ),
     }
 
+    if channel.get("sample_rate_basis").and_then(Value::as_str) != Some("measured") {
+        findings.push(
+            format!("{path}/sample_rate_basis"),
+            "INCOMPLETE",
+            "a nominal sampling-rate declaration is not independent evidence of the acquisition clock rate",
+        );
+    }
     let sync = timebase.get("synchronization_uncertainty").unwrap_or(&Value::Null);
     let drift = timebase.get("drift_uncertainty_ppm").unwrap_or(&Value::Null);
     let alignment = channel.get("time_alignment_uncertainty").unwrap_or(&Value::Null);
@@ -419,8 +428,32 @@ fn check_channel(
         drift.get("value").and_then(Value::as_f64),
         parse_time(timebase.get("reference_epoch").and_then(Value::as_str)),
     ) {
-        let elapsed = (start.signed_duration_since(epoch).num_seconds().unsigned_abs() as f64)
-            .max(end.signed_duration_since(epoch).num_seconds().unsigned_abs() as f64);
+        if drift_ppm < 0.0 {
+            findings.push(
+                format!("{path}/timebase/drift_uncertainty_ppm/value"),
+                "INVALID",
+                "residual drift uncertainty cannot be negative",
+            );
+        }
+        let elapsed_start = start
+            .signed_duration_since(epoch.clone())
+            .num_nanoseconds()
+            .map(|value| (value as f64).abs() / 1.0e9);
+        let elapsed_end = end
+            .signed_duration_since(epoch)
+            .num_nanoseconds()
+            .map(|value| (value as f64).abs() / 1.0e9);
+        let elapsed = match (elapsed_start, elapsed_end) {
+            (Some(a), Some(b)) => a.max(b),
+            _ => {
+                findings.push(
+                    format!("{path}/timebase/reference_epoch"),
+                    "INCOMPLETE",
+                    "reference epoch is too distant for supported nanosecond duration arithmetic",
+                );
+                0.0
+            }
+        };
         let drift_seconds = elapsed * drift_ppm.abs() * 1.0e-6;
         let required_bound = sync_seconds + drift_seconds;
         if alignment_seconds + 1.0e-12 < required_bound {
@@ -592,6 +625,7 @@ fn check_binding(acoustic: &Value, case: &Value, findings: &mut Findings) -> (bo
 
     let mut matched_quantities = BTreeSet::new();
     let mut reference_clock = hydrophone_clock.clone();
+    let hydrophone_timebase_id = hydrophone_channel.get("timebase_id").and_then(Value::as_str);
     let mut synchronized_count = 1usize;
 
     for (physical_quantity, expected_unit) in REQUIRED_PROPULSION_CHANNELS {
@@ -609,6 +643,13 @@ fn check_binding(acoustic: &Value, case: &Value, findings: &mut Findings) -> (bo
         }
         let channel = matches[0];
         let channel_id = channel.get("channel_id").and_then(Value::as_str).unwrap_or("<unknown>");
+        if channel.get("timebase_id").and_then(Value::as_str) != hydrophone_timebase_id {
+            findings.push(
+                format!("/channels/{channel_id}/timebase_id"),
+                "INCOMPARABLE",
+                "initial implementation requires the hydrophone and propulsion channels to resolve through the same versioned timebase record",
+            );
+        }
         if channel.get("unit").and_then(Value::as_str) != Some(expected_unit) {
             findings.push(
                 format!("/channels/{channel_id}/unit"),
