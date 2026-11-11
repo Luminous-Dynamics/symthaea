@@ -734,6 +734,64 @@ mod tests {
         }
     }
 
+    fn d4_action() -> FiniteActionV1 {
+        let mut multiplication = vec![vec![0; 8]; 8];
+        for left in 0..8 {
+            let left_rotation = left % 4;
+            let left_reflection = left / 4;
+            for right in 0..8 {
+                let right_rotation = right % 4;
+                let right_reflection = right / 4;
+                let signed_rotation = if left_reflection == 0 {
+                    right_rotation
+                } else {
+                    (4 - right_rotation) % 4
+                };
+                let product_rotation = (left_rotation + signed_rotation) % 4;
+                let product_reflection = left_reflection ^ right_reflection;
+                multiplication[left][right] = product_reflection * 4 + product_rotation;
+            }
+        }
+
+        let mut permutations = Vec::with_capacity(8);
+        for element in 0..8 {
+            let rotation = element % 4;
+            let reflection = element / 4;
+            let mut permutation = vec![0; 4];
+            for vertex in 0..4 {
+                let signed_vertex = if reflection == 0 {
+                    vertex
+                } else {
+                    (4 - vertex) % 4
+                };
+                permutation[vertex] = (rotation + signed_vertex) % 4;
+            }
+            permutations.push(permutation);
+        }
+
+        let mut pair_permutations = Vec::with_capacity(8);
+        for permutation in &permutations {
+            let mut action = vec![0; 16];
+            for source in 0..4 {
+                for target in 0..4 {
+                    action[source * 4 + target] =
+                        permutation[source] * 4 + permutation[target];
+                }
+            }
+            pair_permutations.push(action);
+        }
+
+        FiniteActionV1 {
+            action_id: "D4-ordered-vertex-pair-action-v1".to_owned(),
+            group: FiniteGroupV1 {
+                group_id: "D4-order-8-v1".to_owned(),
+                identity: 0,
+                multiplication,
+            },
+            permutations: pair_permutations,
+        }
+    }
+
     fn semantics(cost: i64, constraint: i64, boundary: &str, output: &str) -> CandidateSemanticsV1 {
         CandidateSemanticsV1 {
             in_search_domain: true,
@@ -991,6 +1049,64 @@ mod tests {
             QualificationBudgetV1::default(),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn non_abelian_d4_pair_action_matches_three_exhaustive_orbits() {
+        let action = d4_action();
+        assert_ne!(action.group.multiplication[1][4], action.group.multiplication[4][1]);
+
+        let mut candidate_ids = Vec::with_capacity(16);
+        let mut semantics = Vec::with_capacity(16);
+        for source in 0usize..4 {
+            for target in 0usize..4 {
+                let difference = source.abs_diff(target);
+                let distance = difference.min(4 - difference);
+                candidate_ids.push(format!("p{source}{target}"));
+                semantics.push(CandidateSemanticsV1 {
+                    in_search_domain: true,
+                    admissible: true,
+                    feasible: true,
+                    objective_cost: distance as i64,
+                    constraint_signature: vec![distance as i64],
+                    boundary_condition_id: "fixed-square-boundary-v1".to_owned(),
+                    output_equivalence_id: format!("distance-class-{distance}"),
+                });
+            }
+        }
+        let problem = SearchProblemV1 {
+            problem_id: "D4-square-ordered-pairs-v1".to_owned(),
+            candidate_ids,
+            semantics,
+        };
+
+        let outcome =
+            compile_quotient(&problem, &action, QualificationBudgetV1::default()).unwrap();
+        let CompileOutcomeV1::Authorized(certificate) = outcome else {
+            panic!("D4 action must preserve pair-distance task semantics");
+        };
+        let compiled: Vec<BTreeSet<usize>> = certificate
+            .orbits
+            .iter()
+            .map(|orbit| {
+                orbit
+                    .members
+                    .iter()
+                    .map(|member| member.candidate_index)
+                    .collect()
+            })
+            .collect();
+        assert_eq!(compiled, exhaustive_oracle(&action, 16));
+        assert_eq!(
+            certificate
+                .orbits
+                .iter()
+                .map(|orbit| orbit.members.len())
+                .collect::<Vec<_>>(),
+            vec![4, 8, 4]
+        );
+        verify_certificate(&problem, &action, &certificate, QualificationBudgetV1::default())
+            .unwrap();
     }
 
     #[test]
