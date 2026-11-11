@@ -62,6 +62,19 @@ The October/November 2026 landscape makes it clear that causal discovery needs m
 
 **New Luminous experimental ladder:** (1) correct inference on supplied curated evidence; (2) select one decision-relevant experiment; (3) sequentially choose and revise experiments under a finite budget; (4) detect conflicting evidence and stop/reconcile; (5) design and execute a complete rediscovery/repair trajectory; (6) verify the final conclusion against a hidden oracle and independently recorded artifacts. Report stage transitions and failure attribution, not only a terminal answer.
 
+### B2. Model-uncertain experiment selection
+
+Nominal EVSI assumes a sufficiently specified prior, action-utility table and observation likelihood model. That is fragile when the agent's causal mechanism or measurement reliability is uncertain. Add a separate **robust EVSI** arm: evaluate each proposed experiment over a preregistered finite set of plausible decision models, then select using the worst-case net EVSI. Do not average the scenarios unless defensible probabilities are independently calibrated.
+
+Compare:
+- entropy-only EIG;
+- nominal EVSI;
+- risk-adjusted nominal EVSI;
+- finite-set worst-case robust EVSI;
+- random-valid and no-experiment controls.
+
+Report the best / worst / mean-descriptive scenario value, minimum net EVSI, selection reversals, regret under each realized held-out model, stop rate and performance as the uncertainty set expands. The uncertainty set must be frozen before the trial and include plausible prior, likelihood and utility variation; a model cannot choose a convenient set after it sees the observations. This is a Luminous research extension, not an upstream ACED metric or reported SOTA result.
+
 ### C. Abstention and runtime stop
 
 **Stretch target:** exceed 70% paired act/abstain accuracy on a regenerated, independently authored suite of at least 500 pairs, across multiple harnesses, while preserving actionable completion.
