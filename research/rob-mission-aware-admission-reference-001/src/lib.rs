@@ -24,6 +24,8 @@ pub struct InferenceRequest {
     pub action_buffer_slack_ticks: Option<u64>,
     /// Remaining task/actuation deadline slack.
     pub deadline_slack_ticks: Option<u64>,
+    /// Local projection/dispatch guard after remote result return.
+    pub local_projection_dispatch_guard_ticks: u64,
     /// Qualified conservative source-to-actuator AoI upper bound.
     pub actuation_aoi_upper_ticks: Option<u64>,
     /// Maximum task-specific AoI permitted by the consumer contract.
@@ -215,6 +217,8 @@ pub struct AdmissionReport {
     pub service_floor_violations: Vec<String>,
     /// Whether all supplied service-floor obligations were met.
     pub service_floors_met: bool,
+    /// Robot cursor to supply to the next Round Robin admission call.
+    pub next_cursor_robot_id: Option<String>,
     /// Explicitly false: this report never authorizes actuator application.
     pub actuation_authorized: bool,
 }
@@ -247,7 +251,10 @@ fn eligibility(request: &InferenceRequest) -> Result<(), RejectReason> {
         .deadline_slack_ticks
         .ok_or(RejectReason::UnknownTimingBound)?;
     let available_slack = buffer_slack.min(deadline_slack);
-    if p99 > available_slack {
+    let result_and_guard = p99
+        .checked_add(request.local_projection_dispatch_guard_ticks)
+        .ok_or(RejectReason::ResultReturnsTooLate)?;
+    if result_and_guard > available_slack {
         return Err(RejectReason::ResultReturnsTooLate);
     }
 
@@ -393,6 +400,7 @@ pub fn admit_batch(
             resource_use: ResourceUse::default(),
             service_floor_violations: Vec::new(),
             service_floors_met: true,
+            next_cursor_robot_id: None,
             actuation_authorized: false,
         });
     }
@@ -467,6 +475,7 @@ pub fn admit_batch(
     let mut resource_use = ResourceUse::default();
     let mut admitted_request_ids = Vec::new();
     let mut admitted_robots = BTreeSet::new();
+    let mut next_cursor_robot_id = None;
 
     for request in ordered {
         let mut proposed = resource_use;
@@ -475,6 +484,7 @@ pub fn admit_batch(
             resource_use = proposed;
             admitted_request_ids.push(request.request_id.clone());
             admitted_robots.insert(request.robot_id.clone());
+            next_cursor_robot_id = Some(request.robot_id.clone());
             outcomes.insert(request.request_id.clone(), RequestDisposition::Admitted);
         } else {
             outcomes.insert(
@@ -484,7 +494,7 @@ pub fn admit_batch(
         }
     }
 
-    let mut service_floor_robots: BTreeSet<String> = requests
+    let service_floor_robots: BTreeSet<String> = requests
         .iter()
         .filter(|request| request.service_floor_due)
         .map(|request| request.robot_id.clone())
@@ -494,7 +504,6 @@ pub fn admit_batch(
         .filter(|robot_id| !admitted_robots.contains(*robot_id))
         .cloned()
         .collect();
-    service_floor_robots.clear();
 
     let results = requests
         .iter()
@@ -515,6 +524,7 @@ pub fn admit_batch(
         resource_use,
         service_floors_met: service_floor_violations.is_empty(),
         service_floor_violations,
+        next_cursor_robot_id,
         actuation_authorized: false,
     })
 }
@@ -532,6 +542,7 @@ mod tests {
             p99_return_ticks: Some(2),
             action_buffer_slack_ticks: Some(10),
             deadline_slack_ticks: Some(10),
+            local_projection_dispatch_guard_ticks: 0,
             actuation_aoi_upper_ticks: Some(3),
             max_actuation_aoi_ticks: 5,
             poma_upper_ppm: Some(10_000),
@@ -639,6 +650,33 @@ mod tests {
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::ResultReturnsTooLate)
         );
+    }
+
+    #[test]
+    fn projection_dispatch_guard_is_reserved_before_admission() {
+        let mut q = request("q1", "r1");
+        q.p99_return_ticks = Some(8);
+        q.action_buffer_slack_ticks = Some(10);
+        q.deadline_slack_ticks = Some(12);
+        q.local_projection_dispatch_guard_ticks = 3;
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::ResultReturnsTooLate)
+        );
+    }
+
+    #[test]
+    fn result_and_guard_exactly_at_slack_is_admissible() {
+        let mut q = request("q1", "r1");
+        q.p99_return_ticks = Some(8);
+        q.action_buffer_slack_ticks = Some(10);
+        q.deadline_slack_ticks = Some(12);
+        q.local_projection_dispatch_guard_ticks = 2;
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        assert_eq!(report.admitted_request_ids, vec!["q1"]);
     }
 
     #[test]
