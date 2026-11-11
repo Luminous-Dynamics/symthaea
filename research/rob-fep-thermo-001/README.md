@@ -259,3 +259,8 @@ The six-gate evidence-use benchmark is now specified in [evidence_to_action_gate
 - [fixtures/evidence_use_v0_1.schema.json](./fixtures/evidence_use_v0_1.schema.json)
 
 It composes with #11122 and #11338: it does not create another EVSI or active-sensing engine.
+
+
+## Real-time computation and dynamic-world evaluation
+
+The new cross-cutting real-time benchmark is tracked in [Symthaea #11561](https://github.com/Luminous-Dynamics/symthaea/issues/11561) and summarized in [realtime_computation_extension.md](./realtime_computation_extension.md). It distinguishes frozen-world upper bounds from wall-clock real-time operation and charges compute/observation latency against changing physical state.
