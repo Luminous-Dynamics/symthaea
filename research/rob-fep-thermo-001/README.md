@@ -384,3 +384,8 @@ For fleet experiments, add Round Robin, EDF and Armory Lookahead; compare agains
 
 
 The distributed-inference fixture corpus has expanded to 24 cases. DI23 introduces an empirical PoMA-style outcome (7/100 missed actuation windows = 0.07) and separately records missed-actuation task-loss cost. DI24 requires a matched heterogeneous-fleet comparison across Round Robin, EDF, Armory Lookahead and the Luminous candidate, with per-robot starvation, per-tier throughput and safety reporting. These are synthetic schema/semantic controls, not measured benchmark results.
+
+
+## Mission-aware fleet admission workstream
+
+A dedicated child protocol is now tracked at [Symthaea #11627](https://github.com/Luminous-Dynamics/symthaea/issues/11627), with draft [PR #11630](https://github.com/Luminous-Dynamics/symthaea/pull/11630). It compares Round Robin, EDF, Armory Lookahead and RED against a constrained Luminous policy using per-robot action-buffer slack, actuation-miss risk, EVSI, thermal/actuator/recovery evidence and service floors. Its 12 synthetic cases deliberately encode no performance winner.
