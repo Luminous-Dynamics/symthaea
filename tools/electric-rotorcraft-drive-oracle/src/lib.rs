@@ -900,6 +900,825 @@ pub fn evaluate_drive_with_kinematics(
     })
 }
 
+
+/// External electrical loads connected to a shared propulsion DC bus.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DcBusExternalLoadKind {
+    ThermalManagement,
+    OtherAuxiliary,
+    Avionics,
+    CabinEnvironmentalControl,
+}
+
+/// One constant external-load interval with an explicit absolute demand envelope.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DcBusExternalLoadInterval {
+    pub segment_id: String,
+    pub start_timestamp_ns: u64,
+    pub end_timestamp_ns: u64,
+    pub power_lower_bound_w: f64,
+    pub power_nominal_w: f64,
+    pub power_upper_bound_w: f64,
+}
+
+/// Evidence-bound external load profile on one declared bus.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DcBusExternalLoadProfile {
+    pub load_id: String,
+    pub meter_boundary_id: String,
+    pub bus_id: String,
+    pub kind: DcBusExternalLoadKind,
+    pub evidence_manifest_digest: String,
+    pub intervals: Vec<DcBusExternalLoadInterval>,
+}
+
+/// Declared ideal common-voltage bus and its source-side continuous limits.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DcBusConfig {
+    pub bus_id: String,
+    pub source_boundary_id: String,
+    pub source_evidence_manifest_digest: String,
+    pub configuration_digest: String,
+    pub minimum_voltage_v: f64,
+    pub maximum_continuous_current_a: f64,
+    pub maximum_continuous_power_w: f64,
+}
+
+/// Declared propulsion feeder, protection device and common-cause group.
+/// The group is descriptive topology evidence; it does not prove independence.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DcBusBranchConfig {
+    pub branch_id: String,
+    pub drive_path_id: String,
+    pub bus_id: String,
+    pub feeder_id: String,
+    pub meter_boundary_id: String,
+    pub protection_device_id: String,
+    pub common_cause_group_id: String,
+    pub evidence_manifest_digest: String,
+    pub maximum_continuous_current_a: f64,
+    pub maximum_continuous_power_w: f64,
+}
+
+/// Frozen inputs to the shared-bus composition reference.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DcBusMissionInput {
+    pub configuration_digest: String,
+    pub buses: Vec<DcBusConfig>,
+    pub branches: Vec<DcBusBranchConfig>,
+    pub drive_paths: Vec<MissionDriveProfileReport>,
+    pub external_loads: Vec<DcBusExternalLoadProfile>,
+}
+
+/// One propulsion branch's contribution in one shared-bus interval.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DcBusBranchSegmentResult {
+    pub branch_id: String,
+    pub drive_path_id: String,
+    pub feeder_id: String,
+    pub common_cause_group_id: String,
+    pub map_id: String,
+    pub map_digest: String,
+    pub evidence_manifest_digest: String,
+    pub configuration_digest: String,
+    pub context_digest: String,
+    pub dc_power_w: f64,
+    pub dc_current_a: f64,
+    pub dc_energy_j: f64,
+}
+
+/// One separately identified non-propulsion load contribution.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DcBusExternalLoadSegmentResult {
+    pub load_id: String,
+    pub meter_boundary_id: String,
+    pub kind: DcBusExternalLoadKind,
+    pub evidence_manifest_digest: String,
+    pub power_w: f64,
+    pub current_a: f64,
+    pub energy_j: f64,
+}
+
+/// Simultaneous branch and auxiliary demand on an ideal common-voltage bus.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DcBusSegmentResult {
+    pub segment_id: String,
+    pub start_timestamp_ns: u64,
+    pub end_timestamp_ns: u64,
+    pub duration_s: f64,
+    pub bus_voltage_v: f64,
+    pub propulsion_power_w: f64,
+    pub external_load_power_w: f64,
+    pub total_bus_power_w: f64,
+    pub total_bus_current_a: f64,
+    pub total_bus_energy_j: f64,
+    pub branches: Vec<DcBusBranchSegmentResult>,
+    pub external_loads: Vec<DcBusExternalLoadSegmentResult>,
+}
+
+/// Mission aggregation for one demand-envelope scenario on one DC bus.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DcBusScenarioSummary {
+    pub segment_count: usize,
+    pub active_duration_s: f64,
+    pub propulsion_energy_j: f64,
+    pub external_load_energy_j: f64,
+    pub total_bus_energy_j: f64,
+    pub average_bus_power_w: f64,
+    pub peak_bus_power_w: f64,
+    pub peak_bus_current_a: f64,
+    pub segments: Vec<DcBusSegmentResult>,
+}
+
+/// A scenario failure is attributed to an exact interval and, when applicable,
+/// to the path/branch/feeder that caused it.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DcBusFailureKind {
+    PropulsionDrive(DriveError),
+    BranchPowerLimitExceeded {
+        required_power_w: f64,
+        maximum_power_w: f64,
+    },
+    BranchCurrentLimitExceeded {
+        required_current_a: f64,
+        maximum_current_a: f64,
+    },
+    BusUndervoltage {
+        measured_voltage_v: f64,
+        minimum_voltage_v: f64,
+    },
+    BusPowerLimitExceeded {
+        required_power_w: f64,
+        maximum_power_w: f64,
+    },
+    BusCurrentLimitExceeded {
+        required_current_a: f64,
+        maximum_current_a: f64,
+    },
+    NumericalOverflow,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DcBusScenarioFailure {
+    pub bus_id: String,
+    pub segment_id: String,
+    pub branch_id: Option<String>,
+    pub drive_path_id: Option<String>,
+    pub feeder_id: Option<String>,
+    pub kind: DcBusFailureKind,
+}
+
+/// Per-bus scenario results retain independent adverse/nominal/favourable outcomes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DcBusReport {
+    pub bus_id: String,
+    pub source_boundary_id: String,
+    pub source_evidence_manifest_digest: String,
+    pub configuration_digest: String,
+    pub branch_ids: Vec<String>,
+    pub adverse_scenario: Result<DcBusScenarioSummary, Vec<DcBusScenarioFailure>>,
+    pub nominal_scenario: Result<DcBusScenarioSummary, Vec<DcBusScenarioFailure>>,
+    pub favourable_scenario: Result<DcBusScenarioSummary, Vec<DcBusScenarioFailure>>,
+}
+
+/// Full mission-level shared-bus result.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DcBusMissionReport {
+    pub model_version: &'static str,
+    pub configuration_digest: String,
+    pub buses: Vec<DcBusReport>,
+}
+
+/// Structural failures are distinct from per-scenario electrical limit failures.
+#[derive(Debug, Clone, PartialEq)]
+pub enum DcBusCompositionError {
+    InvalidConfiguration(&'static str),
+    DuplicateIdentity(&'static str),
+    MissingBus(String),
+    MissingDrivePath(String),
+    UnmodelledInterval(String),
+    ScheduleMismatch(String),
+    BusVoltageMismatch {
+        bus_id: String,
+        segment_id: String,
+    },
+    NumericalOverflow,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DcBusDemandScenario {
+    Adverse,
+    Nominal,
+    Favourable,
+}
+
+fn selected_drive_result(
+    envelope: &DriveMapEnvelope,
+    scenario: DcBusDemandScenario,
+) -> &Result<DriveReport, DriveError> {
+    match scenario {
+        DcBusDemandScenario::Adverse => &envelope.adverse_efficiency_scenario,
+        DcBusDemandScenario::Nominal => &envelope.nominal_efficiency_scenario,
+        DcBusDemandScenario::Favourable => &envelope.favourable_efficiency_scenario,
+    }
+}
+
+fn selected_external_power(
+    interval: &DcBusExternalLoadInterval,
+    scenario: DcBusDemandScenario,
+) -> f64 {
+    match scenario {
+        DcBusDemandScenario::Adverse => interval.power_upper_bound_w,
+        DcBusDemandScenario::Nominal => interval.power_nominal_w,
+        DcBusDemandScenario::Favourable => interval.power_lower_bound_w,
+    }
+}
+
+fn dc_bus_add_finite(total: &mut f64, value: f64) -> Result<(), DcBusCompositionError> {
+    let next = *total + value;
+    if !next.is_finite() {
+        return Err(DcBusCompositionError::NumericalOverflow);
+    }
+    *total = next;
+    Ok(())
+}
+
+fn summarize_dc_bus_scenario(
+    bus: &DcBusConfig,
+    branches: &[&DcBusBranchConfig],
+    paths: &[MissionDriveProfileReport],
+    external_loads: &[&DcBusExternalLoadProfile],
+    scenario: DcBusDemandScenario,
+) -> Result<DcBusScenarioSummary, Vec<DcBusScenarioFailure>> {
+    let Some(reference_path) = branches
+        .first()
+        .and_then(|branch| paths.iter().find(|path| path.drive_path_id == branch.drive_path_id))
+    else {
+        return Err(vec![DcBusScenarioFailure {
+            bus_id: bus.bus_id.clone(),
+            segment_id: String::new(),
+            branch_id: None,
+            drive_path_id: None,
+            feeder_id: None,
+            kind: DcBusFailureKind::NumericalOverflow,
+        }]);
+    };
+
+    let mut failures = Vec::new();
+    let mut summary = DcBusScenarioSummary {
+        segment_count: reference_path.segments.len(),
+        active_duration_s: reference_path.active_duration_s,
+        propulsion_energy_j: 0.0,
+        external_load_energy_j: 0.0,
+        total_bus_energy_j: 0.0,
+        average_bus_power_w: 0.0,
+        peak_bus_power_w: 0.0,
+        peak_bus_current_a: 0.0,
+        segments: Vec::with_capacity(reference_path.segments.len()),
+    };
+
+    for (segment_index, reference_segment) in reference_path.segments.iter().enumerate() {
+        let duration_s = reference_segment.duration_s;
+        let mut bus_voltage_v = reference_segment.dc_bus_voltage_v;
+        let mut propulsion_power_w = 0.0;
+        let mut external_power_w = 0.0;
+        let mut total_power_w = 0.0;
+        let mut total_current_a = 0.0;
+        let mut propulsion_energy_j = 0.0;
+        let mut external_energy_j = 0.0;
+        let mut branch_results = Vec::with_capacity(branches.len());
+        let mut external_results = Vec::with_capacity(external_loads.len());
+
+        if !bus_voltage_v.is_finite() || bus_voltage_v <= 0.0 {
+            failures.push(DcBusScenarioFailure {
+                bus_id: bus.bus_id.clone(),
+                segment_id: reference_segment.segment_id.clone(),
+                branch_id: None,
+                drive_path_id: None,
+                feeder_id: None,
+                kind: DcBusFailureKind::NumericalOverflow,
+            });
+            continue;
+        }
+        if bus_voltage_v < bus.minimum_voltage_v {
+            failures.push(DcBusScenarioFailure {
+                bus_id: bus.bus_id.clone(),
+                segment_id: reference_segment.segment_id.clone(),
+                branch_id: None,
+                drive_path_id: None,
+                feeder_id: None,
+                kind: DcBusFailureKind::BusUndervoltage {
+                    measured_voltage_v: bus_voltage_v,
+                    minimum_voltage_v: bus.minimum_voltage_v,
+                },
+            });
+        }
+
+        for branch in branches {
+            let Some(path) = paths.iter().find(|path| path.drive_path_id == branch.drive_path_id) else {
+                failures.push(DcBusScenarioFailure {
+                    bus_id: bus.bus_id.clone(),
+                    segment_id: reference_segment.segment_id.clone(),
+                    branch_id: Some(branch.branch_id.clone()),
+                    drive_path_id: Some(branch.drive_path_id.clone()),
+                    feeder_id: Some(branch.feeder_id.clone()),
+                    kind: DcBusFailureKind::NumericalOverflow,
+                });
+                continue;
+            };
+            let segment = &path.segments[segment_index];
+            let envelope = match &segment.evaluation {
+                Ok(envelope) => envelope,
+                Err(error) => {
+                    failures.push(DcBusScenarioFailure {
+                        bus_id: bus.bus_id.clone(),
+                        segment_id: segment.segment_id.clone(),
+                        branch_id: Some(branch.branch_id.clone()),
+                        drive_path_id: Some(branch.drive_path_id.clone()),
+                        feeder_id: Some(branch.feeder_id.clone()),
+                        kind: DcBusFailureKind::PropulsionDrive(error.clone()),
+                    });
+                    continue;
+                }
+            };
+            let drive = match selected_drive_result(envelope, scenario) {
+                Ok(drive) => drive,
+                Err(error) => {
+                    failures.push(DcBusScenarioFailure {
+                        bus_id: bus.bus_id.clone(),
+                        segment_id: segment.segment_id.clone(),
+                        branch_id: Some(branch.branch_id.clone()),
+                        drive_path_id: Some(branch.drive_path_id.clone()),
+                        feeder_id: Some(branch.feeder_id.clone()),
+                        kind: DcBusFailureKind::PropulsionDrive(error.clone()),
+                    });
+                    continue;
+                }
+            };
+
+            let power_w = drive.dc_bus_input_power_w;
+            let current_a = drive.dc_bus_current_a;
+            let energy_j = drive.dc_bus_input_energy_j;
+            if [power_w, current_a, energy_j]
+                .iter()
+                .any(|value| !value.is_finite() || *value < 0.0)
+            {
+                failures.push(DcBusScenarioFailure {
+                    bus_id: bus.bus_id.clone(),
+                    segment_id: segment.segment_id.clone(),
+                    branch_id: Some(branch.branch_id.clone()),
+                    drive_path_id: Some(branch.drive_path_id.clone()),
+                    feeder_id: Some(branch.feeder_id.clone()),
+                    kind: DcBusFailureKind::NumericalOverflow,
+                });
+                continue;
+            }
+            if power_w > branch.maximum_continuous_power_w {
+                failures.push(DcBusScenarioFailure {
+                    bus_id: bus.bus_id.clone(),
+                    segment_id: segment.segment_id.clone(),
+                    branch_id: Some(branch.branch_id.clone()),
+                    drive_path_id: Some(branch.drive_path_id.clone()),
+                    feeder_id: Some(branch.feeder_id.clone()),
+                    kind: DcBusFailureKind::BranchPowerLimitExceeded {
+                        required_power_w: power_w,
+                        maximum_power_w: branch.maximum_continuous_power_w,
+                    },
+                });
+            }
+            if current_a > branch.maximum_continuous_current_a {
+                failures.push(DcBusScenarioFailure {
+                    bus_id: bus.bus_id.clone(),
+                    segment_id: segment.segment_id.clone(),
+                    branch_id: Some(branch.branch_id.clone()),
+                    drive_path_id: Some(branch.drive_path_id.clone()),
+                    feeder_id: Some(branch.feeder_id.clone()),
+                    kind: DcBusFailureKind::BranchCurrentLimitExceeded {
+                        required_current_a: current_a,
+                        maximum_current_a: branch.maximum_continuous_current_a,
+                    },
+                });
+            }
+
+            if let Err(_) = dc_bus_add_finite(&mut propulsion_power_w.clone(), 0.0) {
+                failures.push(DcBusScenarioFailure {
+                    bus_id: bus.bus_id.clone(),
+                    segment_id: segment.segment_id.clone(),
+                    branch_id: Some(branch.branch_id.clone()),
+                    drive_path_id: Some(branch.drive_path_id.clone()),
+                    feeder_id: Some(branch.feeder_id.clone()),
+                    kind: DcBusFailureKind::NumericalOverflow,
+                });
+            }
+            if let Err(_) = dc_bus_add_finite(&mut propulsion_power_w.clone(), 0.0) {
+                failures.push(DcBusScenarioFailure {
+                    bus_id: bus.bus_id.clone(),
+                    segment_id: segment.segment_id.clone(),
+                    branch_id: Some(branch.branch_id.clone()),
+                    drive_path_id: Some(branch.drive_path_id.clone()),
+                    feeder_id: Some(branch.feeder_id.clone()),
+                    kind: DcBusFailureKind::NumericalOverflow,
+                });
+            }
+            propulsion_power_w += power_w;
+            total_power_w += power_w;
+            total_current_a += current_a;
+            propulsion_energy_j += energy_j;
+
+            branch_results.push(DcBusBranchSegmentResult {
+                branch_id: branch.branch_id.clone(),
+                drive_path_id: branch.drive_path_id.clone(),
+                feeder_id: branch.feeder_id.clone(),
+                common_cause_group_id: branch.common_cause_group_id.clone(),
+                map_id: envelope.map_id.clone(),
+                map_digest: envelope.map_digest.clone(),
+                evidence_manifest_digest: envelope.evidence_manifest_digest.clone(),
+                configuration_digest: envelope.configuration_digest.clone(),
+                context_digest: envelope.context_digest.clone(),
+                dc_power_w: power_w,
+                dc_current_a: current_a,
+                dc_energy_j: energy_j,
+            });
+        }
+
+        for load in external_loads {
+            let interval = &load.intervals[segment_index];
+            let power_w = selected_external_power(interval, scenario);
+            let current_a = power_w / bus_voltage_v;
+            let energy_j = power_w * duration_s;
+            if !power_w.is_finite()
+                || !current_a.is_finite()
+                || !energy_j.is_finite()
+                || power_w < 0.0
+                || current_a < 0.0
+                || energy_j < 0.0
+            {
+                failures.push(DcBusScenarioFailure {
+                    bus_id: bus.bus_id.clone(),
+                    segment_id: reference_segment.segment_id.clone(),
+                    branch_id: None,
+                    drive_path_id: None,
+                    feeder_id: None,
+                    kind: DcBusFailureKind::NumericalOverflow,
+                });
+                continue;
+            }
+            external_power_w += power_w;
+            total_power_w += power_w;
+            total_current_a += current_a;
+            external_energy_j += energy_j;
+            external_results.push(DcBusExternalLoadSegmentResult {
+                load_id: load.load_id.clone(),
+                meter_boundary_id: load.meter_boundary_id.clone(),
+                kind: load.kind,
+                evidence_manifest_digest: load.evidence_manifest_digest.clone(),
+                power_w,
+                current_a,
+                energy_j,
+            });
+        }
+
+        if ![
+            propulsion_power_w,
+            external_power_w,
+            total_power_w,
+            total_current_a,
+            propulsion_energy_j,
+            external_energy_j,
+        ]
+        .iter()
+        .all(|value| value.is_finite() && *value >= 0.0)
+        {
+            failures.push(DcBusScenarioFailure {
+                bus_id: bus.bus_id.clone(),
+                segment_id: reference_segment.segment_id.clone(),
+                branch_id: None,
+                drive_path_id: None,
+                feeder_id: None,
+                kind: DcBusFailureKind::NumericalOverflow,
+            });
+            continue;
+        }
+        if total_power_w > bus.maximum_continuous_power_w {
+            failures.push(DcBusScenarioFailure {
+                bus_id: bus.bus_id.clone(),
+                segment_id: reference_segment.segment_id.clone(),
+                branch_id: None,
+                drive_path_id: None,
+                feeder_id: None,
+                kind: DcBusFailureKind::BusPowerLimitExceeded {
+                    required_power_w: total_power_w,
+                    maximum_power_w: bus.maximum_continuous_power_w,
+                },
+            });
+        }
+        if total_current_a > bus.maximum_continuous_current_a {
+            failures.push(DcBusScenarioFailure {
+                bus_id: bus.bus_id.clone(),
+                segment_id: reference_segment.segment_id.clone(),
+                branch_id: None,
+                drive_path_id: None,
+                feeder_id: None,
+                kind: DcBusFailureKind::BusCurrentLimitExceeded {
+                    required_current_a: total_current_a,
+                    maximum_current_a: bus.maximum_continuous_current_a,
+                },
+            });
+        }
+
+        summary.propulsion_energy_j += propulsion_energy_j;
+        summary.external_load_energy_j += external_energy_j;
+        summary.total_bus_energy_j += propulsion_energy_j + external_energy_j;
+        summary.peak_bus_power_w = summary.peak_bus_power_w.max(total_power_w);
+        summary.peak_bus_current_a = summary.peak_bus_current_a.max(total_current_a);
+        summary.segments.push(DcBusSegmentResult {
+            segment_id: reference_segment.segment_id.clone(),
+            start_timestamp_ns: reference_segment.start_timestamp_ns,
+            end_timestamp_ns: reference_segment.end_timestamp_ns,
+            duration_s,
+            bus_voltage_v,
+            propulsion_power_w,
+            external_load_power_w: external_power_w,
+            total_bus_power_w: total_power_w,
+            total_bus_current_a: total_current_a,
+            total_bus_energy_j: propulsion_energy_j + external_energy_j,
+            branches: branch_results,
+            external_loads: external_results,
+        });
+        bus_voltage_v = 0.0;
+        let _ = bus_voltage_v;
+    }
+
+    if !failures.is_empty() {
+        return Err(failures);
+    }
+    summary.average_bus_power_w =
+        summary.total_bus_energy_j / summary.active_duration_s;
+    if ![
+        summary.propulsion_energy_j,
+        summary.external_load_energy_j,
+        summary.total_bus_energy_j,
+        summary.average_bus_power_w,
+        summary.peak_bus_power_w,
+        summary.peak_bus_current_a,
+    ]
+    .iter()
+    .all(|value| value.is_finite() && *value >= 0.0)
+    {
+        return Err(vec![DcBusScenarioFailure {
+            bus_id: bus.bus_id.clone(),
+            segment_id: String::new(),
+            branch_id: None,
+            drive_path_id: None,
+            feeder_id: None,
+            kind: DcBusFailureKind::NumericalOverflow,
+        }]);
+    }
+    Ok(summary)
+}
+
+/// Validate common topology and exact interval alignment, then aggregate all
+/// connected propulsors and external loads on each declared ideal DC bus.
+///
+/// This v0.1 reference checks simultaneous branch/feeder/bus power and current.
+/// It does not solve cable impedance, source dynamics, contactor/protection
+/// behaviour, fault current, or common-cause independence.
+pub fn evaluate_dc_bus_mission(
+    input: &DcBusMissionInput,
+) -> Result<DcBusMissionReport, DcBusCompositionError> {
+    if input.configuration_digest.trim().is_empty()
+        || input.buses.is_empty()
+        || input.branches.is_empty()
+        || input.drive_paths.is_empty()
+    {
+        return Err(DcBusCompositionError::InvalidConfiguration(
+            "configuration identity, buses, branches and drive paths are required",
+        ));
+    }
+
+    let mut bus_ids = std::collections::BTreeSet::new();
+    for bus in &input.buses {
+        if bus.bus_id.trim().is_empty()
+            || bus.source_boundary_id.trim().is_empty()
+            || bus.source_evidence_manifest_digest.trim().is_empty()
+            || bus.configuration_digest != input.configuration_digest
+            || !bus.minimum_voltage_v.is_finite()
+            || bus.minimum_voltage_v <= 0.0
+            || !bus.maximum_continuous_current_a.is_finite()
+            || bus.maximum_continuous_current_a <= 0.0
+            || !bus.maximum_continuous_power_w.is_finite()
+            || bus.maximum_continuous_power_w <= 0.0
+        {
+            return Err(DcBusCompositionError::InvalidConfiguration(
+                "bus identities, configuration and finite positive limits are required",
+            ));
+        }
+        if !bus_ids.insert(bus.bus_id.clone()) {
+            return Err(DcBusCompositionError::DuplicateIdentity("bus ID"));
+        }
+    }
+
+    let mut branch_ids = std::collections::BTreeSet::new();
+    let mut path_ids = std::collections::BTreeSet::new();
+    let mut meter_boundaries = std::collections::BTreeSet::new();
+    for branch in &input.branches {
+        if branch.branch_id.trim().is_empty()
+            || branch.drive_path_id.trim().is_empty()
+            || branch.bus_id.trim().is_empty()
+            || branch.feeder_id.trim().is_empty()
+            || branch.meter_boundary_id.trim().is_empty()
+            || branch.protection_device_id.trim().is_empty()
+            || branch.common_cause_group_id.trim().is_empty()
+            || branch.evidence_manifest_digest.trim().is_empty()
+            || !branch.maximum_continuous_current_a.is_finite()
+            || branch.maximum_continuous_current_a <= 0.0
+            || !branch.maximum_continuous_power_w.is_finite()
+            || branch.maximum_continuous_power_w <= 0.0
+        {
+            return Err(DcBusCompositionError::InvalidConfiguration(
+                "branch identities and finite positive current/power limits are required",
+            ));
+        }
+        if !branch_ids.insert(branch.branch_id.clone()) {
+            return Err(DcBusCompositionError::DuplicateIdentity("branch ID"));
+        }
+        if !path_ids.insert(branch.drive_path_id.clone()) {
+            return Err(DcBusCompositionError::DuplicateIdentity("drive path assignment"));
+        }
+        if !meter_boundaries.insert(branch.meter_boundary_id.clone()) {
+            return Err(DcBusCompositionError::DuplicateIdentity("meter boundary ID"));
+        }
+        if !bus_ids.contains(&branch.bus_id) {
+            return Err(DcBusCompositionError::MissingBus(branch.bus_id.clone()));
+        }
+    }
+
+    let mut supplied_paths = std::collections::BTreeSet::new();
+    for path in &input.drive_paths {
+        if path.drive_path_id.trim().is_empty()
+            || path.configuration_digest != input.configuration_digest
+            || path.segments.is_empty()
+            || !path.unmodelled_intervals.is_empty()
+        {
+            return Err(DcBusCompositionError::UnmodelledInterval(
+                path.drive_path_id.clone(),
+            ));
+        }
+        if !supplied_paths.insert(path.drive_path_id.clone()) {
+            return Err(DcBusCompositionError::DuplicateIdentity("drive path report"));
+        }
+        if !path_ids.contains(&path.drive_path_id) {
+            return Err(DcBusCompositionError::MissingDrivePath(path.drive_path_id.clone()));
+        }
+    }
+    for branch in &input.branches {
+        if !supplied_paths.contains(&branch.drive_path_id) {
+            return Err(DcBusCompositionError::MissingDrivePath(branch.drive_path_id.clone()));
+        }
+    }
+
+    let mut external_ids = std::collections::BTreeSet::new();
+    for load in &input.external_loads {
+        if load.load_id.trim().is_empty()
+            || load.meter_boundary_id.trim().is_empty()
+            || load.bus_id.trim().is_empty()
+            || load.evidence_manifest_digest.trim().is_empty()
+        {
+            return Err(DcBusCompositionError::InvalidConfiguration(
+                "external load and evidence identities are required",
+            ));
+        }
+        if !external_ids.insert(load.load_id.clone()) {
+            return Err(DcBusCompositionError::DuplicateIdentity("external load ID"));
+        }
+        if !meter_boundaries.insert(load.meter_boundary_id.clone()) {
+            return Err(DcBusCompositionError::DuplicateIdentity("meter boundary ID"));
+        }
+        if !bus_ids.contains(&load.bus_id) {
+            return Err(DcBusCompositionError::MissingBus(load.bus_id.clone()));
+        }
+    }
+
+    let mut ordered_buses = input.buses.clone();
+    ordered_buses.sort_by(|left, right| left.bus_id.cmp(&right.bus_id));
+    let mut reports = Vec::with_capacity(ordered_buses.len());
+
+    for bus in &ordered_buses {
+        let mut branches = input
+            .branches
+            .iter()
+            .filter(|branch| branch.bus_id == bus.bus_id)
+            .collect::<Vec<_>>();
+        branches.sort_by(|left, right| left.branch_id.cmp(&right.branch_id));
+        if branches.is_empty() {
+            return Err(DcBusCompositionError::InvalidConfiguration(
+                "every bus in v0.1 requires at least one propulsion branch",
+            ));
+        }
+
+        let first_path = input
+            .drive_paths
+            .iter()
+            .find(|path| path.drive_path_id == branches[0].drive_path_id)
+            .ok_or_else(|| {
+                DcBusCompositionError::MissingDrivePath(branches[0].drive_path_id.clone())
+            })?;
+        let reference_segments = &first_path.segments;
+        for branch in &branches[1..] {
+            let path = input
+                .drive_paths
+                .iter()
+                .find(|path| path.drive_path_id == branch.drive_path_id)
+                .ok_or_else(|| DcBusCompositionError::MissingDrivePath(branch.drive_path_id.clone()))?;
+            if path.segments.len() != reference_segments.len() {
+                return Err(DcBusCompositionError::ScheduleMismatch(path.drive_path_id.clone()));
+            }
+            for (index, segment) in path.segments.iter().enumerate() {
+                let reference = &reference_segments[index];
+                if segment.segment_id != reference.segment_id
+                    || segment.start_timestamp_ns != reference.start_timestamp_ns
+                    || segment.end_timestamp_ns != reference.end_timestamp_ns
+                {
+                    return Err(DcBusCompositionError::ScheduleMismatch(path.drive_path_id.clone()));
+                }
+                if segment.dc_bus_voltage_v.to_bits() != reference.dc_bus_voltage_v.to_bits() {
+                    return Err(DcBusCompositionError::BusVoltageMismatch {
+                        bus_id: bus.bus_id.clone(),
+                        segment_id: reference.segment_id.clone(),
+                    });
+                }
+            }
+        }
+
+        let mut external_loads = input
+            .external_loads
+            .iter()
+            .filter(|load| load.bus_id == bus.bus_id)
+            .collect::<Vec<_>>();
+        external_loads.sort_by(|left, right| left.load_id.cmp(&right.load_id));
+        for load in &external_loads {
+            if load.intervals.len() != reference_segments.len() {
+                return Err(DcBusCompositionError::ScheduleMismatch(load.load_id.clone()));
+            }
+            for (index, interval) in load.intervals.iter().enumerate() {
+                let reference = &reference_segments[index];
+                if interval.segment_id != reference.segment_id
+                    || interval.start_timestamp_ns != reference.start_timestamp_ns
+                    || interval.end_timestamp_ns != reference.end_timestamp_ns
+                    || interval.end_timestamp_ns <= interval.start_timestamp_ns
+                    || !interval.power_lower_bound_w.is_finite()
+                    || !interval.power_nominal_w.is_finite()
+                    || !interval.power_upper_bound_w.is_finite()
+                    || interval.power_lower_bound_w < 0.0
+                    || interval.power_lower_bound_w > interval.power_nominal_w
+                    || interval.power_nominal_w > interval.power_upper_bound_w
+                {
+                    return Err(DcBusCompositionError::ScheduleMismatch(load.load_id.clone()));
+                }
+            }
+        }
+
+        let adverse_scenario = summarize_dc_bus_scenario(
+            bus,
+            &branches,
+            &input.drive_paths,
+            &external_loads,
+            DcBusDemandScenario::Adverse,
+        );
+        let nominal_scenario = summarize_dc_bus_scenario(
+            bus,
+            &branches,
+            &input.drive_paths,
+            &external_loads,
+            DcBusDemandScenario::Nominal,
+        );
+        let favourable_scenario = summarize_dc_bus_scenario(
+            bus,
+            &branches,
+            &input.drive_paths,
+            &external_loads,
+            DcBusDemandScenario::Favourable,
+        );
+
+        reports.push(DcBusReport {
+            bus_id: bus.bus_id.clone(),
+            source_boundary_id: bus.source_boundary_id.clone(),
+            source_evidence_manifest_digest: bus.source_evidence_manifest_digest.clone(),
+            configuration_digest: bus.configuration_digest.clone(),
+            branch_ids: branches.iter().map(|branch| branch.branch_id.clone()).collect(),
+            adverse_scenario,
+            nominal_scenario,
+            favourable_scenario,
+        });
+    }
+
+    Ok(DcBusMissionReport {
+        model_version: MODEL_VERSION,
+        configuration_digest: input.configuration_digest.clone(),
+        buses: reports,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
