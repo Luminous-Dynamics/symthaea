@@ -246,6 +246,75 @@
                   }
                 }
               }
+            },
+            "ship_categories": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "all",
+                  "passenger",
+                  "container_exclusively",
+                  "general_cargo",
+                  "mixed_cargo",
+                  "bulk",
+                  "tanker",
+                  "ro_ro",
+                  "other"
+                ]
+              }
+            },
+            "minimum_gt": {
+              "type": "number",
+              "minimum": 0
+            },
+            "berth_only": {
+              "type": "boolean"
+            },
+            "implementation_phases": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "applies_from",
+                  "port_scope",
+                  "ship_categories",
+                  "requirement"
+                ],
+                "properties": {
+                  "applies_from": {
+                    "type": "string",
+                    "format": "date"
+                  },
+                  "port_scope": {
+                    "enum": [
+                      "afir_article_9_ports",
+                      "eu_ports_with_ops",
+                      "all_ports_in_scope"
+                    ]
+                  },
+                  "ship_categories": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                      "enum": [
+                        "passenger",
+                        "container_exclusively"
+                      ]
+                    }
+                  },
+                  "requirement": {
+                    "enum": [
+                      "connect_ops_and_use_electricity_or_zero_emission_technology"
+                    ]
+                  },
+                  "member_state_early_application_possible": {
+                    "type": "boolean"
+                  }
+                }
+              }
             }
           }
         },
@@ -292,6 +361,12 @@
               "type": "array",
               "items": {
                 "$ref": "#/$defs/gas_scope"
+              }
+            },
+            "ghg_reduction_phase_in": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/ghg_reduction_phase"
               }
             }
           }
@@ -465,6 +540,35 @@
             "type": "string",
             "minLength": 1
           }
+        }
+      }
+    },
+    "ghg_reduction_phase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "year",
+        "value",
+        "unit",
+        "meaning"
+      ],
+      "properties": {
+        "year": {
+          "type": "integer",
+          "minimum": 2000,
+          "maximum": 2200
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "unit": {
+          "const": "percent"
+        },
+        "meaning": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }
