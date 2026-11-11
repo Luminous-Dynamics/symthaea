@@ -62,6 +62,23 @@ Decision-task domains are parsed separately from task family and scenario subtyp
 
 The library exposes `query_inventory::qualify_query_inventory`; the `aced-query-index-qualifier` binary validates exact track counts, distributions, path safety, the inventory and source-ledger digests, all 148 path/digest entries, payload overlap, filename collisions and the metadata-only candidate boundary. It does not download or verify payload bytes, execute the four-turn Query protocol, or produce any agent score.
 
+## ACED-Query comparison protocol
+
+`ACED_QUERY_COMPARISON_PROTOCOL_V0_1.json` and its closed schema define the future Core/Qual model comparison. A critical distinction is that the four metadata tracks count **world files**, not scored tasks:
+
+| Track | World files | Scored task projection |
+|---|---:|---|
+| Core structural | 10 | 10 Core list queries + 50 Qual questions |
+| Core decision | 60 | 60 Core decisions |
+| Guess structural | 30 | 30 Core list queries + 150 Qual questions |
+| Guess decision | 48 | 48 Core decisions |
+
+Thus the paper's active agents are evaluated on 70 Core tasks and 50 Qual questions. The Guess-only baseline is evaluated on its separate 78 Core / 150 Qual task set. Do not infer task denominators by summing world files or compare the Guess baseline as though it used exactly the same task set.
+
+The v2 paper reports Claude Opus 5.5 with the Modular agent at 0.94 Core / 0.98 Qual, and a question-targeted active-learning procedure at 0.96 / 1.00. The latter is a serious classical baseline that Symthaea must reproduce, not a result to dismiss because it is not an LLM. The paper also reports that, under the separate Samp5k regime, Active+Code improves decision-task accuracy in 8 of 9 model cells by an average of 7.3 percentage points. These are external paper results, not Symthaea measurements. See [the full ACED v2 paper](https://arxiv.org/abs/2610.14381).
+
+The protocol therefore keeps two resource regimes separate: the official four-outer-turn comparison and a 5,000-sampled-row budget without the turn limit. It pins the request-parser model, preserves raw and parsed answers separately, and adds a deterministic parser diagnostic without replacing the official LLM-extractor score.
+
 ## Reproduction
 
 From the Symthaea repository root:
