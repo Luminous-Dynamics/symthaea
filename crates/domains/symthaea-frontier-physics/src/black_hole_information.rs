@@ -15,6 +15,8 @@ use core::fmt;
 use num_complex::Complex64;
 
 pub const MAX_DENSE_REDUCED_DIMENSION: usize = 64;
+/// Match the existing state-vector circuit ceiling; larger states require a tensor-network backend.
+pub const MAX_DENSE_STATE_QUBITS: usize = 20;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum QuantumInformationError {
@@ -22,6 +24,7 @@ pub enum QuantumInformationError {
     DimensionOverflow,
     DimensionMismatch { expected: usize, actual: usize },
     DenseDimensionLimit { requested: usize, maximum: usize },
+    DenseStateQubitLimit { requested: usize, maximum: usize },
     InvalidTolerance(f64),
     NonFiniteState { index: usize },
     NonFiniteMatrix { row: usize, column: usize },
@@ -41,6 +44,7 @@ impl fmt::Display for QuantumInformationError {
             Self::DimensionOverflow => write!(f, "Hilbert-space dimension overflow"),
             Self::DimensionMismatch { expected, actual } => write!(f, "dimension mismatch: expected {expected}, got {actual}"),
             Self::DenseDimensionLimit { requested, maximum } => write!(f, "dense dimension {requested} exceeds limit {maximum}"),
+            Self::DenseStateQubitLimit { requested, maximum } => write!(f, "dense state with {requested} qubits exceeds limit {maximum}"),
             Self::InvalidTolerance(t) => write!(f, "invalid tolerance {t}"),
             Self::NonFiniteState { index } => write!(f, "non-finite state amplitude at index {index}"),
             Self::NonFiniteMatrix { row, column } => write!(f, "non-finite matrix entry ({row}, {column})"),
@@ -113,6 +117,12 @@ impl DensityMatrix {
         normalization_tolerance: f64,
     ) -> Result<Self, QuantumInformationError> {
         validate_tolerance(normalization_tolerance)?;
+        if number_of_qubits > MAX_DENSE_STATE_QUBITS {
+            return Err(QuantumInformationError::DenseStateQubitLimit {
+                requested: number_of_qubits,
+                maximum: MAX_DENSE_STATE_QUBITS,
+            });
+        }
         if number_of_qubits >= usize::BITS as usize { return Err(QuantumInformationError::DimensionOverflow); }
         let full_dimension = 1usize << number_of_qubits;
         if amplitudes.len() != full_dimension {
@@ -198,7 +208,8 @@ impl DensityMatrix {
         self.checked_diagnostics(tolerance)
     }
 
-    /// Von Neumann entropy in nats.
+    /// Von Neumann entropy in nats. Eigenvalues in the permitted roundoff
+    /// interval [-tolerance, 0] contribute zero; larger negative values reject.
     pub fn von_neumann_entropy(&self, tolerance: f64) -> Result<f64, QuantumInformationError> {
         Ok(self.spectrum(tolerance)?.into_iter().filter(|p| *p > 0.0).map(|p| -p * p.ln()).sum())
     }
@@ -396,6 +407,14 @@ mod tests {
         let state = vec![Complex64::new(0.5, 0.0); 4];
         assert!(matches!(DensityMatrix::from_pure_state(&state, 2, &[0, 0], TOL),
             Err(QuantumInformationError::DuplicateQubit(0))));
+    }
+
+    #[test]
+    fn dense_state_backend_rejects_above_existing_circuit_qubit_ceiling() {
+        assert!(matches!(
+            DensityMatrix::from_pure_state(&[], MAX_DENSE_STATE_QUBITS + 1, &[], TOL),
+            Err(QuantumInformationError::DenseStateQubitLimit { .. })
+        ));
     }
 
     #[test]
