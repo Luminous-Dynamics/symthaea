@@ -1952,6 +1952,341 @@ fn relative_whitened_vector_defect(left: &[f64], right: &[f64]) -> Option<Option
     relative_defect.is_finite().then_some(Some(relative_defect))
 }
 
+fn charge_exact_vector_field_operations(
+    operation_count: &mut usize,
+    additional: usize,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<(), ExactPolynomialError> {
+    *operation_count = (*operation_count)
+        .checked_add(additional)
+        .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+    if *operation_count > profile.maximum_term_products {
+        return Err(ExactPolynomialError::ResourceLimitExceeded);
+    }
+    Ok(())
+}
+
+fn add_scaled_exact_polynomial(
+    target: &mut ExactPolynomial,
+    source: &ExactPolynomial,
+    scale: ExactRational,
+    profile: ExactPolynomialLieProfileV1,
+    operation_count: &mut usize,
+) -> Result<(), ExactPolynomialError> {
+    for (monomial, coefficient) in source {
+        charge_exact_vector_field_operations(operation_count, 1, profile)?;
+        let scaled = coefficient
+            .checked_mul(scale)
+            .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+        polynomial_add_term(target, monomial.clone(), scaled, profile)?;
+    }
+    Ok(())
+}
+
+fn exact_vector_field_component_residual(
+    state_components: &[ExactPolynomial],
+    output_index: usize,
+    state_generator: &crate::linear_group_action::LinearGeneratorV1,
+    output_generator: &crate::linear_group_action::LinearGeneratorV1,
+    state_coordinate_names: &[String],
+    variable_names: &[String],
+    profile: ExactPolynomialLieProfileV1,
+    operation_count: &mut usize,
+) -> Result<ExactPolynomial, ExactPolynomialError> {
+    let mut residual = ExactPolynomial::new();
+
+    // Build the state-orbit derivative term: sum_j (dF_i/dx_j) * (A x)_j.
+    for (row_index, generator_row) in state_generator.matrix.iter().enumerate() {
+        let state_variable_index = variable_names
+            .iter()
+            .position(|name| name == &state_coordinate_names[row_index])
+            .ok_or(ExactPolynomialError::UnsupportedExpression)?;
+        let derivative = polynomial_derivative(
+            &state_components[output_index],
+            state_variable_index,
+            profile,
+        )?;
+        for (column_index, matrix_entry) in generator_row.iter().enumerate() {
+            let coefficient = ExactRational::from_f64(
+                *matrix_entry,
+                profile.maximum_dyadic_denominator_power,
+            )
+            .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+            if coefficient.is_zero() {
+                continue;
+            }
+            let coordinate_variable_index = variable_names
+                .iter()
+                .position(|name| name == &state_coordinate_names[column_index])
+                .ok_or(ExactPolynomialError::UnsupportedExpression)?;
+            charge_exact_vector_field_operations(operation_count, derivative.len(), profile)?;
+            let term = polynomial_multiply_variable(
+                &derivative,
+                coordinate_variable_index,
+                profile,
+            )?;
+            add_scaled_exact_polynomial(
+                &mut residual,
+                &term,
+                coefficient,
+                profile,
+                operation_count,
+            )?;
+        }
+    }
+
+    // Subtract the explicit output-orbit term: sum_j B_ij F_j(x).
+    for (component_index, matrix_entry) in
+        output_generator.matrix[output_index].iter().enumerate()
+    {
+        let coefficient = ExactRational::from_f64(
+            *matrix_entry,
+            profile.maximum_dyadic_denominator_power,
+        )
+        .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+        if coefficient.is_zero() {
+            continue;
+        }
+        let negative_coefficient = coefficient
+            .checked_neg()
+            .ok_or(ExactPolynomialError::ResourceLimitExceeded)?;
+        add_scaled_exact_polynomial(
+            &mut residual,
+            &state_components[component_index],
+            negative_coefficient,
+            profile,
+            operation_count,
+        )?;
+    }
+
+    Ok(residual)
+}
+
+/// Check exact polynomial infinitesimal equivariance under explicitly paired
+/// state and output representations.
+///
+/// For each paired generator (A, B), every output component is checked against
+/// D F(x) A x - B F(x) = 0. State and output dimensions may differ. The output
+/// generator IDs must pair one-to-one with the admitted state-action generator
+/// IDs; no implicit B = A assumption is made.
+///
+/// All finite f64 polynomial coefficients and generator matrix entries are
+/// interpreted as exact IEEE-754 dyadic rationals in the existing bounded
+/// sparse-polynomial arithmetic. Variables outside the state action remain
+/// symbolic parameters in the identity.
+pub fn check_exact_vector_field_equivariance(
+    vector_field: &[Expr],
+    state_action: &AdmittedLinearGroupActionV1,
+    output_representation: &LinearVectorFieldOutputRepresentationV1,
+    profile: ExactPolynomialLieProfileV1,
+) -> Result<ExactVectorFieldEquivarianceReportV1, ExactVectorFieldEquivarianceErrorV1> {
+    if profile.maximum_variables == 0
+        || profile.maximum_terms == 0
+        || profile.maximum_term_products == 0
+        || profile.maximum_total_degree == 0
+        || profile.maximum_power == 0
+        || profile.maximum_dyadic_denominator_power > 126
+    {
+        return Err(ExactVectorFieldEquivarianceErrorV1::InvalidProfile);
+    }
+
+    if output_representation.representation_id.trim().is_empty() {
+        return Err(ExactVectorFieldEquivarianceErrorV1::EmptyOutputRepresentationId);
+    }
+    if output_representation.coordinate_basis_id.trim().is_empty() {
+        return Err(ExactVectorFieldEquivarianceErrorV1::EmptyOutputBasisId);
+    }
+
+    let output_dimension = output_representation.component_names.len();
+    if output_dimension == 0 {
+        return Err(ExactVectorFieldEquivarianceErrorV1::NoOutputComponents);
+    }
+    if output_dimension > HARD_MAX_METRIC_AWARE_ACTION_DIMENSION {
+        return Err(ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded);
+    }
+    if vector_field.len() != output_dimension {
+        return Err(ExactVectorFieldEquivarianceErrorV1::OutputComponentCountMismatch {
+            expected: output_dimension,
+            actual: vector_field.len(),
+        });
+    }
+    if output_representation.component_unit_ids.len() != output_dimension {
+        return Err(ExactVectorFieldEquivarianceErrorV1::OutputComponentCountMismatch {
+            expected: output_dimension,
+            actual: output_representation.component_unit_ids.len(),
+        });
+    }
+
+    let mut component_names = BTreeSet::new();
+    for (index, name) in output_representation.component_names.iter().enumerate() {
+        if name.trim().is_empty() {
+            return Err(ExactVectorFieldEquivarianceErrorV1::EmptyOutputComponentName {
+                index,
+            });
+        }
+        if !component_names.insert(name) {
+            return Err(ExactVectorFieldEquivarianceErrorV1::DuplicateOutputComponentName {
+                name: name.clone(),
+            });
+        }
+    }
+    for (index, unit_id) in output_representation.component_unit_ids.iter().enumerate() {
+        if unit_id.trim().is_empty() {
+            return Err(ExactVectorFieldEquivarianceErrorV1::EmptyOutputUnitId { index });
+        }
+    }
+
+    let state_declaration = state_action.action();
+    let state_dimension = state_declaration.coordinate_names.len();
+    if state_dimension > HARD_MAX_METRIC_AWARE_ACTION_DIMENSION {
+        return Err(ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded);
+    }
+    if state_declaration.generators.len() > HARD_MAX_METRIC_AWARE_ACTION_GENERATORS {
+        return Err(ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded);
+    }
+    if output_representation.generators.len() != state_declaration.generators.len() {
+        return Err(ExactVectorFieldEquivarianceErrorV1::OutputGeneratorCountMismatch {
+            expected: state_declaration.generators.len(),
+            actual: output_representation.generators.len(),
+        });
+    }
+
+    let mut output_generator_by_id = BTreeMap::new();
+    for generator in &output_representation.generators {
+        if generator.id.trim().is_empty() {
+            return Err(ExactVectorFieldEquivarianceErrorV1::MissingOutputGenerator {
+                generator_id: generator.id.clone(),
+            });
+        }
+        if output_generator_by_id
+            .insert(generator.id.as_str(), generator)
+            .is_some()
+        {
+            return Err(ExactVectorFieldEquivarianceErrorV1::DuplicateOutputGenerator {
+                generator_id: generator.id.clone(),
+            });
+        }
+        if generator.matrix.len() != output_dimension {
+            return Err(ExactVectorFieldEquivarianceErrorV1::OutputGeneratorRowCountMismatch {
+                generator_id: generator.id.clone(),
+                expected: output_dimension,
+                actual: generator.matrix.len(),
+            });
+        }
+        for (row_index, row) in generator.matrix.iter().enumerate() {
+            if row.len() != output_dimension {
+                return Err(
+                    ExactVectorFieldEquivarianceErrorV1::OutputGeneratorColumnCountMismatch {
+                        generator_id: generator.id.clone(),
+                        row: row_index,
+                        expected: output_dimension,
+                        actual: row.len(),
+                    },
+                );
+            }
+            for (column_index, value) in row.iter().enumerate() {
+                if !value.is_finite() {
+                    return Err(
+                        ExactVectorFieldEquivarianceErrorV1::NonFiniteOutputGeneratorEntry {
+                            generator_id: generator.id.clone(),
+                            row: row_index,
+                            column: column_index,
+                        },
+                    );
+                }
+            }
+        }
+    }
+
+    let mut variable_names = Vec::new();
+    for component in vector_field {
+        if !metric_aware_expression_supported(component) {
+            return Err(ExactVectorFieldEquivarianceErrorV1::UnsupportedExpression);
+        }
+        collect_var_names(component, &mut variable_names);
+    }
+    for coordinate_name in &state_declaration.coordinate_names {
+        if !variable_names.contains(coordinate_name) {
+            variable_names.push(coordinate_name.clone());
+        }
+    }
+    if variable_names.len() > profile.maximum_variables
+        || variable_names.len() > HARD_MAX_METRIC_AWARE_EXPRESSION_VARIABLES
+    {
+        return Err(ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded);
+    }
+
+    let mut state_components = Vec::with_capacity(output_dimension);
+    for component in vector_field {
+        let polynomial = parse_exact_polynomial(component, &variable_names, profile).map_err(
+            |error| match error {
+                ExactPolynomialError::UnsupportedExpression => {
+                    ExactVectorFieldEquivarianceErrorV1::UnsupportedExpression
+                }
+                ExactPolynomialError::ResourceLimitExceeded => {
+                    ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded
+                }
+            },
+        )?;
+        state_components.push(polynomial);
+    }
+
+    let mut operation_count = 0usize;
+    let mut generator_results = Vec::with_capacity(state_declaration.generators.len());
+    for state_generator in &state_declaration.generators {
+        let output_generator = output_generator_by_id
+            .get(state_generator.id.as_str())
+            .copied()
+            .ok_or_else(|| ExactVectorFieldEquivarianceErrorV1::MissingOutputGenerator {
+                generator_id: state_generator.id.clone(),
+            })?;
+
+        let mut component_residual_term_counts = Vec::with_capacity(output_dimension);
+        for output_index in 0..output_dimension {
+            let residual = exact_vector_field_component_residual(
+                &state_components,
+                output_index,
+                state_generator,
+                output_generator,
+                &state_declaration.coordinate_names,
+                &variable_names,
+                profile,
+                &mut operation_count,
+            )
+            .map_err(|error| match error {
+                ExactPolynomialError::UnsupportedExpression => {
+                    ExactVectorFieldEquivarianceErrorV1::UnsupportedExpression
+                }
+                ExactPolynomialError::ResourceLimitExceeded => {
+                    ExactVectorFieldEquivarianceErrorV1::ResourceLimitExceeded
+                }
+            })?;
+            component_residual_term_counts.push(residual.len());
+        }
+
+        generator_results.push(ExactVectorFieldGeneratorResultV1 {
+            generator_id: state_generator.id.clone(),
+            component_residual_term_counts,
+        });
+    }
+
+    Ok(ExactVectorFieldEquivarianceReportV1 {
+        action_id: state_declaration.action_id.clone(),
+        state_coordinate_basis_id: state_declaration.coordinate_basis_id.clone(),
+        output_representation: output_representation.clone(),
+        state_action_declaration: state_declaration.clone(),
+        original_state_action_declaration: state_action.declared_action().clone(),
+        state_action_admission_profile: *state_action.profile(),
+        state_action_admission_diagnostics: state_action.diagnostics().clone(),
+        state_coordinate_names: state_declaration.coordinate_names.clone(),
+        output_component_names: output_representation.component_names.clone(),
+        expression_variables: variable_names,
+        vector_field_canonical: vector_field.iter().map(canonical_expression).collect(),
+        profile,
+        generator_results,
+    })
+}
+
 /// Evaluate a vector field's infinitesimal equivariance under every generator
 /// of an explicitly admitted linear action.
 ///
