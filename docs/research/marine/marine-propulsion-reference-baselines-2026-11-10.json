@@ -2571,6 +2571,120 @@
         "Solver-specific methodology; not universal URN solver validation.",
         "Applicability depends on propeller, flow, cavitation and test conditions."
       ]
+    },
+    {
+      "source_id": "IMO-MEPC378-80-BIOFOULING-2023",
+      "title": "2023 Guidelines for the control and management of ships' biofouling to minimize the transfer of invasive aquatic species",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2023-07",
+      "url": "https://www.imo.org/en/ourwork/environment/pages/biofouling.aspx",
+      "evidence_class": "official_imo_guideline",
+      "scope": {
+        "instrument": "Resolution MEPC.378(80)",
+        "topic": "Voluntary global guidance for biofouling management to minimize transfer of invasive aquatic species."
+      },
+      "limitations": [
+        "Guidelines are not a completed mandatory global biofouling treaty.",
+        "Implementation and local cleaning/port requirements must be checked separately."
+      ]
+    },
+    {
+      "source_id": "IMO-MEPC1CIRC918-INWATER-CLEANING-2025",
+      "title": "Guidance on in-water cleaning of ships' biofouling",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2025",
+      "url": "https://www.imo.org/en/ourwork/environment/pages/biofouling.aspx",
+      "evidence_class": "official_imo_guidance",
+      "scope": {
+        "instrument": "MEPC.1/Circ.918",
+        "topic": "Guidance for safe and environmentally responsible in-water cleaning of ships' biofouling."
+      },
+      "limitations": [
+        "Guidance is not a local port permit or authorization.",
+        "Cleaning can damage coatings and release fouling organisms or waste; assess actual method and containment."
+      ]
+    },
+    {
+      "source_id": "IMO-PPR13-BIOFOULING-LEGAL-FRAMEWORK-2026",
+      "title": "PPR 13 groundwork for future legally binding framework on biofouling",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-02-13",
+      "url": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/ppr-13th-session.aspx",
+      "evidence_class": "official_committee_workplan",
+      "scope": {
+        "meeting": "PPR 13, 9–13 February 2026",
+        "status": "Agreed foundational work for a standalone instrument and correspondence group; subsequent MEPC work required.",
+        "target": "IMO page identifies a draft legal framework/recommendations target around MEPC 89 in mid-2029."
+      },
+      "limitations": [
+        "Workplan milestone is not an adopted mandatory legal requirement.",
+        "The framework text, scope, tests, verification and enforcement remain under development."
+      ]
+    },
+    {
+      "source_id": "ISO-6319-2026-INWATER-CLEANING",
+      "title": "Ships and marine technology — Marine environment protection — Conducting and documenting in-water cleaning of biofouling on ships",
+      "publisher": "International Organization for Standardization",
+      "publication_date": "2026",
+      "url": "https://www.iso.org/obp/ui?_escaped_fragment_=iso%3Astd%3Aiso%3A6319%3Aed-1%3Av1%3Aen",
+      "evidence_class": "international_standard_2026",
+      "scope": {
+        "standard": "ISO 6319:2026",
+        "topic": "Conducting and documenting in-water cleaning of biofouling on ships.",
+        "rationale": "Biofouling affects hull resistance/propeller efficiency and can transfer invasive aquatic species."
+      },
+      "limitations": [
+        "Review the full licensed standard text and scope before encoding conformity checks.",
+        "A documentation record does not substitute for local port/state permission or biosecurity clearance."
+      ]
+    },
+    {
+      "source_id": "IMO-GREENVOYAGE-HULL-CLEANING",
+      "title": "GreenVoyage2050 Ship Energy Efficiency Solutions Portal — Hull cleaning",
+      "publisher": "International Maritime Organization / DNV",
+      "publication_date": "ongoing",
+      "url": "https://greenvoyage2050.imo.org/technology/hull-cleaning/",
+      "evidence_class": "official_technology_portal_with_disclaimer",
+      "scope": {
+        "topic": "Hull cleaning methods, indicative work rates, cost and fuel-saving potential.",
+        "reported_ranges": "The portal gives indicative 1–5% fuel-reduction potential depending on fouling and vessel/route; diver and ROV cleaning work-rate/cost estimates are explicitly context dependent."
+      },
+      "limitations": [
+        "The portal disclaims warranty/accuracy/completeness and estimates are not universal performance claims.",
+        "Local contamination restrictions and cleaning permissions vary."
+      ]
+    },
+    {
+      "source_id": "OCEANENG-BIOFOULING-REVIEW-2026-123988",
+      "title": "Biofouling of ships and offshore structures: research trends and future pathways",
+      "publisher": "Ocean Engineering",
+      "publication_date": "2026-02-15",
+      "url": "https://doi.org/10.1016/j.oceaneng.2025.123988",
+      "evidence_class": "peer_reviewed_systematic_bibliometric_review",
+      "scope": {
+        "method": "Review and bibliometric analysis across marine organisms, hydrodynamics, carbon intensity, hull roughness inspection, mitigation and maintenance.",
+        "reported_gap": "The authors identify inspection and maintenance as under-explored in their research mapping."
+      },
+      "limitations": [
+        "Bibliometric review, not a direct ship-performance measurement dataset.",
+        "Use it to identify research gaps, not numeric performance targets."
+      ]
+    },
+    {
+      "source_id": "APOR-HULL-FOULING-GHG-2025-104870",
+      "title": "Underestimated penalty of hull fouling: A scenario-based analysis of GHG emissions from global shipping",
+      "publisher": "Applied Ocean Research",
+      "publication_date": "2025",
+      "url": "https://doi.org/10.1016/j.apor.2025.104870",
+      "evidence_class": "peer_reviewed_scenario_model",
+      "scope": {
+        "fleet_sample": "52,636 vessels across six ship types",
+        "reported_result": "Authors estimate moderate fouling can increase annual fuel/GHG by an average 20–30% under their scenario assumptions."
+      },
+      "limitations": [
+        "Scenario-based model estimate, not direct measurement for each ship.",
+        "Not a universal saving target or transferable factor; reproduce model, fouling scenarios and ship-type assumptions before use."
+      ]
     }
   ]
 }
