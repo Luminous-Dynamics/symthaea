@@ -37,6 +37,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         visual_weight_ppm: 500_000,
         vehicle_encoder_seed_phrase: "public-nonsecret-fresh-process-driving-fixture-seed-v0-1"
             .to_string(),
+        expected_camera_calibration_sha256: None,
     };
     bridge_config.validate()?;
 
