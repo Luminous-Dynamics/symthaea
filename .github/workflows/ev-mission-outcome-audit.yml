@@ -48,6 +48,7 @@ jobs:
             .conflicting_reference_count == 2 and
             .rejected_reference_count == 0 and
             .synthetic_scorable_count == 5 and
+            .physical_reference_case_count == 0 and
             .physical_scorable_count == 0 and
             .physical_false_feasible_upper_95_one_sided == null and
             any(.cases[]; .case_id == "false_feasible_thermal" and
