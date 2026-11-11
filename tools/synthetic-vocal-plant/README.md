@@ -91,3 +91,26 @@ The observers are not averaged. Their cents disagreement is retained as a diagno
 All metric observations bind a stable metric ID, unit, analyzer ID/version, exact PCM digest, sample window and eligible frame count. The VCRB adapter exports only observations marked `Observed`; it does not duplicate VCRB's control-response evaluation logic.
 
 Calibration uses a separately named and parameterized synthetic family. The report records exact PCM repeatability and per-metric maximum absolute repeat deltas. This deterministic calibration is a measurement-pipeline check; it is not statistical calibration for stochastic neural renderers.
+
+
+## Measured response profile — SYNTH-CAL-001
+
+The CLI also fits a backend-specific local response model from actual generated PCM interventions and writes:
+
+- `response-profile.json`: measured metric × control sensitivity coefficients, conservative coefficient uncertainty, held-out prediction checks, split identities and explicit promotability.
+- `response-calibration-pairs.json`: every baseline/intervention pair, control ID/unit/delta, target event, PCM digests and per-metric measured deltas.
+- `vcca-response-profile.json`: a narrow field-compatible adapter for the existing VCCA-001 profile inputs (control bounds, metric residuals and sensitivity cells).
+- SHA-256 sidecars for the profile and calibration-pair artifacts.
+
+The initial control dimensions are pitch shift in cents, formant scaling delta, and energy scaling delta. Each is probed in both positive and negative directions at multiple magnitudes, across two distinct synthetic calibration parameter families.
+
+For each metric/control cell, the compiler fits a through-origin least-squares slope. It derives coefficient uncertainty from the worst observed calibration residual divided by the corresponding absolute control input. Per-metric residual uncertainty comes from the independent no-op repeatability report. These are conservative local engineering bounds for this deterministic backend, not confidence intervals.
+
+A separate confirmatory phrase is then used for one unseen probe per control. Every measured metric delta is compared with the fitted prediction interval. The profile is marked promotable only when all required cells exist, the no-op and split identities qualify, and every held-out prediction is covered.
+
+The fitted matrix may still be **not promotable**. That is a valid result: it exposes model inadequacy instead of weakening a tolerance or forcing a correction. The profile is local to the exact legacy renderer, sample rate and analyzer versions; it must not be reused for another backend or extrapolated outside its measured trust radii.
+
+This module prepares VCCA's inputs but does not duplicate its candidate-ranking algorithm. Every resulting VCCA action remains PROPOSAL_ONLY and requires capability admission plus fresh post-render measurement.
+
+
+The compiler separately checks whether each advertised control produced a positive response in its designated target metric. An ignored or wrong-direction control is marked unsupported in the VCCA adapter, with zero-only action bounds, and prevents profile promotion. A complete-looking matrix cannot make an ineffective renderer control appear supported.

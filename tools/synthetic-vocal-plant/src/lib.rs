@@ -27,6 +27,7 @@ pub const DEFAULT_CROSSFADE_MS: u32 = 5;
 pub const MIN_F0_AUTOCORRELATION: f64 = 0.5;
 
 pub mod observer;
+pub mod calibration;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SyntheticSegmentSpec {

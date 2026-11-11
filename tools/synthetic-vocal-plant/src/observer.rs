@@ -134,6 +134,7 @@ pub fn to_vcrb_observations(
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CalibrationMetric {
+    pub segment_id: String,
     pub metric_id: String,
     pub unit: String,
     pub repeat_max_abs_delta: Option<f64>,
@@ -576,6 +577,7 @@ pub fn calibrate_no_op_repeatability(
                 _ => None,
             };
             metrics.push(CalibrationMetric {
+                segment_id: left.segment_id.clone(),
                 metric_id: left_metric.metric_id.clone(),
                 unit: left_metric.unit.clone(),
                 repeat_max_abs_delta: delta,
