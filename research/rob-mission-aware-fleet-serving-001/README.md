@@ -122,6 +122,70 @@ Cases cover active-session/KV admission pressure, the VLA p99-plus-guard boundar
 
 External comparators for this extension are the 1 November 2026 agentic-robot-fleet KV-cache/admission preprint (arXiv:2611.01404) and EdgePace's unified-memory bandwidth-aware scheduling study (arXiv:2610.37307). Their published results motivate the factors but have not been reproduced by these synthetic fixtures. The six cases were JSON-parsed and deterministically checked for case identity and reserved-path invariants; this is not JSON Schema validator execution, a runtime scheduler, a measured serving trace or hardware evidence.
 
+## Decision- and recovery-aware context retention extension
+
+A second context-management track is now represented by a separate four-case corpus:
+
+- `fixtures/agent_context_retention_v0_1.json`
+- `fixtures/agent_context_retention_v0_1.schema.json`
+
+The test hypothesis is that cache/context value should reflect not only recency or expected reuse, but also the **decision and recovery consequences of losing that context**. Preserve these quantities separately:
+- future phase / agent-transition reuse;
+- expected prefill/re-prefill cost;
+- expected task-loss regret if evicted;
+- whether the context contains uniquely required recovery evidence;
+- the exact action-prefix and observation identities it depends on;
+- remaining KV capacity and action-chunk deadline slack.
+
+This does not justify an unbounded “pin everything” policy. The Luminous candidate must be measured against phase-aware and transition-predictive alternatives, with KV/cache, GPU, memory bandwidth, network, foreground sensing and VLA deadlines all kept as explicit constraints. Action-prefix, local-control, RTA, interlock and safe-stop state are non-evictable by contract, independent of score.
+
+### External comparison matrix (2026)
+
+| Comparator | Reported result / mechanism | Luminous experimental question |
+|---|---|---|
+| AgentKV, EMNLP 2026 | Phase-specific query buffers for think / act / tool; +5.5 points over R-KV, +5.3 over Tri-attention, up to 1.80× output-token throughput versus full-KV SGLang | Does robot mission phase + recovery consequence add value beyond generation-phase query coverage? |
+| CacheScout, arXiv 2608.14624 | Learns agent execution transitions online for eviction/prefetch; +10–18 pp KV hit rate, mean TTFT -18–45%, per-turn latency -29–38%, throughput up to +57% | Can robot request graphs and decision receipts improve prefetch without leaking future event truth or starving VLA? |
+| CONCUR, ICML 2026 | Agent-level cache-aware admission for middle-phase thrashing; up to 4.09× Qwen3-32B and 1.90× DeepSeek-V3 | Does a closed-loop admission policy preserve per-robot service floors and hard control deadlines under sustained overload? |
+| Agentic Robot Fleets, arXiv 2611.01404 (1 Nov 2026) | 80 LIBERO-PRO episodes; contexts to 215k tokens; active-session caps recover throughput after 20→32 concurrency causes thrashing | Can a heterogeneous robot fleet be admitted against KV residency, action-buffer slack and per-robot starvation simultaneously? |
+| Long-WAM, arXiv 2610.10528 | RoboCasa GR-1 success 63.3→78.7% across 0→19.2 s context; 107.4 ms action chunk including future prediction on RTX 5090; 95% dynamic cup stacking on Unitree G1 (19/20) | How much visual history is decision-useful under an explicit control deadline and real resource boundary? |
+| Streaming-WAM, arXiv 2609.28927 | 98.35% LIBERO average success; 41 ms chunk time, 12× over FastWAM; real Stamp Paper episode 90→38 s | Does conditioning the next prediction on the exact executed prefix prevent action-context aliasing during asynchronous execution? |
+| OpenWAM, Stanford (6 Oct 2026) | VTA 97.8% LIBERO-Long; 84% mean on four held-out tasks for a local-context IDM using counterfactual data | Which video/action interaction structure transfers best when the model, action expert and counterfactual data are separately controlled? |
+
+Sources:
+- AgentKV: https://aclanthology.org/2026.emnlp-main.2514/
+- CacheScout: https://arxiv.org/abs/2608.14624
+- CONCUR: https://proceedings.mlr.press/v306/chen26fs.html
+- Agentic Robot Fleets: https://arxiv.org/abs/2611.01404
+- Long-WAM: https://nvlabs.github.io/LongLive/Long-WAM/
+- Streaming-WAM: https://arxiv.org/abs/2609.28927
+- OpenWAM: https://openwam.stanford.edu/
+
+These results are from different tasks, models, hardware and experimental setups; they are comparator evidence, not a matched Luminous leaderboard. Manipulation benchmark scores must not be reported as quadruped locomotion results.
+
+### Factorial evaluation required
+
+Separate three factors rather than collapsing them into one comparison:
+1. **Context policy:** LRU/recency, AgentKV-style phase query buffers, CacheScout-style transition prefetch, CONCUR-style active-agent admission, Luminous decision/recovery-aware residency.
+2. **World/action architecture:** short context, Long-WAM-style causal history scaling, Streaming-WAM action-conditioned future prediction, OpenWAM VTA / ATV / joint / decoupled interaction.
+3. **Execution policy:** synchronous, async without prefix conditioning, async with exact executed-prefix conditioning, progress-triggered replanning (TempoWAM), phase/kinematic transitions (PACE).
+
+Where the model, weights, platform or task cannot be matched, report the difference explicitly. Do not transfer reported success numbers across tasks or hardware.
+
+### Required metrics
+
+In addition to fleet and resource metrics, report:
+- KV hit/miss and re-prefill tokens/time by think/act/tool/recover phase;
+- retained-context task score and exact evidence retrieval / grounding accuracy;
+- expected decision regret attributable to eviction, in the declared task-loss scale;
+- recovery-evidence loss and resulting common-continuation/recovery-route change;
+- cache occupancy/fragmentation and active-context count over time;
+- p50/p95/p99 prefill, decode, brain-turn, VLA chunk and end-to-end action-application latency;
+- chunk-prefix mismatch, expired context and stale action-receipt rejection;
+- foreground camera deadline misses, memory-bandwidth stalls and VLA starvation;
+- per-robot service-floor compliance and sequential mission safe-success.
+
+A candidate context policy is not better merely because KV hit rate or token throughput increases. It must improve the safe-service/resource Pareto frontier without hiding a critical context eviction, camera deadline miss or robot starvation event.
+
 ## Prospective targets (not achieved)
 
 - Zero displacement of local hard-real-time control, RTA and safe-stop.
