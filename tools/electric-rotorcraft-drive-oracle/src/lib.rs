@@ -146,6 +146,10 @@ pub struct DriveKinematicReport {
 pub struct MotorEfficiencyEvidence {
     pub map_id: String,
     pub map_digest: String,
+    pub map_model_version: String,
+    pub torque_cell_lower_index: usize,
+    pub speed_cell_lower_index: usize,
+    pub interpolation_weights: [f64; 4],
     pub configuration_digest: String,
     pub context_digest: String,
     pub evidence_manifest_digest: String,
@@ -179,6 +183,10 @@ pub struct MotorShaftOperatingPoint {
 pub struct DriveMapEnvelope {
     pub map_id: String,
     pub map_digest: String,
+    pub map_model_version: String,
+    pub torque_cell_lower_index: usize,
+    pub speed_cell_lower_index: usize,
+    pub interpolation_weights: [f64; 4],
     pub configuration_digest: String,
     pub context_digest: String,
     pub evidence_manifest_digest: String,
@@ -443,6 +451,7 @@ pub fn evaluate_drive_with_map_evidence(
 ) -> Result<DriveMapEnvelope, DriveError> {
     if evidence.map_id.trim().is_empty()
         || evidence.map_digest.trim().is_empty()
+        || evidence.map_model_version.trim().is_empty()
         || evidence.configuration_digest.trim().is_empty()
         || evidence.context_digest.trim().is_empty()
         || evidence.evidence_manifest_digest.trim().is_empty()
@@ -461,6 +470,17 @@ pub fn evaluate_drive_with_map_evidence(
     if evidence.context_digest != expected_context.context_digest {
         return Err(DriveError::InvalidConfiguration(
             "motor efficiency map context digest does not match drive operating context",
+        ));
+    }
+
+    if evidence
+        .interpolation_weights
+        .iter()
+        .any(|weight| !weight.is_finite() || !(0.0..=1.0).contains(weight))
+        || (evidence.interpolation_weights.iter().sum::<f64>() - 1.0).abs() > 1.0e-12
+    {
+        return Err(DriveError::InvalidConfiguration(
+            "map interpolation weights must be finite, within [0, 1], and sum to one",
         ));
     }
 
@@ -507,6 +527,10 @@ pub fn evaluate_drive_with_map_evidence(
     Ok(DriveMapEnvelope {
         map_id: evidence.map_id.clone(),
         map_digest: evidence.map_digest.clone(),
+        map_model_version: evidence.map_model_version.clone(),
+        torque_cell_lower_index: evidence.torque_cell_lower_index,
+        speed_cell_lower_index: evidence.speed_cell_lower_index,
+        interpolation_weights: evidence.interpolation_weights,
         configuration_digest: evidence.configuration_digest.clone(),
         context_digest: evidence.context_digest.clone(),
         evidence_manifest_digest: evidence.evidence_manifest_digest.clone(),
@@ -590,6 +614,10 @@ mod tests {
         MotorEfficiencyEvidence {
             map_id: "motor-map-v1".to_owned(),
             map_digest: "motor-map-sha256".to_owned(),
+            map_model_version: "electric-propulsion-map-oracle-v0.2.0".to_owned(),
+            torque_cell_lower_index: 3,
+            speed_cell_lower_index: 7,
+            interpolation_weights: [0.375, 0.125, 0.375, 0.125],
             configuration_digest: "aircraft-config-sha256".to_owned(),
             context_digest: "motor-context-sha256".to_owned(),
             evidence_manifest_digest: "measurement-manifest-sha256".to_owned(),
@@ -890,6 +918,10 @@ mod tests {
         );
         assert_eq!(result.map_id, "motor-map-v1");
         assert_eq!(result.map_digest, "motor-map-sha256");
+        assert_eq!(result.map_model_version, "electric-propulsion-map-oracle-v0.2.0");
+        assert_eq!(result.torque_cell_lower_index, 3);
+        assert_eq!(result.speed_cell_lower_index, 7);
+        assert_eq!(result.interpolation_weights, [0.375, 0.125, 0.375, 0.125]);
         assert_eq!(
             result.evidence_manifest_digest,
             "measurement-manifest-sha256"
@@ -1054,6 +1086,63 @@ mod tests {
         };
         let mut evidence = map_evidence(&model, input, transmission);
         evidence.map_digest.clear();
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+    }
+
+    #[test]
+    fn invalid_map_model_version_or_interpolation_weights_fail_closed() {
+        let model = config();
+        let input = input_for_power(10_000.0, 400.0, 1.0);
+        let transmission = TransmissionKinematics {
+            motor_to_rotor_speed_ratio: 1.0,
+        };
+
+        let mut evidence = map_evidence(&model, input, transmission);
+        evidence.map_model_version.clear();
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+
+        let mut evidence = map_evidence(&model, input, transmission);
+        evidence.interpolation_weights = [0.5, 0.5, 0.5, 0.5];
+        assert!(matches!(
+            evaluate_drive_with_map_evidence(
+                &model,
+                input,
+                transmission,
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config-sha256",
+                    context_digest: "motor-context-sha256",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+
+        let mut evidence = map_evidence(&model, input, transmission);
+        evidence.interpolation_weights[0] = f64::NAN;
         assert!(matches!(
             evaluate_drive_with_map_evidence(
                 &model,
