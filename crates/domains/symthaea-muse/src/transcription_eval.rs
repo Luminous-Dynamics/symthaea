@@ -1195,7 +1195,6 @@ mod tests {
             &prediction,
             &reference,
             default_config(),
-            None,
         )
         .unwrap();
         assert_eq!(report.onset_pitch_metrics.true_positives, 0);
@@ -1217,7 +1216,8 @@ mod tests {
         .unwrap();
         assert_eq!(report.onset_pitch_metrics.f1, 1.0);
         assert_eq!(report.full_note_metrics.true_positives, 0);
-        assert_eq!(report.offset_error_ms.sample_count, 0);
+        assert_eq!(report.offset_error_ms.sample_count, 2);
+        assert!(report.offset_error_ms.mean_absolute_error_ms.unwrap() > 150.0);
     }
 
     #[test]
