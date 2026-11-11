@@ -26,6 +26,7 @@ pub const PART_STEM_RECEIPT_DIGEST_SCHEMA_V1: &str =
 pub const PART_STEM_MAX_BUNDLE_BYTES_V1: usize = 16 * 1024 * 1024;
 pub const PART_STEM_MAX_STEMS_V1: usize = 256;
 pub const PART_STEM_MAX_NOTES_V1: usize = 100_000;
+pub const PART_STEM_MAX_MIDI_BYTES_V1: usize = 64 * 1024 * 1024;
 pub const PART_STEM_MAX_WAV_BYTES_V1: usize = 256 * 1024 * 1024;
 pub const PART_STEM_MAX_TOTAL_WAV_BYTES_V1: u64 = 512 * 1024 * 1024;
 pub const PART_STEM_MAX_AUDIO_FRAMES_V1: u64 = 24_000_000;
@@ -304,6 +305,12 @@ fn verify_midi(
 ) -> Result<BTreeMap<u16, Vec<TrackEventProgramChangeV1>>, Vec<PartStemEvidenceIssueV1>> {
     let manifest = &midi.manifest;
     let mut issues = Vec::new();
+    if midi.midi_bytes.len() > PART_STEM_MAX_MIDI_BYTES_V1
+        || manifest.tracks.len() > PART_STEM_MAX_STEMS_V1
+        || manifest.notes.len() > PART_STEM_MAX_NOTES_V1
+    {
+        return Err(vec![PartStemEvidenceIssueV1::TooManyNotes]);
+    }
     if manifest.schema != MIDI_PERFORMANCE_SCHEMA_V1
         || manifest.ticks_per_quarter == 0
         || manifest.tempo_microseconds_per_quarter == 0
@@ -360,6 +367,8 @@ fn verify_midi(
             || track.segment_end_tick <= track.segment_start_tick
             || !non_blank(&track.segment_id)
             || !non_blank(&track.instrument_id)
+            || !non_blank(&track.renderer_id)
+            || !non_blank(&track.patch_id)
         {
             issues.push(PartStemEvidenceIssueV1::InvalidNoteReceipt {
                 ordinal: usize::from(track.track_index),
@@ -656,8 +665,14 @@ pub fn validate_part_stem_bundle_v1(
     if bundle.stems.len() > PART_STEM_MAX_STEMS_V1 {
         issues.push(PartStemEvidenceIssueV1::TooManyStems);
     }
-    if bundle.stems.len() != midi.manifest.tracks.len() {
-        issues.push(PartStemEvidenceIssueV1::MidiTrackCountMismatch);
+    if midi.manifest.tracks.len() > PART_STEM_MAX_STEMS_V1
+        || midi.manifest.notes.len() > PART_STEM_MAX_NOTES_V1
+        || midi.midi_bytes.len() > PART_STEM_MAX_MIDI_BYTES_V1
+    {
+        issues.push(PartStemEvidenceIssueV1::TooManyNotes);
+    }
+    if wav_inputs.len() > PART_STEM_MAX_STEMS_V1 {
+        issues.push(PartStemEvidenceIssueV1::TooManyStems);
     }
     if midi.manifest.notes.len() > PART_STEM_MAX_NOTES_V1 {
         issues.push(PartStemEvidenceIssueV1::TooManyNotes);
@@ -679,6 +694,14 @@ pub fn validate_part_stem_bundle_v1(
         if !valid_sha256(digest) {
             issues.push(PartStemEvidenceIssueV1::InvalidDigest { field: field.into() });
         }
+    }
+    if bundle.stems.len() > PART_STEM_MAX_STEMS_V1
+        || midi.manifest.tracks.len() > PART_STEM_MAX_STEMS_V1
+        || midi.manifest.notes.len() > PART_STEM_MAX_NOTES_V1
+        || midi.midi_bytes.len() > PART_STEM_MAX_MIDI_BYTES_V1
+        || wav_inputs.len() > PART_STEM_MAX_STEMS_V1
+    {
+        return Err(issues);
     }
     if bundle.audio_clock.origin != "score_zero"
         || !(8_000..=192_000).contains(&bundle.audio_clock.sample_rate_hz)
@@ -772,12 +795,17 @@ pub fn validate_part_stem_bundle_v1(
             });
             continue;
         };
-        if id != track_identity(track) {
+        if id != track_identity(track)
+            || stem.renderer_id != track.renderer_id
+            || stem.patch_id != track.patch_id
+        {
             issues.push(PartStemEvidenceIssueV1::StemIdentityMismatch {
                 track_index: stem.midi_track_index,
             });
         }
-        if stem.source_note_ordinals.windows(2).any(|pair| pair[0] >= pair[1]) {
+        if stem.source_note_ordinals.len() > PART_STEM_MAX_NOTES_V1
+            || stem.source_note_ordinals.windows(2).any(|pair| pair[0] >= pair[1])
+        {
             issues.push(PartStemEvidenceIssueV1::InvalidSourceOrdinalOrder {
                 track_index: stem.midi_track_index,
             });
