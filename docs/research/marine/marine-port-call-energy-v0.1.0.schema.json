@@ -404,7 +404,8 @@
         "target_arrival",
         "latest_arrival",
         "minimum_turnaround_seconds",
-        "latest_departure"
+        "latest_departure",
+        "source_id"
       ],
       "properties": {
         "port_call_id": {
@@ -430,6 +431,10 @@
         "latest_departure": {
           "type": "string",
           "format": "date-time"
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
         }
       }
     }
