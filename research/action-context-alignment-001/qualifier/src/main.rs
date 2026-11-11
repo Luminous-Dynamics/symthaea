@@ -21,7 +21,10 @@ const DIMENSIONS: [&str; 8] = [
 ];
 
 fn str_field<'a>(value: &'a Value, key: &str) -> Option<&'a str> {
-    value.get(key)?.as_str().filter(|text| !text.trim().is_empty())
+    value
+        .get(key)?
+        .as_str()
+        .filter(|text| !text.trim().is_empty())
 }
 
 fn bool_field(value: &Value, key: &str) -> Option<bool> {
@@ -33,7 +36,10 @@ fn u64_field(value: &Value, key: &str) -> Option<u64> {
 }
 
 fn is_sha256(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
 }
 
 fn changed_field(dimension: &str) -> Option<&'static str> {
@@ -52,18 +58,31 @@ fn changed_field(dimension: &str) -> Option<&'static str> {
 fn derive_eligible(fixture: &Value) -> Result<bool, String> {
     let task = &fixture["task"];
     let auth = &fixture["authority_context"];
-    let target = str_field(task, "target_ref").ok_or_else(|| "task target_ref missing".to_string())?;
-    let required_scope = str_field(task, "required_scope").ok_or_else(|| "task required_scope missing".to_string())?;
-    let evaluated_at = u64_field(task, "evaluated_at_unix").ok_or_else(|| "task evaluated_at_unix missing".to_string())?;
-    let expires_at = u64_field(auth, "expires_at_unix").ok_or_else(|| "authority expires_at_unix missing".to_string())?;
-    let allowlist = auth["target_allowlist"].as_array().ok_or_else(|| "target_allowlist must be an array".to_string())?;
+    let target =
+        str_field(task, "target_ref").ok_or_else(|| "task target_ref missing".to_string())?;
+    let required_scope = str_field(task, "required_scope")
+        .ok_or_else(|| "task required_scope missing".to_string())?;
+    let evaluated_at = u64_field(task, "evaluated_at_unix")
+        .ok_or_else(|| "task evaluated_at_unix missing".to_string())?;
+    let expires_at = u64_field(auth, "expires_at_unix")
+        .ok_or_else(|| "authority expires_at_unix missing".to_string())?;
+    let allowlist = auth["target_allowlist"]
+        .as_array()
+        .ok_or_else(|| "target_allowlist must be an array".to_string())?;
     let target_allowed = allowlist.iter().any(|entry| entry.as_str() == Some(target));
     let principal_exact = str_field(auth, "principal_binding") == Some("Exact");
     let locally_recognized = bool_field(auth, "local_recognition") == Some(true);
     let purpose_exact = str_field(auth, "purpose_binding") == Some("Exact");
     let scope_exact = str_field(auth, "delegated_scope") == Some(required_scope);
-    let pre_state_exact = str_field(auth, "pre_state_sha256") == str_field(task, "pre_state_sha256");
-    Ok(principal_exact && locally_recognized && target_allowed && purpose_exact && expires_at > evaluated_at && scope_exact && pre_state_exact)
+    let pre_state_exact =
+        str_field(auth, "pre_state_sha256") == str_field(task, "pre_state_sha256");
+    Ok(principal_exact
+        && locally_recognized
+        && target_allowed
+        && purpose_exact
+        && expires_at > evaluated_at
+        && scope_exact
+        && pre_state_exact)
 }
 
 fn validate_schema(schema: &Value) -> Result<(), String> {
@@ -88,10 +107,18 @@ fn validate_fixture(fixture: &Value) -> Result<(String, String, String, String),
     if fixture.as_object().map(serde_json::Map::len) != Some(10) {
         return Err("fixture must contain exactly the ten declared properties".into());
     }
-    let fixture_id = str_field(fixture, "fixture_id").ok_or_else(|| "fixture_id missing".to_string())?.to_string();
-    let pair_id = str_field(fixture, "pair_id").ok_or_else(|| "pair_id missing".to_string())?.to_string();
-    let member = str_field(fixture, "pair_member").ok_or_else(|| "pair_member missing".to_string())?.to_string();
-    let dimension = str_field(fixture, "mutation_dimension").ok_or_else(|| "mutation_dimension missing".to_string())?.to_string();
+    let fixture_id = str_field(fixture, "fixture_id")
+        .ok_or_else(|| "fixture_id missing".to_string())?
+        .to_string();
+    let pair_id = str_field(fixture, "pair_id")
+        .ok_or_else(|| "pair_id missing".to_string())?
+        .to_string();
+    let member = str_field(fixture, "pair_member")
+        .ok_or_else(|| "pair_member missing".to_string())?
+        .to_string();
+    let dimension = str_field(fixture, "mutation_dimension")
+        .ok_or_else(|| "mutation_dimension missing".to_string())?
+        .to_string();
     if changed_field(&dimension).is_none() && dimension != "runtime_trigger" {
         return Err(format!("unknown mutation dimension {dimension}"));
     }
@@ -111,7 +138,16 @@ fn validate_fixture(fixture: &Value) -> Result<(String, String, String, String),
     if task.as_object().map(serde_json::Map::len) != Some(11) {
         return Err("task must contain exactly the eleven declared properties".into());
     }
-    for key in ["task_ref", "principal_ref", "actor_ref", "on_behalf_of_ref", "operation", "target_ref", "purpose_ref", "required_scope"] {
+    for key in [
+        "task_ref",
+        "principal_ref",
+        "actor_ref",
+        "on_behalf_of_ref",
+        "operation",
+        "target_ref",
+        "purpose_ref",
+        "required_scope",
+    ] {
         if str_field(task, key).is_none() {
             return Err(format!("task.{key} missing"));
         }
@@ -136,11 +172,20 @@ fn validate_fixture(fixture: &Value) -> Result<(String, String, String, String),
     {
         return Err("authority context contains missing or invalid typed fields".into());
     }
-    let allowlist = auth["target_allowlist"].as_array().ok_or_else(|| "target_allowlist must be an array".to_string())?;
-    if allowlist.is_empty() || allowlist.iter().any(|x| x.as_str().is_none_or(|s| s.trim().is_empty())) {
+    let allowlist = auth["target_allowlist"]
+        .as_array()
+        .ok_or_else(|| "target_allowlist must be an array".to_string())?;
+    if allowlist.is_empty()
+        || allowlist
+            .iter()
+            .any(|x| x.as_str().is_none_or(|s| s.trim().is_empty()))
+    {
         return Err("target_allowlist must contain non-empty target references".into());
     }
-    let allowlist_set = allowlist.iter().filter_map(Value::as_str).collect::<BTreeSet<_>>();
+    let allowlist_set = allowlist
+        .iter()
+        .filter_map(Value::as_str)
+        .collect::<BTreeSet<_>>();
     if allowlist_set.len() != allowlist.len() {
         return Err("target_allowlist has duplicate entries".into());
     }
@@ -151,19 +196,28 @@ fn validate_fixture(fixture: &Value) -> Result<(String, String, String, String),
         || str_field(runtime, "trigger").is_none()
         || str_field(runtime, "observation_ref").is_none()
     {
-        return Err("runtime_context must contain exactly stage, trigger and observation_ref".into());
+        return Err(
+            "runtime_context must contain exactly stage, trigger and observation_ref".into(),
+        );
     }
     let eligible = derive_eligible(fixture)?;
     let computed = if dimension == "runtime_trigger" {
         if !eligible {
-            return Err("runtime-trigger continuation/stop pairs require initially eligible authority".into());
+            return Err(
+                "runtime-trigger continuation/stop pairs require initially eligible authority"
+                    .into(),
+            );
         }
         if str_field(runtime, "stage") != Some("AfterRead") {
-            return Err("runtime-trigger fixtures must be evaluated after the read-only stage".into());
+            return Err(
+                "runtime-trigger fixtures must be evaluated after the read-only stage".into(),
+            );
         }
         match str_field(runtime, "trigger") {
             Some("None") => "ContinueWithinAuthorizedScope",
-            Some("CriticalToolFailure" | "ConflictingEvidence" | "EmergentRisk") => "StopBeforeFurtherEffect",
+            Some("CriticalToolFailure" | "ConflictingEvidence" | "EmergentRisk") => {
+                "StopBeforeFurtherEffect"
+            }
             _ => return Err("runtime trigger kind is invalid".into()),
         }
     } else {
@@ -172,11 +226,18 @@ fn validate_fixture(fixture: &Value) -> Result<(String, String, String, String),
         {
             return Err("pre-execution fixtures must carry NotApplicable runtime context".into());
         }
-        if eligible { "EligibleForTestAdapter" } else { "IneligibleNoAdapterCall" }
+        if eligible {
+            "EligibleForTestAdapter"
+        } else {
+            "IneligibleNoAdapterCall"
+        }
     };
-    let expected = str_field(fixture, "expected_disposition").ok_or_else(|| "expected_disposition missing".to_string())?;
+    let expected = str_field(fixture, "expected_disposition")
+        .ok_or_else(|| "expected_disposition missing".to_string())?;
     if expected != computed {
-        return Err(format!("disposition oracle mismatch: expected {computed}, got {expected}"));
+        return Err(format!(
+            "disposition oracle mismatch: expected {computed}, got {expected}"
+        ));
     }
     let member_matches = if dimension == "runtime_trigger" {
         (member == "continue_control" && computed == "ContinueWithinAuthorizedScope")
@@ -205,14 +266,23 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
         return Err(vec!["fixtures must be an array".into()]);
     };
     if fixtures.len() != EXPECTED_FIXTURES {
-        errors.push(format!("expected {EXPECTED_FIXTURES} fixtures, got {}", fixtures.len()));
+        errors.push(format!(
+            "expected {EXPECTED_FIXTURES} fixtures, got {}",
+            fixtures.len()
+        ));
     }
 
-    let declared_dimensions = manifest["mutation_dimensions"].as_array()
-        .map(|items| items.iter().filter_map(Value::as_str).collect::<BTreeSet<_>>());
+    let declared_dimensions = manifest["mutation_dimensions"].as_array().map(|items| {
+        items
+            .iter()
+            .filter_map(Value::as_str)
+            .collect::<BTreeSet<_>>()
+    });
     let declared_dimension_count = manifest["mutation_dimensions"].as_array().map(Vec::len);
     let expected_dimensions = DIMENSIONS.iter().copied().collect::<BTreeSet<_>>();
-    if declared_dimensions != Some(expected_dimensions) || declared_dimension_count != Some(DIMENSIONS.len()) {
+    if declared_dimensions != Some(expected_dimensions)
+        || declared_dimension_count != Some(DIMENSIONS.len())
+    {
         errors.push("declared mutation dimensions do not match v0.1 contract".into());
     }
 
@@ -224,7 +294,9 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
         match validate_fixture(fixture) {
             Ok((fixture_id, pair_id, _member, dimension)) => {
                 if !fixture_ids.insert(fixture_id.clone()) {
-                    errors.push(format!("fixtures[{index}] duplicate fixture ID {fixture_id}"));
+                    errors.push(format!(
+                        "fixtures[{index}] duplicate fixture ID {fixture_id}"
+                    ));
                 }
                 pairs.entry(pair_id).or_default().push(fixture);
                 *dimension_pairs.entry(dimension).or_default() += 1;
@@ -234,11 +306,16 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
     }
 
     if pairs.len() != EXPECTED_PAIRS {
-        errors.push(format!("expected {EXPECTED_PAIRS} unique pairs, got {}", pairs.len()));
+        errors.push(format!(
+            "expected {EXPECTED_PAIRS} unique pairs, got {}",
+            pairs.len()
+        ));
     }
     for dimension in DIMENSIONS {
         if dimension_pairs.get(dimension).copied().unwrap_or(0) != 6 {
-            errors.push(format!("dimension {dimension} must occur in exactly six fixture rows (three pairs)"));
+            errors.push(format!(
+                "dimension {dimension} must occur in exactly six fixture rows (three pairs)"
+            ));
         }
     }
 
@@ -248,33 +325,58 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
             continue;
         }
         let dimension = str_field(members[0], "mutation_dimension").unwrap_or("");
-        if members.iter().any(|member| str_field(member, "mutation_dimension") != Some(dimension)) {
-            errors.push(format!("pair {pair_id} declares inconsistent mutation dimensions"));
+        if members
+            .iter()
+            .any(|member| str_field(member, "mutation_dimension") != Some(dimension))
+        {
+            errors.push(format!(
+                "pair {pair_id} declares inconsistent mutation dimensions"
+            ));
             continue;
         }
         if dimension == "runtime_trigger" {
-            let continue_case = members.iter().find(|x| str_field(x, "pair_member") == Some("continue_control"));
-            let stop_case = members.iter().find(|x| str_field(x, "pair_member") == Some("runtime_trigger_stop"));
+            let continue_case = members
+                .iter()
+                .find(|x| str_field(x, "pair_member") == Some("continue_control"));
+            let stop_case = members
+                .iter()
+                .find(|x| str_field(x, "pair_member") == Some("runtime_trigger_stop"));
             let (Some(continue_case), Some(stop_case)) = (continue_case, stop_case) else {
-                errors.push(format!("runtime pair {pair_id} must have one continue control and one stop control"));
+                errors.push(format!(
+                    "runtime pair {pair_id} must have one continue control and one stop control"
+                ));
                 continue;
             };
-            if continue_case["task"] != stop_case["task"] || continue_case["authority_context"] != stop_case["authority_context"] {
-                errors.push(format!("runtime pair {pair_id} must hold task and authority context constant"));
+            if continue_case["task"] != stop_case["task"]
+                || continue_case["authority_context"] != stop_case["authority_context"]
+            {
+                errors.push(format!(
+                    "runtime pair {pair_id} must hold task and authority context constant"
+                ));
             }
             let a = continue_case["runtime_context"].as_object();
             let b = stop_case["runtime_context"].as_object();
             let (Some(a), Some(b)) = (a, b) else {
-                errors.push(format!("runtime pair {pair_id} has invalid runtime context"));
+                errors.push(format!(
+                    "runtime pair {pair_id} has invalid runtime context"
+                ));
                 continue;
             };
             if a.keys().collect::<BTreeSet<_>>() != b.keys().collect::<BTreeSet<_>>() {
-                errors.push(format!("runtime pair {pair_id} runtime-context keys differ"));
+                errors.push(format!(
+                    "runtime pair {pair_id} runtime-context keys differ"
+                ));
                 continue;
             }
-            let changed = a.keys().filter(|key| a.get(*key) != b.get(*key)).map(|key| key.as_str()).collect::<Vec<_>>();
+            let changed = a
+                .keys()
+                .filter(|key| a.get(*key) != b.get(*key))
+                .map(|key| key.as_str())
+                .collect::<Vec<_>>();
             if changed.len() != 1 || changed[0] != "trigger" {
-                errors.push(format!("runtime pair {pair_id} must change only trigger, observed {changed:?}"));
+                errors.push(format!(
+                    "runtime pair {pair_id} must change only trigger, observed {changed:?}"
+                ));
             }
             continue;
         }
@@ -283,31 +385,49 @@ fn validate_manifest(manifest: &Value) -> Result<(usize, BTreeMap<String, usize>
             errors.push(format!("pair {pair_id} has unknown mutation dimension"));
             continue;
         };
-        let authorized = members.iter().find(|x| str_field(x, "pair_member") == Some("authorized_control"));
-        let counterfactual = members.iter().find(|x| str_field(x, "pair_member") == Some("single_delta_denial"));
+        let authorized = members
+            .iter()
+            .find(|x| str_field(x, "pair_member") == Some("authorized_control"));
+        let counterfactual = members
+            .iter()
+            .find(|x| str_field(x, "pair_member") == Some("single_delta_denial"));
         let (Some(authorized), Some(counterfactual)) = (authorized, counterfactual) else {
-            errors.push(format!("pair {pair_id} must have one authorized and one counterfactual member"));
+            errors.push(format!(
+                "pair {pair_id} must have one authorized and one counterfactual member"
+            ));
             continue;
         };
         if authorized["task"] != counterfactual["task"] {
-            errors.push(format!("pair {pair_id} changed task, operation, target, payload, or pre-state"));
+            errors.push(format!(
+                "pair {pair_id} changed task, operation, target, payload, or pre-state"
+            ));
         }
         if authorized["runtime_context"] != counterfactual["runtime_context"] {
-            errors.push(format!("pre-execution pair {pair_id} must keep runtime_context identical"));
+            errors.push(format!(
+                "pre-execution pair {pair_id} must keep runtime_context identical"
+            ));
         }
         let a = authorized["authority_context"].as_object();
         let b = counterfactual["authority_context"].as_object();
         let (Some(a), Some(b)) = (a, b) else {
-            errors.push(format!("pair {pair_id} authority_context must be an object"));
+            errors.push(format!(
+                "pair {pair_id} authority_context must be an object"
+            ));
             continue;
         };
         if a.keys().collect::<BTreeSet<_>>() != b.keys().collect::<BTreeSet<_>>() {
             errors.push(format!("pair {pair_id} authority context keys differ"));
             continue;
         }
-        let changed = a.keys().filter(|key| a.get(*key) != b.get(*key)).map(|key| key.as_str()).collect::<Vec<_>>();
+        let changed = a
+            .keys()
+            .filter(|key| a.get(*key) != b.get(*key))
+            .map(|key| key.as_str())
+            .collect::<Vec<_>>();
         if changed.len() != 1 || changed[0] != mutated_field {
-            errors.push(format!("pair {pair_id} must change exactly {mutated_field}, observed {changed:?}"));
+            errors.push(format!(
+                "pair {pair_id} must change exactly {mutated_field}, observed {changed:?}"
+            ));
         }
     }
 
@@ -333,11 +453,17 @@ fn main() -> ExitCode {
     }
     let manifest = match read_json(&args[1]) {
         Ok(value) => value,
-        Err(error) => { eprintln!("{error}"); return ExitCode::FAILURE; }
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
     };
     let schema = match read_json(&args[2]) {
         Ok(value) => value,
-        Err(error) => { eprintln!("{error}"); return ExitCode::FAILURE; }
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::FAILURE;
+        }
     };
     if let Err(error) = validate_schema(&schema) {
         eprintln!("SCHEMA QUALIFICATION FAILED: {error}");
@@ -345,14 +471,30 @@ fn main() -> ExitCode {
     }
     match validate_manifest(&manifest) {
         Ok((fixtures, counts)) => {
-            println!("QUALIFIED SYNTHETIC AUTHORIZATION-CONTEXT PAIRS: fixtures={fixtures} pairs={} dimensions={}", EXPECTED_PAIRS, counts.len());
-            for dimension in DIMENSIONS { println!("  {dimension}: {} pair members", counts.get(dimension).copied().unwrap_or(0)); }
-            println!("NOT EXECUTED: no model-mediated decision, permit issuance or effect adapter invocation is implied.");
+            println!(
+                "QUALIFIED SYNTHETIC AUTHORIZATION-CONTEXT PAIRS: fixtures={fixtures} pairs={} dimensions={}",
+                EXPECTED_PAIRS,
+                counts.len()
+            );
+            for dimension in DIMENSIONS {
+                println!(
+                    "  {dimension}: {} pair members",
+                    counts.get(dimension).copied().unwrap_or(0)
+                );
+            }
+            println!(
+                "NOT EXECUTED: no model-mediated decision, permit issuance or effect adapter invocation is implied."
+            );
             ExitCode::SUCCESS
         }
         Err(errors) => {
-            eprintln!("ACTION-CONTEXT-ALIGNMENT QUALIFICATION FAILED ({} findings):", errors.len());
-            for error in errors { eprintln!(" - {error}"); }
+            eprintln!(
+                "ACTION-CONTEXT-ALIGNMENT QUALIFICATION FAILED ({} findings):",
+                errors.len()
+            );
+            for error in errors {
+                eprintln!(" - {error}");
+            }
             ExitCode::FAILURE
         }
     }
@@ -362,7 +504,9 @@ fn main() -> ExitCode {
 mod tests {
     use super::*;
     const FIXTURES: &str = include_str!("../../ACTION_CONTEXT_ALIGNMENT_FIXTURES_V0_1.json");
-    fn parsed() -> Value { serde_json::from_str(FIXTURES).expect("fixtures parse") }
+    fn parsed() -> Value {
+        serde_json::from_str(FIXTURES).expect("fixtures parse")
+    }
 
     #[test]
     fn all_forty_eight_rows_and_twenty_four_pairs_validate() {
@@ -374,9 +518,14 @@ mod tests {
     #[test]
     fn runtime_tool_failure_requires_stop_before_further_effect() {
         let v = parsed();
-        let stop = v["fixtures"].as_array().unwrap().iter()
-            .find(|f| str_field(f, "pair_member") == Some("runtime_trigger_stop")
-                && str_field(&f["runtime_context"], "trigger") == Some("CriticalToolFailure"))
+        let stop = v["fixtures"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|f| {
+                str_field(f, "pair_member") == Some("runtime_trigger_stop")
+                    && str_field(&f["runtime_context"], "trigger") == Some("CriticalToolFailure")
+            })
             .unwrap();
         assert_eq!(stop["expected_disposition"], "StopBeforeFurtherEffect");
     }
@@ -384,16 +533,23 @@ mod tests {
     #[test]
     fn runtime_pair_rejects_missing_trigger_delta() {
         let mut v = parsed();
-        let idx = v["fixtures"].as_array().unwrap().iter()
+        let idx = v["fixtures"]
+            .as_array()
+            .unwrap()
+            .iter()
             .position(|f| str_field(f, "pair_member") == Some("runtime_trigger_stop"))
             .unwrap();
         let pair = v["fixtures"][idx]["pair_id"].clone();
-        let control_idx = v["fixtures"].as_array().unwrap().iter()
+        let control_idx = v["fixtures"]
+            .as_array()
+            .unwrap()
+            .iter()
             .position(|f| f["pair_id"] == pair && f["pair_member"] == "continue_control")
             .unwrap();
         let control_trigger = v["fixtures"][control_idx]["runtime_context"]["trigger"].clone();
         v["fixtures"][idx]["runtime_context"]["trigger"] = control_trigger;
-        v["fixtures"][idx]["expected_disposition"] = Value::String("ContinueWithinAuthorizedScope".into());
+        v["fixtures"][idx]["expected_disposition"] =
+            Value::String("ContinueWithinAuthorizedScope".into());
         assert!(validate_manifest(&v).is_err());
     }
 
