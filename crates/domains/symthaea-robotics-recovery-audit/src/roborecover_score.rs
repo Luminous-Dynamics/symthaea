@@ -67,8 +67,15 @@ pub struct StageTypeGroup {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PlannedScenario {
     pub scenario_id: String,
-    /// SHA-256 of the exact upstream scenario JSON from the split manifest.
+    /// Exact relative path in the pinned upstream scenario archive.
+    pub source_path: String,
+    /// SHA-256 of the reconstructed/off-nominal scenario JSON.
     pub scenario_content_sha256: String,
+    /// SHA-256 of the original trajectory JSON from which the scenario derives.
+    pub original_trajectory_sha256: String,
+    pub task_name: String,
+    pub actions: u32,
+    pub replay_prefix_steps: u32,
     /// Evaluator-side construction provenance; never a policy/router feature.
     pub source: ScenarioSource,
     pub stage: RecoveryStage,
@@ -121,10 +128,16 @@ pub struct RoboRecoverTrial {
     pub split: BenchmarkSplit,
     pub execution_mode: ExecutionMode,
     pub source_repository: String,
+    pub source_path: String,
     pub source_revision: String,
     pub split_manifest_blob_sha: String,
     pub stage: RecoveryStage,
     pub deviation: DeviationType,
+    pub scenario_content_sha256: String,
+    pub original_trajectory_sha256: String,
+    pub task_name: String,
+    pub actions: u32,
+    pub replay_prefix_steps: u32,
     /// Evaluator-side construction provenance; never a policy/router feature.
     pub source: ScenarioSource,
     /// Exact status string emitted by the pinned source adapter.
@@ -232,6 +245,10 @@ pub enum ManifestIssue {
     InvalidEvaluatorDigest,
     BlankScenarioDigest(String),
     InvalidScenarioDigest(String),
+    InvalidOriginalTrajectoryDigest(String),
+    InvalidScenarioPath(String),
+    BlankTaskName(String),
+    InvalidActionPrefix(String),
     BlankScenarioId,
     ScenarioGroupNotInMacro9(StageTypeGroup),
     DuplicateScenarioId(String),
@@ -247,7 +264,12 @@ pub enum ManifestIssue {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScenarioScore {
     pub scenario_id: String,
+    pub source_path: String,
     pub scenario_content_sha256: String,
+    pub original_trajectory_sha256: String,
+    pub task_name: String,
+    pub actions: u32,
+    pub replay_prefix_steps: u32,
     pub source: ScenarioSource,
     pub stage: RecoveryStage,
     pub deviation: DeviationType,
@@ -380,6 +402,32 @@ pub fn validate_manifest(
             ));
         } else if !is_lower_or_upper_hex_digest(&scenario.scenario_content_sha256, 64) {
             issues.push(ManifestIssue::InvalidScenarioDigest(
+                scenario.scenario_id.clone(),
+            ));
+        }
+        if !is_lower_or_upper_hex_digest(&scenario.original_trajectory_sha256, 64) {
+            issues.push(ManifestIssue::InvalidOriginalTrajectoryDigest(
+                scenario.scenario_id.clone(),
+            ));
+        }
+        if scenario.source_path.trim().is_empty()
+            || scenario.source_path.starts_with('/')
+            || scenario.source_path.contains('\\')
+            || scenario.source_path.split('/').any(|part| part == ".." || part == ".")
+            || !scenario.source_path.ends_with(&format!("/{}.json", scenario.scenario_id))
+        {
+            issues.push(ManifestIssue::InvalidScenarioPath(
+                scenario.scenario_id.clone(),
+            ));
+        }
+        if scenario.task_name.trim().is_empty() {
+            issues.push(ManifestIssue::BlankTaskName(scenario.scenario_id.clone()));
+        }
+        if scenario.actions == 0
+            || scenario.replay_prefix_steps == 0
+            || scenario.actions != scenario.replay_prefix_steps
+        {
+            issues.push(ManifestIssue::InvalidActionPrefix(
                 scenario.scenario_id.clone(),
             ));
         }
@@ -537,6 +585,12 @@ pub fn score_roborecover(
             && trial.stage == scenario.stage
             && trial.deviation == scenario.deviation
             && trial.evidence.scenario_id == scenario.scenario_id
+            && trial.source_path == scenario.source_path
+            && trial.scenario_content_sha256 == scenario.scenario_content_sha256
+            && trial.original_trajectory_sha256 == scenario.original_trajectory_sha256
+            && trial.task_name == scenario.task_name
+            && trial.actions == scenario.actions
+            && trial.replay_prefix_steps == scenario.replay_prefix_steps
             && trial.evidence.scenario_digest == scenario.scenario_content_sha256
             && trial.evidence.evaluator_digest == manifest.evaluator_digest;
 
@@ -584,7 +638,12 @@ pub fn score_roborecover(
 
         scenario_scores.push(ScenarioScore {
             scenario_id: scenario.scenario_id.clone(),
+            source_path: scenario.source_path.clone(),
             scenario_content_sha256: scenario.scenario_content_sha256.clone(),
+            original_trajectory_sha256: scenario.original_trajectory_sha256.clone(),
+            task_name: scenario.task_name.clone(),
+            actions: scenario.actions,
+            replay_prefix_steps: scenario.replay_prefix_steps,
             source: scenario.source,
             stage: scenario.stage,
             deviation: scenario.deviation,
@@ -691,6 +750,12 @@ pub fn score_roborecover(
                             && trial.stage == scenario.stage
                             && trial.deviation == scenario.deviation
                             && trial.evidence.scenario_id == scenario.scenario_id
+                            && trial.source_path == scenario.source_path
+                            && trial.scenario_content_sha256 == scenario.scenario_content_sha256
+                            && trial.original_trajectory_sha256 == scenario.original_trajectory_sha256
+                            && trial.task_name == scenario.task_name
+                            && trial.actions == scenario.actions
+                            && trial.replay_prefix_steps == scenario.replay_prefix_steps
                             && trial.evidence.scenario_digest == scenario.scenario_content_sha256
                             && trial.evidence.evaluator_digest == manifest.evaluator_digest
                             && trial.evidence.has_complete_identity()
@@ -766,7 +831,12 @@ mod tests {
             .enumerate()
             .map(|(index, group)| PlannedScenario {
                 scenario_id: format!("scenario-{index}"),
+                source_path: format!("robotwin/test/scenario-{index}.json"),
                 scenario_content_sha256: format!("{index:064x}"),
+                original_trajectory_sha256: format!("{:064x}", index + 1000),
+                task_name: format!("task-{index}"),
+                actions: 12,
+                replay_prefix_steps: 12,
                 source: ScenarioSource::Natural,
                 stage: group.stage,
                 deviation: group.deviation,
@@ -803,10 +873,16 @@ mod tests {
             split: manifest.split,
             execution_mode: manifest.execution_mode,
             source_repository: manifest.source_repository.clone(),
+            source_path: scenario.source_path.clone(),
             source_revision: manifest.source_revision.clone(),
             split_manifest_blob_sha: manifest.split_manifest_blob_sha.clone(),
             stage: scenario.stage,
             deviation: scenario.deviation,
+            scenario_content_sha256: scenario.scenario_content_sha256.clone(),
+            original_trajectory_sha256: scenario.original_trajectory_sha256.clone(),
+            task_name: scenario.task_name.clone(),
+            actions: scenario.actions,
+            replay_prefix_steps: scenario.replay_prefix_steps,
             source: scenario.source,
             source_status: "infer_ok".to_owned(),
             inference_steps: 3,
