@@ -1010,6 +1010,24 @@ mod tests {
     }
 
     #[test]
+    fn octave_harmonic_collision_can_mimic_expected_pitch_energy() {
+        // C5 contains a strong second harmonic for C4. The probe can observe
+        // harmonic energy at C4 even though the C4 fundamental is absent.
+        // This is an intentional adversarial fixture: harmonic salience must
+        // never be interpreted as proof that the expected note was played.
+        let midi = midi_artifact(60, 1_920);
+        let wav = sine_wav(523.2511, 1.0);
+        let receipt = observe_rendered_audio_events_v1(&wav, &midi).unwrap();
+        let note = &receipt.note_observations[0];
+        assert_eq!(note.status, AudioEventObservationStatusV1::Measured);
+        assert!(
+            note.harmonic_salience_db.unwrap()
+                > note.fundamental_salience_db.unwrap() + 6.0,
+            "octave energy should raise harmonic salience without a C4 fundamental: {note:?}"
+        );
+    }
+
+    #[test]
     fn notes_shorter_than_the_required_window_abstain() {
         let midi = midi_artifact(69, 96); // 50 ms at 120 BPM.
         let wav = sine_wav(440.0, 1.0);
