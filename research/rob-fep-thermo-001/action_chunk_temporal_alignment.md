@@ -116,3 +116,13 @@ The fixture corpus is synthetic. A successful eligibility disposition establishe
 The temporal-alignment contract is motivated by the 2026 study of asynchronous World Action Model deployment on a 10 Hz bimanual robot. It compared synchronous execution, asynchronous switching, post-hoc blending, denoising-time blending, inference-time velocity guidance and prefix-conditioned generation. Temporal misalignment between observations, predictions and executed commands produced persistent chunk-boundary discontinuities that blending did not repair; prefix-conditioned generation offered the best overall balance under that study's conditions. https://arxiv.org/abs/2608.01880
 
 LIBERO-Dynamic supplies a larger manipulation benchmark for action-horizon and queueing studies (40 tasks; 1,800 episodes; measured policy latency while the world moves; synchronous hold, async queueing, RTC and delay-aware VLASH reference; some real-robot conditions): https://github.com/renshaojie233/LIBERO-Dynamic
+
+
+## 2026 asynchronous world-action model reference methods
+
+Add three separate comparators:
+- Huang et al., Streaming-WAM (arXiv:2609.28927): action-conditioned prediction on the committed action prefix; author-reported 98.35% LIBERO success and 41 ms chunk time; 90% success / 38 s on Stamp Paper task. https://arxiv.org/abs/2609.28927
+- Cai et al., AHA-WAM (arXiv:2606.09811): low-frequency world-context planner plus high-frequency action expert; 92.80% RoboTwin success, 78.3% across four real tasks and 24.17 Hz in author-reported settings. https://arxiv.org/abs/2606.09811
+- Ren et al., StreamingWAM / chunk-wise staircase flow matching (arXiv:2610.15585): distinct paper and authors from Huang's Streaming-WAM; abstract reports 72.9 ms simulation and 57.3 ms real-robot replanning latency. https://arxiv.org/abs/2610.15585
+
+Do not conflate these studies or use their reported latencies as guaranteed target-hardware figures. They motivate controlled ablations of slow/fast model separation, prefix conditioning, chunk length, continuity, queue underflow and state freshness.
