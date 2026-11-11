@@ -617,6 +617,8 @@ fn range_by_id(
     find_range(&rendered.segment_ranges, segment_id)
 }
 
+// Keep the provenance-bearing fields explicit at this serialization boundary.
+#[allow(clippy::too_many_arguments)]
 fn save_case(
     output_dir: &Path,
     case_id: &str,
