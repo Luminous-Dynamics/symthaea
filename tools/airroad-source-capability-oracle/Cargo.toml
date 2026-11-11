@@ -1,0 +1,16 @@
+[package]
+name = "airroad-source-capability-oracle"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "Read-only mission-aligned source capability and reserve gate for aircraft DC buses"
+license = "AGPL-3.0-or-later"
+
+[dependencies]
+electric-rotorcraft-drive-oracle = { path = "../electric-rotorcraft-drive-oracle", version = "0.7.0" }
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
