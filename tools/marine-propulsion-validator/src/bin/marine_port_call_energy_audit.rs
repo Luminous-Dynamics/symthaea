@@ -318,7 +318,13 @@ fn run_audit(schema: &Value, case: &Value) -> AuditReport {
         connection.get("ship_connector_standard") == connection.get("berth_connector_standard")
         && connection.get("ship_voltage_v") == connection.get("berth_voltage_v")
         && connection.get("ship_frequency_hz") == connection.get("berth_frequency_hz")
-        && connection.get("ship_phase_count") == connection.get("berth_phase_count");
+        && connection.get("ship_phase_count") == connection.get("berth_phase_count")
+        && connection.get("voltage_v") == connection.get("ship_voltage_v")
+        && connection.get("voltage_v") == connection.get("berth_voltage_v")
+        && connection.get("frequency_hz") == connection.get("ship_frequency_hz")
+        && connection.get("frequency_hz") == connection.get("berth_frequency_hz")
+        && connection.get("phase_count") == connection.get("ship_phase_count")
+        && connection.get("phase_count") == connection.get("berth_phase_count");
 
     if compatibility == Some("compatible") && !interface_matches {
         findings.push(
@@ -328,11 +334,34 @@ fn run_audit(schema: &Value, case: &Value) -> AuditReport {
         );
     }
 
+    if requested_energy_wh > 0 && usable_connection_seconds == 0 && !findings.blocked {
+        findings.push(
+            "/berth_window",
+            "BLOCKED",
+            "no usable time remains for the requested shore-energy delivery",
+        );
+    }
+    if requested_energy_wh > 0 && effective_connection_power_w == 0 && !findings.blocked {
+        findings.push(
+            "/port_supply/reserved_power_w",
+            "BLOCKED",
+            "known zero effective connection power prevents the requested delivery",
+        );
+    }
+    if requested_energy_wh > 0 && available_energy_wh == 0 && !findings.blocked {
+        findings.push(
+            "/port_supply/available_energy_wh",
+            "BLOCKED",
+            "known zero port energy availability prevents the requested delivery",
+        );
+    }
+
     let delivery_eligible = compatibility == Some("compatible")
         && interface_matches
         && connection.get("port_availability").and_then(Value::as_str) == Some("available")
         && supply.get("reservation_status").and_then(Value::as_str) == Some("confirmed")
         && usable_connection_seconds > 0
+        && (requested_energy_wh == 0 || (effective_connection_power_w > 0 && available_energy_wh > 0))
         && !findings.invalid
         && !findings.blocked;
 
@@ -612,7 +641,18 @@ mod tests {
         let report = run_audit(&schema, &case);
         assert_eq!(report.effective_connection_power_w, 0);
         assert_eq!(report.delivered_energy_wh, 0);
-        assert!(report.delivery_eligible);
+        assert!(!report.delivery_eligible);
+        assert_eq!(report.disposition, "BLOCKED");
+    }
+
+    #[test]
+    fn zero_port_energy_is_known_zero_and_blocks_requested_supply() {
+        let (schema, mut case) = fixture();
+        case["port_supply"]["available_energy_wh"] = serde_json::json!(0);
+        let report = run_audit(&schema, &case);
+        assert_eq!(report.delivered_energy_wh, 0);
+        assert_eq!(report.unserved_energy_wh, 2_000_000);
+        assert_eq!(report.disposition, "BLOCKED");
     }
 
     #[test]
