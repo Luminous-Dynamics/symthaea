@@ -66,18 +66,26 @@ fn derive_eligible(fixture: &Value) -> Result<bool, String> {
 }
 
 fn validate_schema(schema: &Value) -> Result<(), String> {
+    let fixture_items = &schema["properties"]["fixtures"]["items"];
     if str_field(schema, "$schema") != Some("https://json-schema.org/draft/2020-12/schema")
         || str_field(schema, "$id") != Some(SCHEMA_ID)
         || str_field(schema, "type") != Some("object")
         || schema["additionalProperties"] != false
         || schema["properties"]["fixtures"]["type"] != "array"
+        || fixture_items["type"] != "object"
+        || fixture_items["additionalProperties"] != false
+        || fixture_items["properties"]["task"]["additionalProperties"] != false
+        || fixture_items["properties"]["authority_context"]["additionalProperties"] != false
     {
-        return Err("schema identity or bounded top-level contract mismatch".into());
+        return Err("schema identity or bounded nested-object contract mismatch".into());
     }
     Ok(())
 }
 
 fn validate_fixture(fixture: &Value) -> Result<(String, String, String, String), String> {
+    if fixture.as_object().map(serde_json::Map::len) != Some(9) {
+        return Err("fixture must contain exactly the nine declared properties".into());
+    }
     let fixture_id = str_field(fixture, "fixture_id").ok_or_else(|| "fixture_id missing".to_string())?.to_string();
     let pair_id = str_field(fixture, "pair_id").ok_or_else(|| "pair_id missing".to_string())?.to_string();
     let member = str_field(fixture, "pair_member").ok_or_else(|| "pair_member missing".to_string())?.to_string();
@@ -93,6 +101,9 @@ fn validate_fixture(fixture: &Value) -> Result<(String, String, String, String),
     }
 
     let task = &fixture["task"];
+    if task.as_object().map(serde_json::Map::len) != Some(11) {
+        return Err("task must contain exactly the eleven declared properties".into());
+    }
     for key in ["task_ref", "principal_ref", "actor_ref", "on_behalf_of_ref", "operation", "target_ref", "purpose_ref", "required_scope"] {
         if str_field(task, key).is_none() {
             return Err(format!("task.{key} missing"));
@@ -100,16 +111,19 @@ fn validate_fixture(fixture: &Value) -> Result<(String, String, String, String),
     }
     if !str_field(task, "payload_sha256").is_some_and(is_sha256)
         || !str_field(task, "pre_state_sha256").is_some_and(is_sha256)
-        || u64_field(task, "evaluated_at_unix").is_none()
+        || u64_field(task, "evaluated_at_unix").is_none_or(|time| time == 0)
     {
         return Err("task digest or evaluation time is invalid".into());
     }
 
     let auth = &fixture["authority_context"];
+    if auth.as_object().map(serde_json::Map::len) != Some(7) {
+        return Err("authority_context must contain exactly the seven declared properties".into());
+    }
     if !["Exact", "Mismatch"].contains(&str_field(auth, "principal_binding").unwrap_or(""))
         || bool_field(auth, "local_recognition").is_none()
         || !["Exact", "Different"].contains(&str_field(auth, "purpose_binding").unwrap_or(""))
-        || u64_field(auth, "expires_at_unix").is_none()
+        || u64_field(auth, "expires_at_unix").is_none_or(|time| time == 0)
         || str_field(auth, "delegated_scope").is_none()
         || !str_field(auth, "pre_state_sha256").is_some_and(is_sha256)
     {
