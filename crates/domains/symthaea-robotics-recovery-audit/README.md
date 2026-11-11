@@ -50,6 +50,50 @@ Backtrack does not restore object poses or the full scene. Retracing can itself 
 
 An achieved-motion retrace counts as a physical-safe completion only when the world remains continuous, an action actually executes, the task is completed, and upstream safety evidence is verified compliant. Unknown or changed object/scene state fails closed. This is an audit classification, not an implementation of Backtrack or a claim of hardware qualification.
 
+## Cross-benchmark recovery portfolio (do not pool scores)
+
+Three additional 2026 references extend the recovery problem beyond the RoboRecover protocol:
+
+### LIBERO-Recover: depth of state recovery
+
+LIBERO-Recover defines four recovery levels:
+- L1 Action Retry: the original plan remains valid; repeat the failed action.
+- L2 Action Adaptation: revise the action while retaining task-relevant state.
+- L3 Object State Recovery: restore or re-establish a task-relevant object state.
+- L4 Environmental Recovery: recover environmental state that blocks task completion.
+
+It additionally reports Recovery Degradation (RD) across pre-failure / failure / post-failure phases and Recovery Consistency (RC) across failure states. These answer different questions from RoboRecover's Stage–Type Macro-9. Never put L1–L4 into the RoboRecover Stage–Type field.
+
+There is a source-version discrepancy to resolve before importing results: the project page describes 2,178 scenarios, while the current GitHub README advertises 4,803 annotated failure scenes across five LIBERO suites and states that the scenes, annotations and rollouts are released. The project page also lists 3,184 human recovery demos. Pin the exact repository commit, scene-selection manifest, data release version, scenario inclusion rules and evaluator script; reconcile the project-page and repository counts before claiming a full replication.
+
+The current public README further says that each scene evaluation may apply fresh seeded ±2 cm XY object perturbations and separately evaluate gripper-open/closed starts. That is part of that benchmark's protocol, not a replacement for the unperturbed reconstructed failure-state protocol in RoboRecover.
+
+### CARE / FSR-Bench: stage-conditioned corrective execution
+
+CARE learns atomic corrections from failure-distribution estimates, stage-conditioned failure states and motion-planner-generated corrective demonstrations. Its public FSR-Bench snapshot lists five tasks with Easy and Hard evaluators (ten entry points). The repository is MIT-licensed, but is code-only: simulator assets, large datasets and checkpoints are external. Its README explicitly notes that the full fixed 36-scenario test-initialization manifest is absent from this snapshot, the current nominal evaluator does not export the stage-critical grasp/release offsets needed for fitting failure distributions, and the repository does not include a distribution-fitting command. Therefore its evaluator scripts are useful integration references, but this snapshot alone does not establish exact FSR-Bench protocol reproduction.
+
+### MAGMA-GEN: validate proposed recovery supervision
+
+MAGMA-GEN uses a privileged coach to propose a localized correction after an ambiguous failure, then retains a candidate only when re-execution from the same state under matched conditions improves downstream progress. This is a valuable rule for our active-discovery and training-data pipelines: a plausible diagnosis or attractive corrective trajectory is not enough; the proposed correction must demonstrate causal improvement from the same reconstructed state.
+
+### Rollback: counterfactual world-model backtracking
+
+Rollback branches alternative action chunks from saved world-model states and uses sibling outcomes for action-level supervision, with real-robot data co-evolving the model. Its project page reports +10.67 / +11.11 / +11.85 percentage points over its strongest baseline on Jenga, ball tossing and tabletop curling. Those are policy-improvement results on three real-world games, not a RoboRecover recovery score. World-model rollback is an offline/training counterfactual; it must never be relabelled as a robot physically returning to an earlier state.
+
+### Shared reporting rule
+
+Keep at least these quantities distinct in every future experiment:
+1. source/environment-reported task completion;
+2. policy-attributable recovery success;
+3. physical-safe recovery success;
+4. recovery depth / intervention class;
+5. pre-failure to post-failure degradation;
+6. consistency across failure states;
+7. intervention duration, added actions, compute and human burden;
+8. object/scene continuity and future-option preservation.
+
+Publish per-level/per-stratum and per-platform results, not a pooled cross-benchmark average. A single "recovery score" would hide the exact differences these benchmarks were designed to expose.
+
 ## RoboRecover recovery scoring
 
 The `roborecover_score` module consumes a frozen scenario manifest and normalized source result records. It reports three distinct rate families, all with the same scenario-equal and Macro-9 weighting:
