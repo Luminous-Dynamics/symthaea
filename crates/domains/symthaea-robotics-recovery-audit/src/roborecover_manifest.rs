@@ -112,6 +112,11 @@ pub enum SplitManifestIssue {
     WrongScenarioCount { expected: usize, actual: usize },
     MissingTestMacro9Group(StageTypeGroup),
     UnexpectedTestMacro9Group(StageTypeGroup),
+    TestGroupCountMismatch {
+        group: StageTypeGroup,
+        expected: usize,
+        actual: usize,
+    },
     WrongRepository,
     WrongSourceRevision,
     WrongSplitManifestBlobSha,
@@ -146,6 +151,36 @@ fn valid_sample_id(value: &str) -> bool {
         && value.bytes().all(|byte| {
             byte.is_ascii_alphanumeric() || byte == b'_' || byte == b'-'
         })
+}
+
+fn expected_test_group_count(
+    platform: BenchmarkPlatform,
+    group: StageTypeGroup,
+) -> Option<usize> {
+    use DeviationType::{SceneChange, StageRollback, WrongPose, WrongTarget};
+    use RecoveryStage::{Approach, Contact, Move, Place};
+
+    match (platform, group.stage, group.deviation) {
+        (BenchmarkPlatform::Libero, Approach, WrongPose) => Some(49),
+        (BenchmarkPlatform::Libero, Approach, WrongTarget) => Some(25),
+        (BenchmarkPlatform::Libero, Approach, StageRollback) => Some(21),
+        (BenchmarkPlatform::Libero, Approach, SceneChange) => Some(28),
+        (BenchmarkPlatform::Libero, Contact, WrongPose) => Some(12),
+        (BenchmarkPlatform::Libero, Move, WrongPose) => Some(16),
+        (BenchmarkPlatform::Libero, Place, WrongPose) => Some(31),
+        (BenchmarkPlatform::Libero, Place, WrongTarget) => Some(7),
+        (BenchmarkPlatform::Libero, Place, SceneChange) => Some(11),
+        (BenchmarkPlatform::RoboTwin, Approach, WrongPose) => Some(44),
+        (BenchmarkPlatform::RoboTwin, Approach, WrongTarget) => Some(29),
+        (BenchmarkPlatform::RoboTwin, Approach, StageRollback) => Some(24),
+        (BenchmarkPlatform::RoboTwin, Approach, SceneChange) => Some(4),
+        (BenchmarkPlatform::RoboTwin, Contact, WrongPose) => Some(21),
+        (BenchmarkPlatform::RoboTwin, Move, WrongPose) => Some(35),
+        (BenchmarkPlatform::RoboTwin, Place, WrongPose) => Some(23),
+        (BenchmarkPlatform::RoboTwin, Place, WrongTarget) => Some(18),
+        (BenchmarkPlatform::RoboTwin, Place, SceneChange) => Some(2),
+        _ => None,
+    }
 }
 
 fn expected_path(
@@ -376,6 +411,18 @@ pub fn parse_pinned_split_csv(
         for group in observed_groups.difference(&expected_groups) {
             issues.push(SplitManifestIssue::UnexpectedTestMacro9Group(*group));
         }
+        for group in &TEST_MACRO9 {
+            let expected_count = expected_test_group_count(context.platform, *group)
+                .expect("every frozen Macro-9 group has a platform count");
+            let actual_count = group_counts.get(group).copied().unwrap_or(0);
+            if actual_count != expected_count {
+                issues.push(SplitManifestIssue::TestGroupCountMismatch {
+                    group: *group,
+                    expected: expected_count,
+                    actual: actual_count,
+                });
+            }
+        }
         TEST_MACRO9.to_vec()
     } else {
         Vec::new()
@@ -456,8 +503,20 @@ mod tests {
             }]
         };
 
-        for index in 0..expected_rows(split) {
-            let group = groups[index % groups.len()];
+        let assigned_groups = if split == BenchmarkSplit::Test && include_all_test_groups {
+            let mut assigned = Vec::new();
+            for group in &TEST_MACRO9 {
+                let count = expected_test_group_count(platform, *group).unwrap();
+                assigned.extend(std::iter::repeat(*group).take(count));
+            }
+            assigned
+        } else {
+            (0..expected_rows(split))
+                .map(|index| groups[index % groups.len()])
+                .collect()
+        };
+
+        for (index, group) in assigned_groups.into_iter().enumerate() {
             let stage = match group.stage {
                 RecoveryStage::Approach => "Approach",
                 RecoveryStage::Contact => "Contact",
@@ -663,4 +722,51 @@ mod tests {
             SplitManifestIssue::UnknownStage { .. }
         )));
     }
+
+    #[test]
+    fn exact_test_stage_type_counts_are_platform_specific_and_frozen() {
+        for platform in [BenchmarkPlatform::Libero, BenchmarkPlatform::RoboTwin] {
+            let csv = synthetic_csv(platform, BenchmarkSplit::Test, true);
+            let parsed = parse_pinned_split_csv(&csv, context(platform, BenchmarkSplit::Test))
+                .unwrap();
+            assert_eq!(parsed.row_count, 200);
+            for group in &TEST_MACRO9 {
+                assert_eq!(
+                    parsed.group_counts.get(group).copied(),
+                    expected_test_group_count(platform, *group)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn rejects_test_macro9_group_count_drift_even_when_all_nine_groups_exist() {
+        let platform = BenchmarkPlatform::RoboTwin;
+        let mut csv = synthetic_csv(platform, BenchmarkSplit::Test, true);
+        // Move one record from Approach/Wrong Pose to Approach/Wrong Target:
+        // all nine groups remain present, but two frozen group counts drift.
+        let first = row(
+            "sample-000",
+            platform,
+            BenchmarkSplit::Test,
+            "Approach",
+            "Wrong Target",
+        );
+        let old = row(
+            "sample-000",
+            platform,
+            BenchmarkSplit::Test,
+            "Approach",
+            "Wrong Pose",
+        );
+        csv = csv.replacen(&old, &first, 1);
+
+        let errors = parse_pinned_split_csv(&csv, context(platform, BenchmarkSplit::Test))
+            .unwrap_err();
+        assert!(errors.iter().any(|issue| matches!(
+            issue,
+            SplitManifestIssue::TestGroupCountMismatch { .. }
+        )));
+    }
+
 }
