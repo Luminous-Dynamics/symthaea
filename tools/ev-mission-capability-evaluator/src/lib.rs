@@ -92,6 +92,7 @@ pub struct CellEnvelope {
     pub cell_ref: String,
     pub soc_lower_pct: f64,
     pub soc_upper_pct: f64,
+    pub temperature_lower_c: f64,
     pub temperature_upper_c: f64,
     pub voltage_lower_v: f64,
     pub voltage_upper_v: f64,
@@ -248,7 +249,7 @@ fn structurally_validate(mission: &Mission) -> Vec<String> {
         || !(0.0..=1.0).contains(&mission.regenerative_efficiency_lower)
         || !(0.0..=100.0).contains(&mission.minimum_cell_soc_pct)
         || !(mission.minimum_cell_soc_pct..=100.0).contains(&mission.maximum_cell_soc_pct)
-        || !finite_nonnegative(mission.maximum_cell_temperature_c)
+        || !mission.maximum_cell_temperature_c.is_finite()
         || mission.minimum_cell_voltage_v <= 0.0
         || mission.maximum_cell_voltage_v <= mission.minimum_cell_voltage_v
     {
@@ -523,6 +524,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
             if ![
                 cell.soc_lower_pct,
                 cell.soc_upper_pct,
+                cell.temperature_lower_c,
                 cell.temperature_upper_c,
                 cell.voltage_lower_v,
                 cell.voltage_upper_v,
@@ -532,6 +534,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
             || cell.soc_lower_pct < 0.0
             || cell.soc_upper_pct > 100.0
             || cell.soc_lower_pct > cell.soc_upper_pct
+            || cell.temperature_lower_c > cell.temperature_upper_c
             || cell.voltage_lower_v > cell.voltage_upper_v
         {
                 cell_problem = Some((
@@ -543,7 +546,7 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
             }
             if cell.soc_lower_pct < slice.domain_soc_min_pct - EPS
                 || cell.soc_upper_pct > slice.domain_soc_max_pct + EPS
-                || cell.temperature_upper_c < slice.domain_temperature_min_c - EPS
+                || cell.temperature_lower_c < slice.domain_temperature_min_c - EPS
                 || cell.temperature_upper_c > slice.domain_temperature_max_c + EPS
             {
                 cell_problem = Some((
