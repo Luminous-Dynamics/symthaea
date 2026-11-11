@@ -319,3 +319,66 @@ The observer's LPC values are independent observations of generated PCM, not hum
 ### Current engineering state
 
 The stacked branch contains the observer implementation, eight additional authored tests, a VCRB-shaped adapter record, calibration/confirmatory split metadata, and workflow assertions for observation/calibration artifact generation. Total authored tests in the two slices: 24. The Rust workflow must still compile, format, test and run the fixture generator on exact PR head before any pass is claimed.
+
+
+## 12. Competitive landscape refresh — 11 November 2026
+
+The industry has at least three distinct evaluation frontiers. They should be reported separately; a score on one is not a proxy for another.
+
+### 12.1 End-to-end vocal music generation
+
+Artificial Analysis AA-Music-Vocal v1.1 is a blind pairwise-preference leaderboard for prompt-to-music generation with vocals. At the 11 November 2026 inspection, the public leaderboard reported Suno v6 at Elo 1144 ±18 (95% interval 1126–1162; approximately 3,063 samples), Suno v6-mini at 1132 ±18, Mureka V9.5 at 1101 ±18, and Lyria 3.5 at 1050 ±18. The Arena normalizes loudness and output delivery format before blind comparisons.
+
+This is a strong industry reference for full-song generation preference. It is **not** a local lyric-edit benchmark, not a control-response test, and not evidence of instruction preservation. Muse should not claim to beat these systems on AA-Music-Vocal unless it is actually evaluated through that protocol with comparable outputs. The more relevant use is to establish a separate future full-song quality frontier.
+
+Sources:
+- https://artificialanalysis.ai/music/leaderboard/vocals
+- https://artificialanalysis.ai/methodology/music
+
+### 12.2 Score-conditioned / zero-shot singing synthesis
+
+SoulX-Singer (February 2026) is a high-priority open research baseline for zero-shot singing synthesis. Its report describes over 42,000 hours of vocal training data, score/MIDI or melodic conditioning, and support for Mandarin, English and Cantonese; SoulX-Singer-Eval emphasizes strict training/test disentanglement. This is a scale and synthesis-quality comparison, not an editing-preservation result. It uses substantially more data than our permission-free synthetic-only plant and should be treated as an external reference, not a directly matched system today.
+
+VITA-QinYu (May 2026) is a multimodal spoken-language model with role-playing and singing generation, trained using a reported 15.8K hours of generated/curated speech, role-playing and singing data. Its paper reports a 0.13-point MOS improvement over peer SLMs on singing. It is a useful expressive-generation comparator, but not a local-edit transaction benchmark.
+
+Sources:
+- https://arxiv.org/abs/2602.07803
+- https://arxiv.org/abs/2605.06765
+- https://github.com/Soul-AILab/SoulX-Singer-Eval
+
+### 12.3 Melody-preserving lyric editing
+
+YingMusic-Singer-Plus is the closest task-aligned baseline for controllable lyric editing. LyricEditBench describes 7,200 test instances from GTSinger, six lyric modification scenarios, and balanced sampling across singer gender, language, modification type and singing technique. The model uses melody-providing singing audio plus modified lyrics and can optionally use a timbre reference. Its task includes partial/full replacement, insertion, deletion, translation and code-switching.
+
+This is much closer to Muse's lyric-editing claim than a prompt-to-song Elo ranking. Any future comparison must match the exact split, edit operation, source audio, language and reference conditions, and honour the dataset/recording licence. The current synthetic plant does not use this corpus.
+
+Sources:
+- https://github.com/ASLP-lab/YingMusic-Singer-Plus
+- https://huggingface.co/datasets/ASLP-lab/LyricEditBench
+
+### 12.4 Independent pitch tracking
+
+Pitch Detection Benchmark v2 reports 19 monophonic trackers over 10 corpora and nine signal versions per clip (clean plus eight background/reverb/microphone perturbations). Its README reports pitch F1@50c of 0.778 for SwiftF0 and 0.768 for RMVPE, with materially different real-time speed figures. The benchmark's corpus mix means these numbers must not be described as singing-only results.
+
+The VPTB-001 plan should include SwiftF0 and RMVPE as high-priority external trackers, plus FCPE, pYIN/Praat and a clearly documented classical baseline, all on matched PCM/sample-rate/voicing-policy conditions. For the synthetic-only path, use generated known-answer F0 and adversarial octave/subharmonic controls; keep those scores separate from the benchmark's mixed-corpus aggregate.
+
+Source:
+- https://github.com/lars76/pitch-benchmark
+
+### 12.5 Structured control and multimodal evaluation
+
+- SegTune (ACL 2026) provides segment-level musical descriptions plus global prompt context. Muse's opportunity is event-level scope and dependency-aware preservation, not another segment prompt field: https://aclanthology.org/2026.acl-long.586/
+- MusicJudge (Interspeech 2026) couples lyric-block correctness with pitch/rhythm assessment and reports agreement with expert judgments. It is an independent evaluation reference, not a waveform-locality witness: https://research.samsung.com/research-papers/Listening-Like-a-Judge-A-Music-Aware-Framework-for-Automatic-Singing-Performance-Evaluation
+- UniVocal (ACL 2026) evaluates speech↔singing code-switching. That is distinct from switching natural languages while remaining in singing mode: https://aclanthology.org/2026.acl-long.1452/
+- MMAE/ICASSP 2027 measures general-purpose audio editing across modalities and multi-turn complexity. Its hidden test tracks and private rubrics are separate from local VMEA/VCCR scores: https://audio-editing-challenge.github.io/
+
+### 12.6 Strategic interpretation
+
+We should maintain four independent result boards:
+
+1. **Edit correctness and preservation:** MMAE, LyricEditBench-style operations, VMEA, VELB, VCCR and multi-turn integrity.
+2. **Musical performance control:** score adherence, phone/note timing, vibrato/dynamics response, cross-coupling and controller efficiency.
+3. **Singing synthesis quality:** naturalness, pronunciation, pitch/rhythm fidelity, identity/voice consistency and blind preference.
+4. **Evidence integrity:** provenance coverage, repeatability, calibration validity, false-safe rate, reproducibility and correct abstention.
+
+The synthetic-only work can substantially advance boards 1, 2 and 4 without permissions. It can provide signal-processing baselines for board 3, but it cannot qualify human naturalness, singer identity or listener preference. The immediate win condition is a reliable, reproducible editing/control instrument that can later host better renderers, not an unsupported claim to have surpassed 42K-hour or 15.8K-hour trained generation systems.
