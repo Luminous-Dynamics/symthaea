@@ -290,10 +290,18 @@ fn decode_wav(wav_bytes: &[u8]) -> Result<DecodedWavV1, AudioEventObservationIss
 }
 
 fn expected_frame(tick: u64, tempo_us: u32, ppq: u16, sample_rate: u32) -> Option<u64> {
-    let frame = (tick as f64 * f64::from(tempo_us) * f64::from(sample_rate))
-        / (f64::from(ppq) * 1_000_000.0);
-    (frame.is_finite() && frame >= 0.0 && frame <= u64::MAX as f64)
-        .then_some(frame.round() as u64)
+    if ppq == 0 {
+        return None;
+    }
+    // Use checked integer arithmetic so long renders do not accumulate
+    // floating-point timing drift. The final conversion rounds to the nearest
+    // sample frame, with exact half-frame ties rounded upward.
+    let numerator = u128::from(tick)
+        .checked_mul(u128::from(tempo_us))?
+        .checked_mul(u128::from(sample_rate))?;
+    let denominator = u128::from(ppq).checked_mul(1_000_000)?;
+    let rounded = numerator.checked_add(denominator / 2)? / denominator;
+    u64::try_from(rounded).ok()
 }
 
 fn minimum_window_frames(sample_rate: u32, frequency_hz: f64) -> Option<usize> {
@@ -743,6 +751,13 @@ mod tests {
             writer.finalize().unwrap();
         }
         cursor.into_inner()
+    }
+
+    #[test]
+    fn midi_tick_to_sample_frame_mapping_uses_integer_rounding() {
+        assert_eq!(expected_frame(960, 500_000, 960, 48_000), Some(24_000));
+        assert_eq!(expected_frame(1, 500_000, 960, 44_100), Some(23));
+        assert_eq!(expected_frame(1, 500_000, 0, 44_100), None);
     }
 
     #[test]
