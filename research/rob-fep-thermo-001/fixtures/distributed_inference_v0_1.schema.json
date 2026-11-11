@@ -22,8 +22,8 @@
     },
     "cases": {
       "type": "array",
-      "minItems": 17,
-      "maxItems": 17,
+      "minItems": 19,
+      "maxItems": 19,
       "uniqueItems": true,
       "allOf": [
         {
@@ -280,6 +280,36 @@
           },
           "minContains": 1,
           "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI18_COMPRESSION_ACCURACY_TRADEOFF"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DI19_FLEET_BATCH_PRIORITY_ADMISSION"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
         }
       ],
       "items": {
@@ -333,7 +363,20 @@
         "local_thermal_limit_c",
         "local_rta_admissible",
         "whole_system_energy_boundary_complete",
-        "onboard_baseline_whole_system_energy_j"
+        "onboard_baseline_whole_system_energy_j",
+        "payload_compressed",
+        "payload_compression_ratio",
+        "compression_accuracy_loss_pct",
+        "maximum_acceptable_compression_accuracy_loss_pct",
+        "fleet_active_requests",
+        "fleet_high_priority_requests",
+        "fleet_batch_size",
+        "fleet_p99_priority_latency_ms",
+        "fleet_p99_low_priority_latency_ms",
+        "fleet_priority_deadline_ms",
+        "fleet_low_priority_deadline_ms",
+        "fleet_admission_control_enabled",
+        "low_priority_deferred_or_fallback"
       ],
       "properties": {
         "placement": {
@@ -468,6 +511,54 @@
         },
         "onboard_baseline_whole_system_energy_j": {
           "$ref": "#/$defs/nullable_number"
+        },
+        "payload_compressed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "payload_compression_ratio": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "compression_accuracy_loss_pct": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "maximum_acceptable_compression_accuracy_loss_pct": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "fleet_active_requests": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "fleet_high_priority_requests": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "fleet_batch_size": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "fleet_p99_priority_latency_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "fleet_p99_low_priority_latency_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "fleet_priority_deadline_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "fleet_low_priority_deadline_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "fleet_admission_control_enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "low_priority_deferred_or_fallback": {
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "allOf": [
@@ -541,7 +632,9 @@
             "remote_eligible_for_local_admission",
             "onboard_preferred_after_total_cost",
             "robot_battery_saving_only",
-            "remote_timeout_fallback"
+            "remote_timeout_fallback",
+            "compression_quality_loss_exceeds_tolerance",
+            "fleet_priority_admission_preserves_critical_deadline"
           ]
         },
         "selected_placement": {
