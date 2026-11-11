@@ -5,6 +5,9 @@
 //! Exact finite-group quotient construction for bounded discrete search tasks.
 //! Discovery is not proof; task preservation is a separate fail-closed obligation.
 
+// Explicit indices keep finite multiplication/action tables auditable.
+#![allow(clippy::needless_range_loop)]
+
 use std::collections::BTreeSet;
 use std::fmt;
 
@@ -185,13 +188,13 @@ impl fmt::Display for QuotientErrorV1 {
 
 impl std::error::Error for QuotientErrorV1 {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct ValidatedGroupV1 {
     inverses: Vec<usize>,
     checks: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct ValidatedActionV1 {
     group: ValidatedGroupV1,
     checks: usize,
@@ -336,6 +339,13 @@ fn validate_problem(
         }
         if !unique.insert(candidate_id) {
             return Err(QuotientErrorV1::DuplicateCandidateId);
+        }
+    }
+    for semantics in &problem.semantics {
+        if !nonempty(&semantics.boundary_condition_id)
+            || !nonempty(&semantics.output_equivalence_id)
+        {
+            return Err(QuotientErrorV1::InvalidIdentifier);
         }
     }
     Ok(())
