@@ -1717,6 +1717,547 @@ pub fn evaluate_metric_aware_linear_action_samples(
     })
 }
 
+
+/// Numerical policy for infinitesimal equivariance of a vector field.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct MetricAwareVectorFieldEquivarianceProfileV1 {
+    pub maximum_samples: usize,
+    pub maximum_expression_nodes: usize,
+    pub maximum_total_gradient_work: usize,
+    pub maximum_total_generator_sample_pairs: usize,
+    pub minimum_informative_samples_per_generator: usize,
+    /// Maximum relative metric-whitened infinitesimal equivariance defect.
+    pub relative_equivariance_tolerance: f64,
+}
+
+impl Default for MetricAwareVectorFieldEquivarianceProfileV1 {
+    fn default() -> Self {
+        Self {
+            maximum_samples: 4096,
+            maximum_expression_nodes: 16_384,
+            maximum_total_gradient_work: 20_000_000,
+            maximum_total_generator_sample_pairs: 65_536,
+            minimum_informative_samples_per_generator: 1,
+            relative_equivariance_tolerance: 1.0e-8,
+        }
+    }
+}
+
+/// Fail-closed input errors for a sampled vector-field equivariance check.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MetricAwareVectorFieldEquivarianceErrorV1 {
+    InvalidProfile,
+    EmptySampleSet,
+    VectorFieldDimensionMismatch { expected: usize, actual: usize },
+    ActionDimensionLimitExceeded { actual: usize, maximum: usize },
+    GeneratorCountLimitExceeded { actual: usize, maximum: usize },
+    TooManySamples { actual: usize, maximum: usize },
+    SampleDimensionMismatch { sample_index: usize, expected: usize, actual: usize },
+    NonFiniteSampleCoordinate { sample_index: usize, coordinate_index: usize },
+    ExpressionTooComplex { actual: usize, maximum: usize },
+    ExpressionVariableLimitExceeded { actual: usize, maximum: usize },
+    TotalGradientWorkExceeded { actual: usize, maximum: usize },
+    GeneratorSampleBudgetExceeded { actual: usize, maximum: usize },
+    EmptyFixedBindingName { index: usize },
+    DuplicateFixedBinding { name: String },
+    FixedBindingConflictsWithActionCoordinate { name: String },
+    NonFiniteFixedBinding { name: String },
+    MissingFixedBinding { name: String },
+    UnsupportedExpression,
+}
+
+/// Per-generator diagnostics for infinitesimal vector-field equivariance.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MetricAwareVectorFieldGeneratorResultV1 {
+    pub generator_id: String,
+    pub sample_count: usize,
+    pub informative_sample_count: usize,
+    pub uninformative_sample_count: usize,
+    pub invalid_sample_count: usize,
+    pub maximum_relative_defect: f64,
+    pub mean_relative_defect: f64,
+    /// One entry per supplied sample, in original order. None denotes an
+    /// uninformative or invalid field evaluation.
+    pub sample_relative_defects: Vec<Option<f64>>,
+}
+
+/// Replayable evidence for sampled infinitesimal equivariance of a vector field.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MetricAwareVectorFieldEquivarianceReportV1 {
+    pub action_id: String,
+    pub coordinate_basis_id: String,
+    pub action_declaration: crate::linear_group_action::LinearGroupActionV1,
+    pub original_action_declaration: crate::linear_group_action::LinearGroupActionV1,
+    pub action_admission_profile: crate::linear_group_action::LinearGroupActionAdmissionProfileV1,
+    pub action_admission_diagnostics: crate::linear_group_action::LinearGroupActionAdmissionDiagnosticsV1,
+    pub coordinate_names: Vec<String>,
+    pub coordinate_unit_ids: Vec<String>,
+    pub vector_field_display: Vec<String>,
+    pub vector_field_canonical: Vec<String>,
+    pub total_expression_complexity: usize,
+    pub profile: MetricAwareVectorFieldEquivarianceProfileV1,
+    pub fixed_bindings: Vec<(String, f64)>,
+    pub sample_states: Vec<Vec<f64>>,
+    pub generator_results: Vec<MetricAwareVectorFieldGeneratorResultV1>,
+}
+
+impl MetricAwareVectorFieldEquivarianceReportV1 {
+    /// True only when every generator has enough informative samples, no invalid
+    /// evaluations, and a maximum relative equivariance defect within tolerance.
+    pub fn equivariant_under_every_generator(&self) -> bool {
+        !self.generator_results.is_empty()
+            && self.generator_results.iter().all(|result| {
+                result.invalid_sample_count == 0
+                    && result.informative_sample_count
+                        >= self.profile.minimum_informative_samples_per_generator
+                    && result.maximum_relative_defect
+                        <= self.profile.relative_equivariance_tolerance
+            })
+    }
+
+    pub fn total_invalid_evaluations(&self) -> usize {
+        self.generator_results
+            .iter()
+            .map(|result| result.invalid_sample_count)
+            .sum()
+    }
+
+    pub fn total_informative_evaluations(&self) -> usize {
+        self.generator_results
+            .iter()
+            .map(|result| result.informative_sample_count)
+            .sum()
+    }
+}
+
+struct EvaluatedVectorFieldSample {
+    values: Vec<f64>,
+    jacobian: Vec<Vec<f64>>,
+}
+
+/// Evaluate a vector field's infinitesimal equivariance under every generator
+/// of an explicitly admitted linear action.
+///
+/// For a linear action generated by A, equivariance requires
+///
+///     D F(x) * A x = A * F(x).
+///
+/// This function evaluates the defect at the caller-supplied states. It uses
+/// forward-mode AD on the supported smooth expression fragment and measures the
+/// vector defect in the declared metric. It does not establish finite group
+/// equivariance, discrete-time step-map equivariance, conservation, or a physical
+/// Noether map.
+pub fn evaluate_metric_aware_vector_field_equivariance(
+    vector_field: &[Expr],
+    action: &AdmittedLinearGroupActionV1,
+    sample_states: &[Vec<f64>],
+    fixed_bindings: &[(&str, f64)],
+    profile: MetricAwareVectorFieldEquivarianceProfileV1,
+) -> Result<
+    MetricAwareVectorFieldEquivarianceReportV1,
+    MetricAwareVectorFieldEquivarianceErrorV1,
+> {
+    if profile.maximum_samples == 0
+        || profile.maximum_samples > HARD_MAX_METRIC_AWARE_SAMPLES
+        || profile.maximum_expression_nodes == 0
+        || profile.maximum_expression_nodes > HARD_MAX_METRIC_AWARE_EXPRESSION_NODES
+        || profile.maximum_total_gradient_work == 0
+        || profile.maximum_total_gradient_work > HARD_MAX_METRIC_AWARE_GRADIENT_WORK
+        || profile.maximum_total_generator_sample_pairs == 0
+        || profile.maximum_total_generator_sample_pairs
+            > HARD_MAX_METRIC_AWARE_GENERATOR_SAMPLE_PAIRS
+        || profile.minimum_informative_samples_per_generator == 0
+        || profile.minimum_informative_samples_per_generator > profile.maximum_samples
+        || !profile.relative_equivariance_tolerance.is_finite()
+        || !(0.0..=1.0).contains(&profile.relative_equivariance_tolerance)
+    {
+        return Err(MetricAwareVectorFieldEquivarianceErrorV1::InvalidProfile);
+    }
+    if sample_states.is_empty() {
+        return Err(MetricAwareVectorFieldEquivarianceErrorV1::EmptySampleSet);
+    }
+    if sample_states.len() > profile.maximum_samples {
+        return Err(MetricAwareVectorFieldEquivarianceErrorV1::TooManySamples {
+            actual: sample_states.len(),
+            maximum: profile.maximum_samples,
+        });
+    }
+
+    let declaration = action.action();
+    let dimension = declaration.coordinate_names.len();
+    if vector_field.len() != dimension {
+        return Err(
+            MetricAwareVectorFieldEquivarianceErrorV1::VectorFieldDimensionMismatch {
+                expected: dimension,
+                actual: vector_field.len(),
+            },
+        );
+    }
+    if dimension > HARD_MAX_METRIC_AWARE_ACTION_DIMENSION {
+        return Err(
+            MetricAwareVectorFieldEquivarianceErrorV1::ActionDimensionLimitExceeded {
+                actual: dimension,
+                maximum: HARD_MAX_METRIC_AWARE_ACTION_DIMENSION,
+            },
+        );
+    }
+    if declaration.generators.len() > HARD_MAX_METRIC_AWARE_ACTION_GENERATORS {
+        return Err(
+            MetricAwareVectorFieldEquivarianceErrorV1::GeneratorCountLimitExceeded {
+                actual: declaration.generators.len(),
+                maximum: HARD_MAX_METRIC_AWARE_ACTION_GENERATORS,
+            },
+        );
+    }
+
+    let mut total_expression_complexity = 0usize;
+    for expression in vector_field {
+        if !metric_aware_expression_supported(expression) {
+            return Err(MetricAwareVectorFieldEquivarianceErrorV1::UnsupportedExpression);
+        }
+        total_expression_complexity = total_expression_complexity
+            .checked_add(expression.complexity())
+            .ok_or(MetricAwareVectorFieldEquivarianceErrorV1::InvalidProfile)?;
+    }
+    if total_expression_complexity > profile.maximum_expression_nodes {
+        return Err(MetricAwareVectorFieldEquivarianceErrorV1::ExpressionTooComplex {
+            actual: total_expression_complexity,
+            maximum: profile.maximum_expression_nodes,
+        });
+    }
+
+    let mut variable_names = Vec::new();
+    for expression in vector_field {
+        collect_var_names(expression, &mut variable_names);
+    }
+    for coordinate_name in &declaration.coordinate_names {
+        if !variable_names.contains(coordinate_name) {
+            variable_names.push(coordinate_name.clone());
+        }
+    }
+    if variable_names.len() > HARD_MAX_METRIC_AWARE_EXPRESSION_VARIABLES {
+        return Err(
+            MetricAwareVectorFieldEquivarianceErrorV1::ExpressionVariableLimitExceeded {
+                actual: variable_names.len(),
+                maximum: HARD_MAX_METRIC_AWARE_EXPRESSION_VARIABLES,
+            },
+        );
+    }
+
+    let mut fixed_values = BTreeMap::new();
+    for (index, (raw_name, value)) in fixed_bindings.iter().enumerate() {
+        let name = *raw_name;
+        if name.trim().is_empty() {
+            return Err(
+                MetricAwareVectorFieldEquivarianceErrorV1::EmptyFixedBindingName { index },
+            );
+        }
+        if declaration
+            .coordinate_names
+            .iter()
+            .any(|coordinate| coordinate.as_str() == name)
+        {
+            return Err(
+                MetricAwareVectorFieldEquivarianceErrorV1::FixedBindingConflictsWithActionCoordinate {
+                    name: name.to_string(),
+                },
+            );
+        }
+        if !value.is_finite() {
+            return Err(
+                MetricAwareVectorFieldEquivarianceErrorV1::NonFiniteFixedBinding {
+                    name: name.to_string(),
+                },
+            );
+        }
+        if fixed_values.insert(name.to_string(), *value).is_some() {
+            return Err(
+                MetricAwareVectorFieldEquivarianceErrorV1::DuplicateFixedBinding {
+                    name: name.to_string(),
+                },
+            );
+        }
+    }
+    for name in &variable_names {
+        if !declaration.coordinate_names.contains(name) && !fixed_values.contains_key(name) {
+            return Err(
+                MetricAwareVectorFieldEquivarianceErrorV1::MissingFixedBinding {
+                    name: name.clone(),
+                },
+            );
+        }
+    }
+
+    let generator_sample_pairs = sample_states
+        .len()
+        .checked_mul(declaration.generators.len())
+        .ok_or(MetricAwareVectorFieldEquivarianceErrorV1::InvalidProfile)?;
+    if generator_sample_pairs > profile.maximum_total_generator_sample_pairs {
+        return Err(
+            MetricAwareVectorFieldEquivarianceErrorV1::GeneratorSampleBudgetExceeded {
+                actual: generator_sample_pairs,
+                maximum: profile.maximum_total_generator_sample_pairs,
+            },
+        );
+    }
+
+    let gradient_work = sample_states
+        .len()
+        .checked_mul(dimension)
+        .and_then(|count| count.checked_mul(total_expression_complexity))
+        .and_then(|count| count.checked_mul(variable_names.len()))
+        .ok_or(MetricAwareVectorFieldEquivarianceErrorV1::InvalidProfile)?;
+    if gradient_work > profile.maximum_total_gradient_work {
+        return Err(
+            MetricAwareVectorFieldEquivarianceErrorV1::TotalGradientWorkExceeded {
+                actual: gradient_work,
+                maximum: profile.maximum_total_gradient_work,
+            },
+        );
+    }
+
+    let coordinate_indices: Vec<usize> = declaration
+        .coordinate_names
+        .iter()
+        .map(|name| {
+            variable_names
+                .iter()
+                .position(|candidate| candidate == name)
+                .expect("action coordinates appended to variable order")
+        })
+        .collect();
+
+    // Evaluate F(x) and D F(x) once per sample, then reuse them for each generator.
+    let mut evaluated_samples: Vec<Option<EvaluatedVectorFieldSample>> =
+        Vec::with_capacity(sample_states.len());
+    let mut invalid_sample = Vec::with_capacity(sample_states.len());
+
+    for (sample_index, sample) in sample_states.iter().enumerate() {
+        if sample.len() != dimension {
+            return Err(
+                MetricAwareVectorFieldEquivarianceErrorV1::SampleDimensionMismatch {
+                    sample_index,
+                    expected: dimension,
+                    actual: sample.len(),
+                },
+            );
+        }
+        if let Some(coordinate_index) = sample.iter().position(|value| !value.is_finite()) {
+            return Err(
+                MetricAwareVectorFieldEquivarianceErrorV1::NonFiniteSampleCoordinate {
+                    sample_index,
+                    coordinate_index,
+                },
+            );
+        }
+
+        let mut values = vec![0.0_f64; variable_names.len()];
+        for (coordinate_index, variable_index) in coordinate_indices.iter().enumerate() {
+            values[*variable_index] = sample[coordinate_index];
+        }
+        for (name, value) in &fixed_values {
+            let variable_index = variable_names
+                .iter()
+                .position(|candidate| candidate == name)
+                .expect("fixed expression variable retained in AST variable order");
+            values[variable_index] = *value;
+        }
+
+        let mut field_values = Vec::with_capacity(dimension);
+        let mut jacobian = vec![vec![0.0_f64; dimension]; dimension];
+        let mut invalid = false;
+        for (component_index, expression) in vector_field.iter().enumerate() {
+            match eval_expression_with_gradient(
+                expression,
+                &variable_names,
+                &coordinate_indices,
+                &values,
+            ) {
+                Ok(dual) => {
+                    field_values.push(dual.value);
+                    for (coordinate_index, variable_index) in
+                        coordinate_indices.iter().enumerate()
+                    {
+                        jacobian[component_index][coordinate_index] =
+                            dual.gradient[*variable_index];
+                    }
+                }
+                Err(DualEvaluationError::Unsupported) => {
+                    return Err(
+                        MetricAwareVectorFieldEquivarianceErrorV1::UnsupportedExpression,
+                    );
+                }
+                Err(
+                    DualEvaluationError::Nondifferentiable
+                    | DualEvaluationError::InvalidDomain
+                    | DualEvaluationError::NonFinite,
+                ) => {
+                    invalid = true;
+                    break;
+                }
+            }
+        }
+
+        if invalid
+            || field_values.iter().any(|value| !value.is_finite())
+            || jacobian.iter().flatten().any(|value| !value.is_finite())
+        {
+            invalid_sample.push(true);
+            evaluated_samples.push(None);
+        } else {
+            invalid_sample.push(false);
+            evaluated_samples.push(Some(EvaluatedVectorFieldSample {
+                values: field_values,
+                jacobian,
+            }));
+        }
+    }
+
+    let lower = action.scaled_metric_cholesky_lower();
+    let mut generator_results = Vec::with_capacity(declaration.generators.len());
+    for generator in &declaration.generators {
+        let mut informative_sample_count = 0usize;
+        let mut uninformative_sample_count = 0usize;
+        let mut invalid_sample_count = 0usize;
+        let mut residual_sum = 0.0_f64;
+        let mut maximum_relative_defect = 0.0_f64;
+        let mut sample_relative_defects = Vec::with_capacity(sample_states.len());
+
+        for (sample_index, (sample, evaluated)) in
+            sample_states.iter().zip(evaluated_samples.iter()).enumerate()
+        {
+            let Some(evaluated) = evaluated else {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                sample_relative_defects.push(None);
+                continue;
+            };
+
+            let mut orbit_tangent = vec![0.0_f64; dimension];
+            let mut pushed_forward_field = vec![0.0_f64; dimension];
+            let mut derivative_along_orbit = vec![0.0_f64; dimension];
+
+            for (row_index, generator_row) in generator.matrix.iter().enumerate() {
+                for (column_index, coefficient) in generator_row.iter().enumerate() {
+                    orbit_tangent[row_index] += coefficient * sample[column_index];
+                    pushed_forward_field[row_index] += coefficient * evaluated.values[column_index];
+                }
+            }
+            for (row_index, jacobian_row) in evaluated.jacobian.iter().enumerate() {
+                derivative_along_orbit[row_index] = jacobian_row
+                    .iter()
+                    .zip(orbit_tangent.iter())
+                    .map(|(derivative, tangent)| derivative * tangent)
+                    .sum::<f64>();
+            }
+
+            if orbit_tangent.iter().any(|value| !value.is_finite())
+                || pushed_forward_field.iter().any(|value| !value.is_finite())
+                || derivative_along_orbit.iter().any(|value| !value.is_finite())
+            {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                sample_relative_defects.push(None);
+                continue;
+            }
+
+            let mut whitened_derivative = vec![0.0_f64; dimension];
+            let mut whitened_pushforward = vec![0.0_f64; dimension];
+            for (column_index, output) in whitened_derivative.iter_mut().enumerate() {
+                for (row_index, value) in derivative_along_orbit.iter().enumerate() {
+                    *output += lower[row_index][column_index] * *value;
+                }
+            }
+            for (column_index, output) in whitened_pushforward.iter_mut().enumerate() {
+                for (row_index, value) in pushed_forward_field.iter().enumerate() {
+                    *output += lower[row_index][column_index] * *value;
+                }
+            }
+
+            if whitened_derivative.iter().any(|value| !value.is_finite())
+                || whitened_pushforward.iter().any(|value| !value.is_finite())
+            {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                sample_relative_defects.push(None);
+                continue;
+            }
+
+            let derivative_norm = stable_vector_norm(&whitened_derivative);
+            let pushforward_norm = stable_vector_norm(&whitened_pushforward);
+            if !derivative_norm.is_finite() || !pushforward_norm.is_finite() {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                sample_relative_defects.push(None);
+                continue;
+            }
+            let denominator = derivative_norm + pushforward_norm;
+            if denominator == 0.0 {
+                uninformative_sample_count = uninformative_sample_count.saturating_add(1);
+                sample_relative_defects.push(None);
+                continue;
+            }
+
+            let residual: Vec<f64> = whitened_derivative
+                .iter()
+                .zip(whitened_pushforward.iter())
+                .map(|(left, right)| left - right)
+                .collect();
+            let residual_norm = stable_vector_norm(&residual);
+            if !residual_norm.is_finite() {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                sample_relative_defects.push(None);
+                continue;
+            }
+            let relative_defect = residual_norm / denominator;
+            if !relative_defect.is_finite() {
+                invalid_sample_count = invalid_sample_count.saturating_add(1);
+                sample_relative_defects.push(None);
+                continue;
+            }
+
+            informative_sample_count = informative_sample_count.saturating_add(1);
+            residual_sum += relative_defect;
+            maximum_relative_defect = maximum_relative_defect.max(relative_defect);
+            sample_relative_defects.push(Some(relative_defect));
+            let _ = sample_index;
+        }
+
+        let mean_relative_defect = if informative_sample_count == 0 {
+            0.0
+        } else {
+            residual_sum / informative_sample_count as f64
+        };
+        generator_results.push(MetricAwareVectorFieldGeneratorResultV1 {
+            generator_id: generator.id.clone(),
+            sample_count: sample_states.len(),
+            informative_sample_count,
+            uninformative_sample_count,
+            invalid_sample_count,
+            maximum_relative_defect,
+            mean_relative_defect,
+            sample_relative_defects,
+        });
+    }
+
+    Ok(MetricAwareVectorFieldEquivarianceReportV1 {
+        action_id: declaration.action_id.clone(),
+        coordinate_basis_id: declaration.coordinate_basis_id.clone(),
+        action_declaration: declaration.clone(),
+        original_action_declaration: action.declared_action().clone(),
+        action_admission_profile: *action.profile(),
+        action_admission_diagnostics: action.diagnostics().clone(),
+        coordinate_names: declaration.coordinate_names.clone(),
+        coordinate_unit_ids: declaration.coordinate_unit_ids.clone(),
+        vector_field_display: vector_field.iter().map(ToString::to_string).collect(),
+        vector_field_canonical: vector_field.iter().map(canonical_expression).collect(),
+        total_expression_complexity,
+        profile,
+        fixed_bindings: fixed_bindings
+            .iter()
+            .map(|(name, value)| ((*name).to_string(), *value))
+            .collect(),
+        sample_states: sample_states.to_vec(),
+        generator_results,
+    })
+}
+
 fn fd_gradient(
     expr: &Expr,
     state: &[f64],
