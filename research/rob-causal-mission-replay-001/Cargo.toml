@@ -1,0 +1,12 @@
+[package]
+name = "rob-causal-mission-replay-001"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0 OR MIT"
+publish = false
+description = "Offline cross-system causal mission trace replay reference"
+
+[workspace]
+
+[lib]
+path = "src/lib.rs"
