@@ -619,7 +619,8 @@ mod tests {
                 "proposal_event_id": "event-0",
                 "observation_status": "observed",
                 "observation_sha256": "b".repeat(64),
-                "actual_cost": 0.02
+                "actual_cost": 0.02,
+                "observed_outcome": "positive"
             }),
         );
         assert!(validate_trace(&trace(vec![first, second])).is_err());
@@ -678,7 +679,8 @@ mod tests {
                 "proposal_event_id": "missing-proposal",
                 "observation_status": "observed",
                 "observation_sha256": "b".repeat(64),
-                "actual_cost": 0.02
+                "actual_cost": 0.02,
+                "observed_outcome": "positive"
             }),
         );
         assert!(validate_trace(&trace(vec![first, second])).is_err());
@@ -703,7 +705,8 @@ mod tests {
                 "proposal_event_id": "event-0",
                 "observation_status": "observed",
                 "observation_sha256": "b".repeat(64),
-                "actual_cost": 0.02
+                "actual_cost": 0.02,
+                "observed_outcome": "positive"
             }),
         );
         let second_hash = text(&second, "event_sha256").unwrap().to_string();
