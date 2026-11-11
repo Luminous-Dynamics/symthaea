@@ -79,3 +79,13 @@ Research targets:
 - 100% measurement/evidence/method identity for all included input rows.
 
 A source-ledger total is only as trustworthy as its input measurement and conversion method. It does not prove physical energy truth, causal savings, WAPS certification, statutory MRV/FuelEU compliance or vessel approval.
+
+## 7. Companion component-conservation audit
+
+The source-input total is not a proof that conversion paths close. The complementary first-law component audit is specified in [MARINE-ENERGY-CONSERVATION-001](./MARINE-ENERGY-CONSERVATION-001.md) and tracked in [#11595](https://github.com/Luminous-Dynamics/symthaea/issues/11595).
+
+The two contracts answer different questions:
+- source ledger: primary/substitute energy inputs without adding downstream conversion outputs again;
+- conservation ledger: per-component and whole-system balance of inflows, outflows, losses and stored-energy changes.
+
+The micro-GJ unit is 10^-6 GJ = 1,000 joules = 1 kJ. It is not one joule. Integer source-ledger values are unchanged; this corrects the unit equivalence only.
