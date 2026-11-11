@@ -1,0 +1,56 @@
+name: EV mission outcome audit v0.1
+
+on:
+  pull_request:
+    paths:
+      - "docs/transport/EV_MISSION_OUTCOME_AUDIT_V0_1.md"
+      - "schemas/transport/ev_mission_outcome_audit_v0_1.schema.json"
+      - "fixtures/ev_battery/mission_outcome_audit_v0_1.json"
+      - "tools/ev-mission-outcome-audit/**"
+      - ".github/workflows/ev-mission-outcome-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/ev-mission-outcome-audit/Cargo.toml -- --check
+
+      - name: Run independent outcome, censoring, reference-binding and statistical tests
+        run: cargo test --manifest-path tools/ev-mission-outcome-audit/Cargo.toml
+
+      - name: Audit frozen synthetic mission outcomes
+        run: |
+          cargo run --manifest-path tools/ev-mission-outcome-audit/Cargo.toml -- \
+            --schema schemas/transport/ev_mission_outcome_audit_v0_1.schema.json \
+            --corpus fixtures/ev_battery/mission_outcome_audit_v0_1.json \
+            > "$RUNNER_TEMP/mission-outcome-report.json"
+          jq -e '
+            .case_count == 11 and
+            .true_feasible_count == 1 and
+            .false_feasible_count == 2 and
+            .true_infeasible_count == 1 and
+            .false_infeasible_count == 1 and
+            .abstained_count == 1 and
+            .not_scorable_count == 3 and
+            .conflicting_reference_count == 2 and
+            .rejected_reference_count == 0 and
+            .synthetic_scorable_count == 5 and
+            .physical_scorable_count == 0 and
+            .physical_false_feasible_upper_95_one_sided == null and
+            any(.cases[]; .case_id == "false_feasible_thermal" and
+              .classification == "FALSE_FEASIBLE" and
+              (.violated_constraints | index("TEMPERATURE_MAXIMUM")) != null)
+          ' "$RUNNER_TEMP/mission-outcome-report.json"
