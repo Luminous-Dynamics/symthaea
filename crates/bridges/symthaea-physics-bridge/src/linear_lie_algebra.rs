@@ -939,6 +939,112 @@ mod tests {
     }
 
     #[test]
+    fn detects_nearly_dependent_generators_and_abstains() {
+        let mut generators = so3_generators();
+        let jy = generators[1].matrix.clone();
+        for row in 0..3 {
+            for column in 0..3 {
+                generators[0].matrix[row][column] += 1.0e-12 * jy[row][column];
+            }
+        }
+        generators[0].id = "Jx-plus-small-Jy".to_string();
+        let admitted = action(generators, identity(3));
+        let error = qualify_linear_lie_algebra(
+            &admitted,
+            LinearLieAlgebraQualificationProfileV1::default(),
+        )
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            LinearLieAlgebraQualificationErrorV1::RankDeficient {
+                numerical_rank: 2,
+                generator_count: 3,
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn generator_rescaling_and_permutation_preserve_qualification() {
+        let canonical = action(so3_generators(), identity(3));
+        let canonical_report = qualify_linear_lie_algebra(
+            &canonical,
+            LinearLieAlgebraQualificationProfileV1::default(),
+        )
+        .unwrap();
+
+        let mut generators = so3_generators();
+        for (generator, scale) in generators.iter_mut().zip([7.0, -2.0, 0.125]) {
+            for value in generator.matrix.iter_mut().flatten() {
+                *value *= scale;
+            }
+        }
+        generators.reverse();
+        let transformed = action(generators, identity(3));
+        let transformed_report = qualify_linear_lie_algebra(
+            &transformed,
+            LinearLieAlgebraQualificationProfileV1::default(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            canonical_report.status,
+            transformed_report.status
+        );
+        assert!(
+            (canonical_report.diagnostics.maximum_bracket_closure_defect
+                - transformed_report.diagnostics.maximum_bracket_closure_defect)
+                .abs()
+                < 1.0e-12
+        );
+        assert!(
+            (canonical_report.diagnostics.maximum_jacobi_defect.unwrap()
+                - transformed_report.diagnostics.maximum_jacobi_defect.unwrap())
+                .abs()
+                < 1.0e-12
+        );
+    }
+
+    #[test]
+    fn accepts_direct_sum_of_two_commuting_so2_algebras() {
+        let generators = vec![
+            generator(
+                "J01",
+                vec![
+                    vec![0.0, -1.0, 0.0, 0.0],
+                    vec![1.0, 0.0, 0.0, 0.0],
+                    vec![0.0, 0.0, 0.0, 0.0],
+                    vec![0.0, 0.0, 0.0, 0.0],
+                ],
+            ),
+            generator(
+                "J23",
+                vec![
+                    vec![0.0, 0.0, 0.0, 0.0],
+                    vec![0.0, 0.0, 0.0, 0.0],
+                    vec![0.0, 0.0, 0.0, -1.0],
+                    vec![0.0, 0.0, 1.0, 0.0],
+                ],
+            ),
+        ];
+        let admitted = action(generators, identity(4));
+        let report = qualify_linear_lie_algebra(
+            &admitted,
+            LinearLieAlgebraQualificationProfileV1::default(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            report.status,
+            LinearLieAlgebraQualificationStatusV1::NumericallyClosedAndJacobiConsistent
+        );
+        assert_eq!(report.diagnostics.numerical_rank, 2);
+        assert_eq!(report.diagnostics.bracket_pair_count, 1);
+        assert!(report.brackets[0].classified_as_numerically_zero);
+    }
+
+    #[test]
     fn rejects_excessive_work_before_allocating_the_qualification_workspace() {
         let admitted = action(so3_generators(), identity(3));
         let mut profile = LinearLieAlgebraQualificationProfileV1::default();
