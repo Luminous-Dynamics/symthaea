@@ -2,6 +2,8 @@
 
 Parent: [ROB-DISTRIBUTED-INFERENCE-001 / #11573](https://github.com/Luminous-Dynamics/symthaea/issues/11573).
 
+Physical measurement owner: [Symtropy #4713](https://github.com/Luminous-Dynamics/symtropy/issues/4713); initial Rust reference: [Symtropy PR #4715](https://github.com/Luminous-Dynamics/symtropy/pull/4715).
+
 Composes with:
 - Symthaea #11122 EVSI and #11338 robust active sensing;
 - Symthaea #11561 real-time cognition, #11581 adaptive commitment horizon and #5468/#3351 metareasoning;
