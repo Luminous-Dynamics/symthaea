@@ -11,6 +11,7 @@ A Rust-first local exporter for the official Audio Editing Challenge submission.
 - Requires existing regular files ending in .wav.
 - Recomputes every file's SHA-256 and compares it to the local output mapping.
 - Emits one deterministic JSON object per ID, with only the fields id and audio_path.
+- Enforces the official SDK's 1 MiB submission.jsonl limit.
 - Publishes submission.jsonl atomically and refuses to overwrite different existing content.
 - Has no upload or credential interface.
 
