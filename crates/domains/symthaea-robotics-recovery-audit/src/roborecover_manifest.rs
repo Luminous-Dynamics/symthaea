@@ -554,6 +554,7 @@ mod tests {
         assert_eq!(parsed.manifest.macro9_groups.len(), 9);
         assert_eq!(parsed.group_counts.len(), 9);
         assert_eq!(parsed.manifest.scenarios[0].source, ScenarioSource::Unknown);
+        assert!(super::super::roborecover_score::validate_manifest(&parsed.manifest).is_ok());
     }
 
     #[test]
@@ -567,6 +568,7 @@ mod tests {
 
         assert_eq!(parsed.row_count, 800);
         assert_eq!(parsed.manifest.macro9_groups.len(), 0);
+        assert!(super::super::roborecover_score::validate_manifest(&parsed.manifest).is_ok());
         assert!(parsed.group_counts.contains_key(&StageTypeGroup {
             stage: RecoveryStage::Approach,
             deviation: DeviationType::WrongPose,
