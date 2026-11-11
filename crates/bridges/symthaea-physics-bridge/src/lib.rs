@@ -92,6 +92,8 @@ pub use symmetry_inference::{
     MetricAwareVectorFieldEquivarianceReportV1, MetricAwareVectorFieldGeneratorResultV1,
     ExactVectorFieldEquivarianceErrorV1, ExactVectorFieldEquivarianceReportV1,
     ExactVectorFieldGeneratorResultV1, LinearVectorFieldOutputRepresentationV1,
+    ExactVectorFieldEquivarianceErrorV1, ExactVectorFieldEquivarianceReportV1,
+    ExactVectorFieldGeneratorResultV1, LinearVectorFieldOutputRepresentationV1,
     NumericLieDerivativeProfileV2, LieDerivativeSampleStatisticsV1,
     StructuralSymmetryPattern, SymmetryClaimScope, SymmetryInferenceEvidence,
     SymmetryInferenceReport, SymmetryInferenceSearchStatus,
