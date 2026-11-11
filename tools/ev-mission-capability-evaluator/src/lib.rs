@@ -38,6 +38,7 @@ pub struct Mission {
     pub initial_energy_above_reserve_kwh_lower: f64,
     pub regenerative_efficiency_lower: f64,
     pub minimum_cell_soc_pct: f64,
+    pub maximum_cell_soc_pct: f64,
     pub maximum_cell_temperature_c: f64,
     pub minimum_cell_voltage_v: f64,
     pub maximum_cell_voltage_v: f64,
@@ -227,6 +228,7 @@ fn structurally_validate(mission: &Mission) -> Vec<String> {
         mission.initial_energy_above_reserve_kwh_lower,
         mission.regenerative_efficiency_lower,
         mission.minimum_cell_soc_pct,
+        mission.maximum_cell_soc_pct,
         mission.maximum_cell_temperature_c,
         mission.minimum_cell_voltage_v,
         mission.maximum_cell_voltage_v,
@@ -240,6 +242,7 @@ fn structurally_validate(mission: &Mission) -> Vec<String> {
         || !finite_nonnegative(mission.initial_energy_above_reserve_kwh_lower)
         || !(0.0..=1.0).contains(&mission.regenerative_efficiency_lower)
         || !(0.0..=100.0).contains(&mission.minimum_cell_soc_pct)
+        || !(mission.minimum_cell_soc_pct..=100.0).contains(&mission.maximum_cell_soc_pct)
         || !finite_nonnegative(mission.maximum_cell_temperature_c)
         || mission.minimum_cell_voltage_v <= 0.0
         || mission.maximum_cell_voltage_v <= mission.minimum_cell_voltage_v
@@ -293,6 +296,9 @@ fn structurally_validate(mission: &Mission) -> Vec<String> {
         if !slice_ids.insert(slice.step_id.clone()) {
             errors.push(format!("DUPLICATE_CAPABILITY_SLICE:{}", slice.step_id));
         }
+        if !step_ids.contains(&slice.step_id) {
+            errors.push(format!("CAPABILITY_SLICE_REFERENCES_UNKNOWN_STEP:{}", slice.step_id));
+        }
     }
     errors
 }
@@ -304,12 +310,7 @@ fn evaluate_case(case: &MissionCase) -> CaseAudit {
         return reject_input(&case.case_id, errors);
     }
 
-    let steps_by_id: BTreeMap<&str, &MissionStep> = mission
-        .steps
-        .iter()
-        .map(|step| (step.step_id.as_str(), step))
-        .collect();
-    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = mission
+remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = mission
         .capability_slices
         .iter()
         .map(|slice| (slice.step_id.as_str(), slice))
@@ -532,6 +533,7 @@ fn evaluate_case(case: &MissionCase) -> CaseAudit {
                 break;
             }
             if cell.soc_lower_pct < mission.minimum_cell_soc_pct - EPS
+                || cell.soc_upper_pct > mission.maximum_cell_soc_pct + EPS
                 || cell.temperature_upper_c > mission.maximum_cell_temperature_c + EPS
                 || cell.voltage_lower_v < mission.minimum_cell_voltage_v - EPS
                 || cell.voltage_upper_v > mission.maximum_cell_voltage_v + EPS
@@ -579,8 +581,11 @@ fn evaluate_case(case: &MissionCase) -> CaseAudit {
             continue;
         }
 
-        let worst_discharge = (step.requested_battery_power_kw + step.power_uncertainty_kw).max(0.0);
-        let worst_charge = (-step.requested_battery_power_kw + step.power_uncertainty_kw).max(0.0);
+        let lower_power = step.requested_battery_power_kw - step.power_uncertainty_kw;
+        let upper_power = step.requested_battery_power_kw + step.power_uncertainty_kw;
+        let worst_discharge = upper_power.max(0.0);
+        let worst_charge = (-lower_power).max(0.0);
+        let guaranteed_regen = (-upper_power).max(0.0);
         let discharge_margin = slice.discharge_power_lower_kw - worst_discharge;
         let charge_margin = slice.charge_acceptance_lower_kw - worst_charge;
         worst_discharge_margin = Some(
@@ -592,28 +597,23 @@ fn evaluate_case(case: &MissionCase) -> CaseAudit {
 
         let mut step_disposition = "FEASIBLE_WITHIN_DECLARED_ENVELOPE".to_owned();
         let mut reason = None;
-        if step.requested_battery_power_kw >= 0.0 {
-            if discharge_margin < -EPS {
-                step_disposition = "INFEASIBLE".to_owned();
-                reason = Some("Requested discharge exceeds conservative time-indexed pack power".to_owned());
-            }
-            let energy_out = worst_discharge * duration / 3600.0;
-            total_discharge += energy_out;
-            energy_remaining -= energy_out;
-        } else {
-            if charge_margin < -EPS {
-                step_disposition = "INFEASIBLE".to_owned();
-                reason = Some("Requested regenerative/charge power exceeds conservative pack charge acceptance".to_owned());
-            }
-            let guaranteed_charge_kw =
-                (-step.requested_battery_power_kw - step.power_uncertainty_kw).max(0.0);
-            let energy_in = guaranteed_charge_kw
-                * mission.regenerative_efficiency_lower
-                * duration
-                / 3600.0;
-            total_regen_credit += energy_in;
-            energy_remaining += energy_in;
+        if discharge_margin < -EPS {
+            step_disposition = "INFEASIBLE".to_owned();
+            reason = Some("Worst-case discharge request exceeds conservative time-indexed pack power".to_owned());
         }
+        if charge_margin < -EPS {
+            step_disposition = "INFEASIBLE".to_owned();
+            reason = Some("Worst-case regenerative/charge request exceeds conservative pack charge acceptance".to_owned());
+        }
+        let energy_out = worst_discharge * duration / 3600.0;
+        total_discharge += energy_out;
+        energy_remaining -= energy_out;
+        let energy_in = guaranteed_regen
+            * mission.regenerative_efficiency_lower
+            * duration
+            / 3600.0;
+        total_regen_credit += energy_in;
+        energy_remaining += energy_in;
         if energy_remaining < -EPS {
             step_disposition = "INFEASIBLE".to_owned();
             reason = Some("Cumulative mission energy crosses the required end-of-mission reserve".to_owned());
@@ -623,7 +623,7 @@ fn evaluate_case(case: &MissionCase) -> CaseAudit {
             disposition = "INFEASIBLE".to_owned();
             if global_limiting_cell.is_none() {
                 global_limiting_cell = slice.cells.iter()
-                    .min_by(|left, right| {
+                    .max_by(|left, right| {
                         left.temperature_upper_c.partial_cmp(&right.temperature_upper_c)
                             .unwrap_or(std::cmp::Ordering::Equal)
                     })
