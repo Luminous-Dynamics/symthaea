@@ -294,7 +294,7 @@ Local low-level control, RTA and safe-stop remain independent and available with
 
 A new benchmark child is tracked by [Symthaea #11581](https://github.com/Luminous-Dynamics/symthaea/issues/11581). It compares fixed-K, progress-triggered, horizon-decoupled, action-prefix-conditioned and latent Reuse-then-Refine execution against a **bottleneck horizon** bounded by freshness, deadline, thermal, actuator, dynamics, viability, queue and continuity evidence.
 
-See [adaptive_commit_horizon.md](./adaptive_commit_horizon.md) and its 15 synthetic known-answer cases:
+See [adaptive_commit_horizon.md](./adaptive_commit_horizon.md) and its 17 synthetic known-answer cases:
 - [fixtures/adaptive_commit_horizon_v0_1.json](./fixtures/adaptive_commit_horizon_v0_1.json)
 - [fixtures/adaptive_commit_horizon_v0_1.schema.json](./fixtures/adaptive_commit_horizon_v0_1.schema.json)
 
@@ -302,3 +302,8 @@ The result is only a maximum eligible prefix for independent projection/admissio
 
 
 The 17-case adaptive-horizon corpus now includes shared-context and prefix-closure checks. Every qualified cap must bind the same context digest (state/action/model/uncertainty/clock/control-period identity) and be valid for every intermediate prefix tick; mismatched or endpoint-only bounds block eligibility.
+
+
+## Integrated decision architecture
+
+The current architecture/evaluation composition is summarized in [integrated_decision_stack.md](./integrated_decision_stack.md). It separates (1) which cognitive operation to run, (2) where to run it, (3) how long an action prefix may remain committed, and (4) whether the exact proposal is physically authorized. This is a composition contract; the diagram does not imply all edges are implemented or qualified.
