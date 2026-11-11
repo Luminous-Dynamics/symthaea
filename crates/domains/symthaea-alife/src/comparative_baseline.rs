@@ -306,7 +306,6 @@ impl ComparativeBaselineModel {
         let mut raw_systems = Vec::with_capacity(by_system.len());
         let mut within_sse = 0.0;
         let mut total_measurement_variance = 0.0;
-        let mut residual_sum = 0.0;
 
         for (system_id, controls) in &by_system {
             let count = controls.len();
@@ -321,7 +320,6 @@ impl ComparativeBaselineModel {
                 within_sse += delta * delta;
                 total_measurement_variance += item.measurement_stddev.powi(2);
             }
-            residual_sum += mean_residual * count as f64;
             let context_min = controls
                 .iter()
                 .map(|item| item.context)
@@ -354,12 +352,14 @@ impl ComparativeBaselineModel {
             total_measurement_variance / total_controls as f64;
         let within_system_variance =
             (observed_within_variance - mean_control_measurement_variance).max(0.0);
-        let global_intercept = residual_sum / total_controls as f64;
-
+        // Each system contributes one draw from the system-level random-intercept
+        // distribution. Use the unweighted mean of system means for the prior center so
+        // a system with more sampled worlds does not dominate the between-system estimate.
         let group_means = raw_systems
             .iter()
             .map(|entry| entry.2)
             .collect::<Vec<_>>();
+        let global_intercept = group_means.iter().sum::<f64>() / group_means.len() as f64;
         let between_observed_variance = sample_variance(&group_means, global_intercept);
         let average_group_sampling_variance = raw_systems
             .iter()
@@ -637,6 +637,23 @@ mod tests {
             model.diagnostics().common_context_slope * held_out.context
                 + model.diagnostics().global_intercept;
         assert!((global_prediction - 1.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn system_level_prior_center_is_not_dominated_by_larger_control_groups() {
+        let observations = vec![
+            control("a0", "system-a", 0.0, 5.0, "world-a0"),
+            control("a1", "system-a", 1.0, 7.0, "world-a1"),
+            control("a2", "system-a", 2.0, 9.0, "world-a2"),
+            control("b0", "system-b", 0.0, -3.0, "world-b0"),
+            control("b2", "system-b", 2.0, 1.0, "world-b2"),
+        ];
+        let model = ComparativeBaselineModel::fit(&observations).unwrap();
+
+        assert!((model.diagnostics().global_intercept - 1.0).abs() < 1.0e-12);
+        let system_b = target("b-target-unequal", "system-b", 1.0, -1.0);
+        let evaluation = model.evaluate(&system_b, 3.0).unwrap();
+        assert!(evaluation.standardized_residual.abs() < 1.0);
     }
 
     #[test]
