@@ -53,6 +53,18 @@ pub enum TranscriptionRightsBasisV1 {
     Unresolved,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TranscriptionUsageScopeV1 {
+    InternalOnly,
+    ResearchOnly,
+    NonCommercialResearch,
+    /// Permission expressly covers publication of aggregate benchmark results.
+    PublicBenchmarkResults,
+    /// Permission expressly covers redistribution of the underlying audio.
+    PublicDatasetRedistribution,
+    CommercialProductUse,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TranscriptionAudioPreprocessingV1 {
     pub source_sample_rate_hz: u32,
@@ -94,11 +106,16 @@ pub struct TranscriptionExperimentReceiptV1 {
     pub sample_id: String,
     pub split: String,
 
-    /// SHA-256 of the exact audio bytes passed to preprocessing/inference.
+    /// SHA-256 of the exact source audio bytes before preprocessing.
     pub input_audio_sha256: String,
+    /// SHA-256 of the exact canonical model-input bytes after resampling,
+    /// channel conversion, normalization and chunking. For tensor-based APIs,
+    /// hash a documented canonical byte encoding with shape and dtype.
+    pub model_input_audio_sha256: String,
+    pub dataset_manifest_sha256: String,
     pub input_rights_basis: TranscriptionRightsBasisV1,
     pub input_rights_reference: Option<String>,
-    pub input_usage_scope: String,
+    pub input_usage_scope: TranscriptionUsageScopeV1,
 
     pub model_name: String,
     pub model_revision: String,
@@ -107,14 +124,21 @@ pub struct TranscriptionExperimentReceiptV1 {
     pub model_artifact_sha256: Option<String>,
     /// Exact code/container revision when available.
     pub model_code_revision: Option<String>,
+    pub adapter_id: String,
+    pub adapter_revision: String,
     pub model_provider: String,
     pub model_license: String,
-    /// Digest of the complete inference/decode configuration. The full config
-    /// may be stored externally; this receipt binds the exact snapshot.
+    pub model_license_reference: Option<String>,
+    pub model_usage_scope: TranscriptionUsageScopeV1,
+    /// Digest and retrievable reference to the complete inference/decode config.
     pub inference_config_sha256: String,
+    pub inference_config_reference: String,
     pub random_seed: Option<u64>,
 
     pub preprocessing: TranscriptionAudioPreprocessingV1,
+    /// Digest of any additional preprocessing parameters not represented as
+    /// first-class fields above (e.g. filter coefficients or tensor layout).
+    pub preprocessing_config_sha256: String,
     pub conditioning_source: TranscriptionConditioningSourceV1,
     /// Digest of the exact instrument labels/conditioning payload. Required
     /// for every non-None conditioning source.
@@ -158,22 +182,30 @@ struct ReceiptCommitmentV1<'a> {
     benchmark_id: &'a str,
     dataset_id: &'a str,
     dataset_revision: &'a str,
+    dataset_manifest_sha256: &'a str,
     sample_id: &'a str,
     split: &'a str,
     input_audio_sha256: &'a str,
+    model_input_audio_sha256: &'a str,
     input_rights_basis: TranscriptionRightsBasisV1,
     input_rights_reference: &'a Option<String>,
-    input_usage_scope: &'a str,
+    input_usage_scope: TranscriptionUsageScopeV1,
     model_name: &'a str,
     model_revision: &'a str,
     model_delivery: TranscriptionModelDeliveryV1,
     model_artifact_sha256: &'a Option<String>,
     model_code_revision: &'a Option<String>,
+    adapter_id: &'a str,
+    adapter_revision: &'a str,
     model_provider: &'a str,
     model_license: &'a str,
+    model_license_reference: &'a Option<String>,
+    model_usage_scope: TranscriptionUsageScopeV1,
     inference_config_sha256: &'a str,
+    inference_config_reference: &'a str,
     random_seed: Option<u64>,
     preprocessing: &'a TranscriptionAudioPreprocessingV1,
+    preprocessing_config_sha256: &'a str,
     conditioning_source: TranscriptionConditioningSourceV1,
     conditioning_payload_sha256: &'a Option<String>,
     runtime: &'a TranscriptionRuntimeReceiptV1,
@@ -237,22 +269,30 @@ pub fn transcription_experiment_receipt_commitment_v1(
         benchmark_id: &receipt.benchmark_id,
         dataset_id: &receipt.dataset_id,
         dataset_revision: &receipt.dataset_revision,
+        dataset_manifest_sha256: &receipt.dataset_manifest_sha256,
         sample_id: &receipt.sample_id,
         split: &receipt.split,
         input_audio_sha256: &receipt.input_audio_sha256,
+        model_input_audio_sha256: &receipt.model_input_audio_sha256,
         input_rights_basis: receipt.input_rights_basis,
         input_rights_reference: &receipt.input_rights_reference,
-        input_usage_scope: &receipt.input_usage_scope,
+        input_usage_scope: receipt.input_usage_scope,
         model_name: &receipt.model_name,
         model_revision: &receipt.model_revision,
         model_delivery: receipt.model_delivery,
         model_artifact_sha256: &receipt.model_artifact_sha256,
         model_code_revision: &receipt.model_code_revision,
+        adapter_id: &receipt.adapter_id,
+        adapter_revision: &receipt.adapter_revision,
         model_provider: &receipt.model_provider,
         model_license: &receipt.model_license,
+        model_license_reference: &receipt.model_license_reference,
+        model_usage_scope: receipt.model_usage_scope,
         inference_config_sha256: &receipt.inference_config_sha256,
+        inference_config_reference: &receipt.inference_config_reference,
         random_seed: receipt.random_seed,
         preprocessing: &receipt.preprocessing,
+        preprocessing_config_sha256: &receipt.preprocessing_config_sha256,
         conditioning_source: receipt.conditioning_source,
         conditioning_payload_sha256: &receipt.conditioning_payload_sha256,
         runtime: &receipt.runtime,
@@ -269,18 +309,34 @@ pub fn transcription_experiment_receipt_commitment_v1(
     ))
 }
 
-/// A receipt is public-benchmark eligible only when input rights are resolved
-/// and not restricted to non-commercial research. This is a policy signal,
-/// not a legal opinion or a substitute for checking the actual license.
+/// A receipt is public-benchmark-result eligible only when both the input
+/// rights and model terms expressly permit publication of benchmark results
+/// (or wider redistribution), and non-public-domain permissions have a
+/// reference. This is a policy signal, not a legal opinion or license parser.
 pub fn transcription_experiment_public_benchmark_eligible_v1(
     receipt: &TranscriptionExperimentReceiptV1,
 ) -> bool {
-    matches!(
-        receipt.input_rights_basis,
-        TranscriptionRightsBasisV1::PublicDomain
-            | TranscriptionRightsBasisV1::OwnedOrLicensed
-            | TranscriptionRightsBasisV1::ConsentedResearch
-    )
+    let input_basis_ok = match receipt.input_rights_basis {
+        TranscriptionRightsBasisV1::PublicDomain => true,
+        TranscriptionRightsBasisV1::OwnedOrLicensed
+        | TranscriptionRightsBasisV1::ConsentedResearch => {
+            receipt.input_rights_reference.as_deref().is_some_and(|value| !value.trim().is_empty())
+        }
+        TranscriptionRightsBasisV1::ResearchOnly
+        | TranscriptionRightsBasisV1::NonCommercialOnly
+        | TranscriptionRightsBasisV1::Unresolved => false,
+    };
+    let public_scope = |scope| {
+        matches!(
+            scope,
+            TranscriptionUsageScopeV1::PublicBenchmarkResults
+                | TranscriptionUsageScopeV1::PublicDatasetRedistribution
+        )
+    };
+    input_basis_ok
+        && public_scope(receipt.input_usage_scope)
+        && public_scope(receipt.model_usage_scope)
+        && receipt.model_license_reference.as_deref().is_some_and(|value| !value.trim().is_empty())
 }
 
 /// Check receipt structure, exact audio/MIDI bytes, and the nested evaluator
@@ -306,7 +362,9 @@ pub fn validate_transcription_experiment_receipt_v1(
         ("dataset_revision", receipt.dataset_revision.as_str()),
         ("sample_id", receipt.sample_id.as_str()),
         ("split", receipt.split.as_str()),
-        ("input_usage_scope", receipt.input_usage_scope.as_str()),
+        ("adapter_id", receipt.adapter_id.as_str()),
+        ("adapter_revision", receipt.adapter_revision.as_str()),
+        ("inference_config_reference", receipt.inference_config_reference.as_str()),
         ("model_name", receipt.model_name.as_str()),
         ("model_revision", receipt.model_revision.as_str()),
         ("model_provider", receipt.model_provider.as_str()),
@@ -329,7 +387,10 @@ pub fn validate_transcription_experiment_receipt_v1(
 
     for (field, value) in [
         ("input_audio_sha256", receipt.input_audio_sha256.as_str()),
+        ("model_input_audio_sha256", receipt.model_input_audio_sha256.as_str()),
+        ("dataset_manifest_sha256", receipt.dataset_manifest_sha256.as_str()),
         ("inference_config_sha256", receipt.inference_config_sha256.as_str()),
+        ("preprocessing_config_sha256", receipt.preprocessing_config_sha256.as_str()),
         ("prediction_midi_sha256", receipt.prediction_midi_sha256.as_str()),
         ("reference_manifest_sha256", receipt.reference_manifest_sha256.as_str()),
         ("evaluator_report_sha256", receipt.evaluator_report_sha256.as_str()),
@@ -344,6 +405,16 @@ pub fn validate_transcription_experiment_receipt_v1(
         if let Err(issue) = validate_digest("model_artifact_sha256", digest) {
             issues.push(issue);
         }
+    }
+    if let Some(reference) = receipt.model_license_reference.as_deref() {
+        if reference.trim().is_empty() {
+            issues.push(TranscriptionExperimentReceiptIssueV1::MissingField {
+                field: "model_license_reference".into(),
+            });
+        }
+    }
+    if let Some(reference) = receipt.inference_config_reference.as_str().strip_prefix(" ") {
+        let _ = reference;
     }
     if let Some(revision) = receipt.model_code_revision.as_deref() {
         if revision.trim().is_empty() {
@@ -520,17 +591,24 @@ mod tests {
             sample_id: "sample-0001".into(),
             split: "heldout".into(),
             input_audio_sha256: sha256_hex(audio),
+            model_input_audio_sha256: sha256_hex(b"canonical-model-input"),
+            dataset_manifest_sha256: "2".repeat(64),
             input_rights_basis: TranscriptionRightsBasisV1::ConsentedResearch,
             input_rights_reference: Some("consent-register:corpus-v1".into()),
-            input_usage_scope: "noncommercial_research".into(),
+            input_usage_scope: TranscriptionUsageScopeV1::PublicBenchmarkResults,
             model_name: "FixtureAMT".into(),
             model_revision: "v1.2.3".into(),
             model_delivery: TranscriptionModelDeliveryV1::OpenWeights,
             model_artifact_sha256: Some("d".repeat(64)),
             model_code_revision: Some("e".repeat(40)),
+            adapter_id: "symthaea-muse-amt-adapter".into(),
+            adapter_revision: "git:adapter-fixture-v1".into(),
             model_provider: "local".into(),
             model_license: "Apache-2.0".into(),
+            model_license_reference: Some("https://example.invalid/model-license".into()),
+            model_usage_scope: TranscriptionUsageScopeV1::PublicBenchmarkResults,
             inference_config_sha256: "f".repeat(64),
+            inference_config_reference: "artifact://experiment-config/exp-001".into(),
             random_seed: Some(7),
             preprocessing: TranscriptionAudioPreprocessingV1 {
                 source_sample_rate_hz: 48_000,
@@ -542,6 +620,7 @@ mod tests {
                 chunk_duration_ms: 5_000,
                 chunk_overlap_ms: 500,
             },
+            preprocessing_config_sha256: "3".repeat(64),
             conditioning_source: TranscriptionConditioningSourceV1::None,
             conditioning_payload_sha256: None,
             runtime: TranscriptionRuntimeReceiptV1 {
@@ -707,6 +786,7 @@ mod tests {
         let report = report(midi);
         let mut receipt = valid_receipt(audio, midi, &report);
         receipt.input_rights_basis = TranscriptionRightsBasisV1::Unresolved;
+        receipt.input_usage_scope = TranscriptionUsageScopeV1::ResearchOnly;
         receipt.receipt_sha256 = transcription_experiment_receipt_commitment_v1(&receipt).unwrap();
         assert!(validate_transcription_experiment_receipt_v1(
             &receipt,
@@ -725,6 +805,8 @@ mod tests {
         let report = report(midi);
         let mut receipt = valid_receipt(audio, midi, &report);
         receipt.input_rights_basis = TranscriptionRightsBasisV1::NonCommercialOnly;
+        receipt.input_usage_scope = TranscriptionUsageScopeV1::NonCommercialResearch;
+        receipt.model_usage_scope = TranscriptionUsageScopeV1::NonCommercialResearch;
         receipt.receipt_sha256 = transcription_experiment_receipt_commitment_v1(&receipt).unwrap();
         assert!(!transcription_experiment_public_benchmark_eligible_v1(&receipt));
     }
