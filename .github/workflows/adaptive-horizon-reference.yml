@@ -8,7 +8,7 @@ on:
       - ".github/workflows/adaptive-horizon-reference.yml"
 
 concurrency:
-  group: adaptive-horizon-reference-\${{ github.ref }}
+  group: adaptive-horizon-reference-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
