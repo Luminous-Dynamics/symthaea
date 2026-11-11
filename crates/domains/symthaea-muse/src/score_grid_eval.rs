@@ -438,7 +438,7 @@ fn score_metric_for_alignment_v1(
         reference.notes.iter().map(|note| RhythmKeyV1 {
             bar_index: note.bar_index,
             onset_32nd: note.onset_32nd,
-            duration_32nd: note.duration_32nd,
+            duration_32nd: u32::from(note.duration_32nd),
         }),
         transformed.iter().map(|note| {
             note.map(|note| RhythmKeyV1 {
@@ -611,7 +611,7 @@ fn edit_tokens_v1(
                     bar_index: note.bar_index,
                     onset_32nd: note.onset_32nd,
                     pitch_midi: note.pitch_midi,
-                    duration_32nd: u32::from(note.duration_32nd),
+                    duration_32nd: note.duration_32nd,
                 },
                 None => EditTokenV1 {
                     bar_index: i32::MAX,
@@ -631,7 +631,7 @@ fn edit_tokens_v1(
                 bar_index: note.bar_index,
                 onset_32nd: note.onset_32nd,
                 pitch_midi: note.pitch_midi,
-                duration_32nd: note.duration_32nd,
+                duration_32nd: u32::from(note.duration_32nd),
             })
             .collect();
         tokens.sort_unstable();
@@ -690,12 +690,16 @@ pub fn evaluate_score_grid_v1(
     validate_score_grid_observation_v1(reference)?;
     validate_score_grid_observation_v1(prediction)?;
 
+    // Each transform candidate is traversed for score, rhythm and (when
+    // available) PartId-aware multiset matching. Charge the conservative
+    // three-pass cost before allocating the candidate matching maps.
     let scans = prediction
         .notes
         .len()
         .saturating_mul(ALIGNMENT_SCALES_V1.len())
         .saturating_mul(7)
-        .saturating_mul(25);
+        .saturating_mul(25)
+        .saturating_mul(3);
     if scans > SCORE_GRID_MAX_ALIGNMENT_NOTE_SCANS_V1 {
         return Err(ScoreGridEvaluationIssueV1::AlignmentWorkBudgetExceeded {
             scans,
