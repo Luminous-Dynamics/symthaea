@@ -75,6 +75,8 @@ pub struct MidiTranscribedNoteV1 {
     pub midi_channel: u8,
     pub onset_tick: u64,
     pub offset_tick: Option<u64>,
+    /// Stable event order after the deterministic Type-1 track merge.
+    pub source_event_ordinal: u32,
     /// GM program captured at NoteOn; percussion channel 9 is retained.
     pub gm_program: u8,
     pub pitch_midi: u8,
@@ -421,10 +423,14 @@ pub fn parse_transcribed_midi_v1(
     let mut orphan_note_off_count = 0usize;
     let mut overlapping_same_pitch_note_on_count = 0usize;
     let mut programs = [0u8; 16];
-    let mut pending: BTreeMap<(u8, u8), VecDeque<(u64, u8, u8, u16)>> = BTreeMap::new();
+    let mut pending: BTreeMap<(u8, u8), VecDeque<(u64, u8, u8, u16, u32)>> = BTreeMap::new();
     let mut pending_note_count = 0usize;
 
-    for (tick, track_index, _, kind) in absolute_events {
+    for (event_ordinal, (tick, track_index, _, kind)) in
+        absolute_events.into_iter().enumerate()
+    {
+        let source_event_ordinal = u32::try_from(event_ordinal)
+            .map_err(|_| MidiTranscriptionEvaluationIssueV1::MidiTickOverflow)?;
         match kind {
             TrackEventKind::Midi { channel, message } => {
                 let channel = channel.as_int();
@@ -452,14 +458,20 @@ pub fn parse_transcribed_midi_v1(
                             programs[usize::from(channel)],
                             vel.as_int(),
                             track_index_u16,
+                            source_event_ordinal,
                         ));
                         pending_note_count += 1;
                     }
                     MidiMessage::NoteOff { key, .. }
                     | MidiMessage::NoteOn { key, .. } => {
                         if let Some(queue) = pending.get_mut(&(channel, key.as_int())) {
-                            if let Some((start_tick, program, velocity, onset_track_index)) =
-                                queue.pop_front()
+                            if let Some((
+                                start_tick,
+                                program,
+                                velocity,
+                                onset_track_index,
+                                note_on_event_ordinal,
+                            )) = queue.pop_front()
                             {
                                 pending_note_count = pending_note_count.saturating_sub(1);
                                 let onset_seconds = tick_to_seconds(
@@ -482,6 +494,7 @@ pub fn parse_transcribed_midi_v1(
                                     midi_channel: channel,
                                     onset_tick: start_tick,
                                     offset_tick: Some(tick),
+                                    source_event_ordinal: note_on_event_ordinal,
                                     gm_program: program,
                                     pitch_midi: key.as_int(),
                                     velocity_midi: velocity,
@@ -503,7 +516,7 @@ pub fn parse_transcribed_midi_v1(
     }
 
     for ((channel, pitch), queue) in pending {
-        for (start_tick, program, velocity, onset_track_index) in queue {
+        for (start_tick, program, velocity, onset_track_index, note_on_event_ordinal) in queue {
             let onset_seconds = tick_to_seconds(
                 start_tick,
                 &tempo_points,
@@ -516,6 +529,7 @@ pub fn parse_transcribed_midi_v1(
                 midi_channel: channel,
                 onset_tick: start_tick,
                 offset_tick: None,
+                source_event_ordinal: note_on_event_ordinal,
                 gm_program: program,
                 pitch_midi: pitch,
                 velocity_midi: velocity,
@@ -534,12 +548,7 @@ pub fn parse_transcribed_midi_v1(
     notes.sort_by(|left, right| {
         left.onset_seconds
             .total_cmp(&right.onset_seconds)
-            .then_with(|| left.pitch_midi.cmp(&right.pitch_midi))
-            .then_with(|| left.gm_program.cmp(&right.gm_program))
-            .then_with(|| left.track_index.cmp(&right.track_index))
-            .then_with(|| left.midi_channel.cmp(&right.midi_channel))
-            .then_with(|| left.velocity_midi.cmp(&right.velocity_midi))
-            .then_with(|| left.offset_tick.cmp(&right.offset_tick))
+            .then_with(|| left.source_event_ordinal.cmp(&right.source_event_ordinal))
     });
 
     Ok(ParsedMidiTranscriptionV1 {
@@ -2223,6 +2232,7 @@ mod tests {
         );
     }
 
+    #[test]
     fn unclosed_note_is_kept_for_onset_metrics_but_cannot_match_full_note() {
         let notes = vec![(60, 0, 480)];
         let reference = reference_artifact(&notes, 40);
