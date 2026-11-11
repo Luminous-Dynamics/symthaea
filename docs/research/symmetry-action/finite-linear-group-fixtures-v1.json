@@ -1,0 +1,1116 @@
+{
+  "schema": "symthaea-finite-linear-group-fixtures-v1",
+  "convention": {
+    "vectors": "column",
+    "action": "x' = M_g x",
+    "multiplication": "left_element_id followed by right_element_id means matrix product M_left * M_right",
+    "metricIsometry": "M_g^T G M_g = G",
+    "admission": "Complete Cayley table, identity, two-sided inverses, associativity, metric isometry, and matrix homomorphism are independently checked."
+  },
+  "groups": [
+    {
+      "action_id": "C4-canonical",
+      "coordinate_basis_id": "xy",
+      "coordinate_names": [
+        "x",
+        "y"
+      ],
+      "coordinate_unit_ids": [
+        "1",
+        "1"
+      ],
+      "metric": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "identity_element_id": "r0",
+      "elements": [
+        {
+          "id": "r0",
+          "matrix": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        },
+        {
+          "id": "r1",
+          "matrix": [
+            [
+              0,
+              -1
+            ],
+            [
+              1,
+              0
+            ]
+          ]
+        },
+        {
+          "id": "r2",
+          "matrix": [
+            [
+              -1,
+              0
+            ],
+            [
+              0,
+              -1
+            ]
+          ]
+        },
+        {
+          "id": "r3",
+          "matrix": [
+            [
+              0,
+              1
+            ],
+            [
+              -1,
+              0
+            ]
+          ]
+        }
+      ],
+      "multiplication_table": [
+        {
+          "left_element_id": "r0",
+          "right_element_id": "r0",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "r1",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "r2",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "r3",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "r0",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "r1",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "r2",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "r3",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "r0",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "r1",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "r2",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "r3",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "r0",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "r1",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "r2",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "r3",
+          "product_element_id": "r2"
+        }
+      ]
+    },
+    {
+      "action_id": "D4-canonical",
+      "coordinate_basis_id": "xy",
+      "coordinate_names": [
+        "x",
+        "y"
+      ],
+      "coordinate_unit_ids": [
+        "1",
+        "1"
+      ],
+      "metric": [
+        [
+          1,
+          0
+        ],
+        [
+          0,
+          1
+        ]
+      ],
+      "identity_element_id": "r0",
+      "elements": [
+        {
+          "id": "r0",
+          "matrix": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        },
+        {
+          "id": "r1",
+          "matrix": [
+            [
+              0,
+              -1
+            ],
+            [
+              1,
+              0
+            ]
+          ]
+        },
+        {
+          "id": "r2",
+          "matrix": [
+            [
+              -1,
+              0
+            ],
+            [
+              0,
+              -1
+            ]
+          ]
+        },
+        {
+          "id": "r3",
+          "matrix": [
+            [
+              0,
+              1
+            ],
+            [
+              -1,
+              0
+            ]
+          ]
+        },
+        {
+          "id": "f0",
+          "matrix": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              -1
+            ]
+          ]
+        },
+        {
+          "id": "f1",
+          "matrix": [
+            [
+              0,
+              1
+            ],
+            [
+              1,
+              0
+            ]
+          ]
+        },
+        {
+          "id": "f2",
+          "matrix": [
+            [
+              -1,
+              0
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        },
+        {
+          "id": "f3",
+          "matrix": [
+            [
+              0,
+              -1
+            ],
+            [
+              -1,
+              0
+            ]
+          ]
+        }
+      ],
+      "multiplication_table": [
+        {
+          "left_element_id": "r0",
+          "right_element_id": "r0",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "r1",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "r2",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "r3",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "f0",
+          "product_element_id": "f0"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "f1",
+          "product_element_id": "f1"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "f2",
+          "product_element_id": "f2"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "f3",
+          "product_element_id": "f3"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "r0",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "r1",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "r2",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "r3",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "f0",
+          "product_element_id": "f1"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "f1",
+          "product_element_id": "f2"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "f2",
+          "product_element_id": "f3"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "f3",
+          "product_element_id": "f0"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "r0",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "r1",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "r2",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "r3",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "f0",
+          "product_element_id": "f2"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "f1",
+          "product_element_id": "f3"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "f2",
+          "product_element_id": "f0"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "f3",
+          "product_element_id": "f1"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "r0",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "r1",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "r2",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "r3",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "f0",
+          "product_element_id": "f3"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "f1",
+          "product_element_id": "f0"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "f2",
+          "product_element_id": "f1"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "f3",
+          "product_element_id": "f2"
+        },
+        {
+          "left_element_id": "f0",
+          "right_element_id": "r0",
+          "product_element_id": "f0"
+        },
+        {
+          "left_element_id": "f0",
+          "right_element_id": "r1",
+          "product_element_id": "f3"
+        },
+        {
+          "left_element_id": "f0",
+          "right_element_id": "r2",
+          "product_element_id": "f2"
+        },
+        {
+          "left_element_id": "f0",
+          "right_element_id": "r3",
+          "product_element_id": "f1"
+        },
+        {
+          "left_element_id": "f0",
+          "right_element_id": "f0",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "f0",
+          "right_element_id": "f1",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "f0",
+          "right_element_id": "f2",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "f0",
+          "right_element_id": "f3",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "f1",
+          "right_element_id": "r0",
+          "product_element_id": "f1"
+        },
+        {
+          "left_element_id": "f1",
+          "right_element_id": "r1",
+          "product_element_id": "f0"
+        },
+        {
+          "left_element_id": "f1",
+          "right_element_id": "r2",
+          "product_element_id": "f3"
+        },
+        {
+          "left_element_id": "f1",
+          "right_element_id": "r3",
+          "product_element_id": "f2"
+        },
+        {
+          "left_element_id": "f1",
+          "right_element_id": "f0",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "f1",
+          "right_element_id": "f1",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "f1",
+          "right_element_id": "f2",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "f1",
+          "right_element_id": "f3",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "f2",
+          "right_element_id": "r0",
+          "product_element_id": "f2"
+        },
+        {
+          "left_element_id": "f2",
+          "right_element_id": "r1",
+          "product_element_id": "f1"
+        },
+        {
+          "left_element_id": "f2",
+          "right_element_id": "r2",
+          "product_element_id": "f0"
+        },
+        {
+          "left_element_id": "f2",
+          "right_element_id": "r3",
+          "product_element_id": "f3"
+        },
+        {
+          "left_element_id": "f2",
+          "right_element_id": "f0",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "f2",
+          "right_element_id": "f1",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "f2",
+          "right_element_id": "f2",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "f2",
+          "right_element_id": "f3",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "f3",
+          "right_element_id": "r0",
+          "product_element_id": "f3"
+        },
+        {
+          "left_element_id": "f3",
+          "right_element_id": "r1",
+          "product_element_id": "f2"
+        },
+        {
+          "left_element_id": "f3",
+          "right_element_id": "r2",
+          "product_element_id": "f1"
+        },
+        {
+          "left_element_id": "f3",
+          "right_element_id": "r3",
+          "product_element_id": "f0"
+        },
+        {
+          "left_element_id": "f3",
+          "right_element_id": "f0",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "f3",
+          "right_element_id": "f1",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "f3",
+          "right_element_id": "f2",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "f3",
+          "right_element_id": "f3",
+          "product_element_id": "r0"
+        }
+      ]
+    },
+    {
+      "action_id": "D4-sheared",
+      "coordinate_basis_id": "XY",
+      "coordinate_names": [
+        "X",
+        "Y"
+      ],
+      "coordinate_unit_ids": [
+        "1",
+        "1"
+      ],
+      "metric": [
+        [
+          1,
+          -1
+        ],
+        [
+          -1,
+          2
+        ]
+      ],
+      "identity_element_id": "r0",
+      "elements": [
+        {
+          "id": "r0",
+          "matrix": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        },
+        {
+          "id": "r1",
+          "matrix": [
+            [
+              1,
+              -2
+            ],
+            [
+              1,
+              -1
+            ]
+          ]
+        },
+        {
+          "id": "r2",
+          "matrix": [
+            [
+              -1,
+              0
+            ],
+            [
+              0,
+              -1
+            ]
+          ]
+        },
+        {
+          "id": "r3",
+          "matrix": [
+            [
+              -1,
+              2
+            ],
+            [
+              -1,
+              1
+            ]
+          ]
+        },
+        {
+          "id": "f0",
+          "matrix": [
+            [
+              1,
+              -2
+            ],
+            [
+              0,
+              -1
+            ]
+          ]
+        },
+        {
+          "id": "f1",
+          "matrix": [
+            [
+              1,
+              0
+            ],
+            [
+              1,
+              -1
+            ]
+          ]
+        },
+        {
+          "id": "f2",
+          "matrix": [
+            [
+              -1,
+              2
+            ],
+            [
+              0,
+              1
+            ]
+          ]
+        },
+        {
+          "id": "f3",
+          "matrix": [
+            [
+              -1,
+              0
+            ],
+            [
+              -1,
+              1
+            ]
+          ]
+        }
+      ],
+      "multiplication_table": [
+        {
+          "left_element_id": "r0",
+          "right_element_id": "r0",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "r1",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "r2",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "r3",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "f0",
+          "product_element_id": "f0"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "f1",
+          "product_element_id": "f1"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "f2",
+          "product_element_id": "f2"
+        },
+        {
+          "left_element_id": "r0",
+          "right_element_id": "f3",
+          "product_element_id": "f3"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "r0",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "r1",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "r2",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "r3",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "f0",
+          "product_element_id": "f1"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "f1",
+          "product_element_id": "f2"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "f2",
+          "product_element_id": "f3"
+        },
+        {
+          "left_element_id": "r1",
+          "right_element_id": "f3",
+          "product_element_id": "f0"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "r0",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "r1",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "r2",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "r3",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "f0",
+          "product_element_id": "f2"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "f1",
+          "product_element_id": "f3"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "f2",
+          "product_element_id": "f0"
+        },
+        {
+          "left_element_id": "r2",
+          "right_element_id": "f3",
+          "product_element_id": "f1"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "r0",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "r1",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "r2",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "r3",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "f0",
+          "product_element_id": "f3"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "f1",
+          "product_element_id": "f0"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "f2",
+          "product_element_id": "f1"
+        },
+        {
+          "left_element_id": "r3",
+          "right_element_id": "f3",
+          "product_element_id": "f2"
+        },
+        {
+          "left_element_id": "f0",
+          "right_element_id": "r0",
+          "product_element_id": "f0"
+        },
+        {
+          "left_element_id": "f0",
+          "right_element_id": "r1",
+          "product_element_id": "f3"
+        },
+        {
+          "left_element_id": "f0",
+          "right_element_id": "r2",
+          "product_element_id": "f2"
+        },
+        {
+          "left_element_id": "f0",
+          "right_element_id": "r3",
+          "product_element_id": "f1"
+        },
+        {
+          "left_element_id": "f0",
+          "right_element_id": "f0",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "f0",
+          "right_element_id": "f1",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "f0",
+          "right_element_id": "f2",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "f0",
+          "right_element_id": "f3",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "f1",
+          "right_element_id": "r0",
+          "product_element_id": "f1"
+        },
+        {
+          "left_element_id": "f1",
+          "right_element_id": "r1",
+          "product_element_id": "f0"
+        },
+        {
+          "left_element_id": "f1",
+          "right_element_id": "r2",
+          "product_element_id": "f3"
+        },
+        {
+          "left_element_id": "f1",
+          "right_element_id": "r3",
+          "product_element_id": "f2"
+        },
+        {
+          "left_element_id": "f1",
+          "right_element_id": "f0",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "f1",
+          "right_element_id": "f1",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "f1",
+          "right_element_id": "f2",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "f1",
+          "right_element_id": "f3",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "f2",
+          "right_element_id": "r0",
+          "product_element_id": "f2"
+        },
+        {
+          "left_element_id": "f2",
+          "right_element_id": "r1",
+          "product_element_id": "f1"
+        },
+        {
+          "left_element_id": "f2",
+          "right_element_id": "r2",
+          "product_element_id": "f0"
+        },
+        {
+          "left_element_id": "f2",
+          "right_element_id": "r3",
+          "product_element_id": "f3"
+        },
+        {
+          "left_element_id": "f2",
+          "right_element_id": "f0",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "f2",
+          "right_element_id": "f1",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "f2",
+          "right_element_id": "f2",
+          "product_element_id": "r0"
+        },
+        {
+          "left_element_id": "f2",
+          "right_element_id": "f3",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "f3",
+          "right_element_id": "r0",
+          "product_element_id": "f3"
+        },
+        {
+          "left_element_id": "f3",
+          "right_element_id": "r1",
+          "product_element_id": "f2"
+        },
+        {
+          "left_element_id": "f3",
+          "right_element_id": "r2",
+          "product_element_id": "f1"
+        },
+        {
+          "left_element_id": "f3",
+          "right_element_id": "r3",
+          "product_element_id": "f0"
+        },
+        {
+          "left_element_id": "f3",
+          "right_element_id": "f0",
+          "product_element_id": "r3"
+        },
+        {
+          "left_element_id": "f3",
+          "right_element_id": "f1",
+          "product_element_id": "r2"
+        },
+        {
+          "left_element_id": "f3",
+          "right_element_id": "f2",
+          "product_element_id": "r1"
+        },
+        {
+          "left_element_id": "f3",
+          "right_element_id": "f3",
+          "product_element_id": "r0"
+        }
+      ]
+    }
+  ],
+  "negative_controls": [
+    {
+      "id": "nonassociative-order-five-loop",
+      "purpose": "Abstract multiplication table with two-sided identity and inverses but no associativity; every matrix is identity so matrix products alone cannot detect the defect.",
+      "multiplication_table": [
+        [
+          0,
+          1,
+          2,
+          3,
+          4
+        ],
+        [
+          1,
+          0,
+          4,
+          2,
+          3
+        ],
+        [
+          2,
+          3,
+          0,
+          4,
+          1
+        ],
+        [
+          3,
+          4,
+          1,
+          0,
+          2
+        ],
+        [
+          4,
+          2,
+          3,
+          1,
+          0
+        ]
+      ]
+    }
+  ]
+}
