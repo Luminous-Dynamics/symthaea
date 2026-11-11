@@ -54,18 +54,34 @@ impl Default for LinearLieAlgebraQualificationProfileV1 {
 #[derive(Debug, Clone, PartialEq)]
 pub enum LinearLieAlgebraQualificationErrorV1 {
     InvalidProfile,
-    PairBudgetExceeded { required: usize, maximum: usize },
-    JacobiBudgetExceeded { required: usize, maximum: usize },
-    WorkBudgetExceeded { required: usize, maximum: usize },
+    PairBudgetExceeded {
+        required: usize,
+        maximum: usize,
+    },
+    JacobiBudgetExceeded {
+        required: usize,
+        maximum: usize,
+    },
+    WorkBudgetExceeded {
+        required: usize,
+        maximum: usize,
+    },
     WorkEstimateOverflow,
     RankDeficient {
         numerical_rank: usize,
         generator_count: usize,
         unresolved_relative_pivot: f64,
     },
-    NonFiniteWhitenedGenerator { generator_id: String },
-    ZeroWhitenedGenerator { generator_id: String },
-    NonFiniteBracket { left_generator_id: String, right_generator_id: String },
+    NonFiniteWhitenedGenerator {
+        generator_id: String,
+    },
+    ZeroWhitenedGenerator {
+        generator_id: String,
+    },
+    NonFiniteBracket {
+        left_generator_id: String,
+        right_generator_id: String,
+    },
     NonFiniteStructureConstant,
     NonFiniteJacobiResidual,
 }
@@ -182,10 +198,7 @@ pub struct LinearLieAlgebraQualificationReportV1 {
 pub fn qualify_linear_lie_algebra(
     admitted: &AdmittedLinearGroupActionV1,
     profile: LinearLieAlgebraQualificationProfileV1,
-) -> Result<
-    LinearLieAlgebraQualificationReportV1,
-    LinearLieAlgebraQualificationErrorV1,
-> {
+) -> Result<LinearLieAlgebraQualificationReportV1, LinearLieAlgebraQualificationErrorV1> {
     validate_profile(profile)?;
 
     let action = admitted.action();
@@ -241,18 +254,12 @@ pub fn qualify_linear_lie_algebra(
     }
 
     let (orthonormal_basis, triangular, permutation, relative_rank_pivots) =
-        pivoted_modified_gram_schmidt(
-            &normalized_generators,
-            profile.rank_relative_tolerance,
-        )?;
+        pivoted_modified_gram_schmidt(&normalized_generators, profile.rank_relative_tolerance)?;
     let minimum_pivot = relative_rank_pivots
         .iter()
         .copied()
         .fold(f64::INFINITY, f64::min);
-    let maximum_pivot = relative_rank_pivots
-        .iter()
-        .copied()
-        .fold(0.0_f64, f64::max);
+    let maximum_pivot = relative_rank_pivots.iter().copied().fold(0.0_f64, f64::max);
     let pivot_condition_estimate = maximum_pivot / minimum_pivot;
 
     let generator_ids: Vec<String> = action
@@ -289,15 +296,16 @@ pub fn qualify_linear_lie_algebra(
                 profile.zero_bracket_relative_tolerance,
             );
             if !relative_defect.is_finite()
-                || coefficients.iter().any(|coefficient| !coefficient.is_finite())
+                || coefficients
+                    .iter()
+                    .any(|coefficient| !coefficient.is_finite())
             {
                 return Err(LinearLieAlgebraQualificationErrorV1::NonFiniteStructureConstant);
             }
             let classified_as_numerically_zero =
                 bracket_norm <= profile.zero_bracket_relative_tolerance;
 
-            maximum_bracket_closure_defect =
-                maximum_bracket_closure_defect.max(relative_defect);
+            maximum_bracket_closure_defect = maximum_bracket_closure_defect.max(relative_defect);
             for (basis_index, coefficient) in coefficients.iter().enumerate() {
                 structure[left_index][right_index][basis_index] = *coefficient;
                 structure[right_index][left_index][basis_index] = -*coefficient;
@@ -325,10 +333,8 @@ pub fn qualify_linear_lie_algebra(
     if !global_jacobi_scale.is_finite() {
         return Err(LinearLieAlgebraQualificationErrorV1::NonFiniteStructureConstant);
     }
-    let jacobi_roundoff_floor = 64.0
-        * f64::EPSILON
-        * generator_count.max(1) as f64
-        * global_jacobi_scale;
+    let jacobi_roundoff_floor =
+        64.0 * f64::EPSILON * generator_count.max(1) as f64 * global_jacobi_scale;
     let mut jacobi_checks = Vec::new();
     let mut maximum_jacobi_defect = None;
 
@@ -341,12 +347,10 @@ pub fn qualify_linear_lie_algebra(
         for first in 0..generator_count {
             for second in (first + 1)..generator_count {
                 for third in (second + 1)..generator_count {
-                    let first_term =
-                        jacobi_term(&structure, generator_count, first, second, third);
+                    let first_term = jacobi_term(&structure, generator_count, first, second, third);
                     let second_term =
                         jacobi_term(&structure, generator_count, second, third, first);
-                    let third_term =
-                        jacobi_term(&structure, generator_count, third, first, second);
+                    let third_term = jacobi_term(&structure, generator_count, third, first, second);
 
                     let mut residual = vec![0.0_f64; generator_count];
                     for component in 0..generator_count {
@@ -369,17 +373,14 @@ pub fn qualify_linear_lie_algebra(
                     // structure constant squared. This avoids reporting a
                     // unit-sized Jacobi defect for an algebra whose exact
                     // Jacobi terms are zero and whose floating residue is tiny.
-                    let used_global_scale_fallback =
-                        local_term_scale <= jacobi_roundoff_floor;
+                    let used_global_scale_fallback = local_term_scale <= jacobi_roundoff_floor;
                     let defect = if used_global_scale_fallback {
                         global_scale_relative_defect
                     } else {
                         numerator / local_term_scale
                     };
                     if !defect.is_finite() || !global_scale_relative_defect.is_finite() {
-                        return Err(
-                            LinearLieAlgebraQualificationErrorV1::NonFiniteJacobiResidual,
-                        );
+                        return Err(LinearLieAlgebraQualificationErrorV1::NonFiniteJacobiResidual);
                     }
                     maximum_defect = maximum_defect.max(defect);
                     jacobi_checks.push(LieJacobiDiagnosticV1 {
@@ -498,9 +499,11 @@ fn whiten_and_normalize_generator(
         .flatten()
         .fold(0.0_f64, |maximum, value| maximum.max(value.abs()));
     if !input_scale.is_finite() || input_scale == 0.0 {
-        return Err(LinearLieAlgebraQualificationErrorV1::ZeroWhitenedGenerator {
-            generator_id: generator_id.to_string(),
-        });
+        return Err(
+            LinearLieAlgebraQualificationErrorV1::ZeroWhitenedGenerator {
+                generator_id: generator_id.to_string(),
+            },
+        );
     }
 
     // Compute L^T (A / input_scale), then solve X L^T = left_product.
@@ -524,29 +527,34 @@ fn whiten_and_normalize_generator(
             for inner in 0..column {
                 correction += solved_row[inner] * lower[column][inner];
             }
-            solved_row[column] =
-                (left_product[row][column] - correction) / lower[column][column];
+            solved_row[column] = (left_product[row][column] - correction) / lower[column][column];
         }
         whitened[row] = solved_row;
     }
 
     if whitened.iter().flatten().any(|value| !value.is_finite()) {
-        return Err(LinearLieAlgebraQualificationErrorV1::NonFiniteWhitenedGenerator {
-            generator_id: generator_id.to_string(),
-        });
+        return Err(
+            LinearLieAlgebraQualificationErrorV1::NonFiniteWhitenedGenerator {
+                generator_id: generator_id.to_string(),
+            },
+        );
     }
 
     let whitened_entries: Vec<f64> = whitened.iter().flatten().copied().collect();
     let whitened_norm = vector_norm(&whitened_entries);
     if !whitened_norm.is_finite() {
-        return Err(LinearLieAlgebraQualificationErrorV1::NonFiniteWhitenedGenerator {
-            generator_id: generator_id.to_string(),
-        });
+        return Err(
+            LinearLieAlgebraQualificationErrorV1::NonFiniteWhitenedGenerator {
+                generator_id: generator_id.to_string(),
+            },
+        );
     }
     if whitened_norm == 0.0 {
-        return Err(LinearLieAlgebraQualificationErrorV1::ZeroWhitenedGenerator {
-            generator_id: generator_id.to_string(),
-        });
+        return Err(
+            LinearLieAlgebraQualificationErrorV1::ZeroWhitenedGenerator {
+                generator_id: generator_id.to_string(),
+            },
+        );
     }
 
     let mut skew_norm = 0.0_f64;
@@ -559,9 +567,11 @@ fn whiten_and_normalize_generator(
     }
     let skew_defect = skew_norm / (2.0 * whitened_norm);
     if !skew_defect.is_finite() {
-        return Err(LinearLieAlgebraQualificationErrorV1::NonFiniteWhitenedGenerator {
-            generator_id: generator_id.to_string(),
-        });
+        return Err(
+            LinearLieAlgebraQualificationErrorV1::NonFiniteWhitenedGenerator {
+                generator_id: generator_id.to_string(),
+            },
+        );
     }
 
     Ok((normalized, input_scale, whitened_norm, skew_defect))
@@ -621,18 +631,12 @@ fn pivoted_modified_gram_schmidt(
 
         for candidate in (pivot_index + 1)..count {
             let first_projection = dot(&basis_vector, &residuals[candidate]);
-            for (value, basis_value) in residuals[candidate]
-                .iter_mut()
-                .zip(basis_vector.iter())
-            {
+            for (value, basis_value) in residuals[candidate].iter_mut().zip(basis_vector.iter()) {
                 *value -= first_projection * basis_value;
             }
 
             let second_projection = dot(&basis_vector, &residuals[candidate]);
-            for (value, basis_value) in residuals[candidate]
-                .iter_mut()
-                .zip(basis_vector.iter())
-            {
+            for (value, basis_value) in residuals[candidate].iter_mut().zip(basis_vector.iter()) {
                 *value -= second_projection * basis_value;
             }
             triangular[pivot_index][candidate] = first_projection + second_projection;
@@ -765,9 +769,7 @@ mod tests {
         let declared = LinearGroupActionV1 {
             action_id: "lie-basis-test".to_string(),
             coordinate_basis_id: "declared-coordinates".to_string(),
-            coordinate_names: (0..dimension)
-                .map(|index| format!("x{index}"))
-                .collect(),
+            coordinate_names: (0..dimension).map(|index| format!("x{index}")).collect(),
             coordinate_unit_ids: vec!["1".to_string(); dimension],
             metric,
             generators,
@@ -854,9 +856,7 @@ mod tests {
         let xy = report
             .brackets
             .iter()
-            .find(|item| {
-                item.left_generator_id == "Jx" && item.right_generator_id == "Jy"
-            })
+            .find(|item| item.left_generator_id == "Jx" && item.right_generator_id == "Jy")
             .expect("Jx/Jy bracket must be present");
         let expected = 1.0 / 2.0_f64.sqrt();
         assert!((xy.structure_constants[2] - expected).abs() < 1.0e-12);
@@ -939,14 +939,19 @@ mod tests {
         );
         assert!(
             (canonical_report.diagnostics.maximum_bracket_closure_defect
-                - transformed_report.diagnostics.maximum_bracket_closure_defect)
+                - transformed_report
+                    .diagnostics
+                    .maximum_bracket_closure_defect)
                 .abs()
                 < 1.0e-12
         );
         assert!(
             (canonical_report.diagnostics.maximum_jacobi_defect.unwrap()
-                - transformed_report.diagnostics.maximum_jacobi_defect.unwrap())
-                .abs()
+                - transformed_report
+                    .diagnostics
+                    .maximum_jacobi_defect
+                    .unwrap())
+            .abs()
                 < 1.0e-12
         );
         for (canonical_bracket, transformed_bracket) in canonical_report
@@ -978,10 +983,7 @@ mod tests {
     #[test]
     fn so2_is_accepted_with_vacuous_jacobi_triple_set() {
         let admitted = action(
-            vec![generator(
-                "J",
-                vec![vec![0.0, -1.0], vec![1.0, 0.0]],
-            )],
+            vec![generator("J", vec![vec![0.0, -1.0], vec![1.0, 0.0]])],
             identity(2),
         );
         let report = qualify_linear_lie_algebra(
@@ -1007,8 +1009,7 @@ mod tests {
         let jy = generators[1].matrix.clone();
         for row in 0..3 {
             for column in 0..3 {
-                generators[1].matrix[row][column] =
-                    jx[row][column] + 1.0e-12 * jy[row][column];
+                generators[1].matrix[row][column] = jx[row][column] + 1.0e-12 * jy[row][column];
             }
         }
         generators[1].id = "Jx-plus-small-Jy".to_string();
@@ -1052,10 +1053,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(
-            canonical_report.status,
-            transformed_report.status
-        );
+        assert_eq!(canonical_report.status, transformed_report.status);
         assert!(
             (canonical_report.diagnostics.maximum_bracket_closure_defect
                 - transformed_report.diagnostics.maximum_bracket_closure_defect)
@@ -1073,11 +1071,7 @@ mod tests {
     #[test]
     fn accepts_invertible_mixed_and_rescaled_so3_generator_basis() {
         let original = so3_generators();
-        let basis_change = [
-            [2.0, 1.0, 0.0],
-            [0.0, 1.0, 3.0],
-            [1.0, 0.0, -1.0],
-        ];
+        let basis_change = [[2.0, 1.0, 0.0], [0.0, 1.0, 3.0], [1.0, 0.0, -1.0]];
         let mixed = basis_change
             .iter()
             .enumerate()
