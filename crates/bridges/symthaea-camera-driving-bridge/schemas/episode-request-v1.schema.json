@@ -128,6 +128,16 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 1024
+        },
+        "expected_camera_calibration_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     },
