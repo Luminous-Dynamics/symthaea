@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::ops::Range;
 use std::path::{Path, PathBuf};
+use symthaea_vocal_tract::formant_extraction::{self, ExtractionConfig};
 use symthaea_vocal_tract::speech::vocoder;
 use symthaea_vocal_tract::types::{FormantFrame, SourceType};
 
@@ -95,7 +96,33 @@ pub struct ScenarioRecord {
     pub sample_count: usize,
     pub target_f0_median_hz: Option<f32>,
     pub baseline_target_f0_median_hz: Option<f32>,
+    pub target_formant_observation: Option<FormantObservationSummary>,
+    pub baseline_target_formant_observation: Option<FormantObservationSummary>,
     pub locality: Option<LocalityReport>,
+}
+
+/// PCM-only formant observations produced by the existing LPC analysis path.
+/// These are analyzer estimates, not calibrated phonetic ground truth.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct FormantObservationSummary {
+    pub observer_id: String,
+    pub analysis_sample_rate_hz: u32,
+    pub frame_rate_hz: f32,
+    pub window_ms: f32,
+    pub lpc_order: usize,
+    pub preemphasis: f32,
+    pub f0_min_hz: f32,
+    pub f0_max_hz: f32,
+    pub voicing_threshold: f32,
+    pub analysis_frame_count: usize,
+    pub voiced_frame_count: usize,
+    pub ordered_formant_frame_count: usize,
+    pub median_f1_hz: Option<f32>,
+    pub median_f2_hz: Option<f32>,
+    pub median_f3_hz: Option<f32>,
+    pub mad_f1_hz: Option<f32>,
+    pub mad_f2_hz: Option<f32>,
+    pub mad_f3_hz: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -122,6 +149,8 @@ pub struct SuiteManifest {
     pub frame_rate_hz: u32,
     pub crossfade_ms: u32,
     pub parameter_manifest_sha256: String,
+    /// Full source parameters are retained so the digest is independently auditable.
+    pub segment_parameters: Vec<SyntheticSegmentSpec>,
     pub baseline_pcm_sha256: String,
     pub scenarios: Vec<ScenarioRecord>,
     pub unsupported_control_rejections: Vec<RejectedControlRecord>,
@@ -545,6 +574,97 @@ pub fn measure_segment_f0(
     Ok(median)
 }
 
+fn median_f32(mut values: Vec<f32>) -> Option<f32> {
+    if values.is_empty() {
+        return None;
+    }
+    values.sort_by(f32::total_cmp);
+    let middle = values.len() / 2;
+    Some(if values.len() % 2 == 0 {
+        (values[middle - 1] + values[middle]) * 0.5
+    } else {
+        values[middle]
+    })
+}
+
+fn median_and_mad(values: Vec<f32>) -> (Option<f32>, Option<f32>) {
+    let center = median_f32(values.clone());
+    let deviations = match center {
+        Some(median) => values
+            .into_iter()
+            .map(|value| (value - median).abs())
+            .collect(),
+        None => Vec::new(),
+    };
+    (center, median_f32(deviations))
+}
+
+/// Summarize F1-F3 estimates from PCM only. This invokes the LPC analysis
+/// path independently of the renderer's FormantFrame inputs; it does not
+/// receive or inspect the synthetic target formant parameters.
+pub fn measure_segment_formants(
+    rendered: &RenderedPhrase,
+    segment_id: &str,
+    sample_rate_hz: u32,
+) -> Result<FormantObservationSummary, String> {
+    let range = find_range(&rendered.segment_ranges, segment_id)?;
+    let guard = rendered.seam_guard_samples;
+    let start = range.start.saturating_add(guard);
+    let end = range.end.saturating_sub(guard);
+    let samples = if end > start {
+        &rendered.samples[start..end]
+    } else {
+        &[]
+    };
+
+    let config = ExtractionConfig::default();
+    let frames = formant_extraction::extract_formant_frames(samples, sample_rate_hz, &config);
+    let voiced: Vec<&FormantFrame> = frames
+        .iter()
+        .filter(|frame| frame.source_type == SourceType::Vowel && frame.energy > 0.02)
+        .collect();
+    let max_formant_hz = config.analysis_sr as f32 * 0.45;
+    let ordered: Vec<&FormantFrame> = voiced
+        .iter()
+        .copied()
+        .filter(|frame| {
+            [frame.f1, frame.f2, frame.f3]
+                .iter()
+                .all(|value| value.is_finite() && *value >= 150.0 && *value < max_formant_hz)
+                && frame.f1 < frame.f2
+                && frame.f2 < frame.f3
+        })
+        .collect();
+
+    let (median_f1_hz, mad_f1_hz) =
+        median_and_mad(ordered.iter().map(|frame| frame.f1).collect());
+    let (median_f2_hz, mad_f2_hz) =
+        median_and_mad(ordered.iter().map(|frame| frame.f2).collect());
+    let (median_f3_hz, mad_f3_hz) =
+        median_and_mad(ordered.iter().map(|frame| frame.f3).collect());
+
+    Ok(FormantObservationSummary {
+        observer_id: "symthaea_vocal_tract::formant_extraction::extract_formant_frames".into(),
+        analysis_sample_rate_hz: config.analysis_sr,
+        frame_rate_hz: config.frame_rate,
+        window_ms: config.window_secs * 1_000.0,
+        lpc_order: config.lpc_order,
+        preemphasis: config.preemphasis,
+        f0_min_hz: config.f0_min,
+        f0_max_hz: config.f0_max,
+        voicing_threshold: config.voicing_threshold,
+        analysis_frame_count: frames.len(),
+        voiced_frame_count: voiced.len(),
+        ordered_formant_frame_count: ordered.len(),
+        median_f1_hz,
+        median_f2_hz,
+        median_f3_hz,
+        mad_f1_hz,
+        mad_f2_hz,
+        mad_f3_hz,
+    })
+}
+
 pub fn sha256_bytes(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
     digest.iter().map(|byte| format!("{byte:02x}")).collect()
@@ -638,6 +758,16 @@ fn save_case(
         Some(segment_id) => measure_segment_f0(rendered, segment_id, sample_rate_hz)?,
         None => None,
     };
+    let target_formants = match target_segment_id {
+        Some(segment_id) => Some(measure_segment_formants(rendered, segment_id, sample_rate_hz)?),
+        None => None,
+    };
+    let baseline_target_formants = match target_segment_id {
+        Some(segment_id) => {
+            Some(measure_segment_formants(baseline, segment_id, sample_rate_hz)?)
+        }
+        None => None,
+    };
     let locality = match allowed_range {
         Some(range) => Some(measure_locality(
             &baseline.samples,
@@ -656,6 +786,8 @@ fn save_case(
         sample_count: rendered.samples.len(),
         target_f0_median_hz: target_f0,
         baseline_target_f0_median_hz: baseline_target_f0,
+        target_formant_observation: target_formants,
+        baseline_target_formant_observation: baseline_target_formants,
         locality,
     })
 }
@@ -813,6 +945,7 @@ pub fn generate_suite(output_dir: &Path) -> Result<SuiteManifest, String> {
         frame_rate_hz: FRAME_RATE_HZ,
         crossfade_ms,
         parameter_manifest_sha256: sha256_bytes(&parameter_bytes),
+        segment_parameters: segments.clone(),
         baseline_pcm_sha256: sha256_pcm(&baseline.samples),
         scenarios,
         unsupported_control_rejections,
@@ -983,6 +1116,36 @@ mod tests {
             .expect("edited measurement")
             .expect("edited F0");
         assert!(after > before * 1.04, "expected a positive pitch shift: {before} -> {after}");
+    }
+
+    #[test]
+    fn formant_observer_analyzes_pcm_and_records_its_configuration() {
+        let baseline = render(&base());
+        let observed =
+            measure_segment_formants(&baseline, "proxy-vowel-c", DEFAULT_SAMPLE_RATE_HZ)
+                .expect("formant observer should process the target PCM");
+        assert!(observed.analysis_frame_count > 0);
+        assert_eq!(observed.analysis_sample_rate_hz, 10_000);
+        assert_eq!(observed.lpc_order, 16);
+        assert_eq!(observed.window_ms, 25.0);
+        assert!(!observed.observer_id.is_empty());
+    }
+
+    #[test]
+    fn formant_observer_does_not_report_voiced_frames_for_silenced_pcm() {
+        let mut rendered = render(&base());
+        let range = range_by_id(&rendered, "proxy-vowel-c").expect("target range");
+        for sample in &mut rendered.samples[range.start..range.end] {
+            *sample = 0.0;
+        }
+        let observed =
+            measure_segment_formants(&rendered, "proxy-vowel-c", DEFAULT_SAMPLE_RATE_HZ)
+                .expect("silenced PCM is a valid analyzer input");
+        assert_eq!(observed.voiced_frame_count, 0);
+        assert_eq!(observed.ordered_formant_frame_count, 0);
+        assert_eq!(observed.median_f1_hz, None);
+        assert_eq!(observed.median_f2_hz, None);
+        assert_eq!(observed.median_f3_hz, None);
     }
 
     #[test]
