@@ -258,7 +258,11 @@ fn validate_observation(
     Ok(())
 }
 
-fn validate_stop(payload: &Value) -> Result<(), String> {
+fn validate_stop(
+    payload: &Value,
+    proposals: &BTreeMap<String, String>,
+    observed_proposals: &BTreeSet<String>,
+) -> Result<(), String> {
     if !exact_fields(payload, &["evidence_state_sha256", "reason"]) {
         return Err("stop payload must contain exactly evidence_state_sha256 and reason".into());
     }
@@ -266,6 +270,12 @@ fn validate_stop(payload: &Value) -> Result<(), String> {
         || text(payload, "reason").is_none()
     {
         return Err("stop event requires an evidence-state digest and reason".into());
+    }
+    if proposals
+        .keys()
+        .any(|proposal_event_id| !observed_proposals.contains(proposal_event_id))
+    {
+        return Err("stop event cannot leave a proposed experiment without an observed, failed or unknown reconciliation event".into());
     }
     Ok(())
 }
@@ -374,7 +384,7 @@ pub fn validate_trace(trace: &Value) -> Result<TraceReport, Vec<String>> {
                 if stopped {
                     errors.push(format!("event {event_id} duplicates a stop event"));
                 }
-                if let Err(error) = validate_stop(payload) {
+                if let Err(error) = validate_stop(payload, &proposals, &observed_proposals) {
                     errors.push(format!("event {event_id}: {error}"));
                 }
                 stopped = true;
@@ -576,6 +586,29 @@ mod tests {
             }),
         );
         assert!(validate_trace(&trace(vec![first, second, third])).is_err());
+    }
+
+    #[test]
+    fn stop_with_unreconciled_proposal_is_rejected() {
+        let first = event(
+            "event-0",
+            0,
+            "experiment_proposal",
+            GENESIS_SHA256,
+            proposal(),
+        );
+        let first_hash = text(&first, "event_sha256").unwrap().to_string();
+        let stop = event(
+            "event-1",
+            1,
+            "stop",
+            &first_hash,
+            json!({
+                "evidence_state_sha256": "c".repeat(64),
+                "reason": "Stopping with an unobserved probe is not a qualified terminal trace."
+            }),
+        );
+        assert!(validate_trace(&trace(vec![first, stop])).is_err());
     }
 
     #[test]
