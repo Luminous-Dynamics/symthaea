@@ -63,6 +63,19 @@ pub enum AccompanimentProfile {
     VoicedNasalized,
 }
 
+impl AccompanimentProfile {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Plain => "plain",
+            Self::Aspirated => "aspirated",
+            Self::Voiced => "voiced",
+            Self::Nasalized => "nasalized",
+            Self::Prenasalized => "prenasalized",
+            Self::VoicedNasalized => "voiced_nasalized",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub struct TimeIntervalMs {
     pub start: f64,
@@ -650,7 +663,7 @@ pub fn known_answer_gestures() -> Vec<ClickGesture> {
     ];
     for place in places {
         for profile in profiles {
-            let case_id = format!("{}_{}", place.label().replace('-', "_"), format!("{profile:?}").to_lowercase());
+            let case_id = format!("{}_{}", place.label().replace('-', "_"), profile.label().to_owned());
             gestures.push(base_gesture(
                 "ZA_CLICK_CONFIRMATORY_SYNTH_V1",
                 &case_id,
