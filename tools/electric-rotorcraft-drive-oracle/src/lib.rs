@@ -21,7 +21,7 @@
 use std::f64::consts::TAU;
 use std::fmt;
 
-pub const MODEL_VERSION: &str = "electric-rotorcraft-drive-oracle-v0.5.0";
+pub const MODEL_VERSION: &str = "electric-rotorcraft-drive-oracle-v0.6.0";
 
 /// Explicit operating-point efficiencies and bus limits.
 ///
@@ -1059,8 +1059,22 @@ mod tests {
         assert!((adverse.dc_bus_input_energy_j - expected).abs() < 1.0e-6);
         assert_eq!(adverse.segment_count, 2);
         assert_eq!(adverse.active_duration_s, 30.0);
-        assert_eq!(result.segments[0].evaluation.as_ref().unwrap().context_digest, "hot-climb-context");
-        assert_eq!(result.segments[1].evaluation.as_ref().unwrap().context_digest, "cruise-context");
+        assert_eq!(
+            result.segments[0]
+                .evaluation
+                .as_ref()
+                .unwrap()
+                .context_digest,
+            "hot-climb-context"
+        );
+        assert_eq!(
+            result.segments[1]
+                .evaluation
+                .as_ref()
+                .unwrap()
+                .context_digest,
+            "cruise-context"
+        );
     }
 
     #[test]
