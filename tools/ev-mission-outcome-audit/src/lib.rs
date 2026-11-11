@@ -1085,8 +1085,19 @@ mod tests {
     fn only_test_blind_predictions_can_enter_the_outcome_scoreboard() {
         let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
         corpus.cases[0].prediction.evaluation_partition = "TRAIN".to_owned();
+        corpus
+            .split_manifest
+            .assignments
+            .iter_mut()
+            .find(|assignment| assignment.pack_ref == corpus.cases[0].prediction.asset.pack_ref)
+            .unwrap()
+            .partition = "TRAIN".to_owned();
+        let digest = split_manifest_sha256(&corpus.split_manifest).expect("manifest digest");
+        for case in &mut corpus.cases {
+            case.prediction.split_manifest_sha256 = digest.clone();
+        }
         let bytes = serde_json::to_vec(&corpus).expect("training partition corpus");
-        let report = audit_corpus(SCHEMA, &bytes).expect("invalid prediction is recorded");
+        let report = audit_corpus(SCHEMA, &bytes).expect("training prediction is rejected");
         assert_eq!(row(&report, "feasible_correct").classification, "REJECTED_REFERENCE");
     }
 
@@ -1136,6 +1147,29 @@ mod tests {
         let bytes = serde_json::to_vec(&corpus).expect("duplicate measurement reference");
         let error = audit_corpus(SCHEMA, &bytes).expect_err("duplicate measurement evidence is invalid");
         assert!(error.contains("duplicate measurement evidence identity"));
+    }
+
+    #[test]
+    fn split_manifest_digest_mismatch_fails_before_outcome_scoring() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        corpus.split_manifest.assignments[0].partition = "TRAIN".to_owned();
+        let bytes = serde_json::to_vec(&corpus).expect("changed manifest corpus");
+        let error = audit_corpus(SCHEMA, &bytes).expect_err("manifest mutation must invalidate its digest");
+        assert!(error.contains("does not bind to the frozen split-manifest payload"));
+    }
+
+    #[test]
+    fn duplicate_physical_group_assignment_is_rejected() {
+        let mut corpus: Corpus = serde_json::from_slice(CORPUS).expect("corpus");
+        corpus.split_manifest.assignments[1].physical_group_ref =
+            corpus.split_manifest.assignments[0].physical_group_ref.clone();
+        let digest = split_manifest_sha256(&corpus.split_manifest).expect("manifest digest");
+        for case in &mut corpus.cases {
+            case.prediction.split_manifest_sha256 = digest.clone();
+        }
+        let bytes = serde_json::to_vec(&corpus).expect("duplicate physical group manifest");
+        let error = audit_corpus(SCHEMA, &bytes).expect_err("duplicate physical group must fail");
+        assert!(error.contains("appears more than once across split assignments"));
     }
 
 }
