@@ -141,7 +141,6 @@ pub enum MidiTranscriptionEvaluationIssueV1 {
     TooManyPredictedNotes { count: usize, maximum: usize },
     InvalidReferenceTrack { track_index: u16 },
     InvalidReferenceNote { ordinal: usize },
-    InvalidClockAlignmentProfile,
     TooManyCandidatePairs { count: usize, maximum: usize },
     SerializationFailed,
 }
@@ -947,7 +946,10 @@ pub fn evaluate_midi_transcription_v1(
                 - reference_notes[*reference_index].onset_seconds
         })
         .collect();
-    let offset_errors: Vec<_> = full_matching
+    // Offset error is reported for onset-matched notes, even when their
+    // offset misses the full-note tolerance. This avoids hiding bad releases
+    // merely because they failed the full-note F1 match.
+    let offset_errors: Vec<_> = onset_matching
         .iter()
         .filter_map(|(reference_index, prediction_index)| {
             Some(
@@ -1175,7 +1177,6 @@ mod tests {
             &prediction,
             &reference,
             default_config(),
-            None,
         )
         .unwrap();
         assert_eq!(report.onset_pitch_metrics.f1, 1.0);
@@ -1239,15 +1240,7 @@ mod tests {
     fn unclosed_note_is_kept_for_onset_metrics_but_cannot_match_full_note() {
         let notes = vec![(60, 0, 480)];
         let reference = reference_artifact(&notes, 40);
-        let mut prediction = build_midi(&[], 40, &[(0, 500_000)]);
-        // The type-1 note track is the second MTrk. Replace it with a NoteOn
-        // and end-of-track without a NoteOff.
-        let note_marker = [0x00, 0xff, 0x2f, 0x00];
-        let pos = prediction.windows(note_marker.len()).rposition(|w| w == note_marker).unwrap();
-        let start = pos - 5;
-        let replacement_track = [0x00, 0xc0, 40, 0x00, 0x90, 60, 100, 0x00, 0xff, 0x2f, 0x00];
-        let _ = (prediction, note_marker, pos, start, replacement_track);
-        // Use a valid unclosed fixture from raw MIDI.
+        // Use a valid type-0 prediction containing a NoteOn without NoteOff.
         let mut raw = Vec::new();
         raw.extend_from_slice(b"MThd");
         raw.extend_from_slice(&6u32.to_be_bytes());
