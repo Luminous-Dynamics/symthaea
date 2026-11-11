@@ -34,7 +34,7 @@ Every case binds:
 - exact mission-profile reference and SHA-256;
 - exact mission-evaluator report reference and SHA-256;
 - evaluator version and frozen model-artifact reference/digest;
-- the split-manifest reference/digest and TEST_BLIND partition;
+- the full frozen split-manifest payload and recomputed digest, with exact pack/configuration/physical-group assignment and TEST_BLIND partition;
 - split-freeze and prediction-freeze timestamps, both preceding physical outcome observation;
 - the mission's frozen required physical measurement contract (constraint, scope, unit, limit and minimum/maximum relation);
 - independent reference protocol and digest;
