@@ -14,12 +14,23 @@ use super::{
     roborecover_score::{BenchmarkPlatform, BenchmarkSplit, DeviationType, RecoveryStage},
 };
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ParentScenarioIdentity {
+    pub scenario_sha256: String,
+    pub task_name: String,
+    pub stage: RecoveryStage,
+    pub deviation: DeviationType,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct DiscoveryCampaignManifest {
     pub campaign_id: String,
     pub platform: BenchmarkPlatform,
     /// Challenge generation is restricted to the official training split.
     pub source_split: BenchmarkSplit,
+    /// Exact parent frame imported from the pinned 800-row training CSV.
+    /// Candidate IDs, hashes, task names and Stage–Type fields must join this frame.
+    pub allowed_parent_scenarios: BTreeMap<String, ParentScenarioIdentity>,
     pub source_repository: String,
     pub source_revision: String,
     pub train_split_manifest_blob_sha: String,
@@ -116,6 +127,7 @@ pub enum DiscoveryManifestIssue {
     InvalidDigest(&'static str),
     BlankTargetPolicyId,
     InvalidSimulatorHours,
+    InvalidParentFrame,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -206,6 +218,15 @@ pub fn validate_campaign_manifest(
     if !manifest.simulator_hours.is_finite() || manifest.simulator_hours <= 0.0 {
         issues.push(DiscoveryManifestIssue::InvalidSimulatorHours);
     }
+    if manifest.allowed_parent_scenarios.len() != 800
+        || manifest.allowed_parent_scenarios.iter().any(|(sample_id, parent)| {
+            !valid_id(sample_id)
+                || !valid_hex(&parent.scenario_sha256, 64)
+                || parent.task_name.trim().is_empty()
+        })
+    {
+        issues.push(DiscoveryManifestIssue::InvalidParentFrame);
+    }
 
     if issues.is_empty() { Ok(()) } else { Err(issues) }
 }
@@ -214,6 +235,10 @@ fn candidate_identity_matches(
     candidate: &DiscoveryCandidate,
     manifest: &DiscoveryCampaignManifest,
 ) -> bool {
+    let Some(parent) = manifest.allowed_parent_scenarios.get(&candidate.parent_sample_id) else {
+        return false;
+    };
+
     candidate.campaign_id == manifest.campaign_id
         && candidate.platform == manifest.platform
         && candidate.source_split == BenchmarkSplit::Train
@@ -226,6 +251,10 @@ fn candidate_identity_matches(
         && candidate.observation_action_schema_digest == manifest.observation_action_schema_digest
         && candidate.target_policy_id == manifest.target_policy_id
         && candidate.target_policy_digest == manifest.target_policy_digest
+        && parent.scenario_sha256 == candidate.parent_scenario_sha256
+        && parent.task_name == candidate.task_name
+        && parent.stage == candidate.stage
+        && parent.deviation == candidate.deviation
 }
 
 fn candidate_hashes_valid(candidate: &DiscoveryCandidate) -> bool {
@@ -457,10 +486,32 @@ mod tests {
     use super::*;
 
     fn manifest() -> DiscoveryCampaignManifest {
+        let mut allowed_parent_scenarios = BTreeMap::new();
+        allowed_parent_scenarios.insert(
+            "parent-01".to_owned(),
+            ParentScenarioIdentity {
+                scenario_sha256: "1".repeat(64),
+                task_name: "move_can_pot".to_owned(),
+                stage: RecoveryStage::Approach,
+                deviation: DeviationType::WrongPose,
+            },
+        );
+        for index in 0..799 {
+            allowed_parent_scenarios.insert(
+                format!("sample-{index:03}"),
+                ParentScenarioIdentity {
+                    scenario_sha256: format!("{index:064x}"),
+                    task_name: "move_can_pot".to_owned(),
+                    stage: RecoveryStage::Approach,
+                    deviation: DeviationType::WrongPose,
+                },
+            );
+        }
         DiscoveryCampaignManifest {
             campaign_id: "campaign-01".to_owned(),
             platform: BenchmarkPlatform::RoboTwin,
             source_split: BenchmarkSplit::Train,
+            allowed_parent_scenarios,
             source_repository: ROBORECOVER_SOURCE_REPOSITORY.to_owned(),
             source_revision: ROBORECOVER_SOURCE_REVISION.to_owned(),
             train_split_manifest_blob_sha: pinned_split_blob_sha(
@@ -650,4 +701,50 @@ mod tests {
         assert_eq!(report.invalid_hash_rows, 1);
         assert_eq!(report.unique_valid_failure_discoveries, 0);
     }
+
+    #[test]
+    fn rejects_parent_not_in_frozen_training_scenario_frame() {
+        let m = manifest();
+        let mut candidate = candidate("candidate-a", &"4".repeat(64));
+        candidate.parent_sample_id = "heldout-test-sample".to_owned();
+
+        let report = score_discovery_campaign(&m, &[candidate]).unwrap();
+        assert_eq!(report.invalid_identity_rows, 1);
+        assert_eq!(report.valid_candidates, 0);
+        assert_eq!(report.unique_valid_failure_discoveries, 0);
+    }
+
+    #[test]
+    fn rejects_parent_hash_task_or_stage_type_mismatch() {
+        let m = manifest();
+        let mut bad_hash = candidate("candidate-a", &"4".repeat(64));
+        bad_hash.parent_scenario_sha256 = "9".repeat(64);
+
+        let mut bad_task = candidate("candidate-b", &"5".repeat(64));
+        bad_task.task_name = "another_task".to_owned();
+
+        let mut bad_stage = candidate("candidate-c", &"6".repeat(64));
+        bad_stage.deviation = DeviationType::WrongTarget;
+
+        let report = score_discovery_campaign(&m, &[bad_hash, bad_task, bad_stage]).unwrap();
+        assert_eq!(report.invalid_identity_rows, 3);
+        assert_eq!(report.valid_candidates, 0);
+    }
+
+    #[test]
+    fn rejects_incomplete_or_malformed_training_parent_frame() {
+        let mut m = manifest();
+        m.allowed_parent_scenarios.remove("parent-01");
+        assert!(validate_campaign_manifest(&m)
+            .unwrap_err()
+            .contains(&DiscoveryManifestIssue::InvalidParentFrame));
+
+        let mut m = manifest();
+        m.allowed_parent_scenarios.get_mut("parent-01").unwrap().scenario_sha256 =
+            "not-a-digest".to_owned();
+        assert!(validate_campaign_manifest(&m)
+            .unwrap_err()
+            .contains(&DiscoveryManifestIssue::InvalidParentFrame));
+    }
+
 }
