@@ -784,7 +784,7 @@ mod tests {
             .as_array_mut()
             .unwrap()
             .iter_mut()
-            .find(|fixture| fixture["family_id"] == "agent_collusion")
+            .find(|fixture| fixture["class"] == "collusion_control")
             .unwrap();
         fixture["communication_event_ids"] = serde_json::json!([]);
         let errors = validate_manifest(&manifest, &parsed(SCHEMA)).unwrap_err();
