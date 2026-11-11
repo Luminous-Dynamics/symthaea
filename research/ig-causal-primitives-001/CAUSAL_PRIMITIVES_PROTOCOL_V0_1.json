@@ -1,0 +1,72 @@
+{
+  "protocol_id": "IG-CAUSAL-PRIMITIVES-001",
+  "version": "0.1.0",
+  "status": "protocol_and_synthetic_fixture_design",
+  "research_question": "Can an agent recover causal structure, propagate interventions, update only when evidence warrants it, and preserve causal predictions under irrelevant agency framing changes?",
+  "primitives": [
+    {
+      "id": "CausalPrior",
+      "unit": "DAG task",
+      "metrics": [
+        "edge_precision",
+        "edge_recall",
+        "structural_hamming_distance",
+        "identifiability_abstention",
+        "over_rejection_rate"
+      ]
+    },
+    {
+      "id": "ForwardStateTracing",
+      "unit": "SCM intervention",
+      "metrics": [
+        "exact_state_accuracy",
+        "propagation_error",
+        "intervention_consistency",
+        "unsupported_edge_or_equation_attribution"
+      ]
+    },
+    {
+      "id": "BeliefUpdating",
+      "unit": "Bayesian hypothesis update",
+      "metrics": [
+        "posterior_absolute_error",
+        "log_score",
+        "Brier_score_when_defined",
+        "false_update_rate",
+        "over_rejection_rate"
+      ]
+    },
+    {
+      "id": "AgencySensitivity",
+      "unit": "matched narrative pair",
+      "metrics": [
+        "prediction_invariance",
+        "framing_effect_when_mechanism_unchanged",
+        "calibrated_sensitivity_when_mechanism_changes"
+      ]
+    }
+  ],
+  "domains": [
+    "mechanical_infrastructure",
+    "institutional_resource",
+    "abstract_systems"
+  ],
+  "design_rules": [
+    "Never aggregate the four primitives into one causal-reasoning score.",
+    "Observation P(Y|X=x) is not intervention P(Y|do(X=x)).",
+    "Candidate rationales are not independent causal oracles.",
+    "Normative preferences do not have a single causal-correctness answer.",
+    "A self-reported explanation does not establish why a model changed its answer.",
+    "Synthetic fixture qualification does not establish model behavioral competence."
+  ],
+  "composed_owners": {
+    "stance_shift": "https://github.com/Luminous-Dynamics/symthaea/issues/11320",
+    "revision_ledger": "https://github.com/Luminous-Dynamics/symthaea/issues/11340",
+    "communication_topology": "https://github.com/Luminous-Dynamics/symthaea/issues/11337",
+    "confidence_calibration": "https://github.com/Luminous-Dynamics/symthaea/issues/11367",
+    "budget_and_transcript": "https://github.com/Luminous-Dynamics/symthaea/issues/11415",
+    "institutional_lab": "https://github.com/Luminous-Dynamics/symthaea/issues/3095"
+  },
+  "reference": "Feng and Rudzicz, CausalPrism, Findings of EMNLP 2026, https://aclanthology.org/2026.findings-emnlp.1294/",
+  "claim_ceiling": "Protocol and synthetic oracle only; no model or human causal competence is established."
+}
