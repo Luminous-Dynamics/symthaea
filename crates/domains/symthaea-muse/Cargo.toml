@@ -122,6 +122,9 @@ required-features = ["studio"]
 name = "ab_listening_pack"
 
 [[bin]]
+name = "rmi_track_a"
+
+[[bin]]
 name = "cognitive_study"
 required-features = ["theory"]
 

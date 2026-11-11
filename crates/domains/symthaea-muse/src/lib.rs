@@ -122,6 +122,8 @@ pub mod melody;
 #[cfg(feature = "theory")]
 pub mod methodology_plan;
 pub mod midi;
+pub mod rmi_track_a_runner;
+pub mod rmi_benchmark;
 pub mod midi_loader;
 #[cfg(feature = "theory")]
 pub mod musical_policy;
