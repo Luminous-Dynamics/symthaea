@@ -65,7 +65,7 @@ struct AuditReport {
     zone_count: usize,
     confirmed_species_count: usize,
     cleaning_method: Option<String>,
-    performance_comparison_eligible: bool,
+    performance_pair_conditions_matched: bool,
     diagnostics: Vec<Diagnostic>,
 }
 
@@ -539,7 +539,7 @@ fn check_performance_comparison(record: &Value, cleaning_method: Option<&str>, f
         }
     }
 
-    !findings.incomparable && !findings.invalid && !findings.blocked
+    !findings.incomparable && !findings.invalid
 }
 
 fn check_record(record: &Value, findings: &mut Findings) -> (Option<f64>, usize, usize, Option<String>, bool) {
@@ -568,16 +568,8 @@ fn check_record(record: &Value, findings: &mut Findings) -> (Option<f64>, usize,
 
     let (coverage, zones, species) = check_inspection(record, findings);
     let cleaning = check_cleaning_event(record, findings);
-    let mut performance_eligible =
+    let performance_pair_conditions_matched =
         check_performance_comparison(record, cleaning.as_deref(), findings);
-    if record.get("record_status").and_then(Value::as_str) != Some("measured") {
-        performance_eligible = false;
-        findings.push(
-            "/performance_comparison",
-            "INCOMPLETE",
-            "performance comparison may be structurally matched, but eligibility requires measured, source-qualified observations rather than synthetic or modelled records",
-        );
-    }
 
     if record.pointer("/coating_system/condition_status").and_then(Value::as_str) == Some("unknown") {
         findings.push(
@@ -594,7 +586,7 @@ fn check_record(record: &Value, findings: &mut Findings) -> (Option<f64>, usize,
         );
     }
 
-    (coverage, zones, species, cleaning, performance_eligible)
+    (coverage, zones, species, cleaning, performance_pair_conditions_matched)
 }
 
 fn run() -> Result<i32, String> {
@@ -619,7 +611,7 @@ fn run() -> Result<i32, String> {
         zone_count: zones,
         confirmed_species_count: species,
         cleaning_method,
-        performance_comparison_eligible: performance_eligible,
+        performance_pair_conditions_matched: performance_pair_conditions_matched,
         diagnostics: findings.diagnostics,
     };
 
@@ -694,9 +686,9 @@ mod tests {
         let mut record = fixture();
         record["cleaning_event"]["local_authorization_status"] = serde_json::json!("denied");
         let mut findings = Findings::default();
-        let (_, _, _, _, performance_eligible) = check_record(&record, &mut findings);
+        let (_, _, _, _, conditions_matched) = check_record(&record, &mut findings);
         assert!(findings.blocked);
-        assert!(!performance_eligible);
+        assert!(conditions_matched);
     }
 
     #[test]
@@ -733,12 +725,13 @@ mod tests {
     }
 
     #[test]
-    fn synthetic_performance_pair_is_never_claim_eligible() {
+    fn synthetic_performance_pair_is_structurally_matched_but_not_qualified() {
         let record = fixture();
         let mut findings = Findings::default();
-        let (_, _, _, _, eligible) = check_record(&record, &mut findings);
-        assert!(!eligible);
+        let (_, _, _, _, conditions_matched) = check_record(&record, &mut findings);
+        assert!(conditions_matched);
         assert!(findings.incomplete);
+        assert_ne!(findings.disposition(), "BIOFOULING_EVIDENCE_CONTRACT_VALID");
     }
 
     #[test]
