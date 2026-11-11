@@ -1,0 +1,23 @@
+[package]
+name = "synthetic-vocal-plant"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "Deterministic synthetic acoustic plant and known-answer vocal edit suite"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "synthetic-vocal-plant"
+path = "src/main.rs"
+
+[dependencies]
+hound = "3.5"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+symthaea-vocal-tract = { path = "../../crates/domains/symthaea-vocal-tract" }
+
+[workspace]
