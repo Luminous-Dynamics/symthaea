@@ -172,9 +172,23 @@ fn process_episode(
     )?;
     let initial_training_steps = bridge.training_steps();
 
-    fs::create_dir_all(policy_input_dir)?;
+    if output_path.exists() {
+        return Err(format!("receipts output already exists: {}", output_path.display()).into());
+    }
+    if policy_input_dir.exists() {
+        let mut existing = fs::read_dir(policy_input_dir)?;
+        if existing.next().is_some() {
+            return Err(format!(
+                "policy input directory must be empty before processing: {}",
+                policy_input_dir.display()
+            )
+            .into());
+        }
+    }
+
     let mut receipts = Vec::with_capacity(request.observations.len());
     let mut policy_input_artifacts = Vec::with_capacity(request.observations.len());
+    let mut staged_policy_inputs = Vec::with_capacity(request.observations.len());
     let mut aggregate_input_bytes = 0_u64;
 
     for (index, observation) in request.observations.iter().enumerate() {
@@ -215,14 +229,8 @@ fn process_episode(
         }
 
         let artifact_name = format!("policy_input_{:08}.f32le", observation.sequence);
-        let artifact_path = policy_input_dir.join(&artifact_name);
-        fs::write(&artifact_path, &policy_input_bytes)?;
-
-        let relative_artifact_path = artifact_path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .ok_or("policy input artifact name is not valid UTF-8")?
-            .to_string();
+        let relative_artifact_path = artifact_name.clone();
+        staged_policy_inputs.push((artifact_name, policy_input_bytes.clone()));
 
         policy_input_artifacts.push(PolicyInputArtifact {
             sequence: observation.sequence,
@@ -272,6 +280,14 @@ fn process_episode(
         receipts,
         policy_input_artifacts,
     };
+
+    // Do not expose partial HDC artifacts when a later observation rejects.
+    // Every frame, receipt, predecessor link and frozen-learning invariant has
+    // passed before this single episode-level commit phase begins.
+    fs::create_dir_all(policy_input_dir)?;
+    for (artifact_name, artifact_bytes) in staged_policy_inputs {
+        fs::write(policy_input_dir.join(artifact_name), artifact_bytes)?;
+    }
 
     let encoded_output = serde_json::to_vec_pretty(&output)?;
     if let Some(parent) = output_path.parent().filter(|path| !path.as_os_str().is_empty()) {
@@ -337,6 +353,32 @@ mod tests {
         assert_eq!(&encoded[8..12], &1.0_f32.to_bits().to_le_bytes());
         assert_eq!(&encoded[12..16], &(-0.5_f32).to_bits().to_le_bytes());
         assert_eq!(sha256_hex(&encoded).len(), 64);
+    }
+
+    #[test]
+    fn rejects_non_empty_policy_input_output_directory_before_processing() {
+        let unique = format!(
+            "symthaea-camera-bridge-output-test-{}",
+            std::process::id()
+        );
+        let base = std::env::temp_dir().join(unique);
+        let policy_dir = base.join("policy-inputs");
+        let output_path = base.join("receipts.json");
+        fs::create_dir_all(&policy_dir).unwrap();
+        fs::write(policy_dir.join("stale.f32le"), b"stale").unwrap();
+
+        let result = (|| -> Result<(), Box<dyn Error>> {
+            if policy_dir.exists() {
+                let mut existing = fs::read_dir(&policy_dir)?;
+                if existing.next().is_some() {
+                    return Err("policy input directory must be empty before processing".into());
+                }
+            }
+            Ok(())
+        })();
+        assert!(result.is_err());
+        assert!(!output_path.exists());
+        fs::remove_dir_all(base).unwrap();
     }
 
     #[test]
