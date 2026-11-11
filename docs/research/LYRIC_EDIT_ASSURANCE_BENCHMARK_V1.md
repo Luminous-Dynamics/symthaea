@@ -46,6 +46,14 @@ SongBloom combines semantic discrete tokens with acoustic latent patches generat
 
 MusicJudge aligns semantically meaningful lyric blocks and combines lyric correctness with pitch/rhythm fidelity. The authors report Spearman correlation 0.683 with human expert rankings on their 120-performance judged subset. Its multi-signal block matching and singing-aware transcription are useful independent evaluator candidates. It is not a preservation/locality evaluator: its global key policy deliberately accommodates transposition, so Muse still needs score-relative F0 and explicit protected-region measurement. Keep MusicJudge output distinct from the official rubric judge and blinded listener results.
 
+### Speech/singing mode switching: UniVocal and SCSBench (ACL 2026)
+
+UniVocal introduces speech-singing code-switching: transitions between speech and singing are inferred from text context rather than supplied as explicit mode tags. Its SCSBench separates implicit, explicit and mixed mode-switching scenarios, and the paper reports state-of-the-art results on that benchmark. This is a relevant comparator for Muse's speech-to-singing or spoken-to-sung phrase boundary handling, but it is **not** itself a multilingual-language code-switch benchmark. Language identity switches (for example, isiZulu ↔ English) and vocal-mode switches (speech ↔ singing) must be different labels and evaluation tracks.
+
+The SOTA2 SCSBench pages report UniVocal WER 5.83 / SIM 65 / UTMOS 4.36 for the implicit subset, and WER 10.90 / SIM 65.2 / UTMOS 4.36 for the mixed subset. These are benchmark-page results under that benchmark's metric definitions; do not compare them numerically with LyricEditBench PER/F0-CORR/SIM or claim they qualify South African language performance. Use the official UniVocal paper and SCSBench definitions for any reproduction.
+
+Sources: https://aclanthology.org/2026.acl-long.1452/ and https://www.sota2.com/research/sota/speech-quality-evaluation-on-scsbench-mixed
+
 ### Multi-aspect song quality: SongBench and SingMOS-Pro
 
 SongBench decomposes song quality into seven dimensions—vocal, instrument, melody, structure, arrangement, mixing and musicality. SingMOS-Pro covers 7,981 clips from 41 models and 12 datasets, with at least five experienced annotators per clip and separate lyric, melody and overall ratings. These are valuable quality and perceptual-reference tracks. They do not by themselves establish whether a requested local edit was executed or whether unrelated waveform content was preserved.
@@ -153,6 +161,18 @@ Development targets, not current results:
 - improve exact match against matched baselines without reducing IFR or CR.
 
 Do not select universal PER, SIM or F0-CORR limits from the published benchmark table. Freeze each metric's threshold in its own unit using independent calibration data.
+
+## South African language coverage: do not substitute speech corpora for sung references
+
+The separate [SA-SING-001 programme (#11549)](https://github.com/Luminous-Dynamics/symthaea/issues/11549) begins from the six language profiles audited in #11154 (Afrikaans, South African English, Sesotho, Setswana, isiXhosa and isiZulu), but those are pronunciation starting points, not qualified singing languages.
+
+Current resource findings:
+- The SADiLaR CSIR SAMA resource contains orthographically transcribed broadband podcast speech in several South African languages. It has a CC BY 4.0 catalogue record but is Level-0 verified and described as harvested/automatically segmented podcast speech. It may support speech-side orthography/phonetic evaluation after item-level and upstream broadcast-rights review; it is not singing data.
+- The Lwazi ASR Hugging Face card is internally inconsistent: its language table says CC BY 3.0 while its narrative says CC BY 2.5. Do not ingest until the authoritative licence is resolved.
+- Swivuriso / ZA-African Next Voices explicitly prohibits TTS, voice cloning, voice synthesis and any use intended to replicate/generate human voices. Exclude it from Muse singer training, timbre-reference training and generation. Only separate speech-recognition or permitted phonetic-evaluation tasks may be considered under its access terms.
+- Lwazi III isiZulu TTS is listed under CC BY-NC-SA 4.0. This is speech synthesis material, not sung performance; do not infer commercial or cross-identity singing rights from it.
+
+No clearly rights-cleared public South African singing set was identified in this source review. A small performer-consented evaluation-only pilot is therefore the correct first qualification step. South African Sign Language is the country's 12th official language, but is a distinct signed modality; do not force it into an acoustic F0/phoneme score. Keep signed musical performance as a separate future modality.
 
 ## Rights and eligibility
 
