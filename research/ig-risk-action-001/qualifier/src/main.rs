@@ -105,7 +105,7 @@ fn choose_action(values: &BTreeMap<String, Rational>, order: &[String]) -> Resul
 fn validate_fixture(fixture: &Value) -> Result<(String, String), String> {
     let id = string_field(fixture, "scenario_id").ok_or_else(|| "scenario_id missing".to_string())?;
     if string_field(fixture, "probability_source") != Some("SyntheticScenarioOracle")
-        || string_field(fixture, "confidence_target") != Some("post_answer_correctness") {
+        || string_field(fixture, "probability_target") != Some("scenario_defined_action_outcome_success") {
         return Err("probability source or confidence target mismatch".into());
     }
     let family = string_field(fixture, "task_family").ok_or_else(|| "task_family missing".to_string())?;
@@ -217,8 +217,8 @@ mod tests {
     #[test] fn utility_tampering_is_rejected() {
         let mut v=parsed();v["fixtures"][0]["expected_utilities"]["Answer"]["numerator"]=Value::from(999);assert!(validate_manifest(&v).is_err());
     }
-    #[test] fn confidence_target_substitution_is_rejected() {
-        let mut v=parsed();v["fixtures"][0]["confidence_target"]=Value::String("pre_reasoning_success".into());assert!(validate_manifest(&v).is_err());
+    #[test] fn probability_target_substitution_is_rejected() {
+        let mut v=parsed();v["fixtures"][0]["probability_target"]=Value::String("pre_reasoning_success".into());assert!(validate_manifest(&v).is_err());
     }
     #[test] fn invalid_probability_is_rejected() {
         let mut v=parsed();v["fixtures"][0]["probabilities"]["answer_correctness"]["numerator"]=Value::from(101);assert!(validate_manifest(&v).is_err());
