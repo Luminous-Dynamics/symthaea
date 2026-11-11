@@ -713,6 +713,9 @@ pub fn validate_part_stem_bundle_v1(
     let bundle_ordinal_count = bundle.stems.iter().try_fold(0usize, |sum, stem| {
         sum.checked_add(stem.source_note_ordinals.len())
     }).unwrap_or(usize::MAX);
+    if bundle_ordinal_count > PART_STEM_MAX_NOTES_V1 {
+        issues.push(PartStemEvidenceIssueV1::TooManyNotes);
+    }
     if bundle.stems.len() > PART_STEM_MAX_STEMS_V1
         || bundle_ordinal_count > PART_STEM_MAX_NOTES_V1
         || midi.manifest.tracks.len() > PART_STEM_MAX_STEMS_V1
