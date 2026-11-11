@@ -1,0 +1,87 @@
+{
+  "schema_version": "aced-repair-upstream-source-manifest-v0.1",
+  "benchmark_id": "ACED-REPAIR-ADAPTER-001",
+  "status": "pinned_upstream_inventory_only_no_model_trials",
+  "upstream": {
+    "repository": "https://github.com/Rose-STL-Lab/ACED-Bench",
+    "commit": "998dc692bfcf5574e5319d67f1cea9c170569d80",
+    "license": "MIT",
+    "paper": "https://arxiv.org/abs/2610.14381",
+    "paper_revision": "v2",
+    "paper_revision_date": "2026-11-08"
+  },
+  "artifacts": {
+    "test_index_path": "data/repair/test/index.json",
+    "test_index_git_blob_sha": "106ebe58a71d8008ea1ae8e2399d6ea895e74985",
+    "test_index_sha256": "51697a656a8c505111ca0bb744d662aba458e3af628205a45f9a06e92139b614",
+    "eval_index_path": "data/repair/eval/index.json",
+    "eval_index_git_blob_sha": "8f2db499864296cede4d435451e68b28f654f7c4",
+    "eval_index_sha256": "fc7d256c44b894d6abe11ba23ae7393cdd6d4dcf4125b456dc7f6930950fab0d",
+    "data_sha256_manifest_path": "data/SHA256SUMS",
+    "data_sha256_manifest_git_blob_sha": "f14afb97a6b7979c737e5465c2fee26beca81e9b",
+    "data_sha256_manifest_sha256": "0653bb6bd5394e2efb4597359b7709e81664281c3e420ed0f4ff29577f4fb8c1"
+  },
+  "split_contract": {
+    "test_index_rows": 540,
+    "eval_index_rows": 54,
+    "eval_is_subset_of_test": true,
+    "subset_identity": "Each evaluation row must match the test row exactly on file, domain, archetype and seed.",
+    "unique_seed_scope": "Seeds must be unique within each index; test/eval seed overlap is expected because eval is a selected subset.",
+    "payload_policy": "No compressed world payload, ground_truth, oracle intervention, scoring battery or answer file is copied into this adapter repository or made candidate-visible."
+  },
+  "expected_distribution": {
+    "test": {
+      "total": 540,
+      "domains": {
+        "agronomy": 37,
+        "aquaculture": 35,
+        "battery": 34,
+        "bioprocess": 35,
+        "catalysis": 33,
+        "clinical": 132,
+        "datacenter": 31,
+        "fermentation": 138,
+        "semiconductor": 33,
+        "watertreatment": 32
+      },
+      "archetypes": {
+        "collider_selection": 60,
+        "competing_causes": 60,
+        "confounded_chain": 60,
+        "confounded_reversal": 60,
+        "dose_window": 60,
+        "hidden_subtype": 60,
+        "instrument_only": 60,
+        "surrogate_trap": 60,
+        "synergy_pair": 60
+      }
+    },
+    "eval": {
+      "total": 54,
+      "domains": {
+        "agronomy": 6,
+        "aquaculture": 6,
+        "battery": 6,
+        "bioprocess": 6,
+        "catalysis": 5,
+        "clinical": 5,
+        "datacenter": 5,
+        "fermentation": 5,
+        "semiconductor": 5,
+        "watertreatment": 5
+      },
+      "archetypes": {
+        "collider_selection": 6,
+        "competing_causes": 6,
+        "confounded_chain": 6,
+        "confounded_reversal": 6,
+        "dose_window": 6,
+        "hidden_subtype": 6,
+        "instrument_only": 6,
+        "surrogate_trap": 6,
+        "synergy_pair": 6
+      }
+    }
+  },
+  "claim_ceiling": "This manifest binds the upstream index inventory only. It does not validate compressed world payload bytes, reproduce the upstream grader, run an agent or establish causal-repair competence."
+}
