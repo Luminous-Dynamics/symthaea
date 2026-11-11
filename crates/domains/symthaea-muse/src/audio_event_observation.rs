@@ -26,6 +26,12 @@ pub const AUDIO_STEM_EVENT_OBSERVATION_SCHEMA_V1: &str = "muse-audio-stem-event-
 pub const AUDIO_EVENT_OBSERVATION_MAX_FFT_FRAMES_V1: usize = 65_536;
 pub const AUDIO_EVENT_OBSERVATION_MIN_FFT_FRAMES_V1: usize = 4_096;
 pub const AUDIO_EVENT_OBSERVATION_HARMONICS_V1: usize = 6;
+pub const AUDIO_EVENT_OBSERVATION_MAX_MIDI_BYTES_V1: usize = 64 * 1024 * 1024;
+pub const AUDIO_EVENT_OBSERVATION_MAX_WAV_BYTES_V1: usize = 128 * 1024 * 1024;
+pub const AUDIO_EVENT_OBSERVATION_MAX_TRACKS_V1: usize = 256;
+pub const AUDIO_EVENT_OBSERVATION_MAX_NOTES_V1: usize = 100_000;
+pub const AUDIO_EVENT_OBSERVATION_MAX_AUDIO_FRAMES_V1: u64 = 24_000_000;
+pub const AUDIO_EVENT_OBSERVATION_MAX_INTERLEAVED_SAMPLES_V1: u64 = 32_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AudioEventObservationStatusV1 {
@@ -101,6 +107,10 @@ pub enum AudioEventObservationIssueV1 {
     ReceiptEventMismatch { ordinal: usize },
     MissingTrackReceipt { track_index: u16 },
     EmptyTrackNotes { track_index: u16 },
+    InputTooLarge,
+    TooManyTracks,
+    TooManyNotes,
+    TooManyAudioFrames,
 }
 
 
@@ -346,6 +356,15 @@ fn validate_midi_artifact(
     artifact: &MidiPerformanceArtifactV1,
 ) -> Vec<AudioEventObservationIssueV1> {
     let manifest = &artifact.manifest;
+    if artifact.midi_bytes.len() > AUDIO_EVENT_OBSERVATION_MAX_MIDI_BYTES_V1 {
+        return vec![AudioEventObservationIssueV1::InputTooLarge];
+    }
+    if manifest.tracks.len() > AUDIO_EVENT_OBSERVATION_MAX_TRACKS_V1 {
+        return vec![AudioEventObservationIssueV1::TooManyTracks];
+    }
+    if manifest.notes.len() > AUDIO_EVENT_OBSERVATION_MAX_NOTES_V1 {
+        return vec![AudioEventObservationIssueV1::TooManyNotes];
+    }
     let mut issues = Vec::new();
     if manifest.schema != MIDI_PERFORMANCE_SCHEMA_V1
         || manifest.score_digest_schema
@@ -432,6 +451,9 @@ fn validate_midi_artifact(
 }
 
 fn decode_wav(wav_bytes: &[u8]) -> Result<DecodedWavV1, AudioEventObservationIssueV1> {
+    if wav_bytes.is_empty() || wav_bytes.len() > AUDIO_EVENT_OBSERVATION_MAX_WAV_BYTES_V1 {
+        return Err(AudioEventObservationIssueV1::InputTooLarge);
+    }
     let mut reader = WavReader::new(Cursor::new(wav_bytes))
         .map_err(|_| AudioEventObservationIssueV1::InvalidWav)?;
     let spec = reader.spec();
@@ -443,36 +465,45 @@ fn decode_wav(wav_bytes: &[u8]) -> Result<DecodedWavV1, AudioEventObservationIss
     {
         return Err(AudioEventObservationIssueV1::InvalidWav);
     }
-    let samples: Vec<f32> = match spec.sample_format {
-        SampleFormat::Float => reader
-            .samples::<f32>()
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|_| AudioEventObservationIssueV1::InvalidWav)?,
+    let channels = usize::from(spec.channels);
+    let max_samples = AUDIO_EVENT_OBSERVATION_MAX_INTERLEAVED_SAMPLES_V1
+        .min(AUDIO_EVENT_OBSERVATION_MAX_AUDIO_FRAMES_V1 * u64::from(spec.channels));
+    let max_samples = usize::try_from(max_samples)
+        .map_err(|_| AudioEventObservationIssueV1::TooManyAudioFrames)?;
+    let mut samples = Vec::new();
+    match spec.sample_format {
+        SampleFormat::Float => {
+            for sample in reader.samples::<f32>() {
+                let value = sample.map_err(|_| AudioEventObservationIssueV1::InvalidWav)?;
+                if !value.is_finite() {
+                    return Err(AudioEventObservationIssueV1::NonFiniteAudioSample);
+                }
+                if samples.len() >= max_samples {
+                    return Err(AudioEventObservationIssueV1::TooManyAudioFrames);
+                }
+                samples.push(value);
+            }
+        }
         SampleFormat::Int => {
             let scale = (1u64 << (spec.bits_per_sample - 1)) as f64;
-            reader
-                .samples::<i32>()
-                .map(|sample| {
-                    sample
-                        .map(|value| (f64::from(value) / scale) as f32)
-                        .map_err(|_| AudioEventObservationIssueV1::InvalidWav)
-                })
-                .collect::<Result<Vec<_>, _>>()?
+            for sample in reader.samples::<i32>() {
+                let value = sample.map_err(|_| AudioEventObservationIssueV1::InvalidWav)?;
+                if samples.len() >= max_samples {
+                    return Err(AudioEventObservationIssueV1::TooManyAudioFrames);
+                }
+                samples.push((f64::from(value) / scale) as f32);
+            }
         }
-    };
+    }
     if samples.is_empty() {
         return Err(AudioEventObservationIssueV1::InvalidWav);
     }
-    if samples.iter().any(|sample| !sample.is_finite()) {
-        return Err(AudioEventObservationIssueV1::NonFiniteAudioSample);
-    }
-    let channels = usize::from(spec.channels);
-    if samples.len() % channels != 0 {
+    if channels == 0 || samples.len() % channels != 0 {
         return Err(AudioEventObservationIssueV1::SampleCountNotDivisibleByChannels);
     }
     let frame_count = samples.len() / channels;
-    if frame_count == 0 {
-        return Err(AudioEventObservationIssueV1::InvalidWav);
+    if frame_count == 0 || frame_count as u64 > AUDIO_EVENT_OBSERVATION_MAX_AUDIO_FRAMES_V1 {
+        return Err(AudioEventObservationIssueV1::TooManyAudioFrames);
     }
     Ok(DecodedWavV1 {
         info: AudioEventObservationWavInfoV1 {
