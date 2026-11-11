@@ -37,6 +37,24 @@ jobs:
           components: rustfmt, clippy
       - name: Format the new qualification module
         run: rustfmt --edition 2024 --check crates/bridges/symthaea-physics-bridge/src/linear_lie_algebra.rs
+      # Capture exact lockfile drift from the inherited workspace manifest.
+      # The following test remains locked against the regenerated lock.
+      - name: Reconcile and snapshot workspace lockfile
+        run: |
+          set -euo pipefail
+          cargo generate-lockfile
+          cp Cargo.lock "$RUNNER_TEMP/regenerated-Cargo.lock"
+          git diff -- Cargo.lock > "$RUNNER_TEMP/Cargo.lock.diff"
+          echo "generated_lock_sha256=$(sha256sum Cargo.lock | cut -d' ' -f1)"
+          echo "lock_diff_bytes=$(wc -c < "$RUNNER_TEMP/Cargo.lock.diff")"
+      - name: Upload regenerated lockfile evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: symthaea-workspace-lockfile-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/regenerated-Cargo.lock
+            ${{ runner.temp }}/Cargo.lock.diff
+          if-no-files-found: error
       - name: Test the physics bridge library
         run: cargo test --locked -p symthaea-physics-bridge --lib
       - name: Clippy the physics bridge library
