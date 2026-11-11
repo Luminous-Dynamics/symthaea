@@ -1283,6 +1283,215 @@ mod tests {
     }
 
 
+
+    fn two_part_midi_bytes_same_pitch() -> Vec<u8> {
+        let tempo = vec![
+            0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20,
+            0x00, 0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08,
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let mut first = vec![
+            0x00, 0xc0, 0x00,
+            0x00, 0x90, 60, 90,
+            0x87, 0x40, 0x80, 60, 0x00,
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let second = vec![
+            0x00, 0xc1, 24,
+            0x00, 0x91, 60, 100,
+            0x87, 0x40, 0x81, 60, 0x00,
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"MThd");
+        bytes.extend_from_slice(&6u32.to_be_bytes());
+        bytes.extend_from_slice(&1u16.to_be_bytes());
+        bytes.extend_from_slice(&3u16.to_be_bytes());
+        bytes.extend_from_slice(&MIDI_PERFORMANCE_TICKS_PER_QUARTER_V1.to_be_bytes());
+        for track in [&tempo, &first, &second] {
+            bytes.extend_from_slice(b"MTrk");
+            bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
+            bytes.extend_from_slice(track);
+        }
+        first.clear();
+        bytes
+    }
+
+    fn pcm_sine_wav(frequency_hz: f32, frames: u32, amplitude: f32) -> Vec<u8> {
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: 48_000,
+            bits_per_sample: 16,
+            sample_format: SampleFormat::Int,
+        };
+        let mut cursor = Cursor::new(Vec::new());
+        {
+            let mut writer = hound::WavWriter::new(&mut cursor, spec).unwrap();
+            for frame in 0..frames {
+                let sample = (amplitude
+                    * (std::f32::consts::TAU * frequency_hz * frame as f32 / 48_000.0).sin()
+                    * f32::from(i16::MAX)) as i16;
+                writer.write_sample(sample).unwrap();
+            }
+            writer.finalize().unwrap();
+        }
+        cursor.into_inner()
+    }
+
+    fn two_part_same_pitch_fixture() -> (
+        PartStemEvidenceBundleV1,
+        MidiPerformanceArtifactV1,
+        Vec<PartStemWavInputV1>,
+    ) {
+        let midi_bytes = two_part_midi_bytes_same_pitch();
+        let mut manifest = MidiPerformanceManifestV1 {
+            schema: MIDI_PERFORMANCE_SCHEMA_V1.into(),
+            score_digest_schema: symthaea_music_theory::orchestration_timeline::ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1.into(),
+            score_sha256: "a".repeat(64),
+            timeline_digest_schema: MIDI_PERFORMANCE_TIMELINE_DIGEST_SCHEMA_V1.into(),
+            timeline_sha256: "b".repeat(64),
+            binding_digest_schema: MIDI_PERFORMANCE_BINDING_DIGEST_SCHEMA_V1.into(),
+            binding_sha256: "c".repeat(64),
+            capability_digest_schema: MIDI_PERFORMANCE_CAPABILITY_DIGEST_SCHEMA_V1.into(),
+            capability_sha256: "d".repeat(64),
+            midi_sha256: sha256_hex(&midi_bytes),
+            ticks_per_quarter: MIDI_PERFORMANCE_TICKS_PER_QUARTER_V1,
+            tempo_microseconds_per_quarter: 500_000,
+            meter_numerator: 4,
+            meter_denominator: 4,
+            tracks: vec![
+                MidiPerformanceTrackReceiptV1 {
+                    track_index: 1,
+                    track_name: "Part 0 segment-0".into(),
+                    part_id: 0,
+                    segment_id: "segment-0".into(),
+                    instrument_id: "instrument-0".into(),
+                    renderer_id: "fixture-renderer".into(),
+                    patch_id: "patch-0".into(),
+                    gm_program: 0,
+                    midi_channel: 0,
+                    segment_start_tick: 0,
+                    segment_end_tick: 960,
+                },
+                MidiPerformanceTrackReceiptV1 {
+                    track_index: 2,
+                    track_name: "Part 1 segment-0".into(),
+                    part_id: 1,
+                    segment_id: "segment-0".into(),
+                    instrument_id: "instrument-1".into(),
+                    renderer_id: "fixture-renderer".into(),
+                    patch_id: "patch-1".into(),
+                    gm_program: 24,
+                    midi_channel: 1,
+                    segment_start_tick: 0,
+                    segment_end_tick: 960,
+                },
+            ],
+            notes: vec![
+                MidiPerformanceNoteReceiptV1 {
+                    source_note_ordinal: 0,
+                    part_id: 0,
+                    segment_id: "segment-0".into(),
+                    instrument_id: "instrument-0".into(),
+                    track_index: 1,
+                    start_tick: 0,
+                    end_tick: 960,
+                    pitch_midi: 60,
+                    velocity_midi: 90,
+                },
+                MidiPerformanceNoteReceiptV1 {
+                    source_note_ordinal: 1,
+                    part_id: 1,
+                    segment_id: "segment-0".into(),
+                    instrument_id: "instrument-1".into(),
+                    track_index: 2,
+                    start_tick: 0,
+                    end_tick: 960,
+                    pitch_midi: 60,
+                    velocity_midi: 100,
+                },
+            ],
+        };
+        let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
+        let manifest_sha256 = domain_sha256(
+            MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1,
+            &manifest_bytes,
+        );
+        let midi = MidiPerformanceArtifactV1 {
+            midi_bytes,
+            manifest: manifest.clone(),
+            manifest_sha256,
+        };
+        let wav_one = pcm_sine_wav(261.6256, 24_000, 0.35);
+        let wav_two = pcm_sine_wav(261.6256, 24_000, 0.22);
+        let digest_one = sha256_hex(&wav_one);
+        let digest_two = sha256_hex(&wav_two);
+        let event_one = compute_midi_track_event_set_sha256_v1(&midi, 1).unwrap();
+        let event_two = compute_midi_track_event_set_sha256_v1(&midi, 2).unwrap();
+        let mut bundle = PartStemEvidenceBundleV1 {
+            schema: PART_STEM_EVIDENCE_SCHEMA_V1.into(),
+            score_sha256: manifest.score_sha256.clone(),
+            midi_sha256: manifest.midi_sha256.clone(),
+            midi_manifest_sha256: midi.manifest_sha256.clone(),
+            audio_clock: PartStemAudioClockV1 {
+                origin: "score_zero".into(),
+                sample_rate_hz: 48_000,
+                channels: 1,
+                sample_format: PartStemSampleFormatV1::PcmInteger,
+                bits_per_sample: 16,
+                frame_count: 24_000,
+            },
+            stems: vec![
+                PartStemRecordV1 {
+                    part_id: 0,
+                    segment_id: "segment-0".into(),
+                    instrument_id: "instrument-0".into(),
+                    midi_track_index: 1,
+                    render_method: "single_track_input".into(),
+                    renderer_id: "fixture-renderer".into(),
+                    renderer_binary_sha256: "e".repeat(64),
+                    patch_id: "patch-0".into(),
+                    patch_asset_sha256: "f".repeat(64),
+                    render_config_sha256: "1".repeat(64),
+                    track_event_set_sha256: event_one,
+                    source_note_ordinals: vec![0],
+                    wav_sha256: digest_one.clone(),
+                },
+                PartStemRecordV1 {
+                    part_id: 1,
+                    segment_id: "segment-0".into(),
+                    instrument_id: "instrument-1".into(),
+                    midi_track_index: 2,
+                    render_method: "single_track_input".into(),
+                    renderer_id: "fixture-renderer".into(),
+                    renderer_binary_sha256: "e".repeat(64),
+                    patch_id: "patch-1".into(),
+                    patch_asset_sha256: "f".repeat(64),
+                    render_config_sha256: "1".repeat(64),
+                    track_event_set_sha256: event_two,
+                    source_note_ordinals: vec![1],
+                    wav_sha256: digest_two.clone(),
+                },
+            ],
+            bundle_sha256: String::new(),
+        };
+        bundle.bundle_sha256 = part_stem_bundle_commitment_v1(&bundle).unwrap();
+        (
+            bundle,
+            midi,
+            vec![
+                PartStemWavInputV1 {
+                    wav_sha256: digest_one,
+                    wav_bytes: wav_one,
+                },
+                PartStemWavInputV1 {
+                    wav_sha256: digest_two,
+                    wav_bytes: wav_two,
+                },
+            ],
+        )
+    }
+
     #[test]
     fn published_example_fixture_deserializes_to_v1_contract() {
         let bytes = include_bytes!(
@@ -1326,6 +1535,41 @@ mod tests {
         assert!(validate_part_stem_audio_evidence_receipt_v1(
             &tampered, &bundle, &midi, &wavs, 1
         ).contains(&PartStemAudioEvidenceIssueV1::ReceiptDigestMismatch));
+    }
+
+
+    #[test]
+    fn same_pitch_contributors_remain_separately_addressable_by_track() {
+        let (bundle, midi, wavs) = two_part_same_pitch_fixture();
+        assert!(validate_part_stem_bundle_v1(&bundle, &midi, &wavs).is_ok());
+
+        let part_zero =
+            validate_and_observe_part_stem_v1(&bundle, &midi, &wavs, 1).unwrap();
+        let part_one =
+            validate_and_observe_part_stem_v1(&bundle, &midi, &wavs, 2).unwrap();
+
+        assert_eq!(part_zero.audio_observation.track_index, 1);
+        assert_eq!(part_one.audio_observation.track_index, 2);
+        assert_eq!(part_zero.audio_observation.note_observations.len(), 1);
+        assert_eq!(part_one.audio_observation.note_observations.len(), 1);
+        assert_eq!(part_zero.audio_observation.note_observations[0].part_id, 0);
+        assert_eq!(part_one.audio_observation.note_observations[0].part_id, 1);
+        assert_eq!(part_zero.audio_observation.note_observations[0].pitch_midi, 60);
+        assert_eq!(part_one.audio_observation.note_observations[0].pitch_midi, 60);
+        assert_eq!(
+            part_zero.audio_observation.note_observations[0].status,
+            crate::audio_event_observation::AudioEventObservationStatusV1::Measured
+        );
+        assert_eq!(
+            part_one.audio_observation.note_observations[0].status,
+            crate::audio_event_observation::AudioEventObservationStatusV1::Measured
+        );
+        assert!(validate_part_stem_audio_evidence_receipt_v1(
+            &part_zero, &bundle, &midi, &wavs, 1
+        ).is_empty());
+        assert!(validate_part_stem_audio_evidence_receipt_v1(
+            &part_one, &bundle, &midi, &wavs, 2
+        ).is_empty());
     }
 
     #[test]
