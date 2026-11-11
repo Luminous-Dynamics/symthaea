@@ -1331,10 +1331,19 @@ mod tests {
         program: u8,
         tempo_events: &[(u64, u32)],
     ) -> Vec<u8> {
+        build_midi_with_velocity(notes, program, tempo_events, 100)
+    }
+
+    fn build_midi_with_velocity(
+        notes: &[(u8, u64, u64)],
+        program: u8,
+        tempo_events: &[(u64, u32)],
+        velocity: u8,
+    ) -> Vec<u8> {
         let mut note_events: Vec<(u64, u8, Vec<u8>)> =
             vec![(0, 0, vec![0xc0, program])];
         for (pitch, onset, offset) in notes {
-            note_events.push((*onset, 2, vec![0x90, *pitch, 100]));
+            note_events.push((*onset, 2, vec![0x90, *pitch, velocity]));
             note_events.push((*offset, 1, vec![0x80, *pitch, 0]));
         }
         note_events.sort_by_key(|event| (event.0, event.1));
@@ -1387,7 +1396,15 @@ mod tests {
     const MIDI_TRANSCRIPTION_TEST_PPQ: u16 = MIDI_PERFORMANCE_TICKS_PER_QUARTER_V1;
 
     fn reference_artifact(notes: &[(u8, u64, u64)], program: u8) -> MidiPerformanceArtifactV1 {
-        let midi_bytes = build_midi(notes, program, &[(0, 500_000)]);
+        reference_artifact_with_velocity(notes, program, 100)
+    }
+
+    fn reference_artifact_with_velocity(
+        notes: &[(u8, u64, u64)],
+        program: u8,
+        velocity: u8,
+    ) -> MidiPerformanceArtifactV1 {
+        let midi_bytes = build_midi_with_velocity(notes, program, &[(0, 500_000)], velocity);
         let maximum_tick = notes.iter().map(|note| note.2).max().unwrap_or(1);
         let manifest = MidiPerformanceManifestV1 {
             schema: MIDI_PERFORMANCE_SCHEMA_V1.into(),
@@ -1429,7 +1446,7 @@ mod tests {
                     start_tick: *onset,
                     end_tick: *offset,
                     pitch_midi: *pitch,
-                    velocity_midi: 100,
+                    velocity_midi: velocity,
                 })
                 .collect(),
         };
@@ -1531,6 +1548,100 @@ mod tests {
         assert!((parsed.notes[0].onset_seconds - 0.5).abs() < 1e-9);
         assert!((parsed.notes[0].offset_seconds.unwrap() - 1.0).abs() < 1e-9);
         assert_eq!(parsed.tempo_point_count, 2);
+    }
+
+    #[test]
+    fn velocity_error_and_velocity_aware_score_are_reported_separately() {
+        let notes = vec![(60, 0, 480), (64, 960, 1_440)];
+        let reference = reference_artifact_with_velocity(&notes, 40, 100);
+        let prediction = build_midi_with_velocity(&notes, 40, &[(0, 500_000)], 40);
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.onset_pitch_metrics.f1, 1.0);
+        assert_eq!(report.full_note_metrics.f1, 1.0);
+        assert_eq!(report.velocity_aware_full_note_metrics.f1, 0.0);
+        assert_eq!(report.velocity_error.sample_count, 2);
+        assert_eq!(report.velocity_error.mean_absolute_error, Some(60.0));
+    }
+
+    #[test]
+    fn frame_pitch_metrics_measure_time_occupancy_not_note_identity() {
+        let notes = vec![(60, 0, 960), (60, 480, 1_440), (64, 1_920, 2_400)];
+        let reference = reference_artifact(&notes, 40);
+        let prediction = build_midi(&notes, 40, &[(0, 500_000)]);
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.frame_pitch_metrics.f1, 1.0);
+        assert_eq!(report.frame_program_pitch_metrics.f1, 1.0);
+        assert_eq!(report.frame_step_ms, 10);
+        // Same-pitch overlapping note cells are unioned in frame metrics.
+        assert!(report.frame_pitch_metrics.true_positives < 3 * 50);
+    }
+
+    #[test]
+    fn reference_midi_byte_substitution_is_rejected_before_scoring() {
+        let notes = vec![(60, 0, 480)];
+        let mut reference = reference_artifact(&notes, 40);
+        reference.midi_bytes.push(0);
+        let prediction = build_midi(&notes, 40, &[(0, 500_000)]);
+        let error = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            MidiTranscriptionEvaluationIssueV1::ReferenceMidiDigestMismatch
+        );
+    }
+
+    #[test]
+    fn re_sealed_reference_manifest_cannot_relabel_source_velocity() {
+        let notes = vec![(60, 0, 480)];
+        let mut reference = reference_artifact(&notes, 40);
+        reference.manifest.notes[0].velocity_midi = 99;
+        let bytes = serde_json::to_vec(&reference.manifest).unwrap();
+        reference.manifest_sha256 = domain_separated_sha256(
+            MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1,
+            &bytes,
+        );
+        let prediction = build_midi(&notes, 40, &[(0, 500_000)]);
+        let error = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap_err();
+        assert_eq!(
+            error,
+            MidiTranscriptionEvaluationIssueV1::ReferenceMidiDoesNotMatchManifest
+        );
+    }
+
+    #[test]
+    fn maximum_cardinality_matching_does_not_double_count_duplicate_candidates() {
+        let adjacency = vec![vec![0, 1], vec![0]];
+        let matches = maximum_cardinality_matching(&adjacency, 2).unwrap();
+        assert_eq!(matches.len(), 2);
+        assert_eq!(matches, vec![(0, 1), (1, 0)]);
+    }
+
+    #[test]
+    fn conflicting_tempo_events_at_the_same_tick_are_rejected() {
+        let midi = build_midi(&[(60, 0, 480)], 40, &[(0, 500_000), (0, 600_000)]);
+        assert_eq!(
+            parse_transcribed_midi_v1(&midi).unwrap_err(),
+            MidiTranscriptionEvaluationIssueV1::InvalidTempo
+        );
     }
 
     #[test]
