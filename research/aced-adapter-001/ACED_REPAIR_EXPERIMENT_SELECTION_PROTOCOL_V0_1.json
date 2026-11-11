@@ -46,6 +46,11 @@
       "id": "adaptive_selector",
       "name": "Adaptive evidence-gated selector",
       "role": "Choose among measurement, intervention, replication, dose search, subgroup probe, clarification and stop based on evidence state, decision sensitivity and remaining budget. No oracle access."
+    },
+    {
+      "id": "bounded_sequential_evsi",
+      "name": "Bounded adaptive policy-tree EVSI",
+      "role": "Exact finite-horizon lookahead over the declared discrete hypotheses and candidate probes; re-evaluates stopping/next experiment after every outcome. The horizon and candidate set are predeclared; compare against greedy one-step EIG/EVSI, robust EVSI, random-valid and the official ACED agent."
     }
   ],
   "design_controls": {
@@ -441,5 +446,26 @@
       "reporting": "Report each official track separately and cluster paired uncertainty by content-addressed world. The 10 exact structural payload repeats must not count as independent worlds across core and guess tracks."
     },
     "claim_ceiling": "No Query agent trial or Query SOTA claim is made by this protocol or metadata inventory. This extension defines a controlled future comparison only."
+  },
+  "sequential_planning_extension": {
+    "status": "implemented_synthetic_algorithm_tests_not_aced_model_trial",
+    "module": "qualifier/src/sequential_decision_value.rs",
+    "method": "Bounded dynamic programming over a finite discrete hypothesis model. At each node, compare the stop value with every affordable unused experiment. For each observation outcome, Bayes-update the prior and recursively select the next experiment or stop. Subtract experiment cost and declared risk penalty.",
+    "returned_plan": "Nested policy tree whose branches contain outcome, branch probability and continuation; root summary reports expected value, expected experiment count, expected cost and risk penalty.",
+    "preregistered_controls": [
+      "The candidate probe set, priors, likelihoods, action utilities, costs, risk penalties, horizon and stopping threshold are frozen before the first observation.",
+      "All proposed probes are validated before budget filtering, including unaffordable probes.",
+      "Each probe may occur at most once on a path; every outcome branch must have a defined continuation or explicit stop.",
+      "At every node, stop remains a legal action and wins whenever no probe clears the predeclared minimum net value.",
+      "Compare one-step EIG, one-step EVSI, risk-adjusted EVSI, finite-set robust EVSI and bounded sequential EVSI under matched model information and experiment budgets."
+    ],
+    "counterexample": "Four equally likely hypotheses: H1/H2 favour action A, H3/H4 favour action B. Probe alpha partitions {H1,H3}/{H2,H4}; probe beta partitions {H1,H4}/{H2,H3}. Each individual probe leaves the action posterior at 50/50 and has zero one-step EVSI, but the pair of outcomes identifies the correct action. Two-step lookahead should discover the complementary sequence.",
+    "limitations": [
+      "Exact enumeration grows exponentially with horizon and outcome branching.",
+      "Finite discrete hypothesis and known likelihood assumptions only.",
+      "Does not model observation noise uncertainty unless scenarios are explicitly represented.",
+      "Does not solve an unbounded POMDP or continuous intervention optimization.",
+      "Synthetic unit tests are algorithm checks, not an ACED benchmark or model result."
+    ]
   }
 }
