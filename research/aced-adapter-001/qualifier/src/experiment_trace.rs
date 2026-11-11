@@ -661,6 +661,36 @@ mod tests {
     }
 
     #[test]
+    fn failed_or_unknown_observation_is_retained_but_not_proper_score_scored() {
+        let first = event(
+            "event-0",
+            0,
+            "experiment_proposal",
+            GENESIS_SHA256,
+            proposal(),
+        );
+        let first_hash = text(&first, "event_sha256").unwrap().to_string();
+        let second = event(
+            "event-1",
+            1,
+            "experiment_observation",
+            &first_hash,
+            json!({
+                "proposal_event_id": "event-0",
+                "observation_status": "unknown",
+                "observation_sha256": Value::Null,
+                "actual_cost": Value::Null,
+                "observed_outcome": Value::Null
+            }),
+        );
+        let report = validate_trace(&trace(vec![first, second])).unwrap();
+        assert_eq!(report.observation_count, 1);
+        assert_eq!(report.scored_observation_count, 0);
+        assert_eq!(report.mean_brier_score, None);
+        assert_eq!(report.mean_log_loss, None);
+    }
+
+    #[test]
     fn zero_probability_observation_is_not_hidden_by_log_loss_clipping() {
         let mut payload = proposal();
         payload["predicted_outcome_distribution"] = json!([
