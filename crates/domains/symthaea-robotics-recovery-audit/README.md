@@ -18,7 +18,7 @@ It also rejects duplicate trial IDs, blank identity fields, malformed expected-t
     cargo test -p symthaea-robotics-recovery-audit
     cargo fmt --manifest-path crates/domains/symthaea-robotics-recovery-audit/Cargo.toml -- --check
 
-Fifty-nine unit tests are included across the audit kernel, RoboRecover scorer and split-manifest importer. They have not yet been executed in this environment. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
+Seventy-five unit tests are included across the audit kernel, RoboRecover scorer, split-manifest importer and policy-router reference. They have not yet been executed in this environment. The crate deliberately has no external dependencies and does not create a policy runtime, simulator, action authority, sensor classifier, or physical safety controller. The crate includes a narrow RoboRecover score adapter; it is not a policy runtime or action authority.
 
 
 ## Pinned split-manifest importer
@@ -62,6 +62,19 @@ This distinction is necessary because the inspected RoboTwin source can emit `st
 The scorer therefore reports source environment completion, replay-preempted rows, policy-attributable recovery, unknown outcomes and contradictory outcomes separately. It also reports known policy non-completions separately. Its nested `identity_audit` is the low-level trial-ID/expected-manifest audit; `accepted_trial_rows` is the stricter count after source revision, split, execution mode, checkpoint, evaluator and scenario-content matching. This is a policy-attribution clarification, not a claim that we have reproduced the paper's published leaderboard results. Full scenario data hosting and redistribution terms remain pending in the upstream repository.
 
 The nine Macro-9 groups are explicitly frozen in the manifest and matched to the paper's declared test groups. No group is inferred from whichever scenarios happened to execute. Missing, duplicate, unplanned, identity-invalid and metadata-mismatched trials remain failures in the planned denominator.
+
+## Train-only recovery policy selector
+
+The `roborecover_router` module provides a deterministic reference selector for #11545:
+
+- It consumes competence records explicitly bound to the pinned training split, source revision, evaluator, competence table, cross-fit partition and policy checkpoint digest.
+- The runtime context is a predicted Stage–Type group plus confidence. Callers must infer it from deployable observations; evaluator-only ground-truth labels are not a permitted runtime feature.
+- A candidate needs minimum training support, known-outcome coverage, a valid checkpoint identity, and p95 inference latency within the declared budget.
+- Ranking is lexicographic: highest Wilson lower bound on physical-safe completion, then lowest Wilson upper bound on adverse/unknown risk, then latency and stable policy-ID tie-break.
+- Unsafe completions are not successes. Unknown, contradictory, invalid and missing trials are conservatively counted as possible adverse outcomes for the risk upper bound.
+- Test-split records, mismatched provenance, duplicate checkpoint evidence and unsupported contexts are rejected or cause abstention.
+
+The selector returns a policy choice or an explicit abstention; it does not generate action commands, bypass the independent action-admission layer, or authorize actuators. It is a transparent statistical baseline, not yet a learned router and not a benchmark result. Prospective evaluation must compare it with the strongest fixed policy, train-selected static policy, heuristic router, correction baseline and retrospective oracle upper bound under matched budgets.
 
 ## Interpretation
 
