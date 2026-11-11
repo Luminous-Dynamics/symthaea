@@ -154,20 +154,12 @@ pub struct RoboRecoverTrial {
 /// with a task completed by the evaluated policy.
 pub fn classify_policy_completion(trial: &RoboRecoverTrial) -> PolicyCompletion {
     if trial.source_status == "replay_already_done" {
-        return match trial.platform {
-            BenchmarkPlatform::RoboTwin => match (
-                trial.inference_steps,
-                trial.source_terminal_success,
-            ) {
-                (0, Some(true)) => PolicyCompletion::ReplayPreempted,
-                (0, Some(false)) => PolicyCompletion::NotCompleted,
-                (0, None) => PolicyCompletion::Unknown,
-                _ => PolicyCompletion::Contradictory,
-            },
-            BenchmarkPlatform::Libero if trial.inference_steps == 0 => {
-                PolicyCompletion::ReplayPreempted
-            }
-            BenchmarkPlatform::Libero => PolicyCompletion::Contradictory,
+        // The environment terminated during replay/wait before policy handoff.
+        // Success attribution is reported independently by source_reports_success.
+        return if trial.inference_steps == 0 {
+            PolicyCompletion::ReplayPreempted
+        } else {
+            PolicyCompletion::Contradictory
         };
     }
 
@@ -1770,7 +1762,7 @@ mod tests {
 
         assert_eq!(
             classify_policy_completion(&trial),
-            PolicyCompletion::NotCompleted
+            PolicyCompletion::ReplayPreempted
         );
         assert_eq!(source_reports_success(&trial), Some(false));
     }
