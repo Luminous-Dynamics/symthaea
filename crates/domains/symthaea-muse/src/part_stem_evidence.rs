@@ -260,6 +260,15 @@ fn track_identity(track: &MidiPerformanceTrackReceiptV1) -> StemIdentityV1 {
 pub fn part_stem_bundle_commitment_v1(
     bundle: &PartStemEvidenceBundleV1,
 ) -> Result<String, PartStemEvidenceIssueV1> {
+    if bundle.stems.len() > PART_STEM_MAX_STEMS_V1 {
+        return Err(PartStemEvidenceIssueV1::TooManyStems);
+    }
+    let ordinal_count = bundle.stems.iter().try_fold(0usize, |sum, stem| {
+        sum.checked_add(stem.source_note_ordinals.len())
+    }).ok_or(PartStemEvidenceIssueV1::TooManyNotes)?;
+    if ordinal_count > PART_STEM_MAX_NOTES_V1 {
+        return Err(PartStemEvidenceIssueV1::TooManyNotes);
+    }
     let mut stems = bundle.stems.clone();
     stems.sort_by_key(stem_identity);
     let commitment = BundleCommitmentV1 {
@@ -701,7 +710,11 @@ pub fn validate_part_stem_bundle_v1(
             issues.push(PartStemEvidenceIssueV1::InvalidDigest { field: field.into() });
         }
     }
+    let bundle_ordinal_count = bundle.stems.iter().try_fold(0usize, |sum, stem| {
+        sum.checked_add(stem.source_note_ordinals.len())
+    }).unwrap_or(usize::MAX);
     if bundle.stems.len() > PART_STEM_MAX_STEMS_V1
+        || bundle_ordinal_count > PART_STEM_MAX_NOTES_V1
         || midi.manifest.tracks.len() > PART_STEM_MAX_STEMS_V1
         || midi.manifest.notes.len() > PART_STEM_MAX_NOTES_V1
         || midi.midi_bytes.len() > PART_STEM_MAX_MIDI_BYTES_V1
@@ -1128,6 +1141,42 @@ mod tests {
         assert!(issues.iter().any(|issue| matches!(
             issue,
             PartStemEvidenceIssueV1::WavClockMismatch { .. }
+        )));
+    }
+
+    #[test]
+    fn duplicate_track_stem_is_rejected() {
+        let (mut bundle, midi, wavs) = fixture();
+        bundle.stems.push(bundle.stems[0].clone());
+        bundle.bundle_sha256 = part_stem_bundle_commitment_v1(&bundle).unwrap();
+        let issues = validate_part_stem_bundle_v1(&bundle, &midi, &wavs).unwrap_err();
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            PartStemEvidenceIssueV1::DuplicateStemIdentity { .. }
+        )));
+    }
+
+    #[test]
+    fn source_note_ordinal_mismatch_is_rejected() {
+        let (mut bundle, midi, wavs) = fixture();
+        bundle.stems[0].source_note_ordinals = vec![7];
+        bundle.bundle_sha256 = part_stem_bundle_commitment_v1(&bundle).unwrap();
+        let issues = validate_part_stem_bundle_v1(&bundle, &midi, &wavs).unwrap_err();
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            PartStemEvidenceIssueV1::SourceOrdinalCoverageMismatch { .. }
+        )));
+    }
+
+    #[test]
+    fn renderer_identity_must_match_source_track_binding() {
+        let (mut bundle, midi, wavs) = fixture();
+        bundle.stems[0].renderer_id = "other-renderer".into();
+        bundle.bundle_sha256 = part_stem_bundle_commitment_v1(&bundle).unwrap();
+        let issues = validate_part_stem_bundle_v1(&bundle, &midi, &wavs).unwrap_err();
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            PartStemEvidenceIssueV1::StemIdentityMismatch { .. }
         )));
     }
 
