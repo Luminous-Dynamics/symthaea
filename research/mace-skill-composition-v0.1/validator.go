@@ -196,9 +196,9 @@ func Validate(in Request) Report {
 		ss[i].CapabilityGrants = sorted(ss[i].CapabilityGrants)
 		ss[i].Conflicts = sorted(ss[i].Conflicts)
 	}
-	sort.Slice(ss, func(i, j int) bool { return ss[i].ID < ss[j].ID })
+	sort.Slice(ss, func(i, j int) bool { if ss[i].ID != ss[j].ID { return ss[i].ID < ss[j].ID }; return hash(ss[i]) < hash(ss[j]) })
 	srcs := append([]Artifact(nil), in.Sources...)
-	sort.Slice(srcs, func(i, j int) bool { return srcs[i].ID < srcs[j].ID })
+	sort.Slice(srcs, func(i, j int) bool { if srcs[i].ID != srcs[j].ID { return srcs[i].ID < srcs[j].ID }; return hash(srcs[i]) < hash(srcs[j]) })
 	r.ContextDigest = hash(cc)
 	r.SkillRegistryDigest = hash(ss)
 	r.SourceManifestDigest = hash(srcs)
@@ -249,7 +249,11 @@ func Validate(in Request) Report {
 			fail("INVALID_TOKEN_BUDGET", s.ID, "negative per-skill token budget")
 		}
 	}
-	for id, s := range skills {
+	skillIDs := make([]string, 0, len(skills))
+	for id := range skills { skillIDs = append(skillIDs, id) }
+	sort.Strings(skillIDs)
+	for _, id := range skillIDs {
+		s := skills[id]
 		if !selected[id] {
 			continue
 		}
@@ -417,7 +421,7 @@ func Validate(in Request) Report {
 				continue
 			}
 			expiry, e := time.Parse(time.RFC3339, auth.ExpiresAt)
-			if auth.VerifierStatus != "verified" || auth.Principal != c.Principal || auth.Scope != c.Scope || auth.ActionKind != sink.ActionKind || auth.Target != target || auth.ArgumentsDigest != sink.ArgumentsDigest || auth.RequiredCapability != sink.RequiredCapability || !has(c.Capabilities, auth.RequiredCapability) || e != nil || nowErr == nil && !expiry.After(now) || auth.Nonce == "" || nonces[auth.Nonce] {
+			if !validDigest(sink.ArgumentsDigest) || auth.VerifierStatus != "verified" || auth.Principal != c.Principal || auth.Scope != c.Scope || auth.ActionKind != sink.ActionKind || auth.Target != target || auth.ArgumentsDigest != sink.ArgumentsDigest || auth.RequiredCapability != sink.RequiredCapability || !has(c.Capabilities, auth.RequiredCapability) || e != nil || nowErr == nil && !expiry.After(now) || auth.Nonce == "" || nonces[auth.Nonce] {
 				fail("ACTION_AUTH_INVALID", sink.ArtifactID, "authorization receipt mismatch, expired, replayed or malformed")
 			} else {
 				nonces[auth.Nonce] = true
@@ -426,6 +430,11 @@ func Validate(in Request) Report {
 			fail("UNKNOWN_SINK_KIND", sink.ArtifactID, "sink kind is not supported")
 		}
 	}
+	sort.Slice(r.Findings, func(i, j int) bool {
+		if r.Findings[i].Code != r.Findings[j].Code { return r.Findings[i].Code < r.Findings[j].Code }
+		if r.Findings[i].Object != r.Findings[j].Object { return r.Findings[i].Object < r.Findings[j].Object }
+		return r.Findings[i].Detail < r.Findings[j].Detail
+	})
 	r.ReportDigest = ""
 	r.ReportDigest = hash(struct {
 		Accepted                       bool
