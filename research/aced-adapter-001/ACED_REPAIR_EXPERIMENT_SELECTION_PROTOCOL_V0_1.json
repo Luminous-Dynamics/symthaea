@@ -1,0 +1,124 @@
+{
+  "protocol_id": "ACED-REPAIR-EXPERIMENT-SELECTOR-001",
+  "version": "0.1.0",
+  "status": "preregistered_comparison_protocol_not_model_results",
+  "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11598",
+  "pinned_upstream_commit": "998dc692bfcf5574e5319d67f1cea9c170569d80",
+  "official_budget": {
+    "experiments_per_world": 15,
+    "turns_per_world": 32
+  },
+  "objective": "Measure whether experiment selection and stopping policies improve intervention utility and mechanism recovery at equal experimental budgets, rather than maximizing information gain or final answer confidence in isolation.",
+  "primary_estimands": [
+    "paired difference in accepted outcome versus the official upstream-compatible agent",
+    "paired difference in benefit_recovered and intervention regret",
+    "area under utility-recovery-versus-experiment-budget curve",
+    "premature_stop regret and unnecessary_experiment cost",
+    "worst-archetype and worst-domain treatment effects"
+  ],
+  "policy_arms": [
+    {
+      "id": "official_aced",
+      "name": "Official ACED agent",
+      "role": "Primary external reference; preserve upstream prompt, tool contract, budget and grader where licensing and execution permit."
+    },
+    {
+      "id": "random_valid",
+      "name": "Random valid intervention",
+      "role": "Control for unguided exploration; sample only within declared valid actuator and dose bounds."
+    },
+    {
+      "id": "greedy_eig",
+      "name": "Greedy expected information gain",
+      "role": "Select the affordable experiment with greatest expected reduction in uncertainty over a preregistered hypothesis/mechanism posterior."
+    },
+    {
+      "id": "greedy_evsi",
+      "name": "Expected value of sample information",
+      "role": "Select the experiment with greatest expected improvement in downstream decision utility after observing its result, net of declared experiment cost."
+    },
+    {
+      "id": "risk_adjusted_evsi",
+      "name": "Risk-adjusted EVSI",
+      "role": "Subtract intervention hazard, irreversibility and subgroup downside using predeclared loss terms; use safe read-only measurements where intervention risk is material."
+    },
+    {
+      "id": "adaptive_selector",
+      "name": "Adaptive evidence-gated selector",
+      "role": "Choose among measurement, intervention, replication, dose search, subgroup probe, clarification and stop based on evidence state, decision sensitivity and remaining budget. No oracle access."
+    }
+  ],
+  "design_controls": {
+    "matched_unit": "Same pinned world, model snapshot, system prompt, tool schema, serving context, decoding settings, token budget, 15-experiment limit and 32-turn limit within each paired comparison.",
+    "randomization": "Randomize arm execution order and model-call order within each world; keep all treatments for one world in the same statistical cluster.",
+    "seeds": "Precommit world, intervention-sampling, agent and evaluation seeds; include them in a receipt before model execution.",
+    "information_boundary": "The candidate receives only the scenario and tool outputs. It never receives the hidden SCM, true intervention, oracle dose, battery/scoring roles, or the split index.",
+    "no_hindsight": "Record predicted outcome distributions and expected information/value before every experiment; never backfill predictions after observing outcomes.",
+    "stopping": "A stop must bind the evidence state and current best action. Evaluate expected marginal value of the best available additional experiment after cost and risk; retain abstain/unknown when decision value is unresolved.",
+    "official_score": "Never alter the official ACED grader or official metric definitions. New metrics remain a separate scorecard."
+  },
+  "required_scenario_families": [
+    "one experiment is highly informative about a non-decisive variable",
+    "a low-entropy experiment changes the optimal intervention",
+    "a confounded observational correlation is overturned by a targeted intervention",
+    "multiple independent causes require more than one effective lever",
+    "the correct actuator is found but the optimal dose lies in a narrow window",
+    "synergistic effects require a joint intervention",
+    "a surrogate/instrument measurement is informative but not directly actionable",
+    "subgroup effects reverse the population-average policy",
+    "new contradictory evidence requires replication or source reconciliation",
+    "all remaining experiments have negative expected net decision value",
+    "one remaining experiment has high value only for a minority subgroup",
+    "an intervention can cause irreversible or high-cost harm"
+  ],
+  "metrics": [
+    {
+      "name": "benefit_recovered",
+      "definition": "Preserve official ACED ratio of improvement versus oracle fix."
+    },
+    {
+      "name": "intervention_regret",
+      "definition": "Difference between true objective under chosen intervention and oracle objective."
+    },
+    {
+      "name": "utility_auc_budget",
+      "definition": "Area under best-achieved true utility as a function of experiment count; evaluated by hidden oracle after run."
+    },
+    {
+      "name": "expected_value_calibration",
+      "definition": "Proper-score/calibration comparison of pre-registered predicted experiment value versus realized decision-relevant value where estimable."
+    },
+    {
+      "name": "decision_relevant_information",
+      "definition": "Change in optimal downstream action or expected utility attributable to an observation, distinct from generic entropy reduction."
+    },
+    {
+      "name": "premature_stop_regret",
+      "definition": "Counterfactual decision regret when the agent stops while at least one affordable experiment has positive net expected decision value."
+    },
+    {
+      "name": "unnecessary_experiment_cost",
+      "definition": "Declared experiment cost incurred after further evidence cannot improve the decision beyond a preregistered materiality threshold."
+    },
+    {
+      "name": "experiment_efficiency",
+      "definition": "Benefit recovered or regret reduction per experiment, turn, tool call, token and unit cost."
+    },
+    {
+      "name": "worst_group_regret",
+      "definition": "Maximum subgroup/domain/archetype regret; prevents average gains from hiding fragile policies."
+    },
+    {
+      "name": "unsupported_mechanism_claim_rate",
+      "definition": "Rate of mechanism claims not supported by the observations/interventions available before commitment."
+    }
+  ],
+  "statistical_plan": {
+    "primary_unit": "World-level matched paired difference; all seeds and repeated model runs remain clustered by upstream world identity.",
+    "reporting": "Per-world raw results, paired mean/median, confidence intervals, effect sizes, complete denominators, missing/timeout/invalid cases and per-archetype/per-domain results.",
+    "multiplicity": "Predeclare primary outcomes and control family-wise error or false discovery for secondary subgroup comparisons.",
+    "sample_size": "The 54-world upstream evaluation set is an initial external evaluation, not automatically powered for every domain subgroup. Confirmatory work must use a preregistered power analysis and account for only five or six eval worlds in most domains.",
+    "independence": "Do not treat the evaluation subset and parent test inventory as independent samples."
+  },
+  "claim_ceiling": "This protocol proposes matched experiment-selection and stopping comparisons. No policy arm has been run here. No EVSI advantage, SOTA superiority, safety or causal reasoning competence is claimed."
+}
