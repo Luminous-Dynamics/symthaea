@@ -329,12 +329,17 @@ impl EvidenceConflict {
                 ));
             }
             match evidence.iter().find(|record| record.id == *id) {
-                Some(record) => match &record.independence_group {
-                    Some(group) if !group.trim().is_empty() => {
-                        supporting_groups.insert(group.clone());
+                Some(record) => {
+                    if let Some(digest) = &record.artifact_sha256 {
+                        supporting_artifacts.insert(digest.to_ascii_lowercase());
                     }
-                    _ => groups_complete = false,
-                },
+                    match &record.independence_group {
+                        Some(group) if !group.trim().is_empty() => {
+                            supporting_groups.insert(group.clone());
+                        }
+                        _ => groups_complete = false,
+                    }
+                }
                 None => issues.push(format!(
                     "{path} references unknown supporting evidence id: {id}"
                 )),
@@ -353,12 +358,17 @@ impl EvidenceConflict {
                 ));
             }
             match evidence.iter().find(|record| record.id == *id) {
-                Some(record) => match &record.independence_group {
-                    Some(group) if !group.trim().is_empty() => {
-                        contradicting_groups.insert(group.clone());
+                Some(record) => {
+                    if let Some(digest) = &record.artifact_sha256 {
+                        contradicting_artifacts.insert(digest.to_ascii_lowercase());
                     }
-                    _ => groups_complete = false,
-                },
+                    match &record.independence_group {
+                        Some(group) if !group.trim().is_empty() => {
+                            contradicting_groups.insert(group.clone());
+                        }
+                        _ => groups_complete = false,
+                    }
+                }
                 None => issues.push(format!(
                     "{path} references unknown contradicting evidence id: {id}"
                 )),
