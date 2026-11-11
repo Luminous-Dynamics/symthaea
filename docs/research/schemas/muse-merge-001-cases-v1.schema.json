@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/muse-merge-001-cases-v1.schema.json",
+  "title": "MUSE-MERGE-001 deterministic fixture manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "schema_version",
+    "status",
+    "created",
+    "case_count",
+    "expected_outcomes",
+    "cases"
+  ],
+  "properties": {
+    "schema": {
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "status": {
+      "const": "synthetic_known_answer_fixture_manifest_not_executed"
+    },
+    "created": {
+      "type": "string",
+      "format": "date"
+    },
+    "case_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "expected_outcomes": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "SafeAutomaticMerge",
+          "MergeWithRevalidation",
+          "HumanDecisionRequired",
+          "Conflict",
+          "Unknown",
+          "Rejected",
+          "InDoubt"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 15,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "patch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation",
+        "targets",
+        "reads",
+        "writes",
+        "time_domain",
+        "authorization",
+        "artifact_integrity",
+        "description"
+      ],
+      "properties": {
+        "operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targets": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "reads": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "writes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "time_domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authorization": {
+          "type": "string",
+          "minLength": 1
+        },
+        "artifact_integrity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "base_version_id",
+        "patch_a",
+        "patch_b",
+        "expected_outcome",
+        "reason",
+        "requires_human_decision",
+        "requires_render_revalidation"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^M[0-9]{2}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base_version_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "patch_a": {
+          "$ref": "#/$defs/patch"
+        },
+        "patch_b": {
+          "$ref": "#/$defs/patch"
+        },
+        "expected_outcome": {
+          "enum": [
+            "SafeAutomaticMerge",
+            "MergeWithRevalidation",
+            "HumanDecisionRequired",
+            "Conflict",
+            "Unknown",
+            "Rejected",
+            "InDoubt"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "requires_human_decision": {
+          "type": "boolean"
+        },
+        "requires_render_revalidation": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
