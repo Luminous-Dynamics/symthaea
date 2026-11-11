@@ -11,7 +11,7 @@ The public branch contains:
 - typed Go request/skill/artifact/step/sink schema;
 - deterministic composition validator and strict JSON CLI;
 - protocol, threat model and benchmark matrix;
-- 12 named Go test functions: 7 focused validator tests, 1 generated two-step lattice-oracle test, and 4 sink/capability-binding regression tests.
+- 13 named Go test functions: 7 focused validator tests, 1 generated two-step lattice-oracle test, and 4 sink/capability-binding regression tests.
 
 This is a research-only Go reference. No Rust integration is included.
 
