@@ -97,7 +97,7 @@ This benchmark does not duplicate those owners. It measures the *model-mediated 
 ```bash
 cargo fmt --manifest-path research/action-context-alignment-001/qualifier/Cargo.toml --check
 cargo test --manifest-path research/action-context-alignment-001/qualifier/Cargo.toml
-cargo run --manifest-path research/action-context-alignment-001/qualifier/Cargo.toml -- \
+cargo run --manifest-path research/action-context-alignment-001/qualifier/Cargo.toml --bin action-context-alignment-qualifier -- \
   research/action-context-alignment-001/ACTION_CONTEXT_ALIGNMENT_FIXTURES_V0_1.json \
   research/action-context-alignment-001/ACTION_CONTEXT_ALIGNMENT_FIXTURES_V0_1.schema.json
 cargo run --manifest-path research/action-context-alignment-001/qualifier/Cargo.toml \
