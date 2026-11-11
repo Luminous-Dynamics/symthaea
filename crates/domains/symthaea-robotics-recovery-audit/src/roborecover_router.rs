@@ -249,7 +249,7 @@ pub fn select_policy(
             continue;
         }
 
-        if record.identity != *identity {
+        if &record.identity != identity {
             reject(&mut rejected, RouterRejection::IdentityMismatch);
             continue;
         }
