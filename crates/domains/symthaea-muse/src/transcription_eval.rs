@@ -201,12 +201,12 @@ pub struct MidiTempoPointV1 {
 }
 
 #[derive(Debug, Clone)]
-struct EvaluationNoteV1 {
-    pitch_midi: u8,
-    gm_program: u8,
-    velocity_midi: u8,
-    onset_seconds: f64,
-    offset_seconds: Option<f64>,
+pub(crate) struct EvaluationNoteV1 {
+    pub(crate) pitch_midi: u8,
+    pub(crate) gm_program: u8,
+    pub(crate) velocity_midi: u8,
+    pub(crate) onset_seconds: f64,
+    pub(crate) offset_seconds: Option<f64>,
 }
 
 #[derive(Serialize)]
@@ -252,7 +252,7 @@ fn domain_separated_sha256(schema: &str, bytes: &[u8]) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-fn validate_config(
+pub(crate) fn validate_config(
     config: &MidiTranscriptionEvaluationConfigV1,
 ) -> Result<(), MidiTranscriptionEvaluationIssueV1> {
     if config.onset_tolerance_ms == 0 || config.onset_tolerance_ms > 5_000 {
@@ -591,7 +591,7 @@ fn valid_sha256(value: &str) -> bool {
         && value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn validate_reference_artifact_v1(
+pub(crate) fn validate_reference_artifact_v1(
     reference: &MidiPerformanceArtifactV1,
 ) -> Result<(), MidiTranscriptionEvaluationIssueV1> {
     use midly::{MetaMessage, MidiMessage, TrackEventKind};
@@ -821,7 +821,7 @@ fn validate_reference_artifact_v1(
     Ok(())
 }
 
-fn reference_notes(
+pub(crate) fn reference_notes(
     reference: &MidiPerformanceArtifactV1,
 ) -> Result<Vec<EvaluationNoteV1>, MidiTranscriptionEvaluationIssueV1> {
     let programs: BTreeMap<_, _> = reference
@@ -867,7 +867,7 @@ fn reference_notes(
     Ok(notes)
 }
 
-fn maximum_cardinality_matching(
+pub(crate) fn maximum_cardinality_matching(
     adjacency: &[Vec<usize>],
     predicted_count: usize,
 ) -> Result<Vec<(usize, usize)>, MidiTranscriptionEvaluationIssueV1> {
@@ -1096,7 +1096,7 @@ fn mir_eval_round_distance_v1(distance: f64) -> f64 {
     (distance * 10_000.0).round_ties_even() / 10_000.0
 }
 
-fn build_adjacency(
+pub(crate) fn build_adjacency(
     reference: &[EvaluationNoteV1],
     predicted: &[MidiTranscribedNoteV1],
     config: &MidiTranscriptionEvaluationConfigV1,
@@ -1179,7 +1179,7 @@ fn build_adjacency(
     Ok(adjacency)
 }
 
-fn build_onset_only_adjacency(
+pub(crate) fn build_onset_only_adjacency(
     reference: &[EvaluationNoteV1],
     predicted: &[MidiTranscribedNoteV1],
     config: &MidiTranscriptionEvaluationConfigV1,
@@ -1211,7 +1211,7 @@ fn build_onset_only_adjacency(
     Ok(adjacency)
 }
 
-fn build_offset_only_adjacency(
+pub(crate) fn build_offset_only_adjacency(
     reference: &[EvaluationNoteV1],
     predicted: &[MidiTranscribedNoteV1],
     config: &MidiTranscriptionEvaluationConfigV1,
@@ -1294,7 +1294,7 @@ fn average_overlap_ratio_v1(
     ratios.iter().sum::<f64>() / ratios.len() as f64
 }
 
-fn metric_from_matching(
+pub(crate) fn metric_from_matching(
     reference_count: usize,
     predicted_count: usize,
     true_positives: usize,
