@@ -378,7 +378,7 @@ fn check_join(join: &Value, acoustic: &Value, bio: &Value, findings: &mut Findin
         after,
     ) {
         match parse_time(after.get("observed_at").and_then(Value::as_str)) {
-            Some(after_time) if after_time > *cleaning_end => {}
+            Some(after_time) if after_time > cleaning_end.clone() => {}
             Some(_) => findings.push(
                 "/performance_links/after_observation_id",
                 "INCOMPARABLE",
@@ -557,7 +557,11 @@ mod tests {
             serde_json::json!("2026-10-14T10:00:00Z");
         acoustic["measurement_window"]["end"] =
             serde_json::json!("2026-10-14T10:01:00Z");
-        // The join still declares the next-day inspection time and exact digest.
+        join["acoustic_link"]["measurement_start"] =
+            serde_json::json!("2026-10-14T10:00:00Z");
+        join["acoustic_link"]["measurement_end"] =
+            serde_json::json!("2026-10-14T10:01:00Z");
+        // The join now agrees with the acoustic trace, but the hull inspection falls outside the declared time tolerance.
         let mut findings = Findings::default();
         check_join(&join, &acoustic, &bio, &mut findings);
         assert!(findings.incomparable);
