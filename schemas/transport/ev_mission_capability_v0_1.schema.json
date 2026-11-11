@@ -1,0 +1,337 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ev_mission_capability_v0_1",
+  "title": "EV mission profile capability evaluator corpus v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "corpus_version",
+    "cases"
+  ],
+  "properties": {
+    "corpus_version": {
+      "const": "ev-mission-capability-corpus/0.1"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "step_id",
+        "start_time_seconds",
+        "end_time_seconds",
+        "requested_battery_power_kw",
+        "power_uncertainty_kw",
+        "external_energy_kwh"
+      ],
+      "properties": {
+        "step_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_time_seconds": {
+          "type": "number"
+        },
+        "end_time_seconds": {
+          "type": "number"
+        },
+        "requested_battery_power_kw": {
+          "type": "number"
+        },
+        "power_uncertainty_kw": {
+          "type": "number",
+          "minimum": 0
+        },
+        "external_energy_kwh": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cell_ref",
+        "soc_lower_pct",
+        "soc_upper_pct",
+        "temperature_upper_c",
+        "voltage_lower_v",
+        "voltage_upper_v"
+      ],
+      "properties": {
+        "cell_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "soc_lower_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "soc_upper_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "temperature_upper_c": {
+          "type": "number"
+        },
+        "voltage_lower_v": {
+          "type": "number",
+          "minimum": 0
+        },
+        "voltage_upper_v": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "slice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "step_id",
+        "start_time_seconds",
+        "end_time_seconds",
+        "vehicle_ref",
+        "pack_ref",
+        "configuration_sha256",
+        "topology_sha256",
+        "model_version",
+        "model_evidence_ref",
+        "model_evidence_sha256",
+        "source_class",
+        "domain_soc_min_pct",
+        "domain_soc_max_pct",
+        "domain_temperature_min_c",
+        "domain_temperature_max_c",
+        "discharge_power_lower_kw",
+        "charge_acceptance_lower_kw",
+        "cells"
+      ],
+      "properties": {
+        "step_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_time_seconds": {
+          "type": "number"
+        },
+        "end_time_seconds": {
+          "type": "number"
+        },
+        "vehicle_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pack_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "topology_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "model_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_evidence_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_class": {
+          "enum": [
+            "SYNTHETIC_KNOWN_TRUTH",
+            "QUALIFIED_PHYSICAL_MODEL",
+            "UNQUALIFIED_VENDOR_ESTIMATE",
+            "UNSUPPORTED_SOURCE"
+          ]
+        },
+        "domain_soc_min_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "domain_soc_max_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "domain_temperature_min_c": {
+          "type": "number"
+        },
+        "domain_temperature_max_c": {
+          "type": "number"
+        },
+        "discharge_power_lower_kw": {
+          "type": "number",
+          "minimum": 0
+        },
+        "charge_acceptance_lower_kw": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cells": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/cell"
+          }
+        }
+      }
+    },
+    "mission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vehicle_ref",
+        "pack_ref",
+        "configuration_sha256",
+        "topology_sha256",
+        "profile_ref",
+        "profile_sha256",
+        "declared_cell_refs",
+        "start_time_seconds",
+        "end_time_seconds",
+        "initial_energy_above_reserve_kwh_lower",
+        "regenerative_efficiency_lower",
+        "minimum_cell_soc_pct",
+        "maximum_cell_soc_pct",
+        "maximum_cell_temperature_c",
+        "minimum_cell_voltage_v",
+        "maximum_cell_voltage_v",
+        "steps",
+        "capability_slices"
+      ],
+      "properties": {
+        "vehicle_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pack_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "topology_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "profile_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "declared_cell_refs": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "start_time_seconds": {
+          "type": "number"
+        },
+        "end_time_seconds": {
+          "type": "number"
+        },
+        "initial_energy_above_reserve_kwh_lower": {
+          "type": "number",
+          "minimum": 0
+        },
+        "regenerative_efficiency_lower": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "minimum_cell_soc_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "maximum_cell_soc_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "maximum_cell_temperature_c": {
+          "type": "number"
+        },
+        "minimum_cell_voltage_v": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_cell_voltage_v": {
+          "type": "number",
+          "minimum": 0
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/step"
+          }
+        },
+        "capability_slices": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/slice"
+          }
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "expected_disposition",
+        "mission"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_disposition": {
+          "enum": [
+            "FEASIBLE_WITHIN_DECLARED_ENVELOPE",
+            "INFEASIBLE",
+            "NOT_COMPUTABLE",
+            "UNSUPPORTED_DOMAIN",
+            "CONFLICTING_EVIDENCE",
+            "REJECTED_INPUT"
+          ]
+        },
+        "mission": {
+          "$ref": "#/$defs/mission"
+        }
+      }
+    }
+  }
+}
