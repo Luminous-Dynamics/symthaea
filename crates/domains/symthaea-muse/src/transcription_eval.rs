@@ -2123,7 +2123,16 @@ mod tests {
             predicted_eval_note(9, 48, 1),
         ];
         let summary =
-            part_separation_summary_v1(&[1, 2], &reference, &predicted, &[(0, 0), (1, 1)]).unwrap();
+            part_separation_summary_v1(
+                &[1, 2],
+                &reference,
+                &predicted,
+                &[(0, 0), (1, 1)],
+                &[
+                    std::collections::BTreeSet::from([1]),
+                    std::collections::BTreeSet::from([2]),
+                ],
+            ).unwrap();
         assert_eq!(summary.reference_part_count, 2);
         assert_eq!(summary.matched_reference_part_count, 2);
         assert_eq!(summary.matched_prediction_track_count, 2);
@@ -2144,7 +2153,16 @@ mod tests {
             predicted_eval_note(4, 48, 1),
         ];
         let summary =
-            part_separation_summary_v1(&reference, &predicted, &[(0, 0), (1, 1)]).unwrap();
+            part_separation_summary_v1(
+                &[1, 2],
+                &reference,
+                &predicted,
+                &[(0, 0), (1, 1)],
+                &[
+                    std::collections::BTreeSet::from([1]),
+                    std::collections::BTreeSet::from([2]),
+                ],
+            ).unwrap();
         assert_eq!(summary.total_matched_notes, 2);
         assert_eq!(summary.mixed_prediction_track_count, 1);
         assert_eq!(summary.matched_notes_in_mixed_tracks, 2);
@@ -2197,7 +2215,13 @@ mod tests {
         ];
         let predicted = vec![predicted_eval_note(4, 60, 0)];
         let summary =
-            part_separation_summary_v1(&[1, 2], &reference, &predicted, &[(0, 0)]).unwrap();
+            part_separation_summary_v1(
+                &[1, 2],
+                &reference,
+                &predicted,
+                &[(0, 0)],
+                &[std::collections::BTreeSet::from([1])],
+            ).unwrap();
         assert_eq!(summary.matched_reference_part_count, 1);
         assert_eq!(summary.reference_part_coverage, Some(0.5));
         assert_eq!(summary.note_weighted_track_purity, Some(1.0));
@@ -2220,7 +2244,33 @@ mod tests {
     fn zero_matched_notes_has_zero_part_coverage_and_no_purity_estimate() {
         let reference = vec![reference_eval_note(1, 60)];
         let predicted = vec![predicted_eval_note(4, 72, 0)];
-        let summary = part_separation_summary_v1(&[1, 2], &reference, &predicted, &[]).unwrap();
+        let summary = part_separation_summary_v1(&[1, 2], &reference, &predicted, &[], &[]).unwrap();
+        assert_eq!(summary.reference_part_coverage, Some(0.0));
+        assert_eq!(summary.note_weighted_track_purity, None);
+        assert_eq!(summary.note_weighted_lane_purity, None);
+    }
+
+    #[test]
+    fn ambiguous_same_pitch_same_onset_part_assignment_is_not_claimed() {
+        let reference = vec![
+            reference_eval_note(1, 60),
+            reference_eval_note(2, 60),
+        ];
+        let predicted = vec![predicted_eval_note(4, 60, 0)];
+        // The event matches note-wise, but either source PartId could have
+        // generated it. The evaluator must not manufacture a part label.
+        let summary = part_separation_summary_v1(
+            &[1, 2],
+            &reference,
+            &predicted,
+            &[(0, 0)],
+            &[std::collections::BTreeSet::from([1, 2])],
+        )
+        .unwrap();
+        assert_eq!(summary.total_matched_notes, 1);
+        assert_eq!(summary.part_attributed_note_count, 0);
+        assert_eq!(summary.ambiguous_part_assignment_note_count, 1);
+        assert_eq!(summary.matched_reference_part_count, 0);
         assert_eq!(summary.reference_part_coverage, Some(0.0));
         assert_eq!(summary.note_weighted_track_purity, None);
         assert_eq!(summary.note_weighted_lane_purity, None);
