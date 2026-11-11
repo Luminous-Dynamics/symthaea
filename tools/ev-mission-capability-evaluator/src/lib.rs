@@ -568,9 +568,16 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
             } else if cell_disposition == "REJECTED_INPUT" {
                 disposition = "REJECTED_INPUT".to_owned();
             }
-            if global_limiting_cell.is_none() || cell_disposition == "INFEASIBLE" {
+            if cell_disposition == "INFEASIBLE" && global_limiting_cell.is_none() {
                 global_limiting_cell = Some(cell_ref.clone());
             }
+            let hottest_cell = slice.cells.iter()
+                .max_by(|left, right| left.temperature_upper_c.partial_cmp(&right.temperature_upper_c)
+                    .unwrap_or(std::cmp::Ordering::Equal));
+            let hottest_cell_ref = hottest_cell.map(|cell| cell.cell_ref.clone());
+            let hottest_thermal_margin = hottest_cell.map(|cell| {
+                mission.maximum_cell_temperature_c - cell.temperature_upper_c
+            });
             step_audits.push(StepAudit {
                 step_id: step.step_id.clone(),
                 disposition: cell_disposition.clone(),
@@ -585,8 +592,13 @@ remove unused step map    let slices_by_id: BTreeMap<&str, &CapabilitySlice> = m
                 charge_acceptance_margin_kw: None,
                 energy_remaining_above_reserve_kwh_lower: None,
                 external_energy_kwh_not_credited: step.external_energy_kwh,
-                limiting_cell_ref: Some(cell_ref),
-                thermal_margin_c: Some(thermal_margin),
+                limiting_cell_ref: if cell_disposition == "INFEASIBLE" {
+                    Some(cell_ref)
+                } else {
+                    None
+                },
+                hottest_cell_ref,
+                thermal_margin_c: hottest_thermal_margin.or(Some(thermal_margin)),
                 reason: Some("A cell trajectory violates the mission limit or the model support domain".to_owned()),
             });
             continue;
@@ -901,6 +913,16 @@ mod tests {
         let row = case(&report, "peak_passes_but_sustained_energy_fails");
         assert_eq!(row.disposition, "INFEASIBLE");
         assert_eq!(row.limiting_cell_ref, None);
+    }
+
+    #[test]
+    fn unsupported_model_domain_does_not_claim_a_physical_limiting_cell() {
+        let report = report();
+        let row = case(&report, "temperature_out_of_model_domain");
+        assert_eq!(row.disposition, "UNSUPPORTED_DOMAIN");
+        assert_eq!(row.limiting_cell_ref, None);
+        assert_eq!(row.step_audits[0].limiting_cell_ref, None);
+        assert!(row.step_audits[0].hottest_cell_ref.is_some());
     }
 
 }
