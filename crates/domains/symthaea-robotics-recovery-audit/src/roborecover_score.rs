@@ -9,7 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{
-    audit_trials, classify_trial, AuditReport, SafetyEvidence, TerminalOutcome,
+    audit_trials, classify_trial, AuditReport, TerminalOutcome,
     TrialDisposition, TrialEvidence,
 };
 
@@ -424,6 +424,7 @@ pub fn score_roborecover(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::SafetyEvidence;
 
     fn all_groups() -> Vec<StageTypeGroup> {
         vec![
