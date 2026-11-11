@@ -19780,6 +19780,9 @@ dependencies = [
 [[package]]
 name = "symthaea-robotics-recovery-audit"
 version = "0.1.0"
+dependencies = [
+ "sha1",
+]
 
 [[package]]
 name = "symthaea-ros-bridge"
