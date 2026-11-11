@@ -559,10 +559,10 @@ fn whiten_and_normalize_generator(
 
     let mut skew_norm = 0.0_f64;
     let mut normalized = Vec::with_capacity(dimension * dimension);
-    for row in 0..dimension {
-        for column in 0..dimension {
-            skew_norm = skew_norm.hypot(whitened[row][column] + whitened[column][row]);
-            normalized.push(whitened[row][column] / whitened_norm);
+    for (row, row_values) in whitened.iter().take(dimension).enumerate() {
+        for (column, value) in row_values.iter().take(dimension).enumerate() {
+            skew_norm = skew_norm.hypot(*value + whitened[column][row]);
+            normalized.push(*value / whitened_norm);
         }
     }
     let skew_defect = skew_norm / (2.0 * whitened_norm);
@@ -577,15 +577,16 @@ fn whiten_and_normalize_generator(
     Ok((normalized, input_scale, whitened_norm, skew_defect))
 }
 
+/// Output of deterministic column-pivoted MGS:
+/// (orthonormal basis, triangular factor, pivot permutation, relative pivots).
+type PivotedMgsResultV1 = (Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<usize>, Vec<f64>);
+
 /// Deterministic column-pivoted MGS with two reorthogonalization passes.
 /// Original generator columns are unit norm, so pivot residuals are relative.
 fn pivoted_modified_gram_schmidt(
     columns: &[Vec<f64>],
     rank_tolerance: f64,
-) -> Result<
-    (Vec<Vec<f64>>, Vec<Vec<f64>>, Vec<usize>, Vec<f64>),
-    LinearLieAlgebraQualificationErrorV1,
-> {
+) -> Result<PivotedMgsResultV1, LinearLieAlgebraQualificationErrorV1> {
     let count = columns.len();
     let mut residuals = columns.to_vec();
     let mut permutation: Vec<usize> = (0..count).collect();
@@ -596,8 +597,12 @@ fn pivoted_modified_gram_schmidt(
     for pivot_index in 0..count {
         let mut selected = pivot_index;
         let mut selected_norm = vector_norm(&residuals[selected]);
-        for candidate in (pivot_index + 1)..count {
-            let candidate_norm = vector_norm(&residuals[candidate]);
+        for (candidate, residual) in residuals
+            .iter()
+            .enumerate()
+            .skip(pivot_index + 1)
+        {
+            let candidate_norm = vector_norm(residual);
             if candidate_norm > selected_norm {
                 selected = candidate;
                 selected_norm = candidate_norm;
@@ -607,8 +612,8 @@ fn pivoted_modified_gram_schmidt(
         if selected != pivot_index {
             residuals.swap(pivot_index, selected);
             permutation.swap(pivot_index, selected);
-            for row in 0..pivot_index {
-                triangular[row].swap(pivot_index, selected);
+            for row_values in triangular.iter_mut().take(pivot_index) {
+                row_values.swap(pivot_index, selected);
             }
         }
 
@@ -709,10 +714,13 @@ fn jacobi_term(
     middle_right: usize,
 ) -> Vec<f64> {
     let mut result = vec![0.0_f64; generator_count];
-    for output in 0..generator_count {
-        for inner in 0..generator_count {
-            result[output] +=
-                structure[middle_left][middle_right][inner] * structure[outer][inner][output];
+    for (inner, coefficient) in structure[middle_left][middle_right]
+        .iter()
+        .take(generator_count)
+        .enumerate()
+    {
+        for (output, value) in result.iter_mut().enumerate() {
+            *value += coefficient * structure[outer][inner][output];
         }
     }
     result
