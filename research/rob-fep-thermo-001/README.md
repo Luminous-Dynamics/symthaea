@@ -360,3 +360,8 @@ Symtropy [#4689](https://github.com/Luminous-Dynamics/symtropy/issues/4689) now 
 ## Viability-bounded action horizon
 
 Symtropy [#4696](https://github.com/Luminous-Dynamics/symtropy/issues/4696) now owns the selection/evaluation contract for the longest action chunk allowed by the earliest qualified evidence or physical horizon. It distinguishes queued K_min coverage from K_max viability and split-timescale local-expert execution. The initial 12-case corpus and validator are in [draft PR #4704](https://github.com/Luminous-Dynamics/symtropy/pull/4704).
+
+
+## Decision-sensitive freshness extension
+
+The distributed-inference work now distinguishes result age at receipt from actuation-side AoI and from EVSI. See [decision_sensitive_freshness.md](./decision_sensitive_freshness.md) and the updated 22-case distributed-inference fixtures. This prevents an inference server from reporting a fresh result when its command arrives too late to influence the actuator safely or usefully.
