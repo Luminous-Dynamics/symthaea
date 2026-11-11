@@ -1337,7 +1337,7 @@ mod tests {
         .expect("manifest and event fixtures must validate");
         assert_eq!(report.fixtures, 22);
         assert_eq!(report.valid_controls, 10);
-        assert_eq!(report.negative_controls, 11);
+        assert_eq!(report.negative_controls, 12);
     }
 
     #[test]
