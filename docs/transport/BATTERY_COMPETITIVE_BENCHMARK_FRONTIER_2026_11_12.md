@@ -115,6 +115,23 @@ On identical finite design portfolios and total experiment budgets, compare rand
 
 The initial Rust audit in PR #11722 passed its dedicated known-answer workflow on its original head, but the workflow-syntax policy required adding `ready_for_review` to its PR trigger. Treat the audit and workflow governance as separate qualifications until the new-head rerun completes. The fixture outcomes are synthetic; no selector is yet shown to improve real battery experiments or physical discovery.
 
+### Track F — thermal-propagation evidence transfer and product-change requalification
+
+Owner: Symtropy [EV-BATTERY-THERMAL-PROPAGATION-EVIDENCE-001 #4879](https://github.com/Luminous-Dynamics/symtropy/issues/4879) / draft [PR #4881](https://github.com/Luminous-Dynamics/symtropy/pull/4881).
+
+This is an evidence-assurance lane, not a fire/thermal-runaway simulator or a substitute for standards testing. It closes a gap between individual cell/pack/vehicle test records and decisions about whether those records still apply after design or manufacturing changes.
+
+Research basis:
+- UN Regulation No. 100 as consolidated by EU Regulation 2026/1695 includes EV REESS thermal-propagation provisions in 6.15 and Annex 9K, with an application-specific physical-test or systematic risk-management path. The applicability and approval route remain with the competent authority: https://eur-lex.europa.eu/eli/reg/2026/1695/oj/eng/pdf
+- IEC 62660-3:2022 is cell/cell-block safety testing, not a standalone pack/vehicle propagation qualification: https://webstore.iec.ch/en/publication/65084
+- SAE J2464_202108 describes abuse-test methods across cell/module/pack levels but does not supply pass/fail criteria: https://saemobilus.sae.org/standards/j2464_202108-electric-hybrid-electric-vehicle-rechargeable-energy-storage-system-ress-safety-abuse-testing
+- UL 9540A Ed. 6 is a stationary BESS propagation method, including installation-level testing; it is not interchangeable with EV traction REESS evidence: https://www.shopulstandards.com/ProductDetail.aspx?productId=UL9540A_6_S_20260313
+- The 2026 cross-standard review recommends a multilevel evidence chain and equivalence assessment across source terms, topology, thermal pathways, protection, enclosure and exposure: https://www.mdpi.com/2313-0105/12/9/375
+
+The benchmark should compare an unstructured document binder, exact-version matching, one-axis configuration matching and a six-domain typed equivalence audit. Report false-green inheritance, detection of changed/unknown domains, result-state preservation, missing metrology/criteria, source-digest completeness and deterministic replay. The software's strongest positive disposition is only **candidate for competent human/authority review**. It cannot determine safety, predict propagation, certify a standard or authorize destructive testing.
+
+Draft PR #4881 adds a Rust/schema/fixture audit. Its exact-head focused workflow is skipped while the PR remains draft; compile, test, formatting and Clippy are not yet claimed as passing. Fixture evidence is synthetic.
+
 ## Additional materials frontier: sodium-ion and zero-excess sodium-metal
 
 A new bounded materials lane has been opened in Symthaea [SODIUM-BATTERY-MISSION-001 #11694](https://github.com/Luminous-Dynamics/symthaea/issues/11694) / draft [PR #11695](https://github.com/Luminous-Dynamics/symthaea/pull/11695).
