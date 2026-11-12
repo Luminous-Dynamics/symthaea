@@ -314,6 +314,8 @@ fn validate_case(case: &Case) -> Vec<String> {
             errors.push(format!("run {} has no windows", run.run_id));
         }
         let mut window_ids = BTreeSet::new();
+        let mut acoustic_trace_digests = BTreeSet::new();
+        let mut cavitation_observation_digests = BTreeSet::new();
         let mut previous_end: Option<f64> = None;
         for window in &run.windows {
             if window.window_id.trim().is_empty() || !window_ids.insert(window.window_id.clone()) {
@@ -324,7 +326,14 @@ fn validate_case(case: &Case) -> Vec<String> {
             {
                 errors.push(format!("run {} window {} has malformed acoustic/cavitation evidence digest", run.run_id, window.window_id));
             }
+            if !acoustic_trace_digests.insert(window.acoustic_trace_sha256.clone()) {
+                errors.push(format!("run {} reuses an acoustic trace digest across windows", run.run_id));
+            }
+            if !cavitation_observation_digests.insert(window.cavitation_observation_sha256.clone()) {
+                errors.push(format!("run {} reuses a cavitation-observation digest across windows", run.run_id));
+            }
             if !window.start_time_s.is_finite()
+                || window.start_time_s < 0.0
                 || !window.end_time_s.is_finite()
                 || window.end_time_s <= window.start_time_s
                 || ((window.end_time_s - window.start_time_s) - case.window_duration_s).abs()
@@ -604,6 +613,9 @@ fn audit(case: &Case) -> AuditReport {
         }
         if case.runs.len() < case.minimum_runs {
             reasons.push("fewer than the required independent runs are available".to_string());
+        }
+        if run_reports.iter().any(|report| !report.ittc_recommended_acquisition_duration_met) {
+            reasons.push("one or more runs are shorter than the ITTC-recommended acquisition duration of greater than 20 seconds; this is advisory context, not a hard rejection".to_string());
         }
     }
 
@@ -932,8 +944,9 @@ mod tests {
         windows[2].cavitation_present = Some(true);
         let report = audit(&input);
         let run = &report.run_reports[0];
-        assert_eq!(run.observed_cavitation_onsets, Some(1));
-        assert_eq!(run.active_segments_censored_by_window_or_gap, Some(2));
+        assert_eq!(run.observed_cavitation_onsets, Some(2));
+        assert_eq!(run.left_censored_active_segments, Some(2));
+        assert_eq!(run.right_censored_active_segments, Some(0));
     }
 
     #[test]
@@ -944,6 +957,52 @@ mod tests {
         let cavitation: BTreeSet<_> = refs.iter().map(|item| &item.cavitation_observation_sha256).collect();
         assert_eq!(acoustic.len(), refs.len());
         assert_eq!(cavitation.len(), refs.len());
+    }
+
+    #[test]
+    fn trailing_active_episode_is_right_censored() {
+        let mut input = case();
+        input.runs[0].windows[7].cavitation_present = Some(true);
+        let report = audit(&input);
+        assert_eq!(report.run_reports[0].right_censored_active_segments, Some(1));
+    }
+
+    #[test]
+    fn background_exclusion_is_preserved_per_window() {
+        let mut input = case();
+        input.runs[0].windows[0].total_spl_db = 92.0;
+        input.runs[0].windows[0].background_spl_db = 90.0;
+        let report = audit(&input);
+        let first = &report.run_reports[0].window_evidence[0];
+        assert_eq!(first.disposition, "excluded");
+        assert_eq!(first.exclusion_reason, Some("background_margin_below_3_db"));
+        assert_eq!(first.corrected_spl_db, None);
+    }
+
+    #[test]
+    fn unknown_background_method_excludes_every_window_from_spl_summary() {
+        let mut input = case();
+        input.runs[0].background_method = BackgroundMethod::Unknown;
+        let report = audit(&input);
+        assert_eq!(report.run_reports[0].usable_windows, 0);
+        assert_eq!(report.run_reports[0].excluded_unknown_background_method, 8);
+        assert!(report.run_reports[0].energy_equivalent_mean_spl_db.is_none());
+    }
+
+    #[test]
+    fn short_acquisition_duration_is_explicitly_flagged() {
+        let report = audit(&case());
+        assert_eq!(report.run_reports[0].acquisition_duration_s, 8.0);
+        assert!(!report.run_reports[0].ittc_recommended_acquisition_duration_met);
+        assert!(report.reasons.iter().any(|reason| reason.contains("greater than 20 seconds")));
+    }
+
+    #[test]
+    fn duplicate_window_trace_digests_are_invalid() {
+        let mut input = case();
+        input.runs[0].windows[1].acoustic_trace_sha256 =
+            input.runs[0].windows[0].acoustic_trace_sha256.clone();
+        assert_eq!(audit(&input).disposition, "INVALID");
     }
 
     #[test]
