@@ -124,6 +124,19 @@ def verify(path: Path) -> tuple[int, str]:
     return count, digest.hexdigest()
 
 
+def overflow_count(path: Path) -> int:
+    count = 0
+    with path.open("rb") as stream:
+        for raw_line in stream:
+            fields = raw_line.decode("ascii").rstrip("\\n").split("|")
+            if len(fields) == 7 and fields[6] == "OK":
+                lower = f64_from_bits(fields[4])
+                upper = f64_from_bits(fields[5])
+                if math.isinf(lower) or math.isinf(upper):
+                    count += 1
+    return count
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("vectors", type=Path, help="Rust-emitted pipe-delimited vector file")
@@ -138,6 +151,7 @@ def main() -> int:
     print("EXACT_RATIONAL_QUALIFICATION=PASS")
     print(f"CASE_COUNT={count}")
     print(f"VECTOR_CORPUS_SHA256={corpus_digest}")
+    print(f"UNBOUNDED_OVERFLOW_CASES={overflow_count(args.vectors)}")
     print("REFERENCE=Python Fraction.from_float over exact raw binary64 inputs")
     print("SCOPE=single-operation scalar add/sub/mul/div enclosures only")
     return 0
