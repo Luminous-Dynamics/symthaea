@@ -1,0 +1,497 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "LOS18_SERVICE_CONTINUITY_SYNTHETIC_V0_1",
+  "status": "synthetic_contract_fixtures_not_physical_vessel_data",
+  "explicit_warning": "All dimensions, rates, event times, identities and dispositions are synthetic. They are not real vessel requirements, equipment limits, failure probabilities, maintenance procedures or physical results.",
+  "cases": [
+    {
+      "case_id": "watermaker_buffer_preserves_floor_until_authorized_restore",
+      "timeline_seconds": 86400,
+      "services": [
+        {
+          "service_id": "potable_water",
+          "criticality": "critical",
+          "unit": "L/day",
+          "nominal_rate": 80,
+          "minimum_rate": 40,
+          "initial_rate": 80,
+          "initial_state": "nominal",
+          "permitted_degraded": true
+        }
+      ],
+      "events": [
+        {
+          "event_id": "wm_fail",
+          "at_seconds": 3600,
+          "event_type": "component_failure",
+          "service_id": "potable_water",
+          "component_id": "wm_A",
+          "state_after": "degraded_permitted",
+          "delivered_rate_after": 45,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:wm_fail"
+        },
+        {
+          "event_id": "reserve_active",
+          "at_seconds": 3600,
+          "event_type": "buffer_supply_active",
+          "service_id": "potable_water",
+          "component_id": "tank_A",
+          "state_after": "degraded_permitted",
+          "delivered_rate_after": 45,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:reserve_active"
+        },
+        {
+          "event_id": "repair_start",
+          "at_seconds": 7200,
+          "event_type": "repair_started",
+          "service_id": "potable_water",
+          "component_id": "wm_A",
+          "state_after": "degraded_permitted",
+          "delivered_rate_after": 45,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:repair_start"
+        },
+        {
+          "event_id": "repair_done",
+          "at_seconds": 14400,
+          "event_type": "repair_completed",
+          "service_id": "potable_water",
+          "component_id": "wm_A",
+          "state_after": "degraded_permitted",
+          "delivered_rate_after": 45,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:repair_done"
+        },
+        {
+          "event_id": "wm_test",
+          "at_seconds": 18000,
+          "event_type": "post_test_passed",
+          "service_id": "potable_water",
+          "component_id": "wm_A",
+          "state_after": "degraded_permitted",
+          "delivered_rate_after": 45,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:wm_test"
+        },
+        {
+          "event_id": "config_update",
+          "at_seconds": 18600,
+          "event_type": "configuration_updated",
+          "service_id": "potable_water",
+          "component_id": "wm_A",
+          "state_after": "degraded_permitted",
+          "delivered_rate_after": 45,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:config_update"
+        },
+        {
+          "event_id": "release",
+          "at_seconds": 19200,
+          "event_type": "authorized_release",
+          "service_id": "potable_water",
+          "component_id": "wm_A",
+          "state_after": "nominal",
+          "delivered_rate_after": 80,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:release"
+        }
+      ],
+      "maintenance_tasks": [
+        {
+          "task_id": "replace_wm_A",
+          "service_id": "potable_water",
+          "component_id": "wm_A",
+          "procedure_state": "approved_for_declared_task",
+          "qualified_personnel_present": true,
+          "spare_state": "compatible_onboard",
+          "required_tests": [
+            "flow_quality_test"
+          ],
+          "completed_tests": [
+            "flow_quality_test"
+          ],
+          "configuration_updated": true,
+          "authorized_release": true
+        }
+      ],
+      "expected": {
+        "continuity_disposition": "no_floor_breach",
+        "service_floor_breach_count": 0,
+        "first_floor_breach_seconds": null,
+        "authorized_restoration": true,
+        "authorized_restoration_seconds": 19200,
+        "safety_gate_failed": false
+      },
+      "schema_version": "0.1.0",
+      "status": "synthetic_fixture_not_real_vessel_evidence",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SYNTHETIC_CONTINUITY_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "claim_limitations": [
+        "All dimensions, rates, times, IDs and event outcomes are synthetic contract fixtures.",
+        "No physical vessel, failure-rate, MTTR, availability, seaworthiness or safety claim is made."
+      ]
+    },
+    {
+      "case_id": "water_reserve_exhausts_before_spare_arrival",
+      "timeline_seconds": 172800,
+      "services": [
+        {
+          "service_id": "potable_water",
+          "criticality": "critical",
+          "unit": "L/day",
+          "nominal_rate": 80,
+          "minimum_rate": 40,
+          "initial_rate": 80,
+          "initial_state": "nominal",
+          "permitted_degraded": true
+        }
+      ],
+      "events": [
+        {
+          "event_id": "wm_fail",
+          "at_seconds": 3600,
+          "event_type": "component_failure",
+          "service_id": "potable_water",
+          "component_id": "wm_A",
+          "state_after": "degraded_permitted",
+          "delivered_rate_after": 45,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:wm_fail"
+        },
+        {
+          "event_id": "buffer_end",
+          "at_seconds": 86400,
+          "event_type": "service_unavailable",
+          "service_id": "potable_water",
+          "component_id": "tank_A",
+          "state_after": "unavailable",
+          "delivered_rate_after": 0,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:buffer_end"
+        },
+        {
+          "event_id": "spare_eta",
+          "at_seconds": 108000,
+          "event_type": "spare_arrived",
+          "service_id": "potable_water",
+          "component_id": "wm_A",
+          "state_after": "unavailable",
+          "delivered_rate_after": 0,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:spare_eta"
+        }
+      ],
+      "maintenance_tasks": [
+        {
+          "task_id": "replace_wm_A",
+          "service_id": "potable_water",
+          "component_id": "wm_A",
+          "procedure_state": "approved_for_declared_task",
+          "qualified_personnel_present": true,
+          "spare_state": "compatible_arrives_later",
+          "required_tests": [
+            "flow_quality_test"
+          ],
+          "completed_tests": [],
+          "configuration_updated": false,
+          "authorized_release": false
+        }
+      ],
+      "expected": {
+        "continuity_disposition": "floor_breach",
+        "service_floor_breach_count": 1,
+        "first_floor_breach_seconds": 86400,
+        "authorized_restoration": false,
+        "authorized_restoration_seconds": null,
+        "safety_gate_failed": false
+      },
+      "schema_version": "0.1.0",
+      "status": "synthetic_fixture_not_real_vessel_evidence",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SYNTHETIC_CONTINUITY_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "claim_limitations": [
+        "All dimensions, rates, times, IDs and event outcomes are synthetic contract fixtures.",
+        "No physical vessel, failure-rate, MTTR, availability, seaworthiness or safety claim is made."
+      ]
+    },
+    {
+      "case_id": "redundant_pumps_share_common_controller",
+      "timeline_seconds": 43200,
+      "services": [
+        {
+          "service_id": "potable_transfer",
+          "criticality": "critical",
+          "unit": "L/hour",
+          "nominal_rate": 10,
+          "minimum_rate": 5,
+          "initial_rate": 10,
+          "initial_state": "nominal",
+          "permitted_degraded": true
+        }
+      ],
+      "events": [
+        {
+          "event_id": "controller_fail",
+          "at_seconds": 1800,
+          "event_type": "common_dependency_failure",
+          "service_id": "potable_transfer",
+          "component_id": "shared_controller_A",
+          "state_after": "unavailable",
+          "delivered_rate_after": 0,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:controller_fail"
+        }
+      ],
+      "maintenance_tasks": [],
+      "expected": {
+        "continuity_disposition": "floor_breach",
+        "service_floor_breach_count": 1,
+        "first_floor_breach_seconds": 1800,
+        "authorized_restoration": false,
+        "authorized_restoration_seconds": null,
+        "safety_gate_failed": false
+      },
+      "schema_version": "0.1.0",
+      "status": "synthetic_fixture_not_real_vessel_evidence",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SYNTHETIC_CONTINUITY_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "claim_limitations": [
+        "All dimensions, rates, times, IDs and event outcomes are synthetic contract fixtures.",
+        "No physical vessel, failure-rate, MTTR, availability, seaworthiness or safety claim is made."
+      ]
+    },
+    {
+      "case_id": "repair_completed_but_post_test_fails",
+      "timeline_seconds": 86400,
+      "services": [
+        {
+          "service_id": "refrigeration",
+          "criticality": "critical",
+          "unit": "kW_cooling",
+          "nominal_rate": 4,
+          "minimum_rate": 2,
+          "initial_rate": 4,
+          "initial_state": "nominal",
+          "permitted_degraded": true
+        }
+      ],
+      "events": [
+        {
+          "event_id": "compressor_fail",
+          "at_seconds": 3600,
+          "event_type": "component_failure",
+          "service_id": "refrigeration",
+          "component_id": "compressor_A",
+          "state_after": "unavailable",
+          "delivered_rate_after": 0,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:compressor_fail"
+        },
+        {
+          "event_id": "repair_done",
+          "at_seconds": 7200,
+          "event_type": "repair_completed",
+          "service_id": "refrigeration",
+          "component_id": "compressor_A",
+          "state_after": "unavailable",
+          "delivered_rate_after": 0,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:repair_done"
+        },
+        {
+          "event_id": "test_fail",
+          "at_seconds": 9000,
+          "event_type": "post_test_failed",
+          "service_id": "refrigeration",
+          "component_id": "compressor_A",
+          "state_after": "unavailable",
+          "delivered_rate_after": 0,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:test_fail"
+        }
+      ],
+      "maintenance_tasks": [
+        {
+          "task_id": "replace_compressor_A",
+          "service_id": "refrigeration",
+          "component_id": "compressor_A",
+          "procedure_state": "approved_for_declared_task",
+          "qualified_personnel_present": true,
+          "spare_state": "compatible_onboard",
+          "required_tests": [
+            "thermal_performance_test"
+          ],
+          "completed_tests": [],
+          "configuration_updated": false,
+          "authorized_release": false
+        }
+      ],
+      "expected": {
+        "continuity_disposition": "floor_breach",
+        "service_floor_breach_count": 1,
+        "first_floor_breach_seconds": 3600,
+        "authorized_restoration": false,
+        "authorized_restoration_seconds": null,
+        "safety_gate_failed": false
+      },
+      "schema_version": "0.1.0",
+      "status": "synthetic_fixture_not_real_vessel_evidence",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SYNTHETIC_CONTINUITY_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "claim_limitations": [
+        "All dimensions, rates, times, IDs and event outcomes are synthetic contract fixtures.",
+        "No physical vessel, failure-rate, MTTR, availability, seaworthiness or safety claim is made."
+      ]
+    },
+    {
+      "case_id": "wrong_revision_spare_is_rejected",
+      "timeline_seconds": 86400,
+      "services": [
+        {
+          "service_id": "electrical_distribution",
+          "criticality": "critical",
+          "unit": "kW",
+          "nominal_rate": 5,
+          "minimum_rate": 2,
+          "initial_rate": 5,
+          "initial_state": "nominal",
+          "permitted_degraded": true
+        }
+      ],
+      "events": [
+        {
+          "event_id": "converter_fail",
+          "at_seconds": 1800,
+          "event_type": "component_failure",
+          "service_id": "electrical_distribution",
+          "component_id": "converter_A",
+          "state_after": "unavailable",
+          "delivered_rate_after": 0,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:converter_fail"
+        },
+        {
+          "event_id": "spare_reject",
+          "at_seconds": 3600,
+          "event_type": "spare_rejected",
+          "service_id": "electrical_distribution",
+          "component_id": "converter_A",
+          "state_after": "unavailable",
+          "delivered_rate_after": 0,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:spare_reject"
+        }
+      ],
+      "maintenance_tasks": [
+        {
+          "task_id": "replace_converter_A",
+          "service_id": "electrical_distribution",
+          "component_id": "converter_A",
+          "procedure_state": "approved_for_declared_task",
+          "qualified_personnel_present": true,
+          "spare_state": "wrong_revision",
+          "required_tests": [
+            "insulation_and_function_test"
+          ],
+          "completed_tests": [],
+          "configuration_updated": false,
+          "authorized_release": false
+        }
+      ],
+      "expected": {
+        "continuity_disposition": "floor_breach",
+        "service_floor_breach_count": 1,
+        "first_floor_breach_seconds": 1800,
+        "authorized_restoration": false,
+        "authorized_restoration_seconds": null,
+        "safety_gate_failed": false
+      },
+      "schema_version": "0.1.0",
+      "status": "synthetic_fixture_not_real_vessel_evidence",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SYNTHETIC_CONTINUITY_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "claim_limitations": [
+        "All dimensions, rates, times, IDs and event outcomes are synthetic contract fixtures.",
+        "No physical vessel, failure-rate, MTTR, availability, seaworthiness or safety claim is made."
+      ]
+    },
+    {
+      "case_id": "safety_gate_failure_overrides_resource_sufficiency",
+      "timeline_seconds": 86400,
+      "services": [
+        {
+          "service_id": "mission_safety_state",
+          "criticality": "critical",
+          "unit": "status",
+          "nominal_rate": 1,
+          "minimum_rate": 1,
+          "initial_rate": 1,
+          "initial_state": "nominal",
+          "permitted_degraded": true
+        }
+      ],
+      "events": [
+        {
+          "event_id": "safety_review_fail",
+          "at_seconds": 0,
+          "event_type": "safety_gate_failed",
+          "service_id": "mission_safety_state",
+          "component_id": "vessel_safety_case",
+          "state_after": "unsafe_not_authorized",
+          "delivered_rate_after": 0,
+          "evidence_class": "synthetic",
+          "evidence_ref": "synthetic:event:safety_review_fail"
+        }
+      ],
+      "maintenance_tasks": [],
+      "expected": {
+        "continuity_disposition": "unsafe_not_authorized",
+        "service_floor_breach_count": 0,
+        "first_floor_breach_seconds": null,
+        "authorized_restoration": false,
+        "authorized_restoration_seconds": null,
+        "safety_gate_failed": true
+      },
+      "schema_version": "0.1.0",
+      "status": "synthetic_fixture_not_real_vessel_evidence",
+      "mission_binding": {
+        "profile_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "mission_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "operating_case_id": "LOS18_SYNTHETIC_CONTINUITY_V0",
+        "conditions_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "claim_limitations": [
+        "All dimensions, rates, times, IDs and event outcomes are synthetic contract fixtures.",
+        "No physical vessel, failure-rate, MTTR, availability, seaworthiness or safety claim is made."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,344 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-service-continuity-case:v0.1",
+  "title": "Marine service continuity case v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "status",
+    "mission_binding",
+    "timeline_seconds",
+    "services",
+    "events",
+    "maintenance_tasks",
+    "expected",
+    "claim_limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "const": "synthetic_fixture_not_real_vessel_evidence"
+    },
+    "mission_binding": {
+      "$ref": "#/$defs/missionBinding"
+    },
+    "timeline_seconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "services": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/service"
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "maintenance_tasks": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/maintenanceTask"
+      }
+    },
+    "expected": {
+      "$ref": "#/$defs/expected"
+    },
+    "claim_limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "missionBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_digest",
+        "configuration_digest",
+        "mission_digest",
+        "operating_case_id",
+        "conditions_digest"
+      ],
+      "properties": {
+        "profile_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "configuration_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "mission_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "operating_case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "conditions_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service_id",
+        "criticality",
+        "unit",
+        "nominal_rate",
+        "minimum_rate",
+        "initial_rate",
+        "initial_state",
+        "permitted_degraded"
+      ],
+      "properties": {
+        "service_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "criticality": {
+          "enum": [
+            "critical",
+            "essential",
+            "supporting"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nominal_rate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "minimum_rate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "initial_rate": {
+          "type": "number",
+          "minimum": 0
+        },
+        "initial_state": {
+          "enum": [
+            "nominal",
+            "degraded_permitted",
+            "unavailable",
+            "unknown",
+            "unsafe_not_authorized"
+          ]
+        },
+        "permitted_degraded": {
+          "type": "boolean"
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "at_seconds",
+        "event_type",
+        "service_id",
+        "component_id",
+        "state_after",
+        "evidence_class",
+        "evidence_ref"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "at_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "event_type": {
+          "enum": [
+            "component_failure",
+            "service_degraded",
+            "service_unavailable",
+            "buffer_supply_active",
+            "spare_arrived",
+            "spare_rejected",
+            "repair_started",
+            "repair_completed",
+            "post_test_passed",
+            "post_test_failed",
+            "configuration_updated",
+            "authorized_release",
+            "common_dependency_failure",
+            "personnel_unavailable",
+            "safety_gate_failed"
+          ]
+        },
+        "service_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "component_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state_after": {
+          "enum": [
+            "nominal",
+            "degraded_permitted",
+            "unavailable",
+            "unknown",
+            "unsafe_not_authorized"
+          ]
+        },
+        "delivered_rate_after": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "evidence_class": {
+          "const": "synthetic"
+        },
+        "evidence_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "maintenanceTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_id",
+        "service_id",
+        "component_id",
+        "procedure_state",
+        "qualified_personnel_present",
+        "spare_state",
+        "required_tests",
+        "completed_tests",
+        "configuration_updated",
+        "authorized_release"
+      ],
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "service_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "component_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "procedure_state": {
+          "enum": [
+            "approved_for_declared_task",
+            "missing",
+            "unknown"
+          ]
+        },
+        "qualified_personnel_present": {
+          "type": "boolean"
+        },
+        "spare_state": {
+          "enum": [
+            "compatible_onboard",
+            "compatible_arrives_later",
+            "wrong_revision",
+            "unavailable",
+            "unknown"
+          ]
+        },
+        "required_tests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "completed_tests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "configuration_updated": {
+          "type": "boolean"
+        },
+        "authorized_release": {
+          "type": "boolean"
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "continuity_disposition",
+        "service_floor_breach_count",
+        "first_floor_breach_seconds",
+        "authorized_restoration",
+        "authorized_restoration_seconds",
+        "safety_gate_failed"
+      ],
+      "properties": {
+        "continuity_disposition": {
+          "enum": [
+            "no_floor_breach",
+            "floor_breach",
+            "indeterminate",
+            "unsafe_not_authorized"
+          ]
+        },
+        "service_floor_breach_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "first_floor_breach_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "authorized_restoration": {
+          "type": "boolean"
+        },
+        "authorized_restoration_seconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "safety_gate_failed": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
