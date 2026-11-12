@@ -36,3 +36,13 @@ jobs:
         run: python3 -m py_compile tools/airroad-pdcm-impedance-qualifier/verify_two_converter_fixture.py
       - name: Verify exact-rational shared-source interaction fixture
         run: python3 tools/airroad-pdcm-impedance-qualifier/verify_two_converter_fixture.py
+      - name: Check circuits crate formatting without workspace resolution
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-circuits/src/lib.rs
+      - name: Compile and run zero-dependency circuits tests
+        run: |
+          rustc --test --edition=2024 crates/domains/symthaea-circuits/src/lib.rs -o /tmp/symthaea-circuits-tests
+          /tmp/symthaea-circuits-tests
+      - name: Run Clippy directly without workspace resolution
+        run: |
+          clippy-driver --edition=2024 --crate-name symthaea_circuits --crate-type lib crates/domains/symthaea-circuits/src/lib.rs -D warnings --emit=metadata -o /tmp/symthaea-circuits.rmeta
+          clippy-driver --edition=2024 --crate-name symthaea_circuits --test crates/domains/symthaea-circuits/src/lib.rs -D warnings --emit=metadata -o /tmp/symthaea-circuits-tests.rmeta
