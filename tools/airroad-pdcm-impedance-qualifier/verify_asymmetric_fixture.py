@@ -112,9 +112,9 @@ def main():
     for point in fd["expected_points"]:
         omega=q(point["omega_rad_s"])
         jw=(Fraction(0),omega)
-        y1=cdiv((jw[1]-Fraction(1,2),jw[0]),(jw[1]+Fraction(1,2),jw[0]))
+        y1=cdiv((Fraction(-1,2),jw[1]),(Fraction(1,2),jw[1]))
         # Y2 = (s - 1/20)/(2s + 2/5)
-        y2=cdiv((jw[1]-Fraction(1,20),jw[0]),(2*jw[1]+Fraction(2,5),2*jw[0]))
+        y2=cdiv((Fraction(-1,20),jw[1]),(Fraction(2,5),2*jw[1]))
         zsrc=cdiv((Fraction(1),Fraction(0)),(Fraction(1),omega))
         ret=cmul(zsrc,cadd(y1,y2))
         assert y1==complex_pair(point["branch_1"])
