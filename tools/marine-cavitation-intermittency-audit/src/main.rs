@@ -361,6 +361,14 @@ fn validate_case(case: &Case) -> Vec<String> {
         if let Some(digest) = &water.nuclei_distribution_evidence_sha256
             && !is_sha256(digest)
         {
+            errors.push(format!(
+                "run {}: nuclei-distribution evidence digest must be 64 hexadecimal characters",
+                run.run_id
+            ));
+        }
+        if let Some(digest) = &water.nuclei_distribution_evidence_sha256
+            && !is_sha256(digest)
+        {
             errors.push(format!("run {}: nuclei-distribution evidence digest must be 64 hexadecimal characters", run.run_id));
         }
         for (label, digest) in [
@@ -1014,6 +1022,14 @@ mod tests {
         input.evidence_kind = EvidenceKind::Measured;
         input.runs[1].water_condition.method_id = "different-method".to_string();
         assert_eq!(audit(&input).disposition, "INCOMPARABLE_CONDITION");
+    }
+
+    #[test]
+    fn malformed_nuclei_distribution_digest_is_invalid() {
+        let mut input = case();
+        input.runs[0].water_condition.nuclei_distribution_evidence_sha256 =
+            Some("not-a-digest".to_string());
+        assert_eq!(audit(&input).disposition, "INVALID");
     }
 
     #[test]
