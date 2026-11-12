@@ -1362,6 +1362,21 @@ pub fn measure_counterfactual_influence(
     input: &CounterfactualInfluenceInput<'_, '_>,
     verified_calibration: &VerifiedRepeatabilityCalibration,
 ) -> Result<CounterfactualInfluenceReport, CounterfactualInfluenceError> {
+    measure_counterfactual_influence_with_support_policy(
+        input,
+        verified_calibration,
+        &InfluenceSupportPolicy::default(),
+    )
+}
+
+/// Measure the exact paired render and derive channel-specific hysteresis/tail
+/// support with an explicit versioned policy. Raw entry-threshold intervals
+/// and the full per-window trace remain independently available in the report.
+pub fn measure_counterfactual_influence_with_support_policy(
+    input: &CounterfactualInfluenceInput<'_, '_>,
+    verified_calibration: &VerifiedRepeatabilityCalibration,
+    support_policy: &InfluenceSupportPolicy,
+) -> Result<CounterfactualInfluenceReport, CounterfactualInfluenceError> {
     let calibration = &verified_calibration.calibration;
     validate_config(&calibration.analysis)?;
     validate_input(input, calibration)?;
@@ -1369,6 +1384,12 @@ pub fn measure_counterfactual_influence(
     if calibration.cells.len() != windows.len() * calibration.channels {
         return Err(CounterfactualInfluenceError::WindowIndexMismatch);
     }
+    validate_support_policy(
+        support_policy,
+        calibration.total_frames,
+        calibration.sample_rate_hz,
+        windows.len(),
+    )?;
     for (index, (cell, window)) in calibration.cells.iter().zip(&windows).enumerate() {
         let expected_channel = index % calibration.channels;
         if cell.start_frame != window.start_frame
@@ -1420,6 +1441,12 @@ pub fn measure_counterfactual_influence(
         .iter()
         .filter(|measurement| measurement.effect_detected)
         .count();
+    let qualified_support_intervals = qualify_support_intervals(
+        &measurements,
+        calibration.channels,
+        calibration.total_frames,
+        support_policy,
+    );
     let disposition = if affected_channel_windows > 0 {
         InfluenceDisposition::EffectDetected
     } else {
@@ -1457,9 +1484,12 @@ pub fn measure_counterfactual_influence(
         channels: calibration.channels,
         total_frames: calibration.total_frames,
         analysis: calibration.analysis.clone(),
+        support_policy: support_policy.clone(),
         total_channel_windows: measurements.len(),
         affected_channel_windows,
+        window_measurements: measurements.clone(),
         measured_influence_intervals: merge_intervals(affected),
+        qualified_support_intervals,
         disposition,
         receipt_sha256: String::new(),
     })
@@ -1475,7 +1505,11 @@ pub fn verify_counterfactual_influence(
     if !influence_digest_valid(report)? {
         return Err(CounterfactualInfluenceError::InvalidInfluenceReceipt);
     }
-    let expected = measure_counterfactual_influence(input, verified_calibration)?;
+    let expected = measure_counterfactual_influence_with_support_policy(
+        input,
+        verified_calibration,
+        &report.support_policy,
+    )?;
     if &expected != report {
         return Err(CounterfactualInfluenceError::InfluenceReplayMismatch);
     }
