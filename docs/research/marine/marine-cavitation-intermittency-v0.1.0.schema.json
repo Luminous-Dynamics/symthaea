@@ -150,6 +150,7 @@
         "run_id",
         "service_fingerprint_sha256",
         "timebase_receipt_sha256",
+        "water_condition",
         "windows"
       ],
       "properties": {
@@ -189,6 +190,9 @@
         },
         "calibration_certificate_sha256": {
           "$ref": "#/$defs/digest"
+        },
+        "water_condition": {
+          "$ref": "#/$defs/waterCondition"
         }
       }
     },
@@ -245,6 +249,70 @@
         "background_expanded_uncertainty_db": {
           "type": "number",
           "exclusiveMinimum": 0
+        }
+      }
+    },
+    "waterCondition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measure",
+        "value",
+        "unit",
+        "expanded_uncertainty",
+        "equivalence_tolerance",
+        "method_id",
+        "instrument_id",
+        "calibration_certificate_sha256",
+        "evidence_sha256",
+        "nuclei_distribution_evidence_sha256"
+      ],
+      "properties": {
+        "measure": {
+          "enum": [
+            "total_gas_content",
+            "cavitation_susceptibility_alpha"
+          ]
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expanded_uncertainty": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "equivalence_tolerance": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "nuclei_distribution_evidence_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       }
     }
