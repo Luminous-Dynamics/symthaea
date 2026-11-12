@@ -1,0 +1,330 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-acoustic-facility-tf-v0.1.0.schema.json",
+  "title": "Marine facility acoustic transfer-function audit v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "evidence_kind",
+    "source",
+    "facility",
+    "projector",
+    "receiver",
+    "repeatability_tolerance_db",
+    "samples"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_kind": {
+      "enum": [
+        "synthetic",
+        "measured"
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/sourceEvidence"
+    },
+    "facility": {
+      "$ref": "#/$defs/facility"
+    },
+    "projector": {
+      "$ref": "#/$defs/projector"
+    },
+    "receiver": {
+      "$ref": "#/$defs/receiver"
+    },
+    "repeatability_tolerance_db": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "samples": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/sample"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "sourceEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "citation",
+        "raw_data_sha256",
+        "rights_status",
+        "independently_reviewed"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "rights_status": {
+          "enum": [
+            "public_or_permitted",
+            "unknown",
+            "restricted"
+          ]
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "facility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "facility_id",
+        "test_section_revision",
+        "geometry_sha256",
+        "is_closed_test_section",
+        "operating_condition_fingerprint_sha256",
+        "water_condition_evidence_sha256",
+        "flow_state_id",
+        "free_surface_state_id"
+      ],
+      "properties": {
+        "facility_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "test_section_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "geometry_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "is_closed_test_section": {
+          "type": "boolean"
+        },
+        "operating_condition_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "water_condition_evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "flow_state_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "free_surface_state_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "projector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instrument_id",
+        "projector_type",
+        "projector_revision",
+        "transmitter_chain_id",
+        "transmitter_chain_evidence_sha256",
+        "signal_type",
+        "tvr_basis",
+        "tvr_or_reference_source_level_evidence_sha256"
+      ],
+      "properties": {
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "projector_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "projector_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transmitter_chain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transmitter_chain_evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "signal_type": {
+          "enum": [
+            "broadband_noise",
+            "tonal",
+            "chirp",
+            "pseudo_random"
+          ]
+        },
+        "tvr_basis": {
+          "enum": [
+            "independently_measured",
+            "manufacturer_free_field",
+            "unknown"
+          ]
+        },
+        "tvr_or_reference_source_level_evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "receiver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hydrophone_instrument_id",
+        "hydrophone_calibration_certificate_sha256",
+        "acquisition_chain_id",
+        "acquisition_chain_evidence_sha256"
+      ],
+      "properties": {
+        "hydrophone_instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hydrophone_calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "acquisition_chain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "acquisition_chain_evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "position_id",
+        "x_m",
+        "y_m",
+        "z_m",
+        "expanded_position_uncertainty_m"
+      ],
+      "properties": {
+        "position_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "x_m": {
+          "type": "number"
+        },
+        "y_m": {
+          "type": "number"
+        },
+        "z_m": {
+          "type": "number"
+        },
+        "expanded_position_uncertainty_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_id",
+        "repeat_id",
+        "source_position",
+        "receiver_position",
+        "frequency_band_id",
+        "center_frequency_hz",
+        "quantity",
+        "bandwidth_id",
+        "source_level_db",
+        "source_level_expanded_uncertainty_db",
+        "received_spl_db",
+        "received_spl_expanded_uncertainty_db",
+        "source_trace_sha256",
+        "received_trace_sha256"
+      ],
+      "properties": {
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repeat_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_position": {
+          "$ref": "#/$defs/position"
+        },
+        "receiver_position": {
+          "$ref": "#/$defs/position"
+        },
+        "frequency_band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "center_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "quantity": {
+          "enum": [
+            "one_third_octave_band_spl",
+            "power_spectral_density"
+          ]
+        },
+        "bandwidth_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_level_db": {
+          "type": "number"
+        },
+        "source_level_expanded_uncertainty_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "received_spl_db": {
+          "type": "number"
+        },
+        "received_spl_expanded_uncertainty_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "additional_source_basis_uncertainty_db": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "source_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "received_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  }
+}
