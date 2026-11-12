@@ -1196,9 +1196,9 @@ mod tests {
     }
 
     #[test]
-    fn continuity_is_zero_when_beat_intervals_cannot_be_computed() {
-        let reference_times = [0.0, 0.5];
-        let predicted_times = [0.0, 0.5];
+    fn continuity_is_zero_when_only_one_beat_is_available() {
+        let reference_times = [0.0];
+        let predicted_times = [0.0];
         let report = evaluate_beat_grid_v1(
             &prediction(&predicted_times, &[]),
             &[reference("clip", None, &reference_times, &[])],
