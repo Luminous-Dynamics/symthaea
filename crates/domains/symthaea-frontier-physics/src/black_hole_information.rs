@@ -2413,8 +2413,7 @@ pub fn sample_small_hayden_preskill_petz_optimality_ensemble(
         let delta = sample.petz_optimality_commutator_frobenius - mean;
         mean += delta / count;
         m2 += delta * (sample.petz_optimality_commutator_frobenius - mean);
-        maximum_commutator =
-            maximum_commutator.max(sample.petz_optimality_commutator_frobenius);
+        maximum_commutator = maximum_commutator.max(sample.petz_optimality_commutator_frobenius);
         maximum_inverse_sqrt_residual =
             maximum_inverse_sqrt_residual.max(sample.qec_matrix_inverse_sqrt_residual);
         all_optimal &= sample.petz_is_entanglement_fidelity_optimal;
@@ -2423,9 +2422,8 @@ pub fn sample_small_hayden_preskill_petz_optimality_ensemble(
         sample_count,
         first_seed,
         mean_commutator_frobenius: mean,
-        standard_error_commutator_frobenius: (
-            m2 / (sample_count - 1) as f64 / sample_count as f64
-        ).sqrt(),
+        standard_error_commutator_frobenius: (m2 / (sample_count - 1) as f64 / sample_count as f64)
+            .sqrt(),
         maximum_commutator_frobenius: maximum_commutator,
         maximum_qec_matrix_inverse_sqrt_residual: maximum_inverse_sqrt_residual,
         all_samples_petz_optimal: all_optimal,
@@ -2446,8 +2444,7 @@ fn diagnose_hayden_preskill_petz_optimality(
                 for message in 0..2 {
                     let input = (message << 1) | early_radiation;
                     let output = (emitted << 1) | b_prime;
-                    kraus[accessible * 2 + message] =
-                        scrambler[output][input] * inverse_sqrt_two;
+                    kraus[accessible * 2 + message] = scrambler[output][input] * inverse_sqrt_two;
                 }
             }
         }
@@ -2462,11 +2459,9 @@ fn diagnose_hayden_preskill_petz_optimality(
                 for environment_column in 0..2 {
                     let mut contraction = Complex64::new(0.0, 0.0);
                     for accessible in 0..4 {
-                        contraction += channel_kraus[environment_row]
-                            [accessible * 2 + logical_row]
+                        contraction += channel_kraus[environment_row][accessible * 2 + logical_row]
                             .conj()
-                            * channel_kraus[environment_column]
-                                [accessible * 2 + logical_column];
+                            * channel_kraus[environment_column][accessible * 2 + logical_column];
                     }
                     let row = logical_row * 2 + environment_row;
                     let column = logical_column * 2 + environment_column;
@@ -2481,11 +2476,8 @@ fn diagnose_hayden_preskill_petz_optimality(
     for row in 0..4 {
         qec_matrix_trace += qec_matrix[row * 4 + row].re;
         for column in 0..4 {
-            qec_matrix_hermiticity_residual = qec_matrix_hermiticity_residual.max(
-                (qec_matrix[row * 4 + column]
-                    - qec_matrix[column * 4 + row].conj())
-                .norm(),
-            );
+            qec_matrix_hermiticity_residual = qec_matrix_hermiticity_residual
+                .max((qec_matrix[row * 4 + column] - qec_matrix[column * 4 + row].conj()).norm());
         }
     }
     if !qec_matrix_trace.is_finite()
@@ -2521,11 +2513,8 @@ fn diagnose_hayden_preskill_petz_optimality(
     let mut auxiliary_t_hermiticity_residual: f64 = 0.0;
     for row in 0..2 {
         for column in 0..2 {
-            auxiliary_t_hermiticity_residual = auxiliary_t_hermiticity_residual.max(
-                (auxiliary_t[row * 2 + column]
-                    - auxiliary_t[column * 2 + row].conj())
-                .norm(),
-            );
+            auxiliary_t_hermiticity_residual = auxiliary_t_hermiticity_residual
+                .max((auxiliary_t[row * 2 + column] - auxiliary_t[column * 2 + row].conj()).norm());
         }
     }
     if auxiliary_t_hermiticity_residual > tolerance * 100.0 {
@@ -2544,9 +2533,9 @@ fn diagnose_hayden_preskill_petz_optimality(
                     if logical_row == logical_column {
                         let row = logical_row * 2 + environment_row;
                         let column = logical_column * 2 + environment_column;
-                        gamma_tensor_t[row * 4 + column] =
-                            auxiliary_t[environment_row * 2 + environment_column]
-                                * inverse_sqrt_two;
+                        gamma_tensor_t[row * 4 + column] = auxiliary_t
+                            [environment_row * 2 + environment_column]
+                            * inverse_sqrt_two;
                     }
                 }
             }
@@ -2570,8 +2559,8 @@ fn diagnose_hayden_preskill_petz_optimality(
         qec_matrix_inverse_sqrt_residual,
         auxiliary_t_hermiticity_residual,
         petz_optimality_commutator_frobenius,
-        petz_is_entanglement_fidelity_optimal:
-            petz_optimality_commutator_frobenius <= tolerance * 100.0,
+        petz_is_entanglement_fidelity_optimal: petz_optimality_commutator_frobenius
+            <= tolerance * 100.0,
     })
 }
 
