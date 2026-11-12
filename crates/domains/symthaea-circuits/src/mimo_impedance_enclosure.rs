@@ -9,8 +9,8 @@
 #![forbid(unsafe_code)]
 
 use crate::mimo_impedance_passport::{
-    ComplexValue, EvidenceClass, ImpedanceMatrixPointEstimate, MimoImpedanceSweep,
-    PortMatrixError, matrix_at_exact_frequency, validate_mimo_impedance_sweep,
+    ComplexValue, EvidenceClass, ImpedanceMatrixPointEstimate, MimoImpedanceSweep, PortMatrixError,
+    matrix_at_exact_frequency, validate_mimo_impedance_sweep,
 };
 
 /// Version of the conservative complex quotient enclosure algorithm.
@@ -90,10 +90,7 @@ impl NumericInterval {
             return Err(MatrixEnclosureError::NonFiniteOrInvalidInterval);
         }
         let lower = products.iter().copied().fold(f64::INFINITY, f64::min);
-        let upper = products
-            .iter()
-            .copied()
-            .fold(f64::NEG_INFINITY, f64::max);
+        let upper = products.iter().copied().fold(f64::NEG_INFINITY, f64::max);
         Self::new(outward_down(lower)?, outward_up(upper)?)
     }
 
@@ -198,16 +195,10 @@ pub fn enclose_mimo_impedance_matrix_at_exact_frequency(
         .position(|slice| slice.angular_frequency_rad_s == angular_frequency_rad_s)
         .ok_or(MatrixEnclosureError::UnsupportedFrequencyKnot)?;
     let slice = &sweep.frequency_slices[frequency_index];
-    let nominal =
-        matrix_at_exact_frequency(sweep, angular_frequency_rad_s).map_err(MatrixEnclosureError::Passport)?;
+    let nominal = matrix_at_exact_frequency(sweep, angular_frequency_rad_s)
+        .map_err(MatrixEnclosureError::Passport)?;
 
-    build_matrix_enclosure(
-        sweep,
-        frequency_index,
-        slice,
-        &nominal,
-        method_reference,
-    )
+    build_matrix_enclosure(sweep, frequency_index, slice, &nominal, method_reference)
 }
 
 /// Enclose every recorded frequency knot. No interpolation or extrapolation
@@ -245,9 +236,7 @@ pub fn enclose_mimo_impedance_sweep(
     })
 }
 
-fn validate_semantics(
-    semantics: &ErrorBoundSemantics,
-) -> Result<String, MatrixEnclosureError> {
+fn validate_semantics(semantics: &ErrorBoundSemantics) -> Result<String, MatrixEnclosureError> {
     match semantics {
         ErrorBoundSemantics::StatisticalOnly { method_reference } => {
             Err(MatrixEnclosureError::StatisticalOnlyBounds {
@@ -408,10 +397,7 @@ fn denominator_squared_interval(
     current: ComplexValue,
     radius: f64,
 ) -> Result<NumericInterval, MatrixEnclosureError> {
-    if !current.real.is_finite()
-        || !current.imag.is_finite()
-        || !radius.is_finite()
-        || radius < 0.0
+    if !current.real.is_finite() || !current.imag.is_finite() || !radius.is_finite() || radius < 0.0
     {
         return Err(MatrixEnclosureError::NonFiniteOrInvalidInterval);
     }
@@ -626,11 +612,7 @@ mod tests {
             -86.0 / 49.0,
             -44.0 / 81.0,
         );
-        assert_contains(
-            enclosure.impedance_ohm[0][1].real_ohm,
-            32.0 / 81.0,
-            2.0,
-        );
+        assert_contains(enclosure.impedance_ohm[0][1].real_ohm, 32.0 / 81.0, 2.0);
         assert_contains(
             enclosure.impedance_ohm[0][1].imaginary_ohm,
             32.0 / 27.0,
@@ -741,8 +723,10 @@ mod tests {
     #[test]
     fn tiny_current_that_underflows_squared_denominator_is_not_evaluable() {
         let mut sweep = fixture();
-        sweep.frequency_slices[0].columns[0].injected_current_a =
-            ComplexValue { real: 1.0e-300, imag: 0.0 };
+        sweep.frequency_slices[0].columns[0].injected_current_a = ComplexValue {
+            real: 1.0e-300,
+            imag: 0.0,
+        };
         sweep.frequency_slices[0].columns[0].absolute_error_bound_a = 0.0;
         assert_eq!(
             enclose_mimo_impedance_matrix_at_exact_frequency(&sweep, 0.0, &semantics()),
@@ -777,10 +761,8 @@ mod tests {
                 };
                 let denominator = current.real * current.real + current.imag * current.imag;
                 let ratio = ComplexValue {
-                    real: (voltage.real * current.real + voltage.imag * current.imag)
-                        / denominator,
-                    imag: (voltage.imag * current.real - voltage.real * current.imag)
-                        / denominator,
+                    real: (voltage.real * current.real + voltage.imag * current.imag) / denominator,
+                    imag: (voltage.imag * current.real - voltage.real * current.imag) / denominator,
                 };
                 assert!(ratio.real >= element.real_ohm.lower);
                 assert!(ratio.real <= element.real_ohm.upper);
