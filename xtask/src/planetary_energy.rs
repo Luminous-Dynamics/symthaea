@@ -465,3 +465,583 @@ mod tests {
             .any(|finding| finding.code == "EMPTY_CORPUS"));
     }
 }
+
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ServiceCorpus {
+    schema_version: String,
+    status: String,
+    created_for_issue: String,
+    scenarios: Vec<ServiceScenario>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ServiceScenario {
+    scenario_id: String,
+    service_contract_id: String,
+    evidence_class: String,
+    mission_duration_h: f64,
+    intervals: Vec<ServiceInterval>,
+    expected_disposition: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ServiceInterval {
+    interval_id: String,
+    start_hour: f64,
+    duration_hours: f64,
+    capability_receipt_id: String,
+    electricity: ElectricService,
+    #[serde(default)]
+    thermal_services: Vec<ThermalService>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ElectricService {
+    required_energy_kwh: f64,
+    deliverable_energy_after_reserve_kwh: Option<f64>,
+    required_peak_power_kw: f64,
+    deliverable_peak_power_kw: Option<f64>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ThermalService {
+    service_id: String,
+    capability_receipt_id: String,
+    required_useful_heat_kwh: f64,
+    deliverable_useful_heat_kwh: Option<f64>,
+    required_supply_temperature_c: f64,
+    deliverable_supply_temperature_c: Option<f64>,
+    required_peak_thermal_power_kw: f64,
+    deliverable_peak_thermal_power_kw: Option<f64>,
+}
+
+#[derive(Debug, Serialize, PartialEq)]
+pub struct ServiceAuditReport {
+    pub report_schema: &'static str,
+    pub source_sha256: String,
+    pub status: &'static str,
+    pub claim_ceiling: &'static str,
+    pub scenario_count: usize,
+    pub passed_count: usize,
+    pub infeasible_count: usize,
+    pub blocked_unknown_count: usize,
+    pub invalid_count: usize,
+    pub expectation_mismatch_count: usize,
+    pub corpus_findings: Vec<Finding>,
+    pub scenarios: Vec<ServiceScenarioResult>,
+}
+
+#[derive(Debug, Serialize, PartialEq)]
+pub struct ServiceScenarioResult {
+    pub scenario_id: String,
+    pub actual_disposition: &'static str,
+    pub expected_disposition: String,
+    pub expectation_matches: bool,
+    pub findings: Vec<Finding>,
+}
+
+/// Audit upstream, time-indexed service-capability receipts against one frozen
+/// mission contract. This checks completeness and stated service sufficiency;
+/// it does not derive generation, storage dispatch, or thermal performance.
+pub fn audit_service_corpus(bytes: &[u8]) -> Result<ServiceAuditReport> {
+    const SCHEMA: &str = "planetary-energy-service-envelope-fixtures-v0.1";
+    const STATUS: &str = "synthetic_known_truth";
+    const EPSILON: f64 = 1.0e-9;
+    const ALLOWED: [&str; 4] = [
+        "PASS_SYNTHETIC_SERVICE",
+        "INFEASIBLE",
+        "BLOCKED_UNKNOWN",
+        "INVALID",
+    ];
+
+    let corpus: ServiceCorpus =
+        serde_json::from_slice(bytes).context("parsing service-envelope scenario corpus")?;
+    let source_sha256 = sha256_hex(bytes);
+    let mut corpus_findings = Vec::new();
+
+    if corpus.schema_version != SCHEMA {
+        corpus_findings.push(finding(
+            "SERVICE_SCHEMA_VERSION",
+            format!("expected {SCHEMA}, received {}", corpus.schema_version),
+        ));
+    }
+    if corpus.status != STATUS {
+        corpus_findings.push(finding(
+            "SERVICE_FIXTURE_STATUS",
+            format!("expected {STATUS}, received {}", corpus.status),
+        ));
+    }
+    if !corpus.created_for_issue.ends_with("/issues/11756") {
+        corpus_findings.push(finding(
+            "SERVICE_ISSUE_LINEAGE",
+            "created_for_issue must identify Symthaea issue #11756".to_string(),
+        ));
+    }
+    if corpus.scenarios.is_empty() {
+        corpus_findings.push(finding(
+            "SERVICE_EMPTY_CORPUS",
+            "at least one service scenario is required".to_string(),
+        ));
+    }
+
+    let mut seen_scenario_ids = BTreeSet::new();
+    let mut scenarios = Vec::with_capacity(corpus.scenarios.len());
+
+    for scenario in corpus.scenarios {
+        let mut findings = Vec::new();
+        let mut invalid = false;
+        let mut unknown = false;
+        let mut infeasible = false;
+
+        if scenario.scenario_id.trim().is_empty() {
+            invalid = true;
+            findings.push(finding(
+                "EMPTY_SCENARIO_ID",
+                "scenario_id is required".to_string(),
+            ));
+        } else if !seen_scenario_ids.insert(scenario.scenario_id.clone()) {
+            invalid = true;
+            findings.push(finding(
+                "DUPLICATE_SCENARIO_ID",
+                format!("duplicate scenario_id {}", scenario.scenario_id),
+            ));
+        }
+        if scenario.service_contract_id.trim().is_empty() {
+            invalid = true;
+            findings.push(finding(
+                "MISSING_SERVICE_CONTRACT",
+                "service_contract_id is required".to_string(),
+            ));
+        }
+        if scenario.evidence_class != "synthetic_known_truth" {
+            invalid = true;
+            findings.push(finding(
+                "SERVICE_EVIDENCE_CLASS",
+                "v0.1 service fixtures must remain synthetic_known_truth".to_string(),
+            ));
+        }
+        if !scenario.mission_duration_h.is_finite() || scenario.mission_duration_h <= 0.0 {
+            invalid = true;
+            findings.push(finding(
+                "INVALID_MISSION_DURATION",
+                "mission_duration_h must be finite and positive".to_string(),
+            ));
+        }
+        if !ALLOWED.contains(&scenario.expected_disposition.as_str()) {
+            invalid = true;
+            findings.push(finding(
+                "INVALID_EXPECTED_DISPOSITION",
+                "expected_disposition is not a supported disposition".to_string(),
+            ));
+        }
+        if scenario.intervals.is_empty() {
+            invalid = true;
+            findings.push(finding(
+                "NO_SERVICE_INTERVALS",
+                "at least one service interval is required".to_string(),
+            ));
+        }
+
+        let mut interval_ids = BTreeSet::new();
+        let mut ordered: Vec<&ServiceInterval> = scenario.intervals.iter().collect();
+        ordered.sort_by(|left, right| {
+            left.start_hour
+                .partial_cmp(&right.start_hour)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| left.interval_id.cmp(&right.interval_id))
+        });
+
+        let mut expected_start = 0.0_f64;
+        for interval in ordered {
+            if interval.interval_id.trim().is_empty() {
+                invalid = true;
+                findings.push(finding(
+                    "EMPTY_INTERVAL_ID",
+                    "interval_id is required".to_string(),
+                ));
+            } else if !interval_ids.insert(interval.interval_id.clone()) {
+                invalid = true;
+                findings.push(finding(
+                    "DUPLICATE_INTERVAL_ID",
+                    format!("duplicate interval_id {}", interval.interval_id),
+                ));
+            }
+
+            if !interval.start_hour.is_finite()
+                || !interval.duration_hours.is_finite()
+                || interval.start_hour < 0.0
+                || interval.duration_hours <= 0.0
+            {
+                invalid = true;
+                findings.push(finding(
+                    "INVALID_INTERVAL_TIME",
+                    format!("interval {} has invalid start/duration", interval.interval_id),
+                ));
+            } else {
+                if interval.start_hour > expected_start + EPSILON {
+                    unknown = true;
+                    findings.push(finding(
+                        "INCOMPLETE_TIME_COVERAGE",
+                        format!(
+                            "gap from hour {:.9} to {:.9} before interval {}",
+                            expected_start, interval.start_hour, interval.interval_id
+                        ),
+                    ));
+                } else if interval.start_hour < expected_start - EPSILON {
+                    invalid = true;
+                    findings.push(finding(
+                        "OVERLAPPING_TIME_INTERVAL",
+                        format!("interval {} overlaps its predecessor", interval.interval_id),
+                    ));
+                }
+                let end_hour = interval.start_hour + interval.duration_hours;
+                if end_hour > scenario.mission_duration_h + EPSILON {
+                    invalid = true;
+                    findings.push(finding(
+                        "INTERVAL_EXCEEDS_MISSION",
+                        format!("interval {} ends after mission horizon", interval.interval_id),
+                    ));
+                }
+                expected_start = end_hour;
+            }
+
+            if interval.capability_receipt_id.trim().is_empty() {
+                invalid = true;
+                findings.push(finding(
+                    "MISSING_CAPABILITY_RECEIPT",
+                    format!("interval {} has no capability receipt identity", interval.interval_id),
+                ));
+            }
+
+            validate_required_nonnegative(
+                "required_energy_kwh",
+                interval.electricity.required_energy_kwh,
+                &interval.interval_id,
+                &mut findings,
+                &mut invalid,
+            );
+            validate_optional_capacity(
+                "deliverable_energy_after_reserve_kwh",
+                interval.electricity.deliverable_energy_after_reserve_kwh,
+                interval.electricity.required_energy_kwh,
+                &interval.interval_id,
+                &mut findings,
+                &mut invalid,
+                &mut unknown,
+                &mut infeasible,
+            );
+            validate_required_nonnegative(
+                "required_peak_power_kw",
+                interval.electricity.required_peak_power_kw,
+                &interval.interval_id,
+                &mut findings,
+                &mut invalid,
+            );
+            validate_optional_capacity(
+                "deliverable_peak_power_kw",
+                interval.electricity.deliverable_peak_power_kw,
+                interval.electricity.required_peak_power_kw,
+                &interval.interval_id,
+                &mut findings,
+                &mut invalid,
+                &mut unknown,
+                &mut infeasible,
+            );
+
+            let mut thermal_ids = BTreeSet::new();
+            for thermal in &interval.thermal_services {
+                if thermal.service_id.trim().is_empty() {
+                    invalid = true;
+                    findings.push(finding(
+                        "EMPTY_THERMAL_SERVICE_ID",
+                        format!("interval {} has an empty thermal service id", interval.interval_id),
+                    ));
+                } else if !thermal_ids.insert(thermal.service_id.clone()) {
+                    invalid = true;
+                    findings.push(finding(
+                        "DUPLICATE_THERMAL_SERVICE_ID",
+                        format!(
+                            "interval {} repeats thermal service {}",
+                            interval.interval_id, thermal.service_id
+                        ),
+                    ));
+                }
+                if thermal.capability_receipt_id.trim().is_empty() {
+                    invalid = true;
+                    findings.push(finding(
+                        "MISSING_THERMAL_CAPABILITY_RECEIPT",
+                        format!(
+                            "thermal service {} has no capability receipt",
+                            thermal.service_id
+                        ),
+                    ));
+                }
+
+                validate_required_nonnegative(
+                    "required_useful_heat_kwh",
+                    thermal.required_useful_heat_kwh,
+                    &thermal.service_id,
+                    &mut findings,
+                    &mut invalid,
+                );
+                validate_optional_capacity(
+                    "deliverable_useful_heat_kwh",
+                    thermal.deliverable_useful_heat_kwh,
+                    thermal.required_useful_heat_kwh,
+                    &thermal.service_id,
+                    &mut findings,
+                    &mut invalid,
+                    &mut unknown,
+                    &mut infeasible,
+                );
+                validate_required_finite(
+                    "required_supply_temperature_c",
+                    thermal.required_supply_temperature_c,
+                    &thermal.service_id,
+                    &mut findings,
+                    &mut invalid,
+                );
+                match thermal.deliverable_supply_temperature_c {
+                    None => {
+                        unknown = true;
+                        findings.push(finding(
+                            "UNKNOWN_THERMAL_SUPPLY_TEMPERATURE",
+                            format!("thermal service {} lacks a delivered temperature", thermal.service_id),
+                        ));
+                    }
+                    Some(value) if !value.is_finite() => {
+                        invalid = true;
+                        findings.push(finding(
+                            "INVALID_THERMAL_SUPPLY_TEMPERATURE",
+                            format!("thermal service {} has a non-finite delivered temperature", thermal.service_id),
+                        ));
+                    }
+                    Some(value)
+                        if value + EPSILON < thermal.required_supply_temperature_c =>
+                    {
+                        infeasible = true;
+                        findings.push(finding(
+                            "THERMAL_TEMPERATURE_SHORTFALL",
+                            format!(
+                                "thermal service {} requires {:.6} C but declares {:.6} C",
+                                thermal.service_id, thermal.required_supply_temperature_c, value
+                            ),
+                        ));
+                    }
+                    Some(_) => {}
+                }
+                validate_required_nonnegative(
+                    "required_peak_thermal_power_kw",
+                    thermal.required_peak_thermal_power_kw,
+                    &thermal.service_id,
+                    &mut findings,
+                    &mut invalid,
+                );
+                validate_optional_capacity(
+                    "deliverable_peak_thermal_power_kw",
+                    thermal.deliverable_peak_thermal_power_kw,
+                    thermal.required_peak_thermal_power_kw,
+                    &thermal.service_id,
+                    &mut findings,
+                    &mut invalid,
+                    &mut unknown,
+                    &mut infeasible,
+                );
+            }
+        }
+
+        if expected_start < scenario.mission_duration_h - EPSILON {
+            unknown = true;
+            findings.push(finding(
+                "INCOMPLETE_TIME_COVERAGE",
+                format!(
+                    "service trace ends at hour {:.9}, before mission horizon {:.9}",
+                    expected_start, scenario.mission_duration_h
+                ),
+            ));
+        } else if expected_start > scenario.mission_duration_h + EPSILON {
+            invalid = true;
+            findings.push(finding(
+                "TRACE_EXCEEDS_MISSION",
+                "service trace extends beyond mission horizon".to_string(),
+            ));
+        }
+
+        findings.sort();
+        let actual_disposition = if invalid {
+            "INVALID"
+        } else if infeasible {
+            "INFEASIBLE"
+        } else if unknown {
+            "BLOCKED_UNKNOWN"
+        } else {
+            "PASS_SYNTHETIC_SERVICE"
+        };
+        let expectation_matches = actual_disposition == scenario.expected_disposition;
+        if !expectation_matches {
+            findings.push(finding(
+                "EXPECTED_DISPOSITION_MISMATCH",
+                format!(
+                    "expected {}, computed {}",
+                    scenario.expected_disposition, actual_disposition
+                ),
+            ));
+            findings.sort();
+        }
+
+        scenarios.push(ServiceScenarioResult {
+            scenario_id: scenario.scenario_id,
+            actual_disposition,
+            expected_disposition: scenario.expected_disposition,
+            expectation_matches,
+            findings,
+        });
+    }
+
+    scenarios.sort_by(|left, right| left.scenario_id.cmp(&right.scenario_id));
+    corpus_findings.sort();
+
+    let passed_count = scenarios
+        .iter()
+        .filter(|scenario| scenario.actual_disposition == "PASS_SYNTHETIC_SERVICE")
+        .count();
+    let infeasible_count = scenarios
+        .iter()
+        .filter(|scenario| scenario.actual_disposition == "INFEASIBLE")
+        .count();
+    let blocked_unknown_count = scenarios
+        .iter()
+        .filter(|scenario| scenario.actual_disposition == "BLOCKED_UNKNOWN")
+        .count();
+    let invalid_count = scenarios
+        .iter()
+        .filter(|scenario| scenario.actual_disposition == "INVALID")
+        .count();
+    let expectation_mismatch_count = scenarios
+        .iter()
+        .filter(|scenario| !scenario.expectation_matches)
+        .count();
+
+    let status = if corpus_findings.is_empty() && expectation_mismatch_count == 0 {
+        "PASS"
+    } else {
+        "BLOCKED"
+    };
+
+    Ok(ServiceAuditReport {
+        report_schema: "planetary-energy-service-audit-report-v0.1",
+        source_sha256,
+        status,
+        claim_ceiling: "synthetic_upstream_service_receipt_completeness_and_comparison_only",
+        scenario_count: scenarios.len(),
+        passed_count,
+        infeasible_count,
+        blocked_unknown_count,
+        invalid_count,
+        expectation_mismatch_count,
+        corpus_findings,
+        scenarios,
+    })
+}
+
+fn validate_required_nonnegative(
+    field: &str,
+    value: f64,
+    subject: &str,
+    findings: &mut Vec<Finding>,
+    invalid: &mut bool,
+) {
+    if !value.is_finite() || value < 0.0 {
+        *invalid = true;
+        findings.push(finding(
+            "INVALID_REQUIRED_SERVICE_VALUE",
+            format!("{subject}: {field} must be finite and non-negative"),
+        ));
+    }
+}
+
+fn validate_required_finite(
+    field: &str,
+    value: f64,
+    subject: &str,
+    findings: &mut Vec<Finding>,
+    invalid: &mut bool,
+) {
+    if !value.is_finite() {
+        *invalid = true;
+        findings.push(finding(
+            "INVALID_REQUIRED_SERVICE_VALUE",
+            format!("{subject}: {field} must be finite"),
+        ));
+    }
+}
+
+fn validate_optional_capacity(
+    field: &str,
+    available: Option<f64>,
+    required: f64,
+    subject: &str,
+    findings: &mut Vec<Finding>,
+    invalid: &mut bool,
+    unknown: &mut bool,
+    infeasible: &mut bool,
+) {
+    match available {
+        None => {
+            *unknown = true;
+            findings.push(finding(
+                "UNKNOWN_SERVICE_CAPABILITY",
+                format!("{subject}: {field} is unknown, not zero"),
+            ));
+        }
+        Some(value) if !value.is_finite() || value < 0.0 => {
+            *invalid = true;
+            findings.push(finding(
+                "INVALID_DECLARED_CAPABILITY",
+                format!("{subject}: {field} must be finite and non-negative"),
+            ));
+        }
+        Some(value) if value + 1.0e-9 < required => {
+            *infeasible = true;
+            findings.push(finding(
+                "SERVICE_CAPACITY_SHORTFALL",
+                format!("{subject}: {field} {:.6} is below required {:.6}", value, required),
+            ));
+        }
+        Some(_) => {}
+    }
+}
+
+pub fn run_service_audit(input: &Path, output: Option<&Path>) -> Result<()> {
+    let bytes = fs::read(input)
+        .with_context(|| format!("reading service-envelope corpus {}", input.display()))?;
+    let report = audit_service_corpus(&bytes)?;
+    let rendered = serde_json::to_string_pretty(&report)?;
+
+    if let Some(path) = output {
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent)
+                    .with_context(|| format!("creating report directory {}", parent.display()))?;
+            }
+        }
+        fs::write(path, &rendered)
+            .with_context(|| format!("writing service-envelope report {}", path.display()))?;
+    }
+    println!("{rendered}");
+
+    if report.status != "PASS" {
+        bail!(
+            "service-envelope audit BLOCKED: {} corpus finding(s), {} expected-disposition mismatch(es)",
+            report.corpus_findings.len(),
+            report.expectation_mismatch_count
+        );
+    }
+    Ok(())
+}
