@@ -97,6 +97,8 @@ The request schema is `schemas/episode-request-v1.schema.json`; the emitted fuse
 
 The CLI validates the complete episode before committing output files. Fused HDC vectors are staged in memory; if a later observation fails identity, receipt, timing, sequence or encoder validation, neither the receipts JSON nor any policy-input artifact is written. The receipts output path must not already exist, and the policy-input directory must be absent or empty before processing. This prevents a rejected multi-frame episode from leaving a partial set of apparently usable policy inputs. The staged binary HDC output is capped at 1 GiB per episode; the cap is checked before the commit phase.
 
+When `observe()` rejects an observation, stderr includes the exact `BridgeError` variant and `frames_processed_before_rejection=N`. The count is sampled immediately after the rejection. This lets an external fault harness verify that the failing observation did not advance Vision Manifold temporal state; in a replay case, earlier valid observations may already have advanced it.
+
 The CLI writes:
 - one serialized `DrivingObservationReceipt` per delivered observation;
 - a sequential predecessor-receipt chain;
