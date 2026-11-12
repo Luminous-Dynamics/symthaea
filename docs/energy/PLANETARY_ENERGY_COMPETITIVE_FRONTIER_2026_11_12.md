@@ -151,6 +151,22 @@ The target column is a research programme, not present performance. Do not claim
 6. Build the synthetic evaluator and source register; then compare Symthaea candidate/experiment selection with random, space-filling, uncertainty-only, simple engineering and external-tool baselines.
 7. Establish one low-risk terrestrial bench and one regolith-simulant process coupon test only after facility/safety and independent material/product qualification.
 
-## 10. Claim ceiling
+## 10. Machine-readable competitor ledger
+
+The source-defined numeric values and evidence boundaries summarized above are also recorded in:
+
+[`benchmarks/planetary-energy-service/v0.1/competitive-reference-snapshot.json`](../../benchmarks/planetary-energy-service/v0.1/competitive-reference-snapshot.json)
+
+Each record binds a metric identifier, value, unit, exact declared system boundary, evidence class, source reference and caveats. The ledger intentionally keeps:
+- cell beginning-of-life efficiency separate from module/array power-to-mass;
+- flown spacecraft array empirical distribution separate from lunar surface deployment targets;
+- NASA design references separate from solicitation goals;
+- Blue Alchemist process maturity separate from lunar operational use;
+- perovskite research-cell/mini-module measurements separate from factory yield and space qualification;
+- terrestrial PV plant performance-loss data separate from module degradation in lunar/space conditions.
+
+The ledger is a source-qualified starting register, not an automatically validated technology comparison. A future metric promotion requires the exact source revision and context, compatible system boundary, evidence rights and independently reproducible evaluation.
+
+## 11. Claim ceiling
 
 This document reports current source-defined SOTA, programme designs and research targets as of 12 November 2026. It does not establish that any Luminous design beats these values or is physically feasible. No simulator result, source audit, synthetic case or AI-generated architecture is physical validation or approval. Claims require exact configuration identity, comparable functional boundaries, independent measurement, held-out conditions and reproducible artifacts.
