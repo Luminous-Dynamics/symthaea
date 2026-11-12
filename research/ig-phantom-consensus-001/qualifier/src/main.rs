@@ -75,6 +75,8 @@ fn unique_substantive_top(counts: &BTreeMap<String, usize>) -> Option<String> {
     Some((*key).clone())
 }
 fn estimate_top(probabilities: &Value) -> Option<String> {
+    // Any probability mass on UNKNOWN means the complete private plurality cannot be asserted.
+    if probabilities.get("UNKNOWN").and_then(Value::as_u64).unwrap_or(0) > 0 { return None; }
     let mut ranked: Vec<(String, u64)> = probabilities.as_object()?.iter()
         .filter(|(k, _)| k.as_str() != "ABSTAIN" && k.as_str() != "UNKNOWN")
         .map(|(k,v)| (k.clone(), v.as_u64().unwrap_or(0))).collect();
@@ -110,7 +112,11 @@ fn phantom_oracle(f: &Value) -> bool {
     false
 }
 fn tally_matches(actual: &Value, expected: &BTreeMap<String, usize>, opts: &[String]) -> bool {
-    opts.iter().all(|o| actual.get(o).and_then(Value::as_u64) == Some(*expected.get(o).unwrap_or(&0) as u64))
+    let Some(map) = actual.as_object() else { return false; };
+    let actual_keys: BTreeSet<String> = map.keys().cloned().collect();
+    let expected_keys: BTreeSet<String> = opts.iter().cloned().collect();
+    actual_keys == expected_keys
+        && opts.iter().all(|o| actual.get(o).and_then(Value::as_u64) == Some(*expected.get(o).unwrap_or(&0) as u64))
 }
 fn validate_estimate_roster(
     records: &[Value], ids: &BTreeSet<String>, opts: &[String], errors: &mut Vec<String>, context: &str
@@ -380,7 +386,7 @@ fn main() -> ExitCode {
 mod tests {
     use super::*;
     #[test]
-    fn perfect_peer_distribution_has_zero_brier() {
+    fn perfect_peer_distribution_has_zero_l2_error() {
         let rows = vec![
             serde_json::json!({"agent_id":"a","record_status":"recorded","private_choice":"A"}),
             serde_json::json!({"agent_id":"b","record_status":"recorded","private_choice":"A"}),
@@ -449,6 +455,20 @@ mod tests {
 
     fn protocol() -> Value {
         serde_json::from_str(include_str!("../../PHANTOM_CONSENSUS_PROTOCOL_V0_1.json")).unwrap()
+    }
+
+    #[test]
+    fn estimated_unknown_mass_blocks_plurality_inference() {
+        let probabilities = serde_json::json!({"A":600,"B":200,"ABSTAIN":0,"UNKNOWN":200});
+        assert_eq!(estimate_top(&probabilities), None);
+    }
+
+    #[test]
+    fn anonymous_tally_rejects_unexpected_categories() {
+        let mut f = fixture("PHC-006");
+        f["transparency"]["disclosed_tally"]["UNDECLARED"] = serde_json::json!(0);
+        let (errors, _, _) = validate_fixture(&f, &declared_arms());
+        assert!(!errors.is_empty());
     }
 
     #[test]
