@@ -57,7 +57,7 @@ jobs:
         run: cargo metadata --locked --no-deps --format-version 1 > /tmp/muse-workspace-metadata.json
 
       - name: Check Muse formatting
-        run: cargo fmt --manifest-path crates/domains/symthaea-muse/Cargo.toml -- --check
+        run: cargo fmt --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --package symthaea-muse -- --check
 
       - name: Run EVAL-017 influence and support-policy tests
         run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib counterfactual_influence::tests
