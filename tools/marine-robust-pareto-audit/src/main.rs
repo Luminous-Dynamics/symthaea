@@ -815,7 +815,16 @@ mod tests {
         }
     }
 
-    fn candidate(id: &str, energy: f64, acoustic: f64, waste: f64) -> Candidate {
+    fn candidate(id: &str, energy: f64, acoustic: f64) -> Candidate {
+        let operating_point_receipt_sha256 = digest(if id == "A" { '3' } else { '4' });
+        let mut metrics = vec![
+            metric("energy_per_cargo_work", energy, "kWh_per_1000_tonne_nm"),
+            metric("acoustic_1khz", acoustic, "dB_re_1uPa_at_declared_reference"),
+            metric("lifecycle_cost", if id == "A" { 20.0 } else { 21.0 }, "USD_per_1000_tonne_nm"),
+        ];
+        for observation in &mut metrics {
+            observation.operating_point_receipt_sha256 = operating_point_receipt_sha256.clone();
+        }
         Candidate {
             candidate_id: id.to_string(),
             evidence_kind: EvidenceKind::Measured,
@@ -835,25 +844,21 @@ mod tests {
             cargo_work_value: 1_000_000.0,
             cargo_work_expanded_uncertainty: 100.0,
             cargo_work_unit: "tonne_nautical_mile".to_string(),
-            operating_point_receipt_sha256: digest(if id == "A" { '3' } else { '4' }),
-            metrics: vec![
-                metric("energy_per_cargo_work", energy, "kWh_per_1000_tonne_nm"),
-                metric("acoustic_1khz", acoustic, "dB_re_1uPa_at_declared_reference"),
-                metric("lifecycle_cost", 20.0, "USD_per_1000_tonne_nm"),
-                metric("bio_release_count", waste, "organisms_per_cleaning_event"),
-            ],
-            gate_receipts: vec![],
+            operating_point_receipt_sha256,
+            metrics,
+            gate_receipts: vec![GateReceipt {
+                gate_id: "biosecurity-release".to_string(),
+                status: GateStatus::Satisfied,
+                audit_contract_id: "marine-biofouling-evidence-audit-v0.1".to_string(),
+                audit_receipt_sha256: digest(if id == "A" { '8' } else { '9' }),
+                requirement_reference: "permit:zero-uncontained-organism-release".to_string(),
+            }],
         }
     }
 
     fn case() -> Case {
-        let mut a = candidate("A", 90.0, 100.0, 0.0);
-        let mut b = candidate("B", 100.0, 98.0, 0.0);
-        for cand in [&mut a, &mut b] {
-            cand.metrics.iter_mut()
-                .find(|metric| metric.metric_id == "lifecycle_cost")
-                .unwrap().value = if cand.candidate_id == "A" { 20.0 } else { 21.0 };
-        }
+        let a = candidate("A", 90.0, 100.0);
+        let b = candidate("B", 100.0, 98.0);
         Case {
             schema_version: SCHEMA_VERSION.to_string(),
             case_id: "synthetic-marine-pareto-001".to_string(),
@@ -906,11 +911,11 @@ mod tests {
                 HardGateDefinition {
                     gate_id: "biosecurity-release".to_string(),
                     gate_class: "biosecurity".to_string(),
-                    evaluation: GateEvaluation::MetricUpperBound,
-                    metric_id: Some("bio_release_count".to_string()),
-                    threshold: Some(0.0),
-                    unit: Some("organisms_per_cleaning_event".to_string()),
-                    required_audit_contract_id: None,
+                    evaluation: GateEvaluation::ExternalAuditReceipt,
+                    metric_id: None,
+                    threshold: None,
+                    unit: None,
+                    required_audit_contract_id: Some("marine-biofouling-evidence-audit-v0.1".to_string()),
                     requirement_reference: "permit:zero-uncontained-organism-release".to_string(),
                     non_compensable: true,
                 },
