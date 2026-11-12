@@ -17,8 +17,14 @@
 //! named by `SYMTHAEA_SOUNDFONT`. The Muse Studio launcher provides both
 //! via `nix-shell`.
 
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use std::ffi::{OsStr, OsString};
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 /// The consciousness-state color mapped into FluidSynth settings — so the
 /// Studio's state sliders keep DOING something under the soundfont
@@ -101,79 +107,433 @@ pub fn available() -> Option<(PathBuf, PathBuf)> {
     Some((binary, soundfont))
 }
 
-/// Render a Standard MIDI File to MASTERED 16-bit stereo WAV bytes via
-/// FluidSynth. Returns `None` (caller falls back to the native renderer) when
-/// the environment lacks fluidsynth/soundfont, the render fails, or the result
-/// is silent.
+/// Version identifier for the local FluidSynth child-process observation.
+pub const FLUIDSYNTH_INVOCATION_OBSERVATION_SCHEMA_V1: &str =
+    "urn:luminous-dynamics:muse:fluidsynth-invocation-observation:v1";
+
+/// Bound retained stdout/stderr preview bytes. Streams continue to be drained
+/// after this limit so a verbose child cannot block on a full pipe.
+const DIAGNOSTIC_PREVIEW_LIMIT: usize = 8 * 1024;
+
+static FLUID_OUTPUT_NONCE: AtomicU64 = AtomicU64::new(0);
+
+/// One OS argument as passed to the child process. raw_os_hex preserves the
+/// platform-native OsStr encoding; display is only for human inspection.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InvocationArgumentV1 {
+    pub display: String,
+    pub raw_os_hex: String,
+}
+
+/// Result state for a local renderer invocation. These values describe the
+/// observable wrapper/child-process path, not a cryptographic attestation.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum FluidSynthInvocationDispositionV1 {
+    NotAvailable,
+    InputArtifactUnavailable,
+    SpawnFailed,
+    ProcessFailed,
+    MidiChangedDuringRender,
+    RendererAssetChangedDuringRender,
+    OutputMissing,
+    OutputUnmasterableOrSilent,
+    Rendered,
+}
+
+/// Structured local observation of the FluidSynth invocation.
 ///
-/// FluidSynth's default gain (0.2) leaves our deliberately-soft velocities
-/// whisper-quiet, so the render runs at gain 0.8 and the PCM then goes through
-/// [`master_wav`] — the same BS.1770-4 chain and the same
-/// [`crate::auto_master::MasteringConfig`] the native path uses, so the two
-/// renderers are post-processed identically.
+/// The before/after path digests narrow file-replacement races but do not prove
+/// which bytes the operating system loaded into the child process. A malicious
+/// host, kernel, dynamic loader or filesystem can still falsify this local
+/// observation. Stronger execution attestation needs a separate trusted
+/// execution boundary.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FluidSynthInvocationObservationV1 {
+    pub schema: String,
+    pub disposition: FluidSynthInvocationDispositionV1,
+    pub program: Option<InvocationArgumentV1>,
+    pub arguments: Vec<InvocationArgumentV1>,
+    pub executable_sha256_before: Option<String>,
+    pub executable_sha256_after: Option<String>,
+    pub soundfont_sha256_before: Option<String>,
+    pub soundfont_sha256_after: Option<String>,
+    pub midi_sha256_before: Option<String>,
+    pub midi_sha256_after: Option<String>,
+    pub output_wav_sha256_before_mastering: Option<String>,
+    pub mastered_wav_sha256: Option<String>,
+    pub process_spawned: bool,
+    pub process_success: bool,
+    pub process_exit_code: Option<i32>,
+    pub spawn_error: Option<String>,
+    pub stdout_sha256: Option<String>,
+    pub stderr_sha256: Option<String>,
+    pub stdout_total_bytes: u64,
+    pub stderr_total_bytes: u64,
+    pub stdout_preview: String,
+    pub stderr_preview: String,
+    pub stdout_preview_truncated: bool,
+    pub stderr_preview_truncated: bool,
+    pub sample_rate_hz: u32,
+    pub started_unix_ns: u128,
+    pub finished_unix_ns: u128,
+    pub elapsed_micros: u128,
+    pub trust_boundary: String,
+}
+
+/// Output of a render attempt. wav_bytes == None is an explicit failed or
+/// unavailable attempt; the observation remains available to the caller.
+#[derive(Debug, Clone)]
+pub struct FluidSynthRenderAttemptV1 {
+    pub wav_bytes: Option<Vec<u8>>,
+    pub observation: FluidSynthInvocationObservationV1,
+}
+
+fn unix_time_ns() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or(0)
+}
+
+fn sha256_hex_bytes(bytes: &[u8]) -> String {
+    let digest = Sha256::digest(bytes);
+    hex_digest(digest.as_slice())
+}
+
+fn sha256_file(path: &Path) -> Option<String> {
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer).ok()?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Some(hex_digest(hasher.finalize().as_slice()))
+}
+
+fn hex_digest(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        use std::fmt::Write as _;
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
+}
+
+#[cfg(unix)]
+fn raw_os_bytes(value: &OsStr) -> Vec<u8> {
+    use std::os::unix::ffi::OsStrExt;
+    value.as_bytes().to_vec()
+}
+
+#[cfg(windows)]
+fn raw_os_bytes(value: &OsStr) -> Vec<u8> {
+    use std::os::windows::ffi::OsStrExt;
+    value.encode_wide().flat_map(u16::to_le_bytes).collect()
+}
+
+#[cfg(not(any(unix, windows)))]
+fn raw_os_bytes(value: &OsStr) -> Vec<u8> {
+    value.to_string_lossy().as_bytes().to_vec()
+}
+
+fn invocation_argument(value: &OsStr) -> InvocationArgumentV1 {
+    InvocationArgumentV1 {
+        display: value.to_string_lossy().into_owned(),
+        raw_os_hex: hex_digest(&raw_os_bytes(value)),
+    }
+}
+
+#[derive(Debug)]
+struct DrainedStream {
+    sha256: String,
+    preview: String,
+    total_bytes: u64,
+    truncated: bool,
+}
+
+fn drain_stream<R: Read>(mut reader: R) -> std::io::Result<DrainedStream> {
+    let mut hasher = Sha256::new();
+    let mut preview = Vec::with_capacity(DIAGNOSTIC_PREVIEW_LIMIT);
+    let mut total_bytes = 0u64;
+    let mut buffer = [0u8; 8192];
+    loop {
+        let count = reader.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+        total_bytes = total_bytes.saturating_add(count as u64);
+        let remaining = DIAGNOSTIC_PREVIEW_LIMIT.saturating_sub(preview.len());
+        preview.extend_from_slice(&buffer[..count.min(remaining)]);
+    }
+    Ok(DrainedStream {
+        sha256: hex_digest(hasher.finalize().as_slice()),
+        preview: String::from_utf8_lossy(&preview).into_owned(),
+        total_bytes,
+        truncated: total_bytes > preview.len() as u64,
+    })
+}
+
+fn empty_observation(
+    disposition: FluidSynthInvocationDispositionV1,
+    sample_rate: u32,
+) -> FluidSynthInvocationObservationV1 {
+    let now = unix_time_ns();
+    FluidSynthInvocationObservationV1 {
+        schema: FLUIDSYNTH_INVOCATION_OBSERVATION_SCHEMA_V1.to_string(),
+        disposition,
+        program: None,
+        arguments: Vec::new(),
+        executable_sha256_before: None,
+        executable_sha256_after: None,
+        soundfont_sha256_before: None,
+        soundfont_sha256_after: None,
+        midi_sha256_before: None,
+        midi_sha256_after: None,
+        output_wav_sha256_before_mastering: None,
+        mastered_wav_sha256: None,
+        process_spawned: false,
+        process_success: false,
+        process_exit_code: None,
+        spawn_error: None,
+        stdout_sha256: None,
+        stderr_sha256: None,
+        stdout_total_bytes: 0,
+        stderr_total_bytes: 0,
+        stdout_preview: String::new(),
+        stderr_preview: String::new(),
+        stdout_preview_truncated: false,
+        stderr_preview_truncated: false,
+        sample_rate_hz: sample_rate,
+        started_unix_ns: now,
+        finished_unix_ns: now,
+        elapsed_micros: 0,
+        trust_boundary:
+            "local wrapper observation; not proof of child-loaded bytes or trusted-host execution"
+                .to_string(),
+    }
+}
+
+/// Render a Standard MIDI File through FluidSynth and retain both the audio
+/// result and a structured invocation observation.
+///
+/// Unlike the compatibility wrapper, this API preserves failure evidence
+/// (missing input, spawn failure, non-zero exit, changed input/assets, missing
+/// output and silent/unmasterable output) instead of collapsing every failure
+/// to None. Stdout/stderr are drained concurrently; only a bounded preview
+/// is retained while full-stream SHA-256 and byte counts are recorded.
+pub fn render_midi_to_wav_with_observation(
+    midi_path: &Path,
+    sample_rate: u32,
+    color: Option<RenderColor>,
+) -> FluidSynthRenderAttemptV1 {
+    let Some((binary, soundfont)) = available() else {
+        return FluidSynthRenderAttemptV1 {
+            wav_bytes: None,
+            observation: empty_observation(
+                FluidSynthInvocationDispositionV1::NotAvailable,
+                sample_rate,
+            ),
+        };
+    };
+    render_midi_to_wav_with_paths(midi_path, sample_rate, color, &binary, &soundfont)
+}
+
+/// Compatibility API retained for existing callers. New evidence-producing
+/// paths should call render_midi_to_wav_with_observation and persist the
+/// observation even when no audio bytes are returned.
 pub fn render_midi_to_wav(
     midi_path: &Path,
     sample_rate: u32,
     color: Option<RenderColor>,
 ) -> Option<Vec<u8>> {
-    let (binary, soundfont) = available()?;
+    render_midi_to_wav_with_observation(midi_path, sample_rate, color).wav_bytes
+}
+
+fn render_midi_to_wav_with_paths(
+    midi_path: &Path,
+    sample_rate: u32,
+    color: Option<RenderColor>,
+    binary: &Path,
+    soundfont: &Path,
+) -> FluidSynthRenderAttemptV1 {
+    let started = Instant::now();
+    let started_unix_ns = unix_time_ns();
+    let nonce = FLUID_OUTPUT_NONCE.fetch_add(1, Ordering::Relaxed);
     let out = std::env::temp_dir().join(format!(
         "muse_fluid_{}_{}.wav",
         std::process::id(),
-        midi_path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("render")
+        nonce
     ));
-    let mut cmd = Command::new(&binary);
+
+    let executable_before = sha256_file(binary);
+    let soundfont_before = sha256_file(soundfont);
+    let midi_before = sha256_file(midi_path);
+    if executable_before.is_none() || soundfont_before.is_none() || midi_before.is_none() {
+        let mut observation =
+            empty_observation(FluidSynthInvocationDispositionV1::InputArtifactUnavailable, sample_rate);
+        observation.started_unix_ns = started_unix_ns;
+        observation.finished_unix_ns = unix_time_ns();
+        observation.elapsed_micros = started.elapsed().as_micros();
+        observation.executable_sha256_before = executable_before;
+        observation.soundfont_sha256_before = soundfont_before;
+        observation.midi_sha256_before = midi_before;
+        return FluidSynthRenderAttemptV1 { wav_bytes: None, observation };
+    }
+
+    let mut args = Vec::<OsString>::new();
     if let Some(c) = color {
-        cmd.arg("-o")
-            .arg(format!(
-                "synth.reverb.room-size={:.3}",
-                c.reverb_room.clamp(0.0, 1.0)
-            ))
-            .arg("-o")
-            .arg(format!(
-                "synth.reverb.level={:.3}",
-                c.reverb_level.clamp(0.0, 1.0)
-            ))
-            .arg("-o")
-            .arg(format!(
-                "synth.reverb.damp={:.3}",
-                c.reverb_damp.clamp(0.0, 1.0)
-            ));
+        args.push("-o".into());
+        args.push(format!("synth.reverb.room-size={:.3}", c.reverb_room.clamp(0.0, 1.0)).into());
+        args.push("-o".into());
+        args.push(format!("synth.reverb.level={:.3}", c.reverb_level.clamp(0.0, 1.0)).into());
+        args.push("-o".into());
+        args.push(format!("synth.reverb.damp={:.3}", c.reverb_damp.clamp(0.0, 1.0)).into());
         if c.chorus_level > 0.05 {
-            cmd.arg("-o").arg(format!(
-                "synth.chorus.level={:.3}",
-                c.chorus_level.clamp(0.0, 10.0)
-            ));
+            args.push("-o".into());
+            args.push(format!("synth.chorus.level={:.3}", c.chorus_level.clamp(0.0, 10.0)).into());
         } else {
-            cmd.arg("-o").arg("synth.chorus.active=0");
+            args.push("-o".into());
+            args.push("synth.chorus.active=0".into());
         }
     }
-    let status = cmd
-        .arg("-g")
-        .arg("0.8")
-        .arg("-T")
-        .arg("wav")
-        .arg("-F")
-        .arg(&out)
-        .arg("-r")
-        .arg(sample_rate.to_string())
-        .arg("-ni")
-        .arg(&soundfont)
-        .arg(midi_path)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .ok()?;
-    if !status.success() {
-        let _ = std::fs::remove_file(&out);
-        return None;
+    args.extend([
+        "-g".into(),
+        "0.8".into(),
+        "-T".into(),
+        "wav".into(),
+        "-F".into(),
+        out.as_os_str().to_os_string(),
+        "-r".into(),
+        sample_rate.to_string().into(),
+        "-ni".into(),
+        soundfont.as_os_str().to_os_string(),
+        midi_path.as_os_str().to_os_string(),
+    ]);
+
+    let mut command = Command::new(binary);
+    command.args(&args);
+    command.stdout(Stdio::piped()).stderr(Stdio::piped());
+
+    let program = invocation_argument(binary.as_os_str());
+    let arguments = args.iter().map(|arg| invocation_argument(arg.as_os_str())).collect();
+    let mut observation = empty_observation(
+        FluidSynthInvocationDispositionV1::SpawnFailed,
+        sample_rate,
+    );
+    observation.program = Some(program);
+    observation.arguments = arguments;
+    observation.executable_sha256_before = executable_before;
+    observation.soundfont_sha256_before = soundfont_before;
+    observation.midi_sha256_before = midi_before;
+    observation.started_unix_ns = started_unix_ns;
+
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            observation.spawn_error = Some(error.to_string());
+            observation.finished_unix_ns = unix_time_ns();
+            observation.elapsed_micros = started.elapsed().as_micros();
+            observation.executable_sha256_after = sha256_file(binary);
+            observation.soundfont_sha256_after = sha256_file(soundfont);
+            observation.midi_sha256_after = sha256_file(midi_path);
+            return FluidSynthRenderAttemptV1 { wav_bytes: None, observation };
+        }
+    };
+    observation.process_spawned = true;
+
+    let stdout_thread = child.stdout.take().map(|stream| {
+        std::thread::spawn(move || drain_stream(stream))
+    });
+    let stderr_thread = child.stderr.take().map(|stream| {
+        std::thread::spawn(move || drain_stream(stream))
+    });
+
+    let status = child.wait();
+    if let Some(joined) = stdout_thread {
+        if let Ok(Ok(stream)) = joined.join() {
+            observation.stdout_sha256 = Some(stream.sha256);
+            observation.stdout_preview = stream.preview;
+            observation.stdout_total_bytes = stream.total_bytes;
+            observation.stdout_preview_truncated = stream.truncated;
+        }
     }
-    let result = master_wav(&out);
-    let _ = std::fs::remove_file(&out);
-    result
+    if let Some(joined) = stderr_thread {
+        if let Ok(Ok(stream)) = joined.join() {
+            observation.stderr_sha256 = Some(stream.sha256);
+            observation.stderr_preview = stream.preview;
+            observation.stderr_total_bytes = stream.total_bytes;
+            observation.stderr_preview_truncated = stream.truncated;
+        }
+    }
+
+    let status = match status {
+        Ok(status) => status,
+        Err(error) => {
+            observation.spawn_error = Some(format!("wait failed: {error}"));
+            observation.finished_unix_ns = unix_time_ns();
+            observation.elapsed_micros = started.elapsed().as_micros();
+            observation.executable_sha256_after = sha256_file(binary);
+            observation.soundfont_sha256_after = sha256_file(soundfont);
+            observation.midi_sha256_after = sha256_file(midi_path);
+            let _ = std::fs::remove_file(&out);
+            return FluidSynthRenderAttemptV1 { wav_bytes: None, observation };
+        }
+    };
+    observation.process_exit_code = status.code();
+    observation.process_success = status.success();
+
+    observation.executable_sha256_after = sha256_file(binary);
+    observation.soundfont_sha256_after = sha256_file(soundfont);
+    observation.midi_sha256_after = sha256_file(midi_path);
+
+    let binary_unchanged =
+        observation.executable_sha256_before == observation.executable_sha256_after;
+    let soundfont_unchanged =
+        observation.soundfont_sha256_before == observation.soundfont_sha256_after;
+    let midi_unchanged = observation.midi_sha256_before == observation.midi_sha256_after;
+
+    if !status.success() {
+        observation.disposition = FluidSynthInvocationDispositionV1::ProcessFailed;
+        let _ = std::fs::remove_file(&out);
+    } else if !midi_unchanged {
+        observation.disposition = FluidSynthInvocationDispositionV1::MidiChangedDuringRender;
+        let _ = std::fs::remove_file(&out);
+    } else if !binary_unchanged || !soundfont_unchanged {
+        observation.disposition =
+            FluidSynthInvocationDispositionV1::RendererAssetChangedDuringRender;
+        let _ = std::fs::remove_file(&out);
+    } else if !out.is_file() {
+        observation.disposition = FluidSynthInvocationDispositionV1::OutputMissing;
+    } else {
+        observation.output_wav_sha256_before_mastering = sha256_file(&out);
+        match master_wav(&out) {
+            Some(bytes) => {
+                observation.mastered_wav_sha256 = Some(sha256_hex_bytes(&bytes));
+                observation.disposition = FluidSynthInvocationDispositionV1::Rendered;
+                observation.finished_unix_ns = unix_time_ns();
+                observation.elapsed_micros = started.elapsed().as_micros();
+                let _ = std::fs::remove_file(&out);
+                return FluidSynthRenderAttemptV1 {
+                    wav_bytes: Some(bytes),
+                    observation,
+                };
+            }
+            None => {
+                observation.disposition =
+                    FluidSynthInvocationDispositionV1::OutputUnmasterableOrSilent;
+            }
+        }
+        let _ = std::fs::remove_file(&out);
+    }
+
+    observation.finished_unix_ns = unix_time_ns();
+    observation.elapsed_micros = started.elapsed().as_micros();
+    FluidSynthRenderAttemptV1 { wav_bytes: None, observation }
 }
 
 /// Read a WAV, run the full mastering chain, re-encode as 16-bit in memory.
