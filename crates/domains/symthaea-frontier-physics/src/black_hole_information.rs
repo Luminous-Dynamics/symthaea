@@ -377,8 +377,8 @@ impl DensityMatrix {
                 a_index = (a_index << 1) | bit;
             }
             let mut e_index = 0usize;
-            for qubit in 0..number_of_qubits {
-                if !retained[qubit] {
+            for (qubit, is_retained) in retained.iter().copied().enumerate() {
+                if !is_retained {
                     let bit = (basis_index >> (number_of_qubits - 1 - qubit)) & 1;
                     e_index = (e_index << 1) | bit;
                 }
@@ -723,10 +723,10 @@ fn haar_unitary_4(rng: &mut ChaCha20Rng) -> Result<[[Complex64; 4]; 4], QuantumI
                 let phase = core::f64::consts::TAU * u2;
                 *entry = Complex64::new(radius * phase.cos(), radius * phase.sin());
             }
-            for previous in 0..column {
+            for previous_column in columns.iter().take(column) {
                 let mut overlap = Complex64::new(0.0, 0.0);
                 for row in 0..4 {
-                    overlap += columns[previous][row].conj() * vector[row];
+                    overlap += previous_column[row].conj() * vector[row];
                 }
                 for row in 0..4 {
                     vector[row] -= columns[previous][row] * overlap;
@@ -1102,22 +1102,33 @@ pub fn simulate_u1_conserving_random_circuit_entropy(
     })
 }
 
+/// Frozen circuit specification for one independent-seed U(1) scrambling ensemble.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct U1RandomCircuitEntropyConfig {
+    pub number_of_qubits: usize,
+    pub total_excitations: usize,
+    pub depth: usize,
+    pub topology: RandomCircuitTopology,
+    pub retained_qubits: Vec<usize>,
+}
+
 /// Run independent fixed-charge circuit realizations at one declared depth.
 pub fn sample_u1_conserving_random_circuit_entropy_ensemble(
-    number_of_qubits: usize,
-    total_excitations: usize,
-    depth: usize,
-    topology: RandomCircuitTopology,
-    retained_qubits: &[usize],
+    config: U1RandomCircuitEntropyConfig,
     sample_count: usize,
     first_seed: u64,
     tolerance: f64,
 ) -> Result<U1RandomCircuitEntropySummary, QuantumInformationError> {
     if sample_count < 2 {
-        return Err(QuantumInformationError::InvalidEnsembleSampleCount(
-            sample_count,
-        ));
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
     }
+    let U1RandomCircuitEntropyConfig {
+        number_of_qubits,
+        total_excitations,
+        depth,
+        topology,
+        retained_qubits,
+    } = config;
     let mut mean = 0.0;
     let mut sum_squared_deviations = 0.0;
     let mut page_mean = None;
@@ -1128,7 +1139,7 @@ pub fn sample_u1_conserving_random_circuit_entropy_ensemble(
             total_excitations,
             depth,
             topology,
-            retained_qubits,
+            &retained_qubits,
             seed,
             tolerance,
         )?;
@@ -1200,7 +1211,8 @@ mod u1_random_circuit_tests {
             assert!((sample.total_excitation_expectation - 4.0).abs() < TOLERANCE);
             assert!(sample.total_excitation_variance < TOLERANCE);
             assert!(sample.subsystem_entropy_nats >= -TOLERANCE);
-            let maximal_bipartite_entropy = ((1usize << 4).min(1usize << 4) as f64).ln();
+            let maximal_bipartite_entropy = (1usize << 4) as f64;
+            let maximal_bipartite_entropy = maximal_bipartite_entropy.ln();
             assert!(sample.subsystem_entropy_nats <= maximal_bipartite_entropy + 1e-9);
         }
     }
@@ -1233,11 +1245,13 @@ mod u1_random_circuit_tests {
     #[test]
     fn fixed_charge_circuit_ensemble_reports_uncertainty_and_correct_equilibrium() {
         let summary = sample_u1_conserving_random_circuit_entropy_ensemble(
-            8,
-            4,
-            8,
-            RandomCircuitTopology::Brickwork1D,
-            &[0, 1, 2, 3],
+            U1RandomCircuitEntropyConfig {
+                number_of_qubits: 8,
+                total_excitations: 4,
+                depth: 8,
+                topology: RandomCircuitTopology::Brickwork1D,
+                retained_qubits: vec![0, 1, 2, 3],
+            },
             12,
             0xC1AC,
             TOLERANCE,
@@ -1459,7 +1473,7 @@ pub fn simulate_u1_domain_wall_transport(
     tolerance: f64,
 ) -> Result<U1DomainWallTransportResult, QuantumInformationError> {
     validate_tolerance(tolerance)?;
-    if number_of_qubits < 2 || number_of_qubits % 2 != 0 {
+    if number_of_qubits < 2 || !number_of_qubits.is_multiple_of(2) {
         return Err(QuantumInformationError::InvalidCircuitTopology);
     }
     if number_of_qubits > MAX_DENSE_STATE_QUBITS {
@@ -2274,7 +2288,7 @@ pub fn simulate_u1_operator_spreading(
     tolerance: f64,
 ) -> Result<U1OperatorSpreadingSample, QuantumInformationError> {
     validate_tolerance(tolerance)?;
-    if number_of_qubits < 2 || number_of_qubits > 8 {
+    if !(2..=8).contains(&number_of_qubits) {
         return Err(QuantumInformationError::DenseStateQubitLimit {
             requested: number_of_qubits,
             maximum: 8,
@@ -3054,8 +3068,8 @@ mod tests {
         for row in 0..4 {
             for column in 0..4 {
                 let mut dot = Complex64::new(0.0, 0.0);
-                for k in 0..4 {
-                    dot += unitary[k][row].conj() * unitary[k][column];
+                for unitary_row in &unitary {
+                    dot += unitary_row[row].conj() * unitary_row[column];
                 }
                 let expected = if row == column { 1.0 } else { 0.0 };
                 assert!((dot.re - expected).abs() < 1e-12);
@@ -3540,20 +3554,20 @@ mod sequential_evaporation_tests {
     fn u1_gate_is_unitary_and_has_no_cross_charge_matrix_elements() {
         let mut rng = ChaCha20Rng::seed_from_u64(0xC0A5E);
         let gate = u1_conserving_unitary_4(&mut rng).unwrap();
-        for row in 0usize..4 {
-            for column in 0usize..4 {
+        for (row, gate_row) in gate.iter().enumerate() {
+            for (column, element) in gate_row.iter().enumerate() {
                 let row_charge = row.count_ones() as usize;
                 let column_charge = column.count_ones() as usize;
                 if row_charge != column_charge {
-                    assert!(gate[row][column].norm() < 1e-14);
+                    assert!(element.norm() < 1e-14);
                 }
             }
         }
         for left in 0..4 {
             for right in 0..4 {
                 let mut overlap = Complex64::new(0.0, 0.0);
-                for row in 0..4 {
-                    overlap += gate[row][left].conj() * gate[row][right];
+                for gate_row in &gate {
+                    overlap += gate_row[left].conj() * gate_row[right];
                 }
                 let expected = if left == right { 1.0 } else { 0.0 };
                 assert!((overlap.re - expected).abs() < 1e-12);
