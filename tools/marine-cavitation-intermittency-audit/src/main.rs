@@ -331,10 +331,10 @@ fn validate_case(case: &Case) -> Vec<String> {
                 errors.push(format!("run {}: {label} digest must be 64 hexadecimal characters", run.run_id));
             }
         }
-        if let Some(digest) = &water.nuclei_distribution_evidence_sha256 {
-            if !is_sha256(digest) {
-                errors.push(format!("run {}: nuclei-distribution evidence digest must be 64 hexadecimal characters", run.run_id));
-            }
+        if let Some(digest) = &water.nuclei_distribution_evidence_sha256
+            && !is_sha256(digest)
+        {
+            errors.push(format!("run {}: nuclei-distribution evidence digest must be 64 hexadecimal characters", run.run_id));
         }
         for (label, digest) in [
             ("timebase receipt", &run.timebase_receipt_sha256),
@@ -755,9 +755,8 @@ fn audit(case: &Case) -> AuditReport {
         "INVALID"
     } else if water_condition_incomparable {
         "INCOMPARABLE_CONDITION"
-    } else if water_condition_unresolved {
-        "INCOMPLETE"
-    } else if run_reports.iter().any(|report| report.usable_windows < case.minimum_usable_windows_per_run)
+    } else if water_condition_unresolved
+        || run_reports.iter().any(|report| report.usable_windows < case.minimum_usable_windows_per_run)
         || case.runs.len() < case.minimum_runs
         || case.runs.iter().any(|run| run.windows.iter().any(|window| window.cavitation_present.is_none()))
         || case.runs.iter().any(|run| run.background_method == BackgroundMethod::Unknown)
@@ -924,14 +923,14 @@ mod tests {
     #[test]
     fn stable_water_susceptibility_allows_distributional_comparison() {
         let mut input = case();
-        make_measured(&mut input);
+        input.evidence_kind = EvidenceKind::Measured;
         assert_eq!(audit(&input).disposition, "DISTRIBUTIONAL_SUMMARY_ONLY");
     }
 
     #[test]
     fn water_susceptibility_drift_outside_tolerance_is_incomparable() {
         let mut input = case();
-        make_measured(&mut input);
+        input.evidence_kind = EvidenceKind::Measured;
         input.runs[1].water_condition.value = 0.90;
         assert_eq!(audit(&input).disposition, "INCOMPARABLE_CONDITION");
     }
@@ -939,7 +938,7 @@ mod tests {
     #[test]
     fn water_susceptibility_uncertainty_crossing_tolerance_is_incomplete() {
         let mut input = case();
-        make_measured(&mut input);
+        input.evidence_kind = EvidenceKind::Measured;
         input.runs[1].water_condition.value = 0.66;
         input.runs[1].water_condition.expanded_uncertainty = 0.04;
         assert_eq!(audit(&input).disposition, "INCOMPLETE");
@@ -948,7 +947,7 @@ mod tests {
     #[test]
     fn water_susceptibility_method_or_calibration_change_is_incomparable() {
         let mut input = case();
-        make_measured(&mut input);
+        input.evidence_kind = EvidenceKind::Measured;
         input.runs[1].water_condition.method_id = "different-method".to_string();
         assert_eq!(audit(&input).disposition, "INCOMPARABLE_CONDITION");
     }
@@ -956,7 +955,7 @@ mod tests {
     #[test]
     fn partial_nuclei_distribution_evidence_coverage_is_incomplete() {
         let mut input = case();
-        make_measured(&mut input);
+        input.evidence_kind = EvidenceKind::Measured;
         input.runs[1].water_condition.nuclei_distribution_evidence_sha256 = None;
         let report = audit(&input);
         assert_eq!(report.disposition, "INCOMPLETE");
@@ -966,7 +965,7 @@ mod tests {
     #[test]
     fn total_gas_content_is_an_alternative_water_condition_measure() {
         let mut input = case();
-        make_measured(&mut input);
+        input.evidence_kind = EvidenceKind::Measured;
         for run in &mut input.runs {
             run.water_condition.measure = SusceptibilityMeasure::TotalGasContent;
             run.water_condition.value = 40.0;
@@ -978,7 +977,7 @@ mod tests {
     #[test]
     fn no_nuclei_distribution_data_is_reported_as_missing_not_fabricated() {
         let mut input = case();
-        make_measured(&mut input);
+        input.evidence_kind = EvidenceKind::Measured;
         for run in &mut input.runs {
             run.water_condition.nuclei_distribution_evidence_sha256 = None;
         }
