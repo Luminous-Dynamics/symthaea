@@ -1077,7 +1077,7 @@ mod tests {
     #[test]
     fn ood_report_requires_every_held_out_group_and_metric_slice() {
         let mut report = report("system-a", 0.61, EvaluationTrackV1::Blind);
-        report.slices.pop();
+        report.slices.remove(1);
         report.report_sha256 = benchmark_run_report_commitment(&report).unwrap();
         assert_eq!(
             validate_benchmark_run_report(&report),
@@ -1087,7 +1087,7 @@ mod tests {
         );
 
         let mut report = report("system-a", 0.61, EvaluationTrackV1::Blind);
-        report.slices[2].metrics.pop();
+        report.slices[1].metrics.pop();
         report.report_sha256 = benchmark_run_report_commitment(&report).unwrap();
         assert_eq!(
             validate_benchmark_run_report(&report),
