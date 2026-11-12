@@ -28,24 +28,12 @@ jobs:
           toolchain: 1.96.0
           components: rustfmt, clippy
 
-      - name: Generate canonical rustfmt output (format-bootstrap only)
+      - name: Check formatting for the exact bridge source set
         run: |
-          files=(
-            crates/bridges/symthaea-camera-driving-bridge/src/lib.rs
-            crates/bridges/symthaea-camera-driving-bridge/src/bin/camera_driving_bridge.rs
+          rustfmt --edition 2024 --check \
+            crates/bridges/symthaea-camera-driving-bridge/src/lib.rs \
+            crates/bridges/symthaea-camera-driving-bridge/src/bin/camera_driving_bridge.rs \
             crates/bridges/symthaea-camera-driving-bridge/examples/write_fixture_configs.rs
-          )
-          rustfmt --edition 2024 "${files[@]}"
-          export_formatted() {
-            name="$1"
-            file="$2"
-            echo "__FORMAT_EXPORT_BEGIN_${name}__"
-            base64 -w0 "$file" | fold -w 4000
-            echo "__FORMAT_EXPORT_END_${name}__"
-          }
-          export_formatted BRIDGE_LIB "${files[0]}"
-          export_formatted BRIDGE_BIN "${files[1]}"
-          export_formatted FIXTURE_CONFIG "${files[2]}"
 
       - name: Run known-answer and adversarial tests
         run: cargo test --locked --manifest-path crates/bridges/symthaea-camera-driving-bridge/Cargo.toml
