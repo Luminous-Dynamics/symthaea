@@ -27,10 +27,9 @@ use rustfft::{Fft, FftPlanner, num_complex::Complex};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-pub const COUNTERFACTUAL_INFLUENCE_VERSION: &str =
-    "mel-mr-eval-017-counterfactual-influence-v0.1";
+pub const COUNTERFACTUAL_INFLUENCE_VERSION: &str = "mel-mr-eval-017-counterfactual-influence-v0.2";
 pub const REPEATABILITY_CALIBRATION_VERSION: &str =
-    "mel-mr-eval-017-repeatability-calibration-v0.1";
+    "mel-mr-eval-017-repeatability-calibration-v0.2";
 const CALIBRATION_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-repeatability-v1\0";
 const INFLUENCE_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-influence-v1\0";
 const MINIMUM_NOOP_RENDERS: usize = 3;
@@ -51,6 +50,49 @@ pub struct InfluenceAnalysisConfig {
     /// A counterfactual change must exceed this multiple of the largest
     /// measured no-op delta for the matching window/channel.
     pub noise_floor_multiplier: f32,
+    /// Temporal support qualification. This policy is receipt-bound and
+    /// applied independently to each audio channel.
+    pub support_policy: InfluenceSupportPolicy,
+}
+
+/// Temporal qualification of per-window acoustic influence observations.
+/// Release thresholds are fixed-point fractions of the enter thresholds.
+/// Tail extension is conservative post-processing, never a measured effect.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InfluenceSupportPolicy {
+    /// Exit/release threshold as millionths of the enter threshold.
+    /// Must be in 1..999_999 so release is strictly below enter.
+    pub release_ratio_ppm: u32,
+    /// Minimum release-positive windows required to qualify an episode.
+    pub minimum_release_windows: usize,
+    /// Maximum consecutive sub-release windows bridged inside an episode.
+    pub maximum_gap_windows: usize,
+    /// Conservative extension after the last sustained measurement, clamped
+    /// to the rendered output horizon. It never creates support from empty data.
+    pub tail_extension_frames: usize,
+}
+
+impl Default for InfluenceSupportPolicy {
+    fn default() -> Self {
+        Self {
+            release_ratio_ppm: 700_000,
+            minimum_release_windows: 2,
+            maximum_gap_windows: 1,
+            tail_extension_frames: 0,
+        }
+    }
+}
+
+/// One qualified temporal support episode for one channel. The measured end
+/// preserves the last actually observed window; the output end additionally
+/// includes the explicitly configured bounded tail extension.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChannelSupportInterval {
+    pub channel: usize,
+    pub start_frame: usize,
+    pub measured_end_frame: usize,
+    pub end_frame: usize,
+    pub tail_extension_frames: usize,
 }
 
 impl Default for InfluenceAnalysisConfig {
@@ -63,6 +105,7 @@ impl Default for InfluenceAnalysisConfig {
             minimum_rms_delta: 0.0,
             minimum_spectral_distance: 0.0,
             noise_floor_multiplier: 3.0,
+            support_policy: InfluenceSupportPolicy::default(),
         }
     }
 }
@@ -86,6 +129,9 @@ pub enum InfluenceDisposition {
     /// The declared paired outputs did not exceed the calibrated thresholds.
     /// This does not prove that the intervention had no audible effect.
     NoEffectAboveNoiseFloor,
+    /// Raw threshold crossings existed, but no sustained hysteresis-qualified
+    /// episode met the minimum release-window criterion.
+    InsufficientQualifiedSupport,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -335,10 +381,7 @@ fn renderer_execution_profile_sha256(
     Ok((sha256_hex(&identity_bytes), sha256_hex(&config_bytes)))
 }
 
-
-fn receipt_fluidsynth_effects_groups(
-    receipt: &RendererExecutionReceipt,
-) -> Option<u8> {
+fn receipt_fluidsynth_effects_groups(receipt: &RendererExecutionReceipt) -> Option<u8> {
     let process = receipt.process_observation.as_ref()?;
     let mut matches = Vec::new();
     for pair in process.arguments.windows(2) {
@@ -451,8 +494,7 @@ pub(crate) fn verify_renderer_audio_binding_excluding_set(
         return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
     }
     if excluded_source_event_indices.is_empty()
-        && receipt.performed_event_map_sha256.as_deref()
-            != Some(parsed_map.receipt_sha256.as_str())
+        && receipt.performed_event_map_sha256.as_deref() != Some(parsed_map.receipt_sha256.as_str())
     {
         return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
     }
@@ -571,7 +613,15 @@ pub struct InfluenceWindowMeasurement {
     pub spectral_magnitude_distance: f32,
     pub calibrated_rms_threshold: f32,
     pub calibrated_spectral_threshold: f32,
+    /// Hysteresis exit thresholds, strictly below the corresponding enter
+    /// thresholds under the frozen support policy.
+    pub calibrated_release_rms_threshold: f32,
+    pub calibrated_release_spectral_threshold: f32,
+    /// Historical raw enter-threshold crossing; retained unchanged.
     pub effect_detected: bool,
+    pub release_detected: bool,
+    pub in_qualified_episode: bool,
+    pub bridged_gap: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -600,10 +650,22 @@ pub struct CounterfactualInfluenceReport {
     pub total_frames: usize,
     pub analysis: InfluenceAnalysisConfig,
     pub total_channel_windows: usize,
+    /// Raw enter-threshold-positive channel/window count.
     pub affected_channel_windows: usize,
-    /// Merged frame intervals where at least one channel/window exceeded its
-    /// calibrated threshold. These are measured support regions, not ownership.
+    /// Windows in qualified episodes, including bridged interior gaps.
+    pub qualified_support_channel_windows: usize,
+    pub bridged_gap_channel_windows: usize,
+    /// Total post-measurement extension applied across qualified channel episodes.
+    pub tail_extension_frames_applied: usize,
+    /// Raw enter-threshold-positive intervals; diagnostic only.
     pub measured_influence_intervals: Vec<FrameInterval>,
+    /// Union of temporal episodes that passed hysteresis/minimum-duration rules.
+    /// This is the only interval set EVAL-025 should expose to EVAL-019.
+    pub qualified_support_intervals: Vec<FrameInterval>,
+    /// Channel-specific episodes retaining measured end and post-measurement tail.
+    pub qualified_support_by_channel: Vec<ChannelSupportInterval>,
+    /// Complete ordered per-window/per-channel measurements and hysteresis trace.
+    pub measurements: Vec<InfluenceWindowMeasurement>,
     pub disposition: InfluenceDisposition,
     pub receipt_sha256: String,
 }
@@ -665,11 +727,17 @@ impl std::fmt::Display for CounterfactualInfluenceError {
             Self::ZeroChannels => write!(f, "channel count must be non-zero"),
             Self::EmptyAudio => write!(f, "audio must contain at least one frame"),
             Self::InterleavedLengthNotDivisibleByChannels => {
-                write!(f, "interleaved sample count is not divisible by channel count")
+                write!(
+                    f,
+                    "interleaved sample count is not divisible by channel count"
+                )
             }
             Self::NonFiniteSample => write!(f, "audio contains a non-finite sample"),
             Self::AudioLayoutMismatch => {
-                write!(f, "paired audio must have identical rate, channels and frame count")
+                write!(
+                    f,
+                    "paired audio must have identical rate, channels and frame count"
+                )
             }
             Self::WindowLongerThanAudio => write!(f, "analysis window is longer than audio"),
             Self::TooFewNoopRenders => write!(
@@ -680,37 +748,66 @@ impl std::fmt::Display for CounterfactualInfluenceError {
                 write!(f, "repeatability calibration receipt is invalid")
             }
             Self::CalibrationReplayMismatch => {
-                write!(f, "repeatability calibration does not replay from supplied controls")
+                write!(
+                    f,
+                    "repeatability calibration does not replay from supplied controls"
+                )
             }
             Self::CalibrationAnchorMismatch => {
-                write!(f, "baseline output differs from the calibrated anchor output")
+                write!(
+                    f,
+                    "baseline output differs from the calibrated anchor output"
+                )
             }
             Self::CalibrationConfigMismatch => {
-                write!(f, "measurement config differs from the frozen calibration config")
+                write!(
+                    f,
+                    "measurement config differs from the frozen calibration config"
+                )
             }
             Self::RendererReceiptInvalid => {
-                write!(f, "renderer execution receipt does not replay against the supplied artifacts")
+                write!(
+                    f,
+                    "renderer execution receipt does not replay against the supplied artifacts"
+                )
             }
             Self::RendererAudioMismatch => {
-                write!(f, "decoded renderer PCM does not match the supplied audio view")
+                write!(
+                    f,
+                    "decoded renderer PCM does not match the supplied audio view"
+                )
             }
             Self::RendererIdentityMismatch => {
-                write!(f, "renderer identity or configuration differs across paired renders")
+                write!(
+                    f,
+                    "renderer identity or configuration differs across paired renders"
+                )
             }
             Self::InvalidEventId => write!(f, "invalid source event ID"),
-            Self::InvalidIntervention => write!(f, "intervention is a no-op or has invalid parameters"),
+            Self::InvalidIntervention => {
+                write!(f, "intervention is a no-op or has invalid parameters")
+            }
             Self::EmptyArtifact(name) => write!(f, "artifact is empty: {name}"),
             Self::ArtifactTooLarge(name) => write!(f, "artifact exceeds size limit: {name}"),
             Self::IdenticalSchedules => {
-                write!(f, "baseline and counterfactual schedules are byte-identical")
+                write!(
+                    f,
+                    "baseline and counterfactual schedules are byte-identical"
+                )
             }
             Self::SerializationFailure => write!(f, "could not serialize influence evidence"),
             Self::InvalidInfluenceReceipt => write!(f, "influence report receipt is invalid"),
             Self::InfluenceReplayMismatch => {
-                write!(f, "influence report does not replay from supplied artifacts")
+                write!(
+                    f,
+                    "influence report does not replay from supplied artifacts"
+                )
             }
             Self::WindowIndexMismatch => {
-                write!(f, "calibration cells do not match the expected window/channel layout")
+                write!(
+                    f,
+                    "calibration cells do not match the expected window/channel layout"
+                )
             }
         }
     }
@@ -778,9 +875,7 @@ fn influence_digest_valid(
     }
     Ok(canonical_digest(&unsealed, INFLUENCE_DOMAIN)? == expected)
 }
-fn validate_config(
-    config: &InfluenceAnalysisConfig,
-) -> Result<(), CounterfactualInfluenceError> {
+fn validate_config(config: &InfluenceAnalysisConfig) -> Result<(), CounterfactualInfluenceError> {
     if config.window_size_frames < 16 {
         return Err(CounterfactualInfluenceError::InvalidConfig(
             "window_size_frames must be at least 16",
@@ -807,6 +902,27 @@ fn validate_config(
             "noise_floor_multiplier must be at least 1",
         ));
     }
+    let policy = &config.support_policy;
+    if !(1..1_000_000).contains(&policy.release_ratio_ppm) {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "support release_ratio_ppm must be in 1..999999",
+        ));
+    }
+    if policy.minimum_release_windows == 0 || policy.minimum_release_windows > 10_000 {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "support minimum_release_windows must be in 1..=10000",
+        ));
+    }
+    if policy.maximum_gap_windows > 10_000 {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "support maximum_gap_windows must be <= 10000",
+        ));
+    }
+    if policy.tail_extension_frames > 10_000_000 {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "support tail_extension_frames exceeds the implementation bound",
+        ));
+    }
     Ok(())
 }
 
@@ -823,7 +939,11 @@ fn validate_audio(audio: &AudioView<'_>) -> Result<usize, CounterfactualInfluenc
     if audio.interleaved_samples.len() % audio.channels != 0 {
         return Err(CounterfactualInfluenceError::InterleavedLengthNotDivisibleByChannels);
     }
-    if audio.interleaved_samples.iter().any(|sample| !sample.is_finite()) {
+    if audio
+        .interleaved_samples
+        .iter()
+        .any(|sample| !sample.is_finite())
+    {
         return Err(CounterfactualInfluenceError::NonFiniteSample);
     }
     Ok(audio.interleaved_samples.len() / audio.channels)
@@ -854,9 +974,9 @@ fn frame_windows(
     let mut windows = Vec::new();
     let mut start = 0usize;
     loop {
-        let end = start
-            .checked_add(config.window_size_frames)
-            .ok_or(CounterfactualInfluenceError::InvalidConfig("window overflow"))?;
+        let end = start.checked_add(config.window_size_frames).ok_or(
+            CounterfactualInfluenceError::InvalidConfig("window overflow"),
+        )?;
         if end > total_frames {
             break;
         }
@@ -891,9 +1011,7 @@ struct PairMetrics {
 
 fn hann_window(size: usize) -> Vec<f32> {
     (0..size)
-        .map(|index| {
-            0.5 - 0.5 * (std::f32::consts::TAU * index as f32 / size as f32).cos()
-        })
+        .map(|index| 0.5 - 0.5 * (std::f32::consts::TAU * index as f32 / size as f32).cos())
         .collect()
 }
 
@@ -1039,8 +1157,7 @@ pub fn calibrate_repeatability(
     let baseline_schedule_sha256 = sha256_hex(baseline_schedule_bytes);
     if anchor_renderer_evidence.source_score_sha256 != score_sha256
         || anchor_renderer_evidence.input_artifact_sha256 != baseline_schedule_sha256
-        || anchor_renderer_evidence.performed_event_map_artifact_sha256
-            != event_map_sha256
+        || anchor_renderer_evidence.performed_event_map_artifact_sha256 != event_map_sha256
     {
         return Err(CounterfactualInfluenceError::CalibrationConfigMismatch);
     }
@@ -1195,11 +1312,26 @@ fn validate_input(
     for (name, bytes) in [
         ("source_score", input.source_score_bytes),
         ("performed_event_map", input.performed_event_map_bytes),
-        ("counterfactual_performed_event_map", input.counterfactual_performed_event_map_bytes),
+        (
+            "counterfactual_performed_event_map",
+            input.counterfactual_performed_event_map_bytes,
+        ),
         ("baseline_schedule", input.baseline_schedule_bytes),
-        ("counterfactual_schedule", input.counterfactual_schedule_bytes),
-        ("baseline_renderer_receipt", input.baseline_renderer_evidence.receipt_sha256.as_bytes()),
-        ("counterfactual_renderer_receipt", input.counterfactual_renderer_evidence.receipt_sha256.as_bytes()),
+        (
+            "counterfactual_schedule",
+            input.counterfactual_schedule_bytes,
+        ),
+        (
+            "baseline_renderer_receipt",
+            input.baseline_renderer_evidence.receipt_sha256.as_bytes(),
+        ),
+        (
+            "counterfactual_renderer_receipt",
+            input
+                .counterfactual_renderer_evidence
+                .receipt_sha256
+                .as_bytes(),
+        ),
     ] {
         if bytes.is_empty() {
             return Err(CounterfactualInfluenceError::EmptyArtifact(name));
@@ -1234,21 +1366,28 @@ fn validate_input(
         return Err(CounterfactualInfluenceError::RendererAudioMismatch);
     }
     let expected_pitch_sha256 = sha256_hex(input.expected_primary_midi_by_score_index);
-    if input.baseline_renderer_evidence.source_score_sha256
-        != sha256_hex(input.source_score_bytes)
+    if input.baseline_renderer_evidence.source_score_sha256 != sha256_hex(input.source_score_bytes)
         || input.counterfactual_renderer_evidence.source_score_sha256
             != sha256_hex(input.source_score_bytes)
-        || input.baseline_renderer_evidence.expected_primary_pitches_sha256
+        || input
+            .baseline_renderer_evidence
+            .expected_primary_pitches_sha256
             != expected_pitch_sha256
-        || input.counterfactual_renderer_evidence.expected_primary_pitches_sha256
+        || input
+            .counterfactual_renderer_evidence
+            .expected_primary_pitches_sha256
             != expected_pitch_sha256
         || input.baseline_renderer_evidence.input_artifact_sha256
             != sha256_hex(input.baseline_schedule_bytes)
         || input.counterfactual_renderer_evidence.input_artifact_sha256
             != sha256_hex(input.counterfactual_schedule_bytes)
-        || input.baseline_renderer_evidence.performed_event_map_artifact_sha256
+        || input
+            .baseline_renderer_evidence
+            .performed_event_map_artifact_sha256
             != sha256_hex(input.performed_event_map_bytes)
-        || input.counterfactual_renderer_evidence.performed_event_map_artifact_sha256
+        || input
+            .counterfactual_renderer_evidence
+            .performed_event_map_artifact_sha256
             != sha256_hex(input.counterfactual_performed_event_map_bytes)
     {
         return Err(CounterfactualInfluenceError::CalibrationConfigMismatch);
@@ -1268,13 +1407,11 @@ fn validate_input(
         .collect();
     let expected_baseline_ids: std::collections::BTreeSet<usize> =
         (0..input.expected_score_event_count).collect();
-    let expected_counterfactual_ids: std::collections::BTreeSet<usize> =
-        (0..input.expected_score_event_count)
-            .filter(|index| *index != excluded_index)
-            .collect();
-    if baseline_ids != expected_baseline_ids
-        || counterfactual_ids != expected_counterfactual_ids
-    {
+    let expected_counterfactual_ids: std::collections::BTreeSet<usize> = (0..input
+        .expected_score_event_count)
+        .filter(|index| *index != excluded_index)
+        .collect();
+    if baseline_ids != expected_baseline_ids || counterfactual_ids != expected_counterfactual_ids {
         return Err(CounterfactualInfluenceError::InvalidIntervention);
     }
     if input.baseline_renderer_evidence.performed_event_map_sha256
@@ -1306,8 +1443,9 @@ fn validate_input(
         .iter()
         .filter(|row| row.source_event_id != input.source_event_id)
         .collect();
-    let counterfactual_protected =
-        &input.counterfactual_renderer_evidence.performed_event_lineage;
+    let counterfactual_protected = &input
+        .counterfactual_renderer_evidence
+        .performed_event_lineage;
     if baseline_protected.len() != counterfactual_protected.len()
         || baseline_protected.iter().any(|baseline| {
             !counterfactual_protected.iter().any(|candidate| {
@@ -1326,15 +1464,18 @@ fn validate_input(
         return Err(CounterfactualInfluenceError::InvalidIntervention);
     }
 
-    if input.baseline_renderer_evidence.receipt_sha256
-        != calibration.anchor_renderer_receipt_sha256
+    if input.baseline_renderer_evidence.receipt_sha256 != calibration.anchor_renderer_receipt_sha256
         || input.baseline_renderer_evidence.renderer_identity_sha256
             != calibration.renderer_identity_sha256
         || input.baseline_renderer_evidence.renderer_config_sha256
             != calibration.renderer_config_sha256
-        || input.counterfactual_renderer_evidence.renderer_identity_sha256
+        || input
+            .counterfactual_renderer_evidence
+            .renderer_identity_sha256
             != calibration.renderer_identity_sha256
-        || input.counterfactual_renderer_evidence.renderer_config_sha256
+        || input
+            .counterfactual_renderer_evidence
+            .renderer_config_sha256
             != calibration.renderer_config_sha256
     {
         return Err(CounterfactualInfluenceError::RendererIdentityMismatch);
@@ -1342,6 +1483,134 @@ fn validate_input(
     Ok(frames)
 }
 
+/// Run a per-channel hysteresis state machine over the ordered raw trace.
+/// Each episode starts only at an enter-threshold crossing. It remains active
+/// while release-positive windows continue, may bridge the configured number
+/// of interior sub-release windows, and qualifies only after the minimum
+/// release-positive-window count. Tail extension is applied after the final
+/// measured release-positive window and clamped to the exact output horizon.
+fn qualify_support_episodes(
+    measurements: &mut [InfluenceWindowMeasurement],
+    channels: usize,
+    total_frames: usize,
+    policy: &InfluenceSupportPolicy,
+) -> Result<(Vec<ChannelSupportInterval>, usize, usize), CounterfactualInfluenceError> {
+    if channels == 0 || measurements.is_empty() || measurements.len() % channels != 0 {
+        return Err(CounterfactualInfluenceError::WindowIndexMismatch);
+    }
+    if policy.tail_extension_frames > total_frames {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "support tail extension exceeds the rendered output horizon",
+        ));
+    }
+    let windows_per_channel = measurements.len() / channels;
+    let mut episodes = Vec::new();
+    let mut bridged_gap_windows = 0usize;
+    let mut tail_extension_frames_applied = 0usize;
+
+    for channel in 0..channels {
+        let indices: Vec<usize> = (0..windows_per_channel)
+            .map(|window_index| window_index * channels + channel)
+            .collect();
+        let mut previous_start = None;
+        for &index in &indices {
+            let measurement = &measurements[index];
+            if measurement.channel != channel
+                || measurement.start_frame >= measurement.end_frame
+                || measurement.end_frame > total_frames
+                || previous_start.is_some_and(|start| measurement.start_frame <= start)
+            {
+                return Err(CounterfactualInfluenceError::WindowIndexMismatch);
+            }
+            previous_start = Some(measurement.start_frame);
+        }
+
+        let mut cursor = 0usize;
+        while cursor < indices.len() {
+            if !measurements[indices[cursor]].effect_detected {
+                cursor += 1;
+                continue;
+            }
+
+            let episode_start_index = cursor;
+            let mut last_release_index = None;
+            let mut release_positive_windows = 0usize;
+            let mut gap_windows = 0usize;
+            let mut scan = cursor;
+            while scan < indices.len() {
+                let measurement = &measurements[indices[scan]];
+                if measurement.release_detected {
+                    release_positive_windows += 1;
+                    last_release_index = Some(scan);
+                    gap_windows = 0;
+                    scan += 1;
+                    continue;
+                }
+                if last_release_index.is_some() && gap_windows < policy.maximum_gap_windows {
+                    gap_windows += 1;
+                    scan += 1;
+                    continue;
+                }
+                break;
+            }
+
+            if let Some(last_release_index) = last_release_index
+                && release_positive_windows >= policy.minimum_release_windows
+            {
+                for local_index in episode_start_index..=last_release_index {
+                    let measurement = &mut measurements[indices[local_index]];
+                    measurement.in_qualified_episode = true;
+                    if !measurement.release_detected {
+                        measurement.bridged_gap = true;
+                        bridged_gap_windows = bridged_gap_windows.saturating_add(1);
+                    }
+                }
+
+                let first = &measurements[indices[episode_start_index]];
+                let last = &measurements[indices[last_release_index]];
+                let measured_end_frame = last.end_frame;
+                let end_frame = measured_end_frame
+                    .saturating_add(policy.tail_extension_frames)
+                    .min(total_frames);
+                let applied = end_frame.saturating_sub(measured_end_frame);
+                tail_extension_frames_applied =
+                    tail_extension_frames_applied.saturating_add(applied);
+                episodes.push(ChannelSupportInterval {
+                    channel,
+                    start_frame: first.start_frame,
+                    measured_end_frame,
+                    end_frame,
+                    tail_extension_frames: applied,
+                });
+            }
+
+            // If a new raw enter window closed the previous episode, revisit it
+            // as the beginning of a new episode. Otherwise skip the failed
+            // terminating window so it cannot create a phantom episode.
+            cursor = if scan < indices.len() && measurements[indices[scan]].effect_detected {
+                scan
+            } else if scan < indices.len() {
+                scan + 1
+            } else {
+                scan
+            };
+        }
+    }
+
+    episodes.sort_by_key(|episode| (episode.channel, episode.start_frame, episode.end_frame));
+    Ok((episodes, bridged_gap_windows, tail_extension_frames_applied))
+}
+
+fn union_channel_support(episodes: &[ChannelSupportInterval]) -> Vec<FrameInterval> {
+    let intervals = episodes
+        .iter()
+        .map(|episode| FrameInterval {
+            start_frame: episode.start_frame,
+            end_frame: episode.end_frame,
+        })
+        .collect();
+    merge_intervals(intervals)
+}
 
 fn seal_report(
     mut report: CounterfactualInfluenceReport,
@@ -1364,6 +1633,11 @@ pub fn measure_counterfactual_influence(
     validate_config(&calibration.analysis)?;
     validate_input(input, calibration)?;
     let windows = frame_windows(calibration.total_frames, &calibration.analysis)?;
+    if calibration.analysis.support_policy.tail_extension_frames > calibration.total_frames {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "support tail extension exceeds the rendered output horizon",
+        ));
+    }
     if calibration.cells.len() != windows.len() * calibration.channels {
         return Err(CounterfactualInfluenceError::WindowIndexMismatch);
     }
@@ -1379,7 +1653,7 @@ pub fn measure_counterfactual_influence(
 
     let metrics = analyze_pair(input.baseline_audio, input.counterfactual_audio, &windows);
     let mut measurements = Vec::with_capacity(metrics.len());
-    let mut affected = Vec::new();
+    let mut raw_affected = Vec::new();
     for (index, metric) in metrics.into_iter().enumerate() {
         let cell = &calibration.cells[index];
         let rms_threshold = calibration
@@ -1389,14 +1663,17 @@ pub fn measure_counterfactual_influence(
         let spectral_threshold = calibration
             .analysis
             .minimum_spectral_distance
-            .max(
-                cell.maximum_noop_spectral_distance
-                    * calibration.analysis.noise_floor_multiplier,
-            );
+            .max(cell.maximum_noop_spectral_distance * calibration.analysis.noise_floor_multiplier);
+        let release_ratio =
+            calibration.analysis.support_policy.release_ratio_ppm as f32 / 1_000_000.0;
+        let release_rms_threshold = rms_threshold * release_ratio;
+        let release_spectral_threshold = spectral_threshold * release_ratio;
         let effect_detected = metric.rms_delta > rms_threshold
             || metric.spectral_magnitude_distance > spectral_threshold;
+        let release_detected = metric.rms_delta > release_rms_threshold
+            || metric.spectral_magnitude_distance > release_spectral_threshold;
         if effect_detected {
-            affected.push(FrameInterval {
+            raw_affected.push(FrameInterval {
                 start_frame: cell.start_frame,
                 end_frame: cell.end_frame,
             });
@@ -1410,7 +1687,12 @@ pub fn measure_counterfactual_influence(
             spectral_magnitude_distance: metric.spectral_magnitude_distance,
             calibrated_rms_threshold: rms_threshold,
             calibrated_spectral_threshold: spectral_threshold,
+            calibrated_release_rms_threshold: release_rms_threshold,
+            calibrated_release_spectral_threshold: release_spectral_threshold,
             effect_detected,
+            release_detected,
+            in_qualified_episode: false,
+            bridged_gap: false,
         });
     }
 
@@ -1418,8 +1700,22 @@ pub fn measure_counterfactual_influence(
         .iter()
         .filter(|measurement| measurement.effect_detected)
         .count();
-    let disposition = if affected_channel_windows > 0 {
+    let (qualified_support_by_channel, bridged_gap_channel_windows, tail_extension_frames_applied) =
+        qualify_support_episodes(
+            &mut measurements,
+            calibration.channels,
+            calibration.total_frames,
+            &calibration.analysis.support_policy,
+        )?;
+    let qualified_support_channel_windows = measurements
+        .iter()
+        .filter(|measurement| measurement.in_qualified_episode)
+        .count();
+    let qualified_support_intervals = union_channel_support(&qualified_support_by_channel);
+    let disposition = if qualified_support_channel_windows > 0 {
         InfluenceDisposition::EffectDetected
+    } else if affected_channel_windows > 0 {
+        InfluenceDisposition::InsufficientQualifiedSupport
     } else {
         InfluenceDisposition::NoEffectAboveNoiseFloor
     };
@@ -1429,27 +1725,30 @@ pub fn measure_counterfactual_influence(
         intervention: input.intervention.clone(),
         source_score_sha256: sha256_hex(input.source_score_bytes),
         performed_event_map_sha256: sha256_hex(input.performed_event_map_bytes),
-        performed_event_map_receipt_sha256: calibration
-            .performed_event_map_receipt_sha256
-            .clone(),
-        counterfactual_event_map_sha256: sha256_hex(
-            input.counterfactual_performed_event_map_bytes,
-        ),
+        performed_event_map_receipt_sha256: calibration.performed_event_map_receipt_sha256.clone(),
+        counterfactual_event_map_sha256: sha256_hex(input.counterfactual_performed_event_map_bytes),
         counterfactual_event_map_receipt_sha256: input
             .counterfactual_renderer_evidence
             .performed_event_map_sha256
             .clone(),
-        expected_primary_pitches_sha256: calibration
-            .expected_primary_pitches_sha256
-            .clone(),
+        expected_primary_pitches_sha256: calibration.expected_primary_pitches_sha256.clone(),
         baseline_schedule_sha256: sha256_hex(input.baseline_schedule_bytes),
         counterfactual_schedule_sha256: sha256_hex(input.counterfactual_schedule_bytes),
-        renderer_identity_sha256: input.baseline_renderer_evidence.renderer_identity_sha256.clone(),
-        renderer_config_sha256: input.baseline_renderer_evidence.renderer_config_sha256.clone(),
+        renderer_identity_sha256: input
+            .baseline_renderer_evidence
+            .renderer_identity_sha256
+            .clone(),
+        renderer_config_sha256: input
+            .baseline_renderer_evidence
+            .renderer_config_sha256
+            .clone(),
         baseline_audio_sha256: audio_sha256(input.baseline_audio),
         counterfactual_audio_sha256: audio_sha256(input.counterfactual_audio),
         baseline_renderer_receipt_sha256: input.baseline_renderer_evidence.receipt_sha256.clone(),
-        counterfactual_renderer_receipt_sha256: input.counterfactual_renderer_evidence.receipt_sha256.clone(),
+        counterfactual_renderer_receipt_sha256: input
+            .counterfactual_renderer_evidence
+            .receipt_sha256
+            .clone(),
         repeatability_calibration_sha256: calibration.receipt_sha256.clone(),
         sample_rate_hz: calibration.sample_rate_hz,
         channels: calibration.channels,
@@ -1457,7 +1756,13 @@ pub fn measure_counterfactual_influence(
         analysis: calibration.analysis.clone(),
         total_channel_windows: measurements.len(),
         affected_channel_windows,
-        measured_influence_intervals: merge_intervals(affected),
+        qualified_support_channel_windows,
+        bridged_gap_channel_windows,
+        tail_extension_frames_applied,
+        measured_influence_intervals: merge_intervals(raw_affected),
+        qualified_support_intervals,
+        qualified_support_by_channel,
+        measurements,
         disposition,
         receipt_sha256: String::new(),
     })
@@ -1483,9 +1788,7 @@ pub fn verify_counterfactual_influence(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::renderer_execution_receipt::{
-        RendererBackend, RendererProcessObservation,
-    };
+    use crate::renderer_execution_receipt::{RendererBackend, RendererProcessObservation};
 
     fn config() -> InfluenceAnalysisConfig {
         InfluenceAnalysisConfig {
@@ -1494,6 +1797,12 @@ mod tests {
             minimum_rms_delta: 1.0e-6,
             minimum_spectral_distance: 1.0e-4,
             noise_floor_multiplier: 2.0,
+            support_policy: InfluenceSupportPolicy {
+                release_ratio_ppm: 700_000,
+                minimum_release_windows: 1,
+                maximum_gap_windows: 0,
+                tail_extension_frames: 0,
+            },
         }
     }
 
@@ -1512,10 +1821,8 @@ mod tests {
     }
 
     fn push_lineage_marker(track: &mut Vec<u8>, delta: u8, source_index: usize) {
-        let payload = crate::performed_event_map::encode_midi_lineage_marker_payload(
-            source_index,
-            0,
-        );
+        let payload =
+            crate::performed_event_map::encode_midi_lineage_marker_payload(source_index, 0);
         push_delta_event(track, delta, &[0xff, 0x7f, 0x10]);
         track.extend_from_slice(&payload);
     }
@@ -1554,12 +1861,7 @@ mod tests {
         push_delta_event(&mut track, 1, &[0x80, 64, 0]);
         push_delta_event(&mut track, 0, &[0xff, 0x2f, 0x00]);
 
-        let mut midi = vec![
-            b'M', b'T', b'h', b'd', 0, 0, 0, 6,
-            0, 0,
-            0, 1,
-            1, 0xe0,
-        ];
+        let mut midi = vec![b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 0, 0, 1, 1, 0xe0];
         midi.extend_from_slice(b"MTrk");
         midi.extend_from_slice(&(track.len() as u32).to_be_bytes());
         midi.extend_from_slice(&track);
@@ -1575,12 +1877,7 @@ mod tests {
         push_delta_event(&mut track, 1, &[0x80, 65, 0]);
         push_delta_event(&mut track, 0, &[0xff, 0x2f, 0x00]);
 
-        let mut midi = vec![
-            b'M', b'T', b'h', b'd', 0, 0, 0, 6,
-            0, 0,
-            0, 1,
-            1, 0xe0,
-        ];
+        let mut midi = vec![b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 0, 0, 1, 1, 0xe0];
         midi.extend_from_slice(b"MTrk");
         midi.extend_from_slice(&(track.len() as u32).to_be_bytes());
         midi.extend_from_slice(&track);
@@ -1653,11 +1950,7 @@ mod tests {
         process: RendererProcessObservation,
     }
 
-    fn build_render(
-        render_id: &str,
-        midi: &[u8],
-        samples: &[f32],
-    ) -> BoundRender {
+    fn build_render(render_id: &str, midi: &[u8], samples: &[f32]) -> BoundRender {
         build_render_with_gain(render_id, midi, samples, 0.8)
     }
 
@@ -1689,22 +1982,20 @@ mod tests {
         } else {
             None
         };
-        let receipt = RendererExecutionReceipt::from_successful_render(
-            RendererReceiptInputs {
-                render_id,
-                backend: RendererBackend::FluidSynth,
-                score_bytes: SCORE_BYTES,
-                render_config_bytes: CONFIG_BYTES,
-                input_midi_bytes: Some(midi),
-                performed_schedule_bytes: None,
-                renderer_executable_sha256: Some(&executable),
-                soundfont_sha256: Some(&soundfont),
-                process_exit_code: Some(0),
-                process_observation: Some(process.clone()),
-                performed_event_map_sha256: complete_map_digest,
-                output_wav_bytes: &wav,
-            },
-        )
+        let receipt = RendererExecutionReceipt::from_successful_render(RendererReceiptInputs {
+            render_id,
+            backend: RendererBackend::FluidSynth,
+            score_bytes: SCORE_BYTES,
+            render_config_bytes: CONFIG_BYTES,
+            input_midi_bytes: Some(midi),
+            performed_schedule_bytes: None,
+            renderer_executable_sha256: Some(&executable),
+            soundfont_sha256: Some(&soundfont),
+            process_exit_code: Some(0),
+            process_observation: Some(process.clone()),
+            performed_event_map_sha256: complete_map_digest,
+            output_wav_bytes: &wav,
+        })
         .unwrap();
         BoundRender {
             receipt,
@@ -1798,16 +2089,8 @@ mod tests {
         let anchor_evidence = verify_bound_render(&anchor, &samples, None);
         let noop = build_render("one-noop-only", &midi, &samples);
         let noop_evidence = verify_bound_render(&noop, &samples, None);
-        let repeated_audio = [
-            audio(&samples),
-            audio(&samples),
-            audio(&samples),
-        ];
-        let repeated_receipts = [
-            noop_evidence.clone(),
-            noop_evidence.clone(),
-            noop_evidence,
-        ];
+        let repeated_audio = [audio(&samples), audio(&samples), audio(&samples)];
+        let repeated_receipts = [noop_evidence.clone(), noop_evidence.clone(), noop_evidence];
 
         assert_eq!(
             calibrate_repeatability(
@@ -1887,9 +2170,7 @@ mod tests {
             .iter()
             .map(|render| verify_bound_render(render, &samples, None))
             .collect();
-        let repeat_audio: Vec<_> = (0..repeats.len())
-            .map(|_| audio(&samples))
-            .collect();
+        let repeat_audio: Vec<_> = (0..repeats.len()).map(|_| audio(&samples)).collect();
         let calibration = calibrate_repeatability(
             &audio(&samples),
             &repeat_audio,
@@ -1946,9 +2227,7 @@ mod tests {
             .iter()
             .map(|render| verify_bound_render(render, &baseline_samples, None))
             .collect();
-        let noop_audio: Vec<_> = (0..noops.len())
-            .map(|_| audio(&baseline_samples))
-            .collect();
+        let noop_audio: Vec<_> = (0..noops.len()).map(|_| audio(&baseline_samples)).collect();
         let calibration = calibrate_repeatability(
             &audio(&baseline_samples),
             &noop_audio,
@@ -1960,18 +2239,17 @@ mod tests {
             &config(),
         )
         .unwrap();
-        let calibration =
-            verify_repeatability_calibration(
-                &calibration,
-                &audio(&baseline_samples),
-                &noop_audio,
-                SCORE_BYTES,
-                &anchor.map_bytes,
-                &baseline_midi,
-                &anchor_evidence,
-                &noop_evidence,
-            )
-            .unwrap();
+        let calibration = verify_repeatability_calibration(
+            &calibration,
+            &audio(&baseline_samples),
+            &noop_audio,
+            SCORE_BYTES,
+            &anchor.map_bytes,
+            &baseline_midi,
+            &anchor_evidence,
+            &noop_evidence,
+        )
+        .unwrap();
 
         let counterfactual = build_render(
             "counterfactual-remove-event-0",
@@ -2011,8 +2289,30 @@ mod tests {
             report.counterfactual_renderer_receipt_sha256,
             counterfactual_evidence.receipt_sha256()
         );
-        assert_eq!(report.counterfactual_event_map_receipt_sha256, counterfactual.map.receipt_sha256);
+        assert_eq!(
+            report.counterfactual_event_map_receipt_sha256,
+            counterfactual.map.receipt_sha256
+        );
+        assert!(report.measurements.len() == report.total_channel_windows);
         assert!(verify_counterfactual_influence(&report, &experiment, &calibration).unwrap());
+
+        let mut changed_trace = report.clone();
+        changed_trace.measurements[0].release_detected =
+            !changed_trace.measurements[0].release_detected;
+        let changed_trace = seal_report(changed_trace).unwrap();
+        assert_eq!(
+            verify_counterfactual_influence(&changed_trace, &experiment, &calibration).unwrap_err(),
+            CounterfactualInfluenceError::InfluenceReplayMismatch
+        );
+
+        let mut changed_policy = report.clone();
+        changed_policy.analysis.support_policy.maximum_gap_windows += 1;
+        let changed_policy = seal_report(changed_policy).unwrap();
+        assert_eq!(
+            verify_counterfactual_influence(&changed_policy, &experiment, &calibration)
+                .unwrap_err(),
+            CounterfactualInfluenceError::InfluenceReplayMismatch
+        );
     }
 
     #[test]
@@ -2090,8 +2390,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut altered_config_evidence =
-            verify_bound_render(&baseline, &samples, None);
+        let mut altered_config_evidence = verify_bound_render(&baseline, &samples, None);
         altered_config_evidence.renderer_config_sha256 = sha256_hex(b"substituted-config");
         let counterfactual_samples = vec![0.0f32; 128];
         let counterfactual = build_render(
@@ -2120,6 +2419,209 @@ mod tests {
             measure_counterfactual_influence(&experiment, &calibration).unwrap_err(),
             CounterfactualInfluenceError::RendererIdentityMismatch
         );
+    }
+
+    fn synthetic_measurement(
+        start_frame: usize,
+        end_frame: usize,
+        channel: usize,
+        enter: bool,
+        release: bool,
+    ) -> InfluenceWindowMeasurement {
+        InfluenceWindowMeasurement {
+            start_frame,
+            end_frame,
+            channel,
+            rms_delta: if enter {
+                1.0
+            } else if release {
+                0.5
+            } else {
+                0.0
+            },
+            peak_sample_delta: if enter {
+                1.0
+            } else if release {
+                0.5
+            } else {
+                0.0
+            },
+            spectral_magnitude_distance: if enter {
+                1.0
+            } else if release {
+                0.5
+            } else {
+                0.0
+            },
+            calibrated_rms_threshold: 0.8,
+            calibrated_spectral_threshold: 0.8,
+            calibrated_release_rms_threshold: 0.4,
+            calibrated_release_spectral_threshold: 0.4,
+            effect_detected: enter,
+            release_detected: release,
+            in_qualified_episode: false,
+            bridged_gap: false,
+        }
+    }
+
+    fn support_policy(
+        minimum_release_windows: usize,
+        maximum_gap_windows: usize,
+        tail_extension_frames: usize,
+    ) -> InfluenceSupportPolicy {
+        InfluenceSupportPolicy {
+            release_ratio_ppm: 700_000,
+            minimum_release_windows,
+            maximum_gap_windows,
+            tail_extension_frames,
+        }
+    }
+
+    #[test]
+    fn hysteresis_rejects_isolated_enter_spike_but_preserves_raw_trace() {
+        let mut measurements = vec![
+            synthetic_measurement(0, 16, 0, true, true),
+            synthetic_measurement(8, 24, 0, false, false),
+            synthetic_measurement(16, 32, 0, false, false),
+        ];
+        let (episodes, bridged, tail) =
+            qualify_support_episodes(&mut measurements, 1, 32, &support_policy(2, 1, 8)).unwrap();
+        assert!(episodes.is_empty());
+        assert_eq!(bridged, 0);
+        assert_eq!(tail, 0);
+        assert!(measurements[0].effect_detected);
+        assert!(!measurements[0].in_qualified_episode);
+    }
+
+    #[test]
+    fn hysteresis_keeps_sustained_release_windows_after_enter_drops() {
+        let mut measurements = vec![
+            synthetic_measurement(0, 16, 0, true, true),
+            synthetic_measurement(8, 24, 0, false, true),
+            synthetic_measurement(16, 32, 0, false, true),
+            synthetic_measurement(24, 40, 0, false, false),
+        ];
+        let (episodes, bridged, tail) =
+            qualify_support_episodes(&mut measurements, 1, 40, &support_policy(2, 1, 0)).unwrap();
+        assert_eq!(episodes.len(), 1);
+        assert_eq!(episodes[0].start_frame, 0);
+        assert_eq!(episodes[0].measured_end_frame, 32);
+        assert_eq!(episodes[0].end_frame, 32);
+        assert_eq!(bridged, 0);
+        assert_eq!(tail, 0);
+        assert!(measurements[..3].iter().all(|m| m.in_qualified_episode));
+    }
+
+    #[test]
+    fn hysteresis_bridges_one_sub_release_gap_but_keeps_gap_labelled() {
+        let mut measurements = vec![
+            synthetic_measurement(0, 16, 0, true, true),
+            synthetic_measurement(8, 24, 0, false, true),
+            synthetic_measurement(16, 32, 0, false, false),
+            synthetic_measurement(24, 40, 0, false, true),
+            synthetic_measurement(32, 48, 0, false, true),
+        ];
+        let (episodes, bridged, _) =
+            qualify_support_episodes(&mut measurements, 1, 48, &support_policy(2, 1, 0)).unwrap();
+        assert_eq!(episodes.len(), 1);
+        assert_eq!(bridged, 1);
+        assert!(measurements[2].bridged_gap);
+        assert!(measurements[2].in_qualified_episode);
+        assert_eq!(episodes[0].measured_end_frame, 48);
+    }
+
+    #[test]
+    fn hysteresis_closes_episode_after_gap_budget_is_exhausted() {
+        let mut measurements = vec![
+            synthetic_measurement(0, 16, 0, true, true),
+            synthetic_measurement(8, 24, 0, false, true),
+            synthetic_measurement(16, 32, 0, false, false),
+            synthetic_measurement(24, 40, 0, false, false),
+            synthetic_measurement(32, 48, 0, true, true),
+            synthetic_measurement(40, 56, 0, false, true),
+        ];
+        let (episodes, bridged, _) =
+            qualify_support_episodes(&mut measurements, 1, 56, &support_policy(2, 1, 0)).unwrap();
+        assert_eq!(episodes.len(), 2);
+        assert_eq!(bridged, 0);
+        assert_eq!(episodes[0].measured_end_frame, 24);
+        assert_eq!(episodes[1].start_frame, 32);
+        assert_eq!(episodes[1].measured_end_frame, 56);
+        assert!(!measurements[3].in_qualified_episode);
+    }
+
+    #[test]
+    fn hysteresis_preserves_raw_spike_without_planner_support() {
+        let mut measurements = vec![
+            synthetic_measurement(0, 16, 0, true, true),
+            synthetic_measurement(8, 24, 0, false, false),
+            synthetic_measurement(16, 32, 0, false, false),
+        ];
+        let raw_count = measurements.iter().filter(|m| m.effect_detected).count();
+        let (episodes, _, _) =
+            qualify_support_episodes(&mut measurements, 1, 32, &support_policy(2, 0, 16)).unwrap();
+        assert_eq!(raw_count, 1);
+        assert!(episodes.is_empty());
+        assert!(measurements[0].effect_detected);
+        assert!(!measurements[0].in_qualified_episode);
+    }
+
+    #[test]
+    fn explicit_tail_extension_is_bounded_to_rendered_horizon() {
+        let mut measurements = vec![
+            synthetic_measurement(0, 16, 0, true, true),
+            synthetic_measurement(8, 24, 0, false, true),
+        ];
+        let (episodes, _, tail) =
+            qualify_support_episodes(&mut measurements, 1, 28, &support_policy(2, 0, 8)).unwrap();
+        assert_eq!(episodes.len(), 1);
+        assert_eq!(episodes[0].measured_end_frame, 24);
+        assert_eq!(episodes[0].end_frame, 28);
+        assert_eq!(episodes[0].tail_extension_frames, 4);
+        assert_eq!(tail, 4);
+    }
+
+    #[test]
+    fn measured_empty_never_becomes_support_due_to_nonzero_tail_policy() {
+        let mut measurements = vec![
+            synthetic_measurement(0, 16, 0, false, false),
+            synthetic_measurement(8, 24, 0, false, false),
+        ];
+        let (episodes, _, tail) =
+            qualify_support_episodes(&mut measurements, 1, 24, &support_policy(1, 1, 20)).unwrap();
+        assert!(episodes.is_empty());
+        assert_eq!(tail, 0);
+    }
+
+    #[test]
+    fn support_episodes_are_qualified_per_channel_before_interval_union() {
+        let mut measurements = vec![
+            synthetic_measurement(0, 16, 0, true, true),
+            synthetic_measurement(0, 16, 1, false, false),
+            synthetic_measurement(8, 24, 0, false, true),
+            synthetic_measurement(8, 24, 1, false, true),
+            synthetic_measurement(16, 32, 0, false, true),
+            synthetic_measurement(16, 32, 1, false, false),
+        ];
+        let (episodes, _, _) =
+            qualify_support_episodes(&mut measurements, 2, 32, &support_policy(2, 0, 0)).unwrap();
+        assert_eq!(episodes.len(), 1);
+        assert_eq!(episodes[0].channel, 0);
+        assert_eq!(episodes[0].start_frame, 0);
+        assert_eq!(episodes[0].measured_end_frame, 32);
+    }
+
+    #[test]
+    fn support_policy_rejects_non_hysteretic_ratios_and_unbounded_tail() {
+        let mut config = config();
+        config.support_policy.release_ratio_ppm = 1_000_000;
+        assert!(validate_config(&config).is_err());
+        config.support_policy.release_ratio_ppm = 700_000;
+        config.support_policy.minimum_release_windows = 0;
+        assert!(validate_config(&config).is_err());
+        config.support_policy.minimum_release_windows = 2;
+        config.support_policy.tail_extension_frames = 10_000_001;
+        assert!(validate_config(&config).is_err());
     }
 
     #[test]
