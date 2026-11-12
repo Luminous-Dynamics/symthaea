@@ -80,6 +80,7 @@ struct Case {
     predeclared_intervention: bool,
     design_strategy: DesignStrategy,
     intervention_protocol_sha256: String,
+    design_evidence_sha256: String,
     service_fingerprint_sha256: String,
     environment_fingerprint_sha256: String,
     unobserved_sources: Vec<String>,
@@ -138,6 +139,7 @@ struct AuditReport {
     schema_version: &'static str,
     case_id: String,
     target_source: &'static str,
+    design_evidence_sha256: String,
     disposition: &'static str,
     identifiability: &'static str,
     baseline_run_id: String,
@@ -243,6 +245,7 @@ fn validate_case(case: &Case) -> Vec<String> {
     }
     if !is_sha256(&case.source.raw_data_sha256)
         || !is_sha256(&case.intervention_protocol_sha256)
+        || !is_sha256(&case.design_evidence_sha256)
         || !is_sha256(&case.service_fingerprint_sha256)
         || !is_sha256(&case.environment_fingerprint_sha256)
     {
@@ -256,6 +259,12 @@ fn validate_case(case: &Case) -> Vec<String> {
     }
     validate_observation(&case.baseline, "baseline", &mut errors);
     validate_observation(&case.candidate, "candidate", &mut errors);
+    if case.baseline.run_id == case.candidate.run_id {
+        errors.push("baseline and candidate run_id must differ".to_string());
+    }
+    if case.baseline.acoustic_trace_sha256 == case.candidate.acoustic_trace_sha256 {
+        errors.push("baseline and candidate acoustic_trace_sha256 must differ".to_string());
+    }
     errors
 }
 
@@ -307,6 +316,11 @@ fn audit(case: &Case) -> AuditReport {
             } else {
                 let target_baseline = baseline_sources.get(&case.target_source).expect("required source exists");
                 let target_candidate = candidate_sources.get(&case.target_source).expect("required source exists");
+                let source_observable_changed = expected_sources.iter().any(|source| {
+                    let base = baseline_sources.get(source).expect("complete source inventory checked");
+                    let cand = candidate_sources.get(source).expect("complete source inventory checked");
+                    base.observable_kind != cand.observable_kind || base.observable_id != cand.observable_id
+                });
                 let non_target_changed = expected_sources
                     .iter()
                     .filter(|source| **source != case.target_source)
@@ -315,7 +329,10 @@ fn audit(case: &Case) -> AuditReport {
                             != candidate_sources.get(source).map(|x| x.state.as_str())
                     });
 
-                if non_target_changed {
+                if source_observable_changed {
+                    reasons.push("one or more source-state observable identities changed between baseline and candidate".to_string());
+                    identifiability = "INCOMPARABLE";
+                } else if non_target_changed {
                     reasons.push("at least one non-target source state changed between baseline and candidate".to_string());
                     identifiability = "INCOMPARABLE";
                 } else if !case.unobserved_sources.is_empty() {
@@ -417,6 +434,7 @@ fn audit(case: &Case) -> AuditReport {
         schema_version: SCHEMA_VERSION,
         case_id: case.case_id.clone(),
         target_source: case.target_source.name(),
+        design_evidence_sha256: case.design_evidence_sha256.clone(),
         disposition,
         identifiability,
         baseline_run_id: case.baseline.run_id.clone(),
@@ -465,7 +483,7 @@ mod tests {
     use super::*;
 
     fn digest(c: char) -> String {
-        std::iter::repeat(c).take(64).collect()
+        std::iter::repeat_n(c, 64).collect()
     }
 
     fn states(target_state: &str, target_digest: char, machinery_state: &str) -> Vec<SourceStateEvidence> {
@@ -528,6 +546,7 @@ mod tests {
             predeclared_intervention: true,
             design_strategy: DesignStrategy::Randomized,
             intervention_protocol_sha256: digest('3'),
+            design_evidence_sha256: digest('7'),
             service_fingerprint_sha256: digest('1'),
             environment_fingerprint_sha256: digest('2'),
             unobserved_sources: vec![],
@@ -539,6 +558,32 @@ mod tests {
 
     fn make_measured(case: &mut Case) {
         case.evidence_kind = EvidenceKind::Measured;
+    }
+
+    #[test]
+    fn source_observable_identity_change_is_incomparable() {
+        let mut input = case();
+        make_measured(&mut input);
+        input.candidate.source_states.iter_mut()
+            .find(|state| state.source == SourceKind::AmbientBackground)
+            .unwrap().observable_id = "different-ambient-sensor".to_string();
+        assert_eq!(audit(&input).disposition, "INCOMPARABLE");
+    }
+
+    #[test]
+    fn identical_run_ids_or_raw_traces_are_invalid() {
+        let mut input = case();
+        input.candidate.run_id = input.baseline.run_id.clone();
+        assert_eq!(audit(&input).disposition, "INVALID");
+        let mut input = case();
+        input.candidate.acoustic_trace_sha256 = input.baseline.acoustic_trace_sha256.clone();
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn design_evidence_digest_is_preserved_in_receipt() {
+        let report = audit(&case());
+        assert_eq!(report.design_evidence_sha256, digest('7'));
     }
 
     #[test]
@@ -621,7 +666,8 @@ mod tests {
     fn band_delta_uses_conservative_linear_uncertainty_sum() {
         let mut input = case();
         make_measured(&mut input);
-        let band = &audit(&input).band_deltas[0];
+        let report = audit(&input);
+        let band = &report.band_deltas[0];
         assert!((band.combined_expanded_uncertainty_db - 1.0).abs() < 1e-12);
         assert!((band.conservative_delta_lower_db + 4.0).abs() < 1e-12);
         assert!((band.conservative_delta_upper_db + 2.0).abs() < 1e-12);
