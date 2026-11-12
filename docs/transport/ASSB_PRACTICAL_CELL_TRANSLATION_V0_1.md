@@ -45,6 +45,8 @@ Every comparison declares:
 - areal capacity, cathode loading, electrolyte thickness;
 - temperature, current density, voltage window and cycle protocol;
 - separate fabrication and operating pressure;
+- pressure-only comparison requires exact same instrument and method, with the operating-pressure contrast greater than combined uncertainty;
+- report the pressure metrology identity and uncertainty alongside both pressure readings;
 - evidence record, source digest and metrology.
 
 A pressure comparison matches the non-pressure axes and intentionally varies operating pressure. Full-cell outcomes require complete-cell mass accounting. Symmetric-cell and half-cell observations remain useful mechanistic evidence but cannot support full-cell energy or lifetime claims.
