@@ -62,6 +62,9 @@ fn baseline_tally(rows: &[Value], opts: &[String], exclude_index: Option<usize>)
     counts
 }
 fn unique_substantive_top(counts: &BTreeMap<String, usize>) -> Option<String> {
+    // A recorded abstention is excluded by the declared aggregation rule.
+    // A missing peer is UNKNOWN and blocks inference of the full private plurality.
+    if counts.get("UNKNOWN").copied().unwrap_or(0) > 0 { return None; }
     let mut ranked: Vec<(&String, &usize)> = counts.iter()
         .filter(|(k, _)| k.as_str() != "ABSTAIN" && k.as_str() != "UNKNOWN")
         .collect();
@@ -389,6 +392,16 @@ mod tests {
         counts.insert("UNKNOWN".to_string(), 0);
         assert_eq!(unique_substantive_top(&counts), None);
     }
+    #[test]
+    fn unknown_peer_blocks_private_plurality_inference() {
+        let mut counts = BTreeMap::new();
+        counts.insert("A".to_string(), 3);
+        counts.insert("B".to_string(), 1);
+        counts.insert("ABSTAIN".to_string(), 0);
+        counts.insert("UNKNOWN".to_string(), 1);
+        assert_eq!(unique_substantive_top(&counts), None);
+    }
+
     #[test]
     fn ambiguous_signal_can_create_phantom_consensus() {
         let rows = vec![
