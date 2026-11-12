@@ -9,17 +9,20 @@
       {
         "scenario_id": "REF25",
         "ambient_c": 25,
-        "preheat_policy": "none"
+        "preheat_policy": "none",
+        "condition_profile_id": "REF25"
       },
       {
         "scenario_id": "COLD20",
         "ambient_c": -20,
-        "preheat_policy": "none"
+        "preheat_policy": "none",
+        "condition_profile_id": "COLD20"
       },
       {
         "scenario_id": "COLD40",
         "ambient_c": -40,
-        "preheat_policy": "none"
+        "preheat_policy": "none",
+        "condition_profile_id": "COLD40"
       }
     ],
     "system_boundary": "complete_cell",
