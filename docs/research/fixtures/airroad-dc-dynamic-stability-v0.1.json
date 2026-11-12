@@ -109,7 +109,29 @@
         "high_voltage_equilibrium": "V0 > 25 V",
         "unstable_equilibrium": "V0 = 25 V",
         "outside_high_voltage_basin": "0 < V0 < 25 V leads toward the zero-voltage domain boundary"
-      }
+      },
+      "phase_line_probes": [
+        {
+          "voltage_v": "20",
+          "expected_sign": "decreasing"
+        },
+        {
+          "voltage_v": "25",
+          "expected_sign": "equilibrium"
+        },
+        {
+          "voltage_v": "30",
+          "expected_sign": "increasing"
+        },
+        {
+          "voltage_v": "75",
+          "expected_sign": "equilibrium"
+        },
+        {
+          "voltage_v": "90",
+          "expected_sign": "decreasing"
+        }
+      ]
     },
     {
       "id": "near-fold-two-roots",
@@ -168,7 +190,29 @@
         "high_voltage_equilibrium": "V0 > 49 V",
         "unstable_equilibrium": "V0 = 49 V",
         "outside_high_voltage_basin": "0 < V0 < 49 V leads toward the zero-voltage domain boundary"
-      }
+      },
+      "phase_line_probes": [
+        {
+          "voltage_v": "48",
+          "expected_sign": "decreasing"
+        },
+        {
+          "voltage_v": "49",
+          "expected_sign": "equilibrium"
+        },
+        {
+          "voltage_v": "50",
+          "expected_sign": "increasing"
+        },
+        {
+          "voltage_v": "51",
+          "expected_sign": "equilibrium"
+        },
+        {
+          "voltage_v": "52",
+          "expected_sign": "decreasing"
+        }
+      ]
     },
     {
       "id": "critical-fold",
@@ -215,7 +259,21 @@
         "V0 > 50 V": "approaches the fold equilibrium from above",
         "V0 = 50 V": "remains at the exact equilibrium",
         "0 < V0 < 50 V": "moves away from the fold toward the zero-voltage domain boundary"
-      }
+      },
+      "phase_line_probes": [
+        {
+          "voltage_v": "40",
+          "expected_sign": "decreasing"
+        },
+        {
+          "voltage_v": "50",
+          "expected_sign": "equilibrium"
+        },
+        {
+          "voltage_v": "60",
+          "expected_sign": "decreasing"
+        }
+      ]
     },
     {
       "id": "no-equilibrium",
@@ -245,7 +303,21 @@
         "numerator": "-1",
         "denominator": "2500"
       },
-      "initial_voltage_behavior": "No positive equilibrium exists; no equilibrium basin is reported."
+      "initial_voltage_behavior": "No positive equilibrium exists; no equilibrium basin is reported.",
+      "phase_line_probes": [
+        {
+          "voltage_v": "25",
+          "expected_sign": "decreasing"
+        },
+        {
+          "voltage_v": "50",
+          "expected_sign": "decreasing"
+        },
+        {
+          "voltage_v": "100",
+          "expected_sign": "decreasing"
+        }
+      ]
     },
     {
       "id": "scaled-400v-1500kw",
@@ -330,7 +402,29 @@
         "high_voltage_equilibrium": "V0 > 100 V",
         "unstable_equilibrium": "V0 = 100 V",
         "outside_high_voltage_basin": "0 < V0 < 100 V leads toward the zero-voltage domain boundary"
-      }
+      },
+      "phase_line_probes": [
+        {
+          "voltage_v": "50",
+          "expected_sign": "decreasing"
+        },
+        {
+          "voltage_v": "100",
+          "expected_sign": "equilibrium"
+        },
+        {
+          "voltage_v": "200",
+          "expected_sign": "increasing"
+        },
+        {
+          "voltage_v": "300",
+          "expected_sign": "equilibrium"
+        },
+        {
+          "voltage_v": "350",
+          "expected_sign": "decreasing"
+        }
+      ]
     }
   ],
   "limitations": [
