@@ -701,7 +701,6 @@ fn compare_pair(
     let mut b_strict = false;
     let mut a_better_any = false;
     let mut b_better_any = false;
-    let mut any_overlap = false;
 
     for objective in objectives {
         let a = candidate_a.metrics.get(&objective.metric_id).expect("validated candidate has objective metric");
@@ -730,7 +729,6 @@ fn compare_pair(
         b_strict |= b_better;
         a_better_any |= a_better;
         b_better_any |= b_better;
-        any_overlap |= !(a_upper < b_lower || b_upper < a_lower);
 
         evidence.push(ObjectivePairEvidence {
             metric_id: objective.metric_id.clone(),
@@ -754,8 +752,6 @@ fn compare_pair(
         "b_dominates_a"
     } else if a_better_any && b_better_any {
         "robust_tradeoff"
-    } else if any_overlap {
-        "unresolved_interval_order"
     } else {
         "unresolved_interval_order"
     };
