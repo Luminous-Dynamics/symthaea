@@ -8,6 +8,8 @@
 //! path. Multi-part measure sequences must reconcile exactly after rational
 //! normalization; disagreement yields Unknown.
 
+use crate::evidence_digest::canonical_json_sha256;
+use serde::{Deserialize, Serialize};
 use crate::barline_eval::{
     MeasureKind, MeasureMap, MeasureMapStatus, MeasureSpan, RationalBeat,
 };
@@ -318,7 +320,7 @@ pub fn parse_musicxml_part_measure_maps(
 
 
 /// Typed MusicXML barline location in a single partwise measure.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+# [derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MusicXmlBarlineLocationV1 {
     Left,
     Middle,
@@ -326,7 +328,7 @@ pub enum MusicXmlBarlineLocationV1 {
 }
 
 /// Explicit repeat semantics retained from a MusicXML barline.
-#[derive(Debug, Clone, PartialEq, Eq)]
+# [derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlRepeatV1 {
     pub direction: Option<String>,
     pub times: Option<String>,
@@ -334,7 +336,7 @@ pub struct MusicXmlRepeatV1 {
 }
 
 /// Explicit numbered-ending semantics retained from a MusicXML barline.
-#[derive(Debug, Clone, PartialEq, Eq)]
+# [derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlEndingV1 {
     pub number: Option<String>,
     pub ending_type: Option<String>,
@@ -345,7 +347,7 @@ pub struct MusicXmlEndingV1 {
 ///
 /// Repeats and endings remain graph annotations; this type does not expand
 /// playback traversal or duplicate notated measures.
-#[derive(Debug, Clone, PartialEq, Eq)]
+# [derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlPartBarlineEventV1 {
     pub source_order: usize,
     pub source_id: Option<String>,
@@ -369,7 +371,7 @@ pub struct MusicXmlPartBarlineEventV1 {
 }
 
 /// Complete measure map plus every explicit MusicXML barline event for a part.
-#[derive(Debug, Clone, PartialEq, Eq)]
+# [derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlFermataV1 {
     pub fermata_type: Option<String>,
     pub text: Option<String>,
@@ -377,7 +379,7 @@ pub struct MusicXmlFermataV1 {
 }
 
 /// Typed wavy-line marker attached to a barline (for example, a trill line).
-#[derive(Debug, Clone, PartialEq, Eq)]
+# [derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlWavyLineV1 {
     pub line_type: Option<String>,
     pub number: Option<String>,
@@ -385,14 +387,14 @@ pub struct MusicXmlWavyLineV1 {
 }
 
 /// MusicXML footnote/level annotation retained without interpreting its prose.
-#[derive(Debug, Clone, PartialEq, Eq)]
+# [derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlBarlineAnnotationV1 {
     pub element: String,
     pub attributes: Vec<(String, String)>,
     pub text: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+# [derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlPartNotationGraphV1 {
     pub part_id: String,
     pub map: MeasureMap,
@@ -517,6 +519,31 @@ pub fn parse_musicxml_part_notation_graph(
         }
     }
     Ok(output)
+}
+
+
+/// Canonical SHA-256 commitment to one parsed per-part notation graph.
+///
+/// The commitment includes the measure map, non-controlling flags and every
+/// barline event. It is a content digest, not a signature or source-authenticity
+/// proof.
+pub fn musicxml_notation_graph_commitment(
+    graph: &MusicXmlPartNotationGraphV1,
+) -> Result<String, serde_json::Error> {
+    canonical_json_sha256(graph)
+}
+
+/// Reparse the same source and compare the complete per-part notation graph.
+/// Tampered maps, event offsets, repeat semantics or source locators return
+/// false. The source itself remains identified by the caller-supplied ID.
+pub fn validate_musicxml_notation_graph_replay(
+    bytes: &[u8],
+    source_id: &str,
+    score_clock_id: &str,
+    supplied: &[MusicXmlPartNotationGraphV1],
+) -> Result<bool, MusicXmlMeasureAdapterError> {
+    let replayed = parse_musicxml_part_notation_graph(bytes, source_id, score_clock_id)?;
+    Ok(replayed == supplied)
 }
 
 fn parse_barline_events_for_part(
@@ -1530,4 +1557,36 @@ mod tests {
         assert_eq!(graph[0].map.status, MeasureMapStatus::Supported);
         assert_eq!(graph[0].barline_events.len(), 1);
     }
+
+    #[test]
+    fn notation_graph_commitment_and_replay_reject_tampering() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><rest/><duration>8</duration></note>
+            <barline location="middle" id="mid"><bar-style>dashed</bar-style></barline>
+            <note><rest/><duration>8</duration></note>
+            <barline location="right"><repeat direction="backward" times="2"/></barline>
+        </measure></part></score-partwise>"#;
+        let graphs = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "sha256:sealed-graph", "score-clock"
+        ).unwrap();
+        let digest = musicxml_notation_graph_commitment(&graphs[0]).unwrap();
+        assert_eq!(digest.len(), 64);
+        assert!(validate_musicxml_notation_graph_replay(
+            xml.as_bytes(), "sha256:sealed-graph", "score-clock", &graphs
+        ).unwrap());
+
+        let mut tampered = graphs.clone();
+        tampered[0].barline_events[0].score_offset = RationalBeat::new(3, 1).unwrap();
+        assert!(!validate_musicxml_notation_graph_replay(
+            xml.as_bytes(), "sha256:sealed-graph", "score-clock", &tampered
+        ).unwrap());
+
+        let mut tampered_repeat = graphs.clone();
+        tampered_repeat[0].barline_events[1].repeat.as_mut().unwrap().times = Some("3".into());
+        assert!(!validate_musicxml_notation_graph_replay(
+            xml.as_bytes(), "sha256:sealed-graph", "score-clock", &tampered_repeat
+        ).unwrap());
+    }
+
 }
