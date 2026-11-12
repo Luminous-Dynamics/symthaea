@@ -28,7 +28,7 @@ The synthetic fixture is intentionally rejected as measured validation. Exit cod
 
 ## Evidence gates
 
-The audit binds model and full-scale runs to operating-point receipt digests, raw-trace digests and a shared timebase receipt. It requires explicit nD-referenced cavitation numbers, frequency-band identity, and declarations for wake, cavitation pattern, gas/nuclei state, Reynolds-scale review and facility transfer function.
+The audit binds model and full-scale runs to operating-point receipt digests, raw-trace digests and a shared timebase receipt. It requires explicit nD-referenced cavitation numbers, frequency-band identity, a declared high/low-frequency regime and rationale per band, and declarations for wake, cavitation pattern, gas/nuclei state, Reynolds-scale review and facility transfer function.
 
 A research transfer comparison requires at least two distinct model-scale propeller rotation rates. Full-scale observations are compared only at the corresponding ITTC-mapped frequencies and for the same declared band IDs. The model and full-scale source-level records must use the same reference distance (normally 1 m).
 
