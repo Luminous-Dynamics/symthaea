@@ -1661,6 +1661,13 @@ mod tests {
             .unwrap()
             .iter()
             .any(|value| value == "vessel_id"));
+        assert_eq!(
+            schema["$defs"]["validationSplit"]["properties"]["protocol_id"]["enum"]
+                .as_array()
+                .unwrap()
+                .len(),
+            8
+        );
     }
 
     #[test]
