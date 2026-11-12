@@ -173,7 +173,18 @@ struct ExposurePartitionReport {
     ambient_reference_sel_db: Option<f64>,
     ambient_reference_sel_lower_db: Option<f64>,
     ambient_reference_sel_upper_db: Option<f64>,
+    ambient_observation_refs: Vec<AmbientObservationRef>,
     ambient_only_basis: &'static str,
+}
+
+#[derive(Debug, Serialize)]
+struct AmbientObservationRef {
+    observation_id: String,
+    raw_trace_sha256: String,
+    calibration_certificate_sha256: String,
+    measurement_method_id: String,
+    instrument_id: String,
+    timebase_receipt_sha256: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -182,11 +193,29 @@ struct ContributionReport {
     event_id: String,
     receiver_id: String,
     band_id: String,
+    vessel_id: String,
+    vessel_revision: String,
+    propeller_revision: String,
+    source_state_id: String,
+    source_track_sha256: String,
+    operating_point_receipt_sha256: String,
+    source_level_method_id: String,
+    source_level_raw_trace_sha256: String,
+    source_level_calibration_sha256: String,
     source_level_db: f64,
+    source_level_expanded_uncertainty_db: f64,
     transmission_loss_db: f64,
+    transmission_loss_expanded_uncertainty_db: f64,
     received_level_db: f64,
     received_level_lower_db: f64,
     received_level_upper_db: f64,
+    source_latitude_deg: f64,
+    source_longitude_deg: f64,
+    source_depth_m: f64,
+    range_m: f64,
+    receiver_latitude_deg: f64,
+    receiver_longitude_deg: f64,
+    receiver_depth_m: f64,
     duration_s: f64,
     sel_db: f64,
     sel_lower_db: f64,
@@ -200,6 +229,7 @@ struct ContributionReport {
     environment_fingerprint_sha256: String,
     timebase_receipt_sha256: String,
 }
+
 
 #[derive(Debug, Serialize)]
 struct LimitResult {
@@ -226,7 +256,10 @@ fn valid_lat_lon(latitude: f64, longitude: f64) -> bool {
         && longitude.is_finite() && (-180.0..=180.0).contains(&longitude)
 }
 
-fn haversine_distance_m(lat_a: f64, lon_a: f64, lat_b: f64, lon_b: f64) -> f64 {
+fn haversine_slant_distance_m(
+    lat_a: f64, lon_a: f64, depth_a_m: f64,
+    lat_b: f64, lon_b: f64, depth_b_m: f64,
+) -> f64 {
     let to_radians = std::f64::consts::PI / 180.0;
     let lat_a = lat_a * to_radians;
     let lat_b = lat_b * to_radians;
@@ -234,7 +267,8 @@ fn haversine_distance_m(lat_a: f64, lon_a: f64, lat_b: f64, lon_b: f64) -> f64 {
     let delta_lon = (lon_b - lon_a) * to_radians / 2.0;
     let a = delta_lat.sin().powi(2)
         + lat_a.cos() * lat_b.cos() * delta_lon.sin().powi(2);
-    2.0 * EARTH_RADIUS_M * a.sqrt().asin()
+    let horizontal = 2.0 * EARTH_RADIUS_M * a.sqrt().asin();
+    horizontal.hypot(depth_b_m - depth_a_m)
 }
 
 fn log_energy_sum(levels_db: &[f64]) -> Option<f64> {
@@ -269,6 +303,9 @@ fn union_duration(intervals: &[(f64, f64)]) -> f64 {
 
 fn validate_case(case: &Case) -> Vec<String> {
     let mut errors = Vec::new();
+    if case.source_events.is_empty() || case.receivers.is_empty() || case.contributions.is_empty() {
+        errors.push("at least one source event, receiver and acoustic contribution are required".to_string());
+    }
     if case.schema_version != SCHEMA_VERSION {
         errors.push(format!("unsupported schema_version {}; expected {SCHEMA_VERSION}", case.schema_version));
     }
@@ -379,9 +416,13 @@ fn validate_case(case: &Case) -> Vec<String> {
         {
             errors.push(format!("contribution {} has invalid source geometry", contribution.contribution_id));
         } else {
-            let calculated = haversine_distance_m(
-                contribution.source_latitude_deg,contribution.source_longitude_deg,
-                receiver.latitude_deg,receiver.longitude_deg
+            let calculated = haversine_slant_distance_m(
+                contribution.source_latitude_deg,
+                contribution.source_longitude_deg,
+                contribution.source_depth_m,
+                receiver.latitude_deg,
+                receiver.longitude_deg,
+                receiver.depth_m,
             );
             if (calculated-contribution.range_m).abs() > contribution.range_tolerance_m {
                 errors.push(format!("contribution {} declared source/receiver range differs from coordinates", contribution.contribution_id));
@@ -451,6 +492,20 @@ fn validate_case(case: &Case) -> Vec<String> {
             || limit.requirement_reference.trim().is_empty()
         {
             errors.push(format!("exposure limit {} is malformed", limit.limit_id));
+        }
+    }
+
+    let mut ambient_grouped: BTreeMap<(String,String),Vec<&AmbientObservation>> = BTreeMap::new();
+    for observation in &case.ambient_observations {
+        ambient_grouped.entry((observation.receiver_id.clone(),observation.band_id.clone()))
+            .or_default().push(observation);
+    }
+    for ((receiver_id,band_id),mut records) in ambient_grouped {
+        records.sort_by(|a,b|a.start_time_s.total_cmp(&b.start_time_s));
+        for pair in records.windows(2) {
+            if pair[1].start_time_s < pair[0].end_time_s - TIME_TOLERANCE_S {
+                errors.push(format!("ambient reference for receiver {receiver_id}, band {band_id} contains overlapping samples that would double-count ambient SEL"));
+            }
         }
     }
 
@@ -1023,6 +1078,37 @@ mod tests {
         let mut input=case();
         input.ambient_observations[0].measurement_method_id.clear();
         assert_eq!(audit(&input).disposition,"INVALID");
+    }
+
+    #[test]
+    fn slant_range_includes_source_receiver_depth_difference() {
+        let expected = (111.195_f64.powi(2) + 10.0_f64.powi(2)).sqrt();
+        let calculated = haversine_slant_distance_m(0.0,0.0,10.0,0.0,0.001,20.0);
+        assert!((calculated-expected).abs()<1.0e-6);
+    }
+
+    #[test]
+    fn overlapping_ambient_reference_windows_are_invalid() {
+        let mut input=case();
+        let mut duplicate=ambient();
+        duplicate.observation_id="ambient-2".to_string();
+        duplicate.start_time_s=50.0;
+        duplicate.end_time_s=150.0;
+        duplicate.duration_s=100.0;
+        input.ambient_observations.push(duplicate);
+        assert_eq!(audit(&input).disposition,"INVALID");
+    }
+
+    #[test]
+    fn exposure_receipt_preserves_source_and_receiver_lineage() {
+        let report=audit(&case());
+        let receipt=&report.partitions[0].contribution_reports[0];
+        assert_eq!(receipt.vessel_revision,"hull-r1");
+        assert_eq!(receipt.propeller_revision,"prop-r1");
+        assert_eq!(receipt.source_state_id,"propeller-operating-state-1");
+        assert_eq!(receipt.receiver_depth_m,20.0);
+        assert_eq!(receipt.operating_point_receipt_sha256,digest('9'));
+        assert_eq!(report.partitions[0].ambient_observation_refs[0].instrument_id,"hydrophone-1");
     }
 
     #[test]
