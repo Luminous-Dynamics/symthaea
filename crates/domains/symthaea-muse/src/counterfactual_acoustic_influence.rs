@@ -705,7 +705,6 @@ pub struct VerifiedInfluenceRequest<'a> {
     pub intervention: CounterfactualIntervention,
     pub baseline_schedule_sha256: &'a str,
     pub counterfactual_schedule_sha256: &'a str,
-    pub renderer_profile_sha256: &'a str,
 }
 
 struct VerifiedPcm {
@@ -739,7 +738,6 @@ pub fn estimate_from_verified_renderer_evidence(
     validate_sha256("baseline_schedule_sha256", expected_schedule.0)?;
     validate_sha256("counterfactual_schedule_sha256", expected_schedule.1)?;
     validate_sha256("source_score_sha256", request.source_score_sha256)?;
-    validate_sha256("renderer_profile_sha256", request.renderer_profile_sha256)?;
     if expected_schedule.0 == expected_schedule.1 {
         return Err(InfluenceInputError::ContextMismatch);
     }
@@ -794,7 +792,7 @@ pub fn estimate_from_verified_renderer_evidence(
         intervention: request.intervention,
         baseline_schedule_sha256: request.baseline_schedule_sha256,
         counterfactual_schedule_sha256: request.counterfactual_schedule_sha256,
-        renderer_profile_sha256: request.renderer_profile_sha256,
+        renderer_profile_sha256: &baseline_metadata.renderer_profile_sha256,
         baseline_render_receipt_sha256: &baseline_metadata.receipt_sha256,
         baseline_repeat_receipt_sha256: &repeat_receipt_digests,
         counterfactual_render_receipt_sha256: &counterfactual_verified.metadata.receipt_sha256,
@@ -814,9 +812,13 @@ struct VerifiedRenderMetadata {
     backend: crate::renderer_execution_receipt::RendererBackend,
     renderer_executable_sha256: Option<String>,
     soundfont_sha256: Option<String>,
+    render_config_sha256: String,
     sample_rate_hz: u32,
     channels: usize,
+    bits_per_sample: u16,
+    sample_format: crate::renderer_execution_receipt::DecodedSampleFormat,
     frame_count: u64,
+    renderer_profile_sha256: String,
     receipt_sha256: String,
 }
 
@@ -910,6 +912,18 @@ fn verify_and_decode_render(
     {
         return Err(InfluenceInputError::InvalidRendererReceipt);
     }
+    let sample_format = summary.sample_format;
+    let render_config_sha256 = receipt.render_config_sha256.clone();
+    let renderer_profile_sha256 = renderer_profile_digest(
+        receipt.backend,
+        executable_sha256.as_deref(),
+        soundfont_sha256.as_deref(),
+        &render_config_sha256,
+        summary.sample_rate_hz,
+        summary.channels,
+        summary.bits_per_sample,
+        sample_format,
+    )?;
     Ok(VerifiedRender {
         pcm: VerifiedPcm {
             samples,
@@ -922,12 +936,44 @@ fn verify_and_decode_render(
             backend: receipt.backend,
             renderer_executable_sha256: executable_sha256,
             soundfont_sha256,
+            render_config_sha256,
             sample_rate_hz: summary.sample_rate_hz,
             channels: usize::from(summary.channels),
+            bits_per_sample: summary.bits_per_sample,
+            sample_format,
             frame_count: summary.frame_count,
+            renderer_profile_sha256,
             receipt_sha256: receipt.receipt_sha256.clone(),
         },
     })
+}
+
+fn renderer_profile_digest(
+    backend: crate::renderer_execution_receipt::RendererBackend,
+    executable_sha256: Option<&str>,
+    soundfont_sha256: Option<&str>,
+    render_config_sha256: &str,
+    sample_rate_hz: u32,
+    channels: u16,
+    bits_per_sample: u16,
+    sample_format: crate::renderer_execution_receipt::DecodedSampleFormat,
+) -> Result<String, InfluenceInputError> {
+    let canonical = serde_json::to_vec(&(
+        "mel-mr-eval-017-renderer-profile-v1",
+        backend,
+        executable_sha256,
+        soundfont_sha256,
+        render_config_sha256,
+        sample_rate_hz,
+        channels,
+        bits_per_sample,
+        sample_format,
+    ))
+    .map_err(|_| InfluenceInputError::SerializationFailure)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous-dynamics-mel-mr-eval-017-renderer-profile-v1\0");
+    hasher.update(canonical);
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 fn ensure_same_renderer_profile(
@@ -937,9 +983,13 @@ fn ensure_same_renderer_profile(
     if baseline.backend != candidate.backend
         || baseline.renderer_executable_sha256 != candidate.renderer_executable_sha256
         || baseline.soundfont_sha256 != candidate.soundfont_sha256
+        || baseline.render_config_sha256 != candidate.render_config_sha256
         || baseline.sample_rate_hz != candidate.sample_rate_hz
         || baseline.channels != candidate.channels
+        || baseline.bits_per_sample != candidate.bits_per_sample
+        || baseline.sample_format != candidate.sample_format
         || baseline.frame_count != candidate.frame_count
+        || baseline.renderer_profile_sha256 != candidate.renderer_profile_sha256
     {
         return Err(InfluenceInputError::ContextMismatch);
     }
@@ -1269,6 +1319,7 @@ mod tests {
             &counterfactual_wav,
         );
 
+        let renderer_profile_digest_for_test_placeholder = crate::renderer_execution_receipt::sha256_hex(b"renderer profile fixture");
         let report = estimate_from_verified_renderer_evidence(
             native_evidence(
                 &baseline_receipt,
@@ -1295,12 +1346,11 @@ mod tests {
                 &counterfactual_wav,
             ),
             VerifiedInfluenceRequest {
-                source_score_sha256: crate::renderer_execution_receipt::sha256_hex(score).leak(),
+                source_score_sha256: &crate::renderer_execution_receipt::sha256_hex(score),
                 source_event_id: "score_event_index:3",
                 intervention: CounterfactualIntervention::Remove,
-                baseline_schedule_sha256: crate::renderer_execution_receipt::sha256_hex(baseline_schedule).leak(),
-                counterfactual_schedule_sha256: crate::renderer_execution_receipt::sha256_hex(counterfactual_schedule).leak(),
-                renderer_profile_sha256: DIGEST_A,
+                baseline_schedule_sha256: &crate::renderer_execution_receipt::sha256_hex(baseline_schedule),
+                counterfactual_schedule_sha256: &crate::renderer_execution_receipt::sha256_hex(counterfactual_schedule),
             },
             &calibrated_config(),
         )
