@@ -37,7 +37,7 @@ struct Case {
     evidence_kind: EvidenceKind,
     source: SourceEvidence,
     operating_condition_id: String,
-    operating_condition_fingerprint_sha256: String,
+    service_fingerprint_sha256: String,
     environment_fingerprint_sha256: String,
     hydrophone_instrument_id: String,
     calibration_certificate_sha256: String,
@@ -101,6 +101,10 @@ struct AuditReport {
     evidence_kind: &'static str,
     operating_condition_id: String,
     band_id: String,
+    service_fingerprint_sha256: String,
+    environment_fingerprint_sha256: String,
+    hydrophone_instrument_id: String,
+    calibration_certificate_sha256: String,
     quantity_id: &'static str,
     center_frequency_hz: f64,
     disposition: &'static str,
@@ -112,17 +116,27 @@ struct AuditReport {
 }
 
 #[derive(Debug, Serialize)]
+struct WindowEvidenceRef {
+    window_id: String,
+    acoustic_trace_sha256: String,
+    cavitation_observation_sha256: String,
+    start_time_s: f64,
+    end_time_s: f64,
+}
+
+#[derive(Debug, Serialize)]
 struct RunReport {
     run_id: String,
     timebase_receipt_sha256: String,
+    service_fingerprint_sha256: String,
     background_method: &'static str,
     background_trace_sha256: String,
+    window_evidence: Vec<WindowEvidenceRef>,
     total_windows: usize,
     usable_windows: usize,
     excluded_background_dominated: usize,
     excluded_exact_ten_db_boundary: usize,
     excluded_uncertainty_unresolved: usize,
-    excluded_invalid_window: usize,
     cavitation_annotation_coverage: f64,
     cavitation_occupancy_fraction: Option<f64>,
     observed_cavitation_onsets: Option<usize>,
@@ -229,7 +243,7 @@ fn validate_case(case: &Case) -> Vec<String> {
     }
     for (label, digest) in [
         ("source raw data", &case.source.raw_data_sha256),
-        ("operating-condition fingerprint", &case.operating_condition_fingerprint_sha256),
+        ("service fingerprint", &case.service_fingerprint_sha256),
         ("environment fingerprint", &case.environment_fingerprint_sha256),
         ("hydrophone calibration certificate", &case.calibration_certificate_sha256),
     ] {
@@ -268,8 +282,8 @@ fn validate_case(case: &Case) -> Vec<String> {
                 errors.push(format!("run {}: {label} digest must be 64 hexadecimal characters", run.run_id));
             }
         }
-        if run.service_fingerprint_sha256 != case.operating_condition_fingerprint_sha256 {
-            errors.push(format!("run {} operating-condition fingerprint differs from the frozen case", run.run_id));
+        if run.service_fingerprint_sha256 != case.service_fingerprint_sha256 {
+            errors.push(format!("run {} service fingerprint differs from the frozen case", run.run_id));
         }
         if run.windows.is_empty() {
             errors.push(format!("run {} has no windows", run.run_id));
@@ -361,6 +375,9 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
     let p05 = empirical_quantile(&sorted_levels, 0.05);
     let p95 = empirical_quantile(&sorted_levels, 0.95);
 
+    let usable_duration = usable.iter()
+        .map(|window| window.end_time_s - window.start_time_s)
+        .sum();
     let annotated_count = usable.iter().filter(|window| window.cavitation_present.is_some()).count();
     let annotation_coverage = if usable.is_empty() {
         0.0
@@ -395,9 +412,8 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
                     onsets += 1;
                 }
             }
-            let observation_duration = usable.last().unwrap().end_time_s - usable.first().unwrap().start_time_s;
-            let onsets_per_hour = if observation_duration > 0.0 {
-                Some(onsets as f64 * 3600.0 / observation_duration)
+            let onsets_per_hour = if usable_duration > 0.0 {
+                Some(onsets as f64 * 3600.0 / usable_duration)
             } else {
                 None
             };
@@ -412,25 +428,30 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
             (None, None, None, None, None, None)
         };
 
-    let usable_duration = usable.iter()
-        .map(|window| window.end_time_s - window.start_time_s)
-        .sum();
+    let window_evidence = run.windows.iter().map(|window| WindowEvidenceRef {
+        window_id: window.window_id.clone(),
+        acoustic_trace_sha256: window.acoustic_trace_sha256.clone(),
+        cavitation_observation_sha256: window.cavitation_observation_sha256.clone(),
+        start_time_s: window.start_time_s,
+        end_time_s: window.end_time_s,
+    }).collect();
 
     RunReport {
         run_id: run.run_id.clone(),
         timebase_receipt_sha256: run.timebase_receipt_sha256.clone(),
+        service_fingerprint_sha256: run.service_fingerprint_sha256.clone(),
         background_method: match run.background_method {
             BackgroundMethod::BareHub => "bare_hub",
             BackgroundMethod::PressureSuppressed => "pressure_suppressed",
             BackgroundMethod::Unknown => "unknown",
         },
         background_trace_sha256: run.background_trace_sha256.clone(),
+        window_evidence,
         total_windows: run.windows.len(),
         usable_windows: usable.len(),
         excluded_background_dominated,
         excluded_exact_ten_db_boundary,
         excluded_uncertainty_unresolved,
-        excluded_invalid_window,
         cavitation_annotation_coverage: annotation_coverage,
         cavitation_occupancy_fraction: occupancy,
         observed_cavitation_onsets: onsets,
@@ -536,6 +557,10 @@ fn audit(case: &Case) -> AuditReport {
         },
         operating_condition_id: case.operating_condition_id.clone(),
         band_id: case.band.band_id.clone(),
+        service_fingerprint_sha256: case.service_fingerprint_sha256.clone(),
+        environment_fingerprint_sha256: case.environment_fingerprint_sha256.clone(),
+        hydrophone_instrument_id: case.hydrophone_instrument_id.clone(),
+        calibration_certificate_sha256: case.calibration_certificate_sha256.clone(),
         quantity_id: SPL_QUANTITY,
         center_frequency_hz: case.band.center_frequency_hz,
         disposition,
@@ -634,7 +659,7 @@ mod tests {
                 independently_reviewed: true,
             },
             operating_condition_id: "J-0.8-sigma-nD-1".to_string(),
-            operating_condition_fingerprint_sha256: digest('f'),
+            service_fingerprint_sha256: digest('f'),
             environment_fingerprint_sha256: digest('3'),
             hydrophone_instrument_id: "hydrophone-H1".to_string(),
             calibration_certificate_sha256: digest('4'),
