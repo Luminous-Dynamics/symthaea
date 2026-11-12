@@ -153,7 +153,9 @@ pub struct HorizonContract {
 impl HorizonContract {
     fn validate(&self) -> Result<(), ReferenceError> {
         if self.loss_scale_id.trim().is_empty() {
-            return Err(ReferenceError::EmptyField { field: "loss_scale_id" });
+            return Err(ReferenceError::EmptyField {
+                field: "loss_scale_id",
+            });
         }
         if self.loss_model_digest.trim().is_empty() {
             return Err(ReferenceError::EmptyField {
@@ -385,7 +387,9 @@ fn assess_tick(
     evidence: &DecisionTickEvidence,
 ) -> Result<TickDisposition, ReferenceError> {
     if evidence.loss_scale_id != contract.loss_scale_id {
-        return Err(ReferenceError::LossScaleMismatch { tick: evidence.tick });
+        return Err(ReferenceError::LossScaleMismatch {
+            tick: evidence.tick,
+        });
     }
     if evidence.action_domain_digest.trim().is_empty() {
         return Ok(TickDisposition::Unknown {
@@ -466,9 +470,7 @@ fn assess_tick(
             },
         });
     }
-    if calibration.coverage_semantics
-        != CoverageSemantics::SimultaneousAcrossActionSetAndHorizon
-    {
+    if calibration.coverage_semantics != CoverageSemantics::SimultaneousAcrossActionSetAndHorizon {
         return Ok(TickDisposition::Unknown {
             reason: UnknownReason::CalibrationCoverageNotSimultaneous,
         });
@@ -582,9 +584,7 @@ fn assess_tick(
     };
 
     if regret_upper_units <= contract.epsilon_task_loss_units {
-        Ok(TickDisposition::Sufficient {
-            regret_upper_units,
-        })
+        Ok(TickDisposition::Sufficient { regret_upper_units })
     } else {
         Ok(TickDisposition::Insufficient {
             reason: InsufficiencyReason::RegretExceeded {
@@ -718,9 +718,7 @@ pub fn decision_sufficiency_horizon(
         let disposition = assess_tick(contract, evidence)?;
         let current_tick = evidence.tick;
         match &disposition {
-            TickDisposition::Sufficient {
-                regret_upper_units,
-            } => {
+            TickDisposition::Sufficient { regret_upper_units } => {
                 result.last_sufficient_tick = Some(current_tick);
                 result.max_regret_upper_units = Some(
                     result
@@ -735,9 +733,7 @@ pub fn decision_sufficiency_horizon(
                     InsufficiencyReason::SelectedActionNotAdmissible => {
                         HorizonStopReason::SelectedActionNotAdmissible
                     }
-                    InsufficiencyReason::RegretExceeded { .. } => {
-                        HorizonStopReason::RegretExceeded
-                    }
+                    InsufficiencyReason::RegretExceeded { .. } => HorizonStopReason::RegretExceeded,
                 });
                 result.assessments.push(TickAssessment {
                     tick: current_tick,
@@ -747,8 +743,7 @@ pub fn decision_sufficiency_horizon(
             }
             TickDisposition::Unknown { reason } => {
                 result.stopped_at_tick = Some(current_tick);
-                result.stop_reason =
-                    Some(HorizonStopReason::EvidenceUnknown(reason.clone()));
+                result.stop_reason = Some(HorizonStopReason::EvidenceUnknown(reason.clone()));
                 result.assessments.push(TickAssessment {
                     tick: current_tick,
                     disposition,
@@ -828,10 +823,7 @@ mod tests {
         }
     }
 
-    fn alternative(
-        admissibility: Admissibility,
-        loss: Option<LossInterval>,
-    ) -> ActionEvidence {
+    fn alternative(admissibility: Admissibility, loss: Option<LossInterval>) -> ActionEvidence {
         ActionEvidence {
             action_id: "a1".to_owned(),
             admissibility,
@@ -957,12 +949,7 @@ mod tests {
 
     #[test]
     fn incomplete_action_set_returns_unknown() {
-        let mut evidence = step(
-            1,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
+        let mut evidence = step(1, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
         evidence.action_set_complete = false;
         let result = decision_sufficiency_horizon(&contract(), &[evidence]).unwrap();
         assert!(matches!(
@@ -975,12 +962,7 @@ mod tests {
 
     #[test]
     fn one_proven_admissible_action_has_zero_regret_when_set_is_complete() {
-        let evidence = step(
-            1,
-            Admissibility::Yes,
-            Some(LossInterval::new(7, 10)),
-            None,
-        );
+        let evidence = step(1, Admissibility::Yes, Some(LossInterval::new(7, 10)), None);
         let result = decision_sufficiency_horizon(&contract(), &[evidence]).unwrap();
         assert_eq!(result.last_sufficient_tick, Some(1));
         assert_eq!(result.max_regret_upper_units, Some(0));
@@ -1021,12 +1003,7 @@ mod tests {
 
     #[test]
     fn loss_scale_mismatch_is_rejected() {
-        let mut evidence = step(
-            1,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
+        let mut evidence = step(1, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
         evidence.loss_scale_id = "other-task-scale".to_owned();
         assert_eq!(
             decision_sufficiency_horizon(&contract(), &[evidence]),
@@ -1036,12 +1013,7 @@ mod tests {
 
     #[test]
     fn missing_calibration_returns_unknown() {
-        let mut evidence = step(
-            1,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
+        let mut evidence = step(1, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
         evidence.calibration = None;
         let result = decision_sufficiency_horizon(&contract(), &[evidence]).unwrap();
         assert!(matches!(
@@ -1054,12 +1026,7 @@ mod tests {
 
     #[test]
     fn expired_calibration_returns_unknown() {
-        let evidence = step(
-            5,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
+        let evidence = step(5, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
         let mut evidence = evidence;
         evidence.calibration = Some(calibration(4));
         let result = decision_sufficiency_horizon(&contract(), &[evidence]).unwrap();
@@ -1073,12 +1040,7 @@ mod tests {
 
     #[test]
     fn insufficient_calibration_coverage_returns_unknown() {
-        let mut evidence = step(
-            1,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
+        let mut evidence = step(1, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
         let mut receipt = calibration(100);
         receipt.coverage_ppm = 900_000;
         receipt.alpha_ppm = 100_000;
@@ -1094,12 +1056,7 @@ mod tests {
 
     #[test]
     fn receipt_cannot_claim_coverage_with_an_insufficient_episode_count() {
-        let mut evidence = step(
-            1,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
+        let mut evidence = step(1, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
         let calibration = evidence.calibration.as_mut().unwrap();
         calibration.coverage_ppm = 990_000;
         calibration.alpha_ppm = 10_000;
@@ -1115,12 +1072,7 @@ mod tests {
 
     #[test]
     fn interval_expansion_must_match_the_calibration_receipt() {
-        let mut evidence = step(
-            1,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
+        let mut evidence = step(1, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
         evidence.applied_calibration_expansion_units = 4;
         let result = decision_sufficiency_horizon(&contract(), &[evidence]).unwrap();
         assert!(matches!(
@@ -1176,18 +1128,8 @@ mod tests {
 
     #[test]
     fn changed_selected_action_identity_terminates_the_same_horizon() {
-        let first = step(
-            1,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
-        let mut second = step(
-            2,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
+        let first = step(1, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
+        let mut second = step(2, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
         second.selected_action_id = "a1".to_owned();
         second.actions.push(ActionEvidence {
             action_id: "a1".to_owned(),
@@ -1207,12 +1149,7 @@ mod tests {
 
     #[test]
     fn action_domain_digest_must_match_calibration() {
-        let mut evidence = step(
-            1,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
+        let mut evidence = step(1, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
         evidence.action_domain_digest = "different-domain".to_owned();
         let result = decision_sufficiency_horizon(&contract(), &[evidence]).unwrap();
         assert!(matches!(
@@ -1225,19 +1162,9 @@ mod tests {
 
     #[test]
     fn horizon_cannot_exceed_calibrated_scope() {
-        let mut first = step(
-            1,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
+        let mut first = step(1, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
         first.calibration.as_mut().unwrap().maximum_horizon_ticks = 1;
-        let second = step(
-            2,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
+        let second = step(2, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
         let result = decision_sufficiency_horizon(&contract(), &[first, second]).unwrap();
         assert_eq!(result.last_sufficient_tick, None);
         assert!(matches!(
@@ -1250,12 +1177,7 @@ mod tests {
 
     #[test]
     fn digest_mismatch_returns_unknown() {
-        let mut evidence = step(
-            1,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
+        let mut evidence = step(1, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
         evidence.evidence_digest_matches = false;
         let result = decision_sufficiency_horizon(&contract(), &[evidence]).unwrap();
         assert!(matches!(
@@ -1268,12 +1190,7 @@ mod tests {
 
     #[test]
     fn model_digest_mismatch_returns_unknown() {
-        let mut evidence = step(
-            1,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
+        let mut evidence = step(1, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
         evidence.loss_model_digest = "different-model".to_owned();
         let result = decision_sufficiency_horizon(&contract(), &[evidence]).unwrap();
         assert!(matches!(
@@ -1302,12 +1219,7 @@ mod tests {
 
     #[test]
     fn malformed_loss_interval_is_rejected() {
-        let evidence = step(
-            1,
-            Admissibility::Yes,
-            Some(LossInterval::new(10, 2)),
-            None,
-        );
+        let evidence = step(1, Admissibility::Yes, Some(LossInterval::new(10, 2)), None);
         assert_eq!(
             decision_sufficiency_horizon(&contract(), &[evidence]),
             Err(ReferenceError::InvalidLossInterval {
@@ -1319,22 +1231,15 @@ mod tests {
 
     #[test]
     fn sequence_gap_stops_at_first_missing_tick() {
-        let first = step(
-            10,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
-        let second = step(
-            12,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
+        let first = step(10, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
+        let second = step(12, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
         let result = decision_sufficiency_horizon(&contract(), &[first, second]).unwrap();
         assert_eq!(result.last_sufficient_tick, Some(10));
         assert_eq!(result.stopped_at_tick, Some(11));
-        assert_eq!(result.stop_reason, Some(HorizonStopReason::NonContiguousTick));
+        assert_eq!(
+            result.stop_reason,
+            Some(HorizonStopReason::NonContiguousTick)
+        );
         assert!(matches!(
             &result.assessments[1].disposition,
             TickDisposition::Unknown {
@@ -1353,12 +1258,7 @@ mod tests {
 
     #[test]
     fn duplicate_action_identity_is_rejected() {
-        let mut evidence = step(
-            1,
-            Admissibility::Yes,
-            Some(LossInterval::new(1, 2)),
-            None,
-        );
+        let mut evidence = step(1, Admissibility::Yes, Some(LossInterval::new(1, 2)), None);
         evidence.actions.push(ActionEvidence {
             action_id: "a0".to_owned(),
             admissibility: Admissibility::No,
