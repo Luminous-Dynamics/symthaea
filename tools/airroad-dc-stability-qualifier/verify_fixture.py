@@ -56,24 +56,31 @@ def verify_fixture(path: Path) -> int:
 
     for case in cases:
         case_id = case["id"]
+        case_model = case.get("model_parameters", model)
+        case_source_voltage = rational(case_model["Vs"]["exact_rational"])
+        case_source_resistance = rational(case_model["Rs"]["exact_rational"])
+        case_capacitance = rational(case_model["C"]["exact_rational"])
+        if min(case_source_voltage, case_source_resistance, case_capacitance) <= 0:
+            raise AssertionError(f"{case_id}: model parameters must be positive")
         load_power = rational(case["P"]["exact_rational"])
-        expected_delta = source_voltage**2 - 4 * source_resistance * load_power
+        expected_delta = case_source_voltage**2 - 4 * case_source_resistance * load_power
         observed_delta = rational(case["delta"]["exact_rational"])
         require_equal(observed_delta, expected_delta, f"{case_id}: discriminant")
 
-        expected_margin = expected_delta / source_voltage**2
+        expected_margin = expected_delta / case_source_voltage**2
         observed_margin = rational(case["normalized_static_fold_margin"])
         require_equal(observed_margin, expected_margin, f"{case_id}: normalized fold margin")
 
-        expected_loading = load_power / critical_power
+        case_critical_power = case_source_voltage**2 / (4 * case_source_resistance)
+        expected_loading = load_power / case_critical_power
         observed_loading = rational(case["power_loading_fraction"])
         require_equal(observed_loading, expected_loading, f"{case_id}: power loading fraction")
 
         roots = case["roots"]
         if expected_delta > 0:
             sqrt_delta = exact_sqrt(expected_delta)
-            lower_voltage = (source_voltage - sqrt_delta) / 2
-            upper_voltage = (source_voltage + sqrt_delta) / 2
+            lower_voltage = (case_source_voltage - sqrt_delta) / 2
+            upper_voltage = (case_source_voltage + sqrt_delta) / 2
             expected_roots = [
                 (upper_voltage, "locally_asymptotically_stable"),
                 (lower_voltage, "unstable"),
@@ -88,8 +95,8 @@ def verify_fixture(path: Path) -> int:
                 observed_current = Fraction(root["current"])
                 observed_eigenvalue = rational(root["eigenvalue"])
                 expected_current = load_power / voltage
-                expected_eigenvalue = (1 / capacitance) * (
-                    -(1 / source_resistance) + load_power / voltage**2
+                expected_eigenvalue = (1 / case_capacitance) * (
+                    -(1 / case_source_resistance) + load_power / voltage**2
                 )
                 require_equal(observed_voltage, voltage, f"{case_id}: root voltage")
                 require_equal(observed_current, expected_current, f"{case_id}: root current")
@@ -102,7 +109,7 @@ def verify_fixture(path: Path) -> int:
                         f"observed {root['classification']}"
                     )
         elif expected_delta == 0:
-            root_voltage = source_voltage / 2
+            root_voltage = case_source_voltage / 2
             if case["disposition"] != "critical_fold_non_pass":
                 raise AssertionError(f"{case_id}: fold must remain a non-PASS")
             if len(roots) != 1:
