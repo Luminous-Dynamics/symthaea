@@ -34,7 +34,7 @@ The 2024 review by Primc and Mozetič also reports that adhesion does not necess
 
 ### 1. Optimize bondability lifetime, not initial wettability
 
-Define a bondability window for an exact material / adhesive / process profile: the elapsed time after treatment during which the predeclared fraction of specimens still satisfies the declared bond-performance floor under the specified storage condition.
+Define a bondability window for an exact material / adhesive / process profile: the elapsed time after treatment during which the predeclared fraction of specimens still satisfies the declared bond-performance floor under the specified storage condition. In the first offline evaluator this is the greatest sampled delay in a continuous sequence of passing timepoints; it is not interpolated between samples and is not proof of continuous performance between those observations.
 
 Measure immediate bonding and predeclared storage delays. Never infer durability from a single immediate measurement.
 
@@ -175,6 +175,6 @@ The evaluator checks:
 - expected arm / pair dispositions and fail-closed comparability;
 - contact angle retained as a diagnostic only; it is not part of winner selection.
 
-Ten Rust unit tests are authored for fixture replay, bondability-window calculation, untreated controls, over-treatment rejection, contact-angle invariance, missing loads, energy mismatch, insufficient replicates, and service / energy boundary mismatch.
+Eleven Rust unit tests are authored for fixture replay, bondability-window calculation, untreated controls, over-treatment rejection, contact-angle invariance and optionality, missing loads, energy mismatch, insufficient replicates, and service / energy boundary mismatch.
 
 **Execution status:** the exact branch files and fixture are fetched back and the JSON is parsed / structurally checked. This execution environment does not contain cargo, rustc or rustfmt. The Rust module and ten tests are authored but are not compiled or executed; no CI result or physical validation is claimed.
