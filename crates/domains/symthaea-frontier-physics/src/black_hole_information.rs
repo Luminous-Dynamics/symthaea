@@ -2376,6 +2376,391 @@ pub fn simulate_small_hayden_preskill_petz_optimality(
     diagnose_hayden_preskill_petz_optimality(&scrambler, seed, tolerance)
 }
 
+/// General Petz optimality diagnostic based on Theorem 2 of Li et al. (PRL 134, 200602).
+///
+/// Unlike the commuting-state commutator corollary above, this evaluates the
+/// full necessary-and-sufficient condition B = sqrt(M_sigma) (gamma tensor T)
+/// >= 0 for arbitrary full-rank sigma and PSD rho with supp(rho) subset supp(sigma).
+/// The qubit sigma inverse square root is computed analytically; the QEC matrix
+/// square root uses the support-aware Hermitian eigensystem above.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HaydenPreskillPetzGeneralOptimalitySample {
+    pub seed: u64,
+    pub rho_sigma_commutator_frobenius: f64,
+    pub qec_matrix_trace_residual: f64,
+    pub qec_matrix_hermiticity_residual: f64,
+    pub qec_matrix_square_root_residual: f64,
+    pub qec_matrix_numerical_support_rank: usize,
+    pub auxiliary_t_hermiticity_residual: f64,
+    pub b_hermiticity_residual: f64,
+    pub b_minimum_hermitian_part_eigenvalue: f64,
+    pub b_positive_semidefinite_violation: f64,
+    pub petz_is_entanglement_fidelity_optimal: bool,
+}
+
+/// Evaluate the general Theorem-2 Petz optimality condition for a seeded
+/// four-qubit Hayden-Preskill channel and caller-declared qubit states rho,sigma.
+///
+/// rho and sigma are row-major 2x2 density matrices. sigma must be positive
+/// definite so supp(rho) is contained in supp(sigma) and its inverse square
+/// root is numerically well-defined. rho may be rank deficient. No eigenvalue
+/// flooring, trace-preserving repair, or support expansion is performed.
+pub fn simulate_small_hayden_preskill_petz_general_optimality(
+    seed: u64,
+    rho: [[Complex64; 2]; 2],
+    sigma: [[Complex64; 2]; 2],
+    tolerance: f64,
+) -> Result<HaydenPreskillPetzGeneralOptimalitySample, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    let mut rng = ChaCha20Rng::seed_from_u64(seed);
+    let scrambler = haar_unitary_4(&mut rng)?;
+    diagnose_hayden_preskill_petz_general_optimality(
+        &scrambler,
+        seed,
+        flatten_complex_matrix2(rho),
+        flatten_complex_matrix2(sigma),
+        tolerance,
+    )
+}
+
+fn diagnose_hayden_preskill_petz_general_optimality(
+    scrambler: &[[Complex64; 4]; 4],
+    seed: u64,
+    rho: ComplexMatrix2,
+    sigma: ComplexMatrix2,
+    tolerance: f64,
+) -> Result<HaydenPreskillPetzGeneralOptimalitySample, QuantumInformationError> {
+    let (rho_minimum, rho_trace_residual, rho_hermiticity) =
+        validate_qubit_density_matrix(rho, tolerance)?;
+    let (sigma_minimum, sigma_trace_residual, sigma_hermiticity) =
+        validate_qubit_density_matrix(sigma, tolerance)?;
+    if rho_minimum < -tolerance * 100.0 {
+        return Err(QuantumInformationError::NonPositive {
+            minimum_eigenvalue: rho_minimum,
+            tolerance: tolerance * 100.0,
+        });
+    }
+    if sigma_minimum <= tolerance {
+        return Err(QuantumInformationError::NonPositive {
+            minimum_eigenvalue: sigma_minimum,
+            tolerance,
+        });
+    }
+    if rho_trace_residual.max(sigma_trace_residual) > tolerance * 10.0
+        || rho_hermiticity.max(sigma_hermiticity) > tolerance * 10.0
+    {
+        return Err(QuantumInformationError::NonHermitian {
+            residual: rho_trace_residual
+                .max(sigma_trace_residual)
+                .max(rho_hermiticity)
+                .max(sigma_hermiticity),
+            tolerance: tolerance * 10.0,
+        });
+    }
+    let (sqrt_sigma, inverse_sqrt_sigma, sigma_sqrt_residual) =
+        complex_hermitian_sqrt_and_inverse_sqrt_2(sigma, tolerance)?;
+    if sigma_sqrt_residual > tolerance * 100.0 {
+        return Err(QuantumInformationError::EigensolverNonconvergence {
+            sweeps: 2,
+            residual: sigma_sqrt_residual,
+        });
+    }
+    let gamma = complex_matrix2_multiply(&inverse_sqrt_sigma, &rho);
+    let gamma_dagger = complex_matrix2_dagger(&gamma);
+
+    // Build K_b': M -> A=(E,R), with inaccessible B' as the environment.
+    // The QEC matrix is M_sigma[(i,k),(j,l)] =
+    // <i|sqrt(sigma) K_k^dagger K_l sqrt(sigma)|j>.
+    let inverse_sqrt_two = 1.0 / 2.0_f64.sqrt();
+    let mut channel_kraus = [[Complex64::new(0.0, 0.0); 8]; 2];
+    for (b_prime, kraus) in channel_kraus.iter_mut().enumerate() {
+        for emitted in 0..2 {
+            for early_radiation in 0..2 {
+                let accessible = (emitted << 1) | early_radiation;
+                for message in 0..2 {
+                    let input = (message << 1) | early_radiation;
+                    let output = (emitted << 1) | b_prime;
+                    kraus[accessible * 2 + message] =
+                        scrambler[output][input] * inverse_sqrt_two;
+                }
+            }
+        }
+    }
+    let mut weighted_kraus = [[Complex64::new(0.0, 0.0); 8]; 2];
+    for environment in 0..2 {
+        for accessible in 0..4 {
+            for logical_out in 0..2 {
+                for logical_in in 0..2 {
+                    weighted_kraus[environment][accessible * 2 + logical_in] +=
+                        channel_kraus[environment][accessible * 2 + logical_out]
+                            * sqrt_sigma[logical_out * 2 + logical_in];
+                }
+            }
+        }
+    }
+    let mut qec_matrix = [Complex64::new(0.0, 0.0); 16];
+    for logical_row in 0..2 {
+        for environment_row in 0..2 {
+            for logical_column in 0..2 {
+                for environment_column in 0..2 {
+                    let mut contraction = Complex64::new(0.0, 0.0);
+                    for accessible in 0..4 {
+                        contraction += weighted_kraus[environment_row]
+                            [accessible * 2 + logical_row]
+                            .conj()
+                            * weighted_kraus[environment_column]
+                                [accessible * 2 + logical_column];
+                    }
+                    let row = logical_row * 2 + environment_row;
+                    let column = logical_column * 2 + environment_column;
+                    qec_matrix[row * 4 + column] = contraction;
+                }
+            }
+        }
+    }
+
+    let mut qec_trace = Complex64::new(0.0, 0.0);
+    let mut qec_hermiticity_residual: f64 = 0.0;
+    for row in 0..4 {
+        qec_trace += qec_matrix[row * 4 + row];
+        for column in 0..4 {
+            qec_hermiticity_residual = qec_hermiticity_residual.max(
+                (qec_matrix[row * 4 + column] - qec_matrix[column * 4 + row].conj()).norm(),
+            );
+        }
+    }
+    let qec_trace_residual =
+        (qec_trace - Complex64::new(1.0, 0.0)).norm();
+    if qec_trace_residual > tolerance * 100.0
+        || qec_hermiticity_residual > tolerance * 100.0
+    {
+        return Err(QuantumInformationError::NonHermitian {
+            residual: qec_trace_residual.max(qec_hermiticity_residual),
+            tolerance: tolerance * 100.0,
+        });
+    }
+    let (sqrt_qec, qec_matrix_square_root_residual, qec_matrix_numerical_support_rank) =
+        complex_hermitian_square_root_4(qec_matrix, tolerance)?;
+
+    // T = Tr_L[(gamma^dagger tensor I_K) sqrt(M_sigma)].
+    let mut auxiliary_t = [Complex64::new(0.0, 0.0); 4];
+    for environment_row in 0..2 {
+        for environment_column in 0..2 {
+            let mut partial_trace = Complex64::new(0.0, 0.0);
+            for logical_row in 0..2 {
+                for logical_column in 0..2 {
+                    let matrix_row = logical_column * 2 + environment_row;
+                    let matrix_column = logical_row * 2 + environment_column;
+                    partial_trace += gamma_dagger[logical_row * 2 + logical_column]
+                        * sqrt_qec[matrix_row * 4 + matrix_column];
+                }
+            }
+            auxiliary_t[environment_row * 2 + environment_column] = partial_trace;
+        }
+    }
+    let mut auxiliary_t_hermiticity_residual: f64 = 0.0;
+    for row in 0..2 {
+        for column in 0..2 {
+            auxiliary_t_hermiticity_residual = auxiliary_t_hermiticity_residual
+                .max((auxiliary_t[row * 2 + column]
+                    - auxiliary_t[column * 2 + row].conj())
+                    .norm());
+        }
+    }
+
+    let mut gamma_tensor_t = [Complex64::new(0.0, 0.0); 16];
+    for logical_row in 0..2 {
+        for environment_row in 0..2 {
+            for logical_column in 0..2 {
+                for environment_column in 0..2 {
+                    gamma_tensor_t[(logical_row * 2 + environment_row) * 4
+                        + logical_column * 2
+                        + environment_column] = gamma[logical_row * 2 + logical_column]
+                        * auxiliary_t[environment_row * 2 + environment_column];
+                }
+            }
+        }
+    }
+    let b_matrix = complex_matrix4_multiply(&sqrt_qec, &gamma_tensor_t);
+    let mut b_hermiticity_residual: f64 = 0.0;
+    let mut b_hermitian_part = [Complex64::new(0.0, 0.0); 16];
+    for row in 0..4 {
+        for column in 0..4 {
+            let value = b_matrix[row * 4 + column];
+            let adjoint = b_matrix[column * 4 + row].conj();
+            b_hermiticity_residual = b_hermiticity_residual.max((value - adjoint).norm());
+            b_hermitian_part[row * 4 + column] = (value + adjoint) * 0.5;
+        }
+    }
+    let b_density = DensityMatrix::from_entries(4, b_hermitian_part.to_vec())?;
+    let b_eigenvalues = hermitian_eigenvalues(&b_density, tolerance.max(1e-14))?;
+    let b_minimum_hermitian_part_eigenvalue =
+        b_eigenvalues.iter().copied().fold(f64::INFINITY, f64::min);
+    let b_scale = b_eigenvalues
+        .iter()
+        .fold(1.0_f64, |scale, value| scale.max(value.abs()));
+    let b_positive_semidefinite_violation =
+        (-b_minimum_hermitian_part_eigenvalue).max(0.0);
+    let threshold = tolerance * 100.0 * b_scale;
+    let petz_is_entanglement_fidelity_optimal =
+        b_hermiticity_residual <= threshold
+            && b_minimum_hermitian_part_eigenvalue >= -threshold;
+    let mut commutator_squared = 0.0;
+    let rho_sigma = complex_matrix2_multiply(&rho, &sigma);
+    let sigma_rho = complex_matrix2_multiply(&sigma, &rho);
+    for index in 0..4 {
+        commutator_squared += (rho_sigma[index] - sigma_rho[index]).norm_sqr();
+    }
+    Ok(HaydenPreskillPetzGeneralOptimalitySample {
+        seed,
+        rho_sigma_commutator_frobenius: commutator_squared.sqrt(),
+        qec_matrix_trace_residual: qec_trace_residual,
+        qec_matrix_hermiticity_residual: qec_hermiticity_residual,
+        qec_matrix_square_root_residual,
+        qec_matrix_numerical_support_rank,
+        auxiliary_t_hermiticity_residual,
+        b_hermiticity_residual,
+        b_minimum_hermitian_part_eigenvalue,
+        b_positive_semidefinite_violation,
+        petz_is_entanglement_fidelity_optimal,
+    })
+}
+
+type ComplexMatrix2 = [Complex64; 4];
+
+fn flatten_complex_matrix2(matrix: [[Complex64; 2]; 2]) -> ComplexMatrix2 {
+    [
+        matrix[0][0],
+        matrix[0][1],
+        matrix[1][0],
+        matrix[1][1],
+    ]
+}
+
+fn complex_matrix2_multiply(left: &ComplexMatrix2, right: &ComplexMatrix2) -> ComplexMatrix2 {
+    let mut product = [Complex64::new(0.0, 0.0); 4];
+    for row in 0..2 {
+        for column in 0..2 {
+            for inner in 0..2 {
+                product[row * 2 + column] += left[row * 2 + inner] * right[inner * 2 + column];
+            }
+        }
+    }
+    product
+}
+
+fn complex_matrix2_dagger(matrix: &ComplexMatrix2) -> ComplexMatrix2 {
+    [
+        matrix[0].conj(),
+        matrix[2].conj(),
+        matrix[1].conj(),
+        matrix[3].conj(),
+    ]
+}
+
+/// Analytic 2x2 Hermitian square root and inverse square root.
+/// The inverse requires strictly positive sigma; no eigenvalue flooring occurs.
+fn complex_hermitian_sqrt_and_inverse_sqrt_2(
+    matrix: ComplexMatrix2,
+    tolerance: f64,
+) -> Result<(ComplexMatrix2, ComplexMatrix2, f64), QuantumInformationError> {
+    let hermiticity_residual = (matrix[0] - matrix[0].conj())
+        .norm()
+        .max((matrix[3] - matrix[3].conj()).norm())
+        .max((matrix[1] - matrix[2].conj()).norm())
+        .max((matrix[2] - matrix[1].conj()).norm());
+    if hermiticity_residual > tolerance * 10.0 {
+        return Err(QuantumInformationError::NonHermitian {
+            residual: hermiticity_residual,
+            tolerance: tolerance * 10.0,
+        });
+    }
+    let trace = matrix[0].re + matrix[3].re;
+    let determinant = matrix[0].re * matrix[3].re - matrix[1].norm_sqr();
+    if !trace.is_finite() || !determinant.is_finite() || determinant <= 0.0 {
+        return Err(QuantumInformationError::NonPositive {
+            minimum_eigenvalue: determinant,
+            tolerance,
+        });
+    }
+    let discriminant = ((matrix[0].re - matrix[3].re).powi(2)
+        + 4.0 * matrix[1].norm_sqr())
+    .sqrt();
+    let maximum_eigenvalue = 0.5 * (trace + discriminant);
+    let minimum_eigenvalue = determinant / maximum_eigenvalue;
+    if !minimum_eigenvalue.is_finite() || minimum_eigenvalue <= tolerance {
+        return Err(QuantumInformationError::NonPositive {
+            minimum_eigenvalue,
+            tolerance,
+        });
+    }
+    let root_determinant = determinant.sqrt();
+    let denominator = (trace + 2.0 * root_determinant).sqrt();
+    if !denominator.is_finite() || denominator <= 0.0 {
+        return Err(QuantumInformationError::NonPositive {
+            minimum_eigenvalue,
+            tolerance,
+        });
+    }
+    let root = [
+        (matrix[0] + Complex64::new(root_determinant, 0.0)) / denominator,
+        matrix[1] / denominator,
+        matrix[2] / denominator,
+        (matrix[3] + Complex64::new(root_determinant, 0.0)) / denominator,
+    ];
+    // det(sqrt(matrix)) = sqrt(det(matrix)).
+    let inverse_sqrt = [
+        root[3] / root_determinant,
+        -root[1] / root_determinant,
+        -root[2] / root_determinant,
+        root[0] / root_determinant,
+    ];
+    let reconstructed = complex_matrix2_multiply(&root, &root);
+    let inverse_product = complex_matrix2_multiply(&inverse_sqrt, &root);
+    let mut residual: f64 = 0.0;
+    for index in 0..4 {
+        residual = residual.max((reconstructed[index] - matrix[index]).norm());
+        let expected = if index == 0 || index == 3 {
+            Complex64::new(1.0, 0.0)
+        } else {
+            Complex64::new(0.0, 0.0)
+        };
+        residual = residual.max((inverse_product[index] - expected).norm());
+    }
+    if !residual.is_finite() || residual > tolerance * 100.0 {
+        return Err(QuantumInformationError::EigensolverNonconvergence {
+            sweeps: 2,
+            residual,
+        });
+    }
+    Ok((root, inverse_sqrt, residual))
+}
+
+fn validate_qubit_density_matrix(
+    matrix: ComplexMatrix2,
+    tolerance: f64,
+) -> Result<(f64, f64, f64), QuantumInformationError> {
+    let hermiticity_residual = (matrix[0] - matrix[0].conj())
+        .norm()
+        .max((matrix[3] - matrix[3].conj()).norm())
+        .max((matrix[1] - matrix[2].conj()).norm());
+    let trace = matrix[0] + matrix[3];
+    let trace_residual = (trace - Complex64::new(1.0, 0.0)).norm();
+    if hermiticity_residual > tolerance * 10.0 || trace_residual > tolerance * 10.0 {
+        return Ok((f64::NEG_INFINITY, trace_residual, hermiticity_residual));
+    }
+    let a = matrix[0].re;
+    let d = matrix[3].re;
+    let determinant = a * d - matrix[1].norm_sqr();
+    let maximum = 0.5 * (trace.re + ((a - d).powi(2) + 4.0 * matrix[1].norm_sqr()).sqrt());
+    let minimum = if maximum > 0.0 {
+        determinant / maximum
+    } else {
+        f64::NEG_INFINITY
+    };
+    Ok((minimum, trace_residual, hermiticity_residual))
+}
+
 /// Seeded ensemble statistics for the exact Petz-optimality commutator test.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HaydenPreskillPetzOptimalitySummary {
@@ -5124,6 +5509,73 @@ mod hayden_preskill_petz_recovery_tests {
         assert!(matches!(
             sample_small_hayden_preskill_petz_ensemble(1, 0x4A11, TOLERANCE,),
             Err(QuantumInformationError::InvalidEnsembleSampleCount(1))
+        ));
+    }
+}
+
+#[cfg(test)]
+mod petz_general_noncommuting_optimality_tests {
+    use super::*;
+
+    const TOLERANCE: f64 = 1e-10;
+
+    #[test]
+    fn general_theorem_certifies_identity_channel_for_noncommuting_rho_sigma() {
+        let rho = [
+            [Complex64::new(0.7, 0.0), Complex64::new(0.05, 0.12)],
+            [Complex64::new(0.05, -0.12), Complex64::new(0.3, 0.0)],
+        ];
+        let sigma = [
+            [Complex64::new(0.55, 0.0), Complex64::new(0.15, 0.08)],
+            [Complex64::new(0.15, -0.08), Complex64::new(0.45, 0.0)],
+        ];
+        let mut identity = [[Complex64::new(0.0, 0.0); 4]; 4];
+        for (index, row) in identity.iter_mut().enumerate() {
+            row[index] = Complex64::new(1.0, 0.0);
+        }
+        let sample = diagnose_hayden_preskill_petz_general_optimality(
+            &identity,
+            0x1D3A,
+            flatten_complex_matrix2(rho),
+            flatten_complex_matrix2(sigma),
+            TOLERANCE,
+        )
+        .unwrap();
+        assert!(sample.rho_sigma_commutator_frobenius > 1e-3);
+        assert!(sample.qec_matrix_trace_residual < TOLERANCE);
+        assert!(sample.qec_matrix_hermiticity_residual < TOLERANCE);
+        assert!(sample.qec_matrix_square_root_residual < TOLERANCE);
+        assert_eq!(sample.qec_matrix_numerical_support_rank, 4);
+        assert!(sample.auxiliary_t_hermiticity_residual < TOLERANCE);
+        assert!(sample.b_hermiticity_residual < TOLERANCE * 100.0);
+        assert!(sample.b_minimum_hermitian_part_eigenvalue > 0.1);
+        assert!(sample.b_positive_semidefinite_violation.abs() < TOLERANCE);
+        assert!(sample.petz_is_entanglement_fidelity_optimal);
+    }
+
+    #[test]
+    fn general_theorem_rejects_singular_reference_without_pseudoinverse_support() {
+        let rho = [
+            [Complex64::new(0.5, 0.0), Complex64::new(0.0, 0.0)],
+            [Complex64::new(0.0, 0.0), Complex64::new(0.5, 0.0)],
+        ];
+        let singular_sigma = [
+            [Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+            [Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0)],
+        ];
+        let mut identity = [[Complex64::new(0.0, 0.0); 4]; 4];
+        for (index, row) in identity.iter_mut().enumerate() {
+            row[index] = Complex64::new(1.0, 0.0);
+        }
+        assert!(matches!(
+            diagnose_hayden_preskill_petz_general_optimality(
+                &identity,
+                1,
+                flatten_complex_matrix2(rho),
+                flatten_complex_matrix2(singular_sigma),
+                TOLERANCE,
+            ),
+            Err(QuantumInformationError::NonPositive { .. })
         ));
     }
 }
