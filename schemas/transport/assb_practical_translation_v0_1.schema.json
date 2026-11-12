@@ -27,7 +27,8 @@
           "evidence_class",
           "admission",
           "claim_scope",
-          "metrology_ref"
+          "metrology_ref",
+          "rights_ref"
         ],
         "properties": {
           "evidence_id": {
@@ -65,6 +66,10 @@
               "string",
               "null"
             ]
+          },
+          "rights_ref": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
@@ -77,6 +82,10 @@
         "additionalProperties": false,
         "required": [
           "observation_id",
+          "process_revision",
+          "manufacturing_line",
+          "batch_id",
+          "cell_id",
           "design",
           "pressure",
           "mass_inventory",
@@ -175,6 +184,22 @@
             "minimum": 0
           },
           "evidence_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "cell_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "batch_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "manufacturing_line": {
+            "type": "string",
+            "minLength": 1
+          },
+          "process_revision": {
             "type": "string",
             "minLength": 1
           }
@@ -335,6 +360,8 @@
       "additionalProperties": false,
       "required": [
         "cathode_active_mg",
+        "anode_inactive_mg",
+        "cathode_inactive_mg",
         "anode_active_mg",
         "electrolyte_mg",
         "separator_or_support_mg",
@@ -342,7 +369,9 @@
         "casing_and_seals_mg",
         "declared_full_cell_mass_mg",
         "closure_tolerance_mg",
-        "boundary_digest"
+        "boundary_digest",
+        "declared_full_cell_volume_cm3",
+        "volume_boundary_digest"
       ],
       "properties": {
         "cathode_active_mg": {
@@ -378,6 +407,22 @@
           "minimum": 0
         },
         "boundary_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "cathode_inactive_mg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "anode_inactive_mg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "declared_full_cell_volume_cm3": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "volume_boundary_digest": {
           "type": "string",
           "pattern": "^[0-9a-f]{64}$"
         }
