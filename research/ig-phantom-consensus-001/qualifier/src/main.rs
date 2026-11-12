@@ -252,8 +252,7 @@ fn validate_fixture(f: &Value, arms: &BTreeSet<String>) -> (Vec<String>, usize, 
             }
         }
         "anonymous_tally" => {
-            if transparency["disclosed_private_ledger"].is_null()
-                || !transparency["disclosed_private_ledger"].as_array().is_some_and(|v| v.is_empty()) {
+            if !transparency["disclosed_private_ledger"].is_null() {
                 add(&mut errors, "anonymous tally disclosure must not expose the peer-level ledger");
             }
             if !tally_matches(&transparency["disclosed_tally"], &base_tally, &opts) {
