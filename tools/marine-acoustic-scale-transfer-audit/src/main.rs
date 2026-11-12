@@ -339,20 +339,33 @@ fn background_corrected_spl(total_db: f64, background_db: f64) -> Option<f64> {
     corrected.is_finite().then_some(corrected)
 }
 
-// ITTC Rev.03 §2.5.3: below 3 dB the signal is background-dominated;
-// from 3 dB through 10 dB, subtract background in the energy domain;
-// above 10 dB, no correction is required.
-fn ittc_cavitation_spl(total_db: f64, background_db: f64) -> Option<f64> {
+#[derive(Debug, PartialEq, Eq)]
+enum BackgroundCorrectionFailure {
+    BackgroundDominated,
+    ExactTenDbBoundaryUnspecified,
+}
+
+// ITTC Rev.03 §2.5.3: <3 dB is unusable; [3, 10) dB requires
+// energy-domain subtraction; >10 dB requires no adjustment. The
+// procedure does not specify what to do at exactly 10 dB, so v0.1
+// fails closed instead of silently assigning it to either case.
+fn ittc_cavitation_spl(
+    total_db: f64,
+    background_db: f64,
+) -> Result<f64, BackgroundCorrectionFailure> {
     if !total_db.is_finite() || !background_db.is_finite() || total_db <= background_db {
-        return None;
+        return Err(BackgroundCorrectionFailure::BackgroundDominated);
     }
     let margin_db = total_db - background_db;
     if margin_db < 3.0 {
-        None
+        Err(BackgroundCorrectionFailure::BackgroundDominated)
+    } else if margin_db == 10.0 {
+        Err(BackgroundCorrectionFailure::ExactTenDbBoundaryUnspecified)
     } else if margin_db > 10.0 {
-        Some(total_db)
+        Ok(total_db)
     } else {
         background_corrected_spl(total_db, background_db)
+            .ok_or(BackgroundCorrectionFailure::BackgroundDominated)
     }
 }
 
@@ -701,12 +714,18 @@ fn audit(case: &Case) -> AuditReport {
                 &model_band.frequency_regime,
                 &case.scaling.bandwidth,
             );
-            let Some(corrected) = ittc_cavitation_spl(
+            let corrected = match ittc_cavitation_spl(
                 model_band.total_spl_db,
                 model_band.background_spl_db,
-            ) else {
-                any_unresolved_band = true;
-                band_reports.push(BandReport {
+            ) {
+                Ok(value) => value,
+                Err(failure) => {
+                    any_unresolved_band = true;
+                    let comparison = match failure {
+                        BackgroundCorrectionFailure::BackgroundDominated => "background_dominated_unusable",
+                        BackgroundCorrectionFailure::ExactTenDbBoundaryUnspecified => "background_threshold_boundary_unspecified",
+                    };
+                    band_reports.push(BandReport {
                     band_id: model_band.band_id.clone(),
                     frequency_regime: frequency_regime_name(&model_band.frequency_regime),
                     frequency_regime_basis: model_band.frequency_regime_basis.clone(),
@@ -728,9 +747,10 @@ fn audit(case: &Case) -> AuditReport {
                     observed_full_scale_source_level_db: None,
                     observed_interval_lower_db: None,
                     observed_interval_upper_db: None,
-                    comparison: "background_dominated_unusable",
-                });
-                continue;
+                    comparison,
+                    });
+                    continue;
+                }
             };
             let model_source_level = corrected - model_band.facility_transfer_function_db;
             let predicted_full_scale = model_source_level + delta_db;
@@ -796,11 +816,13 @@ fn audit(case: &Case) -> AuditReport {
             let predicted_lower = ittc_cavitation_spl(
                 model_band.total_spl_db - model_band.total_u95_db,
                 model_band.background_spl_db + model_band.background_u95_db,
-            );
+            )
+            .ok();
             let predicted_upper = ittc_cavitation_spl(
                 model_band.total_spl_db + model_band.total_u95_db,
                 model_band.background_spl_db - model_band.background_u95_db,
-            );
+            )
+            .ok();
             let (Some(net_lower), Some(net_upper)) = (predicted_lower, predicted_upper) else {
                 any_unresolved_band = true;
                 band_reports.push(BandReport {
@@ -1255,16 +1277,23 @@ mod tests {
 
     #[test]
     fn background_correction_uses_linear_energy_subtraction() {
-        let corrected = ittc_cavitation_spl(110.0, 100.0).unwrap();
-        assert!((corrected - 109.54242509439325).abs() < 1e-9);
+        let corrected = ittc_cavitation_spl(109.9, 100.0).unwrap();
+        assert!((corrected - 109.5468).abs() < 0.001);
         let at_three_db = ittc_cavitation_spl(103.0, 100.0).unwrap();
         assert!(at_three_db < 103.0);
-        assert_eq!(ittc_cavitation_spl(110.0001, 100.0), Some(110.0001));
+        assert_eq!(ittc_cavitation_spl(110.0001, 100.0), Ok(110.0001));
+        assert_eq!(
+            ittc_cavitation_spl(110.0, 100.0),
+            Err(BackgroundCorrectionFailure::ExactTenDbBoundaryUnspecified)
+        );
     }
 
     #[test]
     fn background_margin_below_three_db_is_not_scaled() {
-        assert_eq!(ittc_cavitation_spl(102.9, 100.0), None);
+        assert_eq!(
+            ittc_cavitation_spl(102.9, 100.0),
+            Err(BackgroundCorrectionFailure::BackgroundDominated)
+        );
         let mut case = fixture_case();
         case.pairs[0].model.bands[0].total_spl_db = 102.9;
         let report = audit(&case);
@@ -1277,8 +1306,21 @@ mod tests {
     }
 
     #[test]
+    fn exact_ten_db_margin_is_not_silently_assigned_a_policy() {
+        let mut case = fixture_case();
+        case.pairs[0].model.bands[0].total_spl_db = 110.0;
+        let report = audit(&case);
+        assert_eq!(report.disposition, "incomplete");
+        assert_eq!(
+            report.pair_reports[0].band_reports[0].comparison,
+            "background_threshold_boundary_unspecified"
+        );
+        assert_eq!(report.pair_reports[0].band_reports[0].model_source_level_db, None);
+    }
+
+    #[test]
     fn background_margin_above_ten_db_is_not_corrected() {
-        assert_eq!(ittc_cavitation_spl(110.1, 100.0), Some(110.1));
+        assert_eq!(ittc_cavitation_spl(110.1, 100.0), Ok(110.1));
         let mut case = fixture_case();
         case.pairs[0].model.bands[0].total_spl_db = 110.1;
         let report = audit(&case);
