@@ -139,7 +139,7 @@
         "single_sample_is_not_ensemble_claim": true,
         "seeds": "frozen before evaluation"
       },
-      "implementation_status": "page_reference_formula_authored_not_executed; Haar sampler and ensemble benchmark not implemented"
+      "implementation_status": "Page reference formula and seeded ChaCha20 Haar-state ensemble sampler authored with Welford uncertainty; not executed in Rust"
     },
     {
       "id": "QI-3",
@@ -365,12 +365,9 @@
     "code_execution": "not_run",
     "rust_tests": "authored_not_run",
     "ci": {
-      "status": "all_skipped",
-      "exact_head_sha": "66023bcb9ce7fd7c744f36c901eb4419712f64e5",
-      "reported_check_runs": 42,
-      "skipped_check_runs": 42,
+      "status": "not_verified_after_latest_source_changes",
       "passed_check_runs": 0,
-      "failed_check_runs": 0
+      "failure_claimed": false
     },
     "results_claimed": false,
     "independent_algorithm_cross_check": {
@@ -385,7 +382,21 @@
         64
       ],
       "maximum_observed_absolute_eigenvalue_difference": "<7e-16",
-      "rust_source_executed": false
+      "rust_source_executed": false,
+      "statistical_cross_check": {
+        "status": "independent_numpy_replication_only",
+        "bipartition_dimensions": [
+          2,
+          8
+        ],
+        "sample_count": 4096,
+        "sample_mean_entropy_nats": 0.5994341731689636,
+        "page_theorem_mean_nats": 0.6003718503718503,
+        "sample_variance_nats_squared": 0.004913813626482819,
+        "standard_error_nats": 0.001095290614359053,
+        "normalized_mean_deviation": -0.8560990029439228,
+        "rust_sampler_executed": false
+      }
     }
   },
   "implementation_progress": {
@@ -399,10 +410,11 @@
       "QI-0_von_neumann_entropy": "authored_not_executed",
       "QI-0_renyi_2_and_3": "authored_not_executed",
       "QI-1_complementary_subsystem_identity_controls": "authored_not_executed",
-      "QI-2_page_haar_average_reference_formula": "authored_not_executed"
+      "QI-2_page_haar_average_reference_formula": "authored_not_executed",
+      "QI-2_seeded_haar_random_state_sampler_and_ensemble_statistics": "authored_not_executed"
     },
     "not_implemented_or_not_qualified": {
-      "haar_state_sampler": "not_implemented",
+      "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
       "finite_depth_random_circuit_ensembles": "not_implemented",
       "sequential_unitary_evaporation_model": "not_implemented",
       "hayden_preskill_recovery_decoders": "not_implemented",
