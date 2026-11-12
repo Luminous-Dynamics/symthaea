@@ -656,6 +656,53 @@
       },
       "expected_disposition": "PASS",
       "energy_boundary_contract_id": "WALL-PLUG-HEATER-ONLY-V1"
+    },
+    {
+      "scenario_id": "NC-ZERO-USEFUL-HEAT",
+      "technology": "RESISTANCE_JOULE_HEATER_ZERO_OUTPUT_CONTROL",
+      "evidence_class": "SYNTHETIC_ACCOUNTING_FIXTURE",
+      "energy_unit": "J",
+      "service": {
+        "service_contract_id": "INDUSTRIAL-HEAT-500C-1H",
+        "service_type": "process_heat",
+        "outlet_temperature_mK": 773150,
+        "outlet_pressure_pa": null,
+        "mass_flow_mg_s": null,
+        "delivery_duration_s": 3600,
+        "delivery_trace_digest": "synthetic-trace:heat-demand-500c-001"
+      },
+      "metering_mode": "NON_OVERLAPPING_BRANCH_METERS",
+      "wall_plug_inputs": [
+        {
+          "input_id": "heater-input",
+          "meter_boundary_id": "meter:heater-terminal",
+          "role": "PRIMARY_PROCESS",
+          "energy_j": 3600000000
+        },
+        {
+          "input_id": "aux-input",
+          "meter_boundary_id": "meter:auxiliary-bus",
+          "role": "AUXILIARY",
+          "energy_j": 180000000
+        }
+      ],
+      "charge": {
+        "stored_energy_increase_j": 3240000000,
+        "charge_conversion_loss_j": 360000000,
+        "auxiliary_dissipation_j": 180000000
+      },
+      "hold": {
+        "stored_energy_after_hold_j": 3078000000,
+        "storage_hold_loss_j": 162000000,
+        "hold_duration_s": 86400
+      },
+      "discharge": {
+        "stored_energy_withdrawn_j": 3078000000,
+        "useful_heat_delivered_j": 0,
+        "discharge_loss_j": 3078000000
+      },
+      "expected_disposition": "REJECTED",
+      "energy_boundary_contract_id": "WALL-PLUG-COMPLETE-THERMAL-STORE-V1"
     }
   ],
   "comparisons": [
