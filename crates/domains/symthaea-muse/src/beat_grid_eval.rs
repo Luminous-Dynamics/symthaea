@@ -17,7 +17,7 @@ use sha2::{Digest, Sha256};
 
 pub const BEAT_GRID_EVALUATION_SCHEMA_V1: &str = "muse-beat-grid-evaluation-v1";
 pub const BEAT_GRID_EVALUATION_ALGORITHM_V1: &str =
-    "sorted-one-to-one-event-match-cemgil-metric-level-v1";
+    "sorted-one-to-one-event-match-cemgil-continuity-goto-p-score-information-gain-v1";
 pub const BEAT_GRID_DEFAULT_TOLERANCE_MS_V1: u32 = 70;
 pub const BEAT_GRID_DEFAULT_DOWNBEAT_TOLERANCE_MS_V1: u32 = 70;
 pub const BEAT_GRID_DEFAULT_CEMGIL_SIGMA_MS_V1: u32 = 40;
@@ -25,6 +25,11 @@ pub const BEAT_GRID_MAX_REFERENCES_V1: usize = 64;
 pub const BEAT_GRID_MAX_EVENTS_PER_SEQUENCE_V1: usize = 2_000_000;
 pub const BEAT_GRID_MAX_TOTAL_EVENTS_V1: usize = 8_000_000;
 pub const BEAT_GRID_MAX_DURATION_SECONDS_V1: f64 = 30_000.0;
+pub const BEAT_GRID_DEFAULT_GOTO_THRESHOLD_BPS_V1: u16 = 3_500;
+pub const BEAT_GRID_DEFAULT_GOTO_MU_BPS_V1: u16 = 2_000;
+pub const BEAT_GRID_DEFAULT_GOTO_SIGMA_BPS_V1: u16 = 2_000;
+pub const BEAT_GRID_DEFAULT_P_SCORE_THRESHOLD_BPS_V1: u16 = 2_000;
+pub const BEAT_GRID_DEFAULT_INFORMATION_GAIN_BINS_V1: u16 = 41;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BeatGridReferenceV1 {
@@ -56,6 +61,11 @@ pub struct BeatGridEvaluationConfigV1 {
     pub metric_level_variants_enabled: bool,
     pub continuity_phase_threshold_basis_points: u16,
     pub continuity_period_threshold_basis_points: u16,
+    pub goto_threshold_basis_points: u16,
+    pub goto_mu_basis_points: u16,
+    pub goto_sigma_basis_points: u16,
+    pub p_score_threshold_basis_points: u16,
+    pub information_gain_bins: u16,
 }
 
 impl Default for BeatGridEvaluationConfigV1 {
@@ -68,6 +78,11 @@ impl Default for BeatGridEvaluationConfigV1 {
             metric_level_variants_enabled: true,
             continuity_phase_threshold_basis_points: 1_750,
             continuity_period_threshold_basis_points: 1_750,
+            goto_threshold_basis_points: BEAT_GRID_DEFAULT_GOTO_THRESHOLD_BPS_V1,
+            goto_mu_basis_points: BEAT_GRID_DEFAULT_GOTO_MU_BPS_V1,
+            goto_sigma_basis_points: BEAT_GRID_DEFAULT_GOTO_SIGMA_BPS_V1,
+            p_score_threshold_basis_points: BEAT_GRID_DEFAULT_P_SCORE_THRESHOLD_BPS_V1,
+            information_gain_bins: BEAT_GRID_DEFAULT_INFORMATION_GAIN_BINS_V1,
         }
     }
 }
@@ -125,6 +140,13 @@ pub struct BeatGridReferenceScoreV1 {
     /// Maximum Cemgil score over reference, offbeat, double, and half-time variants.
     /// This is a diagnostic for metrical-level ambiguity, not strict beat accuracy.
     pub cemgil_best_metric_level: Option<f64>,
+    /// Goto's binary long-continuous-track correctness measure (0 or 1).
+    pub goto_score: f64,
+    /// McKinney P-score; absent only if 10 ms quantization collapses all
+    /// reference intervals and the documented median period is undefined.
+    pub p_score: Option<f64>,
+    /// mir_eval beat-error information gain, normalized to [0, 1].
+    pub information_gain: f64,
     /// mir_eval continuity: correct metric level continuous / total, and any
     /// metrical level continuous / total. These remain separate from strict F1.
     pub continuity_metrics: Option<BeatGridContinuityMetricsV1>,
@@ -231,6 +253,28 @@ fn validate_config(
     if !(1..=5_000).contains(&config.continuity_period_threshold_basis_points) {
         return Err(BeatGridEvaluationIssueV1::InvalidConfig {
             field: "continuity_period_threshold_basis_points".into(),
+        });
+    }
+    if config.goto_threshold_basis_points >= 10_000
+        || config.goto_mu_basis_points == 0
+        || config.goto_mu_basis_points > 5_000
+        || config.goto_sigma_basis_points == 0
+        || config.goto_sigma_basis_points > 5_000
+    {
+        return Err(BeatGridEvaluationIssueV1::InvalidConfig {
+            field: "goto_parameters".into(),
+        });
+    }
+    if config.p_score_threshold_basis_points == 0
+        || config.p_score_threshold_basis_points > 5_000
+    {
+        return Err(BeatGridEvaluationIssueV1::InvalidConfig {
+            field: "p_score_threshold_basis_points".into(),
+        });
+    }
+    if !(2..=257).contains(&config.information_gain_bins) {
+        return Err(BeatGridEvaluationIssueV1::InvalidConfig {
+            field: "information_gain_bins".into(),
         });
     }
     if config.minimum_evaluation_time_ms.is_some_and(|value| value > 30_000_000) {
@@ -697,6 +741,274 @@ fn continuity_metrics(
     }
 }
 
+fn goto_score(
+    reference: &[f64],
+    estimated: &[f64],
+    config: &BeatGridEvaluationConfigV1,
+) -> f64 {
+    if reference.is_empty() || estimated.is_empty() {
+        return 0.0;
+    }
+
+    let threshold = f64::from(config.goto_threshold_basis_points) / 10_000.0;
+    let mean_limit = f64::from(config.goto_mu_basis_points) / 10_000.0;
+    let std_limit = f64::from(config.goto_sigma_basis_points) / 10_000.0;
+    let mut beat_error = vec![1.0f64; reference.len()];
+
+    let mut estimated_start = 0usize;
+    let mut estimated_end = 0usize;
+    for index in 1..reference.len().saturating_sub(1) {
+        let previous_interval = 0.5 * (reference[index] - reference[index - 1]);
+        let next_interval = 0.5 * (reference[index + 1] - reference[index]);
+        let window_min = reference[index] - previous_interval;
+        let window_max = reference[index] + next_interval;
+        while estimated_start < estimated.len() && estimated[estimated_start] < window_min {
+            estimated_start += 1;
+        }
+        if estimated_end < estimated_start {
+            estimated_end = estimated_start;
+        }
+        while estimated_end < estimated.len() && estimated[estimated_end] < window_max {
+            estimated_end += 1;
+        }
+        let count = estimated_end - estimated_start;
+        if count == 1 {
+            let offset = estimated[estimated_start] - reference[index];
+            beat_error[index] = if offset < 0.0 {
+                offset / previous_interval
+            } else {
+                offset / next_interval
+            };
+        }
+    }
+
+    let incorrect: Vec<usize> = beat_error
+        .iter()
+        .enumerate()
+        .filter_map(|(index, error)| (error.abs() > threshold).then_some(index))
+        .collect();
+
+    let mut track: Vec<f64> = Vec::new();
+    if incorrect.len() < 3 {
+        if let (Some(first), Some(last)) = (incorrect.first(), incorrect.last()) {
+            let start = first.saturating_add(1);
+            let end = last.saturating_sub(1);
+            if start < end {
+                track.extend_from_slice(&beat_error[start..end]);
+            }
+        }
+    } else {
+        let mut best_gap = 0usize;
+        let mut best_pair = None;
+        for pair in incorrect.windows(2) {
+            let gap = pair[1] - pair[0];
+            if gap > best_gap {
+                best_gap = gap;
+                best_pair = Some((pair[0], pair[1]));
+            }
+        }
+        if let Some((start, end)) = best_pair {
+            let inner_count = reference.len().saturating_sub(2);
+            if best_gap.saturating_sub(1) as f64 > 0.25 * inner_count as f64 {
+                track.extend_from_slice(&beat_error[start..=end]);
+            }
+        }
+    }
+
+    if track.len() < 2 {
+        return 0.0;
+    }
+    let mean_absolute = track.iter().map(|value| value.abs()).sum::<f64>()
+        / track.len() as f64;
+    let mean = track.iter().sum::<f64>() / track.len() as f64;
+    let sample_variance = track
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>()
+        / (track.len() - 1) as f64;
+    let sample_std = sample_variance.sqrt();
+
+    if mean_absolute < mean_limit && sample_std < std_limit {
+        1.0
+    } else {
+        0.0
+    }
+}
+
+fn round_ties_even(value: f64) -> Option<i64> {
+    if !value.is_finite() || value < i64::MIN as f64 || value > i64::MAX as f64 {
+        return None;
+    }
+    let floor = value.floor();
+    let fraction = value - floor;
+    let rounded = if fraction < 0.5 {
+        floor
+    } else if fraction > 0.5 {
+        floor + 1.0
+    } else if (floor as i64).rem_euclid(2) == 0 {
+        floor
+    } else {
+        floor + 1.0
+    };
+    Some(rounded as i64)
+}
+
+fn p_score(
+    reference: &[f64],
+    estimated: &[f64],
+    config: &BeatGridEvaluationConfigV1,
+) -> Option<f64> {
+    if reference.len() <= 1 || estimated.len() <= 1 {
+        return Some(0.0);
+    }
+    let offset = reference[0].min(estimated[0]);
+    let quantize = |sequence: &[f64]| -> Option<Vec<i64>> {
+        let mut output: Vec<i64> = sequence
+            .iter()
+            .map(|time| ((*time - offset) * 100.0).ceil() as i64)
+            .collect();
+        output.sort_unstable();
+        output.dedup();
+        Some(output)
+    };
+    let reference_bins = quantize(reference)?;
+    let estimated_bins = quantize(estimated)?;
+    if reference_bins.len() < 2 {
+        // mir_eval's median inter-annotation period is undefined after
+        // 10 ms impulse-train quantization collapses the reference to one cell.
+        return None;
+    }
+
+    let intervals: Vec<i64> = reference_bins
+        .windows(2)
+        .map(|pair| pair[1] - pair[0])
+        .collect();
+    let mut sorted_intervals = intervals;
+    sorted_intervals.sort_unstable();
+    let middle = sorted_intervals.len() / 2;
+    let median_interval = if sorted_intervals.len() % 2 == 0 {
+        (sorted_intervals[middle - 1] as f64 + sorted_intervals[middle] as f64) * 0.5
+    } else {
+        sorted_intervals[middle] as f64
+    };
+    let threshold = f64::from(config.p_score_threshold_basis_points) / 10_000.0;
+    let Some(window_size) = round_ties_even(threshold * median_interval) else {
+        return None;
+    };
+    let window_size = window_size.max(0);
+
+    // Summing the valid-lag portion of the full impulse-train correlation is
+    // exactly the count of reference/prediction impulse pairs whose quantized
+    // separation lies inside the symmetric P-score window.
+    let mut low = 0usize;
+    let mut high = 0usize;
+    let mut pair_count = 0u64;
+    for &reference_bin in &reference_bins {
+        let minimum = reference_bin.saturating_sub(window_size);
+        let maximum = reference_bin.saturating_add(window_size);
+        while low < estimated_bins.len() && estimated_bins[low] < minimum {
+            low += 1;
+        }
+        if high < low {
+            high = low;
+        }
+        while high < estimated_bins.len() && estimated_bins[high] <= maximum {
+            high += 1;
+        }
+        pair_count = pair_count.saturating_add((high - low) as u64);
+    }
+
+    let denominator = reference.len().max(estimated.len());
+    Some(pair_count as f64 / denominator as f64)
+}
+
+fn information_gain_entropy(
+    reference: &[f64],
+    estimated: &[f64],
+    bins: usize,
+) -> Option<f64> {
+    if reference.len() <= 1 || estimated.is_empty() {
+        return Some(0.0);
+    }
+    let mut histogram = vec![0usize; bins];
+    for &estimated_time in estimated {
+        let insertion = reference.partition_point(|time| *time < estimated_time);
+        let nearest = if insertion == 0 {
+            0
+        } else if insertion >= reference.len() {
+            reference.len() - 1
+        } else {
+            let left = insertion - 1;
+            let left_error = (estimated_time - reference[left]).abs();
+            let right_error = (reference[insertion] - estimated_time).abs();
+            // Equality chooses the lower/earlier index, matching numpy.argmin.
+            if left_error <= right_error { left } else { insertion }
+        };
+        let absolute_error = estimated_time - reference[nearest];
+
+        // Mirror mir_eval 0.8.2's boundary handling, including its historical
+        // nearest-first-beat / negative-error branch, for fixture parity.
+        let interval = if nearest == reference.len() - 1 {
+            0.5 * (reference[nearest] - reference[nearest - 1])
+        } else if absolute_error < 0.0 {
+            let previous_index = if nearest == 0 {
+                reference.len() - 1
+            } else {
+                nearest - 1
+            };
+            0.5 * (reference[nearest] - reference[previous_index])
+        } else {
+            0.5 * (reference[nearest + 1] - reference[nearest])
+        };
+        if interval == 0.0 || !interval.is_finite() {
+            return None;
+        }
+
+        let scaled_error = 0.5 * absolute_error / interval;
+        // Equivalent to numpy.mod(error + 0.5, -1) + 0.5, yielding
+        // the wrapped interval (-0.5, 0.5].
+        let wrapped_error = scaled_error - (scaled_error - 0.5).ceil();
+        let raw_bin = ((wrapped_error + 0.5) * bins as f64).floor();
+        if !raw_bin.is_finite() {
+            return None;
+        }
+        let bin = (raw_bin as isize).clamp(0, bins as isize - 1) as usize;
+        histogram[bin] += 1;
+    }
+
+    let total = estimated.len() as f64;
+    let entropy = histogram
+        .iter()
+        .filter(|count| **count > 0)
+        .map(|count| {
+            let probability = *count as f64 / total;
+            -probability * probability.log2()
+        })
+        .sum::<f64>();
+    Some(entropy)
+}
+
+fn information_gain(
+    reference: &[f64],
+    estimated: &[f64],
+    bins: usize,
+) -> f64 {
+    if reference.len() <= 1 || estimated.len() <= 1 {
+        return 0.0;
+    }
+    let forward = information_gain_entropy(reference, estimated, bins)
+        .unwrap_or(f64::INFINITY);
+    let backward = information_gain_entropy(estimated, reference, bins)
+        .unwrap_or(f64::INFINITY);
+    let normalizer = (bins as f64).log2();
+    let entropy = forward.max(backward);
+    if !normalizer.is_finite() || normalizer <= 0.0 || !entropy.is_finite() {
+        0.0
+    } else {
+        (normalizer - entropy) / normalizer
+    }
+}
+
 fn score_one_reference(
     reference: &BeatGridReferenceV1,
     prediction: &BeatGridPredictionV1,
@@ -726,6 +1038,13 @@ fn score_one_reference(
         &reference_beats,
         &estimated_beats,
         f64::from(config.cemgil_sigma_ms) / 1_000.0,
+    );
+    let goto = goto_score(&reference_beats, &estimated_beats, config);
+    let p_score = p_score(&reference_beats, &estimated_beats, config);
+    let information_gain = information_gain(
+        &reference_beats,
+        &estimated_beats,
+        usize::from(config.information_gain_bins),
     );
     let cemgil_best = if config.metric_level_variants_enabled {
         metric_level_variants(&reference_beats)
@@ -775,6 +1094,9 @@ fn score_one_reference(
         beat_f_measure,
         cemgil_score: cemgil,
         cemgil_best_metric_level: cemgil_best,
+        goto_score: goto,
+        p_score,
+        information_gain,
         continuity_metrics: Some(continuity_metrics(&reference_beats, &estimated_beats, config)),
         downbeat_metric,
         beat_timing_error,
@@ -956,6 +1278,145 @@ mod tests {
             model_revision: "fixture-v1".into(),
             beat_times_seconds: beats.to_vec(),
             downbeat_times_seconds: downbeats.to_vec(),
+        }
+    }
+
+    #[test]
+    fn pinned_mir_eval_0_8_2_goto_p_score_and_information_gain_fixtures_match() {
+        let reference_beats: Vec<f64> = (0..10).map(|index| index as f64 * 0.5).collect();
+        let exact = reference_beats.clone();
+        let offbeat_50ms: Vec<f64> =
+            reference_beats.iter().map(|time| time + 0.05).collect();
+        let offbeat_100ms: Vec<f64> =
+            reference_beats.iter().map(|time| time + 0.1).collect();
+        let half_time: Vec<f64> =
+            (0..5).map(|index| index as f64).collect();
+        let double_time: Vec<f64> =
+            (0..19).map(|index| index as f64 * 0.25).collect();
+
+        let config = BeatGridEvaluationConfigV1::default();
+        assert_eq!(goto_score(&reference_beats, &exact, &config), 1.0);
+        assert!((p_score(&reference_beats, &exact, &config).unwrap() - 1.0).abs() < 1e-12);
+        assert!((information_gain(&reference_beats, &exact, 41) - 1.0).abs() < 1e-12);
+
+        assert_eq!(goto_score(&reference_beats, &offbeat_50ms, &config), 1.0);
+        assert!((p_score(&reference_beats, &offbeat_50ms, &config).unwrap() - 1.0).abs() < 1e-12);
+        assert!(
+            (information_gain(&reference_beats, &offbeat_50ms, 41)
+                - 0.9124608415961211)
+                .abs()
+                < 1e-12
+        );
+
+        assert_eq!(goto_score(&reference_beats, &offbeat_100ms, &config), 0.0);
+        assert!((p_score(&reference_beats, &offbeat_100ms, &config).unwrap() - 0.9).abs() < 1e-12);
+        assert!(
+            (information_gain(&reference_beats, &offbeat_100ms, 41)
+                - 0.9124608415961211)
+                .abs()
+                < 1e-12
+        );
+
+        assert_eq!(goto_score(&reference_beats, &half_time, &config), 0.0);
+        assert!((p_score(&reference_beats, &half_time, &config).unwrap() - 0.5).abs() < 1e-12);
+        assert!(
+            (information_gain(&reference_beats, &half_time, 41)
+                - 0.8133475887610566)
+                .abs()
+                < 1e-12
+        );
+
+        assert_eq!(goto_score(&reference_beats, &double_time, &config), 0.0);
+        assert!(
+            (p_score(&reference_beats, &double_time, &config).unwrap()
+                - 0.5263157894736842)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (information_gain(&reference_beats, &double_time, 41)
+                - 0.8137207286066387)
+                .abs()
+                < 1e-12
+        );
+    }
+
+    #[test]
+    fn pinned_mir_eval_broken_continuity_and_empty_prediction_metrics_match() {
+        let reference_beats: Vec<f64> = (0..10).map(|index| index as f64 * 0.5).collect();
+        let broken = vec![
+            0.0, 0.5, 1.0, 1.85, 2.35, 2.85, 3.35, 3.85, 4.35, 4.85,
+        ];
+        let config = BeatGridEvaluationConfigV1::default();
+        assert_eq!(goto_score(&reference_beats, &broken, &config), 0.0);
+        assert!((p_score(&reference_beats, &broken, &config).unwrap() - 0.3).abs() < 1e-12);
+        assert!(
+            (information_gain(&reference_beats, &broken, 41)
+                - 0.7581989231048688)
+                .abs()
+                < 1e-12
+        );
+        assert_eq!(goto_score(&reference_beats, &[], &config), 0.0);
+        assert_eq!(p_score(&reference_beats, &[], &config), Some(0.0));
+        assert_eq!(information_gain(&reference_beats, &[], 41), 0.0);
+    }
+
+    #[test]
+    fn legacy_beat_metrics_are_included_in_reference_report_and_commitment() {
+        let beats: Vec<f64> = (0..10).map(|index| index as f64 * 0.5).collect();
+        let references = [reference("a", Some("clip-a"), &beats, &[])];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&beats, &[]),
+            &references,
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        let score = &report.reference_scores[0];
+        assert_eq!(score.goto_score, 1.0);
+        assert_eq!(score.p_score, Some(1.0));
+        assert_eq!(score.information_gain, 1.0);
+
+        let original = beat_grid_evaluation_commitment_v1(&report).unwrap();
+        let mut tampered = report.clone();
+        tampered.reference_scores[0].goto_score = 0.0;
+        let changed = beat_grid_evaluation_commitment_v1(&tampered).unwrap();
+        assert_ne!(original, changed);
+    }
+
+    #[test]
+    fn p_score_is_unknown_when_10ms_quantization_collapses_reference_periods() {
+        let reference_beats = [0.0, 0.001, 0.002, 0.003];
+        let estimated_beats = [0.0, 0.001, 0.002, 0.003];
+        assert_eq!(
+            p_score(
+                &reference_beats,
+                &estimated_beats,
+                &BeatGridEvaluationConfigV1::default()
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn legacy_metric_config_bounds_are_validated() {
+        let beats = [0.0, 0.5, 1.0];
+        let references = [reference("a", None, &beats, &[])];
+        let invalid = [
+            BeatGridEvaluationConfigV1 {
+                goto_threshold_basis_points: 10_000,
+                ..Default::default()
+            },
+            BeatGridEvaluationConfigV1 {
+                p_score_threshold_basis_points: 0,
+                ..Default::default()
+            },
+            BeatGridEvaluationConfigV1 {
+                information_gain_bins: 1,
+                ..Default::default()
+            },
+        ];
+        for config in invalid {
+            assert!(evaluate_beat_grid_v1(&prediction(&beats, &[]), &references, config).is_err());
         }
     }
 
