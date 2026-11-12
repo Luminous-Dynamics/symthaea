@@ -755,24 +755,25 @@ fn goto_score(
     let std_limit = f64::from(config.goto_sigma_basis_points) / 10_000.0;
     let mut beat_error = vec![1.0f64; reference.len()];
 
+    let mut estimated_start = 0usize;
+    let mut estimated_end = 0usize;
     for index in 1..reference.len().saturating_sub(1) {
         let previous_interval = 0.5 * (reference[index] - reference[index - 1]);
         let next_interval = 0.5 * (reference[index + 1] - reference[index]);
         let window_min = reference[index] - previous_interval;
         let window_max = reference[index] + next_interval;
-        let mut found = None;
-        let mut count = 0usize;
-        for &time in estimated {
-            if time >= window_min && time < window_max {
-                count += 1;
-                found = Some(time);
-                if count > 1 {
-                    break;
-                }
-            }
+        while estimated_start < estimated.len() && estimated[estimated_start] < window_min {
+            estimated_start += 1;
         }
+        if estimated_end < estimated_start {
+            estimated_end = estimated_start;
+        }
+        while estimated_end < estimated.len() && estimated[estimated_end] < window_max {
+            estimated_end += 1;
+        }
+        let count = estimated_end - estimated_start;
         if count == 1 {
-            let offset = found.unwrap_or(reference[index]) - reference[index];
+            let offset = estimated[estimated_start] - reference[index];
             beat_error[index] = if offset < 0.0 {
                 offset / previous_interval
             } else {
@@ -931,16 +932,18 @@ fn information_gain_entropy(
     }
     let mut histogram = vec![0usize; bins];
     for &estimated_time in estimated {
-        let mut nearest = 0usize;
-        let mut minimum_difference = (estimated_time - reference[0]).abs();
-        for (index, &reference_time) in reference.iter().enumerate().skip(1) {
-            let difference = (estimated_time - reference_time).abs();
-            // Strict comparison preserves numpy.argmin's first-index tie rule.
-            if difference < minimum_difference {
-                minimum_difference = difference;
-                nearest = index;
-            }
-        }
+        let insertion = reference.partition_point(|time| *time < estimated_time);
+        let nearest = if insertion == 0 {
+            0
+        } else if insertion >= reference.len() {
+            reference.len() - 1
+        } else {
+            let left = insertion - 1;
+            let left_error = (estimated_time - reference[left]).abs();
+            let right_error = (reference[insertion] - estimated_time).abs();
+            // Equality chooses the lower/earlier index, matching numpy.argmin.
+            if left_error <= right_error { left } else { insertion }
+        };
         let absolute_error = estimated_time - reference[nearest];
 
         // Mirror mir_eval 0.8.2's boundary handling, including its historical
