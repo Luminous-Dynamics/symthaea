@@ -827,6 +827,194 @@ pub fn sample_haar_page_entropy_ensemble(
     })
 }
 
+/// Sampling statistics for Haar-random states inside a fixed U(1) charge sector.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SymmetryResolvedPageEnsembleSummary {
+    pub number_of_qubits: usize,
+    pub total_excitations: usize,
+    pub subsystem_a_qubits: usize,
+    pub sample_count: usize,
+    pub seed: u64,
+    pub mean_von_neumann_entropy_nats: f64,
+    pub sample_variance_nats_squared: f64,
+    pub standard_error_nats: f64,
+    /// Normal-approximation interval, not a finite-sample coverage guarantee.
+    pub confidence_95_approx_nats: [f64; 2],
+    pub symmetry_resolved_page_mean_nats: f64,
+    pub normalized_mean_deviation: f64,
+}
+
+/// Sample Haar-random pure states from one fixed-excitation subspace and
+/// compare their reduced entropy with the exact symmetry-resolved Page oracle.
+/// The random complex-Gaussian amplitudes are populated only on computational
+/// basis states whose Hamming weight equals total_excitations.
+pub fn sample_symmetry_resolved_page_entropy_ensemble(
+    number_of_qubits: usize,
+    total_excitations: usize,
+    subsystem_a_qubits: usize,
+    sample_count: usize,
+    seed: u64,
+    tolerance: f64,
+) -> Result<SymmetryResolvedPageEnsembleSummary, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    if sample_count < 2 {
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+    }
+    if number_of_qubits > MAX_DENSE_STATE_QUBITS {
+        return Err(QuantumInformationError::DenseStateQubitLimit {
+            requested: number_of_qubits,
+            maximum: MAX_DENSE_STATE_QUBITS,
+        });
+    }
+    if subsystem_a_qubits > number_of_qubits {
+        return Err(QuantumInformationError::InvalidSubsystemSize {
+            requested: subsystem_a_qubits,
+            maximum: number_of_qubits,
+        });
+    }
+    if total_excitations > number_of_qubits {
+        return Err(QuantumInformationError::InvalidExcitationSector {
+            excitations: total_excitations,
+            number_of_qubits,
+        });
+    }
+    let subsystem_dimension = 1usize << subsystem_a_qubits;
+    if subsystem_dimension > MAX_DENSE_REDUCED_DIMENSION {
+        return Err(QuantumInformationError::DenseDimensionLimit {
+            requested: subsystem_dimension,
+            maximum: MAX_DENSE_REDUCED_DIMENSION,
+        });
+    }
+
+    // Calculate the exact oracle first; this also checks the fixed-sector
+    // Hilbert-space resource ceiling before allocating any sample state.
+    let exact_page_mean = symmetry_resolved_page_average_entropy_nats(
+        number_of_qubits,
+        total_excitations,
+        subsystem_a_qubits,
+    )?;
+    let state_dimension = 1usize << number_of_qubits;
+    let retained_qubits = (0..subsystem_a_qubits).collect::<Vec<_>>();
+    let sector_basis = (0..state_dimension)
+        .filter(|basis| basis.count_ones() as usize == total_excitations)
+        .collect::<Vec<_>>();
+    if sector_basis.is_empty() {
+        return Err(QuantumInformationError::InvalidExcitationSector {
+            excitations: total_excitations,
+            number_of_qubits,
+        });
+    }
+
+    let mut rng = ChaCha20Rng::seed_from_u64(seed);
+    let mut mean = 0.0;
+    let mut sum_squared_deviations = 0.0;
+    for sample_index in 0..sample_count {
+        let mut amplitudes = vec![Complex64::new(0.0, 0.0); state_dimension];
+        for &basis in &sector_basis {
+            amplitudes[basis] = complex_standard_normal(&mut rng);
+        }
+        let norm_squared: f64 =
+            amplitudes.iter().map(|amplitude| amplitude.norm_sqr()).sum();
+        if !norm_squared.is_finite() || norm_squared <= 0.0 {
+            return Err(QuantumInformationError::NonFiniteState { index: sample_index });
+        }
+        let inverse_norm = norm_squared.sqrt().recip();
+        for amplitude in &mut amplitudes {
+            *amplitude *= inverse_norm;
+        }
+
+        let reduced = DensityMatrix::from_pure_state(
+            &amplitudes,
+            number_of_qubits,
+            &retained_qubits,
+            tolerance,
+        )?;
+        let entropy = reduced.von_neumann_entropy(tolerance)?;
+        let delta = entropy - mean;
+        mean += delta / (sample_index + 1) as f64;
+        sum_squared_deviations += delta * (entropy - mean);
+    }
+
+    let sample_variance = sum_squared_deviations / (sample_count - 1) as f64;
+    let standard_error = (sample_variance / sample_count as f64).sqrt();
+    let normalized_deviation = if standard_error > 0.0 {
+        (mean - exact_page_mean) / standard_error
+    } else if mean == exact_page_mean {
+        0.0
+    } else {
+        f64::INFINITY.copysign(mean - exact_page_mean)
+    };
+    Ok(SymmetryResolvedPageEnsembleSummary {
+        number_of_qubits,
+        total_excitations,
+        subsystem_a_qubits,
+        sample_count,
+        seed,
+        mean_von_neumann_entropy_nats: mean,
+        sample_variance_nats_squared: sample_variance,
+        standard_error_nats: standard_error,
+        confidence_95_approx_nats: [
+            mean - 1.96 * standard_error,
+            mean + 1.96 * standard_error,
+        ],
+        symmetry_resolved_page_mean_nats: exact_page_mean,
+        normalized_mean_deviation: normalized_deviation,
+    })
+}
+
+#[cfg(test)]
+mod symmetry_resolved_page_sampler_tests {
+    use super::*;
+
+    const TOLERANCE: f64 = 1e-10;
+
+    #[test]
+    fn fixed_charge_haar_sampler_is_seeded_and_uses_matching_sector_oracle() {
+        let first = sample_symmetry_resolved_page_entropy_ensemble(
+            8, 4, 4, 256, 0xC4A26E, TOLERANCE,
+        ).unwrap();
+        let repeated = sample_symmetry_resolved_page_entropy_ensemble(
+            8, 4, 4, 256, 0xC4A26E, TOLERANCE,
+        ).unwrap();
+        assert_eq!(first, repeated);
+        assert_eq!(first.total_excitations, 4);
+        assert!(first.sample_variance_nats_squared > 0.0);
+        assert!(first.standard_error_nats > 0.0);
+        assert!(first.normalized_mean_deviation.abs() < 6.0);
+        assert!((first.mean_von_neumann_entropy_nats
+            - first.symmetry_resolved_page_mean_nats).abs() < 0.10);
+    }
+
+    #[test]
+    fn fixed_charge_haar_sampler_has_zero_entropy_in_extremal_sectors() {
+        for total_excitations in [0, 4] {
+            let sample = sample_symmetry_resolved_page_entropy_ensemble(
+                4, total_excitations, 2, 16, 0xE100 + total_excitations as u64,
+                TOLERANCE,
+            ).unwrap();
+            assert!(sample.mean_von_neumann_entropy_nats.abs() < TOLERANCE);
+            assert!(sample.symmetry_resolved_page_mean_nats.abs() < TOLERANCE);
+            assert!(sample.sample_variance_nats_squared.abs() < 1e-24);
+        }
+    }
+
+    #[test]
+    fn fixed_charge_haar_sampler_rejects_invalid_sample_and_register_inputs() {
+        assert!(matches!(
+            sample_symmetry_resolved_page_entropy_ensemble(8, 4, 4, 1, 7, TOLERANCE),
+            Err(QuantumInformationError::InvalidEnsembleSampleCount(1))
+        ));
+        assert!(matches!(
+            sample_symmetry_resolved_page_entropy_ensemble(8, 9, 4, 8, 7, TOLERANCE),
+            Err(QuantumInformationError::InvalidExcitationSector { .. })
+        ));
+        assert!(matches!(
+            sample_symmetry_resolved_page_entropy_ensemble(8, 4, 7, 8, 7, TOLERANCE),
+            Err(QuantumInformationError::DenseDimensionLimit { .. })
+        ));
+    }
+}
+
 /// Compensated harmonic sum H_n = sum_(k=1)^n 1/k.
 fn harmonic_number(n: usize) -> f64 {
     let mut sum = 0.0;
