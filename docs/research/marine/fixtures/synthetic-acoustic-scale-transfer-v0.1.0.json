@@ -63,15 +63,14 @@
           "model_upper_hz": 1100,
           "full_scale_lower_hz": 160.99689437998487,
           "full_scale_upper_hz": 196.7739820199815,
-          "model_source_level_db": 120,
           "observed_full_scale_source_level_db": 150.5,
           "uncertainty": {
-            "model_measurement_db": 1,
-            "scaling_model_db": 2,
-            "full_scale_measurement_db": 1,
             "confidence_level": 0.95,
             "composition": "CONSERVATIVE_LINEAR",
-            "independence_evidence_ref": null
+            "independence_evidence_ref": null,
+            "model_measurement_expanded_uncertainty_db": 1,
+            "scaling_model_expanded_uncertainty_db": 2,
+            "full_scale_measurement_expanded_uncertainty_db": 1
           },
           "signal_to_background_margin_db": 12,
           "background_correction_applied": false,
@@ -107,15 +106,14 @@
           "model_upper_hz": 2200,
           "full_scale_lower_hz": 321.99378875996973,
           "full_scale_upper_hz": 393.547964039963,
-          "model_source_level_db": 118.5,
           "observed_full_scale_source_level_db": 149,
           "uncertainty": {
-            "model_measurement_db": 1,
-            "scaling_model_db": 2,
-            "full_scale_measurement_db": 1,
             "confidence_level": 0.95,
             "composition": "CONSERVATIVE_LINEAR",
-            "independence_evidence_ref": null
+            "independence_evidence_ref": null,
+            "model_measurement_expanded_uncertainty_db": 1,
+            "scaling_model_expanded_uncertainty_db": 2,
+            "full_scale_measurement_expanded_uncertainty_db": 1
           },
           "signal_to_background_margin_db": 12,
           "background_correction_applied": false,
