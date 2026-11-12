@@ -15,7 +15,8 @@
     "validation_audit",
     "dataset_audit",
     "custody",
-    "disposition"
+    "disposition",
+    "scenario_audit"
   ],
   "properties": {
     "intake_id": {
@@ -450,6 +451,86 @@
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "scenario_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "corpus_blob_sha",
+        "record_count",
+        "unique_id_count",
+        "required_fields",
+        "missing_required_field_count",
+        "domain_count",
+        "domain_counts",
+        "authority_level_counts",
+        "domain_authority_cell_count",
+        "expected_records_per_domain_authority_cell",
+        "unbalanced_domain_authority_cell_count",
+        "exact_duplicate_scenario_bundle_count",
+        "duplicate_policy_text_count",
+        "status",
+        "scope_limit"
+      ],
+      "properties": {
+        "corpus_blob_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "record_count": {
+          "type": "integer"
+        },
+        "unique_id_count": {
+          "type": "integer"
+        },
+        "required_fields": {
+          "type": "array",
+          "minItems": 10,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "missing_required_field_count": {
+          "type": "integer"
+        },
+        "domain_count": {
+          "type": "integer"
+        },
+        "domain_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        },
+        "authority_level_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer"
+          }
+        },
+        "domain_authority_cell_count": {
+          "type": "integer"
+        },
+        "expected_records_per_domain_authority_cell": {
+          "type": "integer"
+        },
+        "unbalanced_domain_authority_cell_count": {
+          "type": "integer"
+        },
+        "exact_duplicate_scenario_bundle_count": {
+          "type": "integer"
+        },
+        "duplicate_policy_text_count": {
+          "type": "integer"
+        },
+        "status": {
+          "const": "static_structure_pass"
+        },
+        "scope_limit": {
+          "type": "string"
         }
       }
     }
