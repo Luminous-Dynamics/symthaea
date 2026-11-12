@@ -518,8 +518,16 @@
           "$ref": "#/$defs/digest"
         },
         "protocol_id": {
-          "type": "string",
-          "minLength": 1
+          "enum": [
+            "leave_one_model_facility_out",
+            "leave_one_full_scale_trial_site_out",
+            "leave_one_vessel_out",
+            "leave_one_propeller_design_out",
+            "leave_one_propeller_revision_out",
+            "leave_one_campaign_out",
+            "leave_one_operating_condition_family_out",
+            "nested_group_holdout"
+          ]
         },
         "grouping_dimensions": {
           "type": "array",
