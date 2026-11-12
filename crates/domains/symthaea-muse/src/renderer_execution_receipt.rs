@@ -43,6 +43,9 @@ pub struct RendererProcessObservation {
     pub soundfont_path: String,
     pub soundfont_sha256_before: String,
     pub soundfont_sha256_after: String,
+    pub midi_path: String,
+    pub midi_sha256_before: String,
+    pub midi_sha256_after: String,
     /// Ordered argv excluding argv[0], which is executable_path.
     pub arguments: Vec<String>,
     /// Hash of the exact child environment snapshot; raw values are not persisted.
@@ -247,16 +250,25 @@ fn validate_inputs(inputs: &RendererReceiptInputs<'_>) -> Result<(), RendererRec
             optional_digest_is_valid(Some(&process.executable_sha256_after), "process.executable_sha256_after")?;
             optional_digest_is_valid(Some(&process.soundfont_sha256_before), "process.soundfont_sha256_before")?;
             optional_digest_is_valid(Some(&process.soundfont_sha256_after), "process.soundfont_sha256_after")?;
+            optional_digest_is_valid(Some(&process.midi_sha256_before), "process.midi_sha256_before")?;
+            optional_digest_is_valid(Some(&process.midi_sha256_after), "process.midi_sha256_after")?;
             optional_digest_is_valid(Some(&process.environment_sha256), "process.environment_sha256")?;
             optional_digest_is_valid(Some(&process.stdout_sha256), "process.stdout_sha256")?;
             optional_digest_is_valid(Some(&process.stderr_sha256), "process.stderr_sha256")?;
+            let expected_midi_sha256 = sha256_hex(
+                inputs.input_midi_bytes.expect("FluidSynth MIDI presence checked above"),
+            );
             if process.exit_code != 0
                 || process.executable_path.trim().is_empty()
                 || process.executable_path.len() > 4096
                 || process.soundfont_path.trim().is_empty()
                 || process.soundfont_path.len() > 4096
+                || process.midi_path.trim().is_empty()
+                || process.midi_path.len() > 4096
                 || process.executable_sha256_before != process.executable_sha256_after
                 || process.soundfont_sha256_before != process.soundfont_sha256_after
+                || process.midi_sha256_before != process.midi_sha256_after
+                || process.midi_sha256_after != expected_midi_sha256
                 || Some(process.executable_sha256_after.as_str()) != inputs.renderer_executable_sha256
                 || Some(process.soundfont_sha256_after.as_str()) != inputs.soundfont_sha256
                 || process.arguments.len() > 128
@@ -448,6 +460,7 @@ mod tests {
     }
 
     fn fluid_inputs<'a>(wav: &'a [u8]) -> RendererReceiptInputs<'a> {
+        let midi_sha256 = sha256_hex(b"MThd-fixture-midi");
         let process_observation = RendererProcessObservation {
             executable_path: "/usr/bin/fluidsynth".into(),
             executable_sha256_before: DIGEST_C.into(),
@@ -455,6 +468,9 @@ mod tests {
             soundfont_path: "/usr/share/sounds/sf2/test.sf2".into(),
             soundfont_sha256_before: DIGEST_D.into(),
             soundfont_sha256_after: DIGEST_D.into(),
+            midi_path: "/tmp/fixture.mid".into(),
+            midi_sha256_before: midi_sha256.clone(),
+            midi_sha256_after: midi_sha256,
             arguments: vec!["-g".into(), "0.8".into(), "-T".into(), "wav".into()],
             environment_sha256: DIGEST_A.into(),
             stdout_sha256: DIGEST_B.into(),
@@ -563,6 +579,18 @@ mod tests {
         failed.process_exit_code = Some(1);
         assert_eq!(
             RendererExecutionReceipt::from_successful_render(failed).unwrap_err(),
+            RendererReceiptError::InvalidExecutionStatus
+        );
+    }
+
+    #[test]
+    fn fluid_receipt_rejects_process_midi_substitution() {
+        let wav = test_wav(&[0, 0, 1, -1]);
+        let mut inputs = fluid_inputs(&wav);
+        let process = inputs.process_observation.as_mut().unwrap();
+        process.midi_sha256_after = DIGEST_F.into();
+        assert_eq!(
+            RendererExecutionReceipt::from_successful_render(inputs).unwrap_err(),
             RendererReceiptError::InvalidExecutionStatus
         );
     }
