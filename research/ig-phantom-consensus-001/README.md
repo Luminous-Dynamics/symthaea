@@ -47,6 +47,15 @@ The qualifier checks a bounded schema header and explicit structural invariants.
 - Normative-pluralism tasks have no gold preference. The benchmark checks representation, not agreement with a preferred policy.
 - Transparency arms reveal genuine recorded private judgments but never the answer key.
 
+## Implemented versus planned metrics
+
+The protocol names eight outcome families, but v0.1 computes only two synthetic fixture-level quantities:
+
+- `peer_private_belief_l2_error`: squared L2 error between a fixture's estimated peer-choice probability vector and the empirical peer distribution computed from the committed private baseline.
+- `phantom_consensus_incidence`: a bounded known-answer oracle indicating whether any agent's estimated unique peer plurality differs from the unique recorded peer plurality.
+
+The remaining six metrics are research targets, not implemented results in this slice: private/public decision gap, collective-rationality failure, transparency-recovery effect, signal susceptibility, pluralism preservation and full run-validity reporting. The fixture validator checks selected structural invariants for those protocols but does not claim to estimate their causal effects. Future work must not report these as benchmark outputs until their scoring and analysis implementations exist.
+
 ## Claim ceiling
 
 A successful synthetic qualification establishes only that these 12 fixture contracts and bounded oracles behave as declared. No LLM agents were executed by this corpus. No PHANTOM-Bench reproduction, human effect, democratic legitimacy, public-opinion simulation or deployment claim is made. Model evaluation requires exact artifact/method review, matched baselines, pinned prompts/models, randomized treatment blocks, multiple seeds, held-out tasks and independent analysis.
