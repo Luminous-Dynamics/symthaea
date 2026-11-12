@@ -23,8 +23,8 @@ require those source PRs to be merged.
 - Inverter efficiency: 98%
 - DC bus: 400 V
 - Duration: 12 s
-- Motor efficiency: synthetic map value 95%, with 0.5 percentage-point
-  absolute uncertainty (0.4 points nodal plus 0.1 point systematic)
+- Motor efficiency: synthetic nominal map value 95.75%; the metrology-aware
+  coordinate envelope is approximately 95.2966%–96.2037%
 
 Synthetic torque and RPM observations are generated from the drive oracle's
 motor-shaft kinematics, passed through the observation synchronizer, and
@@ -45,11 +45,12 @@ The upper demand is used in the synthetic propulsion electrical-load ledger;
 the transmission loss, motor loss and inverter loss are separately represented
 in the thermal-source ledger for that same upper-bound scenario.
 
-The adverse, nominal, and favourable efficiency cases are independently
-evaluated. The adverse case feeds a branch-meter ledger containing propulsion,
+The minimum, nominal, and upper DC-demand cases are independently evaluated.
+The upper-bound case feeds a branch-meter ledger containing propulsion,
 thermal-management, auxiliary, and distribution loads. A separate loss ledger
-allocates transmission, motor, and inverter losses to named thermal nodes while
-preserving intentionally unallocated fractions. TMS electrical demand is not
+allocates transmission, motor, and inverter losses for that same upper-bound
+scenario to named thermal nodes while preserving intentionally unallocated
+fractions. TMS electrical demand is not
 silently reclassified as battery heat, and conversion losses are not added to
 electrical demand twice.
 
