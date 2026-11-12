@@ -984,7 +984,24 @@ fn qualify_support_intervals(
         }
     }
     output.sort_by_key(|interval| (interval.channel, interval.start_frame));
-    output
+    let mut merged: Vec<QualifiedInfluenceInterval> = Vec::with_capacity(output.len());
+    for interval in output {
+        if let Some(previous) = merged.last_mut()
+            && previous.channel == interval.channel
+            && interval.start_frame <= previous.measured_end_frame
+        {
+            previous.measured_end_frame =
+                previous.measured_end_frame.max(interval.measured_end_frame);
+            previous.qualified_end_frame =
+                previous.qualified_end_frame.max(interval.qualified_end_frame);
+            previous.tail_extension_frames_applied = previous
+                .qualified_end_frame
+                .saturating_sub(previous.measured_end_frame);
+        } else {
+            merged.push(interval);
+        }
+    }
+    merged
 }
 
 fn seal_calibration(
@@ -2049,6 +2066,23 @@ mod tests {
         );
         assert_eq!(report.counterfactual_event_map_receipt_sha256, counterfactual.map.receipt_sha256);
         assert!(verify_counterfactual_influence(&report, &experiment, &calibration).unwrap());
+
+        let mut tampered_policy = report.clone();
+        tampered_policy.support_policy.tail_extension_frames = 1;
+        assert_eq!(
+            verify_counterfactual_influence(&tampered_policy, &experiment, &calibration)
+                .unwrap_err(),
+            CounterfactualInfluenceError::InvalidInfluenceReceipt
+        );
+        let mut tampered_trace = report.clone();
+        if let Some(window) = tampered_trace.window_measurements.first_mut() {
+            window.rms_delta += 0.01;
+        }
+        assert_eq!(
+            verify_counterfactual_influence(&tampered_trace, &experiment, &calibration)
+                .unwrap_err(),
+            CounterfactualInfluenceError::InvalidInfluenceReceipt
+        );
     }
 
     #[test]
