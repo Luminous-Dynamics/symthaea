@@ -638,7 +638,7 @@ mod tests {
                 &[one]
             ),
             Err(CalibrationError::InsufficientCalibrationEpisodes {
-                required_rank: 1,
+                required_rank: 2,
                 sample_count: 1,
             })
         );
