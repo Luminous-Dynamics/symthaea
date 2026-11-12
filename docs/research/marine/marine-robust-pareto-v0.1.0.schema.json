@@ -1,0 +1,434 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-robust-pareto-v0.1.0.schema.json",
+  "title": "Marine robust Pareto audit v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "source_register",
+    "service",
+    "objectives",
+    "hard_gates",
+    "candidates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_register": {
+      "$ref": "#/$defs/sourceRegister"
+    },
+    "service": {
+      "$ref": "#/$defs/service"
+    },
+    "objectives": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/objective"
+      }
+    },
+    "hard_gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/hardGate"
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "sourceRegister": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "register_id",
+        "citation",
+        "register_sha256"
+      ],
+      "properties": {
+        "register_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "register_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mission_id",
+        "vessel_id",
+        "route_id",
+        "measurement_window_id",
+        "service_fingerprint_sha256",
+        "environment_fingerprint_sha256",
+        "cargo_work_unit",
+        "reference_cargo_work",
+        "reference_cargo_work_expanded_uncertainty",
+        "cargo_work_equivalence_tolerance"
+      ],
+      "properties": {
+        "mission_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vessel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "route_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measurement_window_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "service_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "cargo_work_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reference_cargo_work": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "reference_cargo_work_expanded_uncertainty": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cargo_work_equivalence_tolerance": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_id",
+        "direction",
+        "unit"
+      ],
+      "properties": {
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "direction": {
+          "enum": [
+            "minimize",
+            "maximize"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "hardGate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate_id",
+        "gate_class",
+        "evaluation",
+        "metric_id",
+        "threshold",
+        "unit",
+        "required_audit_contract_id",
+        "requirement_reference",
+        "non_compensable"
+      ],
+      "properties": {
+        "gate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gate_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evaluation": {
+          "enum": [
+            "metric_upper_bound",
+            "metric_lower_bound",
+            "external_audit_receipt"
+          ]
+        },
+        "metric_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "threshold": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "required_audit_contract_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "requirement_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "non_compensable": {
+          "const": true
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "evidence_kind",
+        "dataset_id",
+        "citation",
+        "raw_data_sha256",
+        "rights_status",
+        "independently_reviewed",
+        "mission_id",
+        "vessel_id",
+        "route_id",
+        "measurement_window_id",
+        "service_fingerprint_sha256",
+        "environment_fingerprint_sha256",
+        "vessel_revision",
+        "propeller_revision",
+        "cargo_work_value",
+        "cargo_work_expanded_uncertainty",
+        "cargo_work_unit",
+        "operating_point_receipt_sha256",
+        "metrics",
+        "gate_receipts"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_kind": {
+          "enum": [
+            "synthetic",
+            "measured"
+          ]
+        },
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "rights_status": {
+          "enum": [
+            "public_or_permitted",
+            "unknown",
+            "restricted"
+          ]
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        },
+        "mission_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vessel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "route_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measurement_window_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "service_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "vessel_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propeller_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cargo_work_value": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cargo_work_expanded_uncertainty": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cargo_work_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_point_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "metrics": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/metric"
+          }
+        },
+        "gate_receipts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gateReceipt"
+          }
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_id",
+        "value",
+        "expanded_uncertainty",
+        "confidence_level",
+        "unit",
+        "method_id",
+        "raw_data_sha256",
+        "calibration_or_validation_sha256",
+        "timebase_receipt_sha256",
+        "operating_point_receipt_sha256"
+      ],
+      "properties": {
+        "metric_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "number"
+        },
+        "expanded_uncertainty": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "calibration_or_validation_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "timebase_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "operating_point_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "gateReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate_id",
+        "status",
+        "audit_contract_id",
+        "audit_receipt_sha256",
+        "requirement_reference"
+      ],
+      "properties": {
+        "gate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "satisfied",
+            "failed",
+            "unresolved"
+          ]
+        },
+        "audit_contract_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "audit_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "requirement_reference": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
