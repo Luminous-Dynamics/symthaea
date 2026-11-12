@@ -147,6 +147,8 @@ Added and exported src/tail_profile_registry.rs with:
 
 The module deliberately does not add a renderer, route parser, identity service, cryptographic key store, artifact registry, acoustic detector or editor.
 
+The focused workflow requires root Cargo metadata to resolve. The current repository tree contains three source-only paths matched by workspace globs but lacking Cargo manifests (two core prototypes and one README-only REA verifier plan). This branch explicitly excludes those non-package paths rather than adding placeholder packages or weakening the metadata check. The exclusions should be removed when each directory becomes a real Cargo package.
+
 ## 7. Initial tests authored
 
 Ten Rust tests cover:
