@@ -49,7 +49,8 @@
         "useful_heat_delivered_j": 2770000000,
         "discharge_loss_j": 308000000
       },
-      "expected_disposition": "PASS"
+      "expected_disposition": "PASS",
+      "energy_boundary_contract_id": "WALL-PLUG-COMPLETE-THERMAL-STORE-V1"
     },
     {
       "scenario_id": "HTTES-PLASMA-CANDIDATE-001",
@@ -95,7 +96,8 @@
         "useful_heat_delivered_j": 2770000000,
         "discharge_loss_j": 460000000
       },
-      "expected_disposition": "PASS"
+      "expected_disposition": "PASS",
+      "energy_boundary_contract_id": "WALL-PLUG-COMPLETE-THERMAL-STORE-V1"
     },
     {
       "scenario_id": "HTTES-RESISTANCE-600C-001",
@@ -141,7 +143,8 @@
         "useful_heat_delivered_j": 2770000000,
         "discharge_loss_j": 308000000
       },
-      "expected_disposition": "PASS"
+      "expected_disposition": "PASS",
+      "energy_boundary_contract_id": "WALL-PLUG-COMPLETE-THERMAL-STORE-V1"
     },
     {
       "scenario_id": "NC-UNKNOWN-AUXILIARY-ENERGY",
@@ -187,7 +190,8 @@
         "useful_heat_delivered_j": 2770000000,
         "discharge_loss_j": 308000000
       },
-      "expected_disposition": "BLOCKED"
+      "expected_disposition": "BLOCKED",
+      "energy_boundary_contract_id": "WALL-PLUG-COMPLETE-THERMAL-STORE-V1"
     },
     {
       "scenario_id": "NC-MIXED-TOTAL-AND-BRANCH-METERS",
@@ -239,7 +243,8 @@
         "useful_heat_delivered_j": 2770000000,
         "discharge_loss_j": 308000000
       },
-      "expected_disposition": "REJECTED"
+      "expected_disposition": "REJECTED",
+      "energy_boundary_contract_id": "WALL-PLUG-COMPLETE-THERMAL-STORE-V1"
     },
     {
       "scenario_id": "NC-DUPLICATE-METER-BOUNDARY",
@@ -285,7 +290,8 @@
         "useful_heat_delivered_j": 2770000000,
         "discharge_loss_j": 308000000
       },
-      "expected_disposition": "REJECTED"
+      "expected_disposition": "REJECTED",
+      "energy_boundary_contract_id": "WALL-PLUG-COMPLETE-THERMAL-STORE-V1"
     },
     {
       "scenario_id": "NC-CHARGE-BALANCE-MISMATCH",
@@ -331,7 +337,8 @@
         "useful_heat_delivered_j": 2770000000,
         "discharge_loss_j": 308000000
       },
-      "expected_disposition": "REJECTED"
+      "expected_disposition": "REJECTED",
+      "energy_boundary_contract_id": "WALL-PLUG-COMPLETE-THERMAL-STORE-V1"
     },
     {
       "scenario_id": "NC-HOLD-BALANCE-MISMATCH",
@@ -377,7 +384,8 @@
         "useful_heat_delivered_j": 2770000000,
         "discharge_loss_j": 308000000
       },
-      "expected_disposition": "REJECTED"
+      "expected_disposition": "REJECTED",
+      "energy_boundary_contract_id": "WALL-PLUG-COMPLETE-THERMAL-STORE-V1"
     },
     {
       "scenario_id": "NC-DISCHARGE-BALANCE-MISMATCH",
@@ -423,7 +431,8 @@
         "useful_heat_delivered_j": 2670000000,
         "discharge_loss_j": 308000000
       },
-      "expected_disposition": "REJECTED"
+      "expected_disposition": "REJECTED",
+      "energy_boundary_contract_id": "WALL-PLUG-COMPLETE-THERMAL-STORE-V1"
     },
     {
       "scenario_id": "NC-INCOMPLETE-SERVICE-BOUNDARY",
@@ -469,7 +478,8 @@
         "useful_heat_delivered_j": 2770000000,
         "discharge_loss_j": 308000000
       },
-      "expected_disposition": "BLOCKED"
+      "expected_disposition": "BLOCKED",
+      "energy_boundary_contract_id": "WALL-PLUG-COMPLETE-THERMAL-STORE-V1"
     },
     {
       "scenario_id": "NC-UNKNOWN-ENERGY-UNIT",
@@ -515,7 +525,8 @@
         "useful_heat_delivered_j": 2770000000,
         "discharge_loss_j": 308000000
       },
-      "expected_disposition": "REJECTED"
+      "expected_disposition": "REJECTED",
+      "energy_boundary_contract_id": "WALL-PLUG-COMPLETE-THERMAL-STORE-V1"
     },
     {
       "scenario_id": "HTTES-TOTAL-METER-ONLY-REFERENCE",
@@ -555,7 +566,8 @@
         "useful_heat_delivered_j": 2770000000,
         "discharge_loss_j": 308000000
       },
-      "expected_disposition": "PASS"
+      "expected_disposition": "PASS",
+      "energy_boundary_contract_id": "WALL-PLUG-COMPLETE-THERMAL-STORE-V1"
     },
     {
       "scenario_id": "NC-AUXILIARY-METER-OMITTED",
@@ -595,7 +607,55 @@
         "useful_heat_delivered_j": 2770000000,
         "discharge_loss_j": 308000000
       },
-      "expected_disposition": "BLOCKED"
+      "expected_disposition": "BLOCKED",
+      "energy_boundary_contract_id": "WALL-PLUG-COMPLETE-THERMAL-STORE-V1"
+    },
+    {
+      "scenario_id": "NC-SAME-SERVICE-DIFFERENT-ENERGY-BOUNDARY",
+      "technology": "RESISTANCE_JOULE_HEATER_DIFFERENT_METERING_PERIMETER",
+      "evidence_class": "SYNTHETIC_ACCOUNTING_FIXTURE",
+      "energy_unit": "J",
+      "service": {
+        "service_contract_id": "INDUSTRIAL-HEAT-500C-1H",
+        "service_type": "process_heat",
+        "outlet_temperature_mK": 773150,
+        "outlet_pressure_pa": null,
+        "mass_flow_mg_s": null,
+        "delivery_duration_s": 3600,
+        "delivery_trace_digest": "synthetic-trace:heat-demand-500c-001"
+      },
+      "metering_mode": "NON_OVERLAPPING_BRANCH_METERS",
+      "wall_plug_inputs": [
+        {
+          "input_id": "heater-input",
+          "meter_boundary_id": "meter:heater-terminal",
+          "role": "PRIMARY_PROCESS",
+          "energy_j": 3600000000
+        },
+        {
+          "input_id": "aux-input",
+          "meter_boundary_id": "meter:auxiliary-bus",
+          "role": "AUXILIARY",
+          "energy_j": 180000000
+        }
+      ],
+      "charge": {
+        "stored_energy_increase_j": 3240000000,
+        "charge_conversion_loss_j": 360000000,
+        "auxiliary_dissipation_j": 180000000
+      },
+      "hold": {
+        "stored_energy_after_hold_j": 3078000000,
+        "storage_hold_loss_j": 162000000,
+        "hold_duration_s": 86400
+      },
+      "discharge": {
+        "stored_energy_withdrawn_j": 3078000000,
+        "useful_heat_delivered_j": 2770000000,
+        "discharge_loss_j": 308000000
+      },
+      "expected_disposition": "PASS",
+      "energy_boundary_contract_id": "WALL-PLUG-HEATER-ONLY-V1"
     }
   ],
   "comparisons": [
@@ -616,6 +676,12 @@
       "baseline_scenario_id": "HTTES-RESISTANCE-BASELINE-001",
       "candidate_scenario_id": "NC-UNKNOWN-AUXILIARY-ENERGY",
       "expected_disposition": "BLOCKED"
+    },
+    {
+      "comparison_id": "NC-CMP-SAME-HEAT-SERVICE-DIFFERENT-ENERGY-BOUNDARY",
+      "baseline_scenario_id": "HTTES-RESISTANCE-BASELINE-001",
+      "candidate_scenario_id": "NC-SAME-SERVICE-DIFFERENT-ENERGY-BOUNDARY",
+      "expected_disposition": "NOT_COMPARABLE"
     }
   ]
 }
