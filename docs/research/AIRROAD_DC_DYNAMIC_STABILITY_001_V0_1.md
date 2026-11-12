@@ -205,7 +205,7 @@ If a later converter model current-limits or folds back at undervoltage, that is
 
 ## 7. Tier-0 acceptance
 
-- Exact agreement with the four frozen equilibrium cases.
+- Exact-rational oracle agreement with all four frozen equilibrium cases; the binary64 API must classify the clearly separated cases and abstain (non-PASS) on the fold/near-fold ambiguity band.
 - Correct root ordering and source/load current closure.
 - Correct local stability sign for each distinct root.
 - Critical-fold classification is marginal / non-hyperbolic, never robust PASS.
@@ -243,6 +243,64 @@ When available and properly qualified, compare the same equations, parameter val
 
 Tool agreement is not physical correlation when the tools share model equations or parameter sources. A physical campaign requires calibrated synchronized voltage/current traces, exact as-tested topology, source/load identity and controlled test authority.
 
-## 10. Claim ceiling
+## 10. Research and industry comparators
+
+### Published 2026 eVTOL propulsion-microgrid result
+
+Zhao et al., *Small-Signal Stability Analysis and Control Design for eVTOL PDCM*, Aerospace Science and Technology, article 114083, online 16 October 2026, DOI [10.1016/j.ast.2026.114083](https://doi.org/10.1016/j.ast.2026.114083), reports a configuration-specific hardware-in-the-loop study. The article reports:
+- a 75.4% increase in its calculated stability margin when the studied DC-bus voltage is raised from 800 V to 1,200 V;
+- a 53.3% reduction in its reported bus-voltage oscillation value for VDCM droop relative to conventional droop;
+- relative steady-state bus-voltage error reduced from 7.42% to 0.83% in its studied single-point-failure case when VDCM droop was combined with keeping the opposite rotor pair operating.
+
+These are study-specific results for the authors' model, controller and HIL setup. They are not universal eVTOL design constants or Luminous performance results.
+
+### Additional electrical-system comparator
+
+*A General Adaptive Stabilization of a Brushless Generator-Based DC Electrical Power System*, IEEE Transactions on Industry Applications 62(3), May–June 2026, DOI [10.1109/TIA.2026.3661372](https://doi.org/10.1109/TIA.2026.3661372), reports an impedance model and experimental validation of an adaptive stabilization method for a brushless-generator DC system with constant-power loads. This is a useful source/load impedance and experimental-method comparator, not a directly matched eVTOL airworthiness result.
+
+### Matched benchmarking protocol
+
+The Luminous comparison must use identical plant parameters, initial states, load events, model fidelity, uncertainty assumptions and compute budgets. Compare at least:
+1. passive source/capacitance sizing baseline;
+2. conventional droop baseline;
+3. virtual-DC-machine or virtual-inertia/damping droop where the plant topology permits;
+4. an impedance/adaptive stabilizer baseline with its model and controller assumptions stated;
+5. time-domain circuit simulation with independently checked solver convergence;
+6. the Luminous evidence-linked analysis and decision pipeline.
+
+Report separately:
+- small-signal stability margin and eigenvalue/damping estimates;
+- frequency-domain source/load impedance interaction and any declared impedance-ratio criterion;
+- large-signal domain-of-attraction / basin estimate where the model supports it;
+- voltage nadir, overshoot, settling and recovery after matched events;
+- source, branch and converter peak current/power;
+- fault-case bus continuity and post-event mission capability;
+- added mass/volume/energy and thermal cost of capacitors, filters or stabilizers;
+- robustness to source impedance, line parameters, battery SOC/SOH/temperature and model mismatch;
+- false-stable / false-feasible decisions and abstention rate;
+- simulation runtime, model order, physical data requirement and evidence coverage.
+
+Do not use the 75.4% or 53.3% published figures as direct Luminous acceptance targets. First reproduce the paper's conditions or define a matched open benchmark. A fair comparison reports differences in architecture and evidence, not just headline percentages.
+
+### Where Luminous can differentiate
+
+The strongest opportunity is not to claim a better droop controller from a one-state model. It is to connect:
+- as-built power-tree and source/feeder impedance;
+- synchronized propulsor and auxiliary load events;
+- state-conditioned battery/source capability;
+- the exact model and controller revision;
+- uncertainty-qualified stability and basin margins;
+- failure-specific branch/rotor consequences;
+- mission reserve, thermal reset and next-best experiment.
+
+The offline architecture problem can then jointly screen bus voltage, source partitioning, DC-link capacitance, feeder impedance, converter-control family, propulsor load allocation and thermal policy. Hard safety constraints remain constraints, not soft objective penalties. A candidate that cannot support a robust stability claim must remain unresolved rather than being awarded a high average score.
+
+### Regulatory and certification context
+
+EASA's official SC-VTOL page records the final Fifth Publication of MOC-5 SC-VTOL Issue 2 on 5 November 2026, with Electrical Systems identified as the primary technical domain: [EASA Special Condition for VTOL and Means of Compliance](https://www.easa.europa.eu/en/document-library/product-certification-consultations/special-condition-vtol). The actual aircraft category, certification basis and authority determine applicability.
+
+14 CFR §25.1310 is a Part 25 airplane requirement addressing essential-load supply in probable combinations and specified failures; it is not a universal powered-lift/eVTOL threshold. See [14 CFR §25.1310](https://www.law.cornell.edu/cfr/text/14/25.1310). No regulatory voltage margin or certification compliance is inferred by this research contract.
+
+## 11. Claim ceiling
 
 A passing Tier-0 suite establishes only the mathematical and executable correctness of this scalar Thevenin / constant-power-load contract over the frozen synthetic corpus. It does not establish a real battery's impedance, a motor inverter's input behavior, aircraft DC-network dynamic stability, fault interruption, continued safe flight, airworthiness or certification.
