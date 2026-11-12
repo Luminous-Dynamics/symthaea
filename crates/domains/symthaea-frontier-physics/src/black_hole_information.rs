@@ -909,6 +909,22 @@ mod tests {
     }
 
     #[test]
+    fn zero_depth_random_circuit_leaves_product_state_unentangled() {
+        for topology in [
+            RandomCircuitTopology::Brickwork1D,
+            RandomCircuitTopology::AllToAllMatching,
+        ] {
+            let sample = simulate_random_circuit_entropy(
+                6, 0, topology, &[0, 1, 2], 42, TOL,
+            ).unwrap();
+            assert_eq!(sample.two_qubit_gate_count, 0);
+            assert!((sample.state_norm_squared - 1.0).abs() < 1e-14);
+            assert!(sample.subsystem_entropy_nats.abs() < 1e-12);
+            assert!((sample.subsystem_purity - 1.0).abs() < 1e-12);
+        }
+    }
+
+    #[test]
     fn random_brickwork_circuit_is_seed_reproducible_and_norm_preserving() {
         let first = simulate_random_circuit_entropy(
             6, 6, RandomCircuitTopology::Brickwork1D, &[0, 1, 2], 0xB12C, TOL,
