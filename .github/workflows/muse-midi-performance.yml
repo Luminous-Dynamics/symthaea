@@ -24,6 +24,7 @@ on:
     paths:
       - "crates/domains/symthaea-muse/src/midi_performance.rs"
       - "crates/domains/symthaea-muse/src/transcription_eval.rs"
+      - "crates/domains/symthaea-muse/src/beat_grid_eval.rs"
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse/Cargo.toml"
       - "crates/domains/symthaea-music-theory/src/orchestration.rs"
