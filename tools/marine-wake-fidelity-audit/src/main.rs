@@ -950,18 +950,18 @@ fn audit(case: &Case) -> AuditReport {
     }
     let full_vector=case.target.points.iter().all(|p|p.vx_over_vref.is_some()&&p.vr_over_vref.is_some()&&p.vt_over_vref.is_some())
         &&case.realized.points.iter().all(|p|p.vx_over_vref.is_some()&&p.vr_over_vref.is_some()&&p.vt_over_vref.is_some());
+    let axial_only=case.target.points.iter().all(|p|p.vx_over_vref.is_some()&&p.vr_over_vref.is_none()&&p.vt_over_vref.is_none())
+        &&case.realized.points.iter().all(|p|p.vx_over_vref.is_some()&&p.vr_over_vref.is_none()&&p.vt_over_vref.is_none());
     let disposition=if !errors.is_empty() {
         "INVALID"
     } else if has_definite_failure || coordinate_mismatch || scale_mismatch || quadrature_mismatch || !grid_matches {
         "INCOMPARABLE"
-    } else if case.evidence_kind==EvidenceKind::Synthetic || unresolved {
-        if !full_vector && component_metrics.iter().any(|m|m.component=="axial") {
-            "AXIAL_ONLY_DESCRIPTIVE"
-        } else {
-            "INCOMPLETE"
-        }
-    } else if !full_vector {
+    } else if axial_only {
         "AXIAL_ONLY_DESCRIPTIVE"
+    } else if case.evidence_kind==EvidenceKind::Synthetic || unresolved {
+        "INCOMPLETE"
+    } else if !full_vector {
+        "INCOMPLETE"
     } else {
         "FULL_VECTOR_COMPARABLE"
     };
@@ -1093,6 +1093,14 @@ mod tests {
     }
 
     #[test]
+    fn partial_radial_or_tangential_coverage_is_incomplete_not_axial_only() {
+        let mut input=case();
+        input.evidence_kind=EvidenceKind::Measured;
+        input.realized.points[0].vr_over_vref=None;
+        assert_eq!(audit(&input).disposition,"INCOMPLETE");
+    }
+
+    #[test]
     fn synthetic_field_never_becomes_physical_qualification(){
         let report=audit(&case());
         assert_eq!(report.disposition,"INCOMPLETE");
@@ -1158,8 +1166,9 @@ mod tests {
     fn missing_or_mismatched_grid_is_incomplete_not_interpolated(){
         let mut input=case();input.realized.points.pop();
         assert_eq!(audit(&input).disposition,"INVALID");
-        let mut input=case();input.realized.points[0].azimuth_deg=22.5;
-        assert_eq!(audit(&input).disposition,"INCOMPLETE");
+        let mut input=case();input.evidence_kind=EvidenceKind::Measured;
+        input.realized.points[0].azimuth_deg=22.5;
+        assert_eq!(audit(&input).disposition,"INCOMPARABLE");
     }
 
     #[test]
@@ -1250,8 +1259,9 @@ mod tests {
 
     #[test]
     fn scale_basis_mismatch_is_not_compared(){
-        let mut input=case();input.realized.scale_basis=WakeBasis::FullScale;
-        assert_eq!(audit(&input).disposition,"INCOMPLETE");
+        let mut input=case();input.evidence_kind=EvidenceKind::Measured;
+        input.realized.scale_basis=WakeBasis::FullScale;
+        assert_eq!(audit(&input).disposition,"INCOMPARABLE");
     }
 
     #[test]
@@ -1273,7 +1283,7 @@ mod tests {
         let mut input=case();
         input.target.points[0].vr_over_vref=None;
         let report=audit(&input);
-        assert!(report.component_metrics.iter().find(|m|m.component=="radial").unwrap().point_count<72);
+        assert!(report.component_metrics.iter().find(|m|m.component=="radial").unwrap().point_count<24);
         assert_eq!(report.disposition,"INCOMPLETE");
     }
 
