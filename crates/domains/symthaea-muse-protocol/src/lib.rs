@@ -204,6 +204,26 @@ pub struct ImportedWorkAnalysis {
     pub unresolved_interpretations: Vec<String>,
 }
 
+/// Compact, machine-readable summary of notation structure preserved by
+/// the symbolic importer. The full MusicXML graph is stored as a separate
+/// artifact and fetched through Muse Studio's notation-graph endpoint.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ImportedNotationStructureSummary {
+    pub schema: String,
+    /// "supported", "partially_unknown", "unknown", or "unsupported".
+    pub status: String,
+    pub source_sha256: String,
+    pub graph_sha256: Option<String>,
+    pub part_count: usize,
+    pub supported_part_count: usize,
+    pub unknown_part_count: usize,
+    pub measure_count: usize,
+    pub barline_event_count: usize,
+    pub non_controlling_measure_count: usize,
+    pub unavailable_part_ids: Vec<String>,
+    pub explanation: Option<String>,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ImportedWorkSummary {
     pub manifest: ContributionManifest,
@@ -227,6 +247,9 @@ pub struct ImportedWorkSummary {
     /// field existed still deserialize.
     #[serde(default = "default_instrumentation_note")]
     pub instrumentation_note: String,
+    /// Absent for older imports written before structural sidecars existed.
+    #[serde(default)]
+    pub notation_structure: Option<ImportedNotationStructureSummary>,
 }
 
 /// `pub` so `muse_studio.rs` can reuse the exact same text at construction
