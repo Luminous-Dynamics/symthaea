@@ -4909,3 +4909,78 @@ mod hayden_preskill_petz_recovery_tests {
         ));
     }
 }
+
+
+#[cfg(test)]
+mod hayden_preskill_petz_optimality_tests {
+    use super::*;
+
+    const TOLERANCE: f64 = 1e-10;
+
+    #[test]
+    fn identity_channel_satisfies_petz_optimality_commutator_criterion() {
+        let mut identity = [[Complex64::new(0.0, 0.0); 4]; 4];
+        for (index, row) in identity.iter_mut().enumerate() {
+            row[index] = Complex64::new(1.0, 0.0);
+        }
+        let sample =
+            diagnose_hayden_preskill_petz_optimality(&identity, 0, TOLERANCE).unwrap();
+        assert!(sample.qec_matrix_trace_residual < TOLERANCE);
+        assert!(sample.qec_matrix_hermiticity_residual < TOLERANCE);
+        assert!(sample.qec_matrix_inverse_sqrt_residual < TOLERANCE * 10.0);
+        assert!(sample.auxiliary_t_hermiticity_residual < TOLERANCE * 10.0);
+        assert!(sample.petz_optimality_commutator_frobenius < TOLERANCE * 10.0);
+        assert!(sample.petz_is_entanglement_fidelity_optimal);
+    }
+
+    #[test]
+    fn random_hayden_preskill_scramblers_satisfy_the_commuting_state_petz_criterion() {
+        for seed in 0..32 {
+            let sample = simulate_small_hayden_preskill_petz_optimality(
+                0x4A11 + seed,
+                TOLERANCE,
+            )
+            .unwrap();
+            assert!(sample.qec_matrix_trace_residual < TOLERANCE);
+            assert!(sample.qec_matrix_hermiticity_residual < TOLERANCE);
+            assert!(sample.qec_matrix_inverse_sqrt_residual < TOLERANCE * 10.0);
+            assert!(sample.auxiliary_t_hermiticity_residual < TOLERANCE * 10.0);
+            assert!(sample.petz_optimality_commutator_frobenius < TOLERANCE * 100.0);
+            assert!(sample.petz_is_entanglement_fidelity_optimal);
+        }
+    }
+
+    #[test]
+    fn petz_optimality_diagnostic_is_seed_reproducible() {
+        let first =
+            simulate_small_hayden_preskill_petz_optimality(0xDEC0DE, TOLERANCE).unwrap();
+        let repeated =
+            simulate_small_hayden_preskill_petz_optimality(0xDEC0DE, TOLERANCE).unwrap();
+        assert_eq!(first, repeated);
+    }
+
+    #[test]
+    fn petz_optimality_ensemble_reports_commutator_uncertainty_and_all_pass_status() {
+        let summary =
+            sample_small_hayden_preskill_petz_optimality_ensemble(16, 0x4A11, TOLERANCE)
+                .unwrap();
+        assert_eq!(summary.sample_count, 16);
+        assert!(summary.mean_commutator_frobenius >= 0.0);
+        assert!(summary.standard_error_commutator_frobenius >= 0.0);
+        assert!(summary.maximum_commutator_frobenius < TOLERANCE * 100.0);
+        assert!(summary.maximum_qec_matrix_inverse_sqrt_residual < TOLERANCE * 10.0);
+        assert!(summary.all_samples_petz_optimal);
+    }
+
+    #[test]
+    fn petz_optimality_ensemble_rejects_one_sample() {
+        assert!(matches!(
+            sample_small_hayden_preskill_petz_optimality_ensemble(
+                1,
+                0x4A11,
+                TOLERANCE,
+            ),
+            Err(QuantumInformationError::InvalidEnsembleSampleCount(1))
+        ));
+    }
+}
