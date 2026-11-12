@@ -1,0 +1,82 @@
+name: Apparel Engineering Fixture Qualification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/apparel-benchmark-harness/**"
+      - "docs/research/APPAREL_ENGINEERING_DIGITAL_THREAD_001.md"
+      - "docs/research/fixtures/apparel_engineering_thread_v0_1/**"
+      - ".github/workflows/apparel-engineering-fixtures.yml"
+  pull_request:
+    paths:
+      - "tools/apparel-benchmark-harness/**"
+      - "docs/research/APPAREL_ENGINEERING_DIGITAL_THREAD_001.md"
+      - "docs/research/fixtures/apparel_engineering_thread_v0_1/**"
+      - ".github/workflows/apparel-engineering-fixtures.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apparel-fixture-qualification-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  apparel-fixture-contract:
+    name: Apparel digital-thread schema and semantic contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      QUALIFIED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.QUALIFIED_SHA }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Assert exact qualification subject
+        run: test "$(git rev-parse HEAD)" = "$QUALIFIED_SHA"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master @ 2025-08-23
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Assert Rust toolchain identity
+        run: test "$(rustc +1.96.0 --version)" = "rustc 1.96.0 (ac68faa20 2026-05-25)"
+
+      - name: Generate isolated harness lock
+        run: cargo generate-lockfile --manifest-path tools/apparel-benchmark-harness/Cargo.toml
+
+      - name: Assert locked dependency graph
+        run: cargo metadata --manifest-path tools/apparel-benchmark-harness/Cargo.toml --locked --no-deps --format-version 1 > /dev/null
+
+      - name: Format focused auditor
+        run: rustfmt --edition 2024 --check tools/apparel-benchmark-harness/src/main.rs
+
+      - name: Test Draft 2020-12 schema and semantic contract
+        run: cargo test --manifest-path tools/apparel-benchmark-harness/Cargo.toml --locked --bin apparel_thread_audit
+
+      - name: Clippy focused auditor
+        run: cargo clippy --manifest-path tools/apparel-benchmark-harness/Cargo.toml --locked --bin apparel_thread_audit -- -D warnings
+
+      - name: Emit exact-head apparel receipt
+        run: |
+          cargo run --manifest-path tools/apparel-benchmark-harness/Cargo.toml --locked --bin apparel_thread_audit -- \
+            --expected-head "$QUALIFIED_SHA" \
+            --out "$RUNNER_TEMP/apparel-engineering-receipt.json"
+          cat "$RUNNER_TEMP/apparel-engineering-receipt.json"
+
+      - name: Upload exact-head receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: apparel-engineering-fixture-${{ env.QUALIFIED_SHA }}
+          path: ${{ runner.temp }}/apparel-engineering-receipt.json
