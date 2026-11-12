@@ -11,6 +11,7 @@ on:
       - "crates/domains/symthaea-muse/Cargo.toml"
       - "crates/domains/symthaea-muse/src/fluid_render.rs"
       - "crates/domains/symthaea-muse/src/renderer_execution_receipt.rs"
+      - "crates/domains/symthaea-muse/src/counterfactual_acoustic_influence.rs"
       - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
       - ".github/workflows/muse-renderer-invocation-evidence.yml"
   pull_request:
@@ -20,6 +21,7 @@ on:
       - "crates/domains/symthaea-muse/Cargo.toml"
       - "crates/domains/symthaea-muse/src/fluid_render.rs"
       - "crates/domains/symthaea-muse/src/renderer_execution_receipt.rs"
+      - "crates/domains/symthaea-muse/src/counterfactual_acoustic_influence.rs"
       - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
       - ".github/workflows/muse-renderer-invocation-evidence.yml"
   workflow_dispatch:
