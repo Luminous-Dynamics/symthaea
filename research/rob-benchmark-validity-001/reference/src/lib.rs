@@ -539,7 +539,6 @@ pub fn compare_paired_clusters(
         match cluster.independence_disposition {
             EvidenceDisposition::Qualified => {
                 qualified_independent += 1;
-                qualified_deltas.push(delta);
             }
             EvidenceDisposition::Unknown => unknown_independence = true,
             EvidenceDisposition::Rejected => rejected_independence = true,
@@ -555,6 +554,9 @@ pub fn compare_paired_clusters(
         let baseline_ppm = cluster.baseline.safe_success_ppm();
         let candidate_ppm = cluster.candidate.safe_success_ppm();
         let delta = i64::from(candidate_ppm) - i64::from(baseline_ppm);
+        if cluster.independence_disposition == EvidenceDisposition::Qualified {
+            qualified_deltas.push(delta);
+        }
         match delta.cmp(&0) {
             std::cmp::Ordering::Greater
                 if cluster.independence_disposition == EvidenceDisposition::Qualified =>
