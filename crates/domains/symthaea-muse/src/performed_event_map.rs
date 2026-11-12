@@ -682,6 +682,169 @@ impl PerformedEventMap {
         )
     }
 
+    /// Verify a counterfactual map after removing an exact set of source events.
+    /// Every non-excluded source event and all of its descendants must remain
+    /// complete; every excluded source ID must be absent. Exclusion order is
+    /// irrelevant, but duplicate/out-of-range indices reject.
+    pub fn verify_for_score_excluding_set(
+        &self,
+        expected_target_score_sha256: &str,
+        expected_performed_midi_sha256: &str,
+        expected_sample_rate_hz: u32,
+        expected_total_frames: u64,
+        expected_target_event_count: usize,
+        excluded_source_event_indices: &[usize],
+    ) -> Result<(), PerformedEventMapError> {
+        self.validate_structure()?;
+        if self.compute_sha256()? != self.receipt_sha256 {
+            return Err(PerformedEventMapError::InvalidReceipt);
+        }
+        if self.target_score_sha256 != expected_target_score_sha256 {
+            return Err(PerformedEventMapError::ContextMismatch("target score digest"));
+        }
+        if self.performed_midi_sha256 != expected_performed_midi_sha256 {
+            return Err(PerformedEventMapError::ContextMismatch("performed MIDI digest"));
+        }
+        if self.sample_rate_hz != expected_sample_rate_hz {
+            return Err(PerformedEventMapError::ContextMismatch("sample rate"));
+        }
+        if self.total_frames != expected_total_frames {
+            return Err(PerformedEventMapError::ContextMismatch("total frame count"));
+        }
+        if expected_target_event_count == 0
+            || expected_target_event_count > MAX_PERFORMED_EVENT_MAP_EVENTS
+        {
+            return Err(PerformedEventMapError::InvalidExpectedEventCount);
+        }
+        let mut excluded = BTreeSet::new();
+        for index in excluded_source_event_indices {
+            if *index >= expected_target_event_count || !excluded.insert(*index) {
+                return Err(PerformedEventMapError::InvalidExpectedEventCount);
+            }
+        }
+        if excluded.is_empty() {
+            return self.verify_for_score(
+                expected_target_score_sha256,
+                expected_performed_midi_sha256,
+                expected_sample_rate_hz,
+                expected_total_frames,
+                expected_target_event_count,
+            );
+        }
+        if !self.unresolved_source_event_ids.is_empty() {
+            return Err(PerformedEventMapError::UnresolvedSourceEvents);
+        }
+
+        let mut seen_source_ids = HashSet::with_capacity(expected_target_event_count);
+        let mut descendants: BTreeMap<&str, BTreeSet<u32>> = BTreeMap::new();
+        for event in &self.events {
+            let Some(index) = parse_score_event_id(&event.source_event_id) else {
+                return Err(PerformedEventMapError::InvalidSourceEventId);
+            };
+            if index >= expected_target_event_count {
+                return Err(PerformedEventMapError::UnknownSourceEvent);
+            }
+            if excluded.contains(&index) {
+                return Err(PerformedEventMapError::ExcludedSourceEventPresent);
+            }
+            seen_source_ids.insert(event.source_event_id.as_str());
+            descendants
+                .entry(event.source_event_id.as_str())
+                .or_default()
+                .insert(event.descendant_ordinal);
+        }
+
+        for index in 0..expected_target_event_count {
+            if excluded.contains(&index) {
+                continue;
+            }
+            let id = score_event_id(index);
+            if !seen_source_ids.contains(id.as_str()) {
+                return Err(PerformedEventMapError::MissingSourceEvent);
+            }
+            let ordinals = descendants
+                .get(id.as_str())
+                .ok_or(PerformedEventMapError::MissingSourceEvent)?;
+            if !ordinals.contains(&0) {
+                return Err(PerformedEventMapError::MissingSourceEvent);
+            }
+            for (expected, actual) in ordinals.iter().enumerate() {
+                if *actual != expected as u32 {
+                    return Err(PerformedEventMapError::NonContiguousDescendants);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Verify an exact multi-event exclusion and the primary pitches of all
+    /// retained source events. The full Score pitch vector is supplied in
+    /// canonical source-event order; removed events must be absent, never
+    /// silently skipped or remapped.
+    pub fn verify_for_score_excluding_set_and_pitches(
+        &self,
+        expected_target_score_sha256: &str,
+        expected_performed_midi_sha256: &str,
+        expected_sample_rate_hz: u32,
+        expected_total_frames: u64,
+        expected_target_event_count: usize,
+        excluded_source_event_indices: &[usize],
+        expected_midi_by_score_index: &[u8],
+    ) -> Result<(), PerformedEventMapError> {
+        if expected_midi_by_score_index.len() != expected_target_event_count {
+            return Err(PerformedEventMapError::InvalidExpectedEventCount);
+        }
+        self.verify_for_score_excluding_set(
+            expected_target_score_sha256,
+            expected_performed_midi_sha256,
+            expected_sample_rate_hz,
+            expected_total_frames,
+            expected_target_event_count,
+            excluded_source_event_indices,
+        )?;
+        let excluded: BTreeSet<usize> = excluded_source_event_indices.iter().copied().collect();
+        self.verify_primary_pitches_excluding_set(expected_midi_by_score_index, &excluded)
+    }
+
+    fn verify_primary_pitches_excluding_set(
+        &self,
+        expected_midi_by_score_index: &[u8],
+        excluded_source_event_indices: &BTreeSet<usize>,
+    ) -> Result<(), PerformedEventMapError> {
+        let mut primary = BTreeMap::new();
+        for event in &self.events {
+            if event.descendant_ordinal == 0
+                && primary
+                    .insert(event.source_event_id.as_str(), event.midi_note)
+                    .is_some()
+            {
+                return Err(PerformedEventMapError::DuplicateDescendantOrdinal);
+            }
+        }
+        let expected_primary_count = expected_midi_by_score_index
+            .len()
+            .checked_sub(excluded_source_event_indices.len())
+            .ok_or(PerformedEventMapError::InvalidExpectedEventCount)?;
+        if primary.len() != expected_primary_count {
+            return Err(PerformedEventMapError::MissingSourceEvent);
+        }
+        for (index, expected_pitch) in expected_midi_by_score_index.iter().enumerate() {
+            if *expected_pitch > 127 {
+                return Err(PerformedEventMapError::InvalidMidiNote);
+            }
+            if excluded_source_event_indices.contains(&index) {
+                if primary.contains_key(score_event_id(index).as_str()) {
+                    return Err(PerformedEventMapError::ExcludedSourceEventPresent);
+                }
+                continue;
+            }
+            if primary.get(score_event_id(index).as_str()) != Some(expected_pitch) {
+                return Err(PerformedEventMapError::ContextMismatch("primary performed MIDI pitch"));
+            }
+        }
+        Ok(())
+    }
+
     /// Verify the complete receipt/context gate and exact primary MIDI pitches.
     ///
     /// This is the public convenience entry point for acceptance paths; it
@@ -990,6 +1153,52 @@ mod tests {
         assert_eq!(
             map.verify_for_score(&digest('a'), &digest('c'), 48_000, 48_000, 2),
             Err(PerformedEventMapError::ContextMismatch("performed MIDI digest"))
+        );
+    }
+
+    #[test]
+    fn exact_multi_event_exclusion_preserves_all_other_source_events() {
+        let mut map = fixture();
+        map.events.retain(|event| {
+            event.source_event_id != score_event_id(0)
+                && event.source_event_id != score_event_id(1)
+        });
+        map.seal().unwrap();
+        map.verify_for_score_excluding_set_and_pitches(
+            &digest('a'),
+            &digest('b'),
+            48_000,
+            48_000,
+            2,
+            &[1, 0],
+            &[60, 64],
+        )
+        .unwrap();
+
+        let mut wrong = fixture();
+        assert_eq!(
+            wrong.verify_for_score_excluding_set_and_pitches(
+                &digest('a'),
+                &digest('b'),
+                48_000,
+                48_000,
+                2,
+                &[0, 1],
+                &[60, 64],
+            ),
+            Err(PerformedEventMapError::ExcludedSourceEventPresent)
+        );
+
+        assert_eq!(
+            map.verify_for_score_excluding_set(
+                &digest('a'),
+                &digest('b'),
+                48_000,
+                48_000,
+                2,
+                &[0, 0],
+            ),
+            Err(PerformedEventMapError::InvalidExpectedEventCount)
         );
     }
 
