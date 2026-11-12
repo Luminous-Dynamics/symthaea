@@ -856,6 +856,62 @@ mod tests {
     }
 
     #[test]
+    fn committed_synthetic_fixture_is_readable_and_never_qualified() {
+        let raw = include_str!("../../../docs/research/marine/fixtures/synthetic-marine-acoustic-scale-transfer-v0.1.0.json");
+        let case: Case = serde_json::from_str(raw).expect("committed fixture deserializes");
+        let report = audit(&case);
+        assert_eq!(report.disposition, "incomplete");
+        assert_eq!(report.evidence_kind, "synthetic");
+        assert_eq!(report.source_dataset_id, "synthetic-fixture");
+        assert_eq!(report.pair_reports.len(), 2);
+        assert_eq!(
+            report.pair_reports[0].shared_timebase_receipt_sha256,
+            case.pairs[0].shared_timebase_receipt_sha256
+        );
+        assert_eq!(
+            report.pair_reports[0].band_reports[0].frequency_regime_basis,
+            case.pairs[0].model.bands[0].frequency_regime_basis
+        );
+    }
+
+    #[test]
+    fn committed_schema_is_valid_json_and_declares_closed_objects() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/marine-acoustic-scale-transfer-v0.1.0.schema.json"
+        ))
+        .expect("committed schema is valid JSON");
+        assert_eq!(
+            schema["$schema"],
+            "https://json-schema.org/draft/2020-12/schema"
+        );
+        assert_eq!(schema["additionalProperties"], false);
+        assert_eq!(
+            schema["$defs"]["modelBand"]["additionalProperties"],
+            false
+        );
+    }
+
+    #[test]
+    fn ittc_exponent_tables_are_distinct_for_regime_and_bandwidth() {
+        assert_eq!(
+            scaling_exponents(&FrequencyRegime::HighFrequency, &Bandwidth::Proportional),
+            (0.5, 1.0, 1.5, 1.0)
+        );
+        assert_eq!(
+            scaling_exponents(&FrequencyRegime::LowFrequency, &Bandwidth::Proportional),
+            (1.0, 1.0, 2.0, 1.0)
+        );
+        assert_eq!(
+            scaling_exponents(&FrequencyRegime::HighFrequency, &Bandwidth::Constant),
+            (0.25, 1.0, 1.0, 1.5)
+        );
+        assert_eq!(
+            scaling_exponents(&FrequencyRegime::LowFrequency, &Bandwidth::Constant),
+            (0.75, 1.0, 1.5, 1.5)
+        );
+    }
+
+    #[test]
     fn background_correction_uses_linear_energy_subtraction() {
         let corrected = background_corrected_spl(110.0, 100.0).unwrap();
         assert!((corrected - 109.54242509439325).abs() < 1e-9);
