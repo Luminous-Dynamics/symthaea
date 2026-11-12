@@ -217,6 +217,8 @@ pub struct ObserverProfile {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct CapabilityRegistry {
     pub registry_version: String,
+    /// SHA-256 of the canonical frozen registry snapshot, computed by the registry publisher.
+    pub registry_sha256: String,
     pub operators: Vec<OperatorProfile>,
     pub observers: Vec<ObserverProfile>,
 }
@@ -306,6 +308,7 @@ pub enum PlanNodeKind {
     VerifySource,
     Mutate,
     Observe,
+    StageQualification,
     FinalQualification,
 }
 
@@ -315,6 +318,7 @@ impl PlanNodeKind {
             Self::VerifySource => "verify_source",
             Self::Mutate => "mutate",
             Self::Observe => "observe",
+            Self::StageQualification => "stage_qualification",
             Self::FinalQualification => "final_qualification",
         }
     }
@@ -351,6 +355,9 @@ pub struct CompiledPlan {
     pub schema_version: String,
     pub request_id: String,
     pub registry_version: String,
+    pub registry_sha256: String,
+    /// Canonical normalized request, including budgets, policy, scope, controls and all obligations.
+    pub request_contract: String,
     pub sources: Vec<ArtifactRef>,
     pub operator_selections: Vec<OperatorSelection>,
     pub observer_selections: Vec<ObserverSelection>,
@@ -369,6 +376,8 @@ impl CompiledPlan {
         lines.push(format!("schema\t{}", atom(&self.schema_version)));
         lines.push(format!("request\t{}", atom(&self.request_id)));
         lines.push(format!("registry\t{}", atom(&self.registry_version)));
+        lines.push(format!("registry_sha256\t{}", atom(&self.registry_sha256)));
+        lines.push(format!("request_contract\t{}", atom(&self.request_contract)));
         lines.push(format!(
             "resources\t{}\t{}\t{}",
             self.resource_estimate.total_latency_ms,
@@ -555,6 +564,11 @@ fn validate_registry(registry: &CapabilityRegistry) -> Result<(), CompileError> 
     if !valid_identifier(&registry.registry_version) {
         return Err(CompileError::InvalidRequest(
             "registry version must be a non-empty identifier".to_string(),
+        ));
+    }
+    if !valid_sha256(&registry.registry_sha256) {
+        return Err(CompileError::InvalidRequest(
+            "registry snapshot digest must be a lowercase SHA-256".to_string(),
         ));
     }
     let mut operator_identities = BTreeSet::new();
@@ -926,6 +940,124 @@ fn select_observers<'a>(
     Ok(selected)
 }
 
+/// Canonical representation of every normalized request constraint.
+///
+/// All unordered collections are sorted; input bindings and stages are
+/// ordered by stable IDs. Numeric controls are encoded by exact IEEE-754
+/// bit patterns, so different f64 values cannot collapse through formatting.
+fn canonical_request_contract(request: &EditRequest) -> String {
+    let mut lines = vec![
+        format!("request\t{}", atom(&request.request_id)),
+        format!(
+            "budget\t{}\t{}\t{}",
+            request.resource_budget.maximum_total_latency_ms,
+            request.resource_budget.maximum_total_compute_units,
+            request.resource_budget.maximum_mutation_risk_score
+        ),
+        format!(
+            "policy\t{}\t{}",
+            request.policy.require_reproducible_operators,
+            request.policy.require_verified_rights
+        ),
+    ];
+
+    let mut sources = request.sources.clone();
+    sources.sort_by(|a, b| a.id.cmp(&b.id));
+    for source in sources {
+        lines.push(format!(
+            "source\t{}\t{}\t{}\t{}",
+            atom(&source.id),
+            atom(&source.artifact_type),
+            source.modality.label(),
+            atom(&source.sha256)
+        ));
+    }
+
+    let mut stages = request.stages.clone();
+    stages.sort_by(|a, b| a.stage_id.cmp(&b.stage_id));
+    for stage in stages {
+        lines.push(format!(
+            "stage\t{}\t{}\t{}\t{}\t{}\t{}",
+            atom(&stage.stage_id),
+            atom(&stage.operation_id),
+            atom(&stage.output_artifact_type),
+            stage.modality.label(),
+            stage.maximum_permitted_mutation_scope.label(),
+            stage.reproducibility_seed.map(|seed| seed.to_string()).unwrap_or_default()
+        ));
+
+        let mut inputs = stage.inputs;
+        inputs.sort_by(|a, b| a.input_id.cmp(&b.input_id));
+        for input in inputs {
+            let origin = match input.origin {
+                InputOrigin::SourceArtifact(id) => format!("source:{}", atom(&id)),
+                InputOrigin::StageOutput(id) => format!("stage:{}", atom(&id)),
+            };
+            lines.push(format!(
+                "input\t{}\t{}\t{}\t{}",
+                atom(&stage.stage_id),
+                atom(&input.input_id),
+                atom(&input.expected_artifact_type),
+                origin
+            ));
+        }
+
+        for capability in &stage.required_capabilities {
+            lines.push(format!("capability\t{}\t{}", atom(&stage.stage_id), atom(capability)));
+        }
+        for property in &stage.protected_properties {
+            lines.push(format!("protected\t{}\t{}", atom(&stage.stage_id), atom(property)));
+        }
+        for receipt in &stage.required_receipts {
+            lines.push(format!("required_receipt\t{}\t{}", atom(&stage.stage_id), atom(receipt)));
+        }
+        for precondition in &stage.required_preconditions {
+            lines.push(format!("precondition\t{}\t{}", atom(&stage.stage_id), atom(precondition)));
+        }
+        for postcondition in &stage.required_postconditions {
+            lines.push(format!("postcondition\t{}\t{}", atom(&stage.stage_id), atom(postcondition)));
+        }
+
+        let mut controls = stage.controls;
+        controls.sort_by(|a, b| {
+            (&a.control_id, &a.unit).cmp(&(&b.control_id, &b.unit))
+        });
+        for control in controls {
+            lines.push(format!(
+                "control\t{}\t{}\t{}\t{:016x}\t{:016x}",
+                atom(&stage.stage_id),
+                atom(&control.control_id),
+                atom(&control.unit),
+                control.minimum.to_bits(),
+                control.maximum.to_bits()
+            ));
+        }
+
+        let mut observations = stage.observations;
+        observations.sort_by(|a, b| a.metric_id.cmp(&b.metric_id));
+        for observation in observations {
+            lines.push(format!(
+                "observation\t{}\t{}\t{}\t{}\t{}",
+                atom(&stage.stage_id),
+                atom(&observation.metric_id),
+                observation.minimum_observers,
+                observation.must_be_independent_from_mutator,
+                observation.distinct_observer_groups
+            ));
+        }
+
+        if let Some(preferred) = stage.preferred_operator {
+            lines.push(format!(
+                "preferred_operator\t{}\t{}",
+                atom(&stage.stage_id),
+                atom(&preferred.stable_key())
+            ));
+        }
+    }
+
+    lines.join("\n") + "\n"
+}
+
 /// Compile a normalized request into a static execution/evidence DAG.
 ///
 /// No node is executed. execution_authorized is always false. A downstream
@@ -1010,6 +1142,7 @@ pub fn compile_plan(
 
     let mut nodes = Vec::<PlanNode>::new();
     let mut source_node_ids = BTreeMap::<String, String>::new();
+    /// Maps each stage to its qualification barrier, not just its mutation node.
     let mut stage_node_ids = BTreeMap::<String, String>::new();
     let mut operator_selections = Vec::new();
     let mut observer_selections = Vec::new();
@@ -1027,7 +1160,7 @@ pub fn compile_plan(
             profile: None,
             profile_independence_group: None,
             input_artifact_types: vec![source.artifact_type.clone()],
-            output_artifact_type: Some("verified_artifact_reference".to_string()),
+            output_artifact_type: Some(source.artifact_type.clone()),
             evidence_metric: None,
             preconditions: BTreeSet::new(),
             postconditions: BTreeSet::from([
@@ -1060,7 +1193,6 @@ pub fn compile_plan(
             input_types.push(input.expected_artifact_type.clone());
         }
         input_types.sort();
-        stage_node_ids.insert(stage_id.clone(), node_id.clone());
 
         operator_selections.push(OperatorSelection {
             stage_id: stage_id.clone(),
@@ -1087,6 +1219,7 @@ pub fn compile_plan(
             risk_score: operator.risk_score,
         });
 
+        let mut stage_observation_node_ids = Vec::new();
         for (observer, metric_id) in selected_observers.get(stage_id).expect("observers selected") {
             let observer_node_id = format!(
                 "observe:{}:{}:{}:{}:{}",
@@ -1096,6 +1229,7 @@ pub fn compile_plan(
                 atom(&observer.identity.version),
                 atom(&observer.identity.artifact_sha256)
             );
+            stage_observation_node_ids.push(observer_node_id.clone());
             observer_selections.push(ObserverSelection {
                 stage_id: stage_id.clone(),
                 metric_id: metric_id.clone(),
@@ -1122,12 +1256,40 @@ pub fn compile_plan(
                 risk_score: 0,
             });
         }
+
+        // A downstream mutation must wait for the parent stage's independent
+        // observations and qualification barrier, not merely its mutation.
+        let stage_gate_id = format!("qualify-stage:{}", atom(stage_id));
+        let mut stage_gate_dependencies =
+            BTreeSet::from([node_id.clone()]);
+        stage_gate_dependencies.extend(stage_observation_node_ids);
+        nodes.push(PlanNode {
+            node_id: stage_gate_id.clone(),
+            kind: PlanNodeKind::StageQualification,
+            depends_on: stage_gate_dependencies.into_iter().collect(),
+            stage_id: Some(stage_id.clone()),
+            profile: None,
+            profile_independence_group: None,
+            input_artifact_types: vec![stage.output_artifact_type.clone()],
+            output_artifact_type: Some("qualified_stage_artifact".to_string()),
+            evidence_metric: None,
+            preconditions: BTreeSet::from([
+                "stage_mutation_succeeded".to_string(),
+                "all_stage_observations_passed".to_string(),
+                "no_unknown_or_indeterminate_evidence".to_string(),
+            ]),
+            postconditions: BTreeSet::from(["stage_qualified_for_dependents".to_string()]),
+            receipt_obligations: BTreeSet::from(["stage_qualification_receipt".to_string()]),
+            estimated_latency_ms: 0,
+            estimated_compute_units: 0,
+            risk_score: 0,
+        });
+        stage_node_ids.insert(stage_id.clone(), stage_gate_id);
     }
 
-    let final_dependencies = nodes
-        .iter()
-        .filter(|node| matches!(node.kind, PlanNodeKind::Mutate | PlanNodeKind::Observe))
-        .map(|node| node.node_id.clone())
+    let final_dependencies = stage_node_ids
+        .values()
+        .cloned()
         .collect::<BTreeSet<_>>();
     nodes.push(PlanNode {
         node_id: format!("qualify:{}", atom(&request.request_id)),
@@ -1156,6 +1318,8 @@ pub fn compile_plan(
         schema_version: PLAN_SCHEMA_VERSION.to_string(),
         request_id: request.request_id.clone(),
         registry_version: registry.registry_version.clone(),
+        registry_sha256: registry.registry_sha256.clone(),
+        request_contract: canonical_request_contract(request),
         sources: sorted_sources,
         operator_selections,
         observer_selections,
@@ -1342,6 +1506,7 @@ mod tests {
     fn registry() -> CapabilityRegistry {
         CapabilityRegistry {
             registry_version: "registry-2026-11-12-v1".to_string(),
+            registry_sha256: OTHER_DIGEST.to_string(),
             operators: vec![operator("stem-editor", MutationScope::Stem)],
             observers: vec![observer("spectral-auditor", "spectral-family")],
         }
@@ -1609,6 +1774,63 @@ mod tests {
         let gate = plan.nodes.iter().find(|node| node.kind == PlanNodeKind::FinalQualification).unwrap();
         assert!(gate.depends_on.contains(&"mutate:remove-vocals".to_string()));
         assert!(gate.depends_on.contains(&"mutate:remove-drums".to_string()));
+    }
+
+    #[test]
+    fn dependent_mutation_waits_for_parent_observers_and_stage_gate() {
+        let mut request = request();
+        request.stages[0].stage_id = "first".to_string();
+        request.stages.push(EditStageRequest {
+            stage_id: "second".to_string(),
+            inputs: vec![InputBinding {
+                input_id: "previous".to_string(),
+                expected_artifact_type: "audio/wav".to_string(),
+                origin: InputOrigin::StageOutput("first".to_string()),
+            }],
+            ..request.stages[0].clone()
+        });
+        let plan = compile_plan(&request, &registry()).unwrap();
+        let positions: BTreeMap<String, usize> = plan
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(index, node)| (node.node_id.clone(), index))
+            .collect();
+        let first_observer = plan.nodes.iter()
+            .find(|node| node.kind == PlanNodeKind::Observe && node.stage_id.as_deref() == Some("first"))
+            .expect("first stage observer");
+        let first_gate = plan.nodes.iter()
+            .find(|node| node.kind == PlanNodeKind::StageQualification && node.stage_id.as_deref() == Some("first"))
+            .expect("first stage qualification");
+        let second_mutation = plan.nodes.iter()
+            .find(|node| node.kind == PlanNodeKind::Mutate && node.stage_id.as_deref() == Some("second"))
+            .expect("second stage mutation");
+        assert!(positions[&first_observer.node_id] < positions[&first_gate.node_id]);
+        assert!(positions[&first_gate.node_id] < positions[&second_mutation.node_id]);
+        assert!(second_mutation.depends_on.contains(&first_gate.node_id));
+    }
+
+    #[test]
+    fn canonical_manifest_binds_the_complete_request_contract_and_registry_snapshot() {
+        let first = compile_plan(&request(), &registry()).unwrap();
+        let mut changed_request = request();
+        changed_request.stages[0].protected_properties =
+            BTreeSet::from(["non_target_stems".to_string(), "phase_coherence".to_string()]);
+        let second = compile_plan(&changed_request, &registry()).unwrap();
+        assert_ne!(first.canonical_manifest(), second.canonical_manifest());
+
+        let mut changed_registry = registry();
+        changed_registry.registry_sha256 =
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee".to_string();
+        let third = compile_plan(&request(), &changed_registry).unwrap();
+        assert_ne!(first.canonical_manifest(), third.canonical_manifest());
+    }
+
+    #[test]
+    fn invalid_registry_snapshot_digest_is_rejected() {
+        let mut registry = registry();
+        registry.registry_sha256 = "not-a-sha256".to_string();
+        assert!(matches!(compile_plan(&request(), &registry), Err(CompileError::InvalidRequest(_))));
     }
 
     #[test]
