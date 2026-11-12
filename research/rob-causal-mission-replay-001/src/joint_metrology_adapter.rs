@@ -147,24 +147,23 @@ fn required_digest(
 
 /// Consume the upstream first-law result without reimplementing its model.
 pub fn energy_closure(receipt: &EnergyBoundaryReceipt) -> EnergyClosureResult {
-    let disposition = if !receipt.boundary_complete
-        || receipt.boundary_manifest_digest.trim().is_empty()
-    {
-        EnergyClosureDisposition::Unknown
-    } else {
-        match receipt.closure_disposition {
-            UpstreamEnergyDisposition::Balanced
-                if !receipt.closure_receipt_digest.trim().is_empty() =>
-            {
-                EnergyClosureDisposition::Balanced
+    let disposition =
+        if !receipt.boundary_complete || receipt.boundary_manifest_digest.trim().is_empty() {
+            EnergyClosureDisposition::Unknown
+        } else {
+            match receipt.closure_disposition {
+                UpstreamEnergyDisposition::Balanced
+                    if !receipt.closure_receipt_digest.trim().is_empty() =>
+                {
+                    EnergyClosureDisposition::Balanced
+                }
+                UpstreamEnergyDisposition::Balanced | UpstreamEnergyDisposition::Unknown => {
+                    EnergyClosureDisposition::Unknown
+                }
+                UpstreamEnergyDisposition::Inconclusive => EnergyClosureDisposition::Inconclusive,
+                UpstreamEnergyDisposition::Invalid => EnergyClosureDisposition::Invalid,
             }
-            UpstreamEnergyDisposition::Balanced | UpstreamEnergyDisposition::Unknown => {
-                EnergyClosureDisposition::Unknown
-            }
-            UpstreamEnergyDisposition::Inconclusive => EnergyClosureDisposition::Inconclusive,
-            UpstreamEnergyDisposition::Invalid => EnergyClosureDisposition::Invalid,
-        }
-    };
+        };
     EnergyClosureResult {
         boundary_complete: receipt.boundary_complete,
         receipt_digest: (!receipt.closure_receipt_digest.trim().is_empty())
@@ -180,8 +179,7 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
     let mission_id = evidence.mission.scope.mission_id.as_str();
     let instruments = &evidence.instruments;
 
-    if evidence.mission.applications.len() != 1
-        || evidence.mission.physical_transitions.len() != 1
+    if evidence.mission.applications.len() != 1 || evidence.mission.physical_transitions.len() != 1
     {
         push(
             &mut findings,
@@ -193,23 +191,68 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
 
     for (field, value) in [
         ("actuator_id", instruments.actuator_id.as_str()),
-        ("actuator_configuration_digest", instruments.actuator_configuration_digest.as_str()),
-        ("controller_configuration_digest", instruments.controller_configuration_digest.as_str()),
+        (
+            "actuator_configuration_digest",
+            instruments.actuator_configuration_digest.as_str(),
+        ),
+        (
+            "controller_configuration_digest",
+            instruments.controller_configuration_digest.as_str(),
+        ),
         ("policy_digest", instruments.policy_digest.as_str()),
         ("model_digest", instruments.model_digest.as_str()),
-        ("action_domain_digest", instruments.action_domain_digest.as_str()),
-        ("sensor_calibration_digest", instruments.sensor_calibration_digest.as_str()),
-        ("torque_transducer_calibration_digest", instruments.torque_transducer_calibration_digest.as_str()),
-        ("power_analyzer_calibration_digest", instruments.power_analyzer_calibration_digest.as_str()),
-        ("thermal_sensor_calibration_digest", instruments.thermal_sensor_calibration_digest.as_str()),
-        ("sampling_spec_digest", instruments.sampling_spec_digest.as_str()),
-        ("energy_boundary_manifest_digest", instruments.energy_boundary_manifest_digest.as_str()),
-        ("decision_calibration_receipt_digest", instruments.decision_calibration_receipt_digest.as_str()),
-        ("actuator_application_receipt_digest", instruments.actuator_application_receipt_digest.as_str()),
-        ("executed_prefix_expected_digest", instruments.executed_prefix_expected_digest.as_str()),
-        ("executed_prefix_observed_digest", instruments.executed_prefix_observed_digest.as_str()),
-        ("thermal_snapshot_digest", instruments.thermal_snapshot_digest.as_str()),
-        ("expected_predecessor_reserve_digest", evidence.expected_predecessor_reserve_digest.as_str()),
+        (
+            "action_domain_digest",
+            instruments.action_domain_digest.as_str(),
+        ),
+        (
+            "sensor_calibration_digest",
+            instruments.sensor_calibration_digest.as_str(),
+        ),
+        (
+            "torque_transducer_calibration_digest",
+            instruments.torque_transducer_calibration_digest.as_str(),
+        ),
+        (
+            "power_analyzer_calibration_digest",
+            instruments.power_analyzer_calibration_digest.as_str(),
+        ),
+        (
+            "thermal_sensor_calibration_digest",
+            instruments.thermal_sensor_calibration_digest.as_str(),
+        ),
+        (
+            "sampling_spec_digest",
+            instruments.sampling_spec_digest.as_str(),
+        ),
+        (
+            "energy_boundary_manifest_digest",
+            instruments.energy_boundary_manifest_digest.as_str(),
+        ),
+        (
+            "decision_calibration_receipt_digest",
+            instruments.decision_calibration_receipt_digest.as_str(),
+        ),
+        (
+            "actuator_application_receipt_digest",
+            instruments.actuator_application_receipt_digest.as_str(),
+        ),
+        (
+            "executed_prefix_expected_digest",
+            instruments.executed_prefix_expected_digest.as_str(),
+        ),
+        (
+            "executed_prefix_observed_digest",
+            instruments.executed_prefix_observed_digest.as_str(),
+        ),
+        (
+            "thermal_snapshot_digest",
+            instruments.thermal_snapshot_digest.as_str(),
+        ),
+        (
+            "expected_predecessor_reserve_digest",
+            evidence.expected_predecessor_reserve_digest.as_str(),
+        ),
     ] {
         required_digest(&mut findings, value, field, mission_id);
     }
@@ -265,10 +308,8 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
     if let Some(chunk) = evidence.mission.chunks.first()
         && (chunk.model_digest != instruments.model_digest
             || chunk.action_domain_digest != instruments.action_domain_digest
-            || chunk.expected_executed_prefix_digest
-                != instruments.executed_prefix_expected_digest
-            || chunk.observed_executed_prefix_digest
-                != instruments.executed_prefix_observed_digest)
+            || chunk.expected_executed_prefix_digest != instruments.executed_prefix_expected_digest
+            || chunk.observed_executed_prefix_digest != instruments.executed_prefix_observed_digest)
     {
         push(
             &mut findings,
@@ -406,9 +447,7 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
                     reference_limit_ns: Some(limit),
                     disposition: CommandResponseDisposition::Unknown,
                 }
-            } else if onset.stamp.timestamp.upper_ns
-                < application.stamp.timestamp.lower_ns
-            {
+            } else if onset.stamp.timestamp.upper_ns < application.stamp.timestamp.lower_ns {
                 push(
                     &mut findings,
                     FindingSeverity::Invalid,
@@ -421,9 +460,7 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
                     reference_limit_ns: Some(limit),
                     disposition: CommandResponseDisposition::ExceedsReference,
                 }
-            } else if onset.stamp.timestamp.lower_ns
-                < application.stamp.timestamp.upper_ns
-            {
+            } else if onset.stamp.timestamp.lower_ns < application.stamp.timestamp.upper_ns {
                 push(
                     &mut findings,
                     FindingSeverity::Unknown,
@@ -468,10 +505,8 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
                     disposition: CommandResponseDisposition::Unknown,
                 }
             } else {
-                let minimum = onset.stamp.timestamp.lower_ns
-                    - application.stamp.timestamp.upper_ns;
-                let maximum = onset.stamp.timestamp.upper_ns
-                    - application.stamp.timestamp.lower_ns;
+                let minimum = onset.stamp.timestamp.lower_ns - application.stamp.timestamp.upper_ns;
+                let maximum = onset.stamp.timestamp.upper_ns - application.stamp.timestamp.lower_ns;
                 let disposition = if maximum <= limit {
                     CommandResponseDisposition::WithinReference
                 } else if minimum > limit {
@@ -545,12 +580,7 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
 mod tests {
     use super::*;
 
-    fn stamp(
-        id: &str,
-        sequence: u64,
-        tick: u64,
-        time_ns: u64,
-    ) -> super::super::EventStamp {
+    fn stamp(id: &str, sequence: u64, tick: u64, time_ns: u64) -> super::super::EventStamp {
         super::super::EventStamp {
             event_id: id.to_owned(),
             sequence,
@@ -705,12 +735,18 @@ mod tests {
         let report = qualify_joint_metrology(&valid_evidence());
         assert_eq!(report.disposition, QualificationDisposition::Qualified);
         assert_eq!(report.causal_replay.disposition, ReplayDisposition::Closed);
-        assert_eq!(report.energy.disposition, EnergyClosureDisposition::Balanced);
+        assert_eq!(
+            report.energy.disposition,
+            EnergyClosureDisposition::Balanced
+        );
         assert_eq!(
             report.command_response.disposition,
             CommandResponseDisposition::WithinReference
         );
-        assert_eq!(report.causal_replay.aoi_bounds[0].minimum_age_ns, 10_000_000);
+        assert_eq!(
+            report.causal_replay.aoi_bounds[0].minimum_age_ns,
+            10_000_000
+        );
         assert!(!report.actuation_authorized);
         assert!(!report.causal_replay.actuation_authorized);
     }
@@ -721,7 +757,10 @@ mod tests {
         evidence.energy.boundary_complete = false;
         let report = qualify_joint_metrology(&evidence);
         assert_eq!(report.disposition, QualificationDisposition::Unknown);
-        assert_eq!(report.energy.receipt_digest.as_deref(), Some("first-law-receipt"));
+        assert_eq!(
+            report.energy.receipt_digest.as_deref(),
+            Some("first-law-receipt")
+        );
         assert_eq!(report.energy.disposition, EnergyClosureDisposition::Unknown);
     }
 
@@ -743,16 +782,15 @@ mod tests {
         evidence.energy.closure_disposition = UpstreamEnergyDisposition::Invalid;
         let report = qualify_joint_metrology(&evidence);
         assert_eq!(report.disposition, QualificationDisposition::Rejected);
-        assert_eq!(
-            report.energy.disposition,
-            EnergyClosureDisposition::Invalid
-        );
+        assert_eq!(report.energy.disposition, EnergyClosureDisposition::Invalid);
     }
 
     #[test]
     fn missing_thermal_node_prevents_joint_qualification() {
         let mut evidence = valid_evidence();
-        evidence.mission.physical_transitions[0].thermal_node_ids.pop();
+        evidence.mission.physical_transitions[0]
+            .thermal_node_ids
+            .pop();
         let report = qualify_joint_metrology(&evidence);
         assert_eq!(report.disposition, QualificationDisposition::Unknown);
         assert_eq!(report.causal_replay.disposition, ReplayDisposition::Unknown);
@@ -789,7 +827,10 @@ mod tests {
         evidence.mission.decisions[0].regret_upper_units = 3;
         let report = qualify_joint_metrology(&evidence);
         assert_eq!(report.disposition, QualificationDisposition::Rejected);
-        assert_eq!(report.causal_replay.disposition, ReplayDisposition::Rejected);
+        assert_eq!(
+            report.causal_replay.disposition,
+            ReplayDisposition::Rejected
+        );
     }
 
     #[test]
@@ -816,7 +857,10 @@ mod tests {
             report.command_response.disposition,
             CommandResponseDisposition::ExceedsReference
         );
-        assert_eq!(report.causal_replay.aoi_bounds[0].minimum_age_ns, 10_000_000);
+        assert_eq!(
+            report.causal_replay.aoi_bounds[0].minimum_age_ns,
+            10_000_000
+        );
     }
 
     #[test]
@@ -851,11 +895,10 @@ mod tests {
     #[test]
     fn timestamp_uncertainty_overlapping_response_limit_remains_unknown() {
         let mut evidence = valid_evidence();
-        evidence.motion_onset.as_mut().unwrap().stamp.timestamp =
-            super::super::TimestampInterval {
-                lower_ns: 129_000_000,
-                upper_ns: 132_000_000,
-            };
+        evidence.motion_onset.as_mut().unwrap().stamp.timestamp = super::super::TimestampInterval {
+            lower_ns: 129_000_000,
+            upper_ns: 132_000_000,
+        };
         evidence.mission.physical_transitions[0].stamp.timestamp =
             super::super::TimestampInterval {
                 lower_ns: 140_000_000,
@@ -889,6 +932,9 @@ mod tests {
             report.energy.receipt_digest.as_deref(),
             Some("first-law-receipt")
         );
-        assert_eq!(report.energy.disposition, EnergyClosureDisposition::Balanced);
+        assert_eq!(
+            report.energy.disposition,
+            EnergyClosureDisposition::Balanced
+        );
     }
 }
