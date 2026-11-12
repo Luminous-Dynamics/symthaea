@@ -1280,7 +1280,10 @@ mod tests {
         let report=audit(&input);
         let axial=report.component_metrics.iter().find(|m|m.component=="axial").unwrap();
         assert!(axial.area_weight_sum > 0.999);
-        assert!((axial.bias.unwrap() - 0.0018671875).abs() < 1.0e-9);
+        let total_area_weight: f64 = input.target.points.iter().map(|point| point.area_weight).sum();
+        let expected_bias = 0.005
+            + 0.05 * input.target.points[0].area_weight / total_area_weight;
+        assert!((axial.bias.unwrap() - expected_bias).abs() < 1.0e-12);
         assert_ne!(axial.bias,axial.unweighted_bias);
     }
 
