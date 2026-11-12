@@ -21,6 +21,19 @@ This is a rights-aware, fail-closed inventory of an external population-level pl
 - Hugging Face JSON dataset viewer schema-cast failure across scenario and result artifacts.
 - README's MIT license assertion with no LICENSE file in the inspected repository tree and no detected repository license metadata.
 
+## Scenario corpus structural audit
+
+The pinned `scenarios_100.json` blob was inspected read-only and the resulting counts are frozen in the manifest:
+
+- 100 records and 100 unique scenario IDs.
+- All ten declared fields are populated in every record.
+- Ten domains, exactly ten records per domain.
+- Five authority levels, exactly 20 records per level.
+- All 50 domain-by-authority cells contain exactly two records.
+- No exact duplicate scenario bundles or duplicate policy strings were found.
+
+This is a structural audit only. It does not assess whether generated scenarios are balanced, semantically valid, culturally representative, neutral, factually sound, or predictive of human populations.
+
 ## Reproduce local metadata qualification
 
 From the Symthaea repository root:
