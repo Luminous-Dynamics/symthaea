@@ -1,0 +1,545 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.org/schemas/SAM_TRAFFIC_CONVENTION_PROFILE_SCHEMA_V0_1.json",
+  "title": "SAM Traffic Convention Profile Registry v0.1",
+  "description": "Jurisdiction-bound traffic-side, lane-side and vehicle-layout semantics. Structural validity is not proof that a rule profile is legally correct or current.",
+  "type": "object",
+  "required": [
+    "schema_id",
+    "schema_version",
+    "claim_ceiling",
+    "profiles",
+    "evidence_records"
+  ],
+  "properties": {
+    "schema_id": {
+      "const": "luminous.sam.traffic-convention-profiles"
+    },
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "claim_ceiling": {
+      "const": "profile_metadata_only_no_automatic_legal_authority"
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/profile"
+      }
+    },
+    "paired_scenes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/scene"
+      }
+    },
+    "evidence_records": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/evidence_record"
+      }
+    }
+  },
+  "$defs": {
+    "profile": {
+      "type": "object",
+      "required": [
+        "profile_id",
+        "jurisdiction_profile_id",
+        "traffic_side",
+        "steering_wheel_position",
+        "travel_frame_id",
+        "keep_side_sign",
+        "kerbside_sign",
+        "median_side_sign",
+        "passing_side_sign",
+        "passing_rule_profile_id",
+        "passing_rule_profile_version",
+        "lane_ordering_profile_id",
+        "applicability",
+        "jurisdiction_profile_version",
+        "verification_evidence_refs",
+        "verification_method_id",
+        "verification_record_id",
+        "verification_valid_from",
+        "verification_valid_until"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jurisdiction_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "traffic_side": {
+          "enum": [
+            "left",
+            "right",
+            "unknown"
+          ]
+        },
+        "steering_wheel_position": {
+          "enum": [
+            "left",
+            "right",
+            "center",
+            "unknown"
+          ]
+        },
+        "travel_frame_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "keep_side_sign": {
+          "type": "integer",
+          "enum": [
+            -1,
+            1
+          ]
+        },
+        "kerbside_sign": {
+          "type": "integer",
+          "enum": [
+            -1,
+            1
+          ]
+        },
+        "median_side_sign": {
+          "type": "integer",
+          "enum": [
+            -1,
+            1
+          ]
+        },
+        "passing_side_sign": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "enum": [
+            -1,
+            1,
+            null
+          ]
+        },
+        "passing_rule_profile_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "passing_rule_profile_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "lane_ordering_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "applicability": {
+          "enum": [
+            "synthetic_fixture",
+            "jurisdiction_profile_unverified",
+            "verified_for_declared_context",
+            "unknown"
+          ]
+        },
+        "jurisdiction_profile_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verification_evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "verification_method_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "verification_record_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "verification_valid_from": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "verification_valid_until": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "traffic_side": {
+                "const": "left"
+              }
+            },
+            "required": [
+              "traffic_side"
+            ]
+          },
+          "then": {
+            "properties": {
+              "keep_side_sign": {
+                "const": 1
+              },
+              "kerbside_sign": {
+                "const": 1
+              },
+              "median_side_sign": {
+                "const": -1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "traffic_side": {
+                "const": "right"
+              }
+            },
+            "required": [
+              "traffic_side"
+            ]
+          },
+          "then": {
+            "properties": {
+              "keep_side_sign": {
+                "const": -1
+              },
+              "kerbside_sign": {
+                "const": -1
+              },
+              "median_side_sign": {
+                "const": 1
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "traffic_side": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "traffic_side"
+            ]
+          },
+          "then": {
+            "properties": {
+              "applicability": {
+                "const": "unknown"
+              },
+              "passing_side_sign": {
+                "const": null
+              },
+              "passing_rule_profile_id": {
+                "const": null
+              },
+              "passing_rule_profile_version": {
+                "const": null
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "applicability": {
+                "const": "verified_for_declared_context"
+              }
+            },
+            "required": [
+              "applicability"
+            ]
+          },
+          "then": {
+            "properties": {
+              "verification_evidence_refs": {
+                "type": "array",
+                "minItems": 1
+              },
+              "verification_method_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "verification_record_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "verification_valid_from": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              },
+              "verification_valid_until": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "scene": {
+      "type": "object",
+      "required": [
+        "scene_id",
+        "pair_id",
+        "traffic_convention_profile_id",
+        "map_traffic_convention_profile_id",
+        "map_profile_id",
+        "travel_frame_id",
+        "scenario_family",
+        "ego_state",
+        "candidate_command",
+        "lanes",
+        "declared_passing_side_sign"
+      ],
+      "properties": {
+        "scene_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pair_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "traffic_convention_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "map_traffic_convention_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "map_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "travel_frame_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ego_state": {
+          "type": "object",
+          "required": [
+            "position_m",
+            "heading_rad",
+            "velocity_mps",
+            "yaw_rate_rad_s",
+            "lateral_offset_m",
+            "curvature_per_m",
+            "steering_angle_rad"
+          ],
+          "properties": {
+            "position_m": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "heading_rad": {
+              "type": "number"
+            },
+            "velocity_mps": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            "yaw_rate_rad_s": {
+              "type": "number"
+            },
+            "lateral_offset_m": {
+              "type": "number"
+            },
+            "curvature_per_m": {
+              "type": "number"
+            },
+            "steering_angle_rad": {
+              "type": "number"
+            }
+          }
+        },
+        "candidate_command": {
+          "type": "object",
+          "required": [
+            "steering",
+            "throttle",
+            "brake"
+          ],
+          "properties": {
+            "steering": {
+              "type": "number"
+            },
+            "throttle": {
+              "type": "number"
+            },
+            "brake": {
+              "type": "number"
+            }
+          }
+        },
+        "lanes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "lane_id",
+              "role",
+              "center_lateral_m",
+              "relative_lateral_sign"
+            ],
+            "properties": {
+              "lane_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "role": {
+                "enum": [
+                  "ego_travel_lane",
+                  "oncoming_lane",
+                  "bus_lane",
+                  "cycle_lane",
+                  "shoulder",
+                  "unknown"
+                ]
+              },
+              "center_lateral_m": {
+                "type": "number"
+              },
+              "relative_lateral_sign": {
+                "type": "integer",
+                "enum": [
+                  -1,
+                  1
+                ]
+              }
+            }
+          },
+          "minItems": 2
+        },
+        "declared_passing_side_sign": {
+          "type": "integer",
+          "enum": [
+            -1,
+            1
+          ]
+        }
+      }
+    },
+    "evidence_record": {
+      "type": "object",
+      "required": [
+        "evidence_id",
+        "jurisdiction_profile_id",
+        "jurisdiction_profile_version",
+        "evidence_kind",
+        "issuer",
+        "title",
+        "reference_uri",
+        "content_digest",
+        "published_at",
+        "effective_from",
+        "effective_until",
+        "retrieved_at"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jurisdiction_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "jurisdiction_profile_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_kind": {
+          "enum": [
+            "traffic_law",
+            "road_authority",
+            "map_rule_layer",
+            "official_guidance",
+            "standard",
+            "other"
+          ]
+        },
+        "issuer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reference_uri": {
+          "type": "string",
+          "minLength": 1
+        },
+        "content_digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "published_at": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "effective_from": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "effective_until": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "retrieved_at": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        }
+      }
+    }
+  }
+}
