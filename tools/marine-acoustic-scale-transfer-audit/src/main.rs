@@ -744,6 +744,7 @@ mod tests {
     fn background_dominated_band_is_incomplete() {
         let mut case = synthetic_case();
         make_measured(&mut case);
+        case.operating_point_pairs[0].bands[0].model_background_spl_db = 117.1;
         case.operating_point_pairs[0].bands[0].signal_to_background_margin_db = 2.9;
         let report = audit(&case);
         assert_eq!(report.structural_disposition, "INCOMPLETE");
@@ -775,6 +776,51 @@ mod tests {
         band.background_correction_applied = true;
         let report = audit(&case);
         assert_eq!(report.structural_disposition, "ELIGIBLE", "{:?}", report.incomplete_reasons);
+        let corrected = report.pair_results[0].band_results[0]
+            .background_corrected_model_source_level_db.expect("background-corrected level");
+        assert!((corrected - 118.349).abs() < 0.01);
+    }
+
+    #[test]
+    fn tip_vortex_requires_unimplemented_reynolds_scale_correction() {
+        let mut case = synthetic_case();
+        make_measured(&mut case);
+        case.operating_point_pairs[0].cavitation_pattern = "TIP_VORTEX".to_string();
+        let report = audit(&case);
+        assert_eq!(report.structural_disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn unknown_wake_similarity_is_incomplete() {
+        let mut case = synthetic_case();
+        make_measured(&mut case);
+        case.operating_point_pairs[0].wake_similarity_disposition = "UNKNOWN".to_string();
+        let report = audit(&case);
+        assert_eq!(report.structural_disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn signal_background_margin_must_match_measured_levels() {
+        let mut case = synthetic_case();
+        make_measured(&mut case);
+        case.operating_point_pairs[0].bands[0].signal_to_background_margin_db = 9.0;
+        let report = audit(&case);
+        assert_eq!(report.structural_disposition, "INVALID");
+    }
+
+    #[test]
+    fn ten_db_signal_background_margin_needs_no_subtraction() {
+        let mut case = synthetic_case();
+        make_measured(&mut case);
+        let band = &mut case.operating_point_pairs[0].bands[0];
+        band.model_background_spl_db = 110.0;
+        band.signal_to_background_margin_db = 10.0;
+        band.background_correction_applied = false;
+        let report = audit(&case);
+        assert_eq!(report.structural_disposition, "ELIGIBLE", "{:?}", report.incomplete_reasons);
+        let source_level = report.pair_results[0].band_results[0]
+            .background_corrected_model_source_level_db.expect("source level");
+        assert!((source_level - (120.0 - band.facility_transfer_function_db)).abs() < 1.0e-12);
     }
 
     #[test]
