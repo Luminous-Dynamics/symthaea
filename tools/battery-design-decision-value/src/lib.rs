@@ -382,8 +382,7 @@ fn validate_experiment(
     validate_nonnegative(experiment.cost_usd, "experiment USD cost")?;
     validate_nonnegative(experiment.duration_hours, "experiment duration")?;
     validate_nonnegative(experiment.material_grams, "experiment material")?;
-    let experiment_evidence =
-        require_evidence(registry, &experiment.evidence_id, "experiment")?;
+    let experiment_evidence = require_evidence(registry, &experiment.evidence_id, "experiment")?;
 
     validate_unique(
         experiment
