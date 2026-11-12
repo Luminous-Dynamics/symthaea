@@ -127,6 +127,7 @@
           "line_identity_digest",
           "split",
           "feature_cutoff_cycle",
+          "feature_observations",
           "cycles_observed",
           "status",
           "event_cycle",
@@ -206,6 +207,33 @@
           "outcome_evidence_id": {
             "type": "string",
             "minLength": 1
+          },
+          "feature_observations": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "feature_id",
+                "available_cycle",
+                "evidence_id"
+              ],
+              "properties": {
+                "feature_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "available_cycle": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "evidence_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
           }
         }
       }
