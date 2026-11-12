@@ -1636,3 +1636,144 @@ pub fn run_competitive_reference_audit(input: &Path, output: Option<&Path>) -> R
     }
     Ok(())
 }
+
+
+#[cfg(test)]
+mod competitive_reference_tests {
+    use super::*;
+
+    const FIXTURE: &str = include_str!(
+        "../../benchmarks/planetary-energy-service/v0.1/competitive-reference-snapshot.json"
+    );
+
+    fn value_from_fixture() -> serde_json::Value {
+        serde_json::from_str(FIXTURE).expect("competitive snapshot must parse")
+    }
+
+    #[test]
+    fn checked_in_competitive_snapshot_has_source_and_boundary_for_every_metric() {
+        let report = audit_competitive_snapshot(FIXTURE.as_bytes())
+            .expect("competitive snapshot parses");
+        assert_eq!(report.status, "PASS");
+        assert!(report.reference_count >= 10);
+        assert!(report.metric_count >= 15);
+        assert_eq!(report.passed_count, report.metric_count);
+        assert_eq!(report.blocked_count, 0);
+    }
+
+    #[test]
+    fn duplicate_metric_identity_blocks_the_snapshot() {
+        let mut value = value_from_fixture();
+        value["metrics"][1]["metric_id"] = value["metrics"][0]["metric_id"].clone();
+        let bytes = serde_json::to_vec(&value).expect("snapshot serializes");
+        let report = audit_competitive_snapshot(&bytes).expect("snapshot parses");
+        assert_eq!(report.status, "BLOCKED");
+        assert!(report.metrics.iter().any(|metric| {
+            metric.findings.iter().any(|finding| {
+                finding.code == "COMPETITIVE_METRIC_ID_DUPLICATE"
+            })
+        }));
+    }
+
+    #[test]
+    fn duplicate_source_identity_blocks_the_snapshot() {
+        let mut value = value_from_fixture();
+        value["references"][1]["reference_id"] =
+            value["references"][0]["reference_id"].clone();
+        let bytes = serde_json::to_vec(&value).expect("snapshot serializes");
+        let report = audit_competitive_snapshot(&bytes).expect("snapshot parses");
+        assert_eq!(report.status, "BLOCKED");
+        assert!(report
+            .corpus_findings
+            .iter()
+            .any(|finding| finding.code == "COMPETITIVE_REFERENCE_ID_DUPLICATE"));
+    }
+
+    #[test]
+    fn missing_metric_boundary_blocks_cross_boundary_comparison() {
+        let mut value = value_from_fixture();
+        value["metrics"][0]["boundary"] = serde_json::json!("");
+        let bytes = serde_json::to_vec(&value).expect("snapshot serializes");
+        let report = audit_competitive_snapshot(&bytes).expect("snapshot parses");
+        assert_eq!(report.status, "BLOCKED");
+        assert!(report.metrics[0].findings.iter().any(|finding| {
+            finding.code == "COMPETITIVE_METRIC_BOUNDARY_EMPTY"
+        }));
+    }
+
+    #[test]
+    fn unknown_or_invalid_source_reference_cannot_be_used() {
+        let mut value = value_from_fixture();
+        value["metrics"][0]["reference_id"] = serde_json::json!("not-in-reference-register");
+        let bytes = serde_json::to_vec(&value).expect("snapshot serializes");
+        let report = audit_competitive_snapshot(&bytes).expect("snapshot parses");
+        assert_eq!(report.status, "BLOCKED");
+        assert!(report.metrics[0].findings.iter().any(|finding| {
+            finding.code == "COMPETITIVE_METRIC_SOURCE_UNRESOLVED"
+        }));
+    }
+
+    #[test]
+    fn qualitative_and_numeric_values_keep_distinct_types() {
+        let mut value = value_from_fixture();
+        let qualitative = value["metrics"]
+            .as_array()
+            .expect("metrics")
+            .iter()
+            .position(|metric| metric["unit"] == "qualitative")
+            .expect("qualitative metric exists");
+        value["metrics"][qualitative]["unit"] = serde_json::json!("kW");
+        let bytes = serde_json::to_vec(&value).expect("snapshot serializes");
+        let report = audit_competitive_snapshot(&bytes).expect("snapshot parses");
+        assert_eq!(report.status, "BLOCKED");
+        assert!(report.metrics[qualitative].findings.iter().any(|finding| {
+            finding.code == "COMPETITIVE_METRIC_VALUE_TYPE"
+        }));
+    }
+
+    #[test]
+    fn null_values_are_unknown_not_zero() {
+        let mut value = value_from_fixture();
+        value["metrics"][0]["value"] = serde_json::Value::Null;
+        let bytes = serde_json::to_vec(&value).expect("snapshot serializes");
+        let report = audit_competitive_snapshot(&bytes).expect("snapshot parses");
+        assert_eq!(report.status, "BLOCKED");
+        assert!(report.metrics[0].findings.iter().any(|finding| {
+            finding.code == "COMPETITIVE_METRIC_VALUE_NULL"
+        }));
+    }
+
+    #[test]
+    fn source_reference_urls_must_be_https() {
+        let mut value = value_from_fixture();
+        value["references"][0]["url"] = serde_json::json!("http://example.invalid/source");
+        let bytes = serde_json::to_vec(&value).expect("snapshot serializes");
+        let report = audit_competitive_snapshot(&bytes).expect("snapshot parses");
+        assert_eq!(report.status, "BLOCKED");
+        assert!(report
+            .corpus_findings
+            .iter()
+            .any(|finding| finding.code == "COMPETITIVE_REFERENCE_URL"));
+    }
+
+    #[test]
+    fn unknown_fields_are_rejected_by_competitive_snapshot_schema() {
+        let mut value = value_from_fixture();
+        value["metrics"][0]["normalized_winner_score"] = serde_json::json!(100.0);
+        let bytes = serde_json::to_vec(&value).expect("snapshot serializes");
+        assert!(audit_competitive_snapshot(&bytes).is_err());
+    }
+
+    #[test]
+    fn input_metric_order_does_not_change_audit_dispositions() {
+        let original = audit_competitive_snapshot(FIXTURE.as_bytes())
+            .expect("competitive snapshot parses");
+        let mut value = value_from_fixture();
+        value["metrics"].as_array_mut().expect("metrics").reverse();
+        let bytes = serde_json::to_vec(&value).expect("snapshot serializes");
+        let permuted = audit_competitive_snapshot(&bytes).expect("snapshot parses");
+        assert_eq!(original.status, permuted.status);
+        assert_eq!(original.metrics, permuted.metrics);
+        assert_ne!(original.source_sha256, permuted.source_sha256);
+    }
+}
