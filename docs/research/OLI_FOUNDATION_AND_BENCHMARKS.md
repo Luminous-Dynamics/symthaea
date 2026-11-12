@@ -191,6 +191,33 @@ The Symthaea-specific execution order should be:
 
 The chemical datasets are useful for baseline reproduction, but random sample splits do not establish planetary generalization. Preserve sample, geological source, instrument, preparation and processing provenance; whole-source and whole-family holdouts are required before making stronger claims.
 
+
+## 7A. NASA LDKB / Life Detection Forum interoperability
+
+OLI should complement, not duplicate, NASA's community astrobiology knowledge infrastructure.
+
+NASA's Life Detection Knowledge Base organizes potential biosignatures across Chemistry, Structure and Activity. It uses four evidence-assessment dimensions—biological prevalence, abiotic prevalence, biological signal strength and abiotic signal strength—and captures user-authored literature arguments for and against measurements. The Life Detection Forum connects this knowledge to a Measurement Technology Module and a Science Traceability Tool. NASA describes the LDKB as a living community resource that makes evidence gaps visible. The Ladder of Life Detection is a discussion framework, not a universal biosignature/instrument ranking or definitive product.
+
+References:
+- [NASA Life Detection Knowledge Base](https://science.nasa.gov/astrobiology/researchers/life-detection-resources/ldkb/)
+- [NASA Life Detection Forum](https://lifedetectionforum.com/)
+- [NASA Ladder of Life Detection](https://science.nasa.gov/astrobiology/researchers/life-detection-resources/ladder-of-life-detection/)
+- Pohorille et al., *Life Detection Knowledge Base: A Community Tool for Knowledge Management and Representation*, DOI https://doi.org/10.1089/ast.2024.0106.
+
+OLI's opportunity is not to build a bigger static database. It is to add **machine-executable evidence and experiment assurance**: typed observation contracts, model-adequacy diagnostics, open-world abstention, causal intervention/sham records, deterministic abiotic controls, adversarial benchmarks, artifact digests, common-cause dependency checks and independent replay.
+
+The four LDKB dimensions must remain independent, environment-scoped and source-backed. OLI must not collapse biological/abiotic prevalence or signal strength into a universal life probability. A missing argument is an evidence gap, not a zero value. The Ladder remains a contextual reference, not a global score.
+
+Machine-readable mapping and proposed tests: `benchmarks/oli/nasa-ldkb-interop-profile-v0.json`; detailed adapter design: `docs/research/OLI_NASA_LDKB_INTEROPERABILITY.md`.
+
+The proposed interoperability benchmarks cover:
+1. Traceability mapping without losing NASA identifiers or terminology.
+2. Completeness of the four evidence dimensions, with explicit gap detection.
+3. Transformation of a documented evidence gap into a bounded, advisory experiment with rival predictions, controls, resource limits and authority gates.
+4. Independent replay of the path from source entry through measurement, inference and experiment proposal.
+
+No NASA records have been imported or rehosted. This profile does not imply endorsement, partnership or a completed technical integration. Any implementation must use authorized links/exports/APIs and preserve community attribution and source-level rights.
+
 ## 8. Claim ceiling
 
 A passing Rust validator establishes only that the local typed profile satisfies structural checks. It does not establish:
