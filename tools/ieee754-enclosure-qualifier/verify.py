@@ -152,6 +152,7 @@ def main() -> int:
     print(f"CASE_COUNT={count}")
     print(f"VECTOR_CORPUS_SHA256={corpus_digest}")
     print(f"UNBOUNDED_OVERFLOW_CASES={overflow_count(args.vectors)}")
+    print(f"PYTHON_VERSION={sys.version.split()[0]}")
     print("REFERENCE=Python Fraction.from_float over exact raw binary64 inputs")
     print("SCOPE=single-operation scalar add/sub/mul/div enclosures only")
     return 0
