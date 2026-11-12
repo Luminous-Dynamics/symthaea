@@ -1,0 +1,89 @@
+{
+  "schema": "luminous.black_hole_information.fixed_charge_page_u1.v1",
+  "status": "analytic_reference_and_independent_numpy_comparator; rust_sampler_authored_not_executed",
+  "claim_ceiling": "Finite-dimensional Haar-random pure states restricted to a fixed excitation sector. This fixture is not an evaporating black hole, a local-circuit mixing result, a QES calculation, or evidence for gravitational information recovery.",
+  "model": {
+    "number_of_qubits": 8,
+    "total_excitations": 4,
+    "subsystem_a_qubits": 4,
+    "subsystem_b_qubits": 4,
+    "global_sector_dimension": 70,
+    "charge_blocks": [
+      {
+        "subsystem_a_charge": 0,
+        "dimension_a": 1,
+        "dimension_b": 1,
+        "block_dimension": 1
+      },
+      {
+        "subsystem_a_charge": 1,
+        "dimension_a": 4,
+        "dimension_b": 4,
+        "block_dimension": 16
+      },
+      {
+        "subsystem_a_charge": 2,
+        "dimension_a": 6,
+        "dimension_b": 6,
+        "block_dimension": 36
+      },
+      {
+        "subsystem_a_charge": 3,
+        "dimension_a": 4,
+        "dimension_b": 4,
+        "block_dimension": 16
+      },
+      {
+        "subsystem_a_charge": 4,
+        "dimension_a": 1,
+        "dimension_b": 1,
+        "block_dimension": 1
+      }
+    ]
+  },
+  "reference": {
+    "formula": "H_D - sum_q (d_q/D) H_(d_q) + sum_q (d_q/D) Page(m_q,n_q)",
+    "entropy_units": "nats",
+    "exact_symmetry_resolved_page_mean": 2.206170090971405,
+    "unconstrained_16x16_page_mean_for_contrast": 2.2748659695882867,
+    "difference_from_unconstrained_reference": 0.06869587861688187
+  },
+  "independent_numpy_comparator": {
+    "generator": "normalized iid complex Gaussian amplitudes in the fixed Hamming-weight-4 sector; NumPy PRNG; separate partial-trace/eigenspectrum path",
+    "sample_count": 20000,
+    "seed": 321,
+    "sample_mean_entropy_nats": 2.205307857314186,
+    "sample_standard_error_nats": 0.0005072798438006677,
+    "standardized_deviation_from_exact_reference": -1.699,
+    "status": "independent numerical cross-check; not Rust output and not a ChaCha20 bitstream fixture"
+  },
+  "rust_sampler_contract": {
+    "function": "sample_symmetry_resolved_page_entropy_ensemble",
+    "sample_count": 256,
+    "seed_hex": "0xC4A26E",
+    "expected": "reproducible sample statistics and mean consistent with exact symmetry-resolved reference within the declared sampling uncertainty",
+    "execution_status": "source_authored_not_executed"
+  },
+  "negative_controls": [
+    "compare this U(1)-sector Haar ensemble to the unconstrained 16x16 Page mean and incorrectly call the discrepancy a solver error",
+    "omit charge-block weights or replace them with equal weights",
+    "treat the fixed-charge equilibrium reference as proof that the local sequential circuit has mixed",
+    "claim a gravitational Page curve or island saddle from the finite-dimensional ensemble"
+  ],
+  "required_receipt_fields": [
+    "source_sha",
+    "seed",
+    "sample_count",
+    "N",
+    "K",
+    "subsystem_A_size",
+    "charge_block_dimensions",
+    "sample_mean",
+    "sample_variance",
+    "standard_error",
+    "exact_symmetry_resolved_page_mean",
+    "normalized_mean_deviation",
+    "runtime",
+    "peak_memory"
+  ]
+}
