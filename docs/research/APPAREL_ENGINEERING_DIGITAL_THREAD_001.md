@@ -594,3 +594,51 @@ The design paradigm is reinforcement architecture as a **co-designed, roboticall
 The proposed benchmark sequence starts with low-risk coupons and small non-load-bearing panels: placement-accuracy coupons, matrix penetration/bond coupons, and a small curved panel. Report target-to-as-built placement and orientation error, cover/spacing, waviness/sag, damage, matrix penetration and void fraction, bond–slip/pull-out, crack width/spacing, post-crack response, durability, NDT detectability and mass/energy per declared functional unit. Compare conventional pre-installed reinforcement/casting, in-layer textile placement, post-installed reinforcement, robotic spraying/winding and hybrid textile+SHCC only under matched geometry, material, cover, matrix, loading and conditioning.
 
 The source register is now revision `2026-11-12-r6` with 33 sources. Structural use requires independent material and component testing, durability evidence, code review and authorized professional sign-off; this research issue does not qualify a load-bearing building product.
+
+## 21. Sorting must be measured as a physical process, not a classifier score
+
+[TEXTILE-SORT-TO-STREAM-001 #11767](https://github.com/Luminous-Dynamics/symthaea/issues/11767) now separates recognition from physical routing and downstream material acceptance.
+
+The 2026 systematic review [Intelligent and Automated Technologies for Textile Recycling Pre-Processing](https://www.mdpi.com/2227-7080/14/4/200) included 21 primary studies from 2020–2025; it reports 19 studies on identification, only four on explicit physical sorting and three on contaminant detection/removal. These are review-sample counts, not a census of industrial deployments. The research gap is nevertheless important: better classification accuracy does not prove that a sorting cell generates cleaner, accepted feedstock.
+
+Additional 2026 comparators:
+- [Effects of surface contamination on automated textile sorting using NIR-spectroscopy](https://doi.org/10.1016/j.wasman.2025.115227) reports increased misclassification risk from moisture/heavy contamination and improved accuracy when classifiers are tailored to textile fractions.
+- [Challenges and spectra interpretability in textile sorting: NIR hyperspectral images and chemometrics](https://doi.org/10.1016/j.saa.2025.126665) studies material discrimination and minor elastane detection.
+- [NIST NIR-SORT 2.0](https://www.nist.gov/news-events/news/2026/03/nist-releases-nir-sort-20-enhancing-model-validation-textile-feedstock-0) expands blend, dye and instrument diversity.
+- [Mechanical recycling and industrial reintegration of post-industrial stretch textile waste](https://doi.org/10.1016/j.jclepro.2026.149662), 22 October 2026, examines a specific 68 wt% polyester / 29 wt% viscose / 3 wt% elastane stream. It is a specific post-industrial route study, not a universal post-consumer benchmark.
+- [Untangling textile waste flows](https://doi.org/10.1016/j.resconrec.2026.109030), 30 August 2026, reports a Dutch clothing-waste material-flow scenario in which reuse and recycling could reach 40% under specified assumptions (22±9% reuse, 5±2% closed-loop and 13±5% open-loop recycling). This is a scenario estimate, not an observed achieved national rate.
+
+Benchmark the full process separately:
+1. identification (composition, colour, hidden components, contamination);
+2. route selection with open-set uncertainty and abstention;
+3. physical separation and verified collection;
+4. output-stream purity, yield, damage and mass closure;
+5. downstream recycler/process acceptance and secondary functional grade.
+
+Report false-safe routing, over-reject, abstention, measured purity, accepted output mass per input tonne, downstream rejection and cost/resource intensity. A syntactically valid route decision or actuator command is not evidence of a successful physical output.
+
+## 22. Format interoperability: a semantic IR, not a legacy file as the canonical model
+
+[TEXTILE-INTEROP-001 #11768](https://github.com/Luminous-Dynamics/symthaea/issues/11768) addresses file and semantic interchange across pattern CAD, 3D geometry, simulation and manufacturing.
+
+Important standards correction:
+- ASTM D6673-10 was withdrawn in 2019 according to ASTM's current textile standards index. It is a legacy 2D pattern/grade-rule exchange comparator, not a current active standard. Its own scope excludes 2D/3D geometry correspondence and several manufacturing/product-data areas.
+- NIST's 1996 [STEP/EXPRESS apparel pattern information-model research](https://www.nist.gov/publications/data-sharing-implementation-based-information-model-apparel-pattern-making) is a useful neutral-information-model precedent, not proof of a current deployed industry-wide apparel exchange standard.
+- [Knitout v0.6](https://textiles-lab.github.io/knitout/knitout.html) is a machine-independent low-level knitting instruction format. It still requires a supported backend and target-machine capability checks; successful parsing does not authorize or prove physical execution.
+
+The architectural goal is a Luminous semantic garment IR that preserves product revisions, 2D pattern pieces, notches, grain, seams, allowances, grade rules, 2D/3D correspondence, units/frames, BOM/material identities, process profiles and evidence references. Format adapters may import/export legacy or vendor-specific representations. Unsupported critical semantics must be preserved as unresolved or cause refusal; no silent field loss is permitted.
+
+The benchmark should test round-trip semantic retention, ID/revision/frame/unit integrity, geometric deviation, grade-rule preservation, machine/backend compatibility and deterministic exact-head file receipts. File-open success is not semantic interoperability.
+
+## 23. Current expanded benchmark register and semantic coverage
+
+The source manifest is now revision `2026-11-12-r8` with 41 unique research/reference entries across:
+- cloth simulation, real garment manipulation and sewing;
+- visual and NIR/Hyperspectral fibre/material identification;
+- sorting, contamination, minor-component detection and recovery routes;
+- inverse textile design and fabric engineering;
+- apparel scheduling and human-centered production;
+- technical textiles and construction;
+- pattern interchange and machine-instruction formats.
+
+The semantic corpus contains 30 expected cases (26 negative and four positive). The harness now records explicit case coverage: eight cases are mapped to direct executable negative-control tests; 22 remain intent-only/not yet executed. Additional cross-field Rust unit tests cover operation-sequence collisions, measured-material-property evidence, measured-composition evidence, bound-lot quantities, claim evidence resolution and a positive physical-test binding control. Do not report the whole 30-case corpus as fully executed.
