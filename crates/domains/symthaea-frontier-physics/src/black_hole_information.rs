@@ -43,6 +43,14 @@ pub enum QuantumInformationError {
         maximum: usize,
     },
     InvalidPageEntropy(f64),
+    InvalidMutualInformation {
+        value: f64,
+        tolerance: f64,
+    },
+    InformationIdentityError {
+        residual: f64,
+        tolerance: f64,
+    },
     InvalidEnsembleSampleCount(usize),
     InvalidCircuitTopology,
     InvalidSubsystemSize {
@@ -116,6 +124,14 @@ impl fmt::Display for QuantumInformationError {
             Self::InvalidPageEntropy(value) => {
                 write!(f, "Page reference entropy is invalid: {value}")
             }
+            Self::InvalidMutualInformation { value, tolerance } => write!(
+                f,
+                "mutual information {value} is below the allowed numerical tolerance {tolerance}"
+            ),
+            Self::InformationIdentityError { residual, tolerance } => write!(
+                f,
+                "information complementarity residual {residual} exceeds {tolerance}"
+            ),
             Self::InvalidEnsembleSampleCount(count) => {
                 write!(f, "Haar ensemble needs at least two samples, got {count}")
             }
@@ -1969,14 +1985,16 @@ pub fn simulate_small_hayden_preskill_decoupling(
         reference_accessible_radiation_mutual_information,
     ] {
         if !value.is_finite() || value < -tolerance {
-            return Err(QuantumInformationError::InvalidPageEntropy(value));
+            return Err(QuantumInformationError::InvalidMutualInformation {
+                value,
+                tolerance,
+            });
         }
     }
     if information_complementarity_residual > tolerance * 10.0 {
-        return Err(QuantumInformationError::TraceError {
-            real: information_complementarity_residual,
-            imaginary: 0.0,
-            tolerance,
+        return Err(QuantumInformationError::InformationIdentityError {
+            residual: information_complementarity_residual,
+            tolerance: tolerance * 10.0,
         });
     }
 
