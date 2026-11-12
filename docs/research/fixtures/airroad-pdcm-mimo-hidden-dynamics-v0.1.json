@@ -1,0 +1,209 @@
+{
+  "schema": "luminous.airroad.pdcm_mimo_hidden_dynamics.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_reference",
+  "case_id": "two-port-cross-coupling-hidden-siso-instability",
+  "model": {
+    "loop_matrix": [
+      [
+        "0",
+        "1/(s-1)"
+      ],
+      [
+        "1/(s+2)",
+        "0"
+      ]
+    ],
+    "feedback_convention": "det(I + L(s)) = 0",
+    "diagonal_siso_projections": {
+      "L11": "0",
+      "L22": "0",
+      "scalar_characteristic_11": "1 + L11 = 1",
+      "scalar_characteristic_22": "1 + L22 = 1",
+      "interpretation": "Diagonal-only SISO measurements omit both cross-port channels."
+    },
+    "parameters": {
+      "residue_12": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "pole_12_per_s": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "residue_21": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "pole_21_per_s": {
+        "numerator": "-2",
+        "denominator": "1"
+      }
+    },
+    "open_loop_channel_poles": [
+      {
+        "channel": "L12",
+        "pole": {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        "half_plane": "right"
+      },
+      {
+        "channel": "L21",
+        "pole": {
+          "numerator": "-2",
+          "denominator": "1"
+        },
+        "half_plane": "left"
+      }
+    ],
+    "open_loop_rhp_pole_count": 1
+  },
+  "closed_loop": {
+    "determinant": "1 - 1/((s-1)(s+2))",
+    "cleared_characteristic_polynomial_descending": [
+      {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      {
+        "numerator": "-3",
+        "denominator": "1"
+      }
+    ],
+    "discriminant": {
+      "numerator": "13",
+      "denominator": "1"
+    },
+    "roots": [
+      {
+        "exact": "(-1 + sqrt(13))/2",
+        "half_plane": "right",
+        "approx": "1.3027756377319946"
+      },
+      {
+        "exact": "(-1 - sqrt(13))/2",
+        "half_plane": "left",
+        "approx": "-2.302775637731995"
+      }
+    ],
+    "positive_root_sensitivity": {
+      "with_respect_to_residue_12": "residue_21/sqrt(13)",
+      "with_respect_to_residue_21": "residue_12/sqrt(13)",
+      "numeric_at_fixture": "1/sqrt(13)"
+    },
+    "conclusion": "one positive real closed-loop pole despite both diagonal SISO projections being zero"
+  },
+  "frequency_points": [
+    {
+      "omega_rad_s": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "L12": {
+        "real": {
+          "numerator": "-1",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "L21": {
+        "real": {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        "imag": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "determinant_i_plus_l": {
+        "real": {
+          "numerator": "3",
+          "denominator": "2"
+        },
+        "imag": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      }
+    },
+    {
+      "omega_rad_s": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "L12": {
+        "real": {
+          "numerator": "-1",
+          "denominator": "2"
+        },
+        "imag": {
+          "numerator": "-1",
+          "denominator": "2"
+        }
+      },
+      "L21": {
+        "real": {
+          "numerator": "2",
+          "denominator": "5"
+        },
+        "imag": {
+          "numerator": "-1",
+          "denominator": "5"
+        }
+      },
+      "determinant_i_plus_l": {
+        "real": {
+          "numerator": "13",
+          "denominator": "10"
+        },
+        "imag": {
+          "numerator": "1",
+          "denominator": "10"
+        }
+      }
+    }
+  ],
+  "negative_controls": {
+    "remove_l21": {
+      "residue_12": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "residue_21": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "determinant_i_plus_l": "1",
+      "open_loop_rhp_pole_count": 1,
+      "interpretation": "Determinant alone is identically one but the active L12 realization retains its declared RHP pole."
+    },
+    "remove_both_cross_channels": {
+      "residue_12": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "residue_21": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "determinant_i_plus_l": "1",
+      "open_loop_rhp_pole_count": 0
+    }
+  },
+  "claim_ceiling": [
+    "Synthetic abstract 2x2 return-ratio example only.",
+    "Not a general generalized-Nyquist solver.",
+    "Not a measured converter impedance or aircraft electrical network.",
+    "No HIL, PHIL, flight-safety, airworthiness or certification evidence."
+  ]
+}
