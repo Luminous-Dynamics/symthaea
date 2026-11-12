@@ -370,10 +370,13 @@ fn audit(case: &Case) -> AuditReport {
                             + cand.expanded_uncertainty
                             > base.equivalence_tolerance
                     });
+                let target_observed_delta =
+                    (target_baseline.measured_value - target_candidate.measured_value).abs();
+                let target_uncertainty_sum =
+                    target_baseline.expanded_uncertainty + target_candidate.expanded_uncertainty;
                 let target_change_resolved =
-                    (target_baseline.measured_value - target_candidate.measured_value).abs()
-                        > target_baseline.expanded_uncertainty
-                            + target_candidate.expanded_uncertainty;
+                    target_observed_delta - target_uncertainty_sum
+                        > target_baseline.equivalence_tolerance;
 
                 if source_observable_changed {
                     reasons.push("one or more source-state observable identities, units or predeclared equivalence tolerances changed between baseline and candidate".to_string());
@@ -460,10 +463,10 @@ fn audit(case: &Case) -> AuditReport {
         "INCOMPARABLE"
     } else if identifiability == "UNRESOLVED_MIXTURE" {
         "UNRESOLVED_MIXTURE"
-    } else if identifiability == "PARTIALLY_IDENTIFIABLE" {
-        "PARTIALLY_IDENTIFIABLE"
     } else if !evidence_eligible {
         "INCOMPLETE"
+    } else if identifiability == "PARTIALLY_IDENTIFIABLE" {
+        "PARTIALLY_IDENTIFIABLE"
     } else if identifiability == "IDENTIFIABLE_FOR_DECLARED_CONTRAST" {
         "CONTRAST_ELIGIBLE"
     } else {
@@ -562,7 +565,8 @@ mod tests {
             (SourceKind::AmbientBackground, "matched"),
         ]
         .into_iter()
-        .map(|(source, state)| {
+        .enumerate()
+        .map(|(index, (source, state))| {
             let (unit, baseline_value, expanded_uncertainty, equivalence_tolerance) = match source {
                 SourceKind::PropellerCavitation => ("cavitation_state_index", 0.0, 0.05, 0.10),
                 SourceKind::PropellerHydrodynamic => ("wake_metric_index", 1.0, 0.01, 0.05),
@@ -577,7 +581,11 @@ mod tests {
                 state: state.to_string(),
                 observable_kind: "independent_sensor_or_state_record".to_string(),
                 observable_id: format!("obs-{}", source.name()),
-                evidence_sha256: digest(target_digest),
+                evidence_sha256: if source == SourceKind::PropellerCavitation {
+                    digest(target_digest)
+                } else {
+                    digest(char::from(b'a' + index as u8))
+                },
                 measured_value: if source == SourceKind::PropellerCavitation && state == "cavitating" {
                     1.0
                 } else {
@@ -738,6 +746,35 @@ mod tests {
             assert!(schema["$defs"]["sourceState"]["required"]
                 .as_array().unwrap().iter().any(|value| value == required));
         }
+    }
+
+    #[test]
+    fn synthetic_partial_contrast_stays_incomplete() {
+        let mut input = case();
+        input.design_strategy = DesignStrategy::MatchedRepeated;
+        let report = audit(&input);
+        assert_eq!(report.identifiability, "PARTIALLY_IDENTIFIABLE");
+        assert_eq!(report.disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn each_source_observable_uses_a_distinct_evidence_digest() {
+        let input = case();
+        let evidence: BTreeSet<_> = input.baseline.source_states.iter()
+            .map(|state| state.evidence_sha256.as_str())
+            .collect();
+        assert_eq!(evidence.len(), input.baseline.source_states.len());
+    }
+
+    #[test]
+    fn target_change_must_exceed_its_predeclared_equivalence_tolerance() {
+        let mut input = case();
+        make_measured(&mut input);
+        let target = input.candidate.source_states.iter_mut()
+            .find(|state| state.source == SourceKind::PropellerCavitation)
+            .unwrap();
+        target.measured_value = 0.15;
+        assert_eq!(audit(&input).disposition, "UNRESOLVED_MIXTURE");
     }
 
     #[test]
