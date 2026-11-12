@@ -138,3 +138,21 @@ Source: https://pubs.rsc.org/en/content/articlehtml/2025/lc/d5lc00194c
 - Bhattacharya et al. (2026 publication record): https://doi.org/10.1109/TPS.2025.3646554
 - Attri et al. (2026 roadmap): https://doi.org/10.1049/hve2.70241
 - RSC microfluidic nanoparticle synthesis review (2025): https://pubs.rsc.org/en/content/articlehtml/2025/lc/d5lc00194c
+
+
+## High-value 2026 polymer result detail
+
+The 20 October 2026 Péczi-Kovács and Kókai article provides particularly useful material/adhesive counterexamples:
+
+| Substrate + adhesive | Argon plasma result | Nitrogen plasma result | Interpretation |
+|---|---:|---:|---|
+| PET + Loctite 4860 | 2.4 ± 0.5 MPa; WCA 31° | 2.0 ± 0.1 MPa; WCA 13° | Argon gave stronger lap-shear despite the higher contact angle |
+| PP + Soudal Fix All Flexi | 0.8 MPa; WCA 60° | 0.3 ± 0.05 MPa; WCA 17° | Argon gave stronger bond despite the much higher contact angle |
+| HIPS + Soudal Fix All X-treme Power Express | 4.9 MPa; WCA 25° | 4.9 MPa; WCA 0° | Dramatically lower nitrogen contact angle did not improve the reported joint strength |
+| PVC + Loctite EA 9466 | — | 12.8 ± 2.3 MPa vs untreated 2.1 ± 0.3 MPa | Nitrogen was highly effective for this specific pairing; failure occurred in the polymer substrate |
+
+These results do not establish that argon is generally superior. They establish that gas selection is conditional on polymer chemistry, adhesive chemistry, treatment window, and the relevant failure mode. The paper also reports visible degradation / burning after prolonged nitrogen treatment for some polymers, while no visible damage was observed over its investigated argon treatment range. The latter statement is bounded to that study's geometry and parameter range.
+
+The study's test outcomes are literature observations, not Luminous measurements. Its selected lap-shear results do not establish long-term bondability, production duty-cycle reliability, full-system energy consumption, or the superiority of either gas for a different adhesive or application.
+
+Source: Péczi-Kovács & Kókai, published 20 October 2026, https://doi.org/10.1007/s44245-026-00396-4.
