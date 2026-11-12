@@ -718,6 +718,8 @@ pub struct VerifiedInfluenceRequest<'a> {
     pub source_score_sha256: &'a str,
     pub source_event_id: &'a str,
     pub intervention: CounterfactualIntervention,
+    /// Digest of the independently replay-verified symbolic transformation receipt.
+    pub symbolic_intervention_receipt_sha256: &'a str,
     pub baseline_schedule_sha256: &'a str,
     pub counterfactual_schedule_sha256: &'a str,
 }
@@ -753,6 +755,11 @@ pub fn estimate_from_verified_renderer_evidence(
     validate_sha256("baseline_schedule_sha256", expected_schedule.0)?;
     validate_sha256("counterfactual_schedule_sha256", expected_schedule.1)?;
     validate_sha256("source_score_sha256", request.source_score_sha256)?;
+    validate_sha256(
+        "symbolic_intervention_receipt_sha256",
+        request.symbolic_intervention_receipt_sha256,
+    )?;
+    request.intervention.validate()?;
     if expected_schedule.0 == expected_schedule.1 {
         return Err(InfluenceInputError::ContextMismatch);
     }
@@ -805,6 +812,7 @@ pub fn estimate_from_verified_renderer_evidence(
         source_score_sha256: request.source_score_sha256,
         source_event_id: request.source_event_id,
         intervention: request.intervention,
+        symbolic_intervention_receipt_sha256: request.symbolic_intervention_receipt_sha256,
         baseline_schedule_sha256: request.baseline_schedule_sha256,
         counterfactual_schedule_sha256: request.counterfactual_schedule_sha256,
         renderer_profile_sha256: &baseline_metadata.renderer_profile_sha256,
@@ -1367,6 +1375,7 @@ mod tests {
                 source_score_sha256: &source_score_digest,
                 source_event_id: "score_event_index:3",
                 intervention: CounterfactualIntervention::Remove,
+                symbolic_intervention_receipt_sha256: DIGEST_E,
                 baseline_schedule_sha256: &baseline_schedule_digest,
                 counterfactual_schedule_sha256: &counterfactual_schedule_digest,
             },
