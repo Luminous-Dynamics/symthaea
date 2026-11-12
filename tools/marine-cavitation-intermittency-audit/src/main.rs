@@ -1,0 +1,773 @@
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+use std::{env, fs, process};
+
+const SCHEMA_VERSION: &str = "0.1.0";
+const SPL_QUANTITY: &str = "received_spl_db_re_1upa";
+const WINDOW_DURATION_TOLERANCE_S: f64 = 1.0e-6;
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum EvidenceKind {
+    Synthetic,
+    Measured,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum RightsStatus {
+    PublicOrPermitted,
+    Unknown,
+    Restricted,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum BackgroundMethod {
+    BareHub,
+    PressureSuppressed,
+    Unknown,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Case {
+    schema_version: String,
+    case_id: String,
+    evidence_kind: EvidenceKind,
+    source: SourceEvidence,
+    operating_condition_id: String,
+    operating_condition_fingerprint_sha256: String,
+    environment_fingerprint_sha256: String,
+    hydrophone_instrument_id: String,
+    calibration_certificate_sha256: String,
+    band: BandDefinition,
+    window_duration_s: f64,
+    minimum_usable_windows_per_run: usize,
+    minimum_runs: usize,
+    runs: Vec<Run>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SourceEvidence {
+    dataset_id: String,
+    citation: String,
+    raw_data_sha256: String,
+    rights_status: RightsStatus,
+    independently_reviewed: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BandDefinition {
+    band_id: String,
+    quantity_id: String,
+    center_frequency_hz: f64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Run {
+    run_id: String,
+    timebase_receipt_sha256: String,
+    service_fingerprint_sha256: String,
+    background_method: BackgroundMethod,
+    background_trace_sha256: String,
+    windows: Vec<Window>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Window {
+    window_id: String,
+    start_time_s: f64,
+    end_time_s: f64,
+    acoustic_trace_sha256: String,
+    cavitation_observation_sha256: String,
+    cavitation_present: Option<bool>,
+    total_spl_db: f64,
+    background_spl_db: f64,
+    total_expanded_uncertainty_db: f64,
+    background_expanded_uncertainty_db: f64,
+}
+
+#[derive(Debug, Serialize)]
+struct AuditReport {
+    schema_version: &'static str,
+    case_id: String,
+    source_dataset_id: String,
+    source_data_sha256: String,
+    evidence_kind: &'static str,
+    operating_condition_id: String,
+    band_id: String,
+    quantity_id: &'static str,
+    center_frequency_hz: f64,
+    disposition: &'static str,
+    claim_ceiling: &'static str,
+    run_reports: Vec<RunReport>,
+    run_to_run_energy_mean_sd_db: Option<f64>,
+    run_to_run_energy_mean_range_db: Option<f64>,
+    reasons: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct RunReport {
+    run_id: String,
+    timebase_receipt_sha256: String,
+    background_method: &'static str,
+    background_trace_sha256: String,
+    total_windows: usize,
+    usable_windows: usize,
+    excluded_background_dominated: usize,
+    excluded_exact_ten_db_boundary: usize,
+    excluded_uncertainty_unresolved: usize,
+    excluded_invalid_window: usize,
+    cavitation_annotation_coverage: f64,
+    cavitation_occupancy_fraction: Option<f64>,
+    observed_cavitation_onsets: Option<usize>,
+    observed_cavitation_onsets_per_hour: Option<f64>,
+    energy_equivalent_mean_spl_db: Option<f64>,
+    median_spl_db: Option<f64>,
+    p05_spl_db: Option<f64>,
+    p95_spl_db: Option<f64>,
+    cavitation_present_energy_mean_spl_db: Option<f64>,
+    cavitation_absent_energy_mean_spl_db: Option<f64>,
+    cavitation_conditioned_delta_db: Option<f64>,
+    usable_observation_duration_s: f64,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum BackgroundFailure {
+    BackgroundDominated,
+    ExactTenDbBoundaryUnspecified,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct UsableWindow {
+    start_time_s: f64,
+    end_time_s: f64,
+    corrected_spl_db: f64,
+    cavitation_present: Option<bool>,
+}
+
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn finite_positive(value: f64) -> bool {
+    value.is_finite() && value > 0.0
+}
+
+fn energy_mean_db(levels_db: &[f64]) -> Option<f64> {
+    if levels_db.is_empty() || levels_db.iter().any(|level| !level.is_finite()) {
+        return None;
+    }
+    let max_level = levels_db.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let mean_relative_energy = levels_db
+        .iter()
+        .map(|level| 10.0_f64.powf((level - max_level) / 10.0))
+        .sum::<f64>()
+        / levels_db.len() as f64;
+    let result = max_level + 10.0 * mean_relative_energy.log10();
+    result.is_finite().then_some(result)
+}
+
+fn empirical_quantile(sorted: &[f64], probability: f64) -> Option<f64> {
+    if sorted.is_empty() || !(0.0..=1.0).contains(&probability) {
+        return None;
+    }
+    let position = probability * (sorted.len() - 1) as f64;
+    let lower = position.floor() as usize;
+    let upper = position.ceil() as usize;
+    let fraction = position - lower as f64;
+    Some(sorted[lower] + (sorted[upper] - sorted[lower]) * fraction)
+}
+
+fn ittc_background_corrected_spl(
+    total_db: f64,
+    background_db: f64,
+) -> Result<f64, BackgroundFailure> {
+    if !total_db.is_finite() || !background_db.is_finite() || total_db <= background_db {
+        return Err(BackgroundFailure::BackgroundDominated);
+    }
+    let margin_db = total_db - background_db;
+    if margin_db < 3.0 {
+        return Err(BackgroundFailure::BackgroundDominated);
+    }
+    if margin_db == 10.0 {
+        return Err(BackgroundFailure::ExactTenDbBoundaryUnspecified);
+    }
+    if margin_db > 10.0 {
+        return Ok(total_db);
+    }
+    let background_power_ratio = 10.0_f64.powf((background_db - total_db) / 10.0);
+    let net_power_ratio = 1.0 - background_power_ratio;
+    if !net_power_ratio.is_finite() || net_power_ratio <= 0.0 {
+        return Err(BackgroundFailure::BackgroundDominated);
+    }
+    let corrected = total_db + 10.0 * net_power_ratio.log10();
+    if corrected.is_finite() {
+        Ok(corrected)
+    } else {
+        Err(BackgroundFailure::BackgroundDominated)
+    }
+}
+
+fn validate_case(case: &Case) -> Vec<String> {
+    let mut errors = Vec::new();
+    if case.schema_version != SCHEMA_VERSION {
+        errors.push(format!("unsupported schema_version {}; expected {SCHEMA_VERSION}", case.schema_version));
+    }
+    if case.case_id.trim().is_empty()
+        || case.source.dataset_id.trim().is_empty()
+        || case.source.citation.trim().is_empty()
+        || case.operating_condition_id.trim().is_empty()
+        || case.band.band_id.trim().is_empty()
+    {
+        errors.push("case, dataset, operating-condition and band IDs/citation are required".to_string());
+    }
+    for (label, digest) in [
+        ("source raw data", &case.source.raw_data_sha256),
+        ("operating-condition fingerprint", &case.operating_condition_fingerprint_sha256),
+        ("environment fingerprint", &case.environment_fingerprint_sha256),
+        ("hydrophone calibration certificate", &case.calibration_certificate_sha256),
+    ] {
+        if !is_sha256(digest) {
+            errors.push(format!("{label} digest must be 64 hexadecimal characters"));
+        }
+    }
+    if case.band.quantity_id != SPL_QUANTITY {
+        errors.push(format!("band quantity_id must be {SPL_QUANTITY}"));
+    }
+    if !finite_positive(case.band.center_frequency_hz)
+        || !finite_positive(case.window_duration_s)
+        || case.minimum_usable_windows_per_run == 0
+        || case.minimum_runs == 0
+    {
+        errors.push("band frequency, window duration and minimum sample counts must be positive".to_string());
+    }
+    if case.hydrophone_instrument_id.trim().is_empty() {
+        errors.push("hydrophone_instrument_id is required".to_string());
+    }
+    if case.runs.is_empty() {
+        errors.push("at least one run is required".to_string());
+    }
+
+    let mut run_ids = BTreeSet::new();
+    for run in &case.runs {
+        if run.run_id.trim().is_empty() || !run_ids.insert(run.run_id.clone()) {
+            errors.push(format!("empty or duplicate run_id {}", run.run_id));
+        }
+        for (label, digest) in [
+            ("timebase receipt", &run.timebase_receipt_sha256),
+            ("run service fingerprint", &run.service_fingerprint_sha256),
+            ("background trace", &run.background_trace_sha256),
+        ] {
+            if !is_sha256(digest) {
+                errors.push(format!("run {}: {label} digest must be 64 hexadecimal characters", run.run_id));
+            }
+        }
+        if run.service_fingerprint_sha256 != case.operating_condition_fingerprint_sha256 {
+            errors.push(format!("run {} operating-condition fingerprint differs from the frozen case", run.run_id));
+        }
+        if run.windows.is_empty() {
+            errors.push(format!("run {} has no windows", run.run_id));
+        }
+        let mut window_ids = BTreeSet::new();
+        let mut previous_end: Option<f64> = None;
+        for window in &run.windows {
+            if window.window_id.trim().is_empty() || !window_ids.insert(window.window_id.clone()) {
+                errors.push(format!("run {} has empty or duplicate window_id", run.run_id));
+            }
+            if !is_sha256(&window.acoustic_trace_sha256)
+                || !is_sha256(&window.cavitation_observation_sha256)
+            {
+                errors.push(format!("run {} window {} has malformed acoustic/cavitation evidence digest", run.run_id, window.window_id));
+            }
+            if !window.start_time_s.is_finite()
+                || !window.end_time_s.is_finite()
+                || window.end_time_s <= window.start_time_s
+                || ((window.end_time_s - window.start_time_s) - case.window_duration_s).abs()
+                    > WINDOW_DURATION_TOLERANCE_S
+                || !window.total_spl_db.is_finite()
+                || !window.background_spl_db.is_finite()
+                || !finite_positive(window.total_expanded_uncertainty_db)
+                || !finite_positive(window.background_expanded_uncertainty_db)
+            {
+                errors.push(format!("run {} window {} has invalid times, duration, SPL or uncertainty", run.run_id, window.window_id));
+            }
+            if let Some(end) = previous_end {
+                if window.start_time_s < end {
+                    errors.push(format!("run {} windows overlap or are not chronological at {}", run.run_id, window.window_id));
+                }
+            }
+            previous_end = Some(window.end_time_s);
+        }
+    }
+    errors
+}
+
+fn summarize_run(run: &Run, case: &Case) -> RunReport {
+    let mut usable = Vec::new();
+    let mut excluded_background_dominated = 0;
+    let mut excluded_exact_ten_db_boundary = 0;
+    let mut excluded_uncertainty_unresolved = 0;
+    let mut excluded_invalid_window = 0;
+
+    for window in &run.windows {
+        let central = ittc_background_corrected_spl(window.total_spl_db, window.background_spl_db);
+        match central {
+            Err(BackgroundFailure::BackgroundDominated) => {
+                excluded_background_dominated += 1;
+                continue;
+            }
+            Err(BackgroundFailure::ExactTenDbBoundaryUnspecified) => {
+                excluded_exact_ten_db_boundary += 1;
+                continue;
+            }
+            Ok(level) => {
+                let lower = ittc_background_corrected_spl(
+                    window.total_spl_db - window.total_expanded_uncertainty_db,
+                    window.background_spl_db + window.background_expanded_uncertainty_db,
+                );
+                let upper = ittc_background_corrected_spl(
+                    window.total_spl_db + window.total_expanded_uncertainty_db,
+                    window.background_spl_db - window.background_expanded_uncertainty_db,
+                );
+                if lower.is_err() || upper.is_err() {
+                    excluded_uncertainty_unresolved += 1;
+                    continue;
+                }
+                if !level.is_finite() {
+                    excluded_invalid_window += 1;
+                    continue;
+                }
+                usable.push(UsableWindow {
+                    start_time_s: window.start_time_s,
+                    end_time_s: window.end_time_s,
+                    corrected_spl_db: level,
+                    cavitation_present: window.cavitation_present,
+                });
+            }
+        }
+    }
+
+    let levels: Vec<f64> = usable.iter().map(|window| window.corrected_spl_db).collect();
+    let mut sorted_levels = levels.clone();
+    sorted_levels.sort_by(f64::total_cmp);
+    let energy_mean = energy_mean_db(&levels);
+    let median = empirical_quantile(&sorted_levels, 0.5);
+    let p05 = empirical_quantile(&sorted_levels, 0.05);
+    let p95 = empirical_quantile(&sorted_levels, 0.95);
+
+    let annotated_count = usable.iter().filter(|window| window.cavitation_present.is_some()).count();
+    let annotation_coverage = if usable.is_empty() {
+        0.0
+    } else {
+        annotated_count as f64 / usable.len() as f64
+    };
+    let (occupancy, onsets, onsets_per_hour, on_mean, off_mean, conditioned_delta) =
+        if annotated_count == usable.len() && !usable.is_empty() {
+            let present: Vec<f64> = usable.iter()
+                .filter(|window| window.cavitation_present == Some(true))
+                .map(|window| window.corrected_spl_db)
+                .collect();
+            let absent: Vec<f64> = usable.iter()
+                .filter(|window| window.cavitation_present == Some(false))
+                .map(|window| window.corrected_spl_db)
+                .collect();
+            let occupancy = present.len() as f64 / usable.len() as f64;
+
+            let mut onsets = 0usize;
+            for index in 0..usable.len() {
+                let is_present = usable[index].cavitation_present == Some(true);
+                let is_onset = if index == 0 {
+                    is_present
+                } else {
+                    let contiguous = (usable[index].start_time_s - usable[index - 1].end_time_s).abs()
+                        <= WINDOW_DURATION_TOLERANCE_S;
+                    contiguous
+                        && is_present
+                        && usable[index - 1].cavitation_present == Some(false)
+                };
+                if is_onset {
+                    onsets += 1;
+                }
+            }
+            let observation_duration = usable.last().unwrap().end_time_s - usable.first().unwrap().start_time_s;
+            let onsets_per_hour = if observation_duration > 0.0 {
+                Some(onsets as f64 * 3600.0 / observation_duration)
+            } else {
+                None
+            };
+            let on_mean = energy_mean_db(&present);
+            let off_mean = energy_mean_db(&absent);
+            let delta = match (on_mean, off_mean) {
+                (Some(on), Some(off)) => Some(on - off),
+                _ => None,
+            };
+            (Some(occupancy), Some(onsets), onsets_per_hour, on_mean, off_mean, delta)
+        } else {
+            (None, None, None, None, None, None)
+        };
+
+    let usable_duration = usable.iter()
+        .map(|window| window.end_time_s - window.start_time_s)
+        .sum();
+
+    RunReport {
+        run_id: run.run_id.clone(),
+        timebase_receipt_sha256: run.timebase_receipt_sha256.clone(),
+        background_method: match run.background_method {
+            BackgroundMethod::BareHub => "bare_hub",
+            BackgroundMethod::PressureSuppressed => "pressure_suppressed",
+            BackgroundMethod::Unknown => "unknown",
+        },
+        background_trace_sha256: run.background_trace_sha256.clone(),
+        total_windows: run.windows.len(),
+        usable_windows: usable.len(),
+        excluded_background_dominated,
+        excluded_exact_ten_db_boundary,
+        excluded_uncertainty_unresolved,
+        excluded_invalid_window,
+        cavitation_annotation_coverage: annotation_coverage,
+        cavitation_occupancy_fraction: occupancy,
+        observed_cavitation_onsets: onsets,
+        observed_cavitation_onsets_per_hour: onsets_per_hour,
+        energy_equivalent_mean_spl_db: energy_mean,
+        median_spl_db: median,
+        p05_spl_db: p05,
+        p95_spl_db: p95,
+        cavitation_present_energy_mean_spl_db: on_mean,
+        cavitation_absent_energy_mean_spl_db: off_mean,
+        cavitation_conditioned_delta_db: conditioned_delta,
+        usable_observation_duration_s: usable_duration,
+    }
+}
+
+fn sample_sd(values: &[f64]) -> Option<f64> {
+    if values.len() < 2 {
+        return None;
+    }
+    let mean = values.iter().sum::<f64>() / values.len() as f64;
+    let sum_squares = values.iter().map(|value| (value - mean).powi(2)).sum::<f64>();
+    Some((sum_squares / (values.len() - 1) as f64).sqrt())
+}
+
+fn audit(case: &Case) -> AuditReport {
+    let validation_errors = validate_case(case);
+    let mut reasons = validation_errors.clone();
+    let run_reports: Vec<RunReport> = if validation_errors.is_empty() {
+        case.runs.iter().map(|run| summarize_run(run, case)).collect()
+    } else {
+        Vec::new()
+    };
+
+    if validation_errors.is_empty() {
+        let common_method = case.runs.first().map(|run| &run.background_method);
+        if case.runs.iter().any(|run| Some(&run.background_method) != common_method) {
+            reasons.push("background measurement method differs across runs in one operating-condition stratum".to_string());
+        }
+        if case.runs.iter().any(|run| run.windows.iter().any(|window| window.cavitation_present.is_none())) {
+            reasons.push("one or more windows lack independent cavitation observations; occupancy and conditioned summaries are incomplete".to_string());
+        }
+        if run_reports.iter().any(|report| report.usable_windows < case.minimum_usable_windows_per_run) {
+            reasons.push("one or more runs have fewer than the required usable windows".to_string());
+        }
+        if case.runs.len() < case.minimum_runs {
+            reasons.push("fewer than the required independent runs are available".to_string());
+        }
+    }
+
+    let run_means: Vec<f64> = run_reports.iter()
+        .filter_map(|report| report.energy_equivalent_mean_spl_db)
+        .collect();
+    let run_to_run_sd = sample_sd(&run_means);
+    let (range_lower, range_upper) = if run_means.is_empty() {
+        (None, None)
+    } else {
+        let low = run_means.iter().copied().fold(f64::INFINITY, f64::min);
+        let high = run_means.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+        (Some(low), Some(high))
+    };
+    let run_range = match (range_lower, range_upper) {
+        (Some(low), Some(high)) => Some(high - low),
+        _ => None,
+    };
+
+    if case.evidence_kind == EvidenceKind::Synthetic {
+        reasons.push("synthetic evidence cannot qualify physical cavitation intermittency".to_string());
+    }
+    if case.source.rights_status != RightsStatus::PublicOrPermitted {
+        reasons.push("source dataset reuse rights are not established as public_or_permitted".to_string());
+    }
+    if !case.source.independently_reviewed {
+        reasons.push("source evidence has not been independently reviewed".to_string());
+    }
+    if case.runs.iter().any(|run| run.background_method == BackgroundMethod::Unknown) {
+        reasons.push("one or more runs have an unknown background measurement method".to_string());
+    }
+
+    let disposition = if !validation_errors.is_empty() {
+        "INVALID"
+    } else if run_reports.iter().any(|report| report.usable_windows < case.minimum_usable_windows_per_run)
+        || case.runs.len() < case.minimum_runs
+        || case.runs.iter().any(|run| run.windows.iter().any(|window| window.cavitation_present.is_none()))
+        || case.runs.iter().any(|run| run.background_method == BackgroundMethod::Unknown)
+        || reasons.iter().any(|reason| reason.contains("background measurement method differs"))
+        || case.evidence_kind == EvidenceKind::Synthetic
+        || case.source.rights_status != RightsStatus::PublicOrPermitted
+        || !case.source.independently_reviewed
+    {
+        "INCOMPLETE"
+    } else {
+        "DISTRIBUTIONAL_SUMMARY_ONLY"
+    };
+
+    AuditReport {
+        schema_version: SCHEMA_VERSION,
+        case_id: case.case_id.clone(),
+        source_dataset_id: case.source.dataset_id.clone(),
+        source_data_sha256: case.source.raw_data_sha256.clone(),
+        evidence_kind: match case.evidence_kind {
+            EvidenceKind::Synthetic => "synthetic",
+            EvidenceKind::Measured => "measured",
+        },
+        operating_condition_id: case.operating_condition_id.clone(),
+        band_id: case.band.band_id.clone(),
+        quantity_id: SPL_QUANTITY,
+        center_frequency_hz: case.band.center_frequency_hz,
+        disposition,
+        claim_ceiling: "distributional_summary_of_declared_model_scale_windows_only_no_full_scale_transfer_source_decomposition_causal_or_ecological_qualification",
+        run_reports,
+        run_to_run_energy_mean_sd_db: run_to_run_sd,
+        run_to_run_energy_mean_range_db: run_range,
+        reasons,
+    }
+}
+
+fn main() {
+    let mut args = env::args().skip(1);
+    let Some(path) = args.next() else {
+        eprintln!("usage: marine-cavitation-intermittency-audit <case.json>");
+        process::exit(64);
+    };
+    if args.next().is_some() {
+        eprintln!("usage: marine-cavitation-intermittency-audit <case.json>");
+        process::exit(64);
+    }
+    let input = match fs::read_to_string(&path) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("could not read {path}: {error}");
+            process::exit(64);
+        }
+    };
+    let case: Case = match serde_json::from_str(&input) {
+        Ok(value) => value,
+        Err(error) => {
+            eprintln!("invalid case JSON: {error}");
+            process::exit(64);
+        }
+    };
+    let report = audit(&case);
+    println!("{}", serde_json::to_string_pretty(&report).expect("report serializes"));
+    match report.disposition {
+        "DISTRIBUTIONAL_SUMMARY_ONLY" => {}
+        "INVALID" => process::exit(2),
+        _ => process::exit(3),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn digest(letter: char) -> String {
+        std::iter::repeat_n(letter, 64).collect()
+    }
+
+    fn sample_window(index: usize, level: f64, cavitation: bool) -> Window {
+        let start = index as f64;
+        Window {
+            window_id: format!("window-{index}"),
+            start_time_s: start,
+            end_time_s: start + 1.0,
+            acoustic_trace_sha256: digest(if index % 2 == 0 { 'a' } else { 'b' }),
+            cavitation_observation_sha256: digest(if index % 2 == 0 { 'c' } else { 'd' }),
+            cavitation_present: Some(cavitation),
+            total_spl_db: level,
+            background_spl_db: 90.0,
+            total_expanded_uncertainty_db: 0.2,
+            background_expanded_uncertainty_db: 0.2,
+        }
+    }
+
+    fn run(id: &str, levels: &[f64], cavitation: &[bool]) -> Run {
+        let windows = levels.iter().zip(cavitation)
+            .enumerate()
+            .map(|(index, (level, present))| sample_window(index, *level, *present))
+            .collect();
+        Run {
+            run_id: id.to_string(),
+            timebase_receipt_sha256: digest('e'),
+            service_fingerprint_sha256: digest('f'),
+            background_method: BackgroundMethod::BareHub,
+            background_trace_sha256: digest('1'),
+            windows,
+        }
+    }
+
+    fn case() -> Case {
+        let levels = [101.0, 111.0, 101.0, 111.0, 101.0, 111.0, 101.0, 111.0];
+        let states = [false, true, false, true, false, true, false, true];
+        Case {
+            schema_version: SCHEMA_VERSION.to_string(),
+            case_id: "synthetic-intermittency-001".to_string(),
+            evidence_kind: EvidenceKind::Synthetic,
+            source: SourceEvidence {
+                dataset_id: "synthetic-intermittency".to_string(),
+                citation: "Synthetic known-answer fixture only".to_string(),
+                raw_data_sha256: digest('2'),
+                rights_status: RightsStatus::PublicOrPermitted,
+                independently_reviewed: true,
+            },
+            operating_condition_id: "J-0.8-sigma-nD-1".to_string(),
+            operating_condition_fingerprint_sha256: digest('f'),
+            environment_fingerprint_sha256: digest('3'),
+            hydrophone_instrument_id: "hydrophone-H1".to_string(),
+            calibration_certificate_sha256: digest('4'),
+            band: BandDefinition {
+                band_id: "one-third-octave-1000Hz".to_string(),
+                quantity_id: SPL_QUANTITY.to_string(),
+                center_frequency_hz: 1000.0,
+            },
+            window_duration_s: 1.0,
+            minimum_usable_windows_per_run: 4,
+            minimum_runs: 2,
+            runs: vec![run("run-1", &levels, &states), run("run-2", &levels, &states)],
+        }
+    }
+
+    #[test]
+    fn energy_mean_is_not_arithmetic_mean_in_db() {
+        let levels = [100.0, 110.0];
+        let result = energy_mean_db(&levels).unwrap();
+        assert!((result - 107.40362689494244).abs() < 1.0e-10);
+        assert!((result - 105.0).abs() > 2.0);
+    }
+
+    #[test]
+    fn exact_ten_db_background_margin_is_unresolved() {
+        assert!(matches!(
+            ittc_background_corrected_spl(100.0, 90.0),
+            Err(BackgroundFailure::ExactTenDbBoundaryUnspecified)
+        ));
+    }
+
+    #[test]
+    fn three_db_to_below_ten_uses_energy_subtraction() {
+        let corrected = ittc_background_corrected_spl(99.9, 90.0).unwrap();
+        assert!(corrected < 99.9);
+        assert!(ittc_background_corrected_spl(93.0, 90.0).is_ok());
+    }
+
+    #[test]
+    fn greater_than_ten_db_requires_no_adjustment() {
+        assert_eq!(ittc_background_corrected_spl(100.1, 90.0), Ok(100.1));
+    }
+
+    #[test]
+    fn below_three_db_is_not_usable_for_cavitation_summary() {
+        assert!(matches!(
+            ittc_background_corrected_spl(92.9, 90.0),
+            Err(BackgroundFailure::BackgroundDominated)
+        ));
+    }
+
+    #[test]
+    fn synthetic_fixture_never_becomes_physical_qualification() {
+        let report = audit(&case());
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(report.run_reports.len(), 2);
+        assert_eq!(report.run_reports[0].cavitation_occupancy_fraction, Some(0.5));
+        assert!(report.reasons.iter().any(|reason| reason.contains("synthetic evidence")));
+    }
+
+    #[test]
+    fn occupancy_and_onset_rate_are_reported() {
+        let report = audit(&case());
+        let run = &report.run_reports[0];
+        assert_eq!(run.cavitation_occupancy_fraction, Some(0.5));
+        assert_eq!(run.observed_cavitation_onsets, Some(4));
+        assert!(run.observed_cavitation_onsets_per_hour.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn annotation_coverage_unknown_is_not_zero_occupancy() {
+        let mut input = case();
+        input.runs[0].windows[0].cavitation_present = None;
+        let report = audit(&input);
+        assert_eq!(report.run_reports[0].cavitation_occupancy_fraction, None);
+        assert_eq!(report.disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn cavitation_conditioned_levels_are_separated() {
+        let report = audit(&case());
+        let run = &report.run_reports[0];
+        assert!(run.cavitation_present_energy_mean_spl_db.unwrap()
+            > run.cavitation_absent_energy_mean_spl_db.unwrap());
+        assert!(run.cavitation_conditioned_delta_db.unwrap() > 0.0);
+    }
+
+    #[test]
+    fn window_overlap_is_invalid() {
+        let mut input = case();
+        input.runs[0].windows[1].start_time_s = 0.5;
+        input.runs[0].windows[1].end_time_s = 1.5;
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn malformed_timebase_or_background_digest_is_invalid() {
+        let mut input = case();
+        input.runs[0].timebase_receipt_sha256 = "bad".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn uncertainty_crossing_background_threshold_excludes_window() {
+        let mut input = case();
+        input.runs[0].windows[0].total_spl_db = 93.1;
+        input.runs[0].windows[0].background_spl_db = 90.0;
+        input.runs[0].windows[0].total_expanded_uncertainty_db = 0.2;
+        input.runs[0].windows[0].background_expanded_uncertainty_db = 0.2;
+        let report = audit(&input);
+        assert!(report.run_reports[0].excluded_uncertainty_unresolved > 0);
+    }
+
+    #[test]
+    fn one_run_is_not_enough_for_run_to_run_dispersion() {
+        let mut input = case();
+        input.runs.truncate(1);
+        let report = audit(&input);
+        assert_eq!(report.run_to_run_energy_mean_sd_db, None);
+        assert_eq!(report.disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn separate_runs_remain_separate_replicates() {
+        let report = audit(&case());
+        assert_eq!(report.run_reports.len(), 2);
+        assert_eq!(report.run_reports[0].total_windows, 8);
+        assert_eq!(report.run_reports[1].total_windows, 8);
+    }
+
+    #[test]
+    fn empirical_quantile_uses_linear_interpolation() {
+        let values = [1.0, 2.0, 3.0, 4.0];
+        assert_eq!(empirical_quantile(&values, 0.5), Some(2.5));
+    }
+}
