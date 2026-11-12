@@ -1447,7 +1447,8 @@ mod tests {
         ledger.append(reconciled).unwrap();
         assert_eq!(ledger.current_output_digest().unwrap(), digest(L));
 
-        let next = make_mutation("attempt-016");
+        let mut next = make_mutation("attempt-016");
+        next.parent_output_sha256 = digest(L);
         let (auth, _grant) = ledger
             .prepare_authorization(
                 &AuthoritySnapshot {
@@ -1547,7 +1548,7 @@ mod tests {
         let event = ledger.prepare_reconciliation(receipt).unwrap();
         ledger.append(event).unwrap();
         assert_eq!(ledger.current_output_digest().unwrap(), digest(D));
-        assert_eq!(ledger.revision().unwrap(), 6);
+        assert_eq!(ledger.revision().unwrap(), 5);
     }
 
     #[test]
@@ -1584,7 +1585,7 @@ mod tests {
                 &snapshot(&ledger),
                 retry.clone(),
                 approval(&retry),
-                digest(K),
+                digest(H),
             )
             .unwrap();
         assert!(matches!(
