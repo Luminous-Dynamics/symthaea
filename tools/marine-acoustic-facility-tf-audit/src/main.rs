@@ -172,6 +172,8 @@ struct SpatialBandResult {
     minimum_position_mean_tf_db: Option<f64>,
     maximum_position_mean_tf_db: Option<f64>,
     spatial_range_db: Option<f64>,
+    conservative_spatial_range_lower_db: Option<f64>,
+    conservative_spatial_range_upper_db: Option<f64>,
     spatial_consistency_tolerance_db: f64,
     spatial_consistency_disposition: &'static str,
     extrapolation_performed: bool,
@@ -278,6 +280,9 @@ fn validate_case(case: &Case) -> Vec<String> {
     let mut sample_ids = BTreeSet::new();
     let mut per_repeat = BTreeSet::new();
     let mut position_coordinates: BTreeMap<String, (f64, f64, f64)> = BTreeMap::new();
+    let mut source_trace_digests = BTreeSet::new();
+    let mut received_trace_digests = BTreeSet::new();
+    let mut band_metadata: BTreeMap<String, (f64, FrequencyQuantity, String)> = BTreeMap::new();
     for sample in &case.samples {
         if sample.sample_id.trim().is_empty() || !sample_ids.insert(sample.sample_id.clone()) {
             errors.push(format!("empty or duplicate sample_id {}", sample.sample_id));
@@ -320,6 +325,25 @@ fn validate_case(case: &Case) -> Vec<String> {
         }
         if !digest_ok(&sample.source_trace_sha256) || !digest_ok(&sample.received_trace_sha256) {
             errors.push(format!("sample {} source/received trace digest is malformed", sample.sample_id));
+        }
+        if !source_trace_digests.insert(sample.source_trace_sha256.clone())
+            || !received_trace_digests.insert(sample.received_trace_sha256.clone())
+        {
+            errors.push(format!("sample {} reuses a source or received trace digest", sample.sample_id));
+        }
+        let metadata = (sample.center_frequency_hz, sample.quantity, sample.bandwidth_id.clone());
+        if let Some(existing) = band_metadata.get(&sample.frequency_band_id) {
+            if (existing.0 - metadata.0).abs() > 1.0e-9
+                || existing.1 != metadata.1
+                || existing.2 != metadata.2
+            {
+                errors.push(format!(
+                    "frequency band {} is pooled across different centre frequency, quantity or bandwidth",
+                    sample.frequency_band_id
+                ));
+            }
+        } else {
+            band_metadata.insert(sample.frequency_band_id.clone(), metadata);
         }
         if let Some(additional) = sample.additional_source_basis_uncertainty_db
             && (!additional.is_finite() || additional <= 0.0)
@@ -373,7 +397,7 @@ fn audit(case: &Case) -> AuditReport {
         }
     }
     let mut position_band_results = Vec::new();
-    let mut spatial_by_band: BTreeMap<String, Vec<f64>> = BTreeMap::new();
+    let mut spatial_by_band: BTreeMap<String, Vec<(f64, f64)>> = BTreeMap::new();
     let mut has_provisional_basis = false;
     let mut has_spatial_variation = false;
     let mut has_repeatability_failure = false;
@@ -383,7 +407,7 @@ fn audit(case: &Case) -> AuditReport {
         let mut tf_values = Vec::new();
         let mut receipts = Vec::new();
         let mut max_bound: f64 = 0.0;
-        let mut position_disposition = "repeatable_position_tf";
+        let mut position_disposition = "repeatability_unresolved";
         for sample in &samples {
             let (tf, bound, disposition, reason) = sample_transfer(case, sample);
             if let Some(value) = tf { tf_values.push(value); }
@@ -408,19 +432,26 @@ fn audit(case: &Case) -> AuditReport {
         let max = tf_values.iter().copied().reduce(f64::max);
         let sd = sample_sd(&tf_values);
         let range = match (min, max) { (Some(lo), Some(hi)) => Some(hi - lo), _ => None };
-        let repeatable = samples.len() >= 2
-            && range.is_some_and(|value| value <= case.repeatability_tolerance_db)
-            && tf_values.len() == samples.len();
-        if !repeatable {
-            if samples.len() >= 2 && tf_values.len() == samples.len() {
-                has_repeatability_failure = true;
-                position_disposition = "spatially_variable";
-            } else if !has_provisional_basis {
-                position_disposition = "incomplete";
+        let repeatability_lower = range.map(|value| (value - 2.0 * max_bound).max(0.0));
+        let repeatability_upper = range.map(|value| value + 2.0 * max_bound);
+        if samples.len() >= 2 && tf_values.len() == samples.len() {
+            match (repeatability_lower, repeatability_upper) {
+                (_, Some(upper)) if upper <= case.repeatability_tolerance_db => {
+                    position_disposition = "repeatable_position_tf";
+                }
+                (Some(lower), _) if lower > case.repeatability_tolerance_db => {
+                    has_repeatability_failure = true;
+                    position_disposition = "repeatability_outside_tolerance";
+                }
+                _ => {
+                    position_disposition = "repeatability_uncertainty_overlaps_tolerance";
+                }
             }
+        } else if !has_provisional_basis {
+            position_disposition = "incomplete_insufficient_repeats";
         }
         if let Some(value) = mean {
-            spatial_by_band.entry(key.band_id.clone()).or_default().push(value);
+            spatial_by_band.entry(key.band_id.clone()).or_default().push((value, max_bound));
         }
         position_band_results.push(PositionBandResult {
             source_position_id: key.source_position_id,
@@ -446,23 +477,32 @@ fn audit(case: &Case) -> AuditReport {
 
     let mut spatial_band_results = Vec::new();
     for (band_id, values) in spatial_by_band {
-        let min = values.iter().copied().reduce(f64::min);
-        let max = values.iter().copied().reduce(f64::max);
+        let min = values.iter().map(|(value, _)| *value).reduce(f64::min);
+        let max = values.iter().map(|(value, _)| *value).reduce(f64::max);
+        let max_bound = values.iter().map(|(_, bound)| *bound).fold(0.0_f64, f64::max);
         let range = match (min, max) { (Some(lo), Some(hi)) => Some(hi - lo), _ => None };
+        let lower = range.map(|value| (value - 2.0 * max_bound).max(0.0));
+        let upper = range.map(|value| value + 2.0 * max_bound);
         let disposition = if values.len() < 2 {
             "single_position_no_spatial_claim"
-        } else if range.is_some_and(|value| value <= case.repeatability_tolerance_db) {
+        } else if lower.is_some_and(|value| value > case.repeatability_tolerance_db) {
+            has_spatial_variation = true;
+            "spatially_variable_beyond_uncertainty"
+        } else if upper.is_some_and(|value| value <= case.repeatability_tolerance_db) {
             "consistent_over_sampled_positions_only"
         } else {
-            has_spatial_variation = true;
-            "spatially_variable"
+            "spatial_uncertainty_overlaps_tolerance"
         };
         spatial_band_results.push(SpatialBandResult {
-            frequency_band_id: band_id,
+            frequency_band_id: band_id.clone(),
+            center_frequency_hz: case.samples.iter().find(|sample| sample.frequency_band_id == band_id)
+                .map(|sample| sample.center_frequency_hz).unwrap_or_default(),
             position_pair_count: values.len(),
             minimum_position_mean_tf_db: min,
             maximum_position_mean_tf_db: max,
             spatial_range_db: range,
+            conservative_spatial_range_lower_db: lower,
+            conservative_spatial_range_upper_db: upper,
             spatial_consistency_tolerance_db: case.repeatability_tolerance_db,
             spatial_consistency_disposition: disposition,
             extrapolation_performed: false,
@@ -500,6 +540,7 @@ fn audit(case: &Case) -> AuditReport {
         || case.source.rights_status != RightsStatus::PublicOrPermitted
         || !case.source.independently_reviewed
         || position_band_results.iter().any(|x| x.repeat_count < 2)
+        || position_band_results.iter().any(|x| x.repeatability_disposition != "repeatable_position_tf")
     {
         "INCOMPLETE"
     } else {
@@ -595,9 +636,9 @@ mod tests {
             quantity: FrequencyQuantity::OneThirdOctaveBandSpl,
             bandwidth_id: "one-third-octave".to_string(),
             source_level_db: source_level,
-            source_level_expanded_uncertainty_db: 0.5,
+            source_level_expanded_uncertainty_db: 0.1,
             received_spl_db: received,
-            received_spl_expanded_uncertainty_db: 0.5,
+            received_spl_expanded_uncertainty_db: 0.1,
             additional_source_basis_uncertainty_db: None,
             source_trace_sha256: digest(if repeat == "r1" { 'a' } else { 'b' }),
             received_trace_sha256: digest(if id.ends_with('1') { 'c' } else { 'd' }),
@@ -642,7 +683,7 @@ mod tests {
                 acquisition_chain_id: "daq-1".to_string(),
                 acquisition_chain_evidence_sha256: digest('7'),
             },
-            repeatability_tolerance_db: 1.0,
+            repeatability_tolerance_db: 1.5,
             samples: vec![
                 sample("sample-1", "r1", 0.0, 0.0, 1000.0, 150.0, 120.0),
                 sample("sample-2", "r2", 0.0, 0.0, 1000.0, 150.0, 121.0),
@@ -657,6 +698,7 @@ mod tests {
         let report = audit(&input);
         assert_eq!(report.disposition, "REPEATABLE_POSITION_TF");
         assert_eq!(report.position_band_results[0].mean_transfer_function_db, Some(-29.5));
+        assert_eq!(report.position_band_results[0].repeatability_disposition, "repeatable_position_tf");
         assert_eq!(report.position_band_results[0].repeat_count, 2);
         assert!(!report.facility_wide_representative_factor_established);
     }
@@ -714,6 +756,7 @@ mod tests {
         assert_eq!(report.spatial_band_results[0].position_pair_count, 2);
         assert_eq!(report.spatial_band_results[0].spatial_consistency_disposition, "spatially_variable");
         assert_eq!(report.disposition, "SPATIALLY_VARIABLE");
+        assert_eq!(report.spatial_band_results[0].spatial_consistency_disposition, "spatially_variable_beyond_uncertainty");
     }
 
     #[test]
