@@ -4609,7 +4609,6 @@ mod u1_hydrodynamic_scrambling_tests {
     }
 }
 
-
 #[cfg(test)]
 mod hayden_preskill_petz_recovery_tests {
     use super::*;
@@ -4630,11 +4629,8 @@ mod hayden_preskill_petz_recovery_tests {
     #[test]
     fn random_scrambler_petz_recovery_is_cptp_and_has_valid_entanglement_fidelity() {
         for seed in 0..32 {
-            let sample = simulate_small_hayden_preskill_petz_recovery(
-                0x4850 + seed,
-                TOLERANCE,
-            )
-            .unwrap();
+            let sample =
+                simulate_small_hayden_preskill_petz_recovery(0x4850 + seed, TOLERANCE).unwrap();
             assert!((0.0..=1.0).contains(&sample.entanglement_fidelity));
             assert_eq!(sample.accessible_input_dimension, 4);
             assert_eq!(sample.recovered_message_dimension, 2);
@@ -4646,35 +4642,20 @@ mod hayden_preskill_petz_recovery_tests {
 
     #[test]
     fn petz_recovery_is_reproducible_for_a_frozen_scrambler_seed() {
-        let first = simulate_small_hayden_preskill_petz_recovery(
-            0xDEC0DE,
-            TOLERANCE,
-        )
-        .unwrap();
-        let repeated = simulate_small_hayden_preskill_petz_recovery(
-            0xDEC0DE,
-            TOLERANCE,
-        )
-        .unwrap();
+        let first = simulate_small_hayden_preskill_petz_recovery(0xDEC0DE, TOLERANCE).unwrap();
+        let repeated = simulate_small_hayden_preskill_petz_recovery(0xDEC0DE, TOLERANCE).unwrap();
         assert_eq!(first, repeated);
     }
 
     #[test]
     fn petz_recovery_ensemble_reports_seeded_uncertainty_and_bounds() {
-        let summary = sample_small_hayden_preskill_petz_ensemble(
-            16,
-            0x4A11,
-            TOLERANCE,
-        )
-        .unwrap();
+        let summary = sample_small_hayden_preskill_petz_ensemble(16, 0x4A11, TOLERANCE).unwrap();
         assert_eq!(summary.sample_count, 16);
         assert!((0.0..=1.0).contains(&summary.mean_entanglement_fidelity));
         assert!((0.0..=1.0).contains(&summary.minimum_entanglement_fidelity));
         assert!((0.0..=1.0).contains(&summary.maximum_entanglement_fidelity));
-        assert!(summary.minimum_entanglement_fidelity
-            <= summary.mean_entanglement_fidelity);
-        assert!(summary.mean_entanglement_fidelity
-            <= summary.maximum_entanglement_fidelity);
+        assert!(summary.minimum_entanglement_fidelity <= summary.mean_entanglement_fidelity);
+        assert!(summary.mean_entanglement_fidelity <= summary.maximum_entanglement_fidelity);
         assert!(summary.standard_error_entanglement_fidelity >= 0.0);
         assert!(summary.maximum_inverse_square_root_residual < 1e-8);
         assert!(summary.maximum_trace_preservation_residual < 1e-8);
@@ -4683,11 +4664,7 @@ mod hayden_preskill_petz_recovery_tests {
     #[test]
     fn petz_recovery_ensemble_rejects_one_sample() {
         assert!(matches!(
-            sample_small_hayden_preskill_petz_ensemble(
-                1,
-                0x4A11,
-                TOLERANCE,
-            ),
+            sample_small_hayden_preskill_petz_ensemble(1, 0x4A11, TOLERANCE,),
             Err(QuantumInformationError::InvalidEnsembleSampleCount(1))
         ));
     }
