@@ -367,3 +367,18 @@ This is a more immediate and falsifiable work package than attempting a new gene
 - [PLASMA-MHD-BENCH-001 #11733](https://github.com/Luminous-Dynamics/symthaea/issues/11733): liquid-metal blanket MHD solver and experiment qualification.
 
 The new source-and-boundary work does not change the claim ceiling: source inspection, literature comparison, synthetic accounting, solver output, measured observation and physical qualification remain distinct stages.
+
+
+### 9.7 Stoichiometric reaction-enthalpy sanity check
+
+The atmospheric-pressure microwave-plasma article quotes the ammonia decomposition reaction:
+
+`2 NH3 -> N2 + 3 H2`, with reaction enthalpy `+91.88 kJ` per stoichiometric reaction as written.
+
+Using `M(H2) = 2.01588 g/mol`, the reaction produces approximately `0.00604764 kg H2`, so the standard-state reaction enthalpy is:
+
+`91.88 kJ / 0.00604764 kg / 3600 = 4.220 kWh/kg H2`.
+
+The paper's reported 25 kWh/kg H2 net-microwave-energy point is therefore about 5.92 times this reaction-enthalpy reference.
+
+**This ratio is not an efficiency.** It is a derived thermodynamic sanity check, not a complete process balance. The process may also heat the feed/products, transfer energy imperfectly, incur wall and coupling losses, require gas handling and purification, and consume auxiliary power. A proper system efficiency needs a frozen wall-plug boundary and product quality. The calculation and its inputs are stored as `NH3-STOICHIOMETRIC-REACTION-ENTHALPY-001` in the machine-readable reference corpus.
