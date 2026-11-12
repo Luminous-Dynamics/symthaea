@@ -1,0 +1,262 @@
+{
+  "schema": "luminous.airroad.mimo_complex_impedance_enclosure.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_reference",
+  "algorithm_version": "mimo-complex-disc-rectangular-quotient-v0.1",
+  "hard_bound_semantics": {
+    "kind": "deterministic_hard_bound",
+    "method_reference": "sha256:synthetic-hard-bound-method"
+  },
+  "dependence_assumption": "independent_discs_outer_enclosure",
+  "convention": "Z_ij = V_i / I_j",
+  "angular_frequency_rad_s": {
+    "numerator": "0",
+    "denominator": "1"
+  },
+  "ports": [
+    "bus-a",
+    "bus-b"
+  ],
+  "columns": [
+    {
+      "driven_port_id": "bus-a",
+      "injected_current_a": {
+        "real": {
+          "numerator": "2",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "current_error_radius_a": {
+        "numerator": "1",
+        "denominator": "4"
+      },
+      "observations": [
+        {
+          "observed_port_id": "bus-a",
+          "response_voltage_v": {
+            "real": {
+              "numerator": "4",
+              "denominator": "1"
+            },
+            "imag": {
+              "numerator": "2",
+              "denominator": "1"
+            }
+          },
+          "voltage_error_radius_v": {
+            "numerator": "1",
+            "denominator": "2"
+          }
+        },
+        {
+          "observed_port_id": "bus-b",
+          "response_voltage_v": {
+            "real": {
+              "numerator": "1",
+              "denominator": "1"
+            },
+            "imag": {
+              "numerator": "-2",
+              "denominator": "1"
+            }
+          },
+          "voltage_error_radius_v": {
+            "numerator": "1",
+            "denominator": "4"
+          }
+        }
+      ]
+    },
+    {
+      "driven_port_id": "bus-b",
+      "injected_current_a": {
+        "real": {
+          "numerator": "4",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "current_error_radius_a": {
+        "numerator": "1",
+        "denominator": "2"
+      },
+      "observations": [
+        {
+          "observed_port_id": "bus-a",
+          "response_voltage_v": {
+            "real": {
+              "numerator": "4",
+              "denominator": "1"
+            },
+            "imag": {
+              "numerator": "8",
+              "denominator": "1"
+            }
+          },
+          "voltage_error_radius_v": {
+            "numerator": "1",
+            "denominator": "2"
+          }
+        },
+        {
+          "observed_port_id": "bus-b",
+          "response_voltage_v": {
+            "real": {
+              "numerator": "12",
+              "denominator": "1"
+            },
+            "imag": {
+              "numerator": "-4",
+              "denominator": "1"
+            }
+          },
+          "voltage_error_radius_v": {
+            "numerator": "1",
+            "denominator": "2"
+          }
+        }
+      ]
+    }
+  ],
+  "expected_matrix_enclosures_row_major": [
+    [
+      {
+        "observed_port_id": "bus-a",
+        "driven_port_id": "bus-a",
+        "real_ohm": {
+          "lower": {
+            "numerator": "88",
+            "denominator": "81"
+          },
+          "upper": {
+            "numerator": "172",
+            "denominator": "49"
+          }
+        },
+        "imaginary_ohm": {
+          "lower": {
+            "numerator": "8",
+            "denominator": "27"
+          },
+          "upper": {
+            "numerator": "108",
+            "denominator": "49"
+          }
+        }
+      },
+      {
+        "observed_port_id": "bus-a",
+        "driven_port_id": "bus-b",
+        "real_ohm": {
+          "lower": {
+            "numerator": "32",
+            "denominator": "81"
+          },
+          "upper": {
+            "numerator": "2",
+            "denominator": "1"
+          }
+        },
+        "imaginary_ohm": {
+          "lower": {
+            "numerator": "32",
+            "denominator": "27"
+          },
+          "upper": {
+            "numerator": "162",
+            "denominator": "49"
+          }
+        }
+      }
+    ],
+    [
+      {
+        "observed_port_id": "bus-b",
+        "driven_port_id": "bus-a",
+        "real_ohm": {
+          "lower": {
+            "numerator": "4",
+            "denominator": "27"
+          },
+          "upper": {
+            "numerator": "54",
+            "denominator": "49"
+          }
+        },
+        "imaginary_ohm": {
+          "lower": {
+            "numerator": "-86",
+            "denominator": "49"
+          },
+          "upper": {
+            "numerator": "-44",
+            "denominator": "81"
+          }
+        }
+      },
+      {
+        "observed_port_id": "bus-b",
+        "driven_port_id": "bus-b",
+        "real_ohm": {
+          "lower": {
+            "numerator": "152",
+            "denominator": "81"
+          },
+          "upper": {
+            "numerator": "234",
+            "denominator": "49"
+          }
+        },
+        "imaginary_ohm": {
+          "lower": {
+            "numerator": "-106",
+            "denominator": "49"
+          },
+          "upper": {
+            "numerator": "-8",
+            "denominator": "27"
+          }
+        }
+      }
+    ]
+  ],
+  "negative_controls": [
+    {
+      "id": "current-disc-touches-zero",
+      "expected": "not_evaluable_current_set_includes_zero"
+    },
+    {
+      "id": "statistical-only-bound",
+      "expected": "not_evaluable_not_a_hard_bound"
+    },
+    {
+      "id": "empty-method-reference",
+      "expected": "not_evaluable_missing_hard_bound_method"
+    },
+    {
+      "id": "missing-cross-port-observation",
+      "expected": "not_evaluable_missing_matrix_element"
+    },
+    {
+      "id": "off-knot-query",
+      "expected": "not_evaluable_unsupported_frequency"
+    },
+    {
+      "id": "tiny-denominator-underflow",
+      "expected": "not_evaluable_floating_point_domain"
+    }
+  ],
+  "claim_ceiling": [
+    "Synthetic exact-rational fixture only.",
+    "The rectangle is conservative and is not the exact image of the complex-disc quotient.",
+    "Independent voltage/current uncertainty sets are assumed; no covariance or probability claim.",
+    "No measured matrix, calibrated coverage, generalized-Nyquist or aircraft-stability result is claimed."
+  ]
+}
