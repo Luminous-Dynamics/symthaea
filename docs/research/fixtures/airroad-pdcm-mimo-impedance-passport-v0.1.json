@@ -382,6 +382,11 @@
       "id": "zero-excitation",
       "mutate": "set injected current to zero",
       "expected": "not_evaluable_invalid_excitation"
+    },
+    {
+      "id": "current-uncertainty-includes-zero",
+      "mutate": "set injected-current absolute error bound to at least the injected-current magnitude",
+      "expected": "not_evaluable_excitation_uncertainty_covers_zero"
     }
   ],
   "claim_ceiling": [
