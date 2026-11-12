@@ -144,6 +144,55 @@ def main() -> None:
     assert characteristic[(1, 0)] == 3
     assert 3 * 3 > 1  # 9 > max(1 - 8*gamma) for gamma > 0 in the stable domain.
 
+
+    # Independently bind the declared state-space realization to the same
+    # transfer matrix, then derive det(sI - A_cl) from A_cl = A - B*C.
+    state_space = model["state_space"]
+
+    def scalar_poly(value):
+        if isinstance(value, dict):
+            return parse_matrix_entry(value)
+        rational = Fraction(value)
+        return {(0, 0): rational} if rational else {}
+
+    A = [[scalar_poly(value) for value in row] for row in state_space["A"]]
+    B = [[scalar_poly(value) for value in row] for row in state_space["B"]]
+    C = [[scalar_poly(value) for value in row] for row in state_space["C"]]
+    D = [[scalar_poly(value) for value in row] for row in state_space["D"]]
+    zero = {}
+    identity = [[{(0, 0): Fraction(1)} if i == j else {} for j in range(3)] for i in range(3)]
+    expected_A = [[{(0, 0): Fraction(-1)} if i == j else {} for j in range(3)] for i in range(3)]
+    expected_D = [[{} for _ in range(3)] for _ in range(3)]
+    assert A == expected_A
+    assert B == identity
+    assert C == coupling
+    assert D == expected_D
+
+    def matrix_product(left, right):
+        result = []
+        for i in range(3):
+            row = []
+            for j in range(3):
+                value = {}
+                for k in range(3):
+                    value = add(value, multiply(left[i][k], right[k][j]))
+                row.append(value)
+            result.append(row)
+        return result
+
+    BC = matrix_product(B, C)
+    s_identity = [[{(1, 0): Fraction(1)} if i == j else {} for j in range(3)] for i in range(3)]
+    closed_loop_matrix = [
+        [add(A[i][j], negate(BC[i][j])) for j in range(3)]
+        for i in range(3)
+    ]
+    state_characteristic_matrix = [
+        [add(s_identity[i][j], negate(closed_loop_matrix[i][j])) for j in range(3)]
+        for i in range(3)
+    ]
+    state_characteristic = determinant_3(state_characteristic_matrix)
+    assert state_characteristic == characteristic
+
     # Exact set-level classification; no frequency sweep and no floating roots.
     for case in data["uncertainty_sets"]:
         lower = q(case["gamma_lower"])
@@ -170,6 +219,32 @@ def main() -> None:
             assert a0_at_upper_gamma <= 0 <= a0_at_lower_gamma
 
         print(f"PASS {case['id']}: [{lower}, {upper}] -> {actual}")
+
+
+    # A destabilization witness is existential and must not be confused with
+    # ROBUSTLY_UNSTABLE, which is universal over the complete parameter set.
+    cases_by_id = {case["id"]: case for case in data["uncertainty_sets"]}
+    for witness in data["destabilization_witnesses"]:
+        case = cases_by_id[witness["uncertainty_set_id"]]
+        gamma_witness = q(witness["gamma"])
+        lower = q(case["gamma_lower"])
+        upper = q(case["gamma_upper"])
+        assert lower <= gamma_witness <= upper
+        a0_witness = Fraction(1) - 8 * gamma_witness
+        if witness["expected"] == "DESTABILIZATION_WITNESS":
+            assert a0_witness < 0
+        elif witness["expected"] == "MARGINAL_NOT_STRICTLY_UNSTABLE":
+            assert a0_witness == 0
+        elif witness["expected"] == "NO_DESTABILIZATION_WITNESS":
+            assert upper < boundary
+        else:
+            raise AssertionError(f"unknown witness disposition: {witness['expected']}")
+    assert cases_by_id["mixed"]["expected"] == "NOT_ESTABLISHED"
+    assert any(
+        item["uncertainty_set_id"] == "mixed"
+        and item["expected"] == "DESTABILIZATION_WITNESS"
+        for item in data["destabilization_witnesses"]
+    )
 
     # Invalid intervals are rejected by exact admission logic.
     for lower, upper in (
