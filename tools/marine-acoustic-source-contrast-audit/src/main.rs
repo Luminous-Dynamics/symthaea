@@ -698,9 +698,17 @@ mod tests {
     }
 
     #[test]
-    fn design_evidence_digest_is_preserved_in_receipt() {
-        let report = audit(&case());
+    fn design_and_sensor_lineage_are_preserved_in_receipt() {
+        let input = case();
+        let report = audit(&input);
         assert_eq!(report.design_evidence_sha256, digest('7'));
+        assert_eq!(report.source_dataset_id, input.source.dataset_id);
+        assert_eq!(report.source_data_sha256, input.source.raw_data_sha256);
+        assert_eq!(report.baseline_acoustic_trace_sha256, input.baseline.acoustic_trace_sha256);
+        assert_eq!(report.candidate_acoustic_trace_sha256, input.candidate.acoustic_trace_sha256);
+        assert_eq!(report.calibration_certificate_sha256, input.baseline.calibration_certificate_sha256);
+        assert_eq!(report.timebase_receipt_sha256, input.baseline.timebase_receipt_sha256);
+        assert_eq!(report.design_strategy, "randomized");
     }
 
     #[test]
@@ -718,6 +726,18 @@ mod tests {
         let mut input = case();
         input.design_evidence_sha256 = "missing".to_string();
         assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn committed_schema_requires_numeric_source_observables() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/marine-acoustic-source-contrast-v0.1.0.schema.json"
+        )).expect("schema is valid JSON");
+        assert_eq!(schema["$schema"], "https://json-schema.org/draft/2020-12/schema");
+        for required in ["measured_value", "unit", "expanded_uncertainty", "equivalence_tolerance"] {
+            assert!(schema["$defs"]["sourceState"]["required"]
+                .as_array().unwrap().iter().any(|value| value == required));
+        }
     }
 
     #[test]
