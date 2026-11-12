@@ -25,6 +25,7 @@ pub enum MusicXmlMeasureAdapterError {
     InvalidDuration { value: i64 },
     ArithmeticOverflow,
     MissingPartId,
+    DuplicatePartId { id: String },
     UnsupportedRoot { root: String },
     NoParts,
 }
@@ -228,11 +229,17 @@ pub fn parse_musicxml_part_measure_maps(
     }
 
     let mut output = Vec::with_capacity(parts.len());
+    let mut seen_part_ids = std::collections::BTreeSet::new();
     for part in parts {
         let part_id = part
             .attribute("id")
             .filter(|value| !value.trim().is_empty())
             .ok_or(MusicXmlMeasureAdapterError::MissingPartId)?;
+        if !seen_part_ids.insert(part_id.to_string()) {
+            return Err(MusicXmlMeasureAdapterError::DuplicatePartId {
+                id: part_id.to_string(),
+            });
+        }
         let parsed = parse_part(part)?;
         let (status, measures, non_controlling_indices) = match parsed {
             Some(parsed) if !parsed.is_empty() => {
@@ -350,7 +357,19 @@ fn parse_part(
                         }
                         divisions = Some(value);
                     } else if attribute.has_tag_name("time") {
-                        expected_measure_length = parse_time_length(attribute);
+                        // Time-signature changes must occur at a measure
+                        // origin for this V1 measure-span adapter. A change
+                        // after notes have advanced the cursor requires the
+                        // richer internal-boundary/time-event graph.
+                        if cursor.compare_exact(RationalBeat::new(0, 1).unwrap())
+                            != std::cmp::Ordering::Equal
+                        {
+                            return Ok(None);
+                        }
+                        let Some(length) = parse_time_length(attribute) else {
+                            return Ok(None);
+                        };
+                        expected_measure_length = Some(length);
                     }
                 }
             } else if element.has_tag_name("note") {
@@ -741,4 +760,52 @@ mod tests {
         assert!(parts[0].map.measures.is_empty());
     }
 
+
+    #[test]
+    fn duplicate_musicxml_part_ids_are_rejected() {
+        let xml = r#"<score-partwise>
+            <part id="P1"><measure number="1"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>16</duration></note></measure></part>
+            <part id="P1"><measure number="1"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>16</duration></note></measure></part>
+        </score-partwise>"#;
+        assert_eq!(
+            parse_musicxml_part_measure_maps(
+                xml.as_bytes(),
+                "sha256:duplicate-id",
+                "score-clock",
+            ),
+            Err(MusicXmlMeasureAdapterError::DuplicatePartId { id: "P1".into() })
+        );
+    }
+
+    #[test]
+    fn mid_measure_time_signature_change_is_not_flattened() {
+        let xml = r#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><rest/><duration>8</duration></note>
+                <attributes><time><beats>3</beats><beat-type>4</beat-type></time></attributes>
+                <note><rest/><duration>8</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let global = parse(xml);
+        assert!(matches!(global.status, MeasureMapStatus::Unknown { .. }));
+        assert!(global.measures.is_empty());
+    }
+
+    #[test]
+    fn malformed_explicit_time_signature_is_not_replaced_by_previous_meter() {
+        let xml = r#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><rest/><duration>16</duration></note>
+            </measure>
+            <measure number="2">
+                <attributes><time><beats>0</beats><beat-type>8</beat-type></time></attributes>
+                <note><rest/><duration>16</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let global = parse(xml);
+        assert!(matches!(global.status, MeasureMapStatus::Unknown { .. }));
+        assert!(global.measures.is_empty());
+    }
 }
