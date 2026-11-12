@@ -143,6 +143,8 @@ struct BandResult {
     observed_full_scale_source_level_db: f64,
     residual_db: Option<f64>,
     combined_expanded_uncertainty_db: Option<f64>,
+    uncertainty_rule: String,
+    confidence_level: f64,
     within_declared_uncertainty: Option<bool>,
 }
 
@@ -299,6 +301,9 @@ fn audit(case: &Case) -> AuditReport {
     if campaign_rates.len() < 2 {
         incomplete.push("at least two distinct model-propeller rotation-rate strata are required".to_string());
     }
+    if campaign_rates.len() != campaign.model_rotation_rates_rps.len() {
+        incomplete.push("duplicate model rotation-rate strata were declared".to_string());
+    }
 
     if case.operating_point_pairs.is_empty() {
         incomplete.push("no paired model/full-scale operating points were supplied".to_string());
@@ -452,10 +457,11 @@ fn audit(case: &Case) -> AuditReport {
                 observed_full_scale_source_level_db: band.observed_full_scale_source_level_db,
                 residual_db: residual,
                 combined_expanded_uncertainty_db: combined_u,
+                uncertainty_rule: rule,
+                confidence_level: u.confidence_level,
                 within_declared_uncertainty: within,
             });
 
-            let _ = rule;
         }
 
         pair_results.push(PairResult {
