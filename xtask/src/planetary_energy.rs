@@ -72,6 +72,8 @@ pub struct CaseResult {
     pub case_id: String,
     pub status: &'static str,
     pub computed_irradiance_w_m2: Option<f64>,
+    pub reference_flux_fraction_of_1au: Option<f64>,
+    pub ideal_area_multiplier_for_equal_incident_power: Option<f64>,
     pub reported_irradiance_w_m2: f64,
     pub absolute_error_w_m2: Option<f64>,
     pub findings: Vec<Finding>,
@@ -248,16 +250,36 @@ pub fn audit_corpus(bytes: &[u8]) -> Result<AuditReport> {
             }
         }
 
-        let computed = if case.heliocentric_distance_au.is_finite()
+        let distance_squared = if case.heliocentric_distance_au.is_finite()
             && case.heliocentric_distance_au > 0.0
-            && model.solar_irradiance_at_1_au_w_m2.is_finite()
-            && model.solar_irradiance_at_1_au_w_m2 > 0.0
         {
-            Some(model.solar_irradiance_at_1_au_w_m2
-                / case.heliocentric_distance_au.powi(2))
+            let value = case.heliocentric_distance_au.powi(2);
+            if value.is_finite() && value > 0.0 {
+                Some(value)
+            } else {
+                None
+            }
         } else {
             None
         };
+        let ideal_area_multiplier = distance_squared;
+        let reference_flux_fraction = distance_squared.map(|value| 1.0 / value);
+        let computed = reference_flux_fraction.and_then(|fraction| {
+            if model.solar_irradiance_at_1_au_w_m2.is_finite()
+                && model.solar_irradiance_at_1_au_w_m2 > 0.0
+            {
+                Some(model.solar_irradiance_at_1_au_w_m2 * fraction)
+            } else {
+                None
+            }
+        });
+
+        if ideal_area_multiplier.is_none() || reference_flux_fraction.is_none() {
+            findings.push(finding(
+                "AREA_MULTIPLIER_NOT_COMPUTABLE",
+                "distance cannot produce a finite positive equal-flux area multiplier".to_string(),
+            ));
+        }
 
         let absolute_error = computed.map(|value| {
             (value - case.normal_incidence_top_of_atmosphere_irradiance_w_m2).abs()
@@ -291,6 +313,9 @@ pub fn audit_corpus(bytes: &[u8]) -> Result<AuditReport> {
             case_id: case.case_id,
             status,
             computed_irradiance_w_m2: computed.map(round_to_six_decimals),
+            reference_flux_fraction_of_1au: reference_flux_fraction.map(round_to_six_decimals),
+            ideal_area_multiplier_for_equal_incident_power: ideal_area_multiplier
+                .map(round_to_six_decimals),
             reported_irradiance_w_m2: case
                 .normal_incidence_top_of_atmosphere_irradiance_w_m2,
             absolute_error_w_m2: absolute_error.map(round_to_six_decimals),
@@ -450,6 +475,24 @@ mod tests {
         value["reference_model"]["surprise_efficiency_factor"] = serde_json::json!(1.5);
         let bytes = serde_json::to_vec(&value).expect("fixture serializes");
         assert!(audit_corpus(&bytes).is_err());
+    }
+
+
+    #[test]
+    fn equal_incident_power_area_multiplier_scales_with_distance_squared() {
+        let report = audit_corpus(FIXTURE.as_bytes()).expect("audit parses");
+        let belt = report
+            .cases
+            .iter()
+            .find(|case| case.case_id == "main-belt-reference-screen")
+            .expect("main-belt reference exists");
+        assert!((belt.ideal_area_multiplier_for_equal_incident_power.unwrap() - 7.29).abs() < 1e-6);
+        let saturn = report
+            .cases
+            .iter()
+            .find(|case| case.case_id == "saturn-distance-control")
+            .expect("Saturn control exists");
+        assert!((saturn.ideal_area_multiplier_for_equal_incident_power.unwrap() - 90.25).abs() < 1e-6);
     }
 
     #[test]
