@@ -111,13 +111,21 @@ impl PatchFootprint {
     /// Construct a minimal direct patch. Production adapters should populate
     /// all semantic reads, writes, relations and trust state from verified
     /// source artifacts rather than taking caller assertions as proof.
-    pub fn direct(
+    pub fn direct<Targets, Target, Reads, Read, Writes, Write>(
         patch_id: impl Into<String>,
         operation: impl Into<String>,
-        targets: impl IntoIterator<Item = impl Into<String>>,
-        reads: impl IntoIterator<Item = impl Into<String>>,
-        writes: impl IntoIterator<Item = impl Into<String>>,
-    ) -> Self {
+        targets: Targets,
+        reads: Reads,
+        writes: Writes,
+    ) -> Self
+    where
+        Targets: IntoIterator<Item = Target>,
+        Target: Into<String>,
+        Reads: IntoIterator<Item = Read>,
+        Read: Into<String>,
+        Writes: IntoIterator<Item = Write>,
+        Write: Into<String>,
+    {
         Self {
             patch_id: patch_id.into(),
             operation: operation.into(),
@@ -339,7 +347,7 @@ pub fn analyze_merge(
         || intersects(&right.writes, &left.reads);
     if read_write {
         if either_requires_revalidation(left, right) {
-            return revalidation_decision(context);
+            return revalidation_decision(context, left, right);
         }
         return MergeDecision::new(
             MergeOutcome::Conflict,
@@ -395,21 +403,31 @@ pub fn analyze_merge(
     )
 }
 
-fn revalidation_decision(context: MergeContext) -> MergeDecision {
+fn revalidation_decision(
+    context: MergeContext,
+    left: &PatchFootprint,
+    right: &PatchFootprint,
+) -> MergeDecision {
+    let mut reasons = vec![ReasonCode::RevalidationRequired];
+    if left.artifact_integrity == ArtifactIntegrity::StaleDerivedReceipt
+        || right.artifact_integrity == ArtifactIntegrity::StaleDerivedReceipt
+    {
+        reasons.push(ReasonCode::DerivedReceiptStale);
+    }
     if context.revalidation_available {
         MergeDecision::new(
             MergeOutcome::MergeWithRevalidation,
-            vec![ReasonCode::RevalidationRequired],
+            reasons,
             true,
             false,
         )
     } else {
         MergeDecision::new(
             MergeOutcome::Unknown,
-            vec![
-                ReasonCode::RevalidationRequired,
-                ReasonCode::RevalidationUnavailable,
-            ],
+            {
+                reasons.push(ReasonCode::RevalidationUnavailable);
+                reasons
+            },
             false,
             false,
         )
@@ -425,7 +443,7 @@ fn finish_independent_or_revalidate(
     let stale_receipt = left.artifact_integrity == ArtifactIntegrity::StaleDerivedReceipt
         || right.artifact_integrity == ArtifactIntegrity::StaleDerivedReceipt;
     if stale_receipt || either_requires_revalidation(left, right) {
-        return revalidation_decision(context);
+        return revalidation_decision(context, left, right);
     }
 
     MergeDecision::new(MergeOutcome::SafeAutomaticMerge, reasons, true, false)
