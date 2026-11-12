@@ -140,7 +140,6 @@ pub struct DriveKinematicReport {
     pub motor_shaft_output_torque_nm: f64,
 }
 
-
 /// A motor efficiency interval linked to one exact map and evidence manifest.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MotorEfficiencyEvidence {
@@ -200,7 +199,6 @@ pub struct DriveMapEnvelope {
     /// Highest efficiency / lowest DC demand. Typed failures remain visible.
     pub favourable_efficiency_scenario: Result<DriveReport, DriveError>,
 }
-
 
 /// Context-bound motor-shaft coordinate bounds plus the map envelope derived
 /// over that entire rectangle. The coordinate bounds are absolute sets, not
@@ -461,7 +459,6 @@ pub fn evaluate_drive(config: &DriveConfig, input: DriveInput) -> Result<DriveRe
     })
 }
 
-
 /// Derive the motor-side shaft operating point from rotor demand and an
 /// explicit transmission speed ratio/efficiency, without needing motor or
 /// inverter efficiency. Use this before querying a motor efficiency map.
@@ -498,8 +495,7 @@ pub fn derive_motor_shaft_operating_point(
     let motor_angular_velocity_rad_s = rotor_angular_velocity_rad_s * ratio;
     let motor_speed_rpm = motor_angular_velocity_rad_s * 60.0 / TAU;
     let motor_shaft_output_power_w = rotor_shaft_power_w / transmission_efficiency;
-    let motor_shaft_output_torque_nm =
-        motor_shaft_output_power_w / motor_angular_velocity_rad_s;
+    let motor_shaft_output_torque_nm = motor_shaft_output_power_w / motor_angular_velocity_rad_s;
 
     let derived = [
         rotor_angular_velocity_rad_s,
@@ -509,7 +505,10 @@ pub fn derive_motor_shaft_operating_point(
         motor_shaft_output_power_w,
         motor_shaft_output_torque_nm,
     ];
-    if derived.iter().any(|value| !value.is_finite() || *value <= 0.0) {
+    if derived
+        .iter()
+        .any(|value| !value.is_finite() || *value <= 0.0)
+    {
         return Err(DriveError::NumericalOverflow);
     }
 
@@ -576,21 +575,16 @@ pub fn evaluate_drive_with_map_evidence(
     if efficiencies
         .iter()
         .any(|value| !value.is_finite() || !(0.0 < *value && *value <= 1.0))
-        || !(evidence.efficiency_lower_bound
-            <= evidence.efficiency_nominal
-            && evidence.efficiency_nominal
-                <= evidence.efficiency_upper_bound)
+        || !(evidence.efficiency_lower_bound <= evidence.efficiency_nominal
+            && evidence.efficiency_nominal <= evidence.efficiency_upper_bound)
     {
         return Err(DriveError::InvalidConfiguration(
             "motor efficiency bounds must be finite and ordered in (0, 1]",
         ));
     }
 
-    let motor_operating_point = derive_motor_shaft_operating_point(
-        input,
-        transmission,
-        config.transmission_efficiency,
-    )?;
+    let motor_operating_point =
+        derive_motor_shaft_operating_point(input, transmission, config.transmission_efficiency)?;
     if evidence.motor_torque_nm.to_bits()
         != motor_operating_point.motor_shaft_output_torque_nm.to_bits()
         || evidence.motor_speed_rpm.to_bits() != motor_operating_point.motor_speed_rpm.to_bits()
@@ -641,11 +635,8 @@ pub fn evaluate_drive_with_kinematics(
     input: DriveInput,
     transmission: TransmissionKinematics,
 ) -> Result<DriveKinematicReport, DriveError> {
-    let motor_point = derive_motor_shaft_operating_point(
-        input,
-        transmission,
-        config.transmission_efficiency,
-    )?;
+    let motor_point =
+        derive_motor_shaft_operating_point(input, transmission, config.transmission_efficiency)?;
     let drive = evaluate_drive(config, input)?;
 
     Ok(DriveKinematicReport {
@@ -656,7 +647,6 @@ pub fn evaluate_drive_with_kinematics(
         motor_shaft_output_torque_nm: motor_point.motor_shaft_output_torque_nm,
     })
 }
-
 
 /// Propagate rectangular motor-shaft torque/RPM bounds and a coordinate-aware
 /// map efficiency envelope into DC-bus demand.
@@ -763,9 +753,7 @@ pub fn evaluate_motor_shaft_coordinate_envelope(
         ));
     }
 
-    let shaft_power = |torque_nm: f64, speed_rpm: f64| {
-        torque_nm * (speed_rpm * TAU / 60.0)
-    };
+    let shaft_power = |torque_nm: f64, speed_rpm: f64| torque_nm * (speed_rpm * TAU / 60.0);
     let shaft_power_lower_bound_w = shaft_power(
         evidence.torque_lower_bound_nm,
         evidence.speed_lower_bound_rpm,
@@ -783,7 +771,9 @@ pub fn evaluate_motor_shaft_coordinate_envelope(
         shaft_power_nominal_w,
         shaft_power_upper_bound_w,
     ];
-    if powers.iter().any(|value| !value.is_finite() || *value <= 0.0)
+    if powers
+        .iter()
+        .any(|value| !value.is_finite() || *value <= 0.0)
         || shaft_power_lower_bound_w > shaft_power_nominal_w
         || shaft_power_nominal_w > shaft_power_upper_bound_w
     {
@@ -797,8 +787,7 @@ pub fn evaluate_motor_shaft_coordinate_envelope(
      -> Result<MotorShaftDemandReport, DriveError> {
         let motor_electrical_input_power_w = mechanical_power_w / motor_efficiency;
         let motor_loss_w = motor_electrical_input_power_w - mechanical_power_w;
-        let dc_bus_input_power_w =
-            motor_electrical_input_power_w / config.inverter_efficiency;
+        let dc_bus_input_power_w = motor_electrical_input_power_w / config.inverter_efficiency;
         let inverter_loss_w = dc_bus_input_power_w - motor_electrical_input_power_w;
         let dc_bus_current_a = dc_bus_input_power_w / config.dc_bus_voltage_v;
         let derived = [
@@ -934,12 +923,9 @@ mod tests {
         input: DriveInput,
         transmission: TransmissionKinematics,
     ) -> MotorEfficiencyEvidence {
-        let point = derive_motor_shaft_operating_point(
-            input,
-            transmission,
-            model.transmission_efficiency,
-        )
-        .unwrap();
+        let point =
+            derive_motor_shaft_operating_point(input, transmission, model.transmission_efficiency)
+                .unwrap();
         MotorEfficiencyEvidence {
             map_id: "motor-map-v1".to_owned(),
             map_digest: "motor-map-sha256".to_owned(),
@@ -1233,21 +1219,15 @@ mod tests {
         let favourable = result.favourable_efficiency_scenario.unwrap();
         assert!(adverse.dc_bus_input_power_w > nominal.dc_bus_input_power_w);
         assert!(nominal.dc_bus_input_power_w > favourable.dc_bus_input_power_w);
-        assert!(
-            (adverse.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.90 * 0.98)).abs()
-                < 1.0e-8
-        );
-        assert!(
-            (nominal.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.95 * 0.98)).abs()
-                < 1.0e-8
-        );
-        assert!(
-            (favourable.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.98 * 0.98)).abs()
-                < 1.0e-8
-        );
+        assert!((adverse.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.90 * 0.98)).abs() < 1.0e-8);
+        assert!((nominal.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.95 * 0.98)).abs() < 1.0e-8);
+        assert!((favourable.dc_bus_input_power_w - 10_000.0 / (0.90 * 0.98 * 0.98)).abs() < 1.0e-8);
         assert_eq!(result.map_id, "motor-map-v1");
         assert_eq!(result.map_digest, "motor-map-sha256");
-        assert_eq!(result.map_model_version, "electric-propulsion-map-oracle-v0.2.0");
+        assert_eq!(
+            result.map_model_version,
+            "electric-propulsion-map-oracle-v0.2.0"
+        );
         assert_eq!(result.torque_cell_lower_index, 3);
         assert_eq!(result.speed_cell_lower_index, 7);
         assert_eq!(result.interpolation_weights, [0.375, 0.125, 0.375, 0.125]);
@@ -1648,7 +1628,8 @@ mod tests {
                 context_digest: "motor-context",
             },
             &evidence,
-        ).unwrap();
+        )
+        .unwrap();
 
         let lower_shaft = 5.0 * (2_000.0 * TAU / 60.0);
         let nominal_shaft = 6.0 * (2_500.0 * TAU / 60.0);
@@ -1660,16 +1641,11 @@ mod tests {
         let minimum = result.minimum_demand_scenario.unwrap();
         let nominal = result.nominal_demand_scenario.unwrap();
         let upper = result.upper_demand_scenario.unwrap();
-        assert!((minimum.dc_bus_input_power_w
-            - lower_shaft / (0.90 * 0.98)).abs() < 1.0e-9);
-        assert!((nominal.dc_bus_input_power_w
-            - nominal_shaft / (0.85 * 0.98)).abs() < 1.0e-9);
-        assert!((upper.dc_bus_input_power_w
-            - upper_shaft / (0.80 * 0.98)).abs() < 1.0e-9);
-        assert!(minimum.dc_bus_input_power_w
-            <= nominal.dc_bus_input_power_w);
-        assert!(nominal.dc_bus_input_power_w
-            <= upper.dc_bus_input_power_w);
+        assert!((minimum.dc_bus_input_power_w - lower_shaft / (0.90 * 0.98)).abs() < 1.0e-9);
+        assert!((nominal.dc_bus_input_power_w - nominal_shaft / (0.85 * 0.98)).abs() < 1.0e-9);
+        assert!((upper.dc_bus_input_power_w - upper_shaft / (0.80 * 0.98)).abs() < 1.0e-9);
+        assert!(minimum.dc_bus_input_power_w <= nominal.dc_bus_input_power_w);
+        assert!(nominal.dc_bus_input_power_w <= upper.dc_bus_input_power_w);
         assert_eq!(result.evidence_manifest_digest, "source-manifest");
     }
 
@@ -1685,7 +1661,8 @@ mod tests {
                 context_digest: "motor-context",
             },
             &evidence,
-        ).unwrap();
+        )
+        .unwrap();
 
         assert!(result.minimum_demand_scenario.is_ok());
         assert!(result.nominal_demand_scenario.is_ok());
@@ -1740,5 +1717,4 @@ mod tests {
             Err(DriveError::InvalidConfiguration(_))
         ));
     }
-
 }
