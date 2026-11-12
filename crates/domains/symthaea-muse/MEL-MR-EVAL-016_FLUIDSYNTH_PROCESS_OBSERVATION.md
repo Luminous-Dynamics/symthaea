@@ -15,7 +15,7 @@ MEL-MR-EVAL-015 records a local render receipt, but its first integration only h
 - Executable, SoundFont and exact MIDI input content hashes are taken before and after the child invocation. A receipt-producing render requires all three pairs to match the receipt's artifact identities.
 - A process-output WAV is mastered only after exit code zero and stable pre/post executable and SoundFont hashes.
 - Renderer receipt v0.2 binds executable/SoundFont/MIDI paths and pre/post hashes, ordered argv, allowlisted-environment digest, diagnostic digests/previews, truncation state, exit/spawn result and the mastered WAV digest.
-- The Studio FluidSynth candidate path uses this observation rather than asserting exit code zero and hashing assets afterward. Every attempted process observation is retained on the candidate and exposed independently at `GET /api/piece/{id}/render-invocation`, including failed attempts and NativeMuse fallback. A successful `/render-receipt` remains a separate artifact and is created only when the output and all evidence checks pass.
+- The Studio FluidSynth candidate path uses this observation rather than asserting exit code zero and hashing assets afterward. Every attempted process observation is retained on the candidate and exposed independently at `GET /api/piece/{id}/render-invocation`, including failed attempts and NativeMuse fallback. A successful `/render-receipt` remains a separate artifact and is created only when the output and all evidence checks pass. The selected renderer remains `native` whenever the FluidSynth attempt lacks a qualified output+receipt pair.
 
 ## Fail-closed controls
 
@@ -33,6 +33,16 @@ MEL-MR-EVAL-015 records a local render receipt, but its first integration only h
 This is stronger **local process evidence**, not cryptographic or remote attestation. The child may load a file through a race that changes and is restored between observations; hashes do not prove the kernel loaded those exact pages. A privileged or malicious host can falsify process observations. Captured process output is the direct child stdout/stderr, not an independent sensor of internal FluidSynth state. Environment hashing is a commitment to the snapshot supplied by this adapter, not a claim that every possible external machine state is captured.
 
 The MIDI file is checked for mutation across the process window. Failure observations are preserved even when Studio falls back to NativeMuse, but the fallback render does not inherit a FluidSynth receipt. The next substantial boundary is native-renderer schedule capture plus renderer-specific measured acoustic timing and PCM-locality audit.
+
+## Exact MIDI and failed-attempt semantics
+
+The process observation includes the canonical MIDI path plus SHA-256 before and after the child invocation. A FluidSynth success receipt requires:
+- process exit code exactly zero and no spawn error;
+- stable executable, SoundFont and MIDI hashes;
+- the observed MIDI digest equals the exact MIDI bytes supplied to the receipt;
+- the observed mastered-WAV digest equals the actual output-WAV digest.
+
+When the child fails, assets change, MIDI changes, output is absent/silent/unmasterable, or receipt construction fails, Studio retains the process observation but does not accept FluidSynth audio. It uses the disclosed NativeMuse render path and stores no FluidSynth success receipt. The separate invocation endpoint preserves why the renderer attempt was not accepted.
 
 ## Tests authored
 
