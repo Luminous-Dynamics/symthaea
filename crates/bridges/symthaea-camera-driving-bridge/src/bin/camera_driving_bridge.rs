@@ -206,7 +206,7 @@ fn process_episode(
         }
         let pixels = fs::read(&pixels_path)?;
 
-        let result = bridge.observe(CapturedDrivingObservation {
+        let result = match bridge.observe(CapturedDrivingObservation {
             sequence: observation.sequence,
             timestamp_us: observation.timestamp_us,
             vehicle_state_timestamp_us: observation.vehicle_state_timestamp_us,
@@ -216,7 +216,16 @@ fn process_episode(
             channels: observation.upstream.channels,
             vehicle_state: &observation.vehicle_state,
             upstream: observation.upstream.clone(),
-        })?;
+        }) {
+            Ok(result) => result,
+            Err(error) => {
+                return Err(format!(
+                    "{error} (frames_processed_before_rejection={})",
+                    bridge.frames_processed()
+                )
+                .into());
+            }
+        };
 
         let policy_input_bytes =
             encode_policy_hv(result.policy_input.dim(), result.policy_input.as_slice())?;
