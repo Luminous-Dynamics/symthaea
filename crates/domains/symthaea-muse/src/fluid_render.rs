@@ -206,7 +206,7 @@ fn unix_time_ns() -> u128 {
 
 fn sha256_hex_bytes(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
-    hex_digest(digest.as_slice())
+    hex_digest(&digest)
 }
 
 fn sha256_file(path: &Path) -> Option<String> {
@@ -220,7 +220,8 @@ fn sha256_file(path: &Path) -> Option<String> {
         }
         hasher.update(&buffer[..read]);
     }
-    Some(hex_digest(hasher.finalize().as_slice()))
+    let digest = hasher.finalize();
+    Some(hex_digest(&digest))
 }
 
 fn hex_digest(bytes: &[u8]) -> String {
