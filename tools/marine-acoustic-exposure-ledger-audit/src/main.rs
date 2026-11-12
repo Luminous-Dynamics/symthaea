@@ -168,9 +168,12 @@ struct ExposurePartitionReport {
     ship_only_cumulative_sel_db: f64,
     ship_only_cumulative_sel_lower_db: f64,
     ship_only_cumulative_sel_upper_db: f64,
-    maximum_received_level_db: f64,
-    maximum_received_level_lower_db: f64,
-    maximum_received_level_upper_db: f64,
+    maximum_individual_contribution_received_level_db: f64,
+    maximum_individual_contribution_received_level_lower_db: f64,
+    maximum_individual_contribution_received_level_upper_db: f64,
+    maximum_simultaneous_ship_received_level_db: f64,
+    maximum_simultaneous_ship_received_level_lower_db: f64,
+    maximum_simultaneous_ship_received_level_upper_db: f64,
     contribution_reports: Vec<ContributionReport>,
     ambient_observation_count: usize,
     ambient_reference_sel_db: Option<f64>,
@@ -606,6 +609,44 @@ fn calculate_contribution<'a>(
     })
 }
 
+fn maximum_simultaneous_level<F>(
+    contributions: &[CalculatedContribution<'_>],
+    level: F,
+) -> Option<f64>
+where
+    F: Fn(&CalculatedContribution<'_>) -> f64,
+{
+    let mut boundaries: Vec<(f64, bool, usize, f64)> = Vec::new();
+    for (index, contribution) in contributions.iter().enumerate() {
+        boundaries.push((contribution.input.start_time_s, true, index, level(contribution)));
+        boundaries.push((contribution.input.end_time_s, false, index, level(contribution)));
+    }
+    boundaries.sort_by(|a,b| a.0.total_cmp(&b.0).then_with(||a.1.cmp(&b.1)));
+    let mut active:BTreeMap<usize,f64>=BTreeMap::new();
+    let mut maximum:Option<f64>=None;
+    let mut index=0;
+    while index<boundaries.len() {
+        let time=boundaries[index].0;
+        let mut end=index;
+        while end<boundaries.len() && boundaries[end].0==time { end+=1; }
+        // Half-open intervals [start,end): remove ended contributions first.
+        for (_,is_start,id,_) in &boundaries[index..end] {
+            if !*is_start { active.remove(id); }
+        }
+        for (_,is_start,id,level) in &boundaries[index..end] {
+            if *is_start { active.insert(*id,*level); }
+        }
+        if !active.is_empty() {
+            let levels:Vec<f64>=active.values().copied().collect();
+            if let Some(total)=log_energy_sum(&levels) {
+                maximum=Some(maximum.map_or(total,|current|current.max(total)));
+            }
+        }
+        index=end;
+    }
+    maximum
+}
+
 fn calculate_ambient_sel(
     observations: &[&AmbientObservation],
 ) -> (Option<f64>,Option<f64>,Option<f64>,Vec<AmbientObservationRef>) {
@@ -669,9 +710,12 @@ fn audit(case:&Case)->AuditReport {
         let unique_coverage=union_duration(&intervals);
         let summed_duration: f64=contributions.iter().map(|item|item.input.duration_s).sum();
         let unique_events:BTreeSet<&str>=contributions.iter().map(|item|item.input.event_id.as_str()).collect();
-        let max_received=contributions.iter().map(|item|item.received_level_db).fold(f64::NEG_INFINITY,f64::max);
-        let max_lower=contributions.iter().map(|item|item.received_level_lower_db).fold(f64::NEG_INFINITY,f64::max);
-        let max_upper=contributions.iter().map(|item|item.received_level_upper_db).fold(f64::NEG_INFINITY,f64::max);
+        let max_individual=contributions.iter().map(|item|item.received_level_db).fold(f64::NEG_INFINITY,f64::max);
+        let max_individual_lower=contributions.iter().map(|item|item.received_level_lower_db).fold(f64::NEG_INFINITY,f64::max);
+        let max_individual_upper=contributions.iter().map(|item|item.received_level_upper_db).fold(f64::NEG_INFINITY,f64::max);
+        let max_simultaneous=maximum_simultaneous_level(&contributions,|item|item.received_level_db).unwrap_or(f64::NEG_INFINITY);
+        let max_simultaneous_lower=maximum_simultaneous_level(&contributions,|item|item.received_level_lower_db).unwrap_or(f64::NEG_INFINITY);
+        let max_simultaneous_upper=maximum_simultaneous_level(&contributions,|item|item.received_level_upper_db).unwrap_or(f64::NEG_INFINITY);
         let contribution_reports=contributions.iter().map(|item|ContributionReport {
             contribution_id:item.input.contribution_id.clone(),
             event_id:item.input.event_id.clone(),
@@ -730,9 +774,12 @@ fn audit(case:&Case)->AuditReport {
             ship_only_cumulative_sel_db:ship_sel,
             ship_only_cumulative_sel_lower_db:ship_lower,
             ship_only_cumulative_sel_upper_db:ship_upper,
-            maximum_received_level_db:max_received,
-            maximum_received_level_lower_db:max_lower,
-            maximum_received_level_upper_db:max_upper,
+            maximum_individual_contribution_received_level_db:max_individual,
+            maximum_individual_contribution_received_level_lower_db:max_individual_lower,
+            maximum_individual_contribution_received_level_upper_db:max_individual_upper,
+            maximum_simultaneous_ship_received_level_db:max_simultaneous,
+            maximum_simultaneous_ship_received_level_lower_db:max_simultaneous_lower,
+            maximum_simultaneous_ship_received_level_upper_db:max_simultaneous_upper,
             contribution_reports,
             ambient_observation_count:ambient_refs.len(),
             ambient_reference_sel_db:ambient_sel,
@@ -994,6 +1041,24 @@ mod tests {
             report.partitions[0].contribution_reports[0].source_to_propagation_sync_receipt_sha256,
             digest('6')
         );
+    }
+
+    #[test]
+    fn simultaneous_received_level_energy_sums_only_overlapping_events() {
+        let report=audit(&case());
+        let partition=&report.partitions[0];
+        let expected=log_energy_sum(&[60.0,59.0]).unwrap();
+        assert!((partition.maximum_simultaneous_ship_received_level_db-expected).abs()<1e-12);
+        assert!((partition.maximum_individual_contribution_received_level_db-60.0).abs()<1e-12);
+    }
+
+    #[test]
+    fn sequential_events_do_not_get_added_to_instantaneous_peak() {
+        let mut input=case();
+        input.contributions[1].start_time_s=10.0;
+        input.contributions[1].end_time_s=20.0;
+        assert!((audit(&input).partitions[0].maximum_simultaneous_ship_received_level_db-60.0).abs()<1e-12);
+        assert!((audit(&input).partitions[0].unique_temporal_coverage_s-20.0).abs()<1e-12);
     }
 
     #[test]
