@@ -39,6 +39,12 @@ exclude = [
     # complete Cargo package. Keep it out of workspace discovery until source ownership
     # and the full candidate evaluator are committed; do not add placeholder modules.
     "crates/domains/symthaea-architecture-engineering",
+    # Dishwasher observer evaluation is an unintegrated source fragment: quality and
+    # validation sibling modules plus the crate root/manifest are not present yet.
+    "crates/domains/symthaea-dishwasher-design",
+    # REA compat has a lib.rs but its declared bundle module and package manifest
+    # are absent; keep it out of workspace discovery until the adapter is complete.
+    "crates/domains/symthaea-rea-compat",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
     # ARCHIVED 2026-07-16 (vision review P2.2): real SigLIP/Moondream/ocrs ONNX
