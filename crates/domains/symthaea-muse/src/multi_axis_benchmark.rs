@@ -118,6 +118,7 @@ pub struct RendererIdentityV1 {
     pub renderer_id: String,
     pub renderer_version: String,
     pub soundfont_or_asset_sha256: Option<String>,
+    pub render_configuration_sha256: String,
     pub sample_rate_hz: u32,
     pub channel_layout: String,
     pub loudness_policy: String,
@@ -307,11 +308,13 @@ pub fn validate_benchmark_protocol(
         &protocol.split.held_out_group_ids,
         "held_out_group_ids",
     )?;
-    let training: BTreeSet<_> = protocol.split.training_group_ids.iter().collect();
-    let evaluation: BTreeSet<_> = protocol.split.evaluation_group_ids.iter().collect();
+    let training: BTreeSet<String> =
+        protocol.split.training_group_ids.iter().cloned().collect();
+    let evaluation: BTreeSet<String> =
+        protocol.split.evaluation_group_ids.iter().cloned().collect();
     if let Some(group_id) = training.intersection(&evaluation).next() {
         return Err(BenchmarkValidationError::TrainingEvaluationOverlap {
-            group_id: (**group_id).clone(),
+            group_id: group_id.clone(),
         });
     }
     if protocol.split.claim == GeneralizationClaimV1::OutOfDistribution {
@@ -380,6 +383,10 @@ pub fn validate_benchmark_protocol(
                 });
             }
         }
+        validate_digest(
+            "renderer.render_configuration_sha256",
+            &renderer.render_configuration_sha256,
+        )?;
         if renderer.sample_rate_hz == 0 {
             return Err(BenchmarkValidationError::EmptyIdentity {
                 field: "renderer.sample_rate_hz".into(),
@@ -510,7 +517,10 @@ pub fn validate_benchmark_run_report(
                     metric_id: metric.metric_id.clone(),
                 });
             }
-            if !metric.value.is_finite() || metric.sample_count == 0 {
+            if !metric.value.is_finite()
+                || metric.sample_count == 0
+                || metric.sample_count > slice.sample_count
+            {
                 return Err(BenchmarkValidationError::InvalidMetricValue {
                     metric_id: metric.metric_id.clone(),
                 });
@@ -522,8 +532,19 @@ pub fn validate_benchmark_run_report(
                     metric_id: metric.metric_id.clone(),
                 });
             }
+            if slice.is_overall
+                && report.protocol.split.claim == GeneralizationClaimV1::OutOfDistribution
+                && metric.confidence_interval.is_none()
+            {
+                return Err(BenchmarkValidationError::InvalidConfidenceInterval {
+                    metric_id: metric.metric_id.clone(),
+                });
+            }
             if let Some(interval) = &metric.confidence_interval {
-                if !interval.lower.is_finite()
+                if (slice.is_overall
+                    && report.protocol.split.claim == GeneralizationClaimV1::OutOfDistribution
+                    && interval.cluster_unit != report.protocol.split.grouping_unit)
+                    || !interval.lower.is_finite()
                     || !interval.upper.is_finite()
                     || !interval.confidence_level.is_finite()
                     || interval.lower > interval.upper
@@ -669,6 +690,7 @@ mod tests {
                 renderer_id: "pinned-reference-renderer".into(),
                 renderer_version: "1.0".into(),
                 soundfont_or_asset_sha256: Some(digest('e')),
+                render_configuration_sha256: digest('9'),
                 sample_rate_hz: 44_100,
                 channel_layout: "stereo".into(),
                 loudness_policy: "none".into(),
