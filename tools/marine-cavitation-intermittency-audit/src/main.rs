@@ -510,9 +510,14 @@ fn summarize_run(run: &Run) -> RunReport {
                 observed_onsets += 1;
             }
         }
-        let right_censored_segments = usize::from(
-            usable.last().is_some_and(|window| window.cavitation_present == Some(true))
-        );
+        let right_censored_segments = if usable
+            .last()
+            .is_some_and(|window| window.cavitation_present == Some(true))
+        {
+            1
+        } else {
+            0
+        };
         let onsets_per_hour = if usable_duration_s > 0.0 {
             Some(observed_onsets as f64 * 3600.0 / usable_duration_s)
         } else {
@@ -538,10 +543,14 @@ fn summarize_run(run: &Run) -> RunReport {
         (None, None, None, None, None, None, None, None)
     };
 
-    let acquisition_duration_s = match (run.windows.first(), run.windows.last()) {
-        (Some(first), Some(last)) => last.end_time_s - first.start_time_s,
-        _ => 0.0,
-    };
+    // Use the sum of observed window durations, not wall-clock span:
+    // gaps between windows are not acquired data and must not inflate the
+    // ITTC-recommended acquisition-period diagnostic.
+    let acquisition_duration_s: f64 = run
+        .windows
+        .iter()
+        .map(|window| window.end_time_s - window.start_time_s)
+        .sum();
 
     RunReport {
         run_id: run.run_id.clone(),
