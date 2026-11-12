@@ -111,8 +111,6 @@ enum FacilityTransferState {
 #[serde(deny_unknown_fields)]
 struct ScalePair {
     pair_id: String,
-    shared_timebase_receipt_sha256: String,
-    scale_transfer_u95_db: f64,
     model: ModelRun,
     full_scale: FullScaleRun,
 }
@@ -121,10 +119,12 @@ struct ScalePair {
 #[serde(deny_unknown_fields)]
 struct ModelRun {
     run_id: String,
+    timebase_receipt_sha256: String,
     operating_point_receipt_sha256: String,
     raw_trace_sha256: String,
     diameter_m: f64,
     rpm_hz: f64,
+    rpm_u95_hz: f64,
     cavitation_number_n_d: f64,
     source_reference_distance_m: f64,
     bands: Vec<ModelBand>,
@@ -137,6 +137,7 @@ struct ModelBand {
     center_frequency_hz: f64,
     frequency_regime: FrequencyRegime,
     frequency_regime_basis: String,
+    scale_transfer_u95_db: f64,
     total_spl_db: f64,
     background_spl_db: f64,
     facility_transfer_function_db: f64,
@@ -149,6 +150,7 @@ struct ModelBand {
 #[serde(deny_unknown_fields)]
 struct FullScaleRun {
     run_id: String,
+    timebase_receipt_sha256: String,
     operating_point_receipt_sha256: String,
     raw_trace_sha256: String,
     diameter_m: f64,
@@ -191,7 +193,8 @@ struct PairReport {
     pair_id: String,
     model_run_id: String,
     full_scale_run_id: String,
-    shared_timebase_receipt_sha256: String,
+    model_timebase_receipt_sha256: String,
+    full_scale_timebase_receipt_sha256: String,
     model_operating_point_receipt_sha256: String,
     model_raw_trace_sha256: String,
     full_scale_operating_point_receipt_sha256: String,
@@ -309,6 +312,31 @@ fn mapped_frequency_hz(model: &ModelRun, full: &FullScaleRun, model_frequency_hz
         * (full.cavitation_number_n_d / model.cavitation_number_n_d).sqrt()
 }
 
+fn distinct_model_rotation_rate_count(pairs: &[ScalePair]) -> usize {
+    let mut intervals: Vec<(f64, f64)> = pairs
+        .iter()
+        .map(|pair| {
+            (
+                pair.model.rpm_hz - pair.model.rpm_u95_hz,
+                pair.model.rpm_hz + pair.model.rpm_u95_hz,
+            )
+        })
+        .collect();
+    intervals.sort_by(|left, right| left.0.total_cmp(&right.0));
+
+    let mut count = 0;
+    let mut covered_upper = f64::NEG_INFINITY;
+    for (lower, upper) in intervals {
+        if lower > covered_upper {
+            count += 1;
+            covered_upper = upper;
+        } else {
+            covered_upper = covered_upper.max(upper);
+        }
+    }
+    count
+}
+
 fn validate_case(case: &Case) -> Vec<String> {
     let mut errors = Vec::new();
     if case.schema_version != SCHEMA_VERSION {
@@ -329,6 +357,14 @@ fn validate_case(case: &Case) -> Vec<String> {
     if case.scaling.method_id != ITTC_METHOD {
         errors.push(format!("method_id must be {}", ITTC_METHOD));
     }
+    if case.scaling.bandwidth == Bandwidth::Proportional
+        && case.scaling.representation != SpectrumRepresentation::PowerSpectrum
+    {
+        errors.push(
+            "ITTC proportional-bandwidth table requires power_spectrum representation"
+                .to_string(),
+        );
+    }
     if !case.frequency_match_tolerance_fraction.is_finite()
         || case.frequency_match_tolerance_fraction <= 0.0
         || case.frequency_match_tolerance_fraction >= 1.0
@@ -344,16 +380,10 @@ fn validate_case(case: &Case) -> Vec<String> {
         if pair.pair_id.trim().is_empty() || !pair_ids.insert(pair.pair_id.clone()) {
             errors.push(format!("empty or duplicate pair_id: {}", pair.pair_id));
         }
-        if !is_sha256(&pair.shared_timebase_receipt_sha256) {
-            errors.push(format!("{}: invalid shared timebase receipt digest", pair.pair_id));
-        }
-        if !finite_positive(pair.scale_transfer_u95_db) {
-            errors.push(format!("{}: scale_transfer_u95_db must be finite and positive", pair.pair_id));
-        }
-
         for (label, value) in [
             ("model diameter", pair.model.diameter_m),
             ("model rpm_hz", pair.model.rpm_hz),
+            ("model rpm_u95_hz", pair.model.rpm_u95_hz),
             ("model sigma_nD", pair.model.cavitation_number_n_d),
             ("model source reference distance", pair.model.source_reference_distance_m),
             ("full-scale diameter", pair.full_scale.diameter_m),
@@ -364,6 +394,12 @@ fn validate_case(case: &Case) -> Vec<String> {
             if !finite_positive(value) {
                 errors.push(format!("{}: {} must be finite and positive", pair.pair_id, label));
             }
+        }
+        if pair.model.rpm_u95_hz >= pair.model.rpm_hz {
+            errors.push(format!(
+                "{}: model rpm_u95_hz must be smaller than rpm_hz",
+                pair.pair_id
+            ));
         }
         let reference_distance_delta =
             (pair.model.source_reference_distance_m - pair.full_scale.source_reference_distance_m).abs();
@@ -378,6 +414,8 @@ fn validate_case(case: &Case) -> Vec<String> {
         }
 
         for (label, digest) in [
+            ("model timebase receipt", &pair.model.timebase_receipt_sha256),
+            ("full-scale timebase receipt", &pair.full_scale.timebase_receipt_sha256),
             ("model operating-point receipt", &pair.model.operating_point_receipt_sha256),
             ("model raw trace", &pair.model.raw_trace_sha256),
             ("full-scale operating-point receipt", &pair.full_scale.operating_point_receipt_sha256),
@@ -418,6 +456,7 @@ fn validate_case(case: &Case) -> Vec<String> {
                 ("total_u95_db", band.total_u95_db),
                 ("background_u95_db", band.background_u95_db),
                 ("facility_transfer_u95_db", band.facility_transfer_u95_db),
+                ("scale_transfer_u95_db", band.scale_transfer_u95_db),
             ] {
                 if !finite_positive(value) {
                     errors.push(format!("{} / {}: {} must be finite and positive; unknown uncertainty cannot be encoded as zero", pair.pair_id, band.band_id, label));
@@ -449,11 +488,7 @@ fn validate_case(case: &Case) -> Vec<String> {
 
 fn audit(case: &Case) -> AuditReport {
     let validation_errors = validate_case(case);
-    let mut unique_rpm_bits = BTreeSet::new();
-    for pair in &case.pairs {
-        unique_rpm_bits.insert(pair.model.rpm_hz.to_bits());
-    }
-    let unique_model_rotation_rates = unique_rpm_bits.len();
+    let unique_model_rotation_rates = distinct_model_rotation_rate_count(&case.pairs);
 
     if !validation_errors.is_empty() {
         return AuditReport {
@@ -625,12 +660,12 @@ fn audit(case: &Case) -> AuditReport {
                 - model_band.facility_transfer_function_db
                 - model_band.facility_transfer_u95_db
                 + delta_db
-                - pair.scale_transfer_u95_db;
+                - model_band.scale_transfer_u95_db;
             let predicted_upper = net_upper
                 - model_band.facility_transfer_function_db
                 + model_band.facility_transfer_u95_db
                 + delta_db
-                + pair.scale_transfer_u95_db;
+                + model_band.scale_transfer_u95_db;
             let observed_lower = full_band.source_level_db - full_band.source_level_u95_db;
             let observed_upper = full_band.source_level_db + full_band.source_level_u95_db;
             let overlaps = predicted_lower <= observed_upper && observed_lower <= predicted_upper;
@@ -660,7 +695,8 @@ fn audit(case: &Case) -> AuditReport {
             pair_id: pair.pair_id.clone(),
             model_run_id: pair.model.run_id.clone(),
             full_scale_run_id: pair.full_scale.run_id.clone(),
-            shared_timebase_receipt_sha256: pair.shared_timebase_receipt_sha256.clone(),
+            model_timebase_receipt_sha256: pair.model.timebase_receipt_sha256.clone(),
+            full_scale_timebase_receipt_sha256: pair.full_scale.timebase_receipt_sha256.clone(),
             model_operating_point_receipt_sha256: pair.model.operating_point_receipt_sha256.clone(),
             model_raw_trace_sha256: pair.model.raw_trace_sha256.clone(),
             full_scale_operating_point_receipt_sha256: pair.full_scale.operating_point_receipt_sha256.clone(),
