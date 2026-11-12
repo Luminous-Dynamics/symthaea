@@ -7,6 +7,7 @@ on:
       - "crates/domains/symthaea-muse/src/audio_event_observation.rs"
       - "crates/domains/symthaea-muse/src/midi_performance.rs"
       - "crates/domains/symthaea-muse/src/lib.rs"
+      - "Cargo.toml"
       - "docs/research/MUSE_STEM_001_PART_STEM_EVIDENCE_V1.md"
       - "docs/research/schemas/muse-part-stem-evidence-v1.schema.json"
       - "docs/research/fixtures/muse-part-stem-evidence-v1.example.json"
