@@ -1544,6 +1544,18 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn schema_and_fixture_require_explicit_reference_run() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/marine-cavitation-intermittency-v0.1.0.schema.json"
+        )).expect("schema JSON parses");
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/fixtures/synthetic-marine-cavitation-intermittency-v0.1.0.json"
+        )).expect("fixture JSON parses");
+        assert!(schema["required"].as_array().unwrap().iter().any(|value| value == "reference_run_id"));
+        assert_eq!(fixture["reference_run_id"], fixture["runs"][0]["run_id"]);
+    }
+
     fn schema_and_fixture_require_water_condition_for_every_run() {
         let schema: serde_json::Value = serde_json::from_str(include_str!(
             "../../../docs/research/marine/marine-cavitation-intermittency-v0.1.0.schema.json"
