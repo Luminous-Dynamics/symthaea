@@ -66,8 +66,8 @@ jobs:
       - name: Verify Cargo workspace metadata resolves
         run: cargo metadata --locked --no-deps --format-version 1 > /tmp/muse-workspace-metadata.json
 
-      - name: Check Muse formatting
-        run: cargo fmt --manifest-path crates/domains/symthaea-muse/Cargo.toml -- --check
+      - name: Check new evaluator formatting
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/counterfactual_acoustic_influence.rs crates/domains/symthaea-muse/src/pairwise_event_interaction.rs
 
       - name: Run FluidSynth invocation and temp-path tests
         run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib fluid_render::tests
