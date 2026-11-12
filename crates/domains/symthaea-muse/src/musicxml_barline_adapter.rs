@@ -320,7 +320,7 @@ pub fn parse_musicxml_part_measure_maps(
 
 
 /// Typed MusicXML barline location in a single partwise measure.
-# [derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MusicXmlBarlineLocationV1 {
     Left,
     Middle,
@@ -328,7 +328,7 @@ pub enum MusicXmlBarlineLocationV1 {
 }
 
 /// Explicit repeat semantics retained from a MusicXML barline.
-# [derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlRepeatV1 {
     pub direction: Option<String>,
     pub times: Option<String>,
@@ -336,7 +336,7 @@ pub struct MusicXmlRepeatV1 {
 }
 
 /// Explicit numbered-ending semantics retained from a MusicXML barline.
-# [derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlEndingV1 {
     pub number: Option<String>,
     pub ending_type: Option<String>,
@@ -347,7 +347,7 @@ pub struct MusicXmlEndingV1 {
 ///
 /// Repeats and endings remain graph annotations; this type does not expand
 /// playback traversal or duplicate notated measures.
-# [derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlPartBarlineEventV1 {
     pub source_order: usize,
     pub source_id: Option<String>,
@@ -371,7 +371,7 @@ pub struct MusicXmlPartBarlineEventV1 {
 }
 
 /// Complete measure map plus every explicit MusicXML barline event for a part.
-# [derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlFermataV1 {
     pub fermata_type: Option<String>,
     pub text: Option<String>,
@@ -379,7 +379,7 @@ pub struct MusicXmlFermataV1 {
 }
 
 /// Typed wavy-line marker attached to a barline (for example, a trill line).
-# [derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlWavyLineV1 {
     pub line_type: Option<String>,
     pub number: Option<String>,
@@ -387,14 +387,14 @@ pub struct MusicXmlWavyLineV1 {
 }
 
 /// MusicXML footnote/level annotation retained without interpreting its prose.
-# [derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlBarlineAnnotationV1 {
     pub element: String,
     pub attributes: Vec<(String, String)>,
     pub text: Option<String>,
 }
 
-# [derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlPartNotationGraphV1 {
     pub part_id: String,
     pub map: MeasureMap,
