@@ -29,7 +29,15 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
-      - name: Check formatting
+      - name: Format Rust source
+        run: cargo fmt --manifest-path tools/marine-acoustic-scale-transfer-audit/Cargo.toml
+      - name: Preserve rustfmt output for exact-head commit
+        uses: actions/upload-artifact@v4
+        with:
+          name: marine-acoustic-scale-transfer-rustfmt
+          path: tools/marine-acoustic-scale-transfer-audit/src/main.rs
+          if-no-files-found: error
+      - name: Verify formatting
         run: cargo fmt --manifest-path tools/marine-acoustic-scale-transfer-audit/Cargo.toml -- --check
       - name: Clippy
         run: cargo clippy --manifest-path tools/marine-acoustic-scale-transfer-audit/Cargo.toml --all-targets -- -D warnings
