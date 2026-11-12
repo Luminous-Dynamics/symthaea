@@ -26,6 +26,8 @@ MUSE-MIR-012 preserves repeat/ending markers in an immutable per-part notation g
 - Missing backward `times` uses the MusicXML default of two total passes.
 - Backward repeat without a preceding forward marker uses the start of the notated part as the implicit repeat start.
 - Multiple sequential, non-overlapping repeat regions.
+- The MusicXML `after-jump` attribute is preserved in the source graph. V1 accepts absent/`no`, but returns Unsupported for `yes` because D.C./D.S. jump semantics are not implemented.
+- Every source measure's number (including non-numeric labels), document ID, display text, pickup/implicit flag and non-controlling flag is retained in a dedicated measure locator. Playback visits bind directly to this locator rather than trying to recover the source measure number from whichever barline event happens to exist.
 
 V1 expands each part independently. MusicXML's non-controlling per-part measure lattices remain valid and do not imply synchronized barlines between parts.
 
@@ -36,6 +38,10 @@ The current traversal returns Unsupported rather than guessing when it encounter
 - numbered endings / voltas;
 - segno or coda jumps;
 - D.C. / D.S. or other navigation semantics;
+- `after-jump="yes"` repeat semantics;
+- MusicXML `<sound>` navigation attributes: `dacapo`, `dalsegno`, `segno`, `coda`, `tocoda`, `forward-repeat`, `fine`;
+- selective `time-only` controls on sounds, notes, lyrics, ties and other playback-related elements;
+- unrecognized repeat attributes;
 - repeat markers on middle barlines;
 - unknown repeat directions;
 - unrecognized barline attributes or child elements that may affect playback;
@@ -77,7 +83,7 @@ The notation graph still contains exactly four measures. No barline or note-eval
 
 ## Authored fixtures
 
-The new Rust module `crates/domains/symthaea-muse/src/repeat_traversal.rs` includes tests for:
+The new Rust module `crates/domains/symthaea-muse/src/repeat_traversal.rs` includes 13 focused tests:
 1. no repeats: each notated measure visited once;
 2. default forward/backward repeat: two total passes;
 3. explicit repeat count three;
@@ -88,16 +94,25 @@ The new Rust module `crates/domains/symthaea-muse/src/repeat_traversal.rs` inclu
 8. unknown barline extension -> Unsupported;
 9. zero/malformed repeat counts -> error;
 10. repeat-pass and total-visit budget exhaustion;
-11. source graph/report digest replay and tamper rejection.
+11. source graph/report digest replay and tamper rejection;
+12. after-jump and MusicXML sound-navigation controls -> Unsupported;
+13. repeated visits preserve non-numeric source measure labels.
 
-The test fixtures also exercise MusicXML parsing into the actual notation-graph API, not a mock graph.
+The parent MusicXML adapter now has 29 focused tests, including:
+- after-jump and unknown repeat attribute preservation;
+- preservation of `<sound>` attributes and selective `time-only` controls;
+- source measure numbers, IDs, display text, pickup flags and non-controlling flags.
+
+The test fixtures exercise MusicXML parsing into the actual notation-graph API, not a mock graph.
 
 ## Qualification boundaries
 
 - Tests are authored, not compiled/executed.
 - No local Rust toolchain is available in the authoring environment.
 - No exact-head CI pass, DAW playback parity, or performance-timing claim is made.
+- MusicXML semantics are based on the official 4.0 `<repeat>` contract: `times` is the number of times the repeated section is played; `after-jump` changes repeat behavior after a D.C./D.S. jump. The adapter now preserves both fields and V1 refuses the unsupported post-jump case. See the [MusicXML 4.0 repeat reference](https://www.w3.org/2021/06/musicxml40/musicxml-reference/elements/repeat/) and [schema annotation](https://www.w3.org/2021/06/musicxml40/listings/musicxml.xsd/).
 - V1 does not implement endings or navigation jumps.
+- V1 preserves playback-affecting `<sound>` and `time-only` controls, but refuses traversal when those controls would alter the visit sequence or note/lyric eligibility.
 - V1 does not schedule concurrent parts against a conductor timeline.
 - A separate renderer/performance layer must still establish tempo-map, fermata, rubato, swing and audio-clock behavior.
 
