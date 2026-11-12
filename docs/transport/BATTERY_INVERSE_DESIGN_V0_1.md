@@ -21,6 +21,17 @@ Optimize the material + electrode + process window + cell architecture + operati
 - Experiment option: question, expected information/decision value, duration, cost, material, risk, facility needs, and estimate evidence. STOP / NO_EXPERIMENT remains available.
 - Read-only: no scheduling, purchasing, synthesis, lab equipment operation, hazardous-work authorization, BMS control, or deployment approval.
 
+## Canonical evidence registry
+
+Every metric, hard gate and experiment estimate resolves to one shared evidence record containing:
+- immutable evidence ID;
+- evidence class (synthetic, assumption, vendor, literature, surrogate, calculation, physical measurement, independent laboratory);
+- declared source SHA-256 digest;
+- claim scope and validity domain;
+- admission state (candidate, research-admitted, evaluation-admitted, blocked, unknown).
+
+Candidate-supplied labels cannot override this registry. Metrics used for Pareto ranking and experiment estimates used for selection must be admitted for evaluation. A physical hard gate requires an evaluation-admitted physical-measurement or independent-laboratory evidence record. Digest syntax is checked; this does not authenticate the source bytes, instrument, signer or laboratory.
+
 ## Pareto and experiment tournament
 
 Compare random, DOE/grid, single-objective Bayesian optimization, multi-objective Bayesian optimization, uncertainty-only, diversity/novelty, reproducible expert-prioritized, and mission-conditioned evidence-weighted value-of-information policies under equal frozen budgets.
