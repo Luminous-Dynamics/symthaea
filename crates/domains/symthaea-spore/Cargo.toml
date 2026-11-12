@@ -10,6 +10,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 symthaea-core = { path = "../../core/symthaea-core", default-features = false }
+symthaea-boot-ecology = { path = "../../core/symthaea-boot-ecology" }
 symthaea-consciousness-equation = { path = "../symthaea-consciousness-equation" }
 symthaea-neuromodulators = { path = "../symthaea-neuromodulators" }
 symthaea-types = { path = "../../core/symthaea-types" }
