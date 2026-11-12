@@ -2151,8 +2151,8 @@ pub fn simulate_identity_hayden_preskill_petz_control(
 ) -> Result<HaydenPreskillPetzRecoverySample, QuantumInformationError> {
     validate_tolerance(tolerance)?;
     let mut identity = [[Complex64::new(0.0, 0.0); 4]; 4];
-    for index in 0..4 {
-        identity[index][index] = Complex64::new(1.0, 0.0);
+    for (index, row) in identity.iter_mut().enumerate() {
+        row[index] = Complex64::new(1.0, 0.0);
     }
     petz_recovery_from_scrambler(&identity, 0, tolerance)
 }
@@ -2228,14 +2228,14 @@ fn petz_recovery_from_scrambler(
     // environment. The initial B,R Bell pair supplies the 1/sqrt(2) factor.
     let inverse_sqrt_two = 1.0 / 2.0_f64.sqrt();
     let mut channel_kraus = [[Complex64::new(0.0, 0.0); 8]; 2];
-    for b_prime in 0..2 {
+    for (b_prime, kraus) in channel_kraus.iter_mut().enumerate() {
         for e in 0..2 {
             for r in 0..2 {
                 let accessible = (e << 1) | r;
                 for message in 0..2 {
                     let input = (message << 1) | r;
                     let output = (e << 1) | b_prime;
-                    channel_kraus[b_prime][accessible * 2 + message] =
+                    kraus[accessible * 2 + message] =
                         scrambler[output][input] * inverse_sqrt_two;
                 }
             }
