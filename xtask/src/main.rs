@@ -5,6 +5,7 @@ mod crate_status;
 mod duplicate_scan;
 mod manifest;
 mod planetary_energy;
+mod planetary_optical;
 mod planetary_reference;
 mod rhn_sweep;
 
@@ -100,9 +101,9 @@ enum Commands {
         #[arg(long)]
         out: Option<PathBuf>,
     },
-    /// Audit source-register and competitive-reference metadata and cross-references.
+    /// Audit the source register and its cross-links to the competitive snapshot.
     /// Does not independently authenticate external claims or reproduce experiments.
-    PlanetaryReferenceAudit {
+    PlanetarySourceAudit {
         #[arg(
             long,
             default_value = "research/planetary-energy/source-register-v0.1.json"
@@ -113,6 +114,18 @@ enum Commands {
             default_value = "benchmarks/planetary-energy-service/v0.1/competitive-reference-snapshot.json"
         )]
         competitive_snapshot: PathBuf,
+        /// Optional path for the machine-readable audit report.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
+    /// Audit low-optical-impact surface evidence and declared observer budgets.
+    /// This is a synthetic contract check, not BRDF/radiative-transfer or laser-safety validation.
+    PlanetaryOpticalImpactAudit {
+        #[arg(
+            long,
+            default_value = "benchmarks/planetary-energy-service/v0.1/optical-impact-cases.json"
+        )]
+        input: PathBuf,
         /// Optional path for the machine-readable audit report.
         #[arg(long)]
         out: Option<PathBuf>,
@@ -170,7 +183,7 @@ fn main() -> anyhow::Result<()> {
         Commands::PlanetaryReferenceAudit { input, out } => {
             planetary_energy::run_competitive_reference_audit(&input, out.as_deref())?;
         }
-        Commands::PlanetaryReferenceAudit {
+        Commands::PlanetarySourceAudit {
             source_register,
             competitive_snapshot,
             out,
@@ -180,6 +193,9 @@ fn main() -> anyhow::Result<()> {
                 &competitive_snapshot,
                 out.as_deref(),
             )?;
+        }
+        Commands::PlanetaryOpticalImpactAudit { input, out } => {
+            planetary_optical::run(&input, out.as_deref())?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
