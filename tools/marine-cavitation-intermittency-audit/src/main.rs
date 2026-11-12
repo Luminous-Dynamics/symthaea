@@ -63,6 +63,10 @@ struct Case {
     environment_fingerprint_sha256: String,
     hydrophone_instrument_id: String,
     calibration_certificate_sha256: String,
+    cavitation_instrument_id: String,
+    cavitation_observation_method_id: String,
+    cavitation_calibration_or_validation_sha256: String,
+    maximum_sync_alignment_uncertainty_s: f64,
     band: BandDefinition,
     window_duration_s: f64,
     minimum_usable_windows_per_run: usize,
@@ -93,6 +97,8 @@ struct BandDefinition {
 struct Run {
     run_id: String,
     timebase_receipt_sha256: String,
+    operating_point_receipt_sha256: String,
+    acoustic_cavitation_sync_receipt_sha256: String,
     service_fingerprint_sha256: String,
     environment_fingerprint_sha256: String,
     hydrophone_instrument_id: String,
@@ -109,6 +115,8 @@ struct Window {
     window_id: String,
     start_time_s: f64,
     end_time_s: f64,
+    acoustic_cavitation_alignment_offset_s: f64,
+    acoustic_cavitation_alignment_expanded_uncertainty_s: f64,
     acoustic_trace_sha256: String,
     cavitation_observation_sha256: String,
     cavitation_present: Option<bool>,
@@ -131,6 +139,10 @@ struct AuditReport {
     environment_fingerprint_sha256: String,
     hydrophone_instrument_id: String,
     calibration_certificate_sha256: String,
+    cavitation_instrument_id: String,
+    cavitation_observation_method_id: String,
+    cavitation_calibration_or_validation_sha256: String,
+    maximum_sync_alignment_uncertainty_s: f64,
     quantity_id: &'static str,
     center_frequency_hz: f64,
     disposition: &'static str,
@@ -149,6 +161,9 @@ struct WindowEvidenceRef {
     cavitation_observation_sha256: String,
     start_time_s: f64,
     end_time_s: f64,
+    acoustic_cavitation_alignment_offset_s: f64,
+    acoustic_cavitation_alignment_expanded_uncertainty_s: f64,
+    acoustic_cavitation_alignment_eligible: bool,
     disposition: &'static str,
     exclusion_reason: Option<&'static str>,
     corrected_spl_db: Option<f64>,
@@ -158,10 +173,14 @@ struct WindowEvidenceRef {
 struct RunReport {
     run_id: String,
     timebase_receipt_sha256: String,
+    operating_point_receipt_sha256: String,
+    acoustic_cavitation_sync_receipt_sha256: String,
     service_fingerprint_sha256: String,
     environment_fingerprint_sha256: String,
     hydrophone_instrument_id: String,
     calibration_certificate_sha256: String,
+    operating_point_receipt_sha256: String,
+    acoustic_cavitation_sync_receipt_sha256: String,
     background_method: &'static str,
     background_trace_sha256: String,
     water_condition: WaterCondition,
@@ -172,6 +191,7 @@ struct RunReport {
     excluded_exact_ten_db_boundary: usize,
     excluded_uncertainty_unresolved: usize,
     excluded_unknown_background_method: usize,
+    excluded_alignment_unresolved: usize,
     cavitation_annotation_coverage: f64,
     cavitation_occupancy_fraction: Option<f64>,
     observed_cavitation_onsets: Option<usize>,
@@ -285,6 +305,7 @@ fn validate_case(case: &Case) -> Vec<String> {
         ("service fingerprint", &case.service_fingerprint_sha256),
         ("environment fingerprint", &case.environment_fingerprint_sha256),
         ("hydrophone calibration certificate", &case.calibration_certificate_sha256),
+        ("cavitation calibration/validation record", &case.cavitation_calibration_or_validation_sha256),
     ] {
         if !is_sha256(digest) {
             errors.push(format!("{label} digest must be 64 hexadecimal characters"));
@@ -300,8 +321,16 @@ fn validate_case(case: &Case) -> Vec<String> {
     {
         errors.push("band frequency, window duration and minimum sample counts must be positive".to_string());
     }
-    if case.hydrophone_instrument_id.trim().is_empty() {
-        errors.push("hydrophone_instrument_id is required".to_string());
+    if case.hydrophone_instrument_id.trim().is_empty()
+        || case.cavitation_instrument_id.trim().is_empty()
+        || case.cavitation_observation_method_id.trim().is_empty()
+    {
+        errors.push("hydrophone/cavitation instrument and cavitation observation method IDs are required".to_string());
+    }
+    if !finite_positive(case.maximum_sync_alignment_uncertainty_s)
+        || case.maximum_sync_alignment_uncertainty_s >= case.window_duration_s / 2.0
+    {
+        errors.push("maximum_sync_alignment_uncertainty_s must be positive and less than half the window duration".to_string());
     }
     if case.runs.is_empty() {
         errors.push("at least one run is required".to_string());
@@ -338,6 +367,8 @@ fn validate_case(case: &Case) -> Vec<String> {
         }
         for (label, digest) in [
             ("timebase receipt", &run.timebase_receipt_sha256),
+            ("operating-point receipt", &run.operating_point_receipt_sha256),
+            ("acoustic/cavitation synchronization receipt", &run.acoustic_cavitation_sync_receipt_sha256),
             ("run service fingerprint", &run.service_fingerprint_sha256),
             ("run environment fingerprint", &run.environment_fingerprint_sha256),
             ("run calibration certificate", &run.calibration_certificate_sha256),
@@ -387,6 +418,8 @@ fn validate_case(case: &Case) -> Vec<String> {
                 || window.end_time_s <= window.start_time_s
                 || ((window.end_time_s - window.start_time_s) - case.window_duration_s).abs()
                     > WINDOW_DURATION_TOLERANCE_S
+                || !window.acoustic_cavitation_alignment_offset_s.is_finite()
+                || !finite_positive(window.acoustic_cavitation_alignment_expanded_uncertainty_s)
                 || !window.total_spl_db.is_finite()
                 || !window.background_spl_db.is_finite()
                 || !finite_positive(window.total_expanded_uncertainty_db)
@@ -405,21 +438,31 @@ fn validate_case(case: &Case) -> Vec<String> {
     errors
 }
 
-fn summarize_run(run: &Run) -> RunReport {
+fn summarize_run(run: &Run, case: &Case) -> RunReport {
     let mut usable = Vec::new();
     let mut window_evidence = Vec::with_capacity(run.windows.len());
     let mut excluded_background_dominated = 0;
     let mut excluded_exact_ten_db_boundary = 0;
     let mut excluded_uncertainty_unresolved = 0;
     let mut excluded_unknown_background_method = 0;
+    let mut excluded_alignment_unresolved = 0;
 
     for window in &run.windows {
+        let alignment_eligible = window.acoustic_cavitation_alignment_offset_s.abs()
+            + window.acoustic_cavitation_alignment_expanded_uncertainty_s
+            <= case.maximum_sync_alignment_uncertainty_s;
+        if !alignment_eligible {
+            excluded_alignment_unresolved += 1;
+        }
         let evidence_ref = |disposition, exclusion_reason, corrected_spl_db| WindowEvidenceRef {
             window_id: window.window_id.clone(),
             acoustic_trace_sha256: window.acoustic_trace_sha256.clone(),
             cavitation_observation_sha256: window.cavitation_observation_sha256.clone(),
             start_time_s: window.start_time_s,
             end_time_s: window.end_time_s,
+            acoustic_cavitation_alignment_offset_s: window.acoustic_cavitation_alignment_offset_s,
+            acoustic_cavitation_alignment_expanded_uncertainty_s: window.acoustic_cavitation_alignment_expanded_uncertainty_s,
+            acoustic_cavitation_alignment_eligible: alignment_eligible,
             disposition,
             exclusion_reason,
             corrected_spl_db,
@@ -484,7 +527,11 @@ fn summarize_run(run: &Run) -> RunReport {
                     start_time_s: window.start_time_s,
                     end_time_s: window.end_time_s,
                     corrected_spl_db: level,
-                    cavitation_present: window.cavitation_present,
+                    cavitation_present: if alignment_eligible {
+                        window.cavitation_present
+                    } else {
+                        None
+                    },
                 });
             }
         }
@@ -510,7 +557,12 @@ fn summarize_run(run: &Run) -> RunReport {
     let annotation_coverage = if run.windows.is_empty() {
         0.0
     } else {
-        annotated_total as f64 / run.windows.len() as f64
+        run.windows.iter().filter(|window| {
+            window.acoustic_cavitation_alignment_offset_s.abs()
+                + window.acoustic_cavitation_alignment_expanded_uncertainty_s
+                <= case.maximum_sync_alignment_uncertainty_s
+                && window.cavitation_present.is_some()
+        }).count() as f64 / run.windows.len() as f64
     };
     let annotated_usable = usable
         .iter()
@@ -608,6 +660,8 @@ fn summarize_run(run: &Run) -> RunReport {
         environment_fingerprint_sha256: run.environment_fingerprint_sha256.clone(),
         hydrophone_instrument_id: run.hydrophone_instrument_id.clone(),
         calibration_certificate_sha256: run.calibration_certificate_sha256.clone(),
+        operating_point_receipt_sha256: run.operating_point_receipt_sha256.clone(),
+        acoustic_cavitation_sync_receipt_sha256: run.acoustic_cavitation_sync_receipt_sha256.clone(),
         background_method: match run.background_method {
             BackgroundMethod::BareHub => "bare_hub",
             BackgroundMethod::PressureSuppressed => "pressure_suppressed",
@@ -622,6 +676,7 @@ fn summarize_run(run: &Run) -> RunReport {
         excluded_exact_ten_db_boundary,
         excluded_uncertainty_unresolved,
         excluded_unknown_background_method,
+        excluded_alignment_unresolved,
         cavitation_annotation_coverage: annotation_coverage,
         cavitation_occupancy_fraction: occupancy,
         observed_cavitation_onsets: onsets,
@@ -654,7 +709,7 @@ fn audit(case: &Case) -> AuditReport {
     let validation_errors = validate_case(case);
     let mut reasons = validation_errors.clone();
     let run_reports: Vec<RunReport> = if validation_errors.is_empty() {
-        case.runs.iter().map(summarize_run).collect()
+        case.runs.iter().map(|run| summarize_run(run, case)).collect()
     } else {
         Vec::new()
     };
@@ -711,6 +766,9 @@ fn audit(case: &Case) -> AuditReport {
         if case.runs.iter().any(|run| run.windows.iter().any(|window| window.cavitation_present.is_none())) {
             reasons.push("one or more windows lack independent cavitation observations; occupancy and conditioned summaries are incomplete".to_string());
         }
+        if run_reports.iter().any(|report| report.excluded_alignment_unresolved > 0) {
+            reasons.push("one or more cavitation annotations exceed the declared acoustic/video synchronization tolerance; event occupancy and conditioned comparisons are incomplete".to_string());
+        }
         if run_reports.iter().any(|report| report.usable_windows < case.minimum_usable_windows_per_run) {
             reasons.push("one or more runs have fewer than the required usable windows".to_string());
         }
@@ -759,6 +817,7 @@ fn audit(case: &Case) -> AuditReport {
         || run_reports.iter().any(|report| report.usable_windows < case.minimum_usable_windows_per_run)
         || case.runs.len() < case.minimum_runs
         || case.runs.iter().any(|run| run.windows.iter().any(|window| window.cavitation_present.is_none()))
+        || run_reports.iter().any(|report| report.excluded_alignment_unresolved > 0)
         || case.runs.iter().any(|run| run.background_method == BackgroundMethod::Unknown)
         || reasons.iter().any(|reason| reason.contains("background measurement method differs"))
         || case.evidence_kind == EvidenceKind::Synthetic
@@ -785,6 +844,10 @@ fn audit(case: &Case) -> AuditReport {
         environment_fingerprint_sha256: case.environment_fingerprint_sha256.clone(),
         hydrophone_instrument_id: case.hydrophone_instrument_id.clone(),
         calibration_certificate_sha256: case.calibration_certificate_sha256.clone(),
+        cavitation_instrument_id: case.cavitation_instrument_id.clone(),
+        cavitation_observation_method_id: case.cavitation_observation_method_id.clone(),
+        cavitation_calibration_or_validation_sha256: case.cavitation_calibration_or_validation_sha256.clone(),
+        maximum_sync_alignment_uncertainty_s: case.maximum_sync_alignment_uncertainty_s,
         quantity_id: SPL_QUANTITY,
         center_frequency_hz: case.band.center_frequency_hz,
         disposition,
@@ -849,6 +912,8 @@ mod tests {
             window_id: format!("window-{index}"),
             start_time_s: start,
             end_time_s: start + 1.0,
+            acoustic_cavitation_alignment_offset_s: 0.0,
+            acoustic_cavitation_alignment_expanded_uncertainty_s: 0.001,
             acoustic_trace_sha256: digest_seed(seed),
             cavitation_observation_sha256: digest_seed(seed + 10_000),
             cavitation_present: Some(cavitation),
@@ -867,6 +932,8 @@ mod tests {
         Run {
             run_id: id.to_string(),
             timebase_receipt_sha256: digest('e'),
+            operating_point_receipt_sha256: digest(if run_index == 0 { 'a' } else { 'b' }),
+            acoustic_cavitation_sync_receipt_sha256: digest(if run_index == 0 { 'c' } else { 'd' }),
             service_fingerprint_sha256: digest('f'),
             environment_fingerprint_sha256: digest('3'),
             hydrophone_instrument_id: "hydrophone-H1".to_string(),
@@ -908,6 +975,10 @@ mod tests {
             environment_fingerprint_sha256: digest('3'),
             hydrophone_instrument_id: "hydrophone-H1".to_string(),
             calibration_certificate_sha256: digest('4'),
+            cavitation_instrument_id: "high-speed-camera-C1".to_string(),
+            cavitation_observation_method_id: "synchronized-blade-phase-annotation-v1".to_string(),
+            cavitation_calibration_or_validation_sha256: digest('9'),
+            maximum_sync_alignment_uncertainty_s: 0.01,
             band: BandDefinition {
                 band_id: "one-third-octave-1000Hz".to_string(),
                 quantity_id: SPL_QUANTITY.to_string(),
@@ -1147,6 +1218,46 @@ mod tests {
         assert_eq!(audit(&input).disposition, "INVALID");
         let mut input = case();
         input.runs[0].calibration_certificate_sha256 = digest('8');
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn cavitation_video_alignment_outside_tolerance_invalidates_event_annotation_only() {
+        let mut input = case();
+        input.runs[0].windows[0].acoustic_cavitation_alignment_offset_s = 0.01;
+        input.runs[0].windows[0].acoustic_cavitation_alignment_expanded_uncertainty_s = 0.002;
+        let report = audit(&input);
+        let run = &report.run_reports[0];
+        assert_eq!(run.excluded_alignment_unresolved, 1);
+        assert_eq!(run.usable_windows, 8);
+        assert_eq!(run.cavitation_annotation_coverage, 7.0 / 8.0);
+        assert_eq!(run.cavitation_occupancy_fraction, None);
+        assert_eq!(report.disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn alignment_uncertainty_at_declared_limit_is_eligible() {
+        let mut input = case();
+        input.runs[0].windows[0].acoustic_cavitation_alignment_offset_s = 0.005;
+        input.runs[0].windows[0].acoustic_cavitation_alignment_expanded_uncertainty_s = 0.005;
+        let report = audit(&input);
+        assert_eq!(report.run_reports[0].excluded_alignment_unresolved, 0);
+    }
+
+    #[test]
+    fn malformed_operating_point_or_sync_receipt_is_invalid() {
+        let mut input = case();
+        input.runs[0].operating_point_receipt_sha256 = "missing".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
+        let mut input = case();
+        input.runs[0].acoustic_cavitation_sync_receipt_sha256 = "missing".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn malformed_cavitation_camera_validation_digest_is_invalid() {
+        let mut input = case();
+        input.cavitation_calibration_or_validation_sha256 = "missing".to_string();
         assert_eq!(audit(&input).disposition, "INVALID");
     }
 
