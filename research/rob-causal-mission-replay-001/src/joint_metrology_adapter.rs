@@ -279,8 +279,23 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
         );
     }
 
+    if let Some(observation) = evidence.mission.observations.first()
+        && observation.sensor_digest != instruments.sensor_calibration_digest
+    {
+        push(
+            &mut findings,
+            FindingSeverity::Invalid,
+            "JOINT_SOURCE_SENSOR_CALIBRATION_MISMATCH",
+            &observation.observation_id,
+        );
+    }
+
     if let Some(application) = evidence.mission.applications.first()
         && (application.actuator_id != instruments.actuator_id
+            || application.actuator_configuration_digest
+                != instruments.actuator_configuration_digest
+            || application.controller_configuration_digest
+                != instruments.controller_configuration_digest
             || application.application_receipt_digest
                 != instruments.actuator_application_receipt_digest)
     {
@@ -307,6 +322,7 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
 
     if let Some(chunk) = evidence.mission.chunks.first()
         && (chunk.model_digest != instruments.model_digest
+            || chunk.policy_digest != instruments.policy_digest
             || chunk.action_domain_digest != instruments.action_domain_digest
             || chunk.expected_executed_prefix_digest != instruments.executed_prefix_expected_digest
             || chunk.observed_executed_prefix_digest != instruments.executed_prefix_observed_digest)
@@ -336,6 +352,16 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
                 &mut findings,
                 FindingSeverity::Invalid,
                 "JOINT_THERMAL_SNAPSHOT_BINDING_MISMATCH",
+                &transition.transition_id,
+            );
+        }
+        if transition.thermal_sensor_calibration_digest
+            != instruments.thermal_sensor_calibration_digest
+        {
+            push(
+                &mut findings,
+                FindingSeverity::Invalid,
+                "JOINT_THERMAL_SENSOR_CALIBRATION_MISMATCH",
                 &transition.transition_id,
             );
         }
@@ -629,6 +655,7 @@ mod tests {
                 selected_action_id: "action-01".to_owned(),
                 source_observation_ids: vec!["observation-01".to_owned()],
                 loss_model_digest: "model-digest".to_owned(),
+                policy_digest: "policy-digest".to_owned(),
                 loss_scale_id: "joint-task-loss-v1".to_owned(),
                 action_domain_digest: "action-domain-digest".to_owned(),
                 calibration_id: "calibration-01".to_owned(),
@@ -646,6 +673,7 @@ mod tests {
                 request_id: None,
                 action_id: "action-01".to_owned(),
                 model_digest: "model-digest".to_owned(),
+                policy_digest: "policy-digest".to_owned(),
                 action_domain_digest: "action-domain-digest".to_owned(),
                 expected_executed_prefix_digest: "prefix-expected".to_owned(),
                 observed_executed_prefix_digest: "prefix-expected".to_owned(),
@@ -664,6 +692,8 @@ mod tests {
                 source_observation_ids: vec!["observation-01".to_owned()],
                 request_id: None,
                 actuator_id: "joint-actuator-01".to_owned(),
+                actuator_configuration_digest: "actuator-config".to_owned(),
+                controller_configuration_digest: "controller-config".to_owned(),
                 application_receipt_digest: "application-receipt".to_owned(),
             }],
             physical_transitions: vec![PhysicalTransition {
@@ -674,6 +704,7 @@ mod tests {
                 resulting_state_digest: "reserve-1".to_owned(),
                 thermal_model_digest: "thermal-model".to_owned(),
                 thermal_snapshot_digest: "thermal-snapshot".to_owned(),
+                thermal_sensor_calibration_digest: "thermal-calibration".to_owned(),
                 thermal_node_ids: vec![
                     "motor-winding".to_owned(),
                     "motor-housing".to_owned(),
@@ -915,6 +946,48 @@ mod tests {
             CommandResponseDisposition::Unknown
         );
         assert_eq!(report.disposition, QualificationDisposition::Unknown);
+    }
+
+
+    #[test]
+    fn sensor_policy_and_hardware_configuration_receipts_must_bind_exactly() {
+        let mut sensor = valid_evidence();
+        sensor.mission.observations[0].sensor_digest = "other-sensor-cal".to_owned();
+        assert_eq!(
+            qualify_joint_metrology(&sensor).disposition,
+            QualificationDisposition::Rejected
+        );
+
+        let mut policy = valid_evidence();
+        policy.mission.chunks[0].policy_digest = "other-policy".to_owned();
+        assert_eq!(
+            qualify_joint_metrology(&policy).disposition,
+            QualificationDisposition::Rejected
+        );
+
+        let mut actuator = valid_evidence();
+        actuator.mission.applications[0].actuator_configuration_digest =
+            "other-actuator-config".to_owned();
+        assert_eq!(
+            qualify_joint_metrology(&actuator).disposition,
+            QualificationDisposition::Rejected
+        );
+
+        let mut controller = valid_evidence();
+        controller.mission.applications[0].controller_configuration_digest =
+            "other-controller-config".to_owned();
+        assert_eq!(
+            qualify_joint_metrology(&controller).disposition,
+            QualificationDisposition::Rejected
+        );
+
+        let mut thermal = valid_evidence();
+        thermal.mission.physical_transitions[0].thermal_sensor_calibration_digest =
+            "other-thermal-cal".to_owned();
+        assert_eq!(
+            qualify_joint_metrology(&thermal).disposition,
+            QualificationDisposition::Rejected
+        );
     }
 
     #[test]
