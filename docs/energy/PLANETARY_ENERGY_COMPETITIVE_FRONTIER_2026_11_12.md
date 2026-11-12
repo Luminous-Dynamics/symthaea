@@ -167,6 +167,14 @@ Each record binds a metric identifier, value, unit, exact declared system bounda
 
 The ledger is a source-qualified starting register, not an automatically validated technology comparison. A future metric promotion requires the exact source revision and context, compatible system boundary, evidence rights and independently reproducible evaluation.
 
+The offline source-register audit is available as:
+
+```bash
+cargo run -p xtask -- planetary-reference-audit
+```
+
+It checks the presence and consistency of source, unit, evidence-class, boundary, caveat and identity metadata. It does not re-run the cited experiments or establish that a source claim is independently true.
+
 ## 11. Claim ceiling
 
 This document reports current source-defined SOTA, programme designs and research targets as of 12 November 2026. It does not establish that any Luminous design beats these values or is physically feasible. No simulator result, source audit, synthetic case or AI-generated architecture is physical validation or approval. Claims require exact configuration identity, comparable functional boundaries, independent measurement, held-out conditions and reproducible artifacts.
