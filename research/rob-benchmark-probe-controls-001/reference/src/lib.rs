@@ -927,7 +927,7 @@ mod tests {
                 }
             })
             .map(|mut cluster| {
-                cluster.tally.control_ticks += u64::from(arm_id.len());
+                cluster.tally.control_ticks += u64::try_from(arm_id.len()).expect("test arm ID length fits u64");
                 cluster
             })
             .collect()
