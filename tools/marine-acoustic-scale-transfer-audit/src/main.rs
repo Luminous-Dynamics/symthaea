@@ -172,6 +172,11 @@ struct FullScaleBand {
 struct AuditReport {
     schema_version: &'static str,
     case_id: String,
+    source_dataset_id: String,
+    source_data_sha256: String,
+    evidence_kind: &'static str,
+    scaling_method_id: String,
+    bandwidth_convention: &'static str,
     spectrum_representation: &'static str,
     disposition: &'static str,
     comparison_outcome: &'static str,
@@ -186,6 +191,11 @@ struct PairReport {
     pair_id: String,
     model_run_id: String,
     full_scale_run_id: String,
+    shared_timebase_receipt_sha256: String,
+    model_operating_point_receipt_sha256: String,
+    model_raw_trace_sha256: String,
+    full_scale_operating_point_receipt_sha256: String,
+    full_scale_raw_trace_sha256: String,
     frequency_scale_factor: f64,
     band_reports: Vec<BandReport>,
 }
@@ -193,6 +203,8 @@ struct PairReport {
 #[derive(Debug, Serialize)]
 struct BandReport {
     band_id: String,
+    frequency_regime: &'static str,
+    frequency_regime_basis: String,
     spl_scale_delta_db: f64,
     model_source_level_db: f64,
     predicted_full_scale_source_level_db: f64,
@@ -205,6 +217,27 @@ struct BandReport {
     observed_interval_lower_db: Option<f64>,
     observed_interval_upper_db: Option<f64>,
     comparison: &'static str,
+}
+
+fn evidence_kind_name(value: &EvidenceKind) -> &'static str {
+    match value {
+        EvidenceKind::Synthetic => "synthetic",
+        EvidenceKind::Measured => "measured",
+    }
+}
+
+fn bandwidth_name(value: &Bandwidth) -> &'static str {
+    match value {
+        Bandwidth::Proportional => "proportional",
+        Bandwidth::Constant => "constant",
+    }
+}
+
+fn frequency_regime_name(value: &FrequencyRegime) -> &'static str {
+    match value {
+        FrequencyRegime::HighFrequency => "high_frequency",
+        FrequencyRegime::LowFrequency => "low_frequency",
+    }
 }
 
 fn spectrum_representation_name(value: &SpectrumRepresentation) -> &'static str {
@@ -426,6 +459,11 @@ fn audit(case: &Case) -> AuditReport {
         return AuditReport {
             schema_version: SCHEMA_VERSION,
             case_id: case.case_id.clone(),
+            source_dataset_id: case.source.dataset_id.clone(),
+            source_data_sha256: case.source.raw_data_sha256.clone(),
+            evidence_kind: evidence_kind_name(&case.evidence_kind),
+            scaling_method_id: case.scaling.method_id.clone(),
+            bandwidth_convention: bandwidth_name(&case.scaling.bandwidth),
             spectrum_representation: spectrum_representation_name(&case.scaling.representation),
             disposition: "invalid",
             comparison_outcome: "not_evaluated",
@@ -510,6 +548,8 @@ fn audit(case: &Case) -> AuditReport {
                 any_prediction_only = true;
                 band_reports.push(BandReport {
                     band_id: model_band.band_id.clone(),
+                    frequency_regime: frequency_regime_name(&model_band.frequency_regime),
+                    frequency_regime_basis: model_band.frequency_regime_basis.clone(),
                     spl_scale_delta_db: delta_db,
                     model_source_level_db: model_source_level,
                     predicted_full_scale_source_level_db: predicted_full_scale,
@@ -614,6 +654,11 @@ fn audit(case: &Case) -> AuditReport {
             pair_id: pair.pair_id.clone(),
             model_run_id: pair.model.run_id.clone(),
             full_scale_run_id: pair.full_scale.run_id.clone(),
+            shared_timebase_receipt_sha256: pair.shared_timebase_receipt_sha256.clone(),
+            model_operating_point_receipt_sha256: pair.model.operating_point_receipt_sha256.clone(),
+            model_raw_trace_sha256: pair.model.raw_trace_sha256.clone(),
+            full_scale_operating_point_receipt_sha256: pair.full_scale.operating_point_receipt_sha256.clone(),
+            full_scale_raw_trace_sha256: pair.full_scale.raw_trace_sha256.clone(),
             frequency_scale_factor: frequency_factor,
             band_reports,
         });
@@ -651,6 +696,8 @@ fn audit(case: &Case) -> AuditReport {
         "incomplete"
     } else if any_prediction_only {
         "prediction_only"
+    } else if any_disjoint_band {
+        "comparison_outside_declared_uncertainty"
     } else {
         "computational_comparison_only"
     };
@@ -672,6 +719,11 @@ fn audit(case: &Case) -> AuditReport {
     AuditReport {
         schema_version: SCHEMA_VERSION,
         case_id: case.case_id.clone(),
+        source_dataset_id: case.source.dataset_id.clone(),
+        source_data_sha256: case.source.raw_data_sha256.clone(),
+        evidence_kind: evidence_kind_name(&case.evidence_kind),
+        scaling_method_id: case.scaling.method_id.clone(),
+        bandwidth_convention: bandwidth_name(&case.scaling.bandwidth),
         spectrum_representation: spectrum_representation_name(&case.scaling.representation),
         disposition,
         comparison_outcome,
@@ -713,6 +765,7 @@ fn main() {
     match report.disposition {
         "invalid" | "not_comparable" => process::exit(2),
         "incomplete" | "prediction_only" => process::exit(3),
+        "comparison_outside_declared_uncertainty" => process::exit(4),
         _ => {}
     }
 }
@@ -893,6 +946,7 @@ mod tests {
         case.pairs[0].full_scale.bands[0].source_level_db = 150.0;
         let report = audit(&case);
         assert_eq!(report.comparison_outcome, "at_least_one_band_disjoint");
+        assert_eq!(report.disposition, "comparison_outside_declared_uncertainty");
         assert_eq!(report.pair_reports[0].band_reports[0].comparison, "intervals_disjoint");
     }
 
