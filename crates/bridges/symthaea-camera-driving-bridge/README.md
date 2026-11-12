@@ -23,6 +23,7 @@ It deliberately does not call `VehicleController`, command an actuator, or claim
 - Camera/vehicle timestamp skew is bounded.
 - The first timestep is supplied as a configuration constant; subsequent timesteps are derived from capture timestamps.
 - A configured maximum inter-frame gap and maximum camera/vehicle timestamp skew are enforced.
+- Capture-to-delivery age is bounded by `maximum_observation_delivery_age_us`; an over-age frame is rejected before Vision Manifold or vehicle temporal state advances.
 - Vehicle channels and timestamp must be finite.
 - Vision HDC dimension must equal the vehicle encoder dimension (16,384).
 - Depth-enabled VisionConfig is rejected because this bridge has no physical depth input.
@@ -90,9 +91,9 @@ cargo run --locked \
   --example write_fixture_configs -- bridge-config.json vision-config.json
 ```
 
-The helper pins the expected episode, agent, camera, 640×360 RGB geometry, one-frame-drop timing bounds and default 16,384D no-depth VisionConfig. Its seed phrase is public fixture data, not a production secret.
+The helper pins the expected episode, agent, camera, 640×360 RGB geometry, one-frame-drop timing bounds, a 5,000 µs maximum capture-to-delivery age and default 16,384D no-depth VisionConfig. Its seed phrase is public fixture data, not a production secret.
 
-The request schema is `schemas/episode-request-v1.schema.json`; the emitted fused receipt schema is `schemas/driving-observation-receipt-v1.schema.json`. the emitted fused receipt schema is `schemas/driving-observation-receipt-v1.schema.json`. Each observation references an RGB pixel artifact by a path relative to the request file. The CLI rejects absolute paths, parent-directory traversal and symlinks that resolve outside the request directory. It checks the source pixel digest against the upstream Symtropy policy receipt before advancing the Vision Manifold.
+The request schema is `schemas/episode-request-v1.schema.json`; the emitted fused receipt schema is `schemas/driving-observation-receipt-v1.schema.json`. Each observation references an RGB pixel artifact by a path relative to the request file. The CLI rejects absolute paths, parent-directory traversal and symlinks that resolve outside the request directory. It checks the source pixel digest against the upstream Symtropy policy receipt before advancing the Vision Manifold.
 
 The CLI validates the complete episode before committing output files. Fused HDC vectors are staged in memory; if a later observation fails identity, receipt, timing, sequence or encoder validation, neither the receipts JSON nor any policy-input artifact is written. The receipts output path must not already exist, and the policy-input directory must be absent or empty before processing. This prevents a rejected multi-frame episode from leaving a partial set of apparently usable policy inputs. The staged binary HDC output is capped at 1 GiB per episode; the cap is checked before the commit phase.
 
