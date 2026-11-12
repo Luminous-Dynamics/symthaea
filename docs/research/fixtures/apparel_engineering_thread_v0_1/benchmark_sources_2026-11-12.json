@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "manifest_id": "APPAREL-TEXTILE-BENCHMARK-SOURCES-2026-11-12",
-  "purpose": "Versioned source register for research baselines in cloth simulation, robotic garment manipulation, textile sorting and sewing. This manifest does not declare any dataset ingested or authorize redistribution. This revision adds OpenTextile-NIR, two inverse-design research comparators, a design-sorting mismatch study and a 2026 critical fabric-design review. Reported percentages/metrics are source-specific and must not be treated as universal or reproduced Luminous results. This revision adds apparel scheduling comparators spanning dual-resource MIP/CP/heuristics, textile steam-aware multi-objective RL, source-load coordination, multi-line flow shops and human-centered scheduling. Published case results are scope-specific and are not a common leaderboard. This revision adds ASTM D6673-10 pattern interchange, the Knitout v0.6 machine-independent knitting instruction format and an open parametric sweater reference generator. These formats cover different layers and must not be conflated as a complete garment digital thread.",
+  "purpose": "Versioned source register for research baselines in cloth simulation, robotic garment manipulation, textile sorting and sewing. This manifest does not declare any dataset ingested or authorize redistribution. This revision adds OpenTextile-NIR, two inverse-design research comparators, a design-sorting mismatch study and a 2026 critical fabric-design review. Reported percentages/metrics are source-specific and must not be treated as universal or reproduced Luminous results. This revision adds apparel scheduling comparators spanning dual-resource MIP/CP/heuristics, textile steam-aware multi-objective RL, source-load coordination, multi-line flow shops and human-centered scheduling. Published case results are scope-specific and are not a common leaderboard. This revision adds ASTM D6673-10 pattern interchange, the Knitout v0.6 machine-independent knitting instruction format and an open parametric sweater reference generator. These formats cover different layers and must not be conflated as a complete garment digital thread. This revision adds human-AI sustainable fashion co-design, sketch-to-parametric garment generation, spatially varying ease/pattern extraction, controllable fashion diffusion and multimodal sketch/text-to-pattern sources. These are distinct levels of the workflow; image generation, editable pattern generation, 3D fit evaluation and physical product qualification must not be conflated.",
   "sources": [
     {
       "source_id": "RGBENCH-REAL-GARMENT-EVAL-V1",
@@ -652,6 +652,137 @@
       ],
       "intended_use": "reference pipeline for measurements → parametric garment pattern → Knitout and backend-specific comparison",
       "redistribution_action": "read repository license, generated file rights and exact upstream commit before reusing source or assets"
+    },
+    {
+      "source_id": "HUMAN-AI-SUSTAINABLE-FASHION-CODESIGN-2026",
+      "name": "A human-AI co-design framework for sustainable fashion",
+      "source_kind": "human_ai_fashion_codesign_study",
+      "paper_url": "https://doi.org/10.1177/24723444261488123",
+      "publication_date": "2026-09-23",
+      "license_status": "publisher_access_and_reuse_terms_to_be_verified",
+      "reported_scope": {
+        "design_records": 4200,
+        "expert_rated_designs": 350,
+        "consumer_participants": 864,
+        "production_patterns": 426,
+        "evaluation_dimensions": [
+          "novelty",
+          "colour_harmony",
+          "production_complexity",
+          "waste_and_circularity_potential",
+          "brand_fit"
+        ],
+        "human_ai_intervention": "co-design and consumer evaluation, including preferences and willingness to pay"
+      },
+      "known_limitations": [
+        "study-specific dataset and populations; not a universal fashion taste benchmark",
+        "reproduce exact task, sampling, rating rubric and split before comparisons",
+        "production-pattern count does not itself prove physical manufacture or fit"
+      ],
+      "intended_use": "human-in-loop fashion co-design benchmark, designer/consumer evaluations and sustainability/production-awareness metrics",
+      "redistribution_action": "verify article rights, underlying dataset permissions and supplementary materials before reuse"
+    },
+    {
+      "source_id": "SKETCH-TO-PARAMETRIC-GARMENT-FIT-2026",
+      "name": "Sketch-to-parametric garment generation with dynamic fit evaluation",
+      "source_kind": "parametric_garment_generation_research",
+      "paper_url": "https://doi.org/10.1177/15589250261441600",
+      "publication_date": "2026-04-28",
+      "license_status": "article_and_supplement_reuse_terms_to_be_verified",
+      "reported_scope": {
+        "task": "sketch to parametric garment geometry with dynamic fitting",
+        "reported_metrics": {
+          "chamfer_distance_mm": 0.87,
+          "detail_matching_percent": 91,
+          "runtime_ms_for_100k_vertices": 45,
+          "designer_task_time_minutes_before": 390,
+          "designer_task_time_minutes_after": 55
+        },
+        "reported_evaluation": "designer comparison under study-specific tasks"
+      },
+      "known_limitations": [
+        "metric values depend on the paper's assets, task and evaluation protocol",
+        "global Chamfer may miss local seam, notch, grain or assembly defects",
+        "runtime is hardware/implementation dependent",
+        "does not alone establish physical wearer fit or manufacturing readiness"
+      ],
+      "intended_use": "matched sketch-to-parametric-geometry and dynamic-fit benchmark comparator",
+      "redistribution_action": "check dataset/code/supplement license and exact benchmark protocol"
+    },
+    {
+      "source_id": "EASE-SPATIALLY-VARYING-GARMENT-FIT-2026",
+      "name": "EASE: spatially varying ease for parametric garment fitting and pattern extraction",
+      "source_kind": "parametric_fit_and_pattern_extraction_research",
+      "paper_url": "https://doi.org/10.1016/j.cag.2026.104644",
+      "publication_date": "2026",
+      "license_status": "publisher_access_and_reuse_terms_to_be_verified",
+      "reported_scope": {
+        "methods": [
+          "spatially varying ease fields",
+          "per-triangle anisotropic ease",
+          "local-global fitting/optimization",
+          "mapping from 3D garments to 2D sewing patterns"
+        ],
+        "task": "parametric fit control and garment pattern extraction"
+      },
+      "known_limitations": [
+        "computational garment fit is not equivalent to wearer comfort or human fit validation",
+        "requires matched avatar, garment and material assumptions",
+        "reproduce geometry, pattern and ease metrics separately"
+      ],
+      "intended_use": "baseline for local ease control, 3D-to-2D pattern extraction and geometry accuracy",
+      "redistribution_action": "review paper/supplement and code license before reuse"
+    },
+    {
+      "source_id": "CONTROLLABLE-FASHION-DIFFUSION-2026",
+      "name": "Controllable diffusion models for fashion design and prototyping",
+      "source_kind": "fashion_ideation_generation_research",
+      "paper_url": "https://doi.org/10.1002/cav.70155",
+      "publication_date": "2026-06",
+      "license_status": "publisher_access_and_reuse_terms_to_be_verified",
+      "reported_scope": {
+        "methods": [
+          "human-refined masks",
+          "pose-guided structural conditioning",
+          "sketch/edge guidance",
+          "parameter-efficient fine-tuning"
+        ],
+        "task": "controllable fashion concept and prototype image generation"
+      },
+      "known_limitations": [
+        "visual ideation output is not an editable or validated sewing pattern",
+        "visual fidelity does not establish manufacturability or physical material behavior",
+        "style/reference asset rights and data leakage require auditing"
+      ],
+      "intended_use": "image-only generative fashion baseline, contrasted with parametric/pattern/engineering-aware workflows",
+      "redistribution_action": "verify data, model and image rights before reuse"
+    },
+    {
+      "source_id": "MULTIMODAL-FASHION-SKETCH-TO-PATTERN-2026",
+      "name": "Multimodal sketch and text conditioned garment pattern generation",
+      "source_kind": "multimodal_garment_pattern_generation_research",
+      "paper_url": "https://doi.org/10.3389/frai.2026.1828627",
+      "publication_date": "2026",
+      "license_status": "open_access_article; underlying_code_and_data_terms_to_be_verified",
+      "reported_scope": {
+        "inputs": [
+          "fashion sketches",
+          "textual design details"
+        ],
+        "methods": [
+          "multimodal conditioning",
+          "landmark-guided pattern generation",
+          "sewing-detail representation"
+        ],
+        "evaluation": "CLO3D-based digital garment validation"
+      },
+      "known_limitations": [
+        "digital validation does not establish physical garment fit or production acceptance",
+        "pattern export and commercial CAD interoperability need separate validation",
+        "verify dataset and code rights"
+      ],
+      "intended_use": "multimodal sketch/text-to-pattern research comparator",
+      "redistribution_action": "check article license, repository and training asset rights before reuse"
     }
   ],
   "split_policy": [
@@ -663,5 +794,5 @@
   ],
   "cross_dataset_rule": "TexSortML visual garment-family labels are not fibre-composition labels. NIR-SORT composition observations are not garment-category labels. Fusion is permitted only with matched item identity, independent measurement provenance and explicit missing/unknown states.",
   "claim_ceiling": "This source register is a research intake manifest. It does not prove that any dataset has been downloaded, parsed, reproduced, licensed for redistribution, or evaluated by Luminous Dynamics. The companion RGBench garment asset subset is separately licensed for non-commercial research; do not treat its rights as inherited from the CC-BY-4.0 capture set.",
-  "revision": "2026-11-12-r4"
+  "revision": "2026-11-12-r5"
 }
