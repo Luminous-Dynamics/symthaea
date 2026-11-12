@@ -27,6 +27,7 @@
 pub mod ac;
 pub mod dc;
 pub mod dc_bus_interaction;
+pub mod dc_bus_mimo_reference;
 pub mod dc_bus_stability;
 pub mod transient;
 
