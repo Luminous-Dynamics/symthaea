@@ -2036,6 +2036,9 @@ mod tests {
         assert_eq!(report.source_event_id, "score_event_index:0");
         assert_eq!(report.disposition, InfluenceDisposition::EffectDetected);
         assert!(report.affected_channel_windows > 0);
+        assert_eq!(report.window_measurements.len(), report.total_channel_windows);
+        assert_eq!(report.support_policy.version, INFLUENCE_SUPPORT_POLICY_VERSION);
+        assert!(!report.qualified_support_intervals.is_empty());
         assert_eq!(
             report.baseline_renderer_receipt_sha256,
             anchor_evidence.receipt_sha256()
@@ -2178,4 +2181,135 @@ mod tests {
             CounterfactualInfluenceError::NonFiniteSample
         );
     }
+
+
+    fn support_measurement(
+        start_frame: usize,
+        end_frame: usize,
+        channel: usize,
+        rms_delta: f32,
+        entry_threshold: f32,
+        effect_detected: bool,
+    ) -> InfluenceWindowMeasurement {
+        InfluenceWindowMeasurement {
+            start_frame,
+            end_frame,
+            channel,
+            rms_delta,
+            peak_sample_delta: rms_delta,
+            spectral_magnitude_distance: 0.0,
+            calibrated_rms_threshold: entry_threshold,
+            calibrated_spectral_threshold: 1.0,
+            effect_detected,
+        }
+    }
+
+    #[test]
+    fn support_hysteresis_bridges_release_level_gap_without_rewriting_measured_intervals() {
+        let measurements = vec![
+            support_measurement(0, 16, 0, 1.5, 1.0, true),
+            support_measurement(8, 24, 0, 0.75, 1.0, false),
+            support_measurement(16, 32, 0, 1.2, 1.0, true),
+        ];
+        let policy = InfluenceSupportPolicy::default();
+        let intervals = qualify_support_intervals(&measurements, 1, 64, &policy);
+        assert_eq!(intervals.len(), 1);
+        assert_eq!(intervals[0].channel, 0);
+        assert_eq!(intervals[0].start_frame, 0);
+        assert_eq!(intervals[0].measured_end_frame, 32);
+        assert_eq!(intervals[0].qualified_end_frame, 32);
+        assert_eq!(intervals[0].tail_extension_frames_applied, 0);
+        assert_eq!(
+            measurements.iter().filter(|m| m.effect_detected).count(),
+            2,
+            "hysteresis must not mutate the raw entry-threshold observations"
+        );
+    }
+
+    #[test]
+    fn minimum_consecutive_entries_rejects_isolated_spikes() {
+        let measurements = vec![
+            support_measurement(0, 16, 0, 1.5, 1.0, true),
+            support_measurement(8, 24, 0, 0.75, 1.0, false),
+            support_measurement(16, 32, 0, 1.2, 1.0, true),
+            support_measurement(24, 40, 0, 0.0, 1.0, false),
+        ];
+        let policy = InfluenceSupportPolicy {
+            minimum_consecutive_entry_windows: 2,
+            ..InfluenceSupportPolicy::default()
+        };
+        assert!(
+            qualify_support_intervals(&measurements, 1, 64, &policy).is_empty(),
+            "two isolated strong windows separated by a release-only window are not consecutive"
+        );
+
+        let consecutive = vec![
+            support_measurement(0, 16, 0, 1.5, 1.0, true),
+            support_measurement(8, 24, 0, 1.2, 1.0, true),
+            support_measurement(16, 32, 0, 0.75, 1.0, false),
+        ];
+        let intervals = qualify_support_intervals(&consecutive, 1, 64, &policy);
+        assert_eq!(intervals.len(), 1);
+        assert_eq!(intervals[0].measured_end_frame, 32);
+    }
+
+    #[test]
+    fn tail_extension_is_separate_bounded_and_reports_applied_frames() {
+        let measurements = vec![support_measurement(64, 80, 0, 1.5, 1.0, true)];
+        let policy = InfluenceSupportPolicy {
+            tail_extension_frames: 40,
+            ..InfluenceSupportPolicy::default()
+        };
+        let intervals = qualify_support_intervals(&measurements, 1, 100, &policy);
+        assert_eq!(intervals.len(), 1);
+        assert_eq!(intervals[0].measured_end_frame, 80);
+        assert_eq!(intervals[0].qualified_end_frame, 100);
+        assert_eq!(intervals[0].tail_extension_frames_applied, 20);
+        assert!(
+            intervals[0].qualified_end_frame <= 100,
+            "policy extension must not escape the exact output horizon"
+        );
+    }
+
+    #[test]
+    fn qualified_support_remains_channel_specific() {
+        let measurements = vec![
+            support_measurement(0, 16, 0, 1.5, 1.0, true),
+            support_measurement(8, 24, 0, 0.0, 1.0, false),
+            support_measurement(16, 32, 1, 1.4, 1.0, true),
+        ];
+        let intervals = qualify_support_intervals(
+            &measurements,
+            2,
+            64,
+            &InfluenceSupportPolicy::default(),
+        );
+        assert_eq!(intervals.len(), 2);
+        assert_eq!(intervals[0].channel, 0);
+        assert_eq!(intervals[1].channel, 1);
+    }
+
+    #[test]
+    fn invalid_support_policy_parameters_reject() {
+        let mut policy = InfluenceSupportPolicy::default();
+        policy.release_rms_ratio = 0.0;
+        assert!(validate_support_policy(&policy, 128, 48_000, 15).is_err());
+
+        let mut policy = InfluenceSupportPolicy::default();
+        policy.release_spectral_ratio = f32::NAN;
+        assert!(validate_support_policy(&policy, 128, 48_000, 15).is_err());
+
+        let mut policy = InfluenceSupportPolicy::default();
+        policy.minimum_consecutive_entry_windows = 0;
+        assert!(validate_support_policy(&policy, 128, 48_000, 15).is_err());
+
+        let mut policy = InfluenceSupportPolicy::default();
+        policy.tail_extension_frames = 129;
+        assert!(validate_support_policy(&policy, 128, 48_000, 15).is_err());
+
+        let mut policy = InfluenceSupportPolicy::default();
+        policy.version = "unrecognized-policy".to_owned();
+        assert!(validate_support_policy(&policy, 128, 48_000, 15).is_err());
+    }
+
 }
