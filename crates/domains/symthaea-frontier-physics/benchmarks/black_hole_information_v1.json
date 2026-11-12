@@ -199,7 +199,7 @@
         "all_to_all_random_two_qubit_circuits",
         "one_dimensional_brickwork_random_circuits",
         "energy_conserving_circuits_when_explicitly_implemented",
-        "U1_conserving_fixed_charge_microcanonical_boundary_emission",
+        "U1_conserving_low_entanglement_product_state_sequential_boundary_emission",
         "U1_conserving_finite_depth_random_circuits_from_fixed_charge_product_states",
         "U1_conserving_1d_domain_wall_transport_quench"
       ],
@@ -239,7 +239,9 @@
         "half_chain_entropy_and_purity_by_layer",
         "independent_seed_density_profile_standard_error",
         "independent_seed_transport_standard_error",
-        "independent_seed_entropy_standard_error"
+        "independent_seed_entropy_standard_error",
+        "initial_product_state_excited_qubit_labels",
+        "initial_and_final_radiation_entropy_boundary_conditions"
       ],
       "acceptance": {
         "global_unitarity_and_state_norm_drift_reported_per_step": true,
@@ -268,18 +270,29 @@
         "fixed_sector_charge_variance": 1e-10,
         "integrated_cut_current_left_charge_ledger": 1e-10,
         "density_profile_cross_implementation_error": 1e-8,
-        "transport_diffusion_exponent": "only claim exponent after multi-size, multi-seed, intermediate-time finite-size scaling; target 0.5 +/- 0.1 for diffusive domain-wall imbalance"
+        "transport_diffusion_exponent": "only claim exponent after multi-size, multi-seed, intermediate-time finite-size scaling; target 0.5 +/- 0.1 for diffusive domain-wall imbalance",
+        "initial_radiation_entropy_nats": 1e-12,
+        "final_complete_radiation_entropy_nats": 1e-10,
+        "initial_state_is_not_Haar_equilibrium": true,
+        "initial_charge_sector_exact": true
       },
-      "implementation_status": "Page/Haar, closed and U1-conserving circuits, sequential factor transfer, and domain-wall transport source plus ensemble statistics authored; Rust runner validation pending",
+      "implementation_status": "closed-register scramblers, symmetry-resolved Haar/Page oracle and sampler, U(1)-conserving finite-depth product-state circuits, product-state sequential factor transfer, and domain-wall transport source plus ensemble statistics authored; Rust runner validation pending",
       "source_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/random_circuit_scrambling_v1.json",
-      "claim_ceiling": "Finite-dimensional unitary circuits with exact excitation conservation and a symmetry-sector Haar reference. This is not Hawking emission, gravitational backreaction, an island/QES calculation, or a four-dimensional black-hole evaporation derivation.",
+      "claim_ceiling": "Finite-dimensional closed qubit-chain unitary circuits and tensor-factor transfer with exact excitation conservation and a symmetry-sector Haar reference. The sequential model starts from a low-entanglement product state. None of these are Hawking radiation, gravitational backreaction, a Page-island/QES calculation, or a four-dimensional black-hole evaporation derivation.",
       "sequential_evaporation_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/sequential_evaporation_u1_v1.json",
       "equilibrium_reference": {
         "model": "Haar-random pure state restricted to the exact total-excitation sector",
         "oracle": "symmetry_resolved_page_average_entropy_nats(N,K,|A|)",
         "caveat": "The oracle is a kinematic equilibrium reference. The chosen local or boundary-emission circuit must independently demonstrate mixing toward it; no convergence is presumed."
       },
-      "source_fixture_u1_circuit": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/u1_scrambling_circuit_v1.json"
+      "source_fixture_u1_circuit": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/u1_scrambling_circuit_v1.json",
+      "initial_condition": {
+        "type": "computational_basis_product_state_in_a_fixed_total_excitation_sector",
+        "charge_sector": "exact Hamming weight K",
+        "preparation": "for 0<K<N, occupy qubit 0, leave qubit 1 empty, and choose K-1 occupied sites from {2,...,N-1} using the declared seeded PRNG; vacuum and fully-filled sectors are explicit trivial controls",
+        "rationale": "A Haar-random fixed-sector initial state is already at the symmetry-sector equilibrium ensemble, so it is not a valid low-entanglement initial condition for studying scrambling growth or an evaporation-like entropy history."
+      },
+      "source_fixture_sequential": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/sequential_evaporation_u1_v1.json"
     },
     {
       "id": "QI-3T",
@@ -404,7 +417,8 @@
         "decoder_runtime",
         "decoder_peak_memory",
         "charge_sector_leakage",
-        "noise_sensitivity"
+        "noise_sensitivity",
+        "quantum_Pinsker_upper_bound_and_slack"
       ],
       "decoder_baselines": [
         "exact_small_dimension_optimal_recovery_via_SDP_or_channel_optimization",
@@ -429,9 +443,12 @@
           "unrestricted recovery compared as if it preserved U(1)",
           "recovery claim made using mutual information only",
           "fidelity reported without gate count/depth/runtime"
-        ]
+        ],
+        "direct_decoupling_measurement": "trace distance 1/2||rho_QBprime-rho_Q tensor rho_Bprime||_1 from signed Hermitian spectrum; do not infer it from mutual information",
+        "quantum_pinsker": "D_trace <= sqrt(I(Q:Bprime)/2) with mutual information in nats; violations beyond declared tolerance fail",
+        "no_decoder_claim_from_decoupling": true
       },
-      "implementation_status": "not_implemented; QI-4A decoupling-only diagnostic now provides an exact small one-step setup but no recovery channel"
+      "implementation_status": "QI-4A one-step four-qubit reference/early-radiation/scrambler diagnostic reports mutual information, direct Q-Bprime trace distance, Pinsker consistency and information complementarity; no recovery decoder has been implemented"
     },
     {
       "id": "QI-5",
@@ -540,7 +557,10 @@
     "claim a charge-preserving recovery while silently allowing sector leakage",
     "infer message recovery from a large squared commutator or OTOC alone",
     "compare normalized squared commutators with different operator conventions without conversion",
-    "infer asymptotic operator-front velocity from one system size or one random seed"
+    "infer asymptotic operator-front velocity from one system size or one random seed",
+    "initialize the sequential-emission scrambling benchmark from a Haar-random fixed-charge state and then claim entropy growth from a low-entropy black hole",
+    "call QI-4A mutual-information decoupling a successful recovery decoder",
+    "substitute Pinsker's mutual-information upper bound for the directly measured trace distance"
   ],
   "competitive_baselines": [
     {
@@ -689,13 +709,16 @@
       "QI_4A_single_emission_decoupling": "source_authored_not_executed",
       "QI_4A_information_error_taxonomy": "source_authored_not_executed",
       "QI_3O_U1_operator_spreading": "source_authored_not_executed",
-      "QI_3O_operator_error_taxonomy": "source_authored_not_executed"
+      "QI_3O_operator_error_taxonomy": "source_authored_not_executed",
+      "QI_3_sequential_product_state_initialization": "source_authored_not_executed",
+      "QI_4A_direct_decoupling_trace_distance": "source_authored_not_executed",
+      "QI_4A_quantum_Pinsker_consistency": "source_authored_not_executed"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
       "finite_depth_random_circuit_ensembles": "seeded_Haar_U4_brickwork_and_all_to_all_matching_source_authored_not_executed; sequential_evaporation_and_energy_conserving_variants_not_implemented",
-      "sequential_unitary_evaporation_model": "U(1)-conserving fixed-charge microcanonical boundary-emission source authored; Rust execution and benchmark receipts pending",
-      "hayden_preskill_recovery_decoders": "not_implemented",
+      "sequential_unitary_evaporation_model": "U(1)-conserving product-state boundary-emission source authored, with explicit initial occupied-site list; no Rust execution receipts",
+      "hayden_preskill_recovery_decoders": "not implemented; current QI-4A diagnostic measures one-step decoupling information and trace distance only",
       "mps_entropy_from_validated_schmidt_spectrum": "not_qualified",
       "island_or_qes_calculation": "not_implemented",
       "energy_conserving_circuits": "U(1)-conserving equal-gap qubit gate family and sequential factor-transfer toy model authored; Rust execution pending"
