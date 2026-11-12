@@ -1964,15 +1964,12 @@ pub fn simulate_small_hayden_preskill_decoupling(
     )
         .abs();
 
-    for (name, value) in [
-        ("I(Q:B')", reference_black_hole_mutual_information),
-        ("I(Q:A)", reference_accessible_radiation_mutual_information),
+    for value in [
+        reference_black_hole_mutual_information,
+        reference_accessible_radiation_mutual_information,
     ] {
         if !value.is_finite() || value < -tolerance {
             return Err(QuantumInformationError::InvalidPageEntropy(value));
-        }
-        if value.abs() < tolerance {
-            let _ = name;
         }
     }
     if information_complementarity_residual > tolerance * 10.0 {
