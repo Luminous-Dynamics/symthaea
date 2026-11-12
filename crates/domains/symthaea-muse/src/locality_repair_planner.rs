@@ -487,6 +487,9 @@ pub struct RepairObjectiveVector {
     pub measured_influence_interval_count: usize,
     /// Maximum observed EVAL-018 PCM interaction RMS against protected events.
     pub max_protected_pcm_interaction_rms: f64,
+    pub max_protected_pcm_interaction_peak: f64,
+    /// Number of measured EVAL-018 windows with a non-zero pairwise residual.
+    pub measured_interaction_affected_windows: usize,
     /// Maximum observed EVAL-018 spectral-magnitude interaction RMS.
     pub max_protected_spectral_interaction_rms: f64,
     /// EVAL-019's reusable render estimate for the frozen probe plan.
@@ -734,12 +737,18 @@ pub fn build_locality_repair_plan(
         let mut selected_but_unmeasured_protected_pairs = Vec::new();
         let mut unselected_protected_pairs = Vec::new();
         let mut max_protected_pcm_interaction_rms = 0.0f64;
+        let mut max_protected_pcm_interaction_peak = 0.0f64;
+        let mut measured_interaction_affected_windows = 0usize;
         let mut max_protected_spectral_interaction_rms = 0.0f64;
         let mut measured_interaction_receipts = Vec::new();
         for pair in relevant_pairs {
             if let Some(evidence) = interaction_by_pair.get(&pair) {
                 max_protected_pcm_interaction_rms =
                     max_protected_pcm_interaction_rms.max(evidence.max_pcm_interaction_rms);
+                max_protected_pcm_interaction_peak =
+                    max_protected_pcm_interaction_peak.max(evidence.max_pcm_interaction_peak);
+                measured_interaction_affected_windows = measured_interaction_affected_windows
+                    .saturating_add(evidence.affected_windows);
                 max_protected_spectral_interaction_rms = max_protected_spectral_interaction_rms
                     .max(evidence.max_spectral_interaction_rms);
                 measured_interaction_receipts.push(evidence.report_receipt_sha256.clone());
@@ -794,6 +803,8 @@ pub fn build_locality_repair_plan(
                 measured_influence_support_frames,
                 measured_influence_interval_count,
                 max_protected_pcm_interaction_rms,
+                max_protected_pcm_interaction_peak,
+                measured_interaction_affected_windows,
                 max_protected_spectral_interaction_rms,
                 estimated_probe_render_count: probe_plan.estimated_render_count,
                 unmeasured_protected_pairs: unmeasured_protected_pairs.len(),
@@ -861,6 +872,8 @@ fn dominates(left: &RepairObjectiveVector, right: &RepairObjectiveVector) -> boo
         && left.measured_influence_support_frames <= right.measured_influence_support_frames
         && left.measured_influence_interval_count <= right.measured_influence_interval_count
         && left.max_protected_pcm_interaction_rms <= right.max_protected_pcm_interaction_rms
+        && left.max_protected_pcm_interaction_peak <= right.max_protected_pcm_interaction_peak
+        && left.measured_interaction_affected_windows <= right.measured_interaction_affected_windows
         && left.max_protected_spectral_interaction_rms <= right.max_protected_spectral_interaction_rms
         && left.estimated_probe_render_count <= right.estimated_probe_render_count
         && left.unmeasured_protected_pairs <= right.unmeasured_protected_pairs;
@@ -869,6 +882,8 @@ fn dominates(left: &RepairObjectiveVector, right: &RepairObjectiveVector) -> boo
         || left.measured_influence_support_frames < right.measured_influence_support_frames
         || left.measured_influence_interval_count < right.measured_influence_interval_count
         || left.max_protected_pcm_interaction_rms < right.max_protected_pcm_interaction_rms
+        || left.max_protected_pcm_interaction_peak < right.max_protected_pcm_interaction_peak
+        || left.measured_interaction_affected_windows < right.measured_interaction_affected_windows
         || left.max_protected_spectral_interaction_rms < right.max_protected_spectral_interaction_rms
         || left.estimated_probe_render_count < right.estimated_probe_render_count
         || left.unmeasured_protected_pairs < right.unmeasured_protected_pairs;
