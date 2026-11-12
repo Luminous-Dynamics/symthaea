@@ -376,9 +376,10 @@ fn group_comparability(
     } else {
         let first_lab = rows[0].lab_id.as_str();
         if rows.iter().any(|row| row.lab_id != first_lab) {
-            return Err(AuditError(format!(
+            return Err(AuditError(
                 "LAB_NATIVE and PROTOCOL_DEVIATION groups must be scoped to one lab; do not pool across labs"
-            )));
+                    .into(),
+            ));
         }
     }
 
