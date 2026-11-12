@@ -533,12 +533,12 @@ mod tests {
         let omega_one = evaluate_return_ratio(p, op, 1e-12, 1.0).unwrap();
         close(omega_one.branch_1_admittance_s.real, 3.0 / 5.0, 1e-12);
         close(omega_one.branch_1_admittance_s.imag, 4.0 / 5.0, 1e-12);
-        close(omega_one.branch_2_admittance_s.real, 99.0 / 104.0, 1e-12);
-        close(omega_one.branch_2_admittance_s.imag, 25.0 / 104.0, 1e-12);
+        close(omega_one.branch_2_admittance_s.real, 99.0 / 208.0, 1e-12);
+        close(omega_one.branch_2_admittance_s.imag, 25.0 / 208.0, 1e-12);
         close(omega_one.source_impedance_ohm.real, 0.5, 1e-12);
         close(omega_one.source_impedance_ohm.imag, -0.5, 1e-12);
-        close(omega_one.return_ratio.real, 337.0 / 260.0, 1e-12);
-        close(omega_one.return_ratio.imag, -133.0 / 520.0, 1e-12);
+        close(omega_one.return_ratio.real, 519.0 / 520.0, 1e-12);
+        close(omega_one.return_ratio.imag, -81.0 / 1040.0, 1e-12);
     }
 
     #[test]
