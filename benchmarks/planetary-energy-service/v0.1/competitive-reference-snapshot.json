@@ -103,6 +103,13 @@
       "url": "https://www.nasa.gov/centers-and-facilities/johnson/sunlight-extracts-oxygen-from-regolith-using-solar-chemistry/",
       "source_class": "government_prototype_test_report",
       "published_year": 2026
+    },
+    {
+      "reference_id": "nasa-lunar-laser-power-beaming-2024",
+      "source": "NASA NTRS: Engineering Design Study of Laser Power Beaming for Applications on the Moon",
+      "url": "https://ntrs.nasa.gov/citations/20240011011",
+      "source_class": "government_design_reference",
+      "published_year": 2024
     }
   ],
   "metrics": [
@@ -369,6 +376,54 @@
       "reference_id": "nasa-card",
       "caveats": [
         "CO production confirmed in the reported integrated test; do not claim an operational lunar oxygen plant or full-scale industrial output."
+      ]
+    },
+    {
+      "metric_id": "lunar-laser-power-beaming-user-power-design",
+      "metric": "continuous_user_power_design_target",
+      "unit": "W",
+      "value": 300,
+      "boundary": "NASA lunar laser-power-beaming design study target at remote receiver",
+      "evidence_class": "government_design_reference",
+      "reference_id": "nasa-lunar-laser-power-beaming-2024",
+      "caveats": [
+        "Design-study requirement, not an operational demonstration or measured end-to-end delivered power."
+      ]
+    },
+    {
+      "metric_id": "lunar-laser-power-beaming-range-design",
+      "metric": "power_beaming_range_design_target",
+      "unit": "km",
+      "value": 10,
+      "boundary": "NASA lunar laser-power-beaming line-of-sight design distance to user receiver",
+      "evidence_class": "government_design_reference",
+      "reference_id": "nasa-lunar-laser-power-beaming-2024",
+      "caveats": [
+        "Design study range; actual availability depends on line of sight, pointing, conversion, safety exclusion and optical conditions."
+      ]
+    },
+    {
+      "metric_id": "lunar-laser-power-beaming-life-design",
+      "metric": "power_beaming_design_life",
+      "unit": "years",
+      "value": 5,
+      "boundary": "NASA lunar laser-power-beaming design study mission life requirement",
+      "evidence_class": "government_design_reference",
+      "reference_id": "nasa-lunar-laser-power-beaming-2024",
+      "caveats": [
+        "Design requirement, not demonstrated lifetime."
+      ]
+    },
+    {
+      "metric_id": "lunar-laser-power-beaming-mass-cap",
+      "metric": "power_beaming_landed_mass_limit",
+      "unit": "kg",
+      "value": 625,
+      "boundary": "NASA lunar laser-power-beaming study's total system landed-mass limit",
+      "evidence_class": "government_design_reference",
+      "reference_id": "nasa-lunar-laser-power-beaming-2024",
+      "caveats": [
+        "System design limit from the study; not measured hardware landed mass."
       ]
     }
   ]
