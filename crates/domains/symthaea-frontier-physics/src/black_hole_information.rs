@@ -2356,7 +2356,8 @@ pub struct HaydenPreskillPetzOptimalitySample {
     pub seed: u64,
     pub qec_matrix_trace_residual: f64,
     pub qec_matrix_hermiticity_residual: f64,
-    pub qec_matrix_inverse_sqrt_residual: f64,
+    pub qec_matrix_square_root_residual: f64,
+    pub qec_matrix_numerical_support_rank: usize,
     pub auxiliary_t_hermiticity_residual: f64,
     /// Frobenius norm ||[M_sigma, gamma tensor T]||_F.
     pub petz_optimality_commutator_frobenius: f64,
@@ -2383,7 +2384,8 @@ pub struct HaydenPreskillPetzOptimalitySummary {
     pub mean_commutator_frobenius: f64,
     pub standard_error_commutator_frobenius: f64,
     pub maximum_commutator_frobenius: f64,
-    pub maximum_qec_matrix_inverse_sqrt_residual: f64,
+    pub maximum_qec_matrix_square_root_residual: f64,
+    pub minimum_qec_matrix_numerical_support_rank: usize,
     pub all_samples_petz_optimal: bool,
 }
 
@@ -2402,7 +2404,8 @@ pub fn sample_small_hayden_preskill_petz_optimality_ensemble(
     let mut mean = 0.0;
     let mut m2 = 0.0;
     let mut maximum_commutator: f64 = 0.0;
-    let mut maximum_inverse_sqrt_residual: f64 = 0.0;
+    let mut maximum_square_root_residual: f64 = 0.0;
+    let mut minimum_support_rank = 4usize;
     let mut all_optimal = true;
     for sample_index in 0..sample_count {
         let sample = simulate_small_hayden_preskill_petz_optimality(
@@ -2414,8 +2417,9 @@ pub fn sample_small_hayden_preskill_petz_optimality_ensemble(
         mean += delta / count;
         m2 += delta * (sample.petz_optimality_commutator_frobenius - mean);
         maximum_commutator = maximum_commutator.max(sample.petz_optimality_commutator_frobenius);
-        maximum_inverse_sqrt_residual =
-            maximum_inverse_sqrt_residual.max(sample.qec_matrix_inverse_sqrt_residual);
+        maximum_square_root_residual =
+            maximum_square_root_residual.max(sample.qec_matrix_square_root_residual);
+        minimum_support_rank = minimum_support_rank.min(sample.qec_matrix_numerical_support_rank);
         all_optimal &= sample.petz_is_entanglement_fidelity_optimal;
     }
     Ok(HaydenPreskillPetzOptimalitySummary {
@@ -2425,7 +2429,8 @@ pub fn sample_small_hayden_preskill_petz_optimality_ensemble(
         standard_error_commutator_frobenius: (m2 / (sample_count - 1) as f64 / sample_count as f64)
             .sqrt(),
         maximum_commutator_frobenius: maximum_commutator,
-        maximum_qec_matrix_inverse_sqrt_residual: maximum_inverse_sqrt_residual,
+        maximum_qec_matrix_square_root_residual: maximum_square_root_residual,
+        minimum_qec_matrix_numerical_support_rank: minimum_support_rank,
         all_samples_petz_optimal: all_optimal,
     })
 }
@@ -2490,10 +2495,11 @@ fn diagnose_hayden_preskill_petz_optimality(
         });
     }
 
-    let (inverse_sqrt_qec, qec_matrix_inverse_sqrt_residual) =
-        complex_hermitian_inverse_sqrt_4(qec_matrix, tolerance)?;
-    // For positive-definite M, sqrt(M) = M * M^(-1/2).
-    let sqrt_qec = complex_matrix4_multiply(&qec_matrix, &inverse_sqrt_qec);
+    // The optimality theorem requires the positive square root of M_sigma,
+    // not its inverse. Use a support-aware Hermitian eigensystem so rank-
+    // deficient positive-semidefinite QEC matrices remain well-defined.
+    let (sqrt_qec, qec_matrix_square_root_residual, qec_matrix_numerical_support_rank) =
+        complex_hermitian_square_root_4(qec_matrix, tolerance)?;
 
     // gamma = sigma^(-1/2) rho = I/sqrt(2), and
     // T = Tr_L[(gamma^dagger tensor I) sqrt(M)].
@@ -2556,7 +2562,8 @@ fn diagnose_hayden_preskill_petz_optimality(
         seed,
         qec_matrix_trace_residual: (qec_matrix_trace - 1.0).abs(),
         qec_matrix_hermiticity_residual,
-        qec_matrix_inverse_sqrt_residual,
+        qec_matrix_square_root_residual,
+        qec_matrix_numerical_support_rank,
         auxiliary_t_hermiticity_residual,
         petz_optimality_commutator_frobenius,
         petz_is_entanglement_fidelity_optimal: petz_optimality_commutator_frobenius
@@ -3826,6 +3833,226 @@ fn hermitian_eigenvalues(
 
 /// Cyclic Jacobi sweeps have O(n^3) work per sweep, avoiding a full O(n^2)
 /// maximum-pivot search before each individual rotation.
+/// Cyclic Jacobi eigendecomposition of a real symmetric row-major matrix.
+/// Eigenvectors are returned as columns in a row-major n x n array.
+fn jacobi_eigendecomposition_symmetric(
+    a: &mut [f64],
+    n: usize,
+    tol: f64,
+) -> Result<(Vec<f64>, Vec<f64>), QuantumInformationError> {
+    const MAX_SWEEPS: usize = 100;
+    let mut vectors = vec![0.0; n * n];
+    for index in 0..n {
+        vectors[index * n + index] = 1.0;
+    }
+    let mut residual = f64::INFINITY;
+    for _ in 0..MAX_SWEEPS {
+        let mut scale: f64 = 1.0;
+        residual = 0.0;
+        for row in 0..n {
+            scale = scale.max(a[row * n + row].abs());
+            for column in (row + 1)..n {
+                residual = residual.max(a[row * n + column].abs());
+            }
+        }
+        if residual <= tol * scale {
+            let mut order = (0..n).collect::<Vec<_>>();
+            order.sort_by(|left, right| {
+                a[*left * n + *left].total_cmp(&a[*right * n + *right])
+            });
+            let eigenvalues = order.iter().map(|index| a[*index * n + *index]).collect();
+            let mut sorted_vectors = vec![0.0; n * n];
+            for (new_column, old_column) in order.into_iter().enumerate() {
+                for row in 0..n {
+                    sorted_vectors[row * n + new_column] = vectors[row * n + old_column];
+                }
+            }
+            return Ok((eigenvalues, sorted_vectors));
+        }
+        for p in 0..n {
+            for q in (p + 1)..n {
+                let apq = a[p * n + q];
+                if apq.abs() <= tol * scale / n as f64 {
+                    continue;
+                }
+                let app = a[p * n + p];
+                let aqq = a[q * n + q];
+                let tau = (aqq - app) / (2.0 * apq);
+                let sign = if tau < 0.0 { -1.0 } else { 1.0 };
+                let t = sign / (tau.abs() + (1.0 + tau * tau).sqrt());
+                let cosine = 1.0 / (1.0 + t * t).sqrt();
+                let sine = t * cosine;
+                for k in 0..n {
+                    if k == p || k == q {
+                        continue;
+                    }
+                    let akp = a[k * n + p];
+                    let akq = a[k * n + q];
+                    let new_p = cosine * akp - sine * akq;
+                    let new_q = sine * akp + cosine * akq;
+                    a[k * n + p] = new_p;
+                    a[p * n + k] = new_p;
+                    a[k * n + q] = new_q;
+                    a[q * n + k] = new_q;
+                }
+                for row in 0..n {
+                    let vip = vectors[row * n + p];
+                    let viq = vectors[row * n + q];
+                    vectors[row * n + p] = cosine * vip - sine * viq;
+                    vectors[row * n + q] = sine * vip + cosine * viq;
+                }
+                a[p * n + p] = app - t * apq;
+                a[q * n + q] = aqq + t * apq;
+                a[p * n + q] = 0.0;
+                a[q * n + p] = 0.0;
+            }
+        }
+    }
+    Err(QuantumInformationError::EigensolverNonconvergence {
+        sweeps: MAX_SWEEPS,
+        residual,
+    })
+}
+
+/// Positive-semidefinite square root of a 4x4 complex-Hermitian matrix.
+///
+/// The 8x8 real-symmetric embedding is diagonalized with its eigenvectors.
+/// Real eigenvector pairs are mapped back into an orthonormal complex basis;
+/// tiny negative eigenvalues within the declared roundoff tolerance are
+/// treated as zero, while materially negative eigenvalues fail closed.
+/// Positive eigenvalues are never raised to an arbitrary floor. The returned
+/// numerical support rank uses the declared tolerance, and the reconstruction
+/// residual checks ||S*S-M||_F / max(1,||M||_F).
+fn complex_hermitian_square_root_4(
+    matrix: ComplexMatrix4,
+    tolerance: f64,
+) -> Result<(ComplexMatrix4, f64, usize), QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    let mut hermiticity_residual: f64 = 0.0;
+    for row in 0..4 {
+        for column in 0..4 {
+            hermiticity_residual = hermiticity_residual
+                .max((matrix[row * 4 + column] - matrix[column * 4 + row].conj()).norm());
+        }
+    }
+    if !hermiticity_residual.is_finite() || hermiticity_residual > tolerance * 10.0 {
+        return Err(QuantumInformationError::NonHermitian {
+            residual: hermiticity_residual,
+            tolerance: tolerance * 10.0,
+        });
+    }
+
+    const REAL_DIMENSION: usize = 8;
+    let mut real = vec![0.0; REAL_DIMENSION * REAL_DIMENSION];
+    for row in 0..4 {
+        for column in 0..4 {
+            let value = matrix[row * 4 + column];
+            real[row * REAL_DIMENSION + column] = value.re;
+            real[row * REAL_DIMENSION + 4 + column] = -value.im;
+            real[(4 + row) * REAL_DIMENSION + column] = value.im;
+            real[(4 + row) * REAL_DIMENSION + 4 + column] = value.re;
+        }
+    }
+    let (real_eigenvalues, real_eigenvectors) =
+        jacobi_eigendecomposition_symmetric(&mut real, REAL_DIMENSION, tolerance.max(1e-14))?;
+    let spectral_scale = real_eigenvalues
+        .iter()
+        .fold(1.0_f64, |scale, value| scale.max(value.abs()));
+    let minimum_eigenvalue = real_eigenvalues
+        .iter()
+        .copied()
+        .fold(f64::INFINITY, f64::min);
+    if !minimum_eigenvalue.is_finite() || minimum_eigenvalue < -tolerance * 100.0 * spectral_scale {
+        return Err(QuantumInformationError::NonPositive {
+            minimum_eigenvalue,
+            tolerance: tolerance * 100.0 * spectral_scale,
+        });
+    }
+
+    let mut basis: Vec<[Complex64; 4]> = Vec::with_capacity(4);
+    let mut basis_eigenvalues: Vec<f64> = Vec::with_capacity(4);
+    // Every complex-Hermitian eigenvalue appears twice in its real embedding.
+    for pair_start in (0..REAL_DIMENSION).step_by(2) {
+        let pair_eigenvalue =
+            0.5 * (real_eigenvalues[pair_start] + real_eigenvalues[pair_start + 1]);
+        for column in pair_start..(pair_start + 2) {
+            let mut vector = core::array::from_fn(|row| {
+                Complex64::new(
+                    real_eigenvectors[row * REAL_DIMENSION + column],
+                    real_eigenvectors[(4 + row) * REAL_DIMENSION + column],
+                )
+            });
+            // Complex Gram-Schmidt removes the duplicate i*v direction from
+            // the real embedding and orthogonalizes degenerate eigenspaces.
+            for accepted in &basis {
+                let overlap = accepted
+                    .iter()
+                    .zip(vector.iter())
+                    .map(|(left, right)| left.conj() * *right)
+                    .sum::<Complex64>();
+                for index in 0..4 {
+                    vector[index] -= accepted[index] * overlap;
+                }
+            }
+            let norm_squared = vector.iter().map(|value| value.norm_sqr()).sum::<f64>();
+            if norm_squared > 1e-16 {
+                let inverse_norm = norm_squared.sqrt().recip();
+                for value in &mut vector {
+                    *value *= inverse_norm;
+                }
+                basis.push(vector);
+                basis_eigenvalues.push(pair_eigenvalue.max(0.0));
+            }
+        }
+    }
+    if basis.len() != 4 || basis_eigenvalues.len() != 4 {
+        return Err(QuantumInformationError::EigensolverNonconvergence {
+            sweeps: REAL_DIMENSION,
+            residual: (4usize.saturating_sub(basis.len())) as f64,
+        });
+    }
+
+    let mut square_root = [Complex64::new(0.0, 0.0); 16];
+    let mut numerical_support_rank = 0usize;
+    for (eigenvalue, vector) in basis_eigenvalues.iter().zip(basis.iter()) {
+        if *eigenvalue > tolerance * spectral_scale {
+            numerical_support_rank += 1;
+        }
+        let root_eigenvalue = eigenvalue.sqrt();
+        for row in 0..4 {
+            for column in 0..4 {
+                square_root[row * 4 + column] +=
+                    root_eigenvalue * vector[row] * vector[column].conj();
+            }
+        }
+    }
+
+    let mut squared = [Complex64::new(0.0, 0.0); 16];
+    for row in 0..4 {
+        for column in 0..4 {
+            for inner in 0..4 {
+                squared[row * 4 + column] +=
+                    square_root[row * 4 + inner] * square_root[inner * 4 + column];
+            }
+        }
+    }
+    let difference_norm = squared
+        .iter()
+        .zip(matrix.iter())
+        .map(|(left, right)| (*left - *right).norm_sqr())
+        .sum::<f64>()
+        .sqrt();
+    let matrix_norm = matrix.iter().map(|value| value.norm_sqr()).sum::<f64>().sqrt();
+    let residual = difference_norm / matrix_norm.max(1.0);
+    if !residual.is_finite() || residual > tolerance * 1000.0 {
+        return Err(QuantumInformationError::EigensolverNonconvergence {
+            sweeps: REAL_DIMENSION,
+            residual,
+        });
+    }
+    Ok((square_root, residual, numerical_support_rank))
+}
+
 fn jacobi_eigenvalues(
     a: &mut [f64],
     n: usize,
@@ -4900,6 +5127,71 @@ mod hayden_preskill_petz_recovery_tests {
 }
 
 #[cfg(test)]
+mod petz_semidefinite_square_root_tests {
+    use super::*;
+
+    const TOLERANCE: f64 = 1e-10;
+
+    #[test]
+    fn positive_semidefinite_square_root_handles_rank_one_and_rank_two_support() {
+        let rank_one = [
+            Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+        ];
+        let (root_one, residual_one, rank_one_support) =
+            complex_hermitian_square_root_4(rank_one, TOLERANCE).unwrap();
+        assert_eq!(rank_one_support, 1);
+        assert!(residual_one < 1e-12);
+        assert!((root_one[0].re - 1.0).abs() < 1e-12);
+        assert!(root_one[1..].iter().all(|value| value.norm() < 1e-12));
+
+        let rank_two = [
+            Complex64::new(0.25, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.75, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+        ];
+        let (root_two, residual_two, rank_two_support) =
+            complex_hermitian_square_root_4(rank_two, TOLERANCE).unwrap();
+        assert_eq!(rank_two_support, 2);
+        assert!(residual_two < 1e-12);
+        assert!((root_two[0].re - 0.5).abs() < 1e-12);
+        assert!((root_two[5].re - 0.75_f64.sqrt()).abs() < 1e-12);
+        assert!(root_two.iter().enumerate().all(|(index, value)| {
+            if index != 0 && index != 5 { value.norm() < 1e-12 } else { true }
+        }));
+    }
+
+    #[test]
+    fn positive_semidefinite_square_root_rejects_materially_negative_spectrum() {
+        let negative = [
+            Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(-0.01, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+        ];
+        assert!(matches!(
+            complex_hermitian_square_root_4(negative, TOLERANCE),
+            Err(QuantumInformationError::NonPositive { .. })
+        ));
+    }
+}
+
+#[cfg(test)]
 mod hayden_preskill_petz_optimality_tests {
     use super::*;
 
@@ -4914,7 +5206,8 @@ mod hayden_preskill_petz_optimality_tests {
         let sample = diagnose_hayden_preskill_petz_optimality(&identity, 0, TOLERANCE).unwrap();
         assert!(sample.qec_matrix_trace_residual < TOLERANCE);
         assert!(sample.qec_matrix_hermiticity_residual < TOLERANCE);
-        assert!(sample.qec_matrix_inverse_sqrt_residual < TOLERANCE * 10.0);
+        assert!(sample.qec_matrix_square_root_residual < TOLERANCE * 10.0);
+        assert!((1..=4).contains(&sample.qec_matrix_numerical_support_rank));
         assert!(sample.auxiliary_t_hermiticity_residual < TOLERANCE * 10.0);
         assert!(sample.petz_optimality_commutator_frobenius < TOLERANCE * 10.0);
         assert!(sample.petz_is_entanglement_fidelity_optimal);
@@ -4927,7 +5220,8 @@ mod hayden_preskill_petz_optimality_tests {
                 simulate_small_hayden_preskill_petz_optimality(0x4A11 + seed, TOLERANCE).unwrap();
             assert!(sample.qec_matrix_trace_residual < TOLERANCE);
             assert!(sample.qec_matrix_hermiticity_residual < TOLERANCE);
-            assert!(sample.qec_matrix_inverse_sqrt_residual < TOLERANCE * 10.0);
+            assert!(sample.qec_matrix_square_root_residual < TOLERANCE * 10.0);
+        assert!((1..=4).contains(&sample.qec_matrix_numerical_support_rank));
             assert!(sample.auxiliary_t_hermiticity_residual < TOLERANCE * 10.0);
             assert!(sample.petz_optimality_commutator_frobenius < TOLERANCE * 100.0);
             assert!(sample.petz_is_entanglement_fidelity_optimal);
@@ -4949,7 +5243,8 @@ mod hayden_preskill_petz_optimality_tests {
         assert!(summary.mean_commutator_frobenius >= 0.0);
         assert!(summary.standard_error_commutator_frobenius >= 0.0);
         assert!(summary.maximum_commutator_frobenius < TOLERANCE * 100.0);
-        assert!(summary.maximum_qec_matrix_inverse_sqrt_residual < TOLERANCE * 10.0);
+        assert!(summary.maximum_qec_matrix_square_root_residual < TOLERANCE * 10.0);
+        assert!((1..=4).contains(&summary.minimum_qec_matrix_numerical_support_rank));
         assert!(summary.all_samples_petz_optimal);
     }
 
