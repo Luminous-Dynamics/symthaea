@@ -243,22 +243,23 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "field_id",
-        "method",
-        "scale_basis",
-        "propeller_revision",
-        "condition_fingerprint_sha256",
-        "reference_velocity_mps",
-        "instrument_or_solver_id",
-        "calibration_or_solver_validation_sha256",
-        "raw_data_sha256",
-        "coordinate_frame",
         "angular_origin",
-        "positive_azimuth",
-        "axial_positive_direction",
-        "area_weight_method_id",
         "area_weight_evidence_sha256",
-        "points"
+        "area_weight_method_id",
+        "axial_positive_direction",
+        "calibration_or_solver_validation_sha256",
+        "condition_fingerprint_sha256",
+        "coordinate_frame",
+        "field_id",
+        "instrument_or_solver_id",
+        "method",
+        "operating_point_receipt_sha256",
+        "points",
+        "positive_azimuth",
+        "propeller_revision",
+        "raw_data_sha256",
+        "reference_velocity_mps",
+        "scale_basis"
       ],
       "properties": {
         "field_id": {
@@ -337,6 +338,9 @@
           "items": {
             "$ref": "#/$defs/wakePoint"
           }
+        },
+        "operating_point_receipt_sha256": {
+          "$ref": "#/$defs/digest"
         }
       }
     },
