@@ -214,9 +214,9 @@ fn exact_group_ids(
     let mut groups = BTreeSet::new();
 
     for cell_id in cell_ids {
-        let cell = cell_by_id.get(cell_id.as_str()).ok_or_else(|| {
-            AuditError(format!("{label} references unknown cell {cell_id}"))
-        })?;
+        let cell = cell_by_id
+            .get(cell_id.as_str())
+            .ok_or_else(|| AuditError(format!("{label} references unknown cell {cell_id}")))?;
         groups.insert(cell.design_group_id.clone());
     }
 
@@ -231,9 +231,9 @@ fn exact_protocol_group_ids(
     let mut groups = BTreeSet::new();
 
     for cell_id in cell_ids {
-        let cell = cell_by_id.get(cell_id.as_str()).ok_or_else(|| {
-            AuditError(format!("{label} references unknown cell {cell_id}"))
-        })?;
+        let cell = cell_by_id
+            .get(cell_id.as_str())
+            .ok_or_else(|| AuditError(format!("{label} references unknown cell {cell_id}")))?;
         groups.insert(cell.protocol_group_id.clone());
     }
 
@@ -289,7 +289,9 @@ fn validate_split(
 
     for cell_id in &assigned {
         if !cell_by_id.contains_key(cell_id.as_str()) {
-            return Err(AuditError(format!("split references unknown cell {cell_id}")));
+            return Err(AuditError(format!(
+                "split references unknown cell {cell_id}"
+            )));
         }
     }
 
@@ -325,7 +327,10 @@ fn validate_split(
         "train protocol group ID",
     )?;
     let declared_validation_protocols = unique_ids(
-        split.validation_protocol_group_ids.iter().map(String::as_str),
+        split
+            .validation_protocol_group_ids
+            .iter()
+            .map(String::as_str),
         "validation protocol group ID",
     )?;
     let declared_test_protocols = unique_ids(
@@ -333,8 +338,7 @@ fn validate_split(
         "test protocol group ID",
     )?;
 
-    let actual_train_protocols =
-        exact_protocol_group_ids(&train, cell_by_id, "train partition")?;
+    let actual_train_protocols = exact_protocol_group_ids(&train, cell_by_id, "train partition")?;
     let actual_validation_protocols =
         exact_protocol_group_ids(&validation, cell_by_id, "validation partition")?;
     let actual_test_protocols = exact_protocol_group_ids(&test, cell_by_id, "test partition")?;
@@ -392,7 +396,9 @@ fn validate_manifest(manifest: &BenchmarkManifest) -> Result<(), AuditError> {
     require_nonempty(&manifest.manifest_id, "manifest ID")?;
 
     if manifest.cutoff_cycles.is_empty() {
-        return Err(AuditError("at least one prediction cutoff is required".into()));
+        return Err(AuditError(
+            "at least one prediction cutoff is required".into(),
+        ));
     }
 
     let cutoff_set: BTreeSet<u32> = manifest.cutoff_cycles.iter().copied().collect();
@@ -406,7 +412,9 @@ fn validate_manifest(manifest: &BenchmarkManifest) -> Result<(), AuditError> {
     }
 
     if manifest.cells.is_empty() {
-        return Err(AuditError("at least one cell observation is required".into()));
+        return Err(AuditError(
+            "at least one cell observation is required".into(),
+        ));
     }
 
     let cell_ids = unique_ids(
@@ -442,11 +450,13 @@ fn validate_manifest(manifest: &BenchmarkManifest) -> Result<(), AuditError> {
         }
     }
 
-    let (train, validation, test) =
-        validate_split(&manifest.split, &cell_by_id, &cell_ids)?;
+    let (train, validation, test) = validate_split(&manifest.split, &cell_by_id, &cell_ids)?;
 
     let outcome_ids = unique_ids(
-        manifest.outcomes.iter().map(|outcome| outcome.cell_id.as_str()),
+        manifest
+            .outcomes
+            .iter()
+            .map(|outcome| outcome.cell_id.as_str()),
         "outcome cell ID",
     )?;
 
@@ -487,11 +497,16 @@ fn validate_manifest(manifest: &BenchmarkManifest) -> Result<(), AuditError> {
     }
 
     if manifest.predictions.is_empty() {
-        return Err(AuditError("at least one test prediction is required".into()));
+        return Err(AuditError(
+            "at least one test prediction is required".into(),
+        ));
     }
 
     unique_ids(
-        manifest.predictions.iter().map(|item| item.cell_id.as_str()),
+        manifest
+            .predictions
+            .iter()
+            .map(|item| item.cell_id.as_str()),
         "prediction cell ID",
     )?;
 
@@ -501,14 +516,12 @@ fn validate_manifest(manifest: &BenchmarkManifest) -> Result<(), AuditError> {
         require_nonempty(&prediction.design_group_id, "prediction design group ID")?;
         require_nonempty(&prediction.model_evidence_ref, "model evidence reference")?;
 
-        let cell = cell_by_id
-            .get(prediction.cell_id.as_str())
-            .ok_or_else(|| {
-                AuditError(format!(
-                    "prediction references unknown cell {}",
-                    prediction.cell_id
-                ))
-            })?;
+        let cell = cell_by_id.get(prediction.cell_id.as_str()).ok_or_else(|| {
+            AuditError(format!(
+                "prediction references unknown cell {}",
+                prediction.cell_id
+            ))
+        })?;
 
         if !test.contains(&prediction.cell_id) {
             return Err(AuditError(format!(
@@ -618,9 +631,7 @@ pub fn audit_design_lifetime_manifest(
                     .or_default()
                     .push(absolute_error);
 
-                if actual >= prediction.lower_cycle_life
-                    && actual <= prediction.upper_cycle_life
-                {
+                if actual >= prediction.lower_cycle_life && actual <= prediction.upper_cycle_life {
                     interval_covered_count += 1;
                 }
             }
@@ -637,11 +648,7 @@ pub fn audit_design_lifetime_manifest(
     }
 
     let count = event_errors.len() as f64;
-    let mae_cycles_pooled = event_errors
-        .iter()
-        .map(|(error, _)| *error)
-        .sum::<f64>()
-        / count;
+    let mae_cycles_pooled = event_errors.iter().map(|(error, _)| *error).sum::<f64>() / count;
     let rmse_cycles_pooled = (event_errors
         .iter()
         .map(|(error, _)| error * error)
@@ -658,8 +665,7 @@ pub fn audit_design_lifetime_manifest(
         .values()
         .map(|errors| errors.iter().sum::<f64>() / errors.len() as f64)
         .collect();
-    let mae_cycles_design_macro =
-        group_means.iter().sum::<f64>() / group_means.len() as f64;
+    let mae_cycles_design_macro = group_means.iter().sum::<f64>() / group_means.len() as f64;
     let test_design_group_count = group_errors.len();
 
     let test_cell_ids = &manifest.split.test_cell_ids;
@@ -815,7 +821,10 @@ mod tests {
     fn rejects_design_group_leakage() {
         let mut manifest = valid_manifest();
         manifest.split.train_cell_ids.push("B1".into());
-        manifest.split.train_design_group_ids.push("DESIGN-B".into());
+        manifest
+            .split
+            .train_design_group_ids
+            .push("DESIGN-B".into());
         manifest.split.test_cell_ids.clear();
         manifest.split.test_design_group_ids.clear();
 
@@ -829,14 +838,12 @@ mod tests {
         manifest.split.kind = SplitKind::LeaveOneProtocolOut;
         manifest.split.train_cell_ids = vec!["A1".into(), "A2".into(), "B1".into()];
         manifest.split.test_cell_ids = vec!["C1".into()];
-        manifest.split.train_design_group_ids =
-            vec!["DESIGN-A".into(), "DESIGN-B".into()];
+        manifest.split.train_design_group_ids = vec!["DESIGN-A".into(), "DESIGN-B".into()];
         manifest.split.test_design_group_ids = vec!["DESIGN-C".into()];
         manifest.split.train_protocol_group_ids = vec!["P1".into(), "P2".into()];
         manifest.split.test_protocol_group_ids = vec!["P2".into()];
 
-        let error =
-            audit_design_lifetime_manifest(&manifest).expect_err("protocol leakage fails");
+        let error = audit_design_lifetime_manifest(&manifest).expect_err("protocol leakage fails");
         assert!(error.0.contains("leave-one-protocol-out split"));
     }
 
@@ -881,8 +888,7 @@ mod tests {
         let mut manifest = valid_manifest();
         manifest.cells[2].feature_available_through_cycle = 20;
 
-        let error =
-            audit_design_lifetime_manifest(&manifest).expect_err("future features fail");
+        let error = audit_design_lifetime_manifest(&manifest).expect_err("future features fail");
         assert!(error.0.contains("unavailable at its prediction cutoff"));
     }
 
@@ -893,8 +899,7 @@ mod tests {
         manifest.cells[2].feature_available_through_cycle = 50;
         manifest.predictions[0].prediction_cutoff_cycle = 30;
 
-        let error =
-            audit_design_lifetime_manifest(&manifest).expect_err("undeclared cutoff fails");
+        let error = audit_design_lifetime_manifest(&manifest).expect_err("undeclared cutoff fails");
         assert!(error.0.contains("undeclared prediction cutoff"));
     }
 
@@ -903,9 +908,12 @@ mod tests {
         let mut manifest = valid_manifest();
         manifest.outcomes[2].observed_through_cycle = 40;
 
-        let error =
-            audit_design_lifetime_manifest(&manifest).expect_err("short outcome horizon fails");
-        assert!(error.0.contains("outcome horizon ends before its prediction cutoff"));
+        let error = audit_design_lifetime_manifest(&manifest).expect_err("short outcome horizon fails");
+        assert!(
+            error
+                .0
+                .contains("outcome horizon ends before its prediction cutoff")
+        );
     }
 
     #[test]
@@ -932,8 +940,7 @@ mod tests {
         manifest.predictions[0].design_group_id = "DESIGN-A".into();
         manifest.predictions[0].prediction_cutoff_cycle = 50;
 
-        let error =
-            audit_design_lifetime_manifest(&manifest).expect_err("no event point score");
+        let error = audit_design_lifetime_manifest(&manifest).expect_err("no event point score");
         assert!(error.0.contains("no event-observed test outcomes"));
     }
 
@@ -952,8 +959,7 @@ mod tests {
         let mut manifest = valid_manifest();
         manifest.outcomes[3].event_code = None;
 
-        let error =
-            audit_design_lifetime_manifest(&manifest).expect_err("competing code required");
+        let error = audit_design_lifetime_manifest(&manifest).expect_err("competing code required");
         assert!(error.0.contains("competing event code"));
     }
 
