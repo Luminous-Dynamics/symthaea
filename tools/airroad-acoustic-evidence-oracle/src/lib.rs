@@ -614,7 +614,7 @@ fn validate_rotors(
             ),
         ] {
             match channels.get(channel_id) {
-                Some(channel) if channel.kind == expected_kind => {}
+                Some(channel) if &channel.kind == &expected_kind => {}
                 Some(_) => errors.push(AcousticValidationError::ChannelKindMismatch(
                     channel_id.to_owned(),
                 )),
@@ -999,10 +999,10 @@ mod tests {
     #[test]
     fn rotor_thrust_and_torque_channels_must_match_declared_rotor() {
         let mut input = bundle();
-        input.channels[4].kind = ChannelKind::RotorThrust {
+        input.channels[3].kind = ChannelKind::RotorThrust {
             rotor_id: "different-rotor".to_owned(),
         };
-        input.channels[5].kind = ChannelKind::RotorTorque {
+        input.channels[4].kind = ChannelKind::RotorTorque {
             rotor_id: "different-rotor".to_owned(),
         };
 
