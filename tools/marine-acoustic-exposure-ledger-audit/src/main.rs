@@ -114,6 +114,9 @@ struct AcousticContribution {
 #[serde(deny_unknown_fields)]
 struct AmbientObservation {
     observation_id: String,
+    evidence_kind: EvidenceKind,
+    rights_status: RightsStatus,
+    independently_reviewed: bool,
     receiver_id: String,
     band_id: String,
     start_time_s: f64,
@@ -416,8 +419,8 @@ fn validate_case(case: &Case) -> Vec<String> {
             || !receivers.iter().any(|receiver| receiver == &observation.receiver_id)
             || observation.band_id.trim().is_empty()
             || !observation.ambient_only_basis.eq("independently_measured_ambient_reference")
-            || !observation.measurement_method_id.trim().is_empty()
-            || !observation.instrument_id.trim().is_empty()
+            || observation.measurement_method_id.trim().is_empty()
+            || observation.instrument_id.trim().is_empty()
             || !observation.start_time_s.is_finite()
             || !observation.end_time_s.is_finite()
             || observation.end_time_s <= observation.start_time_s
@@ -467,6 +470,566 @@ fn validate_case(case: &Case) -> Vec<String> {
     errors
 }
 
-fn main() {
-    eprintln!("Implement audit");
+
+#[derive(Debug, Serialize)]
+struct AmbientObservationRef {
+    observation_id: String,
+    raw_trace_sha256: String,
+    calibration_certificate_sha256: String,
+    measurement_method_id: String,
+    timebase_receipt_sha256: String,
 }
+
+#[derive(Debug)]
+struct CalculatedContribution<'a> {
+    input: &'a AcousticContribution,
+    source_event: &'a SourceEvent,
+    receiver: &'a Receiver,
+    source_level_db: f64,
+    source_level_uncertainty_db: f64,
+    received_level_db: f64,
+    received_level_lower_db: f64,
+    received_level_upper_db: f64,
+    sel_db: f64,
+    sel_lower_db: f64,
+    sel_upper_db: f64,
+}
+
+fn calculate_contribution<'a>(
+    contribution: &'a AcousticContribution,
+    event: &'a SourceEvent,
+    receiver: &'a Receiver,
+) -> Option<CalculatedContribution<'a>> {
+    let band = event.source_levels.iter().find(|band| band.band_id == contribution.band_id)?;
+    let uncertainty = band.expanded_uncertainty_db
+        + contribution.transmission_loss_expanded_uncertainty_db;
+    let received = band.source_level_db - contribution.transmission_loss_db;
+    let lower = received - uncertainty;
+    let upper = received + uncertainty;
+    let duration_adjustment = 10.0 * contribution.duration_s.log10();
+    let sel = received + duration_adjustment;
+    let sel_lower = lower + duration_adjustment;
+    let sel_upper = upper + duration_adjustment;
+    if ![received,lower,upper,sel,sel_lower,sel_upper].iter().all(|value| value.is_finite()) {
+        return None;
+    }
+    Some(CalculatedContribution {
+        input: contribution,
+        source_event: event,
+        receiver,
+        source_level_db: band.source_level_db,
+        source_level_uncertainty_db: band.expanded_uncertainty_db,
+        received_level_db: received,
+        received_level_lower_db: lower,
+        received_level_upper_db: upper,
+        sel_db: sel,
+        sel_lower_db: sel_lower,
+        sel_upper_db: sel_upper,
+    })
+}
+
+fn calculate_ambient_sel(
+    observations: &[&AmbientObservation],
+) -> (Option<f64>,Option<f64>,Option<f64>,Vec<AmbientObservationRef>) {
+    let mut central=Vec::new();
+    let mut lower=Vec::new();
+    let mut upper=Vec::new();
+    let mut references=Vec::new();
+    for observation in observations {
+        let adjustment=10.0*observation.duration_s.log10();
+        central.push(observation.ambient_spl_db+adjustment);
+        lower.push(observation.ambient_spl_db-observation.expanded_uncertainty_db+adjustment);
+        upper.push(observation.ambient_spl_db+observation.expanded_uncertainty_db+adjustment);
+        references.push(AmbientObservationRef {
+            observation_id:observation.observation_id.clone(),
+            raw_trace_sha256:observation.raw_trace_sha256.clone(),
+            calibration_certificate_sha256:observation.calibration_certificate_sha256.clone(),
+            measurement_method_id:observation.measurement_method_id.clone(),
+            timebase_receipt_sha256:observation.timebase_receipt_sha256.clone(),
+        });
+    }
+    (
+        log_energy_sum(&central),
+        log_energy_sum(&lower),
+        log_energy_sum(&upper),
+        references,
+    )
+}
+
+fn audit(case:&Case)->AuditReport {
+    let validation_errors=validate_case(case);
+    let mut reasons=validation_errors.clone();
+    let mut grouped:BTreeMap<(String,String),Vec<CalculatedContribution>>=BTreeMap::new();
+    if validation_errors.is_empty() {
+        for contribution in &case.contributions {
+            let event=case.source_events.iter().find(|event|event.event_id==contribution.event_id).unwrap();
+            let receiver=case.receivers.iter().find(|receiver|receiver.receiver_id==contribution.receiver_id).unwrap();
+            if let Some(calculated)=calculate_contribution(contribution,event,receiver) {
+                grouped.entry((contribution.receiver_id.clone(),contribution.band_id.clone()))
+                    .or_default().push(calculated);
+            } else {
+                reasons.push(format!("contribution {} could not be converted to finite received-level/SEL intervals",contribution.contribution_id));
+            }
+        }
+    }
+
+    let mut partitions=Vec::new();
+    for ((receiver_id,band_id),mut contributions) in grouped {
+        contributions.sort_by(|a,b|a.input.start_time_s.total_cmp(&b.input.start_time_s)
+            .then_with(||a.input.contribution_id.cmp(&b.input.contribution_id)));
+        let central:Vec<f64>=contributions.iter().map(|item|item.sel_db).collect();
+        let lower:Vec<f64>=contributions.iter().map(|item|item.sel_lower_db).collect();
+        let upper:Vec<f64>=contributions.iter().map(|item|item.sel_upper_db).collect();
+        let Some(ship_sel)=log_energy_sum(&central) else {
+            reasons.push(format!("receiver {receiver_id} band {band_id} ship SEL could not be accumulated"));
+            continue;
+        };
+        let Some(ship_lower)=log_energy_sum(&lower) else { continue; };
+        let Some(ship_upper)=log_energy_sum(&upper) else { continue; };
+        let intervals:Vec<(f64,f64)>=contributions.iter()
+            .map(|item|(item.input.start_time_s,item.input.end_time_s)).collect();
+        let unique_coverage=union_duration(&intervals);
+        let summed_duration: f64=contributions.iter().map(|item|item.input.duration_s).sum();
+        let unique_events:BTreeSet<&str>=contributions.iter().map(|item|item.input.event_id.as_str()).collect();
+        let max_received=contributions.iter().map(|item|item.received_level_db).fold(f64::NEG_INFINITY,f64::max);
+        let max_lower=contributions.iter().map(|item|item.received_level_lower_db).fold(f64::NEG_INFINITY,f64::max);
+        let max_upper=contributions.iter().map(|item|item.received_level_upper_db).fold(f64::NEG_INFINITY,f64::max);
+        let contribution_reports=contributions.iter().map(|item|ContributionReport {
+            contribution_id:item.input.contribution_id.clone(),
+            event_id:item.input.event_id.clone(),
+            receiver_id:item.input.receiver_id.clone(),
+            band_id:item.input.band_id.clone(),
+            vessel_id:item.source_event.vessel_id.clone(),
+            vessel_revision:item.source_event.vessel_revision.clone(),
+            propeller_revision:item.source_event.propeller_revision.clone(),
+            source_state_id:item.source_event.source_state_id.clone(),
+            source_track_sha256:item.source_event.source_track_sha256.clone(),
+            operating_point_receipt_sha256:item.source_event.operating_point_receipt_sha256.clone(),
+            source_level_method_id:item.source_event.source_level_method_id.clone(),
+            source_level_raw_trace_sha256:item.source_event.source_level_raw_trace_sha256.clone(),
+            source_level_calibration_sha256:item.source_event.source_level_calibration_sha256.clone(),
+            source_level_db:item.source_level_db,
+            source_level_expanded_uncertainty_db:item.source_level_uncertainty_db,
+            transmission_loss_db:item.input.transmission_loss_db,
+            transmission_loss_expanded_uncertainty_db:item.input.transmission_loss_expanded_uncertainty_db,
+            received_level_db:item.received_level_db,
+            received_level_lower_db:item.received_level_lower_db,
+            received_level_upper_db:item.received_level_upper_db,
+            duration_s:item.input.duration_s,
+            sel_db:item.sel_db,
+            sel_lower_db:item.sel_lower_db,
+            sel_upper_db:item.sel_upper_db,
+            source_latitude_deg:item.input.source_latitude_deg,
+            source_longitude_deg:item.input.source_longitude_deg,
+            source_depth_m:item.input.source_depth_m,
+            range_m:item.input.range_m,
+            receiver_latitude_deg:item.receiver.latitude_deg,
+            receiver_longitude_deg:item.receiver.longitude_deg,
+            receiver_depth_m:item.receiver.depth_m,
+            propagation_model_id:item.input.propagation_model_id.clone(),
+            propagation_model_version:item.input.propagation_model_version.clone(),
+            propagation_validation_sha256:item.input.propagation_validation_sha256.clone(),
+            bathymetry_sha256:item.input.bathymetry_sha256.clone(),
+            sound_speed_profile_sha256:item.input.sound_speed_profile_sha256.clone(),
+            seabed_model_sha256:item.input.seabed_model_sha256.clone(),
+            environment_fingerprint_sha256:item.input.environment_fingerprint_sha256.clone(),
+            timebase_receipt_sha256:item.input.timebase_receipt_sha256.clone(),
+        }).collect();
+
+        let ambient_refs:Vec<&AmbientObservation>=case.ambient_observations.iter()
+            .filter(|obs|obs.receiver_id==receiver_id&&obs.band_id==band_id).collect();
+        let (ambient_sel,ambient_lower,ambient_upper,ambient_observation_refs)=calculate_ambient_sel(&ambient_refs);
+        partitions.push(ExposurePartitionReport {
+            receiver_id:receiver_id.clone(),
+            band_id:band_id.clone(),
+            contribution_count:contributions.len(),
+            unique_source_event_count:unique_events.len(),
+            unique_temporal_coverage_s:unique_coverage,
+            summed_source_contribution_duration_s:summed_duration,
+            ship_only_cumulative_sel_db:ship_sel,
+            ship_only_cumulative_sel_lower_db:ship_lower,
+            ship_only_cumulative_sel_upper_db:ship_upper,
+            maximum_received_level_db:max_received,
+            maximum_received_level_lower_db:max_lower,
+            maximum_received_level_upper_db:max_upper,
+            contribution_reports,
+            ambient_observation_count:ambient_refs.len(),
+            ambient_reference_sel_db:ambient_sel,
+            ambient_reference_sel_lower_db:ambient_lower,
+            ambient_reference_sel_upper_db:ambient_upper,
+            ambient_observation_refs,
+            ambient_only_basis:"separate_ambient_reference_not_added_to_ship_energy",
+        });
+    }
+
+    let mut limit_results=Vec::new();
+    let mut any_limit_failed=false;
+    let mut any_limit_unresolved=false;
+    for limit in &case.exposure_limits {
+        let partition=partitions.iter().find(|item|item.receiver_id==limit.receiver_id&&item.band_id==limit.band_id);
+        let (lower,upper,status)=match partition {
+            Some(partition)=>{
+                let lower=partition.ship_only_cumulative_sel_lower_db;
+                let upper=partition.ship_only_cumulative_sel_upper_db;
+                let status=if upper<=limit.upper_sel_threshold_db {
+                    "pass"
+                } else if lower>limit.upper_sel_threshold_db {
+                    any_limit_failed=true;
+                    "fail"
+                } else {
+                    any_limit_unresolved=true;
+                    "unresolved"
+                };
+                (Some(lower),Some(upper),status)
+            }
+            None=>{
+                any_limit_unresolved=true;
+                (None,None,"missing")
+            }
+        };
+        limit_results.push(LimitResult {
+            limit_id:limit.limit_id.clone(),
+            receiver_id:limit.receiver_id.clone(),
+            band_id:limit.band_id.clone(),
+            threshold_db:limit.upper_sel_threshold_db,
+            observed_lower_db:lower,
+            observed_upper_db:upper,
+            status,
+            requirement_reference:limit.requirement_reference.clone(),
+        });
+    }
+
+    if case.source_events.iter().any(|event|event.evidence_kind!=EvidenceKind::Measured
+        || event.rights_status!=RightsStatus::PublicOrPermitted
+        || !event.independently_reviewed) {
+        reasons.push("one or more source events are synthetic, unreviewed or not rights-cleared".to_string());
+    }
+    if case.ambient_observations.iter().any(|obs|obs.evidence_kind!=EvidenceKind::Measured
+        || obs.rights_status!=RightsStatus::PublicOrPermitted
+        || !obs.independently_reviewed) {
+        reasons.push("one or more ambient observations are synthetic, unreviewed or not rights-cleared".to_string());
+    }
+
+    let evidence_incomplete=case.source_events.iter().any(|event|event.evidence_kind!=EvidenceKind::Measured
+        || event.rights_status!=RightsStatus::PublicOrPermitted
+        || !event.independently_reviewed)
+        || case.ambient_observations.iter().any(|obs|obs.evidence_kind!=EvidenceKind::Measured
+            || obs.rights_status!=RightsStatus::PublicOrPermitted
+            || !obs.independently_reviewed);
+    let disposition=if !validation_errors.is_empty() {
+        "INVALID"
+    } else if any_limit_failed {
+        "EXPOSURE_LIMIT_FAILED"
+    } else if evidence_incomplete||any_limit_unresolved {
+        "INCOMPLETE"
+    } else {
+        "EXPOSURE_LEDGER_COMPUTED"
+    };
+
+    AuditReport {
+        schema_version:SCHEMA_VERSION,
+        case_id:case.case_id.clone(),
+        period_id:case.period.period_id.clone(),
+        disposition,
+        partitions,
+        limit_results,
+        claim_ceiling:"frequency_resolved_source_to_receiver_ship_only_cumulative_sel_and_separate_ambient_reference_only_no_propagation_solver_ecological_effect_or_regulatory_compliance_claim",
+        reasons,
+    }
+}
+
+fn main() {
+    let mut args=env::args().skip(1);
+    let Some(path)=args.next() else {
+        eprintln!("usage: marine-acoustic-exposure-ledger-audit <case.json>");
+        process::exit(64);
+    };
+    if args.next().is_some() {
+        eprintln!("usage: marine-acoustic-exposure-ledger-audit <case.json>");
+        process::exit(64);
+    }
+    let input=match fs::read_to_string(&path) {
+        Ok(value)=>value,
+        Err(error)=>{
+            eprintln!("could not read {path}: {error}");
+            process::exit(64);
+        }
+    };
+    let case:Case=match serde_json::from_str(&input) {
+        Ok(value)=>value,
+        Err(error)=>{
+            eprintln!("invalid case JSON: {error}");
+            process::exit(64);
+        }
+    };
+    let report=audit(&case);
+    println!("{}",serde_json::to_string_pretty(&report).expect("report serializes"));
+    match report.disposition {
+        "EXPOSURE_LEDGER_COMPUTED"|"EXPOSURE_LIMIT_FAILED"=>{}
+        "INCOMPLETE"=>process::exit(3),
+        _=>process::exit(2),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn digest(c:char)->String { std::iter::repeat_n(c,64).collect() }
+
+    fn source_event(id:&str,level:f64,uncertainty:f64)->SourceEvent {
+        SourceEvent {
+            event_id:id.to_string(),
+            evidence_kind:EvidenceKind::Measured,
+            dataset_id:format!("dataset-{id}"),
+            citation:"controlled ship trial".to_string(),
+            rights_status:RightsStatus::PublicOrPermitted,
+            independently_reviewed:true,
+            vessel_id:"vessel-1".to_string(),
+            vessel_revision:"hull-r1".to_string(),
+            propeller_revision:"prop-r1".to_string(),
+            source_state_id:"propeller-operating-state-1".to_string(),
+            mission_id:"mission-1".to_string(),
+            route_id:"route-1".to_string(),
+            service_fingerprint_sha256:digest('1'),
+            environment_fingerprint_sha256:digest('2'),
+            source_track_sha256:digest(if id=="event-a"{'a'}else{'b'}),
+            source_level_method_id:"measured_source_spectrum_v1".to_string(),
+            source_level_calibration_sha256:digest('c'),
+            source_level_raw_trace_sha256:digest(if id=="event-a"{'d'}else{'e'}),
+            source_level_timebase_receipt_sha256:digest('f'),
+            operating_point_receipt_sha256:digest('9'),
+            source_levels:vec![SourceLevelBand {
+                band_id:"one-third-octave-125Hz".to_string(),
+                quantity_id:"source_level_db_re_1upa_at_1m".to_string(),
+                center_frequency_hz:125.0,
+                source_level_db:level,
+                expanded_uncertainty_db:uncertainty,
+            }],
+        }
+    }
+
+    fn receiver()->Receiver {
+        Receiver {
+            receiver_id:"receiver-1".to_string(),
+            latitude_deg:0.0,
+            longitude_deg:0.001,
+            depth_m:20.0,
+            location_evidence_sha256:digest('7'),
+        }
+    }
+
+    fn contribution(id:&str,event_id:&str,start:f64,end:f64,tl:f64,tl_u:f64)->AcousticContribution {
+        AcousticContribution {
+            contribution_id:id.to_string(),
+            event_id:event_id.to_string(),
+            receiver_id:"receiver-1".to_string(),
+            band_id:"one-third-octave-125Hz".to_string(),
+            start_time_s:start,
+            end_time_s:end,
+            duration_s:end-start,
+            source_latitude_deg:0.0,
+            source_longitude_deg:0.0,
+            source_depth_m:10.0,
+            range_m:111.195,
+            range_tolerance_m:2.0,
+            transmission_loss_db:tl,
+            transmission_loss_expanded_uncertainty_db:tl_u,
+            propagation_model_id:"bellhop".to_string(),
+            propagation_model_version:"test-v1".to_string(),
+            propagation_validation_sha256:digest('a'),
+            bathymetry_sha256:digest('b'),
+            sound_speed_profile_sha256:digest('c'),
+            seabed_model_sha256:digest('d'),
+            environment_fingerprint_sha256:digest('2'),
+            timebase_receipt_sha256:digest('e'),
+        }
+    }
+
+    fn ambient()->AmbientObservation {
+        AmbientObservation {
+            observation_id:"ambient-1".to_string(),
+            evidence_kind:EvidenceKind::Measured,
+            rights_status:RightsStatus::PublicOrPermitted,
+            independently_reviewed:true,
+            receiver_id:"receiver-1".to_string(),
+            band_id:"one-third-octave-125Hz".to_string(),
+            start_time_s:0.0,
+            end_time_s:100.0,
+            duration_s:100.0,
+            ambient_spl_db:50.0,
+            expanded_uncertainty_db:1.0,
+            measurement_method_id:"ambient-monitoring-v1".to_string(),
+            instrument_id:"hydrophone-1".to_string(),
+            calibration_certificate_sha256:digest('f'),
+            raw_trace_sha256:digest('8'),
+            timebase_receipt_sha256:digest('9'),
+            ambient_only_basis:"independently_measured_ambient_reference".to_string(),
+        }
+    }
+
+    fn case()->Case {
+        Case {
+            schema_version:SCHEMA_VERSION.to_string(),
+            case_id:"synthetic-test-case".to_string(),
+            period:ExposurePeriod {
+                period_id:"one-hour-window".to_string(),
+                start_time_s:0.0,
+                end_time_s:3600.0,
+                service_fingerprint_sha256:digest('1'),
+                environment_fingerprint_sha256:digest('2'),
+            },
+            source_events:vec![source_event("event-a",120.0,0.5),source_event("event-b",119.0,0.5)],
+            receivers:vec![receiver()],
+            contributions:vec![
+                contribution("contrib-a","event-a",0.0,10.0,60.0,0.5),
+                contribution("contrib-b","event-b",0.0,10.0,60.0,0.5),
+            ],
+            ambient_observations:vec![ambient()],
+            exposure_limits:vec![ExposureLimit {
+                limit_id:"ship-sel-limit".to_string(),
+                receiver_id:"receiver-1".to_string(),
+                band_id:"one-third-octave-125Hz".to_string(),
+                upper_sel_threshold_db:80.0,
+                requirement_reference:"scenario-limit:receiver-1-125hz".to_string(),
+            }],
+        }
+    }
+
+    #[test]
+    fn received_level_is_source_level_minus_transmission_loss() {
+        let input=case();
+        let report=audit(&input);
+        let contribution=&report.partitions[0].contribution_reports[0];
+        assert!((contribution.received_level_db-60.0).abs()<1e-12);
+    }
+
+    #[test]
+    fn single_segment_sel_adds_ten_log_duration() {
+        let mut input=case();
+        input.contributions.truncate(1);
+        let report=audit(&input);
+        assert!((report.partitions[0].ship_only_cumulative_sel_db-70.0).abs()<1e-12);
+    }
+
+    #[test]
+    fn overlapping_independent_ship_events_are_energy_summed_not_db_added() {
+        let report=audit(&case());
+        let expected=log_energy_sum(&[70.0,69.0]).unwrap();
+        assert!((report.partitions[0].ship_only_cumulative_sel_db-expected).abs()<1e-12);
+        assert!(report.partitions[0].ship_only_cumulative_sel_db<100.0);
+        assert!((report.partitions[0].unique_temporal_coverage_s-10.0).abs()<1e-12);
+        assert!((report.partitions[0].summed_source_contribution_duration_s-20.0).abs()<1e-12);
+    }
+
+    #[test]
+    fn ambient_reference_is_not_added_to_ship_only_sel() {
+        let report=audit(&case());
+        let partition=&report.partitions[0];
+        assert!(partition.ambient_reference_sel_db.is_some());
+        assert_eq!(partition.ambient_only_basis,"separate_ambient_reference_not_added_to_ship_energy");
+        assert!((partition.ship_only_cumulative_sel_db-log_energy_sum(&[70.0,69.0]).unwrap()).abs()<1e-12);
+    }
+
+    #[test]
+    fn source_and_propagation_uncertainties_expand_received_sel_bounds() {
+        let report=audit(&case());
+        let contribution=&report.partitions[0].contribution_reports[0];
+        assert!((contribution.received_level_lower_db-59.0).abs()<1e-12);
+        assert!((contribution.received_level_upper_db-61.0).abs()<1e-12);
+        assert!((contribution.sel_lower_db-69.0).abs()<1e-12);
+        assert!((contribution.sel_upper_db-71.0).abs()<1e-12);
+    }
+
+    #[test]
+    fn upper_exposure_limit_passes_only_when_full_interval_is_below() {
+        let report=audit(&case());
+        assert_eq!(report.limit_results[0].status,"pass");
+    }
+
+    #[test]
+    fn uncertainty_overlapping_exposure_limit_is_unresolved() {
+        let mut input=case();
+        input.exposure_limits[0].upper_sel_threshold_db=72.0;
+        let report=audit(&input);
+        assert_eq!(report.limit_results[0].status,"unresolved");
+        assert_eq!(report.disposition,"INCOMPLETE");
+    }
+
+    #[test]
+    fn exposure_limit_fails_only_when_lower_interval_is_above() {
+        let mut input=case();
+        input.exposure_limits[0].upper_sel_threshold_db=68.0;
+        let report=audit(&input);
+        assert_eq!(report.limit_results[0].status,"fail");
+        assert_eq!(report.disposition,"EXPOSURE_LIMIT_FAILED");
+    }
+
+    #[test]
+    fn synthetic_source_events_never_qualify_exposure_ledger() {
+        let mut input=case();
+        input.source_events[0].evidence_kind=EvidenceKind::Synthetic;
+        let report=audit(&input);
+        assert_eq!(report.disposition,"INCOMPLETE");
+    }
+
+    #[test]
+    fn unknown_source_rights_hold_exposure_claim() {
+        let mut input=case();
+        input.source_events[0].rights_status=RightsStatus::Unknown;
+        assert_eq!(audit(&input).disposition,"INCOMPLETE");
+    }
+
+    #[test]
+    fn duplicate_contribution_id_is_invalid() {
+        let mut input=case();
+        input.contributions[1].contribution_id=input.contributions[0].contribution_id.clone();
+        assert_eq!(audit(&input).disposition,"INVALID");
+    }
+
+    #[test]
+    fn overlapping_same_event_receiver_band_intervals_are_invalid() {
+        let mut input=case();
+        input.contributions[1].event_id="event-a".to_string();
+        input.contributions[1].start_time_s=5.0;
+        input.contributions[1].end_time_s=15.0;
+        input.contributions[1].duration_s=10.0;
+        assert_eq!(audit(&input).disposition,"INVALID");
+    }
+
+    #[test]
+    fn range_mismatch_against_receiver_coordinates_is_invalid() {
+        let mut input=case();
+        input.contributions[0].range_m=500.0;
+        assert_eq!(audit(&input).disposition,"INVALID");
+    }
+
+    #[test]
+    fn missing_propagation_validation_reference_is_invalid() {
+        let mut input=case();
+        input.contributions[0].propagation_validation_sha256="bad".to_string();
+        assert_eq!(audit(&input).disposition,"INVALID");
+    }
+
+    #[test]
+    fn source_environment_mismatch_is_invalid() {
+        let mut input=case();
+        input.contributions[0].environment_fingerprint_sha256=digest('3');
+        assert_eq!(audit(&input).disposition,"INVALID");
+    }
+
+    #[test]
+    fn ambient_method_and_instrument_are_required() {
+        let mut input=case();
+        input.ambient_observations[0].measurement_method_id.clear();
+        assert_eq!(audit(&input).disposition,"INVALID");
+    }
+
+    #[test]
+    fn unmatched_source_frequency_band_is_invalid() {
+        let mut input=case();
+        input.contributions[0].band_id="one-third-octave-250Hz".to_string();
+        assert_eq!(audit(&input).disposition,"INVALID");
+    }
+}
+
