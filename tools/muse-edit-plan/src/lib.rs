@@ -623,7 +623,6 @@ fn validate_registry(registry: &CapabilityRegistry) -> Result<(), CompileError> 
             || !valid_identifier(&profile.output_artifact_type)
             || !valid_identifier(&profile.independence_group)
             || profile.risk_score > 100
-            || profile.rights == RightsStatus::Restricted
             || profile.rights_basis_sha256.as_deref().is_some_and(|digest| !valid_sha256(digest))
             || profile.supported_operations.iter().any(|value| !valid_identifier(value))
             || profile.input_artifact_types.iter().any(|value| !valid_identifier(value))
@@ -654,7 +653,6 @@ fn validate_registry(registry: &CapabilityRegistry) -> Result<(), CompileError> 
             || !valid_identifier(&profile.identity.version)
             || !valid_sha256(&profile.identity.artifact_sha256)
             || !valid_identifier(&profile.independence_group)
-            || profile.rights == RightsStatus::Restricted
             || profile.rights_basis_sha256.as_deref().is_some_and(|digest| !valid_sha256(digest))
             || profile.accepted_artifact_types.iter().any(|value| !valid_identifier(value))
             || profile.measured_metrics.iter().any(|value| !valid_identifier(value))
