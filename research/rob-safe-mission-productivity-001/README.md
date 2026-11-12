@@ -80,4 +80,4 @@ The 10% target is prospective. It must be preregistered after baseline variance 
     cargo test --locked --manifest-path research/rob-safe-mission-productivity-001/Cargo.toml
     cargo clippy --locked --manifest-path research/rob-safe-mission-productivity-001/Cargo.toml --all-targets -- -D warnings
 
-The crate contains 17 authored deterministic unit tests. Exact-head Rust 1.96 CI is the execution gate. These tests are not physical results or reproduced SOTA comparisons.
+The crate contains 20 authored deterministic unit tests covering paired workload identity, per-robot safety regressions, Unknown versus Invalid evidence, energy-boundary missingness, mixed task-unit rejection, causal-closure weighting and productivity denominators. Exact-head Rust 1.96 CI is the execution gate. These tests are not physical results or reproduced SOTA comparisons.
