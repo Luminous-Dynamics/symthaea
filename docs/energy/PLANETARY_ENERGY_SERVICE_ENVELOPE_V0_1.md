@@ -369,6 +369,20 @@ Sources:
 - https://www.nasa.gov/centers-and-facilities/johnson/sunlight-extracts-oxygen-from-regolith-using-solar-chemistry/
 - https://www.nasa.gov/exploration-systems-development-mission-directorate/fission-surface-power/
 
+### Direct lunar regolith-to-PV manufacturing comparator
+
+NASA's current Lunar Surface Technology page describes Blue Origin's Blue Alchemist as an integrated, autonomous molten-regolith-electrolysis system using regolith simulants to produce silicon solar cells, aluminium wires, oxygen, iron and slag. NASA TechPort's ISRUPower entry describes the programme as an active integrated technology project and reports maturation to TRL 6. This is the closest direct public comparator for the regolith-to-solar-product portion of PESE.
+
+Other relevant work includes TU Berlin/JPM Silicon's SoMo project on simplified solar-cell manufacturing from lunar regolith and the 2026 lunar-energy review's discussion of regolith-derived perovskite PV research and radiation-tolerant perovskite panel architectures.
+
+This changes our competitive thesis: **do not claim that Luminous is first to manufacture PV from lunar regolith.** Instead, benchmark the complete manufacturing-to-service chain: usable feedstock, silicon/precursor purification, product yield and quality, power and process heat consumed, equipment/spares imports, module and array lifetime, repairability, and lifetime delivered electricity. NASA's public programme summary does not provide all process yields, per-Wp energy, product I-V curves, long-duration reliability or full lifecycle mass data; those fields remain unknown until source-qualified evidence is located.
+
+Sources:
+- https://www.nasa.gov/lunar-surface-technology/
+- https://techport.nasa.gov/projects/146991
+- https://www.tu.berlin/en/raumfahrttechnik/research/current-projects/somo
+- https://www.nature.com/articles/s44453-026-00053-w
+
 ### Lunar thermal and long-duration storage
 
 NASA's 2026 Thermal & Fluids Analysis Workshop proceedings include a concept for a radiant heat-pump system with a radiation-only condenser/radiator and preliminary analysis of roughly 15 kW peak habitat heat load. The work is described as concept/model development with future representative testing; it is not a demonstrated lunar product.
