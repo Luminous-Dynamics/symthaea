@@ -1375,6 +1375,288 @@ pub fn sample_haar_page_entropy_ensemble(
     })
 }
 
+/// One layer of a 1D U(1)-conserving domain-wall transport experiment.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1DomainWallTransportSample {
+    pub layer: usize,
+    pub density_profile: Vec<f64>,
+    /// Left-to-right expected excitation current for bond (i,i+1).
+    pub bond_currents: Vec<f64>,
+    pub total_excitation_expectation: f64,
+    pub total_excitation_variance: f64,
+    pub left_half_excitation_expectation: f64,
+    pub domain_wall_imbalance: f64,
+    pub cumulative_cut_transport: f64,
+    pub continuity_max_residual: f64,
+    pub full_state_norm_squared: f64,
+    pub half_chain_entropy_nats: f64,
+    pub half_chain_purity: f64,
+    pub two_qubit_gate_count_this_layer: usize,
+}
+
+/// Full trajectory for a 1D brickwork domain-wall quench.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1DomainWallTransportResult {
+    pub number_of_qubits: usize,
+    pub initial_left_excitations: usize,
+    pub seed: u64,
+    pub total_two_qubit_gates: usize,
+    pub samples: Vec<U1DomainWallTransportSample>,
+}
+
+/// Simulate charge diffusion and entanglement growth from a domain-wall product
+/// state under nearest-neighbour U(1)-conserving random gates.
+///
+/// The initial state is |1...10...0> with initial_left_excitations occupied
+/// sites at the left edge. The standard benchmark uses an even register and
+/// half filling. Each layer applies a brickwork matching of independent Haar
+/// U(1) x U(2) x U(1) gates. The routine records site occupations, bond
+/// currents, local continuity residuals, left-half charge, domain-wall
+/// imbalance, integrated cut transport, and half-chain entropy/purity.
+///
+/// This is a finite-dimensional closed spin-chain transport experiment, not
+/// Hawking emission or a black-hole evaporation model.
+pub fn simulate_u1_domain_wall_transport(
+    number_of_qubits: usize,
+    initial_left_excitations: usize,
+    depth: usize,
+    seed: u64,
+    tolerance: f64,
+) -> Result<U1DomainWallTransportResult, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    if number_of_qubits < 2 || number_of_qubits % 2 != 0 {
+        return Err(QuantumInformationError::InvalidCircuitTopology);
+    }
+    if number_of_qubits > MAX_DENSE_STATE_QUBITS {
+        return Err(QuantumInformationError::DenseStateQubitLimit {
+            requested: number_of_qubits,
+            maximum: MAX_DENSE_STATE_QUBITS,
+        });
+    }
+    if initial_left_excitations * 2 != number_of_qubits {
+        return Err(QuantumInformationError::InvalidExcitationSector {
+            excitations: initial_left_excitations,
+            number_of_qubits,
+        });
+    }
+    let half = number_of_qubits / 2;
+    if (1usize << half) > MAX_DENSE_REDUCED_DIMENSION {
+        return Err(QuantumInformationError::DenseDimensionLimit {
+            requested: 1usize << half,
+            maximum: MAX_DENSE_REDUCED_DIMENSION,
+        });
+    }
+
+    let dimension = 1usize << number_of_qubits;
+    let mut amplitudes = vec![Complex64::new(0.0, 0.0); dimension];
+    let mut initial_basis = 0usize;
+    for qubit in 0..initial_left_excitations {
+        initial_basis |= 1usize << (number_of_qubits - 1 - qubit);
+    }
+    amplitudes[initial_basis] = Complex64::new(1.0, 0.0);
+    let mut rng = ChaCha20Rng::seed_from_u64(seed);
+    let mut samples = Vec::with_capacity(depth + 1);
+    let mut total_two_qubit_gates = 0usize;
+    let initial_left_charge = initial_left_excitations as f64;
+    let mut cumulative_cut_transport = 0.0;
+
+    for layer in 0..=depth {
+        let density_before = (0..number_of_qubits)
+            .map(|qubit| {
+                qubit_excitation_expectation(&amplitudes, number_of_qubits, qubit)
+            })
+            .collect::<Vec<_>>();
+        let mut currents = vec![0.0; number_of_qubits - 1];
+        let mut gates_this_layer = 0usize;
+        if layer > 0 {
+            let parity = (layer - 1) % 2;
+            for first in (parity..(number_of_qubits - 1)).step_by(2) {
+                let second = first + 1;
+                let before_left = density_before[first];
+                let unitary = u1_conserving_unitary_4(&mut rng)?;
+                apply_two_qubit_unitary(
+                    &mut amplitudes,
+                    number_of_qubits,
+                    first,
+                    second,
+                    &unitary,
+                )?;
+                let after_left = qubit_excitation_expectation(
+                    &amplitudes,
+                    number_of_qubits,
+                    first,
+                );
+                currents[first] = before_left - after_left;
+                gates_this_layer += 1;
+                total_two_qubit_gates += 1;
+            }
+        }
+
+        let density_profile = (0..number_of_qubits)
+            .map(|qubit| {
+                qubit_excitation_expectation(&amplitudes, number_of_qubits, qubit)
+            })
+            .collect::<Vec<_>>();
+        let left_charge: f64 = density_profile[..half].iter().sum();
+        let right_charge: f64 = density_profile[half..].iter().sum();
+        let total_charge: f64 = density_profile.iter().sum();
+        let domain_wall_imbalance = left_charge - right_charge;
+        cumulative_cut_transport += currents[half - 1];
+        let continuity_max_residual = (0..number_of_qubits)
+            .map(|site| {
+                let incoming = if site == 0 { 0.0 } else { currents[site - 1] };
+                let outgoing = if site + 1 == number_of_qubits {
+                    0.0
+                } else {
+                    currents[site]
+                };
+                let actual_change = density_profile[site] - density_before[site];
+                (actual_change - (incoming - outgoing)).abs()
+            })
+            .fold(0.0_f64, f64::max);
+
+        let norm_squared: f64 =
+            amplitudes.iter().map(|value| value.norm_sqr()).sum();
+        if !norm_squared.is_finite() {
+            return Err(QuantumInformationError::NonFiniteState { index: dimension });
+        }
+        if (norm_squared - 1.0).abs() > tolerance {
+            return Err(QuantumInformationError::NormalizationError {
+                norm_squared,
+                tolerance,
+            });
+        }
+        let (charge_expectation, charge_variance) =
+            total_excitation_moments(&amplitudes);
+        if (charge_expectation - initial_left_charge).abs() > tolerance
+            || charge_variance > tolerance
+            || (total_charge - initial_left_charge).abs() > tolerance
+        {
+            return Err(QuantumInformationError::NormalizationError {
+                norm_squared: charge_expectation,
+                tolerance,
+            });
+        }
+        let retained = (0..half).collect::<Vec<_>>();
+        let reduced = DensityMatrix::from_pure_state(
+            &amplitudes,
+            number_of_qubits,
+            &retained,
+            tolerance,
+        )?;
+        let entropy = reduced.von_neumann_entropy(tolerance)?;
+        let purity = reduced.diagnostics(tolerance)?.purity;
+        samples.push(U1DomainWallTransportSample {
+            layer,
+            density_profile,
+            bond_currents: currents,
+            total_excitation_expectation: charge_expectation,
+            total_excitation_variance: charge_variance,
+            left_half_excitation_expectation: left_charge,
+            domain_wall_imbalance,
+            cumulative_cut_transport,
+            continuity_max_residual,
+            full_state_norm_squared: norm_squared,
+            half_chain_entropy_nats: entropy,
+            half_chain_purity: purity,
+            two_qubit_gate_count_this_layer: gates_this_layer,
+        });
+    }
+
+    Ok(U1DomainWallTransportResult {
+        number_of_qubits,
+        initial_left_excitations,
+        seed,
+        total_two_qubit_gates,
+        samples,
+    })
+}
+
+/// Expected occupation of one site in the computational basis.
+fn qubit_excitation_expectation(
+    amplitudes: &[Complex64],
+    number_of_qubits: usize,
+    qubit: usize,
+) -> f64 {
+    let mask = 1usize << (number_of_qubits - 1 - qubit);
+    amplitudes
+        .iter()
+        .enumerate()
+        .filter(|(basis, _)| *basis & mask != 0)
+        .map(|(_, amplitude)| amplitude.norm_sqr())
+        .sum()
+}
+
+#[cfg(test)]
+mod u1_domain_wall_transport_tests {
+    use super::*;
+
+    const TOLERANCE: f64 = 1e-10;
+
+    #[test]
+    fn depth_zero_domain_wall_has_exact_density_zero_entropy_and_charge() {
+        let result =
+            simulate_u1_domain_wall_transport(8, 4, 0, 0xD0A11, TOLERANCE).unwrap();
+        assert_eq!(result.samples.len(), 1);
+        let sample = &result.samples[0];
+        assert_eq!(
+            sample.density_profile,
+            vec![1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0]
+        );
+        assert!(sample.half_chain_entropy_nats.abs() < TOLERANCE);
+        assert!((sample.total_excitation_expectation - 4.0).abs() < TOLERANCE);
+        assert!(sample.total_excitation_variance < TOLERANCE);
+        assert!(sample.continuity_max_residual < TOLERANCE);
+        assert_eq!(result.total_two_qubit_gates, 0);
+    }
+
+    #[test]
+    fn domain_wall_layers_preserve_charge_and_report_current_continuity() {
+        let result =
+            simulate_u1_domain_wall_transport(8, 4, 12, 0xD1FF, TOLERANCE).unwrap();
+        assert_eq!(result.samples.len(), 13);
+        for sample in &result.samples {
+            assert!((sample.total_excitation_expectation - 4.0).abs() < TOLERANCE);
+            assert!(sample.total_excitation_variance < TOLERANCE);
+            assert!((sample.full_state_norm_squared - 1.0).abs() < TOLERANCE);
+            assert!(sample.continuity_max_residual < TOLERANCE);
+            assert!(sample.half_chain_entropy_nats >= -TOLERANCE);
+            assert!((0.0..=1.0).contains(&sample.half_chain_purity));
+            assert!((sample.left_half_excitation_expectation
+                + sample.cumulative_cut_transport - 4.0).abs() < 1e-8);
+        }
+        let final_sample = result.samples.last().unwrap();
+        assert!(
+            (final_sample.left_half_excitation_expectation - 4.0).abs() > 1e-8,
+            "domain-wall benchmark seed should produce nonzero transport"
+        );
+        assert!(result.total_two_qubit_gates > 0);
+    }
+
+    #[test]
+    fn domain_wall_trajectory_is_seed_reproducible() {
+        let a = simulate_u1_domain_wall_transport(8, 4, 6, 0x51DE, TOLERANCE).unwrap();
+        let b = simulate_u1_domain_wall_transport(8, 4, 6, 0x51DE, TOLERANCE).unwrap();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn domain_wall_rejects_non_half_filling_odd_and_unsupported_inputs() {
+        assert!(matches!(
+            simulate_u1_domain_wall_transport(8, 3, 4, 1, TOLERANCE),
+            Err(QuantumInformationError::InvalidExcitationSector { .. })
+        ));
+        assert!(matches!(
+            simulate_u1_domain_wall_transport(7, 3, 4, 1, TOLERANCE),
+            Err(QuantumInformationError::InvalidCircuitTopology)
+        ));
+        assert!(matches!(
+            simulate_u1_domain_wall_transport(22, 11, 4, 1, TOLERANCE),
+            Err(QuantumInformationError::DenseStateQubitLimit { .. })
+        ));
+    }
+}
+
 /// Sampling statistics for Haar-random states inside a fixed U(1) charge sector.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SymmetryResolvedPageEnsembleSummary {
