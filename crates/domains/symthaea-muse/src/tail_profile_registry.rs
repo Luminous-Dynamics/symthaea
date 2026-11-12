@@ -576,6 +576,18 @@ fn cluster_maxima(
         {
             return Err(TailProfileError::InvalidEvidence("source_event_index"));
         }
+        if o.event_final_note_off_frame > o.output_frame_count
+            || o.raw_measured_end_frame.is_some_and(|end| end > o.output_frame_count)
+            || o.hysteresis_support_end_frame.is_some_and(|end| end > o.output_frame_count)
+        {
+            return Err(TailProfileError::InvalidEvidence("event_frame_horizon"));
+        }
+        let expected_tail = o.hysteresis_support_end_frame
+            .unwrap_or(o.event_final_note_off_frame)
+            .saturating_sub(o.event_final_note_off_frame);
+        if expected_tail != o.measured_tail_frames {
+            return Err(TailProfileError::InvalidEvidence("tail_frame_derivation"));
+        }
         if o.observation_sha256 != observation_digest(o)? {
             return Err(TailProfileError::InvalidEvidence("event_observation_digest"));
         }
@@ -1152,7 +1164,16 @@ mod tests {
             TailProfileError::IncompleteSourceEventCoverage
         );
         let mut duplicate = cal.clone();
-        duplicate.push(cal[0].clone());
+        let mut distinct_receipt_same_event = cal[0].clone();
+        distinct_receipt_same_event.observation.measured_tail_frames += 1;
+        distinct_receipt_same_event.observation.hysteresis_support_end_frame =
+            Some(distinct_receipt_same_event.observation.event_final_note_off_frame
+                + distinct_receipt_same_event.observation.measured_tail_frames);
+        distinct_receipt_same_event.observation.segmented_influence_report_sha256 =
+            digest("same-event-second-render");
+        distinct_receipt_same_event.observation.observation_sha256 =
+            observation_digest(&distinct_receipt_same_event.observation).unwrap();
+        duplicate.push(distinct_receipt_same_event);
         assert_eq!(
             build_tail_profile(&duplicate, &qual, &config()).unwrap_err(),
             TailProfileError::DuplicateSourceEventObservation
@@ -1203,7 +1224,8 @@ mod tests {
             expires_at_unix_seconds: 500,
             signature: Vec::new(),
         };
-        signed.signature = Sha256::digest(signed_profile_message(&signed).unwrap()).to_vec();
+        let signed_message = signed_profile_message(&signed).unwrap();
+        signed.signature = Sha256::digest(signed_message).to_vec();
         let mut registry = TailProfileRegistrySnapshot {
             version: TAIL_PROFILE_REGISTRY_VERSION.to_owned(),
             created_at_unix_seconds: 90,
