@@ -1,0 +1,256 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-acoustic-source-contrast-v0.1.0.schema.json",
+  "title": "Marine acoustic source-state contrast audit v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "evidence_kind",
+    "source",
+    "target_source",
+    "predeclared_intervention",
+    "design_strategy",
+    "intervention_protocol_sha256",
+    "service_fingerprint_sha256",
+    "environment_fingerprint_sha256",
+    "unobserved_sources",
+    "band_frequency_tolerance_fraction",
+    "baseline",
+    "candidate"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_kind": {
+      "enum": [
+        "synthetic",
+        "measured"
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/sourceEvidence"
+    },
+    "target_source": {
+      "$ref": "#/$defs/sourceKind"
+    },
+    "predeclared_intervention": {
+      "type": "boolean"
+    },
+    "design_strategy": {
+      "enum": [
+        "randomized",
+        "counterbalanced",
+        "matched_repeated",
+        "uncontrolled"
+      ]
+    },
+    "intervention_protocol_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "service_fingerprint_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "environment_fingerprint_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "unobserved_sources": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "band_frequency_tolerance_fraction": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "baseline": {
+      "$ref": "#/$defs/observation"
+    },
+    "candidate": {
+      "$ref": "#/$defs/observation"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "sourceKind": {
+      "enum": [
+        "propeller_cavitation",
+        "propeller_hydrodynamic",
+        "prime_mover",
+        "shaft_gearbox",
+        "auxiliary_machinery",
+        "hull_appendage_flow",
+        "ambient_background"
+      ]
+    },
+    "sourceEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "citation",
+        "raw_data_sha256",
+        "rights_status",
+        "independently_reviewed"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "rights_status": {
+          "enum": [
+            "public_or_permitted",
+            "unknown",
+            "restricted"
+          ]
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "hydrophone_instrument_id",
+        "calibration_certificate_sha256",
+        "timebase_receipt_sha256",
+        "acoustic_trace_sha256",
+        "service_fingerprint_sha256",
+        "environment_fingerprint_sha256",
+        "source_states",
+        "bands"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hydrophone_instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "timebase_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "acoustic_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "service_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_states": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sourceState"
+          }
+        },
+        "bands": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/band"
+          }
+        }
+      }
+    },
+    "sourceState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "state",
+        "observable_kind",
+        "observable_id",
+        "evidence_sha256"
+      ],
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/sourceKind"
+        },
+        "state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observable_kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observable_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "band": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "band_id",
+        "quantity_id",
+        "center_frequency_hz",
+        "received_level_db",
+        "expanded_uncertainty_db",
+        "confidence_level"
+      ],
+      "properties": {
+        "band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quantity_id": {
+          "const": "received_spl_db_re_1upa"
+        },
+        "center_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "received_level_db": {
+          "type": "number"
+        },
+        "expanded_uncertainty_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        }
+      }
+    }
+  }
+}
