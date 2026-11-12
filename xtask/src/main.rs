@@ -5,6 +5,7 @@ mod crate_status;
 mod duplicate_scan;
 mod manifest;
 mod planetary_energy;
+mod planetary_reference;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -99,6 +100,23 @@ enum Commands {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Audit source-register and competitive-reference metadata and cross-references.
+    /// Does not independently authenticate external claims or reproduce experiments.
+    PlanetaryReferenceAudit {
+        #[arg(
+            long,
+            default_value = "research/planetary-energy/source-register-v0.1.json"
+        )]
+        source_register: PathBuf,
+        #[arg(
+            long,
+            default_value = "benchmarks/planetary-energy-service/v0.1/competitive-reference-snapshot.json"
+        )]
+        competitive_snapshot: PathBuf,
+        /// Optional path for the machine-readable audit report.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -151,6 +169,17 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::PlanetaryReferenceAudit { input, out } => {
             planetary_energy::run_competitive_reference_audit(&input, out.as_deref())?;
+        }
+        Commands::PlanetaryReferenceAudit {
+            source_register,
+            competitive_snapshot,
+            out,
+        } => {
+            planetary_reference::run(
+                &source_register,
+                &competitive_snapshot,
+                out.as_deref(),
+            )?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
