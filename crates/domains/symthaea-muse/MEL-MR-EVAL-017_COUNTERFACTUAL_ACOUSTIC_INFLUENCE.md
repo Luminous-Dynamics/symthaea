@@ -1,6 +1,6 @@
 # MEL-MR-EVAL-017 — Counterfactual Performed-Event Acoustic Influence
 
-**Status:** first deterministic measurement primitive authored on 12 November 2026. It is not yet integrated with live FluidSynth/NativeMuse render orchestration, and its six unit tests are authored but not reported as executed.
+**Status:** first deterministic measurement primitive authored on 12 November 2026. It is not yet integrated with live FluidSynth/NativeMuse render orchestration, and its eight unit tests are authored but not reported as executed.
 
 **Parent issue:** [#9093 — Build counterfactual performed-event acoustic influence maps](https://github.com/Luminous-Dynamics/symthaea/issues/9093)
 
@@ -41,7 +41,14 @@ The new src/counterfactual_acoustic_influence.rs module provides:
 - Three-way result: Detected, NoDetectableInfluence, or Abstain. No calibration ID always forces abstention while retaining exploratory measurements.
 - Domain-separated SHA-256 report receipt and a replay verifier that recomputes the full measurement map from exact supplied buffers.
 
-The report binds caller-provided renderer receipt digests but does not validate those renderer receipts itself. The caller must independently verify every supplied render receipt and prove that the repeat renders use the same source schedule, renderer profile, effects, sample format and relevant random-stream policy.
+The lower-level fixture API binds caller-provided renderer receipt digests but does not validate those renderer receipts itself. A new preferred entry point, `estimate_from_verified_renderer_evidence`, accepts each receipt together with its exact `RendererReceiptInputs`, calls the receipt replay verifier, decodes the same WAV bytes, and rejects any output-byte substitution before estimating influence. It also checks that:
+- baseline and repeat render receipts bind the exact same serialized Score and schedule digest;
+- the counterfactual receipt binds the same Score but the separately declared changed schedule digest;
+- all renders use the same backend, executable/SoundFont commitments, semantic render-config digest and output format;
+- baseline, repeat and counterfactual receipts have distinct receipt digests;
+- the renderer-profile digest is derived from those independently replay-verified receipt fields rather than accepted as an unchecked caller claim.
+
+This still does not attest a malicious host or prove that an untrusted process loaded the claimed pages. It does remove the avoidable gap where the influence estimator could be handed a valid-looking receipt digest alongside different WAV bytes. The caller must still establish that repeat renders are independent executions and that their seed/effects policy is suitable for the experiment.
 
 ## Explicit non-claims and limits
 
@@ -49,12 +56,12 @@ The report binds caller-provided renderer receipt digests but does not validate 
 - RMS and spectral magnitude answer different questions. Neither is a universal perceptual metric, and phase-sensitive changes may not be faithfully represented by magnitude distance alone.
 - The current first tranche uses one baseline plus at least one repeat. Production experiments should use multiple independent repeats and report the distribution, not only the maximum, of the noise floor.
 - The same-schedule repeats must be independent executions. Reusing one output buffer under multiple receipt IDs is invalid experimental practice even though this module cannot detect it.
-- The module does not currently orchestrate MIDI rewriting, renderer invocations, native synthesis schedule capture, deterministic seed pairing, or PCM extraction. It consumes those artifacts as inputs.
+- The module does not currently orchestrate MIDI rewriting, renderer invocations, native synthesis schedule capture or deterministic seed pairing. The verified entry point does decode exact receipt-bound WAV bytes into PCM; the fixture-level API continues to consume already-decoded audio views.
 - A receipt digest establishes internal consistency, not trusted execution, source authenticity, or a malicious-host security guarantee.
 
 ## Initial deterministic tests
 
-Six tests are authored:
+Eight tests are authored:
 
 1. A source-event removal with a decaying release tail is detected against a same-schedule repeat.
 2. A counterfactual deviation that matches repeat-render noise is not falsely classified as an intervention effect.
@@ -62,12 +69,14 @@ Six tests are authored:
 4. Stereo support remains channel-specific.
 5. Replay rejects changed audio and changed renderer-profile context.
 6. Empty event IDs and zero-delta interventions reject.
+7. Baseline, repeat and counterfactual NativeMuse fixtures are independently replay-verified before PCM influence analysis.
+8. Replacing WAV bytes without changing the corresponding renderer receipt rejects.
 
 These tests have not yet been run by the pinned Rust workflow. No empirical accuracy, false-attribution rate, calibration quality or SOTA result is claimed.
 
 ## Next implementation sequence
 
-1. **Adapter integration:** construct the input context from independently replay-verified #9064/#9090 receipts and exact baseline/counterfactual MIDI artifacts.
+1. **Live adapter integration:** connect FluidSynth/NativeMuse candidate rendering to the verified-evidence entry point, using its exact WAV bytes and receipt inputs. The first verified NativeMuse fixture path is covered by tests; live Studio orchestration is not yet wired.
 2. **Repeat-render campaign:** collect at least three same-schedule repeat renders per deterministic renderer/profile and estimate per-window noise-floor distributions. Test renderers that deliberately vary effects or random seeds.
 3. **MIDI intervention compiler:** bind exact source event ID to one typed MIDI/schedule intervention. Verify every non-target event is unchanged before rendering.
 4. **Effect-tail calibration:** use isolated notes, repeated same-pitch notes, chords, sustained notes, release tails, reverb/chorus and mastering settings. Establish support-containment, onset/offset error and false-attribution curves.
