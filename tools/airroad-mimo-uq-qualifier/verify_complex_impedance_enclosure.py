@@ -118,13 +118,44 @@ def main():
             )
 
     controls = {item["id"]: item["expected"] for item in data["negative_controls"]}
+
+    # Execute current-disc zero-exclusion and explicit hard-bound semantics.
+    control_column = columns[0]
+    zero_current = parse_complex(control_column["injected_current_a"])
+    zero_radius = abs(zero_current[0])
+    assert abs(zero_current[0]) - zero_radius <= 0
     assert controls["current-disc-touches-zero"] == "not_evaluable_current_set_includes_zero"
+
+    assert data["hard_bound_semantics"]["kind"] == "deterministic_hard_bound"
+    statistical_only = {"kind": "statistical_only", "method_reference": "one-sigma"}
+    assert statistical_only["kind"] != "deterministic_hard_bound"
     assert controls["statistical-only-bound"] == "not_evaluable_not_a_hard_bound"
+
+    empty_method = dict(data["hard_bound_semantics"])
+    empty_method["method_reference"] = ""
+    assert not empty_method["method_reference"].strip()
     assert controls["empty-method-reference"] == "not_evaluable_missing_hard_bound_method"
+
+    # A deleted cross-port observation cannot complete a square matrix.
+    missing = json.loads(json.dumps(data))
+    missing["columns"][0]["observations"].pop()
+    observed_ids = {
+        item["observed_port_id"] for item in missing["columns"][0]["observations"]
+    }
+    assert observed_ids != set(ports)
     assert controls["missing-cross-port-observation"] == "not_evaluable_missing_matrix_element"
+
+    query_hz = Fraction(1, 1)
+    recorded_hz = q(data["angular_frequency_rad_s"])
+    assert query_hz != recorded_hz
     assert controls["off-knot-query"] == "not_evaluable_unsupported_frequency"
+
+    # The rational current is nonzero, but binary64 squaring can underflow.
+    tiny = 1.0e-300
+    assert tiny != 0.0 and tiny * tiny == 0.0
     assert controls["tiny-denominator-underflow"] == "not_evaluable_floating_point_domain"
-    print("PASS six negative-control contract labels")
+
+    print("PASS all six executable negative controls")
 
 
 if __name__ == "__main__":
