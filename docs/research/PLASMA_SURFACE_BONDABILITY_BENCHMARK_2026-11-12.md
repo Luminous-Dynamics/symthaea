@@ -60,6 +60,8 @@ Compare not only one plasma cell against one incumbent, but also line speed, tre
 
 Use one exact rigid-plastic adherend / adhesive pair for the first lap-shear comparison. For direct reconstruction of Péczi-Kovács and Kókai (2026), preserve their PET-G / adhesive and PP / adhesive material identities and use **ISO 4587:2003**, the method used in their study. ISO lists this edition as published/current and states that it specifies tensile lap-shear strength for rigid-to-rigid bonded assemblies; it does not provide design information. The standard was confirmed in 2021 and entered systematic review in July 2026. ASTM D3163-01(2023) may be selected for a separate protocol where appropriate, but results from different standards or specimen preparation must remain distinct.
 
+The source paper's experimental protocol used PET-G sheet (rather than an unspecified PET grade), a 12.5 mm single-lap overlap, ISO 4587:2003, a 10 mm/s crosshead speed, and three specimens per treatment category. The joints were made immediately after treatment to minimize time-dependent surface recovery; exact bondline thickness was not measured. Reproduction must preserve these conditions and must not describe this small immediate-bond dataset as a bondability-window or lifetime study.
+
 Freeze these arms before tuning:
 - untreated control;
 - the best applicable incumbent for the exact process context (corona, flame, primer/cleaning, or another justified incumbent);
@@ -146,11 +148,12 @@ No duplicate energy ledger, calibration registry, plasma solver, sensor authorit
 
 ## Research references
 
-- Péczi-Kovács & Kókai (2026-10-20), *Effect of argon and nitrogen plasma surface treatment on wettability and adhesive bond strength of PP, HIPS, PVC, PC and PET*. https://doi.org/10.1007/s44245-026-00396-4
+- Péczi-Kovács & Kókai (2026-10-20), *Effect of argon and nitrogen plasma surface treatment on wettability and adhesive bond strength of PP, HIPS, PVC, PC and PET-G*. https://doi.org/10.1007/s44245-026-00396-4
 - Spanou et al. (2026-02-07), *Argon Cold Plasma Modification of Polyethylene Films to Tailor Surface and Barrier Properties*. https://doi.org/10.1002/app.70533
 - Primc & Mozetič (2024), *Surface Modification of Polymers by Plasma Treatment for Appropriate Adhesion of Coatings*. https://doi.org/10.3390/ma17071494
 - *Large-Scale Applications of Plasma Technologies: Progresses and Challenges* (2026). https://doi.org/10.1049/hve2.70241
-- ASTM D3163-01(2023), rigid-plastic lap-shear comparative testing: https://store.astm.org/standards/d3163
+- ISO 4587:2003, tensile lap-shear strength of rigid-to-rigid assemblies (source paper method): https://www.iso.org/standard/34852.html
+- ASTM D3163-01(2023), a separate rigid-plastic lap-shear method where applicable: https://store.astm.org/standards/d3163
 - ASTM D5946-24, contact angle on corona-treated polymer films: https://store.astm.org/standards/d5946
 - ASTM D903-98(2025), comparative peel / stripping strength: https://store.astm.org/standards/d903
 
