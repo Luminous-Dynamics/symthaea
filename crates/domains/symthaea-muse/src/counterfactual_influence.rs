@@ -27,8 +27,7 @@ use rustfft::{Fft, FftPlanner, num_complex::Complex};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-pub const COUNTERFACTUAL_INFLUENCE_VERSION: &str =
-    "mel-mr-eval-017-counterfactual-influence-v0.2";
+pub const COUNTERFACTUAL_INFLUENCE_VERSION: &str = "mel-mr-eval-017-counterfactual-influence-v0.2";
 pub const REPEATABILITY_CALIBRATION_VERSION: &str =
     "mel-mr-eval-017-repeatability-calibration-v0.1";
 const CALIBRATION_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-repeatability-v1\0";
@@ -328,8 +327,7 @@ pub(crate) fn verify_renderer_audio_binding(
         return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
     }
     if excluded_source_event_index.is_none()
-        && receipt.performed_event_map_sha256.as_deref()
-            != Some(parsed_map.receipt_sha256.as_str())
+        && receipt.performed_event_map_sha256.as_deref() != Some(parsed_map.receipt_sha256.as_str())
     {
         return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
     }
@@ -558,11 +556,17 @@ impl std::fmt::Display for CounterfactualInfluenceError {
             Self::ZeroChannels => write!(f, "channel count must be non-zero"),
             Self::EmptyAudio => write!(f, "audio must contain at least one frame"),
             Self::InterleavedLengthNotDivisibleByChannels => {
-                write!(f, "interleaved sample count is not divisible by channel count")
+                write!(
+                    f,
+                    "interleaved sample count is not divisible by channel count"
+                )
             }
             Self::NonFiniteSample => write!(f, "audio contains a non-finite sample"),
             Self::AudioLayoutMismatch => {
-                write!(f, "paired audio must have identical rate, channels and frame count")
+                write!(
+                    f,
+                    "paired audio must have identical rate, channels and frame count"
+                )
             }
             Self::WindowLongerThanAudio => write!(f, "analysis window is longer than audio"),
             Self::TooFewNoopRenders => write!(
@@ -573,37 +577,66 @@ impl std::fmt::Display for CounterfactualInfluenceError {
                 write!(f, "repeatability calibration receipt is invalid")
             }
             Self::CalibrationReplayMismatch => {
-                write!(f, "repeatability calibration does not replay from supplied controls")
+                write!(
+                    f,
+                    "repeatability calibration does not replay from supplied controls"
+                )
             }
             Self::CalibrationAnchorMismatch => {
-                write!(f, "baseline output differs from the calibrated anchor output")
+                write!(
+                    f,
+                    "baseline output differs from the calibrated anchor output"
+                )
             }
             Self::CalibrationConfigMismatch => {
-                write!(f, "measurement config differs from the frozen calibration config")
+                write!(
+                    f,
+                    "measurement config differs from the frozen calibration config"
+                )
             }
             Self::RendererReceiptInvalid => {
-                write!(f, "renderer execution receipt does not replay against the supplied artifacts")
+                write!(
+                    f,
+                    "renderer execution receipt does not replay against the supplied artifacts"
+                )
             }
             Self::RendererAudioMismatch => {
-                write!(f, "decoded renderer PCM does not match the supplied audio view")
+                write!(
+                    f,
+                    "decoded renderer PCM does not match the supplied audio view"
+                )
             }
             Self::RendererIdentityMismatch => {
-                write!(f, "renderer identity or configuration differs across paired renders")
+                write!(
+                    f,
+                    "renderer identity or configuration differs across paired renders"
+                )
             }
             Self::InvalidEventId => write!(f, "invalid source event ID"),
-            Self::InvalidIntervention => write!(f, "intervention is a no-op or has invalid parameters"),
+            Self::InvalidIntervention => {
+                write!(f, "intervention is a no-op or has invalid parameters")
+            }
             Self::EmptyArtifact(name) => write!(f, "artifact is empty: {name}"),
             Self::ArtifactTooLarge(name) => write!(f, "artifact exceeds size limit: {name}"),
             Self::IdenticalSchedules => {
-                write!(f, "baseline and counterfactual schedules are byte-identical")
+                write!(
+                    f,
+                    "baseline and counterfactual schedules are byte-identical"
+                )
             }
             Self::SerializationFailure => write!(f, "could not serialize influence evidence"),
             Self::InvalidInfluenceReceipt => write!(f, "influence report receipt is invalid"),
             Self::InfluenceReplayMismatch => {
-                write!(f, "influence report does not replay from supplied artifacts")
+                write!(
+                    f,
+                    "influence report does not replay from supplied artifacts"
+                )
             }
             Self::WindowIndexMismatch => {
-                write!(f, "calibration cells do not match the expected window/channel layout")
+                write!(
+                    f,
+                    "calibration cells do not match the expected window/channel layout"
+                )
             }
         }
     }
@@ -671,9 +704,7 @@ fn influence_digest_valid(
     }
     Ok(canonical_digest(&unsealed, INFLUENCE_DOMAIN)? == expected)
 }
-fn validate_config(
-    config: &InfluenceAnalysisConfig,
-) -> Result<(), CounterfactualInfluenceError> {
+fn validate_config(config: &InfluenceAnalysisConfig) -> Result<(), CounterfactualInfluenceError> {
     if config.window_size_frames < 16 {
         return Err(CounterfactualInfluenceError::InvalidConfig(
             "window_size_frames must be at least 16",
@@ -716,7 +747,11 @@ fn validate_audio(audio: &AudioView<'_>) -> Result<usize, CounterfactualInfluenc
     if audio.interleaved_samples.len() % audio.channels != 0 {
         return Err(CounterfactualInfluenceError::InterleavedLengthNotDivisibleByChannels);
     }
-    if audio.interleaved_samples.iter().any(|sample| !sample.is_finite()) {
+    if audio
+        .interleaved_samples
+        .iter()
+        .any(|sample| !sample.is_finite())
+    {
         return Err(CounterfactualInfluenceError::NonFiniteSample);
     }
     Ok(audio.interleaved_samples.len() / audio.channels)
@@ -747,9 +782,9 @@ fn frame_windows(
     let mut windows = Vec::new();
     let mut start = 0usize;
     loop {
-        let end = start
-            .checked_add(config.window_size_frames)
-            .ok_or(CounterfactualInfluenceError::InvalidConfig("window overflow"))?;
+        let end = start.checked_add(config.window_size_frames).ok_or(
+            CounterfactualInfluenceError::InvalidConfig("window overflow"),
+        )?;
         if end > total_frames {
             break;
         }
@@ -784,9 +819,7 @@ struct PairMetrics {
 
 fn hann_window(size: usize) -> Vec<f32> {
     (0..size)
-        .map(|index| {
-            0.5 - 0.5 * (std::f32::consts::TAU * index as f32 / size as f32).cos()
-        })
+        .map(|index| 0.5 - 0.5 * (std::f32::consts::TAU * index as f32 / size as f32).cos())
         .collect()
 }
 
@@ -932,8 +965,7 @@ pub fn calibrate_repeatability(
     let baseline_schedule_sha256 = sha256_hex(baseline_schedule_bytes);
     if anchor_renderer_evidence.source_score_sha256 != score_sha256
         || anchor_renderer_evidence.input_artifact_sha256 != baseline_schedule_sha256
-        || anchor_renderer_evidence.performed_event_map_artifact_sha256
-            != event_map_sha256
+        || anchor_renderer_evidence.performed_event_map_artifact_sha256 != event_map_sha256
     {
         return Err(CounterfactualInfluenceError::CalibrationConfigMismatch);
     }
@@ -1116,8 +1148,7 @@ fn lineage_rows_match(
         before.source_event_id == after.source_event_id
             && before.descendant_ordinal == after.descendant_ordinal
             && before.midi_track_index == after.midi_track_index
-            && (!require_stable_note_on_ordinal
-                || before.note_on_ordinal == after.note_on_ordinal)
+            && (!require_stable_note_on_ordinal || before.note_on_ordinal == after.note_on_ordinal)
             && before.midi_channel == after.midi_channel
             && before.midi_note == after.midi_note
             && before.onset_micros == after.onset_micros
@@ -1177,11 +1208,26 @@ fn validate_input(
     for (name, bytes) in [
         ("source_score", input.source_score_bytes),
         ("performed_event_map", input.performed_event_map_bytes),
-        ("counterfactual_performed_event_map", input.counterfactual_performed_event_map_bytes),
+        (
+            "counterfactual_performed_event_map",
+            input.counterfactual_performed_event_map_bytes,
+        ),
         ("baseline_schedule", input.baseline_schedule_bytes),
-        ("counterfactual_schedule", input.counterfactual_schedule_bytes),
-        ("baseline_renderer_receipt", input.baseline_renderer_evidence.receipt_sha256.as_bytes()),
-        ("counterfactual_renderer_receipt", input.counterfactual_renderer_evidence.receipt_sha256.as_bytes()),
+        (
+            "counterfactual_schedule",
+            input.counterfactual_schedule_bytes,
+        ),
+        (
+            "baseline_renderer_receipt",
+            input.baseline_renderer_evidence.receipt_sha256.as_bytes(),
+        ),
+        (
+            "counterfactual_renderer_receipt",
+            input
+                .counterfactual_renderer_evidence
+                .receipt_sha256
+                .as_bytes(),
+        ),
     ] {
         if bytes.is_empty() {
             return Err(CounterfactualInfluenceError::EmptyArtifact(name));
@@ -1217,21 +1263,28 @@ fn validate_input(
     }
     let baseline_pitch_sha256 = sha256_hex(input.expected_primary_midi_by_score_index);
     let counterfactual_pitch_sha256 = sha256_hex(&counterfactual_primary_pitches);
-    if input.baseline_renderer_evidence.source_score_sha256
-        != sha256_hex(input.source_score_bytes)
+    if input.baseline_renderer_evidence.source_score_sha256 != sha256_hex(input.source_score_bytes)
         || input.counterfactual_renderer_evidence.source_score_sha256
             != sha256_hex(input.source_score_bytes)
-        || input.baseline_renderer_evidence.expected_primary_pitches_sha256
+        || input
+            .baseline_renderer_evidence
+            .expected_primary_pitches_sha256
             != baseline_pitch_sha256
-        || input.counterfactual_renderer_evidence.expected_primary_pitches_sha256
+        || input
+            .counterfactual_renderer_evidence
+            .expected_primary_pitches_sha256
             != counterfactual_pitch_sha256
         || input.baseline_renderer_evidence.input_artifact_sha256
             != sha256_hex(input.baseline_schedule_bytes)
         || input.counterfactual_renderer_evidence.input_artifact_sha256
             != sha256_hex(input.counterfactual_schedule_bytes)
-        || input.baseline_renderer_evidence.performed_event_map_artifact_sha256
+        || input
+            .baseline_renderer_evidence
+            .performed_event_map_artifact_sha256
             != sha256_hex(input.performed_event_map_bytes)
-        || input.counterfactual_renderer_evidence.performed_event_map_artifact_sha256
+        || input
+            .counterfactual_renderer_evidence
+            .performed_event_map_artifact_sha256
             != sha256_hex(input.counterfactual_performed_event_map_bytes)
     {
         return Err(CounterfactualInfluenceError::CalibrationConfigMismatch);
@@ -1302,11 +1355,7 @@ fn validate_input(
             }
             // Removing a prior note shifts MIDI note-on ordinals on its track;
             // every other musical field and stable descendant identity must stay exact.
-            if !lineage_rows_match(
-                &baseline_protected,
-                &counterfactual_protected,
-                false,
-            ) {
+            if !lineage_rows_match(&baseline_protected, &counterfactual_protected, false) {
                 return Err(CounterfactualInfluenceError::InvalidIntervention);
             }
         }
@@ -1315,26 +1364,26 @@ fn validate_input(
                 &baseline_target_rows,
                 &counterfactual_target_rows,
                 *semitones,
-            ) || !lineage_rows_match(
-                &baseline_protected,
-                &counterfactual_protected,
-                true,
-            ) {
+            ) || !lineage_rows_match(&baseline_protected, &counterfactual_protected, true)
+            {
                 return Err(CounterfactualInfluenceError::InvalidIntervention);
             }
         }
         _ => return Err(CounterfactualInfluenceError::InvalidIntervention),
     }
 
-    if input.baseline_renderer_evidence.receipt_sha256
-        != calibration.anchor_renderer_receipt_sha256
+    if input.baseline_renderer_evidence.receipt_sha256 != calibration.anchor_renderer_receipt_sha256
         || input.baseline_renderer_evidence.renderer_identity_sha256
             != calibration.renderer_identity_sha256
         || input.baseline_renderer_evidence.renderer_config_sha256
             != calibration.renderer_config_sha256
-        || input.counterfactual_renderer_evidence.renderer_identity_sha256
+        || input
+            .counterfactual_renderer_evidence
+            .renderer_identity_sha256
             != calibration.renderer_identity_sha256
-        || input.counterfactual_renderer_evidence.renderer_config_sha256
+        || input
+            .counterfactual_renderer_evidence
+            .renderer_config_sha256
             != calibration.renderer_config_sha256
     {
         return Err(CounterfactualInfluenceError::RendererIdentityMismatch);
@@ -1388,10 +1437,7 @@ pub fn measure_counterfactual_influence(
         let spectral_threshold = calibration
             .analysis
             .minimum_spectral_distance
-            .max(
-                cell.maximum_noop_spectral_distance
-                    * calibration.analysis.noise_floor_multiplier,
-            );
+            .max(cell.maximum_noop_spectral_distance * calibration.analysis.noise_floor_multiplier);
         let effect_detected = metric.rms_delta > rms_threshold
             || metric.spectral_magnitude_distance > spectral_threshold;
         if effect_detected {
@@ -1428,19 +1474,13 @@ pub fn measure_counterfactual_influence(
         intervention: input.intervention.clone(),
         source_score_sha256: sha256_hex(input.source_score_bytes),
         performed_event_map_sha256: sha256_hex(input.performed_event_map_bytes),
-        performed_event_map_receipt_sha256: calibration
-            .performed_event_map_receipt_sha256
-            .clone(),
-        counterfactual_event_map_sha256: sha256_hex(
-            input.counterfactual_performed_event_map_bytes,
-        ),
+        performed_event_map_receipt_sha256: calibration.performed_event_map_receipt_sha256.clone(),
+        counterfactual_event_map_sha256: sha256_hex(input.counterfactual_performed_event_map_bytes),
         counterfactual_event_map_receipt_sha256: input
             .counterfactual_renderer_evidence
             .performed_event_map_sha256
             .clone(),
-        expected_primary_pitches_sha256: calibration
-            .expected_primary_pitches_sha256
-            .clone(),
+        expected_primary_pitches_sha256: calibration.expected_primary_pitches_sha256.clone(),
         counterfactual_expected_primary_pitches_sha256: sha256_hex(
             &expected_counterfactual_primary_pitches(
                 input.expected_primary_midi_by_score_index,
@@ -1451,12 +1491,21 @@ pub fn measure_counterfactual_influence(
         ),
         baseline_schedule_sha256: sha256_hex(input.baseline_schedule_bytes),
         counterfactual_schedule_sha256: sha256_hex(input.counterfactual_schedule_bytes),
-        renderer_identity_sha256: input.baseline_renderer_evidence.renderer_identity_sha256.clone(),
-        renderer_config_sha256: input.baseline_renderer_evidence.renderer_config_sha256.clone(),
+        renderer_identity_sha256: input
+            .baseline_renderer_evidence
+            .renderer_identity_sha256
+            .clone(),
+        renderer_config_sha256: input
+            .baseline_renderer_evidence
+            .renderer_config_sha256
+            .clone(),
         baseline_audio_sha256: audio_sha256(input.baseline_audio),
         counterfactual_audio_sha256: audio_sha256(input.counterfactual_audio),
         baseline_renderer_receipt_sha256: input.baseline_renderer_evidence.receipt_sha256.clone(),
-        counterfactual_renderer_receipt_sha256: input.counterfactual_renderer_evidence.receipt_sha256.clone(),
+        counterfactual_renderer_receipt_sha256: input
+            .counterfactual_renderer_evidence
+            .receipt_sha256
+            .clone(),
         repeatability_calibration_sha256: calibration.receipt_sha256.clone(),
         sample_rate_hz: calibration.sample_rate_hz,
         channels: calibration.channels,
@@ -1490,9 +1539,7 @@ pub fn verify_counterfactual_influence(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::renderer_execution_receipt::{
-        RendererBackend, RendererProcessObservation,
-    };
+    use crate::renderer_execution_receipt::{RendererBackend, RendererProcessObservation};
 
     fn config() -> InfluenceAnalysisConfig {
         InfluenceAnalysisConfig {
@@ -1519,10 +1566,8 @@ mod tests {
     }
 
     fn push_lineage_marker(track: &mut Vec<u8>, delta: u8, source_index: usize) {
-        let payload = crate::performed_event_map::encode_midi_lineage_marker_payload(
-            source_index,
-            0,
-        );
+        let payload =
+            crate::performed_event_map::encode_midi_lineage_marker_payload(source_index, 0);
         push_delta_event(track, delta, &[0xff, 0x7f, 0x10]);
         track.extend_from_slice(&payload);
     }
@@ -1565,12 +1610,7 @@ mod tests {
         push_delta_event(&mut track, 1, &[0x80, 64, 0]);
         push_delta_event(&mut track, 0, &[0xff, 0x2f, 0x00]);
 
-        let mut midi = vec![
-            b'M', b'T', b'h', b'd', 0, 0, 0, 6,
-            0, 0,
-            0, 1,
-            1, 0xe0,
-        ];
+        let mut midi = vec![b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 0, 0, 1, 1, 0xe0];
         midi.extend_from_slice(b"MTrk");
         midi.extend_from_slice(&(track.len() as u32).to_be_bytes());
         midi.extend_from_slice(&track);
@@ -1586,12 +1626,7 @@ mod tests {
         push_delta_event(&mut track, 1, &[0x80, 64, 0]);
         push_delta_event(&mut track, 0, &[0xff, 0x2f, 0x00]);
 
-        let mut midi = vec![
-            b'M', b'T', b'h', b'd', 0, 0, 0, 6,
-            0, 0,
-            0, 1,
-            1, 0xe0,
-        ];
+        let mut midi = vec![b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 0, 0, 1, 1, 0xe0];
         midi.extend_from_slice(b"MTrk");
         midi.extend_from_slice(&(track.len() as u32).to_be_bytes());
         midi.extend_from_slice(&track);
@@ -1607,12 +1642,7 @@ mod tests {
         push_delta_event(&mut track, 1, &[0x80, 65, 0]);
         push_delta_event(&mut track, 0, &[0xff, 0x2f, 0x00]);
 
-        let mut midi = vec![
-            b'M', b'T', b'h', b'd', 0, 0, 0, 6,
-            0, 0,
-            0, 1,
-            1, 0xe0,
-        ];
+        let mut midi = vec![b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 0, 0, 1, 1, 0xe0];
         midi.extend_from_slice(b"MTrk");
         midi.extend_from_slice(&(track.len() as u32).to_be_bytes());
         midi.extend_from_slice(&track);
@@ -1683,11 +1713,7 @@ mod tests {
         process: RendererProcessObservation,
     }
 
-    fn build_render(
-        render_id: &str,
-        midi: &[u8],
-        samples: &[f32],
-    ) -> BoundRender {
+    fn build_render(render_id: &str, midi: &[u8], samples: &[f32]) -> BoundRender {
         build_render_with_gain(render_id, midi, samples, 0.8)
     }
 
@@ -1719,22 +1745,20 @@ mod tests {
         } else {
             None
         };
-        let receipt = RendererExecutionReceipt::from_successful_render(
-            RendererReceiptInputs {
-                render_id,
-                backend: RendererBackend::FluidSynth,
-                score_bytes: SCORE_BYTES,
-                render_config_bytes: CONFIG_BYTES,
-                input_midi_bytes: Some(midi),
-                performed_schedule_bytes: None,
-                renderer_executable_sha256: Some(&executable),
-                soundfont_sha256: Some(&soundfont),
-                process_exit_code: Some(0),
-                process_observation: Some(process.clone()),
-                performed_event_map_sha256: complete_map_digest,
-                output_wav_bytes: &wav,
-            },
-        )
+        let receipt = RendererExecutionReceipt::from_successful_render(RendererReceiptInputs {
+            render_id,
+            backend: RendererBackend::FluidSynth,
+            score_bytes: SCORE_BYTES,
+            render_config_bytes: CONFIG_BYTES,
+            input_midi_bytes: Some(midi),
+            performed_schedule_bytes: None,
+            renderer_executable_sha256: Some(&executable),
+            soundfont_sha256: Some(&soundfont),
+            process_exit_code: Some(0),
+            process_observation: Some(process.clone()),
+            performed_event_map_sha256: complete_map_digest,
+            output_wav_bytes: &wav,
+        })
         .unwrap();
         BoundRender {
             receipt,
@@ -1751,12 +1775,7 @@ mod tests {
         samples: &[f32],
         excluded_source_event_index: Option<usize>,
     ) -> VerifiedRendererAudioBinding {
-        verify_bound_render_with_pitches(
-            render,
-            samples,
-            &[60, 64],
-            excluded_source_event_index,
-        )
+        verify_bound_render_with_pitches(render, samples, &[60, 64], excluded_source_event_index)
     }
 
     fn verify_bound_render_with_pitches(
@@ -1841,16 +1860,8 @@ mod tests {
         let anchor_evidence = verify_bound_render(&anchor, &samples, None);
         let noop = build_render("one-noop-only", &midi, &samples);
         let noop_evidence = verify_bound_render(&noop, &samples, None);
-        let repeated_audio = [
-            audio(&samples),
-            audio(&samples),
-            audio(&samples),
-        ];
-        let repeated_receipts = [
-            noop_evidence.clone(),
-            noop_evidence.clone(),
-            noop_evidence,
-        ];
+        let repeated_audio = [audio(&samples), audio(&samples), audio(&samples)];
+        let repeated_receipts = [noop_evidence.clone(), noop_evidence.clone(), noop_evidence];
 
         assert_eq!(
             calibrate_repeatability(
@@ -1930,9 +1941,7 @@ mod tests {
             .iter()
             .map(|render| verify_bound_render(render, &samples, None))
             .collect();
-        let repeat_audio: Vec<_> = (0..repeats.len())
-            .map(|_| audio(&samples))
-            .collect();
+        let repeat_audio: Vec<_> = (0..repeats.len()).map(|_| audio(&samples)).collect();
         let calibration = calibrate_repeatability(
             &audio(&samples),
             &repeat_audio,
@@ -1990,9 +1999,7 @@ mod tests {
             .iter()
             .map(|render| verify_bound_render(render, &baseline_samples, None))
             .collect();
-        let noop_audio: Vec<_> = (0..noops.len())
-            .map(|_| audio(&baseline_samples))
-            .collect();
+        let noop_audio: Vec<_> = (0..noops.len()).map(|_| audio(&baseline_samples)).collect();
         let calibration = verify_repeatability_calibration(
             &calibrate_repeatability(
                 &audio(&baseline_samples),
@@ -2045,8 +2052,14 @@ mod tests {
         };
 
         let report = measure_counterfactual_influence(&experiment, &calibration).unwrap();
-        assert_eq!(report.intervention, EventIntervention::Transpose { semitones: 2 });
-        assert_eq!(report.expected_primary_pitches_sha256, sha256_hex(&[60, 64]));
+        assert_eq!(
+            report.intervention,
+            EventIntervention::Transpose { semitones: 2 }
+        );
+        assert_eq!(
+            report.expected_primary_pitches_sha256,
+            sha256_hex(&[60, 64])
+        );
         assert_eq!(
             report.counterfactual_expected_primary_pitches_sha256,
             sha256_hex(&[62, 64])
@@ -2114,12 +2127,8 @@ mod tests {
 
         let valid_counterfactual =
             build_render("transpose-valid", &transposed_event_zero_midi(2), &samples);
-        let valid_evidence = verify_bound_render_with_pitches(
-            &valid_counterfactual,
-            &samples,
-            &[62, 64],
-            None,
-        );
+        let valid_evidence =
+            verify_bound_render_with_pitches(&valid_counterfactual, &samples, &[62, 64], None);
         let base_target = baseline_evidence
             .performed_event_lineage()
             .iter()
@@ -2220,9 +2229,7 @@ mod tests {
             .iter()
             .map(|render| verify_bound_render(render, &baseline_samples, None))
             .collect();
-        let noop_audio: Vec<_> = (0..noops.len())
-            .map(|_| audio(&baseline_samples))
-            .collect();
+        let noop_audio: Vec<_> = (0..noops.len()).map(|_| audio(&baseline_samples)).collect();
         let calibration = calibrate_repeatability(
             &audio(&baseline_samples),
             &noop_audio,
@@ -2234,18 +2241,17 @@ mod tests {
             &config(),
         )
         .unwrap();
-        let calibration =
-            verify_repeatability_calibration(
-                &calibration,
-                &audio(&baseline_samples),
-                &noop_audio,
-                SCORE_BYTES,
-                &anchor.map_bytes,
-                &baseline_midi,
-                &anchor_evidence,
-                &noop_evidence,
-            )
-            .unwrap();
+        let calibration = verify_repeatability_calibration(
+            &calibration,
+            &audio(&baseline_samples),
+            &noop_audio,
+            SCORE_BYTES,
+            &anchor.map_bytes,
+            &baseline_midi,
+            &anchor_evidence,
+            &noop_evidence,
+        )
+        .unwrap();
 
         let counterfactual = build_render(
             "counterfactual-remove-event-0",
@@ -2285,7 +2291,10 @@ mod tests {
             report.counterfactual_renderer_receipt_sha256,
             counterfactual_evidence.receipt_sha256()
         );
-        assert_eq!(report.counterfactual_event_map_receipt_sha256, counterfactual.map.receipt_sha256);
+        assert_eq!(
+            report.counterfactual_event_map_receipt_sha256,
+            counterfactual.map.receipt_sha256
+        );
         assert!(verify_counterfactual_influence(&report, &experiment, &calibration).unwrap());
     }
 
@@ -2364,8 +2373,7 @@ mod tests {
         )
         .unwrap();
 
-        let mut altered_config_evidence =
-            verify_bound_render(&baseline, &samples, None);
+        let mut altered_config_evidence = verify_bound_render(&baseline, &samples, None);
         altered_config_evidence.renderer_config_sha256 = sha256_hex(b"substituted-config");
         let counterfactual_samples = vec![0.0f32; 128];
         let counterfactual = build_render(
