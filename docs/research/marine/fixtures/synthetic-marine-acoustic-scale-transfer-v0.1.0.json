@@ -49,7 +49,9 @@
           }
         ],
         "timebase_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "rpm_u95_hz": 0.01
+        "rpm_u95_hz": 0.01,
+        "background_measurement_method": "bare_hub",
+        "background_trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
       },
       "full_scale": {
         "run_id": "full-1",
@@ -97,7 +99,9 @@
           }
         ],
         "timebase_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
-        "rpm_u95_hz": 0.01
+        "rpm_u95_hz": 0.01,
+        "background_measurement_method": "bare_hub",
+        "background_trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
       },
       "full_scale": {
         "run_id": "full-2",
