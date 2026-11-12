@@ -1283,7 +1283,8 @@ mod tests {
             expires_at_unix_seconds: 500,
             signature: Vec::new(),
         };
-        signed.signature = Sha256::digest(signed_profile_message(&signed).unwrap()).to_vec();
+        let signed_message = signed_profile_message(&signed).unwrap();
+        signed.signature = Sha256::digest(signed_message).to_vec();
         let mut registry = TailProfileRegistrySnapshot {
             version: TAIL_PROFILE_REGISTRY_VERSION.to_owned(),
             created_at_unix_seconds: 90,
