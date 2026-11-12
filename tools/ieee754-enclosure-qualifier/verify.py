@@ -121,20 +121,7 @@ def verify(path: Path) -> tuple[int, str]:
     if rejected_zero_divisors < 1:
         raise RuntimeError("corpus did not exercise zero-divisor rejection")
 
-    return count, digest.hexdigest()
-
-
-def overflow_count(path: Path) -> int:
-    count = 0
-    with path.open("rb") as stream:
-        for raw_line in stream:
-            fields = raw_line.decode("ascii").rstrip("\n").split("|")
-            if len(fields) == 7 and fields[6] == "OK":
-                lower = f64_from_bits(fields[4])
-                upper = f64_from_bits(fields[5])
-                if math.isinf(lower) or math.isinf(upper):
-                    count += 1
-    return count
+    return count, digest.hexdigest(), overflow_enclosures
 
 
 def main() -> int:
@@ -143,7 +130,7 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        count, corpus_digest = verify(args.vectors)
+        count, corpus_digest, overflow_enclosures = verify(args.vectors)
     except Exception as exc:  # noqa: BLE001 - CLI must return failure for any oracle defect
         print(f"EXACT_RATIONAL_QUALIFICATION=FAIL: {exc}", file=sys.stderr)
         return 1
@@ -151,7 +138,7 @@ def main() -> int:
     print("EXACT_RATIONAL_QUALIFICATION=PASS")
     print(f"CASE_COUNT={count}")
     print(f"VECTOR_CORPUS_SHA256={corpus_digest}")
-    print(f"UNBOUNDED_OVERFLOW_CASES={overflow_count(args.vectors)}")
+    print(f"UNBOUNDED_OVERFLOW_CASES={overflow_enclosures}")
     print(f"PYTHON_VERSION={sys.version.split()[0]}")
     print("REFERENCE=Python Fraction.from_float over exact raw binary64 inputs")
     print("SCOPE=single-operation scalar add/sub/mul/div enclosures only")
