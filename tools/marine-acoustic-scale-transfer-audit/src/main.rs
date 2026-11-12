@@ -172,6 +172,7 @@ struct FullScaleBand {
 struct AuditReport {
     schema_version: &'static str,
     case_id: String,
+    spectrum_representation: &'static str,
     disposition: &'static str,
     comparison_outcome: &'static str,
     unique_model_rotation_rates: usize,
@@ -204,6 +205,13 @@ struct BandReport {
     observed_interval_lower_db: Option<f64>,
     observed_interval_upper_db: Option<f64>,
     comparison: &'static str,
+}
+
+fn spectrum_representation_name(value: &SpectrumRepresentation) -> &'static str {
+    match value {
+        SpectrumRepresentation::PowerSpectrum => "power_spectrum",
+        SpectrumRepresentation::PowerSpectralDensity => "power_spectral_density",
+    }
 }
 
 fn finite_positive(value: f64) -> bool {
@@ -418,6 +426,7 @@ fn audit(case: &Case) -> AuditReport {
         return AuditReport {
             schema_version: SCHEMA_VERSION,
             case_id: case.case_id.clone(),
+            spectrum_representation: spectrum_representation_name(&case.scaling.representation),
             disposition: "invalid",
             comparison_outcome: "not_evaluated",
             unique_model_rotation_rates,
@@ -663,6 +672,7 @@ fn audit(case: &Case) -> AuditReport {
     AuditReport {
         schema_version: SCHEMA_VERSION,
         case_id: case.case_id.clone(),
+        spectrum_representation: spectrum_representation_name(&case.scaling.representation),
         disposition,
         comparison_outcome,
         unique_model_rotation_rates,
