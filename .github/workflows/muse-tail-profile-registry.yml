@@ -1,0 +1,68 @@
+name: Muse Tail Profile Registry
+
+on:
+  push:
+    branches:
+      - "research/mel-mr-eval-035-*"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/tail_profile_registry.rs"
+      - "crates/domains/symthaea-muse/src/counterfactual_influence.rs"
+      - "crates/domains/symthaea-muse/src/renderer_execution_receipt.rs"
+      - ".github/workflows/muse-tail-profile-registry.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/tail_profile_registry.rs"
+      - "crates/domains/symthaea-muse/src/counterfactual_influence.rs"
+      - "crates/domains/symthaea-muse/src/renderer_execution_receipt.rs"
+      - ".github/workflows/muse-tail-profile-registry.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-tail-profile-registry-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: exact-head-tail-profile-reference
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'exact_head=%s\n' "$actual"
+
+      - name: Resolve workspace metadata
+        run: cargo metadata --locked --format-version 1 --no-deps > /tmp/muse-workspace-metadata.json
+
+      - name: Check Muse formatting
+        run: cargo fmt --manifest-path crates/domains/symthaea-muse/Cargo.toml -- --check
+
+      - name: Run tail-profile registry tests
+        run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib tail_profile_registry::tests
+
+      - name: Run Clippy for Muse library and tests
+        run: cargo clippy --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib --tests -- -D warnings
