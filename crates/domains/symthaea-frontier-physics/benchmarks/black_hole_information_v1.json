@@ -68,7 +68,8 @@
     "emission_semantics": "After the boundary-pair unitary, one active tensor factor is appended to radiation and excluded from all later gates",
     "complementarity": "For the closed globally pure register, calculate S(R) and S(B) independently at every nontrivial cut and report their absolute difference",
     "energy_ledger": "For equal-gap qubits with H = hbar*omega*N, record N_R and N_B separately and verify N = N_R + N_B at every emission step; report per-emission occupation expectation.",
-    "symmetry_resolved_page_reference": "For a U(1)-conserving fixed-total-excitation model compare only with the exact Haar average inside that same charge sector; the unconstrained Page formula is an invalid equilibrium comparator unless symmetry breaking is explicitly part of the model."
+    "symmetry_resolved_page_reference": "For a U(1)-conserving fixed-total-excitation model compare only with the exact Haar average inside that same charge sector; the unconstrained Page formula is an invalid equilibrium comparator unless symmetry breaking is explicitly part of the model.",
+    "symmetry_sector_reference": "A fixed-charge pure-state ensemble has a symmetry-resolved Page average; do not substitute the unconstrained Haar Page formula."
   },
   "benchmark_ladder": [
     {
@@ -145,6 +146,42 @@
         "seeds": "frozen before evaluation"
       },
       "implementation_status": "Page reference formula and seeded ChaCha20 Haar-state ensemble sampler authored with Welford uncertainty; not executed in Rust"
+    },
+    {
+      "id": "QI-2S",
+      "name": "symmetry-resolved Haar/Page equilibrium for fixed U(1) charge",
+      "status": "source_authored_not_executed",
+      "model": "Haar-random pure state inside a fixed total-excitation sector K of N qubits",
+      "reference": {
+        "formula": "E[S_A] = H_D - sum_q (d_q/D) H_(d_q) + sum_q (d_q/D) Page(m_q,n_q)",
+        "definitions": {
+          "D": "binomial(N,K)",
+          "m_q": "binomial(A,q)",
+          "n_q": "binomial(N-A,K-q)",
+          "d_q": "m_q*n_q",
+          "q_range": "max(0,K-(N-A)) through min(K,A)",
+          "H_j": "j-th harmonic number",
+          "Page": "exact complex-Haar Page average for dimensions m_q and n_q"
+        },
+        "interpretation": "The charge blocks have Dirichlet-distributed weights with parameters d_q; each normalized block is an independent Haar bipartite state. This is the exact average for the stated finite-dimensional symmetry sector."
+      },
+      "observables": [
+        "symmetry_resolved_page_entropy",
+        "fixed_charge_haar_sample_mean",
+        "sample_variance_and_standard_error",
+        "charge_sector_dimension",
+        "charge_block_weights_and_dimensions"
+      ],
+      "acceptance": {
+        "ensemble_mean": "inside preregistered sampling confidence interval or within a declared standard-error threshold",
+        "unconstrained_Page_formula_is_not_used_as_U1_equilibrium": true,
+        "seeds_and_sample_count_frozen_before_evaluation": true,
+        "block_dimensions_sum_to_binomial_N_K": true
+      },
+      "implementation_status": "exact symmetry-resolved Page oracle and seeded fixed-charge Haar sampler with Welford statistics authored; Rust execution pending",
+      "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
+      "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/fixed_charge_page_u1_v1.json",
+      "claim_ceiling": "Finite-dimensional Haar random states within an exact U(1) charge sector. No claim about gravitational evaporation, a local circuit reaching equilibrium, a Page island, or QES dominance."
     },
     {
       "id": "QI-3",
@@ -327,7 +364,8 @@
     "radiation_black_hole_entropy_complementarity_failure",
     "energy_partition_ledger_mismatch",
     "unconstrained_Haar_Page_reference_used_for_fixed_charge_ensemble",
-    "fixed_charge_equilibrium_claim_without_depth_and_seed_convergence"
+    "fixed_charge_equilibrium_claim_without_depth_and_seed_convergence",
+    "fixed_charge_Haar_sample_compared_to_unconstrained_Page_mean"
   ],
   "competitive_baselines": [
     {
@@ -468,7 +506,9 @@
       "QI-3_seeded_local_and_all_to_all_random_two_qubit_scramblers": "partial_source_authored_not_executed",
       "QI_3_U1_conserving_sequential_register_transfer": "source_authored_not_executed",
       "QI_3_sequential_emission_energy_ledger": "source_authored_not_executed",
-      "QI_3_symmetry_resolved_Page_equilibrium_oracle": "source_authored_not_executed"
+      "QI_3_symmetry_resolved_Page_equilibrium_oracle": "source_authored_not_executed",
+      "QI_2S_symmetry_resolved_Page_oracle": "source_authored_not_executed",
+      "QI_2S_seeded_fixed_charge_Haar_sampler": "source_authored_not_executed"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
