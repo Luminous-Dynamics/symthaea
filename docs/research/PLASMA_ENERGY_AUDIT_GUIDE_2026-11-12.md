@@ -33,6 +33,7 @@ The command is offline and uses existing `xtask` dependencies. It does not invok
 ## 2. Source-register audit
 
 The source audit requires:
+- an HTTP(S) source URL with a non-empty authority (scheme-only values such as `https://` are rejected);
 - a non-empty programme and claim ceiling;
 - declared, unique evidence classes;
 - at least one uniquely identified source case and negative control;
