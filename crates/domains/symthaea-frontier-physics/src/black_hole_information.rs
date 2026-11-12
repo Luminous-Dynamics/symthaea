@@ -2335,6 +2335,246 @@ fn petz_recovery_from_scrambler(
     })
 }
 
+/// Numerical optimality diagnostic for the Petz recovery map in the
+/// maximally-mixed Hayden-Preskill toy channel.
+///
+/// The 2025 PRL Petz-optimality theorem gives a necessary-and-sufficient
+/// criterion. When the logical input state rho and reference state sigma
+/// commute, Petz is entanglement-fidelity optimal iff
+/// [M_sigma, gamma tensor T] = 0, where
+/// gamma = sigma^(-1/2) rho and
+/// T = Tr_L[(gamma^dagger tensor I) sqrt(M_sigma)].
+///
+/// Here rho = sigma = I/2, so gamma = I/sqrt(2). The QEC matrix M_sigma
+/// is built from the two channel Kraus operators K_b' for M -> A=E tensor R:
+/// M[(i,k),(j,l)] = (1/2) <i|K_k^dagger K_l|j>.
+/// The diagnostic computes the commutator directly. It does not infer
+/// optimality from a high Petz fidelity or from a comparison against a
+/// constant-output decoder.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HaydenPreskillPetzOptimalitySample {
+    pub seed: u64,
+    pub qec_matrix_trace_residual: f64,
+    pub qec_matrix_hermiticity_residual: f64,
+    pub qec_matrix_inverse_sqrt_residual: f64,
+    pub auxiliary_t_hermiticity_residual: f64,
+    /// Frobenius norm ||[M_sigma, gamma tensor T]||_F.
+    pub petz_optimality_commutator_frobenius: f64,
+    pub petz_is_entanglement_fidelity_optimal: bool,
+}
+
+/// Evaluate the 2025 PRL necessary-and-sufficient Petz optimality criterion
+/// for a seeded four-qubit Hayden-Preskill scrambler and maximally-mixed input.
+pub fn simulate_small_hayden_preskill_petz_optimality(
+    seed: u64,
+    tolerance: f64,
+) -> Result<HaydenPreskillPetzOptimalitySample, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    let mut rng = ChaCha20Rng::seed_from_u64(seed);
+    let scrambler = haar_unitary_4(&mut rng)?;
+    diagnose_hayden_preskill_petz_optimality(&scrambler, seed, tolerance)
+}
+
+/// Seeded ensemble statistics for the exact Petz-optimality commutator test.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HaydenPreskillPetzOptimalitySummary {
+    pub sample_count: usize,
+    pub first_seed: u64,
+    pub mean_commutator_frobenius: f64,
+    pub standard_error_commutator_frobenius: f64,
+    pub maximum_commutator_frobenius: f64,
+    pub maximum_qec_matrix_inverse_sqrt_residual: f64,
+    pub all_samples_petz_optimal: bool,
+}
+
+/// Test the criterion over independent Haar U(4) scramblers.
+pub fn sample_small_hayden_preskill_petz_optimality_ensemble(
+    sample_count: usize,
+    first_seed: u64,
+    tolerance: f64,
+) -> Result<HaydenPreskillPetzOptimalitySummary, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    if sample_count < 2 {
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(
+            sample_count,
+        ));
+    }
+    let mut mean = 0.0;
+    let mut m2 = 0.0;
+    let mut maximum_commutator: f64 = 0.0;
+    let mut maximum_inverse_sqrt_residual: f64 = 0.0;
+    let mut all_optimal = true;
+    for sample_index in 0..sample_count {
+        let sample = simulate_small_hayden_preskill_petz_optimality(
+            first_seed.wrapping_add(sample_index as u64),
+            tolerance,
+        )?;
+        let count = (sample_index + 1) as f64;
+        let delta = sample.petz_optimality_commutator_frobenius - mean;
+        mean += delta / count;
+        m2 += delta * (sample.petz_optimality_commutator_frobenius - mean);
+        maximum_commutator =
+            maximum_commutator.max(sample.petz_optimality_commutator_frobenius);
+        maximum_inverse_sqrt_residual =
+            maximum_inverse_sqrt_residual.max(sample.qec_matrix_inverse_sqrt_residual);
+        all_optimal &= sample.petz_is_entanglement_fidelity_optimal;
+    }
+    Ok(HaydenPreskillPetzOptimalitySummary {
+        sample_count,
+        first_seed,
+        mean_commutator_frobenius: mean,
+        standard_error_commutator_frobenius: (
+            m2 / (sample_count - 1) as f64 / sample_count as f64
+        ).sqrt(),
+        maximum_commutator_frobenius: maximum_commutator,
+        maximum_qec_matrix_inverse_sqrt_residual: maximum_inverse_sqrt_residual,
+        all_samples_petz_optimal: all_optimal,
+    })
+}
+
+fn diagnose_hayden_preskill_petz_optimality(
+    scrambler: &[[Complex64; 4]; 4],
+    seed: u64,
+    tolerance: f64,
+) -> Result<HaydenPreskillPetzOptimalitySample, QuantumInformationError> {
+    let inverse_sqrt_two = 1.0 / 2.0_f64.sqrt();
+    let mut channel_kraus = [[Complex64::new(0.0, 0.0); 8]; 2];
+    for (b_prime, kraus) in channel_kraus.iter_mut().enumerate() {
+        for emitted in 0..2 {
+            for early_radiation in 0..2 {
+                let accessible = (emitted << 1) | early_radiation;
+                for message in 0..2 {
+                    let input = (message << 1) | early_radiation;
+                    let output = (emitted << 1) | b_prime;
+                    kraus[accessible * 2 + message] =
+                        scrambler[output][input] * inverse_sqrt_two;
+                }
+            }
+        }
+    }
+
+    // M_sigma[(i,k),(j,l)] = <i|sqrt(sigma) K_k^dagger K_l sqrt(sigma)|j>,
+    // with sigma=I/2. The factor 1/2 comes from the two square-root factors.
+    let mut qec_matrix = [Complex64::new(0.0, 0.0); 16];
+    for logical_row in 0..2 {
+        for environment_row in 0..2 {
+            for logical_column in 0..2 {
+                for environment_column in 0..2 {
+                    let mut contraction = Complex64::new(0.0, 0.0);
+                    for accessible in 0..4 {
+                        contraction += channel_kraus[environment_row]
+                            [accessible * 2 + logical_row]
+                            .conj()
+                            * channel_kraus[environment_column]
+                                [accessible * 2 + logical_column];
+                    }
+                    let row = logical_row * 2 + environment_row;
+                    let column = logical_column * 2 + environment_column;
+                    qec_matrix[row * 4 + column] = contraction * 0.5;
+                }
+            }
+        }
+    }
+
+    let mut qec_matrix_trace = 0.0;
+    let mut qec_matrix_hermiticity_residual: f64 = 0.0;
+    for row in 0..4 {
+        qec_matrix_trace += qec_matrix[row * 4 + row].re;
+        for column in 0..4 {
+            qec_matrix_hermiticity_residual = qec_matrix_hermiticity_residual.max(
+                (qec_matrix[row * 4 + column]
+                    - qec_matrix[column * 4 + row].conj())
+                .norm(),
+            );
+        }
+    }
+    if !qec_matrix_trace.is_finite()
+        || (qec_matrix_trace - 1.0).abs() > tolerance * 10.0
+        || qec_matrix_hermiticity_residual > tolerance * 10.0
+    {
+        return Err(QuantumInformationError::NonHermitian {
+            residual: qec_matrix_hermiticity_residual.max((qec_matrix_trace - 1.0).abs()),
+            tolerance: tolerance * 10.0,
+        });
+    }
+
+    let (inverse_sqrt_qec, qec_matrix_inverse_sqrt_residual) =
+        complex_hermitian_inverse_sqrt_4(qec_matrix, tolerance)?;
+    // For positive-definite M, sqrt(M) = M * M^(-1/2).
+    let sqrt_qec = complex_matrix4_multiply(&qec_matrix, &inverse_sqrt_qec);
+
+    // gamma = sigma^(-1/2) rho = I/sqrt(2), and
+    // T = Tr_L[(gamma^dagger tensor I) sqrt(M)].
+    let mut auxiliary_t = [Complex64::new(0.0, 0.0); 4];
+    for environment_row in 0..2 {
+        for environment_column in 0..2 {
+            let mut partial_trace = Complex64::new(0.0, 0.0);
+            for logical in 0..2 {
+                let row = logical * 2 + environment_row;
+                let column = logical * 2 + environment_column;
+                partial_trace += sqrt_qec[row * 4 + column];
+            }
+            auxiliary_t[environment_row * 2 + environment_column] =
+                partial_trace * inverse_sqrt_two;
+        }
+    }
+    let mut auxiliary_t_hermiticity_residual: f64 = 0.0;
+    for row in 0..2 {
+        for column in 0..2 {
+            auxiliary_t_hermiticity_residual = auxiliary_t_hermiticity_residual.max(
+                (auxiliary_t[row * 2 + column]
+                    - auxiliary_t[column * 2 + row].conj())
+                .norm(),
+            );
+        }
+    }
+    if auxiliary_t_hermiticity_residual > tolerance * 100.0 {
+        return Err(QuantumInformationError::NonHermitian {
+            residual: auxiliary_t_hermiticity_residual,
+            tolerance: tolerance * 100.0,
+        });
+    }
+
+    // gamma tensor T is (I/sqrt(2)) tensor T because gamma is scalar identity.
+    let mut gamma_tensor_t = [Complex64::new(0.0, 0.0); 16];
+    for logical_row in 0..2 {
+        for environment_row in 0..2 {
+            for logical_column in 0..2 {
+                for environment_column in 0..2 {
+                    if logical_row == logical_column {
+                        let row = logical_row * 2 + environment_row;
+                        let column = logical_column * 2 + environment_column;
+                        gamma_tensor_t[row * 4 + column] =
+                            auxiliary_t[environment_row * 2 + environment_column]
+                                * inverse_sqrt_two;
+                    }
+                }
+            }
+        }
+    }
+    let left = complex_matrix4_multiply(&qec_matrix, &gamma_tensor_t);
+    let right = complex_matrix4_multiply(&gamma_tensor_t, &qec_matrix);
+    let mut commutator_squared = 0.0;
+    for index in 0..16 {
+        commutator_squared += (left[index] - right[index]).norm_sqr();
+    }
+    let petz_optimality_commutator_frobenius = commutator_squared.sqrt();
+    if !petz_optimality_commutator_frobenius.is_finite() {
+        return Err(QuantumInformationError::NonFiniteState { index: 16 });
+    }
+
+    Ok(HaydenPreskillPetzOptimalitySample {
+        seed,
+        qec_matrix_trace_residual: (qec_matrix_trace - 1.0).abs(),
+        qec_matrix_hermiticity_residual,
+        qec_matrix_inverse_sqrt_residual,
+        auxiliary_t_hermiticity_residual,
+        petz_optimality_commutator_frobenius,
+        petz_is_entanglement_fidelity_optimal:
+            petz_optimality_commutator_frobenius <= tolerance * 100.0,
+    })
+}
+
 type ComplexMatrix4 = [Complex64; 16];
 
 fn complex_matrix4_identity() -> ComplexMatrix4 {
