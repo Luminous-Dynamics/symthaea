@@ -1,0 +1,16 @@
+[package]
+name = "airroad-dc-dynamic-stability"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Standalone analytical reference for a Thevenin source and constant-power DC load"
+
+[lib]
+path = "src/lib.rs"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "warn"
+pedantic = "warn"
