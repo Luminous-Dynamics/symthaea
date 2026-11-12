@@ -21,6 +21,7 @@ on:
       - "research/melothaea-midi-meter-parse-v1"
       - "research/melothaea-measure-phase-eval-v1"
       - "research/melothaea-beat-grid-eval-v1"
+      - "research/melothaea-beat-legacy-metrics-v1"
     paths:
       - "crates/domains/symthaea-muse/src/midi_performance.rs"
       - "crates/domains/symthaea-muse/src/transcription_eval.rs"
