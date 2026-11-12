@@ -351,11 +351,24 @@ fn audit(case: &Case) -> AuditReport {
                     .any(|source| {
                         let base = baseline_sources.get(source).expect("complete source inventory checked");
                         let cand = candidate_sources.get(source).expect("complete source inventory checked");
+                        let observed_delta = (base.measured_value - cand.measured_value).abs();
                         base.state != cand.state
-                            || (base.measured_value - cand.measured_value).abs()
-                                + base.expanded_uncertainty
-                                + cand.expanded_uncertainty
+                            || observed_delta
+                                - base.expanded_uncertainty
+                                - cand.expanded_uncertainty
                                 > base.equivalence_tolerance
+                    });
+                let non_target_stability_unresolved = expected_sources
+                    .iter()
+                    .filter(|source| **source != case.target_source)
+                    .any(|source| {
+                        let base = baseline_sources.get(source).expect("complete source inventory checked");
+                        let cand = candidate_sources.get(source).expect("complete source inventory checked");
+                        let observed_delta = (base.measured_value - cand.measured_value).abs();
+                        observed_delta
+                            + base.expanded_uncertainty
+                            + cand.expanded_uncertainty
+                            > base.equivalence_tolerance
                     });
                 let target_change_resolved =
                     (target_baseline.measured_value - target_candidate.measured_value).abs()
@@ -366,8 +379,11 @@ fn audit(case: &Case) -> AuditReport {
                     reasons.push("one or more source-state observable identities, units or predeclared equivalence tolerances changed between baseline and candidate".to_string());
                     identifiability = "INCOMPARABLE";
                 } else if non_target_changed {
-                    reasons.push("at least one non-target source state changed between baseline and candidate".to_string());
+                    reasons.push("at least one non-target source state is demonstrably outside its predeclared equivalence tolerance".to_string());
                     identifiability = "INCOMPARABLE";
+                } else if non_target_stability_unresolved {
+                    reasons.push("expanded uncertainty does not establish that every non-target source remained within its predeclared equivalence tolerance".to_string());
+                    identifiability = "INCOMPLETE";
                 } else if !case.unobserved_sources.is_empty() {
                     reasons.push("unobserved source contributors remain in the acoustic mixture".to_string());
                     identifiability = "UNRESOLVED_MIXTURE";
@@ -637,6 +653,17 @@ mod tests {
             .unwrap();
         auxiliary.measured_value += 0.20;
         assert_eq!(audit(&input).disposition, "INCOMPARABLE");
+    }
+
+    #[test]
+    fn non_target_observable_uncertainty_crossing_equivalence_limit_is_incomplete() {
+        let mut input = case();
+        make_measured(&mut input);
+        let auxiliary = input.candidate.source_states.iter_mut()
+            .find(|state| state.source == SourceKind::AuxiliaryMachinery)
+            .unwrap();
+        auxiliary.measured_value += 0.04;
+        assert_eq!(audit(&input).disposition, "INCOMPLETE");
     }
 
     #[test]
