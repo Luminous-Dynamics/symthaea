@@ -442,6 +442,9 @@ struct Candidate {
     /// Present only when FluidSynth produced a local artifact-bound receipt.
     /// Native rendering is not yet instrumented at the synthesizer schedule boundary.
     render_receipt: Option<symthaea_muse::renderer_execution_receipt::RendererExecutionReceipt>,
+    /// Local child-process evidence for a FluidSynth attempt, including failed
+    /// attempts; independent from the successful-output receipt.
+    render_invocation_observation: Option<symthaea_muse::renderer_execution_receipt::RendererProcessObservation>,
     state: symthaea_muse::MusicalState,
     seed: u64,
     renderer: &'static str,
@@ -487,8 +490,11 @@ struct Candidate {
 }
 
 struct FluidCandidateRender {
-    wav_bytes: Vec<u8>,
-    receipt: symthaea_muse::renderer_execution_receipt::RendererExecutionReceipt,
+    /// Present only when rendering and receipt verification both succeeded.
+    wav_bytes: Option<Vec<u8>>,
+    receipt: Option<symthaea_muse::renderer_execution_receipt::RendererExecutionReceipt>,
+    /// Retained even when the child failed or its output was rejected.
+    process_observation: symthaea_muse::renderer_execution_receipt::RendererProcessObservation,
 }
 
 struct Studio {
@@ -1016,6 +1022,7 @@ async fn main() {
         .route("/api/harmony/{id}", get(harmony_summary))
         .route("/api/piece/{id}/listen-bundle", get(listen_bundle))
         .route("/api/piece/{id}/render-receipt", get(render_execution_receipt))
+        .route("/api/piece/{id}/render-invocation", get(render_invocation_observation))
         .route("/api/motifs/{id}", get(motifs_summary))
         .route(
             "/api/piece/{id}/performance-bundle",
@@ -1382,14 +1389,27 @@ async fn cognitive_sonata_return(
     })
     .await
     .map_err(internal)?;
-    let renderer = if fluid_wav.is_some() {
-        "fluidsynth"
-    } else {
-        "native"
-    };
-    let (wav, render_receipt) = match fluid_wav {
-        Some(render) => (render.wav_bytes, Some(render.receipt)),
-        None => (wav_bytes(&composition.audio).map_err(internal)?, None),
+    let (renderer, wav, render_receipt, render_invocation_observation) = match fluid_wav {
+        Some(render) => match (render.wav_bytes, render.receipt) {
+            (Some(wav), Some(receipt)) => (
+                "fluidsynth",
+                wav,
+                Some(receipt),
+                Some(render.process_observation),
+            ),
+            _ => (
+                "native",
+                wav_bytes(&composition.audio).map_err(internal)?,
+                None,
+                Some(render.process_observation),
+            ),
+        },
+        None => (
+            "native",
+            wav_bytes(&composition.audio).map_err(internal)?,
+            None,
+            None,
+        ),
     };
 
     let mut renderer_recipe = RendererRecipe::new(
@@ -1504,6 +1524,7 @@ async fn cognitive_sonata_return(
                 score: selected.score,
                 spec,
                 render_receipt,
+                render_invocation_observation,
                 state,
                 seed: intent.seed,
                 renderer,
@@ -2023,14 +2044,27 @@ async fn compose(
             let id = studio.next_id.fetch_add(1, Ordering::Relaxed);
             let fingerprint = symthaea_music_theory::fingerprint::exact_fingerprint(&score);
             let duplicate_of = mark_duplicate(&mut seen_fingerprints, fingerprint, id);
-            let renderer = if fluid_wav.is_some() {
-                "fluidsynth"
-            } else {
-                "native"
-            };
-            let (wav, render_receipt) = match fluid_wav {
-                Some(render) => (render.wav_bytes, Some(render.receipt)),
-                None => (wav_bytes(&comp.audio).map_err(internal)?, None),
+            let (renderer, wav, render_receipt, render_invocation_observation) = match fluid_wav {
+                Some(render) => match (render.wav_bytes, render.receipt) {
+                    (Some(wav), Some(receipt)) => (
+                        "fluidsynth",
+                        wav,
+                        Some(receipt),
+                        Some(render.process_observation),
+                    ),
+                    _ => (
+                        "native",
+                        wav_bytes(&comp.audio).map_err(internal)?,
+                        None,
+                        Some(render.process_observation),
+                    ),
+                },
+                None => (
+                    "native",
+                    wav_bytes(&comp.audio).map_err(internal)?,
+                    None,
+                    None,
+                ),
             };
             let analysis = symthaea_music_theory::musical_phi(&score);
             let (phi, local_coherence, global_coherence) = (
@@ -2146,6 +2180,7 @@ async fn compose(
                     score,
                     spec: cand_spec,
                     render_receipt: render_receipt.clone(),
+                    render_invocation_observation: render_invocation_observation.clone(),
                     state: state_used.clone(),
                     seed,
                     renderer,
@@ -2713,55 +2748,32 @@ fn fluidsynth_candidate_wav(
         RendererBackend, RendererExecutionReceipt, RendererProcessObservation,
         RendererReceiptInputs, sha256_hex, summarize_wav,
     };
+
     let path = fluidsynth_candidate_midi_path(seed);
     let result = (|| -> Option<FluidCandidateRender> {
         symthaea_muse::midi_export::export_performance_midi(score, spec, seed, state, &path).ok()?;
         let midi_bytes = std::fs::read(&path).ok()?;
-        // The state sliders stay authoritative; the piece's performance dialect only
-        // shifts the room for the selected rendering style.
         let dialect = symthaea_muse::theory_realize::dialect_for_spec(spec);
         let color = symthaea_muse::fluid_render::room_for_dialect(
             symthaea_muse::fluid_render::RenderColor::from_state(state),
             dialect,
         );
+
         let invocation =
             symthaea_muse::fluid_render::render_midi_to_wav_observed(
                 &path,
                 SAMPLE_RATE,
                 Some(color),
             )?;
-        // Keep the original MIDI artifact bound to the renderer input and reject
-        // an observed mutation during the child-process window.
-        let midi_bytes_after = std::fs::read(&path).ok()?;
-        if sha256_hex(&midi_bytes_after) != sha256_hex(&midi_bytes) {
-            return None;
-        }
-        let midi_sha256 = sha256_hex(&midi_bytes);
-        if invocation.exit_code != Some(0)
-            || invocation.spawn_error.is_some()
-            || invocation.executable_sha256_before != invocation.executable_sha256_after
-            || invocation.soundfont_sha256_before != invocation.soundfont_sha256_after
-            || invocation.midi_sha256_before != midi_sha256
-            || invocation.midi_sha256_after != midi_sha256
-        {
-            eprintln!(
-                "FluidSynth invocation rejected: exit={:?}, spawn_error={:?}, stderr={}",
-                invocation.exit_code,
-                invocation.spawn_error,
-                invocation.stderr_preview
-            );
-            return None;
-        }
-        let wav_bytes = invocation.mastered_wav_bytes.as_ref()?.clone();
-        let executable_sha256 = invocation.executable_sha256_after.as_str();
-        let soundfont_sha256 = invocation.soundfont_sha256_after.as_str();
-        let executable_path = invocation.executable_path.to_str()?.to_owned();
-        let soundfont_path = invocation.soundfont_path.to_str()?.to_owned();
+
+        // Preserve process evidence independently from whether its audio output
+        // can be used. A failed FluidSynth attempt remains visible even when
+        // the user receives the disclosed NativeMuse fallback.
         let process_observation = RendererProcessObservation {
-            executable_path,
+            executable_path: invocation.executable_path.to_str()?.to_owned(),
             executable_sha256_before: invocation.executable_sha256_before.clone(),
             executable_sha256_after: invocation.executable_sha256_after.clone(),
-            soundfont_path,
+            soundfont_path: invocation.soundfont_path.to_str()?.to_owned(),
             soundfont_sha256_before: invocation.soundfont_sha256_before.clone(),
             soundfont_sha256_after: invocation.soundfont_sha256_after.clone(),
             midi_path: invocation.midi_path.to_str()?.to_owned(),
@@ -2775,15 +2787,63 @@ fn fluidsynth_candidate_wav(
             stderr_preview: invocation.stderr_preview.clone(),
             stdout_truncated: invocation.stdout_truncated,
             stderr_truncated: invocation.stderr_truncated,
-            exit_code: invocation.exit_code?,
+            exit_code: invocation.exit_code,
+            spawn_error: invocation.spawn_error.clone(),
+            mastered_wav_sha256: invocation.mastered_wav_sha256.clone(),
         };
-        let score_bytes = serde_json::to_vec(score).ok()?;
+
+        let midi_bytes_after = std::fs::read(&path).ok()?;
+        let expected_midi_sha256 = sha256_hex(&midi_bytes);
+        let input_stable = sha256_hex(&midi_bytes_after) == expected_midi_sha256
+            && invocation.midi_sha256_before == expected_midi_sha256
+            && invocation.midi_sha256_after == expected_midi_sha256;
+        let Some(wav_bytes) = invocation.mastered_wav_bytes.clone() else {
+            return Some(FluidCandidateRender {
+                wav_bytes: None,
+                receipt: None,
+                process_observation,
+            });
+        };
+
+        let output_sha256 = sha256_hex(&wav_bytes);
+        let invocation_verified = input_stable
+            && invocation.exit_code == Some(0)
+            && invocation.spawn_error.is_none()
+            && invocation.executable_sha256_before == invocation.executable_sha256_after
+            && invocation.soundfont_sha256_before == invocation.soundfont_sha256_after
+            && process_observation.mastered_wav_sha256.as_deref() == Some(output_sha256.as_str());
+        if !invocation_verified {
+            return Some(FluidCandidateRender {
+                wav_bytes: None,
+                receipt: None,
+                process_observation,
+            });
+        }
+
+        let score_bytes = match serde_json::to_vec(score) {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                return Some(FluidCandidateRender {
+                    wav_bytes: None,
+                    receipt: None,
+                    process_observation,
+                });
+            }
+        };
         let score_sha256 = sha256_hex(&score_bytes);
-        let audio_summary = summarize_wav(&wav_bytes).ok()?;
+        let audio_summary = match summarize_wav(&wav_bytes) {
+            Ok(summary) => summary,
+            Err(_) => {
+                return Some(FluidCandidateRender {
+                    wav_bytes: None,
+                    receipt: None,
+                    process_observation,
+                });
+            }
+        };
 
         // Map lineage only when complete coverage and exact primary pitches
-        // verify. A failed map stays absent in the receipt; it does not
-        // discard otherwise valid output or claim preservation.
+        // verify. A failed map stays absent; it never claims preservation.
         let map_sha256 = PerformedEventMap::from_midi_bytes(
             &midi_bytes,
             &score_sha256,
@@ -2806,7 +2866,7 @@ fn fluidsynth_candidate_wav(
             .map(|()| map.receipt_sha256)
         });
 
-        let render_config_bytes = serde_json::to_vec(&serde_json::json!({
+        let render_config_bytes = match serde_json::to_vec(&serde_json::json!({
             "config_version": "muse-fluidsynth-render-config-v2",
             "renderer_path": &process_observation.executable_path,
             "soundfont_path": &process_observation.soundfont_path,
@@ -2827,23 +2887,46 @@ fn fluidsynth_candidate_wav(
             "seed": seed,
             "spec": spec,
             "state": state,
-        })).ok()?;
+        })) {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                return Some(FluidCandidateRender {
+                    wav_bytes: None,
+                    receipt: None,
+                    process_observation,
+                });
+            }
+        };
         let render_id = format!("muse-fluid-{}", unique_temp_suffix());
-        let receipt = RendererExecutionReceipt::from_successful_render(RendererReceiptInputs {
+        let receipt = match RendererExecutionReceipt::from_successful_render(RendererReceiptInputs {
             render_id: &render_id,
             backend: RendererBackend::FluidSynth,
             score_bytes: &score_bytes,
             render_config_bytes: &render_config_bytes,
             input_midi_bytes: Some(&midi_bytes),
             performed_schedule_bytes: None,
-            renderer_executable_sha256: Some(executable_sha256),
-            soundfont_sha256: Some(soundfont_sha256),
-            process_exit_code: Some(process_observation.exit_code),
-            process_observation: Some(process_observation),
+            renderer_executable_sha256: Some(&process_observation.executable_sha256_after),
+            soundfont_sha256: Some(&process_observation.soundfont_sha256_after),
+            process_exit_code: process_observation.exit_code,
+            process_observation: Some(process_observation.clone()),
             performed_event_map_sha256: map_sha256.as_deref(),
             output_wav_bytes: &wav_bytes,
-        }).ok()?;
-        Some(FluidCandidateRender { wav_bytes, receipt })
+        }) {
+            Ok(receipt) => receipt,
+            Err(_) => {
+                return Some(FluidCandidateRender {
+                    wav_bytes: None,
+                    receipt: None,
+                    process_observation,
+                });
+            }
+        };
+
+        Some(FluidCandidateRender {
+            wav_bytes: Some(wav_bytes),
+            receipt: Some(receipt),
+            process_observation,
+        })
     })();
     let _ = std::fs::remove_file(&path);
     result
@@ -4452,6 +4535,21 @@ async fn render_execution_receipt(
         candidate.render_receipt.clone().ok_or(StatusCode::NOT_FOUND)?
     };
     Ok(Json(receipt))
+}
+
+async fn render_invocation_observation(
+    State(studio): State<Arc<Studio>>,
+    AxPath(id): AxPath<u64>,
+) -> Result<Json<symthaea_muse::renderer_execution_receipt::RendererProcessObservation>, StatusCode> {
+    let observation = {
+        let store = studio.candidates.lock().unwrap();
+        let candidate = store.get(&id).ok_or(StatusCode::NOT_FOUND)?;
+        candidate
+            .render_invocation_observation
+            .clone()
+            .ok_or(StatusCode::NOT_FOUND)?
+    };
+    Ok(Json(observation))
 }
 
 async fn listen_bundle(
