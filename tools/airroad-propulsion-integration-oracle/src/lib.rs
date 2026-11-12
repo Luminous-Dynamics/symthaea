@@ -5,10 +5,11 @@
 //! oracles. This crate qualifies software hand-offs only; it is not a physical
 //! motor, battery, thermal, aircraft, safety, or certification model.
 //!
-//! Observation torque/RPM bounds are preserved in the report, but this version
-//! does not combine those coordinate bounds into the DC-demand scenarios. The
-//! adverse/nominal/favourable drive scenarios vary the motor-map efficiency
-//! bound only; a later increment must propagate the full operating-point set.
+//! Observation torque/RPM bounds are propagated through the map by querying
+//! the four corners of their uncertainty rectangle. This is valid only while
+//! all corners remain in the same bilinear map cell; cell-crossing intervals
+//! fail closed. Other drivetrain and mission-demand uncertainties are outside
+//! this fixture's propagated envelope.
 
 #![forbid(unsafe_code)]
 
@@ -47,6 +48,7 @@ pub enum IntegrationError {
     Map(MapError),
     Drive(DriveError),
     Ledger(LedgerError),
+    UncertaintyEnvelopeCrossesMapCell,
 }
 
 impl fmt::Display for IntegrationError {
@@ -149,6 +151,50 @@ fn channel(
     }
 }
 
+/// Conservative map-efficiency bounds over the observed torque/RPM rectangle.
+///
+/// Within one bilinear map cell, the interpolated efficiency and linearly
+/// interpolated nodal uncertainty attain their rectangle extrema at corners.
+/// If any corner enters another cell, this adapter refuses to claim that the
+/// four-corner envelope is sufficient; the interval must first be partitioned
+/// at map grid lines.
+fn map_efficiency_bounds_over_observation_interval(
+    map: &EfficiencyMap2D,
+    observation: &MotorMapOperatingPoint,
+    nominal: &MapLookup,
+) -> Result<(f64, f64), IntegrationError> {
+    let torque_bounds = [
+        observation.torque_value_nm - observation.torque_absolute_uncertainty_nm,
+        observation.torque_value_nm + observation.torque_absolute_uncertainty_nm,
+    ];
+    let speed_bounds = [
+        observation.speed_value_rpm - observation.speed_absolute_uncertainty_rpm,
+        observation.speed_value_rpm + observation.speed_absolute_uncertainty_rpm,
+    ];
+    let mut lower_bound = f64::INFINITY;
+    let mut upper_bound = f64::NEG_INFINITY;
+
+    for torque in torque_bounds {
+        for speed in speed_bounds {
+            let corner = map.lookup(MapQuery {
+                configuration_digest: &observation.configuration_digest,
+                context_digest: &observation.context_digest,
+                motor_torque_nm: torque,
+                motor_speed_rpm: speed,
+            })?;
+            if corner.torque_cell_lower_index != nominal.torque_cell_lower_index
+                || corner.speed_cell_lower_index != nominal.speed_cell_lower_index
+            {
+                return Err(IntegrationError::UncertaintyEnvelopeCrossesMapCell);
+            }
+            lower_bound = lower_bound.min(corner.efficiency_lower_bound);
+            upper_bound = upper_bound.max(corner.efficiency_upper_bound);
+        }
+    }
+
+    Ok((lower_bound, upper_bound))
+}
+
 fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationError> {
     // Frozen reference: 10 kW at the rotor shaft and 3,000 rotor RPM.
     let rotor_speed_rpm = 3_000.0;
@@ -190,14 +236,14 @@ fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationErro
             MeasurementQuantity::Torque,
             MeasurementUnit::NewtonMetre,
             expected_motor_point.motor_shaft_output_torque_nm,
-            0.001,
+            0.01,
         ),
         channel(
             "motor-speed",
             MeasurementQuantity::RotationalSpeed,
             MeasurementUnit::RevolutionsPerMinute,
             expected_motor_point.motor_speed_rpm,
-            0.05,
+            0.5,
         ),
     ];
     let synchronized = synchronize_at(
@@ -225,10 +271,21 @@ fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationErro
         vec![speed * 0.5, speed * 1.5],
         vec![
             MapNode {
+                efficiency: 0.94,
+                absolute_uncertainty_bound: 0.002,
+            },
+            MapNode {
+                efficiency: 0.96,
+                absolute_uncertainty_bound: 0.003,
+            },
+            MapNode {
                 efficiency: 0.95,
                 absolute_uncertainty_bound: 0.004,
-            };
-            4
+            },
+            MapNode {
+                efficiency: 0.98,
+                absolute_uncertainty_bound: 0.005,
+            },
         ],
         0.001,
     )?;
@@ -238,6 +295,8 @@ fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationErro
         motor_torque_nm: torque,
         motor_speed_rpm: speed,
     })?;
+    let (efficiency_lower_bound, efficiency_upper_bound) =
+        map_efficiency_bounds_over_observation_interval(&map, &observation, &map_lookup)?;
 
     // Explicit adapter between independently versioned map and drive oracles.
     let evidence = MotorEfficiencyEvidence {
@@ -252,9 +311,9 @@ fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationErro
         evidence_manifest_digest: map_lookup.evidence_manifest_digest.clone(),
         motor_torque_nm: map_lookup.motor_torque_nm,
         motor_speed_rpm: map_lookup.motor_speed_rpm,
-        efficiency_lower_bound: map_lookup.efficiency_lower_bound,
+        efficiency_lower_bound,
         efficiency_nominal: map_lookup.efficiency,
-        efficiency_upper_bound: map_lookup.efficiency_upper_bound,
+        efficiency_upper_bound,
     };
     let drive_config = DriveConfig {
         transmission_efficiency,
@@ -533,6 +592,67 @@ mod tests {
     }
 
     #[test]
+    fn measurement_coordinate_uncertainty_widens_the_drive_efficiency_envelope() {
+        let report = run_synthetic_fixture().unwrap();
+        assert!(
+            report.drive_envelope.efficiency_lower_bound
+                < report.map_lookup.efficiency_lower_bound
+        );
+        assert!(
+            report.drive_envelope.efficiency_upper_bound
+                > report.map_lookup.efficiency_upper_bound
+        );
+        assert!(report.motor_observation.torque_absolute_uncertainty_nm > 0.0);
+        assert!(report.motor_observation.speed_absolute_uncertainty_rpm > 0.0);
+    }
+
+    #[test]
+    fn uncertainty_rectangle_crossing_a_map_cell_fails_closed() {
+        let core = build_core(100_000.0).unwrap();
+        let torque = core.observation.torque_value_nm;
+        let speed = core.observation.speed_value_rpm;
+        let torque_lower = torque - core.observation.torque_absolute_uncertainty_nm;
+        let torque_upper = torque + core.observation.torque_absolute_uncertainty_nm;
+        let speed_lower = speed - core.observation.speed_absolute_uncertainty_rpm;
+        let speed_upper = speed + core.observation.speed_absolute_uncertainty_rpm;
+        let crossing_map = EfficiencyMap2D::new(
+            "synthetic-crossing-map",
+            "synthetic-crossing-map-digest",
+            CONFIGURATION_DIGEST,
+            CONTEXT_DIGEST,
+            EVIDENCE_MANIFEST_DIGEST,
+            vec![torque_lower, torque, torque_upper],
+            vec![speed_lower, speed_upper],
+            vec![
+                MapNode {
+                    efficiency: 0.95,
+                    absolute_uncertainty_bound: 0.001,
+                };
+                6
+            ],
+            0.0,
+        )
+        .unwrap();
+        let nominal = crossing_map
+            .lookup(MapQuery {
+                configuration_digest: CONFIGURATION_DIGEST,
+                context_digest: CONTEXT_DIGEST,
+                motor_torque_nm: torque,
+                motor_speed_rpm: speed,
+            })
+            .unwrap();
+
+        assert!(matches!(
+            map_efficiency_bounds_over_observation_interval(
+                &crossing_map,
+                &core.observation,
+                &nominal
+            ),
+            Err(IntegrationError::UncertaintyEnvelopeCrossesMapCell)
+        ));
+    }
+
+    #[test]
     fn drive_consumer_rejects_mismatched_configuration_before_evaluation() {
         let core = build_core(100_000.0).unwrap();
         let result = evaluate_drive_with_map_evidence(
@@ -555,7 +675,7 @@ mod tests {
     fn adverse_map_scenario_failure_is_not_hidden_by_nominal_feasibility() {
         // The 0.5% absolute efficiency bound makes adverse demand exceed this
         // limit while nominal and favourable demand remain below it.
-        let core = build_core(11_960.0).unwrap();
+        let core = build_core(11_880.0).unwrap();
         assert!(matches!(
             core.drive_envelope.adverse_efficiency_scenario,
             Err(DriveError::DcBusPowerLimitExceeded { .. })
