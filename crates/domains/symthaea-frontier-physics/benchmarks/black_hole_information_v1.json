@@ -368,7 +368,9 @@
           "ballistic": "z approximately 1",
           "kpz_like_superdiffusive": "z approximately 1.5",
           "classification_rule": "Only name a regime when confidence intervals and cross-size stability distinguish candidate exponents; otherwise report unresolved/anomalous."
-        }
+        },
+        "minimum_r_squared_for_universality_label": 0.9,
+        "universality_classification": "Require R-squared >=0.90, z intervals and finite-size stability over at least three largest N values; otherwise report effective finite-size z and unresolved classification."
       },
       "implementation": {
         "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
@@ -383,7 +385,9 @@
         "dynamic_scaling_fit": "log(mean per-seed gradient-width second moment) versus log(layer); z=2/slope"
       },
       "claim_ceiling": "A finite closed U(1)-conserving qubit-chain transport/scrambling benchmark. Not a black-hole evaporation model, a gravitational Page curve, a QES/island calculation or a recovery decoder.",
-      "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/u1_domain_wall_dynamic_scaling_v1.json"
+      "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/u1_domain_wall_dynamic_scaling_v1.json",
+      "exploratory_pilot_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/u1_domain_wall_dynamic_scaling_v1.json",
+      "exploratory_pilot_interpretation": "An independent 8-seed NumPy pilot for N=6,8,10,12 has low R-squared and wide, size-drifting z estimates; it fails the proposed 0.90 regime-label gate. This is explicitly non-confirmatory and not Rust output."
     },
     {
       "id": "QI-3O",
