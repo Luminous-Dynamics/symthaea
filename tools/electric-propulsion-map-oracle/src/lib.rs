@@ -13,7 +13,7 @@
 
 use std::fmt;
 
-pub const MODEL_VERSION: &str = "electric-propulsion-map-oracle-v0.2.0";
+pub const MODEL_VERSION: &str = "electric-propulsion-map-oracle-v0.3.0";
 
 /// One measured or otherwise evidence-qualified map node.
 ///
