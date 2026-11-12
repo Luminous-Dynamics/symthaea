@@ -191,6 +191,28 @@ cargo run -p xtask -- planetary-reference-audit
 
 It checks the presence and consistency of source, unit, evidence-class, boundary, caveat and identity metadata. It does not re-run the cited experiments or establish that a source claim is independently true.
 
+
+## 11A. New lunar architecture work opened
+
+The 2 September 2026 npj Space Exploration review adds three concrete comparison lanes:
+- triangular three-face vertical arrays and passive orientation strategies;
+- piezoelectric non-contact dust removal;
+- PV/T with deep-space radiative cooling, CSP with regolith thermal storage, and ORC / closed-Brayton power conversion.
+
+It reports roughly 50% greater overall solar-energy utilization for one cited PV/T configuration and an RFC specific-energy range of 400–1,000 Wh/kg. These are review-reported, source-specific values: the primary study boundaries must be retrieved before matched comparison. In particular, confirm whether the RFC figure includes tanks, insulation, electrolyzer, fuel-cell stack, thermal management, fluids and service life.
+
+The following focused public work items are now open:
+- [LUNAR-VERTICAL-ARRAY-001 #11783](https://github.com/Luminous-Dynamics/symthaea/issues/11783): terrain-aware planar, triangular, vertical mast and distributed array tournament.
+- [LUNAR-THERMAL-SERVICE-001 #11785](https://github.com/Luminous-Dynamics/symthaea/issues/11785): PV/T, radiative cooling, CSP and regolith thermal storage comparison.
+- [LUNAR-POWER-BEAMING-001 #11786](https://github.com/Luminous-Dynamics/symthaea/issues/11786): optical power networks versus cable and local generation.
+
+The NASA 2024 surface laser-power-beaming design study adds a separate distribution comparator: 300 W continuous usable receiver power at up to 10 km, 5-year design life and a landed-mass cap below 625 kg. The study reports 1,595 W optical output, 542 W on the receiver PV array, 300 W usable load power and 242 W to receiver batteries. It is a design study, not an operational lunar link. It explicitly counts intermittent availability due to VSAT shadowing and receiver storage.
+
+Sources:
+- Gao et al. (2026), lunar energy review: https://www.nature.com/articles/s44453-026-00053-w
+- NASA NTRS laser power beaming study: https://ntrs.nasa.gov/citations/20240011011
+- NASA VSAT / RFC / LunaGrid / Harmonia portfolio: https://www.nasa.gov/lunar-surface-technology/
+
 ## 12. Claim ceiling
 
 This document reports current source-defined SOTA, programme designs and research targets as of 12 November 2026. It does not establish that any Luminous design beats these values or is physically feasible. No simulator result, source audit, synthetic case or AI-generated architecture is physical validation or approval. Claims require exact configuration identity, comparable functional boundaries, independent measurement, held-out conditions and reproducible artifacts.
