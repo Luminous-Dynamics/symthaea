@@ -707,12 +707,7 @@ mod tests {
         let high_regret_old_recovery = context(
             "high-regret-old-recovery",
             40,
-            1,
-            800,
-            true,
-            900_000,
-            900_000,
-            500,
+            (1, 800, true, 900_000, 900_000, 500),
         );
         let contexts = vec![low_regret_recent, high_regret_old_recovery];
         let lru = plan_retention(RetentionPolicy::Lru, &request(80, 40), &contexts).unwrap();
