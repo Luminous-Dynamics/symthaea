@@ -4,13 +4,14 @@
   "generated_date": "2026-11-12",
   "claim_ceiling": "SOURCE_REGISTER_ONLY_NO_LUMINOUS_REPRODUCTION_NO_PROCESS_RECIPE_NO_DEVICE_QUALIFICATION",
   "rules": {
-    "contact_angle_is_not_adhesion": false,
     "immediate_bond_result_establishes_bondability_lifetime": false,
     "substrate_property_retention_must_be_application_specific": true,
     "mixed_material_or_adhesive_pairs_are_comparable": false,
     "different_test_standards_are_poolable": false,
     "published_laboratory_metrics_are_complete_wall_plug_system_metrics": false,
-    "luminous_reproduction": false
+    "luminous_reproduction": false,
+    "contact_angle_alone_is_sufficient_for_adhesion_claim": false,
+    "bond_strength_outcome_required_for_adhesion_claim": true
   },
   "evidence_classes": [
     "PUBLISHED_LAB_EXPERIMENT",
