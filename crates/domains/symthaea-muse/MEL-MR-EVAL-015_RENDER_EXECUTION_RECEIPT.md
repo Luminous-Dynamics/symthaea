@@ -32,6 +32,16 @@ The new renderer_execution_receipt.rs module provides:
 - A Studio temp-MIDI path fix: concurrent candidate renders with the same seed no longer derive the same temp filename from process-ID plus seed alone; a per-process monotonic nonce is included. One focused regression test is authored.
 - Seven Unix fake-child tests are authored for successful invocation/argument/allowlist/stream capture; non-zero exit diagnostics; MIDI substitution; SoundFont substitution; successful exit without output; spawn failure caused by a non-executable renderer; and stderr draining beyond the preview limit. These exercise local wrapper classification, not a malicious kernel or host. Three fixture tuple-shape mistakes found during source review have been corrected.
 
+## Focused exact-head qualification workflow (12 November 2026)
+
+Added `.github/workflows/muse-renderer-invocation-evidence.yml`. It checks out the exact PR head, pins Rust 1.96.0 and separately runs:
+- Muse rustfmt check;
+- FluidSynth invocation + receipt-adapter tests;
+- renderer execution receipt parser/tamper tests;
+- Clippy for the Muse library and tests with warnings denied.
+
+The workflow is intentionally independent of the root workspace's full CI matrix. It is triggered by renderer/receipt/Muse manifest changes and also supports manual dispatch. Its result is pending; no Rust validation pass is claimed here.
+
 ## Not implemented yet
 
 - The compatibility FluidSynth API still returns `Option<Vec<u8>>` for legacy callers. Evidence-producing Muse candidate rendering now uses the structured API; non-Muse legacy call sites do not automatically persist invocation observations.
