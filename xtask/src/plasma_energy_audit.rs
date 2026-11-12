@@ -924,7 +924,7 @@ mod tests {
 
     fn minimal_dec_source_case(
         particle_energy_origin: Option<&str>,
-        fusion_born_output_observed: Option<bool>,
+        fusion_born_output_demonstrated: Option<bool>,
     ) -> Value {
         let mut case = serde_json::json!({
             "case_id": "dec-case-1",
@@ -937,8 +937,8 @@ mod tests {
         if let Some(origin) = particle_energy_origin {
             case["particle_energy_origin"] = Value::String(origin.to_owned());
         }
-        if let Some(observed) = fusion_born_output_observed {
-            case["fusion_born_output_observed"] = Value::Bool(observed);
+        if let Some(demonstrated) = fusion_born_output_demonstrated {
+            case["fusion_born_output_demonstrated"] = Value::Bool(demonstrated);
         }
         case
     }
@@ -970,7 +970,7 @@ mod tests {
             Some(true),
         ));
         let error = audit_source_value(&source, "dec-origin.json").unwrap_err();
-        assert!(error.to_string().contains("fusion_born_output_observed=false"));
+        assert!(error.to_string().contains("fusion_born_output_demonstrated=false"));
     }
 
     #[test]
@@ -1130,8 +1130,8 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                 "{display_name}: DEC case {case_id} has an empty particle_energy_origin"
             );
             ensure!(
-                case.get("fusion_born_output_observed").and_then(Value::as_bool) == Some(false),
-                "{display_name}: DEC case {case_id} must explicitly preserve fusion_born_output_observed=false until a source-matched fusion-born output is admitted"
+                case.get("fusion_born_output_demonstrated").and_then(Value::as_bool) == Some(false),
+                "{display_name}: DEC case {case_id} must explicitly preserve fusion_born_output_demonstrated=false until a source-matched fusion-born output is admitted"
             );
             ensure!(
                 case.get("comparison_status").and_then(Value::as_str).is_some(),
