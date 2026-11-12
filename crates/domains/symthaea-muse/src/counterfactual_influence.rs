@@ -28,11 +28,13 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 pub const COUNTERFACTUAL_INFLUENCE_VERSION: &str =
-    "mel-mr-eval-017-counterfactual-influence-v0.1";
+    "mel-mr-eval-017-counterfactual-influence-v0.2";
+pub const INFLUENCE_SUPPORT_POLICY_VERSION: &str =
+    "mel-mr-eval-017-support-policy-v1";
 pub const REPEATABILITY_CALIBRATION_VERSION: &str =
     "mel-mr-eval-017-repeatability-calibration-v0.1";
 const CALIBRATION_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-repeatability-v1\0";
-const INFLUENCE_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-influence-v1\0";
+const INFLUENCE_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-influence-v2\0";
 const MINIMUM_NOOP_RENDERS: usize = 3;
 const MAX_EVENT_ID_BYTES: usize = 256;
 const MAX_ARTIFACT_BYTES: usize = 64 * 1024 * 1024;
@@ -408,6 +410,45 @@ pub struct InfluenceWindowMeasurement {
     pub effect_detected: bool,
 }
 
+/// Versioned policy for turning per-window measurements into a stable support
+/// representation. Raw measured intervals are never changed by this policy.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InfluenceSupportPolicy {
+    pub version: String,
+    /// Release ratio applied to the per-window RMS entry threshold, in (0, 1].
+    pub release_rms_ratio: f32,
+    /// Release ratio applied to the per-window spectral entry threshold, in (0, 1].
+    pub release_spectral_ratio: f32,
+    /// Minimum number of consecutive entry-threshold windows in a channel run.
+    pub minimum_consecutive_entry_windows: usize,
+    /// Explicit profile-specific extension beyond measured support.
+    pub tail_extension_frames: usize,
+}
+
+impl Default for InfluenceSupportPolicy {
+    fn default() -> Self {
+        Self {
+            version: INFLUENCE_SUPPORT_POLICY_VERSION.to_owned(),
+            release_rms_ratio: 0.5,
+            release_spectral_ratio: 0.5,
+            minimum_consecutive_entry_windows: 1,
+            tail_extension_frames: 0,
+        }
+    }
+}
+
+/// Channel-specific support. measured_end_frame is the final window that
+/// passed the release criterion. qualified_end_frame includes only the
+/// explicit policy extension and is not claimed to be observed acoustics.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct QualifiedInfluenceInterval {
+    pub channel: usize,
+    pub start_frame: usize,
+    pub measured_end_frame: usize,
+    pub qualified_end_frame: usize,
+    pub tail_extension_frames_applied: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CounterfactualInfluenceReport {
     pub version: String,
@@ -433,11 +474,16 @@ pub struct CounterfactualInfluenceReport {
     pub channels: usize,
     pub total_frames: usize,
     pub analysis: InfluenceAnalysisConfig,
+    /// Exact support policy used to derive qualified support intervals.
+    pub support_policy: InfluenceSupportPolicy,
     pub total_channel_windows: usize,
     pub affected_channel_windows: usize,
-    /// Merged frame intervals where at least one channel/window exceeded its
-    /// calibrated threshold. These are measured support regions, not ownership.
+    /// Full ordered per-window/channel trace, replayed from exact PCM.
+    pub window_measurements: Vec<InfluenceWindowMeasurement>,
+    /// Entry-threshold crossings only, before hysteresis or tail extension.
     pub measured_influence_intervals: Vec<FrameInterval>,
+    /// Channel-specific support after hysteresis/minimum-run qualification.
+    pub qualified_support_intervals: Vec<QualifiedInfluenceInterval>,
     pub disposition: InfluenceDisposition,
     pub receipt_sha256: String,
 }
@@ -489,6 +535,7 @@ pub enum CounterfactualInfluenceError {
     InvalidInfluenceReceipt,
     InfluenceReplayMismatch,
     WindowIndexMismatch,
+    InvalidSupportPolicy(&'static str),
 }
 
 impl std::fmt::Display for CounterfactualInfluenceError {
@@ -545,6 +592,9 @@ impl std::fmt::Display for CounterfactualInfluenceError {
             }
             Self::WindowIndexMismatch => {
                 write!(f, "calibration cells do not match the expected window/channel layout")
+            }
+            Self::InvalidSupportPolicy(reason) => {
+                write!(f, "invalid influence support policy: {reason}")
             }
         }
     }
