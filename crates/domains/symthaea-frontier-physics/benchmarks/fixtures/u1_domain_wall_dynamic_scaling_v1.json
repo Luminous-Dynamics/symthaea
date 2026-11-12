@@ -1,0 +1,103 @@
+{
+  "schema": "luminous.black_hole_information.u1_domain_wall_dynamic_scaling.v1",
+  "status": "source_authored_rust_execution_pending",
+  "claim_ceiling": "Finite-size U(1)-conserving random-circuit transport. A fitted z is an effective exponent for the declared register, gate family, seeds and time window; it is not a thermodynamic-limit result unless cross-size scaling establishes stability. This is not black-hole evaporation or a gravitational Page curve.",
+  "model": {
+    "register_sizes": [
+      6,
+      8,
+      10,
+      12
+    ],
+    "total_excitations": "N/2",
+    "initial_state": "|111...1000...0>, MSB-first, open chain",
+    "gate_family": "nearest-neighbour brickwork with independent Haar U(1) x U(2) x U(1) gates",
+    "observables": [
+      "per-seed site-density profile",
+      "absolute density-gradient centroid and second central moment",
+      "mean width squared and standard error",
+      "log-log slope alpha",
+      "dynamic exponent z=2/alpha"
+    ],
+    "width_definition": "For rho_i(t)=<n_i>, define g_i=abs(rho_(i+1)-rho_i), x_i=i+1/2, xbar=sum(g_i*x_i)/sum(g_i), w^2=sum(g_i*(x_i-xbar)^2)/sum(g_i). Compute w^2 per independent seed before averaging.",
+    "scaling_law": "w^2(t) proportional to t^alpha, z=2/alpha"
+  },
+  "preregistered_protocol": {
+    "sample_count_per_size": 64,
+    "first_seed_hex": "0xB1A5",
+    "seed_schedule": "seed=0xB1A5 + size_index*100000 + sample_index; size_index follows [6,8,10,12], sample_index starts at zero",
+    "depth": "2*N",
+    "fit_window": "ceil(N/2) through 2*N inclusive; time window is declared before inspecting fitted exponents",
+    "uncertainty": "leave-one-seed-out jackknife for z and per-layer standard error of width squared",
+    "finite_size_comparison": "Compare z(N), jackknife intervals and fit R-squared across all four sizes. Also run a shifted preregistered window in a separate sensitivity study rather than tuning the primary window after seeing its result."
+  },
+  "reference_hypotheses": {
+    "diffusive": {
+      "z": 2,
+      "interpretation": "width squared grows linearly with time"
+    },
+    "ballistic": {
+      "z": 1,
+      "interpretation": "width squared grows quadratically with time"
+    },
+    "kpz_like_superdiffusive": {
+      "z": 1.5,
+      "interpretation": "width squared grows approximately as t^(4/3)"
+    },
+    "other": "Report the fitted effective exponent and uncertainty without forcing one of the reference labels."
+  },
+  "acceptance": {
+    "minimum_sample_count_per_size": 64,
+    "minimum_fit_points": 3,
+    "finite_positive_width_squared_at_every_fit_layer": true,
+    "jackknife_standard_error_required": true,
+    "report_r_squared_without_hiding_poor_fit": true,
+    "finite_size_stability": "Proposed target: max-min z across largest three sizes <= 0.2 with overlapping uncertainty intervals; otherwise report finite-size drift/unresolved.",
+    "universality_claim_requires": "A stable scaling window, multiple sizes, seed uncertainty, window sensitivity, and exclusion of ballistic/diffusive/KPZ reference alternatives by the declared uncertainty."
+  },
+  "implementation": {
+    "api": "analyze_u1_domain_wall_dynamic_exponent",
+    "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
+    "status": "source_authored_not_executed",
+    "jackknife": "leave-one-seed-out, recompute the log-log exponent after omitting each seed",
+    "diagnostics": [
+      "mean width squared per layer",
+      "width squared standard error",
+      "log-log slope alpha",
+      "R-squared",
+      "z=2/alpha",
+      "jackknife standard error and approximate 95% interval",
+      "depth/N finite-size ratio"
+    ]
+  },
+  "negative_controls": [
+    "fit width squared versus time only and call the resulting slope a measured dynamic exponent",
+    "select the fit window after inspecting the fitted z",
+    "classify a universality class from a single register size",
+    "bootstrap layer points as if they were independent seed realizations",
+    "report z without jackknife uncertainty",
+    "discard low-R-squared or censored/saturated points without recording the exclusion"
+  ],
+  "required_receipt_fields": [
+    "source_sha",
+    "branch",
+    "N",
+    "K",
+    "depth",
+    "fit_start_layer",
+    "fit_end_layer",
+    "sample_count",
+    "first_seed",
+    "seed_schedule",
+    "mean_width_squared_by_layer",
+    "width_standard_error_by_layer",
+    "log_log_slope_alpha",
+    "fit_r_squared",
+    "dynamic_exponent_z",
+    "jackknife_standard_error_z",
+    "approximate_confidence_interval_z",
+    "finite_size_depth_ratio",
+    "runtime",
+    "peak_memory"
+  ]
+}
