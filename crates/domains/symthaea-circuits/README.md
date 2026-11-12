@@ -67,3 +67,12 @@ The cubic Routh-Hurwitz test normalizes its coefficients by a characteristic pol
 The `dc_bus_mimo_reference` module provides a narrow exact 2×2 cross-port return-ratio example. It retains both off-diagonal terms, computes `det(I + L(jω))`, carries active open-loop right-half-plane channel-pole metadata, and derives the cleared characteristic polynomial when both cross channels are present.
 
 It demonstrates that diagonal-only SISO projections can omit a coupled unstable mode, and that determinant cancellation must not erase an active realization pole. This is a synthetic benchmark/reference, not a generalized-Nyquist solver or physical converter/aircraft model. See `docs/research/AIRROAD_PDCM_MIMO_001_V0_1.md`.
+
+
+## Post-fault sustained electrical supply envelope
+
+The `post_fault_supply_envelope` module performs exact integer W/J accounting over a digest-bound, piecewise-constant post-fault profile. It consumes confirmed post-isolation path evidence, critical-load demand upper bounds, non-storage source-capability lower bounds, storage discharge-power lower bounds, and one cumulative usable-energy lower bound.
+
+It distinguishes sustained electrical supply, missing/unavailable paths, instantaneous power shortfall, finite-energy exhaustion and NOT EVALUABLE path evidence. It does not solve protection or network transients, battery electrochemistry, thermal response, thrust or flight-control authority. A sustained-supply result is not a mission/flight PASS.
+
+See `docs/research/AIRROAD_POST_FAULT_SUPPLY_001_V0_1.md`.
