@@ -89,11 +89,16 @@ pub struct IntegrationReport {
 struct CoreResult {
     manifest: RunManifest,
     observation: MotorMapOperatingPoint,
+    #[cfg(test)]
     map: EfficiencyMap2D,
     map_lookup: MapLookup,
+    #[cfg(test)]
     evidence: MotorEfficiencyEvidence,
+    #[cfg(test)]
     drive_config: DriveConfig,
+    #[cfg(test)]
     drive_input: DriveInput,
+    #[cfg(test)]
     transmission: TransmissionKinematics,
     drive_envelope: DriveMapEnvelope,
 }
@@ -269,11 +274,16 @@ fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationErro
     Ok(CoreResult {
         manifest,
         observation,
+        #[cfg(test)]
         map,
         map_lookup,
+        #[cfg(test)]
         evidence,
+        #[cfg(test)]
         drive_config,
+        #[cfg(test)]
         drive_input,
+        #[cfg(test)]
         transmission,
         drive_envelope,
     })
