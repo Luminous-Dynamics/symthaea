@@ -5,14 +5,15 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version",
     "case_id",
     "evidence_kind",
-    "source",
-    "scaling",
-    "similarity",
     "frequency_match_tolerance_fraction",
-    "pairs"
+    "pairs",
+    "scaling",
+    "schema_version",
+    "similarity",
+    "source",
+    "validation_split"
   ],
   "properties": {
     "schema_version": {
@@ -147,6 +148,7 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
+          "benchmark_group_id",
           "cavitation_pattern",
           "cavitation_pattern_comparability",
           "full_scale",
@@ -181,9 +183,16 @@
               "partial",
               "unknown"
             ]
+          },
+          "benchmark_group_id": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
+    },
+    "validation_split": {
+      "$ref": "#/$defs/validationSplit"
     }
   },
   "$defs": {
@@ -426,6 +435,106 @@
         "source_level_u95_db": {
           "type": "number",
           "exclusiveMinimum": 0
+        }
+      }
+    },
+    "groupingDimension": {
+      "enum": [
+        "model_facility_id",
+        "full_scale_trial_site_id",
+        "vessel_id",
+        "propeller_design_id",
+        "propeller_revision",
+        "campaign_id",
+        "operating_condition_family_id"
+      ]
+    },
+    "benchmarkGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "group_id",
+        "role",
+        "model_facility_id",
+        "full_scale_trial_site_id",
+        "vessel_id",
+        "propeller_design_id",
+        "propeller_revision",
+        "campaign_id",
+        "operating_condition_family_id"
+      ],
+      "properties": {
+        "group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": [
+            "calibration",
+            "held_out"
+          ]
+        },
+        "model_facility_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "full_scale_trial_site_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vessel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propeller_design_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propeller_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "campaign_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_condition_family_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "validationSplit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "split_manifest_sha256",
+        "protocol_id",
+        "grouping_dimensions",
+        "groups"
+      ],
+      "properties": {
+        "split_manifest_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "protocol_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "grouping_dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/groupingDimension"
+          }
+        },
+        "groups": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/benchmarkGroup"
+          }
         }
       }
     }
