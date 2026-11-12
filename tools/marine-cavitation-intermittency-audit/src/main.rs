@@ -549,11 +549,6 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
         .iter()
         .map(|window| window.end_time_s - window.start_time_s)
         .sum();
-    let annotated_total = run
-        .windows
-        .iter()
-        .filter(|window| window.cavitation_present.is_some())
-        .count();
     let annotation_coverage = if run.windows.is_empty() {
         0.0
     } else {
