@@ -736,7 +736,7 @@ fn haar_unitary_4(rng: &mut ChaCha20Rng) -> Result<[[Complex64; 4]; 4], QuantumI
                     overlap += previous_column[row].conj() * vector[row];
                 }
                 for row in 0..4 {
-                    vector[row] -= columns[previous][row] * overlap;
+                    vector[row] -= previous_column[row] * overlap;
                 }
             }
             let norm_squared: f64 = vector.iter().map(|value| value.norm_sqr()).sum();
