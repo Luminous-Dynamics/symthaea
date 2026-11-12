@@ -20,6 +20,9 @@ exclude = [
     # is resolved; do not add placeholder manifests just to satisfy metadata.
     "crates/core/symthaea",
     "crates/core/symthaea-observation-attestation",
+    # This directory currently contains only the verifier design README;
+    # exclude it until its independent Cargo package is actually introduced.
+    "crates/domains/symthaea-rea-evidence-verifier",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
