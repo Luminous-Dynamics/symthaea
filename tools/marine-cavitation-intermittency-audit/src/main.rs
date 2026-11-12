@@ -125,6 +125,9 @@ struct WindowEvidenceRef {
     cavitation_observation_sha256: String,
     start_time_s: f64,
     end_time_s: f64,
+    disposition: &'static str,
+    exclusion_reason: Option<&'static str>,
+    corrected_spl_db: Option<f64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -143,12 +146,15 @@ struct RunReport {
     excluded_background_dominated: usize,
     excluded_exact_ten_db_boundary: usize,
     excluded_uncertainty_unresolved: usize,
-    excluded_invalid_window: usize,
+    excluded_unknown_background_method: usize,
     cavitation_annotation_coverage: f64,
     cavitation_occupancy_fraction: Option<f64>,
     observed_cavitation_onsets: Option<usize>,
     observed_cavitation_onsets_per_hour: Option<f64>,
-    active_segments_censored_by_window_or_gap: Option<usize>,
+    left_censored_active_segments: Option<usize>,
+    right_censored_active_segments: Option<usize>,
+    acquisition_duration_s: f64,
+    ittc_recommended_acquisition_duration_met: bool,
     energy_equivalent_mean_spl_db: Option<f64>,
     median_spl_db: Option<f64>,
     p05_spl_db: Option<f64>,
@@ -341,23 +347,52 @@ fn validate_case(case: &Case) -> Vec<String> {
     errors
 }
 
-fn summarize_run(run: &Run, case: &Case) -> RunReport {
+fn summarize_run(run: &Run) -> RunReport {
     let mut usable = Vec::new();
+    let mut window_evidence = Vec::with_capacity(run.windows.len());
     let mut excluded_background_dominated = 0;
     let mut excluded_exact_ten_db_boundary = 0;
     let mut excluded_uncertainty_unresolved = 0;
-    let mut excluded_invalid_window = 0;
+    let mut excluded_unknown_background_method = 0;
 
     for window in &run.windows {
-        let central = ittc_background_corrected_spl(window.total_spl_db, window.background_spl_db);
-        match central {
+        let evidence_ref = |disposition, exclusion_reason, corrected_spl_db| WindowEvidenceRef {
+            window_id: window.window_id.clone(),
+            acoustic_trace_sha256: window.acoustic_trace_sha256.clone(),
+            cavitation_observation_sha256: window.cavitation_observation_sha256.clone(),
+            start_time_s: window.start_time_s,
+            end_time_s: window.end_time_s,
+            disposition,
+            exclusion_reason,
+            corrected_spl_db,
+        };
+
+        if run.background_method == BackgroundMethod::Unknown {
+            excluded_unknown_background_method += 1;
+            window_evidence.push(evidence_ref(
+                "excluded",
+                Some("unknown_background_measurement_method"),
+                None,
+            ));
+            continue;
+        }
+
+        match ittc_background_corrected_spl(window.total_spl_db, window.background_spl_db) {
             Err(BackgroundFailure::BackgroundDominated) => {
                 excluded_background_dominated += 1;
-                continue;
+                window_evidence.push(evidence_ref(
+                    "excluded",
+                    Some("background_margin_below_3_db"),
+                    None,
+                ));
             }
             Err(BackgroundFailure::ExactTenDbBoundaryUnspecified) => {
                 excluded_exact_ten_db_boundary += 1;
-                continue;
+                window_evidence.push(evidence_ref(
+                    "excluded",
+                    Some("exact_10_db_boundary_unspecified_by_ittc_rev03"),
+                    None,
+                ));
             }
             Ok(level) => {
                 let lower = ittc_background_corrected_spl(
@@ -370,12 +405,23 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
                 );
                 if lower.is_err() || upper.is_err() {
                     excluded_uncertainty_unresolved += 1;
+                    window_evidence.push(evidence_ref(
+                        "excluded",
+                        Some("expanded_uncertainty_crosses_background_eligibility_boundary"),
+                        None,
+                    ));
                     continue;
                 }
                 if !level.is_finite() {
-                    excluded_invalid_window += 1;
+                    excluded_uncertainty_unresolved += 1;
+                    window_evidence.push(evidence_ref(
+                        "excluded",
+                        Some("corrected_level_non_finite"),
+                        None,
+                    ));
                     continue;
                 }
+                window_evidence.push(evidence_ref("included", None, Some(level)));
                 usable.push(UsableWindow {
                     start_time_s: window.start_time_s,
                     end_time_s: window.end_time_s,
@@ -394,72 +440,99 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
     let p05 = empirical_quantile(&sorted_levels, 0.05);
     let p95 = empirical_quantile(&sorted_levels, 0.95);
 
-    let usable_duration = usable.iter()
+    let usable_duration_s: f64 = usable
+        .iter()
         .map(|window| window.end_time_s - window.start_time_s)
         .sum();
-    let annotated_count = usable.iter().filter(|window| window.cavitation_present.is_some()).count();
-    let annotation_coverage = if usable.is_empty() {
+    let annotated_total = run
+        .windows
+        .iter()
+        .filter(|window| window.cavitation_present.is_some())
+        .count();
+    let annotation_coverage = if run.windows.is_empty() {
         0.0
     } else {
-        annotated_count as f64 / usable.len() as f64
+        annotated_total as f64 / run.windows.len() as f64
     };
-    let (occupancy, onsets, onsets_per_hour, censored_segments, on_mean, off_mean, conditioned_delta) =
-        if annotated_count == usable.len() && !usable.is_empty() {
-            let present: Vec<f64> = usable.iter()
-                .filter(|window| window.cavitation_present == Some(true))
-                .map(|window| window.corrected_spl_db)
-                .collect();
-            let absent: Vec<f64> = usable.iter()
-                .filter(|window| window.cavitation_present == Some(false))
-                .map(|window| window.corrected_spl_db)
-                .collect();
-            let occupancy = present.len() as f64 / usable.len() as f64;
+    let annotated_usable = usable
+        .iter()
+        .filter(|window| window.cavitation_present.is_some())
+        .count();
 
-            let mut onsets = 0usize;
-            let mut censored_active_segments = 0usize;
-            for index in 0..usable.len() {
-                let is_present = usable[index].cavitation_present == Some(true);
-                if !is_present {
-                    continue;
-                }
-                if index == 0 {
-                    // The first observed window is left-censored: onset may
-                    // have occurred before this run began.
-                    censored_active_segments += 1;
-                    continue;
-                }
-                let contiguous = (usable[index].start_time_s - usable[index - 1].end_time_s).abs()
-                    <= WINDOW_DURATION_TOLERANCE_S;
-                if !contiguous {
-                    // A gap hides the transition, so do not invent an onset.
-                    censored_active_segments += 1;
-                } else if usable[index - 1].cavitation_present == Some(false) {
-                    onsets += 1;
-                }
+    let (
+        occupancy,
+        onsets,
+        onsets_per_hour,
+        left_censored,
+        right_censored,
+        on_mean,
+        off_mean,
+        conditioned_delta,
+    ) = if annotated_usable == usable.len() && !usable.is_empty() {
+        let present: Vec<f64> = usable
+            .iter()
+            .filter(|window| window.cavitation_present == Some(true))
+            .map(|window| window.corrected_spl_db)
+            .collect();
+        let absent: Vec<f64> = usable
+            .iter()
+            .filter(|window| window.cavitation_present == Some(false))
+            .map(|window| window.corrected_spl_db)
+            .collect();
+        let occupancy = present.len() as f64 / usable.len() as f64;
+
+        let mut observed_onsets = 0usize;
+        let mut left_censored_segments = 0usize;
+        for index in 0..usable.len() {
+            if usable[index].cavitation_present != Some(true) {
+                continue;
             }
-            let onsets_per_hour = if usable_duration > 0.0 {
-                Some(onsets as f64 * 3600.0 / usable_duration)
-            } else {
-                None
-            };
-            let on_mean = energy_mean_db(&present);
-            let off_mean = energy_mean_db(&absent);
-            let delta = match (on_mean, off_mean) {
-                (Some(on), Some(off)) => Some(on - off),
-                _ => None,
-            };
-            (Some(occupancy), Some(onsets), onsets_per_hour, Some(censored_active_segments), on_mean, off_mean, delta)
+            if index == 0 {
+                // Acquisition starts while this active segment is already present.
+                left_censored_segments += 1;
+                continue;
+            }
+            let contiguous = (usable[index].start_time_s - usable[index - 1].end_time_s).abs()
+                <= WINDOW_DURATION_TOLERANCE_S;
+            if !contiguous {
+                // A gap hides the transition into this active segment.
+                left_censored_segments += 1;
+            } else if usable[index - 1].cavitation_present == Some(false) {
+                observed_onsets += 1;
+            }
+        }
+        let right_censored_segments = usize::from(
+            usable.last().is_some_and(|window| window.cavitation_present == Some(true))
+        );
+        let onsets_per_hour = if usable_duration_s > 0.0 {
+            Some(observed_onsets as f64 * 3600.0 / usable_duration_s)
         } else {
-            (None, None, None, None, None, None, None)
+            None
         };
+        let on_mean = energy_mean_db(&present);
+        let off_mean = energy_mean_db(&absent);
+        let delta = match (on_mean, off_mean) {
+            (Some(on), Some(off)) => Some(on - off),
+            _ => None,
+        };
+        (
+            Some(occupancy),
+            Some(observed_onsets),
+            onsets_per_hour,
+            Some(left_censored_segments),
+            Some(right_censored_segments),
+            on_mean,
+            off_mean,
+            delta,
+        )
+    } else {
+        (None, None, None, None, None, None, None, None)
+    };
 
-    let window_evidence = run.windows.iter().map(|window| WindowEvidenceRef {
-        window_id: window.window_id.clone(),
-        acoustic_trace_sha256: window.acoustic_trace_sha256.clone(),
-        cavitation_observation_sha256: window.cavitation_observation_sha256.clone(),
-        start_time_s: window.start_time_s,
-        end_time_s: window.end_time_s,
-    }).collect();
+    let acquisition_duration_s = match (run.windows.first(), run.windows.last()) {
+        (Some(first), Some(last)) => last.end_time_s - first.start_time_s,
+        _ => 0.0,
+    };
 
     RunReport {
         run_id: run.run_id.clone(),
@@ -480,12 +553,15 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
         excluded_background_dominated,
         excluded_exact_ten_db_boundary,
         excluded_uncertainty_unresolved,
-        excluded_invalid_window,
+        excluded_unknown_background_method,
         cavitation_annotation_coverage: annotation_coverage,
         cavitation_occupancy_fraction: occupancy,
         observed_cavitation_onsets: onsets,
         observed_cavitation_onsets_per_hour: onsets_per_hour,
-        active_segments_censored_by_window_or_gap: censored_segments,
+        left_censored_active_segments: left_censored,
+        right_censored_active_segments: right_censored,
+        acquisition_duration_s,
+        ittc_recommended_acquisition_duration_met: acquisition_duration_s > 20.0,
         energy_equivalent_mean_spl_db: energy_mean,
         median_spl_db: median,
         p05_spl_db: p05,
@@ -493,7 +569,7 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
         cavitation_present_energy_mean_spl_db: on_mean,
         cavitation_absent_energy_mean_spl_db: off_mean,
         cavitation_conditioned_delta_db: conditioned_delta,
-        usable_observation_duration_s: usable_duration,
+        usable_observation_duration_s: usable_duration_s,
     }
 }
 
@@ -510,7 +586,7 @@ fn audit(case: &Case) -> AuditReport {
     let validation_errors = validate_case(case);
     let mut reasons = validation_errors.clone();
     let run_reports: Vec<RunReport> = if validation_errors.is_empty() {
-        case.runs.iter().map(|run| summarize_run(run, case)).collect()
+        case.runs.iter().map(summarize_run).collect()
     } else {
         Vec::new()
     };
