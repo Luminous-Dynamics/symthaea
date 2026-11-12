@@ -764,6 +764,35 @@ mod tests {
         ]
     }
 
+    fn evidence() -> Vec<EvidenceRecord> {
+        vec![
+            EvidenceRecord {
+                evidence_id: "SYNTH-EVIDENCE".into(),
+                evidence_class: EvidenceClass::SyntheticFixture,
+                source_sha256: "1".repeat(64),
+                claim_scope: "synthetic objective values".into(),
+                validity_domain: "test fixtures only".into(),
+                admission: EvidenceAdmission::AdmittedForEvaluation,
+            },
+            EvidenceRecord {
+                evidence_id: "SYNTH-GATE".into(),
+                evidence_class: EvidenceClass::SyntheticFixture,
+                source_sha256: "2".repeat(64),
+                claim_scope: "synthetic hard-gate fixture".into(),
+                validity_domain: "test fixtures only".into(),
+                admission: EvidenceAdmission::AdmittedForEvaluation,
+            },
+            EvidenceRecord {
+                evidence_id: "SYNTH-VOI".into(),
+                evidence_class: EvidenceClass::SyntheticFixture,
+                source_sha256: "3".repeat(64),
+                claim_scope: "synthetic experiment estimate".into(),
+                validity_domain: "test fixtures only".into(),
+                admission: EvidenceAdmission::AdmittedForEvaluation,
+            },
+        ]
+    }
+
     fn candidate(id: &str, values: [f64; 3], gate_disposition: GateDisposition) -> Candidate {
         let metrics = |offset: f64| {
             vec![
@@ -775,7 +804,6 @@ mod tests {
                     lower_bound: values[0] + offset - 1.0,
                     upper_bound: values[0] + offset + 1.0,
                     evidence_id: "SYNTH-EVIDENCE".into(),
-                    evidence_class: EvidenceClass::SyntheticFixture,
                 },
                 MetricObservation {
                     objective_id: "throughput".into(),
@@ -813,14 +841,12 @@ mod tests {
                     gate_id: "declared_mission_feasible".into(),
                     disposition: GateDisposition::Pass,
                     evidence_id: "SYNTH-GATE".into(),
-                    evidence_class: EvidenceClass::SyntheticFixture,
                     requires_physical_evidence: false,
                 },
                 HardGate {
                     gate_id: "physical_safety".into(),
                     disposition: gate_disposition,
                     evidence_id: "SYNTH-GATE".into(),
-                    evidence_class: EvidenceClass::SyntheticFixture,
                     requires_physical_evidence: true,
                 },
             ],
@@ -841,6 +867,7 @@ mod tests {
         let result = audit_design_portfolio(
             &scenarios(),
             &objectives(),
+            &evidence(),
             &[candidate(
                 "a",
                 [300.0, 1800.0, 100.0],
@@ -909,7 +936,7 @@ mod tests {
                 .retain(|gate| gate.gate_id != "physical_safety");
         }
 
-        let result = audit_design_portfolio(&scenarios(), &objectives(), &eligible_candidates)
+        let result = audit_design_portfolio(&scenarios(), &objectives(), &evidence(), &eligible_candidates)
             .expect("valid finite portfolio");
 
         assert_eq!(
@@ -929,7 +956,7 @@ mod tests {
             .expect("energy metric")
             .boundary = "active_material_only".into();
 
-        let error = audit_design_portfolio(&scenarios(), &objectives(), &[item])
+        let error = audit_design_portfolio(&scenarios(), &objectives(), &evidence(), &[item])
             .expect_err("boundary mismatch must fail closed");
 
         assert!(error.0.contains("mismatched unit or boundary"));
@@ -990,7 +1017,7 @@ mod tests {
             allow_no_experiment: true,
         };
 
-        let selection = select_experiment(&options, &budget).expect("valid options");
+        let selection = select_experiment(&options, &evidence(), &budget).expect("valid options");
         assert_eq!(selection.experiment_id, Some("exp-small".into()));
     }
 
@@ -1018,6 +1045,62 @@ mod tests {
     }
 
     #[test]
+    fn candidate_evidence_must_resolve_through_shared_registry() {
+        let mut item = candidate("a", [300.0, 1800.0, 100.0], GateDisposition::Unknown);
+        item.scenario_metrics
+            .get_mut("nominal")
+            .expect("nominal scenario")[0]
+            .evidence_id = "UNREGISTERED-EVIDENCE".into();
+
+        let error = audit_design_portfolio(
+            &scenarios(),
+            &objectives(),
+            &evidence(),
+            &[item],
+        )
+        .expect_err("unknown evidence ID must fail closed");
+
+        assert!(error.0.contains("references unknown evidence ID"));
+    }
+
+    #[test]
+    fn evidence_not_admitted_for_evaluation_cannot_qualify_candidate() {
+        let mut records = evidence();
+        records[0].admission = EvidenceAdmission::AdmittedForResearch;
+        let item = candidate("a", [300.0, 1800.0, 100.0], GateDisposition::Unknown);
+
+        let result = audit_design_portfolio(
+            &scenarios(),
+            &objectives(),
+            &records,
+            &[item],
+        )
+        .expect("well-formed but research-only evidence remains auditable");
+
+        assert!(result.eligible_candidate_ids.is_empty());
+        assert!(result.rejected[0]
+            .reasons
+            .contains(&RejectionReason::MetricEvidenceNotAdmitted("energy".into())));
+    }
+
+    #[test]
+    fn evidence_digest_must_be_well_formed_sha256() {
+        let mut records = evidence();
+        records[0].source_sha256 = "not-a-digest".into();
+        let item = candidate("a", [300.0, 1800.0, 100.0], GateDisposition::Unknown);
+
+        let error = audit_design_portfolio(
+            &scenarios(),
+            &objectives(),
+            &records,
+            &[item],
+        )
+        .expect_err("invalid digest syntax must fail closed");
+
+        assert!(error.0.contains("lowercase 64-character SHA-256"));
+    }
+
+    #[test]
     fn canonical_frontier_is_independent_of_candidate_input_order() {
         let a = candidate("a", [320.0, 1800.0, 105.0], GateDisposition::Pass);
         let b = candidate("b", [300.0, 2200.0, 90.0], GateDisposition::Pass);
@@ -1028,9 +1111,9 @@ mod tests {
             item.hard_gates.retain(|gate| gate.gate_id != "physical_safety");
         }
 
-        let one = audit_design_portfolio(&scenarios(), &objectives(), &first).expect("first order");
+        let one = audit_design_portfolio(&scenarios(), &objectives(), &evidence(), &first).expect("first order");
         let two =
-            audit_design_portfolio(&scenarios(), &objectives(), &second).expect("second order");
+            audit_design_portfolio(&scenarios(), &objectives(), &evidence(), &second).expect("second order");
 
         assert_eq!(one.pareto_front_ids, two.pareto_front_ids);
         assert_eq!(one.scores, two.scores);
