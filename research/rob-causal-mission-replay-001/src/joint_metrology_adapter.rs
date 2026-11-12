@@ -387,11 +387,59 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
                     reference_limit_ns: Some(limit),
                     disposition: CommandResponseDisposition::Unknown,
                 }
-            } else if onset.stamp.timestamp.lower_ns < application.stamp.timestamp.upper_ns {
+            } else if onset.stamp.timestamp.upper_ns
+                < application.stamp.timestamp.lower_ns
+            {
+                push(
+                    &mut findings,
+                    FindingSeverity::Invalid,
+                    "JOINT_MOTION_ONSET_PRECEDES_COMMAND",
+                    &application.command_id,
+                );
+                CommandResponseResult {
+                    minimum_latency_ns: None,
+                    maximum_latency_ns: None,
+                    reference_limit_ns: Some(limit),
+                    disposition: CommandResponseDisposition::ExceedsReference,
+                }
+            } else if onset.stamp.timestamp.lower_ns
+                < application.stamp.timestamp.upper_ns
+            {
                 push(
                     &mut findings,
                     FindingSeverity::Unknown,
                     "JOINT_MOTION_ONSET_TIME_ORDER_UNCERTAIN",
+                    &application.command_id,
+                );
+                CommandResponseResult {
+                    minimum_latency_ns: None,
+                    maximum_latency_ns: None,
+                    reference_limit_ns: Some(limit),
+                    disposition: CommandResponseDisposition::Unknown,
+                }
+            } else if let Some(transition) = evidence.mission.physical_transitions.first()
+                && (onset.stamp.sequence >= transition.stamp.sequence
+                    || onset.stamp.timestamp.lower_ns > transition.stamp.timestamp.upper_ns)
+            {
+                push(
+                    &mut findings,
+                    FindingSeverity::Invalid,
+                    "JOINT_MOTION_ONSET_AFTER_PHYSICAL_TRANSITION",
+                    &application.command_id,
+                );
+                CommandResponseResult {
+                    minimum_latency_ns: None,
+                    maximum_latency_ns: None,
+                    reference_limit_ns: Some(limit),
+                    disposition: CommandResponseDisposition::ExceedsReference,
+                }
+            } else if let Some(transition) = evidence.mission.physical_transitions.first()
+                && onset.stamp.timestamp.upper_ns > transition.stamp.timestamp.lower_ns
+            {
+                push(
+                    &mut findings,
+                    FindingSeverity::Unknown,
+                    "JOINT_MOTION_TO_THERMAL_TRANSITION_ORDER_UNCERTAIN",
                     &application.command_id,
                 );
                 CommandResponseResult {
