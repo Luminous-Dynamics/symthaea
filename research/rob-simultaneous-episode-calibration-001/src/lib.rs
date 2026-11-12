@@ -285,7 +285,10 @@ fn validate_scope(scope: &CalibrationScope) -> Result<BTreeSet<&str>, Calibratio
         ("loss_model_digest", scope.loss_model_digest.as_str()),
         ("loss_scale_id", scope.loss_scale_id.as_str()),
         ("action_domain_digest", scope.action_domain_digest.as_str()),
-        ("calibration_split_digest", scope.calibration_split_digest.as_str()),
+        (
+            "calibration_split_digest",
+            scope.calibration_split_digest.as_str(),
+        ),
         (
             "exchangeability_evidence_digest",
             scope.exchangeability_evidence_digest.as_str(),
@@ -522,9 +525,7 @@ pub fn expand_interval_for(
 
     let unbounded_upper = interval.upper_units.checked_add(receipt.expansion_units);
     Ok(ExpandedLossInterval {
-        lower_units: interval
-            .lower_units
-            .saturating_sub(receipt.expansion_units),
+        lower_units: interval.lower_units.saturating_sub(receipt.expansion_units),
         upper_units: unbounded_upper.unwrap_or(u64::MAX),
         upper_saturated: unbounded_upper.is_none(),
     })
@@ -646,11 +647,9 @@ mod tests {
     #[test]
     fn zero_residuals_produce_zero_expansion_only_with_sufficient_complete_episodes() {
         let episodes = nineteen_episodes(&[]);
-        let receipt = calibrate_simultaneous_episode_envelope(
-            &scope(50_000, 2, &["a0", "a1"]),
-            &episodes,
-        )
-        .unwrap();
+        let receipt =
+            calibrate_simultaneous_episode_envelope(&scope(50_000, 2, &["a0", "a1"]), &episodes)
+                .unwrap();
         assert_eq!(receipt.expansion_units, 0);
         assert_eq!(receipt.coverage_ppm, 950_000);
         assert_eq!(receipt.calibration_episode_count, 19);
@@ -661,12 +660,12 @@ mod tests {
         let mut episodes = nineteen_episodes(&[]);
         // One cell in one independent episode is an outlier. The episode
         // maximum makes the expansion simultaneous over every action/tick.
-        episodes[18].observations[3].reference_expected_loss.upper_units += 7;
-        let receipt = calibrate_simultaneous_episode_envelope(
-            &scope(50_000, 2, &["a0", "a1"]),
-            &episodes,
-        )
-        .unwrap();
+        episodes[18].observations[3]
+            .reference_expected_loss
+            .upper_units += 7;
+        let receipt =
+            calibrate_simultaneous_episode_envelope(&scope(50_000, 2, &["a0", "a1"]), &episodes)
+                .unwrap();
         assert_eq!(receipt.expansion_units, 7);
 
         for tick in [10, 11] {
@@ -695,14 +694,8 @@ mod tests {
             &nineteen_episodes(&errors),
         )
         .unwrap();
-        let expanded = expand_interval_for(
-            &receipt,
-            "scope-v1",
-            "a0",
-            10,
-            LossInterval::new(2, 4),
-        )
-        .unwrap();
+        let expanded =
+            expand_interval_for(&receipt, "scope-v1", "a0", 10, LossInterval::new(2, 4)).unwrap();
         assert_eq!(expanded.lower_units, 0);
     }
 
@@ -732,10 +725,7 @@ mod tests {
         let mut e = episode("m1", "scope-v1", 2, &["a0", "a1"], 10, 0);
         e.observations.pop();
         assert!(matches!(
-            calibrate_simultaneous_episode_envelope(
-                &scope(50_000, 2, &["a0", "a1"]),
-                &[e]
-            ),
+            calibrate_simultaneous_episode_envelope(&scope(50_000, 2, &["a0", "a1"]), &[e]),
             Err(CalibrationError::IncompleteGrid { .. })
         ));
     }
@@ -745,10 +735,7 @@ mod tests {
         let e1 = episode("same", "scope-v1", 2, &["a0", "a1"], 10, 0);
         let e2 = e1.clone();
         assert_eq!(
-            calibrate_simultaneous_episode_envelope(
-                &scope(50_000, 2, &["a0", "a1"]),
-                &[e1, e2]
-            ),
+            calibrate_simultaneous_episode_envelope(&scope(50_000, 2, &["a0", "a1"]), &[e1, e2]),
             Err(CalibrationError::DuplicateEpisodeId("same".to_owned()))
         );
     }
@@ -758,10 +745,7 @@ mod tests {
         let mut e = episode("m1", "scope-v1", 2, &["a0", "a1"], 10, 0);
         e.observations[1] = e.observations[0].clone();
         assert!(matches!(
-            calibrate_simultaneous_episode_envelope(
-                &scope(50_000, 2, &["a0", "a1"]),
-                &[e]
-            ),
+            calibrate_simultaneous_episode_envelope(&scope(50_000, 2, &["a0", "a1"]), &[e]),
             Err(CalibrationError::DuplicateCell { .. })
         ));
     }
@@ -770,10 +754,7 @@ mod tests {
     fn wrong_scope_digest_rejects_episode() {
         let e = episode("m1", "other-scope", 2, &["a0", "a1"], 10, 0);
         assert_eq!(
-            calibrate_simultaneous_episode_envelope(
-                &scope(50_000, 2, &["a0", "a1"]),
-                &[e]
-            ),
+            calibrate_simultaneous_episode_envelope(&scope(50_000, 2, &["a0", "a1"]), &[e]),
             Err(CalibrationError::EpisodeScopeMismatch {
                 episode_id: "m1".to_owned()
             })
@@ -784,10 +765,7 @@ mod tests {
     fn unexpected_candidate_action_is_rejected() {
         let e = episode("m1", "scope-v1", 2, &["a0", "wrong"], 10, 0);
         assert!(matches!(
-            calibrate_simultaneous_episode_envelope(
-                &scope(50_000, 2, &["a0", "a1"]),
-                &[e]
-            ),
+            calibrate_simultaneous_episode_envelope(&scope(50_000, 2, &["a0", "a1"]), &[e]),
             Err(CalibrationError::UnexpectedAction { .. })
         ));
     }
@@ -797,10 +775,7 @@ mod tests {
         let mut e = episode("m1", "scope-v1", 2, &["a0", "a1"], 10, 0);
         e.observations[0].tick = 99;
         assert!(matches!(
-            calibrate_simultaneous_episode_envelope(
-                &scope(50_000, 2, &["a0", "a1"]),
-                &[e]
-            ),
+            calibrate_simultaneous_episode_envelope(&scope(50_000, 2, &["a0", "a1"]), &[e]),
             Err(CalibrationError::UnexpectedTick { .. })
         ));
     }
@@ -810,10 +785,7 @@ mod tests {
         let mut e = episode("m1", "scope-v1", 2, &["a0", "a1"], 10, 0);
         e.observations[0].predicted = LossInterval::new(5, 2);
         assert!(matches!(
-            calibrate_simultaneous_episode_envelope(
-                &scope(50_000, 2, &["a0", "a1"]),
-                &[e]
-            ),
+            calibrate_simultaneous_episode_envelope(&scope(50_000, 2, &["a0", "a1"]), &[e]),
             Err(CalibrationError::InvalidLossInterval { .. })
         ));
     }
@@ -823,10 +795,7 @@ mod tests {
         let mut e = episode("m1", "scope-v1", 2, &["a0", "a1"], 10, 0);
         e.observations[0].reference_expected_loss = LossInterval::new(9, 4);
         assert!(matches!(
-            calibrate_simultaneous_episode_envelope(
-                &scope(50_000, 2, &["a0", "a1"]),
-                &[e]
-            ),
+            calibrate_simultaneous_episode_envelope(&scope(50_000, 2, &["a0", "a1"]), &[e]),
             Err(CalibrationError::InvalidLossInterval { .. })
         ));
     }
