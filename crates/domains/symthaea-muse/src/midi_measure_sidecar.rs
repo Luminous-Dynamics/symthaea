@@ -133,11 +133,11 @@ pub fn parse_midi_measure_sidecar(
     }
     let ppq = match smf.header.timing {
         Timing::Metrical(value) => {
-            let ppq = value.as_int();
-            if ppq == 0 {
+            let raw_ppq = u64::from(value.as_int());
+            if raw_ppq == 0 {
                 return Err(MidiMeasureSidecarError::InvalidPpq);
             }
-            ppq
+            u16::try_from(raw_ppq).map_err(|_| MidiMeasureSidecarError::InvalidPpq)?
         }
         Timing::Timecode(_, _) => return Err(MidiMeasureSidecarError::SmpteTimingUnsupported),
     };
