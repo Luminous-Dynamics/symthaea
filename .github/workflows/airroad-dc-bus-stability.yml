@@ -8,6 +8,7 @@ on:
       - "crates/domains/symthaea-circuits/Cargo.toml"
       - "crates/domains/symthaea-circuits/README.md"
       - "docs/research/fixtures/airroad-dc-dynamic-stability-v0.1.json"
+      - "docs/research/AIRROAD_DC_DYNAMIC_STABILITY_001_V0_1.md"
       - "tools/airroad-dc-stability-qualifier/verify_fixture.py"
       - ".github/workflows/airroad-dc-bus-stability.yml"
   push:
