@@ -14,7 +14,7 @@
 #![forbid(unsafe_code)]
 
 use electric_propulsion_map_oracle::{
-    EfficiencyMap2D, MapCoordinateBounds, MapCoordinateEnvelope, MapLookup, MapNode, MapQuery,
+    EfficiencyMap2D, MapCoordinateBounds, MapCoordinateEnvelope, MapLookup, MapNode,
 };
 use electric_propulsion_observation_oracle::{
     CalibrationStatus, MeasurementChannel, MeasurementQuantity, MeasurementSample,
@@ -423,7 +423,7 @@ pub fn run_synthetic_fixture() -> Result<IntegrationReport, IntegrationError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use electric_propulsion_map_oracle::MapError;
+    use electric_propulsion_map_oracle::{MapError, MapQuery};
 
     #[test]
     fn end_to_end_fixture_preserves_evidence_and_closes_both_ledgers() {
