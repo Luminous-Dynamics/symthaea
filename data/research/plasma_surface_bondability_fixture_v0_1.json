@@ -12,7 +12,7 @@
     "substrate_lot": "SYNTHETIC_LOT_001",
     "adhesive_system": "SYNTHETIC_ADHESIVE_A",
     "joint_geometry": "single_lap_rigid_plastic",
-    "test_method": "ASTM_D3163_01_2023",
+    "test_method": "ISO_4587_2003",
     "acceptance_threshold_mpa": 5,
     "minimum_acceptance_fraction": 0.8,
     "bondability_delays_hours": [
@@ -27,7 +27,8 @@
         "unit": "fraction_of_untreated_control",
         "minimum": 0.95
       }
-    ]
+    ],
+    "test_method_source_note": "The 2026 literature comparator used ISO 4587:2003. Synthetic test values do not reproduce the study."
   },
   "energy_boundary": {
     "energy_boundary_contract_id": "SYNTHETIC_GRID_TO_ACCEPTED_BONDED_AREA_V1",
