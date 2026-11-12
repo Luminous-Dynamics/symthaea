@@ -111,10 +111,7 @@
               ]
             },
             "code_reuse_status": {
-              "enum": [
-                "blocked_unresolved",
-                "admitted"
-              ]
+              "const": "blocked_unresolved"
             }
           }
         },
@@ -239,7 +236,7 @@
           "type": "boolean"
         },
         "deterministic_speaker_order_across_fresh_processes_guaranteed": {
-          "type": "boolean"
+          "const": false
         },
         "qualification_status": {
           "type": "string"
@@ -338,7 +335,7 @@
           }
         },
         "reconciliation_status": {
-          "type": "string"
+          "const": "unresolved_distinct_estimands_or_snapshots_not_yet_reconciled"
         },
         "admission_rule": {
           "type": "string"
@@ -366,7 +363,7 @@
           "type": "string"
         },
         "viewer_status": {
-          "type": "string"
+          "const": "DatasetGenerationCastError"
         },
         "viewer_error_new_columns": {
           "type": "array",
@@ -384,7 +381,7 @@
           "type": "string"
         },
         "dataset_admission_status": {
-          "type": "string"
+          "const": "blocked_schema_and_rights_review"
         }
       }
     },
@@ -421,16 +418,10 @@
           "const": false
         },
         "rights_admission": {
-          "enum": [
-            "blocked_unresolved",
-            "admitted"
-          ]
+          "const": "blocked_unresolved"
         },
         "data_use_status": {
-          "enum": [
-            "metadata_only",
-            "admitted"
-          ]
+          "const": "metadata_only"
         }
       }
     },
@@ -444,10 +435,7 @@
       ],
       "properties": {
         "overall": {
-          "enum": [
-            "metadata_only_blocked",
-            "admitted_for_reproduction"
-          ]
+          "const": "metadata_only_blocked"
         },
         "issues": {
           "type": "array",
