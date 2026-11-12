@@ -1,0 +1,27 @@
+{
+  "schema_version": "0.1.0",
+  "manifest_id": "SYNTH-BATTERY-DESIGN-001",
+  "mission": {"mission_id":"SYNTH-STATIONARY-10Y","application":"stationary_storage_reference","duty_cycle_ref":"SYNTH-DAILY-CYCLE","required_calendar_life_years":10,"minimum_lifetime_energy_kwh":1500,"system_boundary":"cell"},
+  "scenarios": [
+    {"scenario_id":"nominal","temperature_c":25,"age_state":"beginning_of_life","duty_cycle_ref":"SYNTH-DAILY-CYCLE"},
+    {"scenario_id":"hot-aged","temperature_c":40,"age_state":"aged_reference_state","duty_cycle_ref":"SYNTH-DAILY-CYCLE"}
+  ],
+  "objectives": [
+    {"objective_id":"usable_specific_energy","unit":"Wh/kg","direction":"maximize","boundary":"complete_cell"},
+    {"objective_id":"lifetime_energy_throughput","unit":"kWh/cell","direction":"maximize","boundary":"complete_cell_lifetime"},
+    {"objective_id":"manufacturing_cost","unit":"USD/kWh","direction":"minimize","boundary":"cell_ex_factory"}
+  ],
+  "evidence": [
+    {"evidence_id":"E-SYN-1","evidence_class":"synthetic_fixture","source_digest":"1111111111111111111111111111111111111111111111111111111111111111","claim_scope":"synthetic known-truth metrics only","validity_domain":"fixture scenarios only","admission":"admitted_for_evaluation"},
+    {"evidence_id":"E-SYN-2","evidence_class":"synthetic_fixture","source_digest":"2222222222222222222222222222222222222222222222222222222222222222","claim_scope":"synthetic experiment estimates only","validity_domain":"fixture candidate space only","admission":"admitted_for_evaluation"}
+  ],
+  "candidates": [
+    {"candidate_id":"design-a","revision":"r1","design_refs":{"materials":["synthetic-silicon-carbon"],"electrode_design":"electrode-a","process_window":"recipe-a-window","cell_configuration":"cell-a"},"scenario_metrics":[{"scenario_id":"nominal","metrics":[{"objective_id":"usable_specific_energy","value":330,"lower":320,"upper":340,"evidence_id":"E-SYN-1"},{"objective_id":"lifetime_energy_throughput","value":1700,"lower":1600,"upper":1800,"evidence_id":"E-SYN-1"},{"objective_id":"manufacturing_cost","value":110,"lower":105,"upper":115,"evidence_id":"E-SYN-1"}]},{"scenario_id":"hot-aged","metrics":[{"objective_id":"usable_specific_energy","value":310,"lower":300,"upper":320,"evidence_id":"E-SYN-1"},{"objective_id":"lifetime_energy_throughput","value":1450,"lower":1350,"upper":1550,"evidence_id":"E-SYN-1"},{"objective_id":"manufacturing_cost","value":112,"lower":107,"upper":117,"evidence_id":"E-SYN-1"}]}],"hard_gates":[{"gate_id":"mission_feasible_synthetic","disposition":"pass","evidence_id":"E-SYN-1"},{"gate_id":"manufacturing_window_declared","disposition":"pass","evidence_id":"E-SYN-1"},{"gate_id":"physical_safety_qualification","disposition":"unknown","evidence_id":"E-SYN-1"}]},
+    {"candidate_id":"design-b","revision":"r1","design_refs":{"materials":["synthetic-LFP"],"electrode_design":"electrode-b","process_window":"recipe-b-window","cell_configuration":"cell-b"},"scenario_metrics":[{"scenario_id":"nominal","metrics":[{"objective_id":"usable_specific_energy","value":302,"lower":295,"upper":309,"evidence_id":"E-SYN-1"},{"objective_id":"lifetime_energy_throughput","value":2050,"lower":1950,"upper":2150,"evidence_id":"E-SYN-1"},{"objective_id":"manufacturing_cost","value":100,"lower":96,"upper":104,"evidence_id":"E-SYN-1"}]},{"scenario_id":"hot-aged","metrics":[{"objective_id":"usable_specific_energy","value":295,"lower":288,"upper":302,"evidence_id":"E-SYN-1"},{"objective_id":"lifetime_energy_throughput","value":1850,"lower":1750,"upper":1950,"evidence_id":"E-SYN-1"},{"objective_id":"manufacturing_cost","value":104,"lower":100,"upper":108,"evidence_id":"E-SYN-1"}]}],"hard_gates":[{"gate_id":"mission_feasible_synthetic","disposition":"pass","evidence_id":"E-SYN-1"},{"gate_id":"manufacturing_window_declared","disposition":"pass","evidence_id":"E-SYN-1"},{"gate_id":"physical_safety_qualification","disposition":"unknown","evidence_id":"E-SYN-1"}]}
+  ],
+  "experiment_options": [
+    {"experiment_id":"exp-relaxation-impedance","question":"Can relaxation plus impedance distinguish the limiting mechanism?","estimated_cost_usd":150,"duration_hours":4,"material_consumption_g":5,"risk_class":"low","expected_information_gain":0.35,"estimate_evidence_id":"E-SYN-2"},
+    {"experiment_id":"exp-replicate-cell-build","question":"Can repeat complete-cell builds estimate between-batch variance?","estimated_cost_usd":3000,"duration_hours":336,"material_consumption_g":120,"risk_class":"moderate","expected_information_gain":0.8,"estimate_evidence_id":"E-SYN-2"}
+  ],
+  "selection_policy": {"max_cost_usd":500,"max_duration_hours":12,"max_material_g":20,"allow_no_experiment":true,"maximum_risk_class":"moderate"}
+}
