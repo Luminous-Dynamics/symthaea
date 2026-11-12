@@ -1296,8 +1296,9 @@ mod tests {
         let fixture: serde_json::Value = serde_json::from_str(include_str!(
             "../../../docs/research/marine/fixtures/synthetic-marine-robust-pareto-v0.1.0.json"
         )).expect("fixture JSON parses");
-        assert_eq!(fixture["evidence_kind"], "synthetic");
         assert_eq!(fixture["candidates"].as_array().unwrap().len(), 2);
+        assert_eq!(fixture["candidates"][0]["evidence_kind"], "synthetic");
+        assert_eq!(fixture["candidates"][1]["evidence_kind"], "synthetic");
         assert!(fixture["candidates"][0]["metrics"][0]["operating_point_receipt_sha256"].is_string());
         assert_eq!(fixture["hard_gates"].as_array().unwrap().iter().filter(|gate| gate["non_compensable"] == true).count(), 2);
     }
