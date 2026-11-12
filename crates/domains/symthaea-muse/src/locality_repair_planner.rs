@@ -34,8 +34,7 @@ use crate::interaction_probe_plan::{
     InteractionProbePlanError, verify_interaction_probe_plan,
 };
 use crate::symbolic_audio_binding::{
-    AudioPreservationProfile, RendererManifest,
-    SymbolicAudioBindingError, audio_preservation_profile_sha256,
+    AudioPreservationProfile, RendererManifest, audio_preservation_profile_sha256,
     renderer_manifest_sha256, validate_frozen_edit_contract_for_rendering,
 };
 use serde::{Deserialize, Serialize};
@@ -54,6 +53,7 @@ pub struct RepairPlannerRequest {
     pub source_score_sha256: String,
     pub instruction_sha256: String,
     pub renderer_manifest_sha256: String,
+    pub preservation_profile_sha256: String,
     /// EVAL-017/018 process-level renderer identity and normalized config.
     /// The caller resolves this pair against the renderer manifest in its
     /// trusted adapter before constructing the request.
@@ -186,7 +186,6 @@ pub struct QualifiedSymbolicRepairCandidate {
     contract_sha256: String,
     renderer_manifest_sha256: String,
     preservation_profile_sha256: String,
-    operation: SupportedEditOperation,
     changed_event_indices: Vec<usize>,
     pitch_magnitude_semitones: u64,
 }
@@ -289,7 +288,6 @@ pub fn qualify_symbolic_repair_candidate(
         contract_sha256: input.contract.contract_sha256.clone(),
         renderer_manifest_sha256: manifest_sha256,
         preservation_profile_sha256: profile_sha256,
-        operation,
         changed_event_indices,
         pitch_magnitude_semitones,
     })
@@ -483,6 +481,7 @@ pub struct RepairObjectiveVector {
     /// Measured EVAL-017 influence support frames for changed source events.
     /// This is a planning exposure, not collateral ownership.
     pub measured_influence_support_frames: u64,
+    pub measured_influence_interval_count: usize,
     /// Maximum observed EVAL-018 PCM interaction RMS against protected events.
     pub max_protected_pcm_interaction_rms: f64,
     /// Maximum observed EVAL-018 spectral-magnitude interaction RMS.
@@ -505,6 +504,10 @@ pub struct RepairCandidateProposal {
     pub measured_interaction_receipts: Vec<String>,
     pub missing_influence_event_indices: Vec<usize>,
     pub unmeasured_protected_pairs: Vec<(usize, usize)>,
+    /// Pairs selected by EVAL-019 but still awaiting an EVAL-018 render/report.
+    pub selected_but_unmeasured_protected_pairs: Vec<(usize, usize)>,
+    /// Unmeasured pairs not selected by the current EVAL-019 plan.
+    pub unselected_protected_pairs: Vec<(usize, usize)>,
     pub selected_probe_plan_sha256: String,
     pub reasons: Vec<String>,
 }
@@ -539,6 +542,9 @@ pub struct LocalityRepairPlan {
     /// Deterministic lexicographic pick from the Pareto frontier. This is a
     /// recommendation only; it is not an acceptance or mutation authorization.
     pub preferred_candidate_id: Option<String>,
+    pub probe_all_possible_pair_count: u128,
+    pub probe_unprobed_pair_count: u128,
+    pub estimated_probe_render_count: u128,
     pub receipt_sha256: String,
 }
 
@@ -547,6 +553,7 @@ fn validate_request(request: &RepairPlannerRequest) -> Result<(), RepairPlannerE
         ("source_score_sha256", request.source_score_sha256.as_str()),
         ("instruction_sha256", request.instruction_sha256.as_str()),
         ("renderer_manifest_sha256", request.renderer_manifest_sha256.as_str()),
+        ("preservation_profile_sha256", request.preservation_profile_sha256.as_str()),
         ("renderer_identity_sha256", request.renderer_identity_sha256.as_str()),
         ("renderer_config_sha256", request.renderer_config_sha256.as_str()),
         ("probe_renderer_profile_sha256", request.probe_renderer_profile_sha256.as_str()),
@@ -587,6 +594,15 @@ fn validate_plan_context(
     {
         return Err(RepairPlannerError::ProbePlanMismatch);
     }
+    if request
+        .protected_event_indices
+        .iter()
+        .any(|index| *index >= probe_plan.event_count)
+    {
+        return Err(RepairPlannerError::InvalidRequest(
+            "protected event index is outside the probe plan Score inventory",
+        ));
+    }
     let mut candidate_ids = std::collections::BTreeSet::new();
     for candidate in candidates {
         if !candidate_ids.insert(candidate.candidate_id.clone()) {
@@ -600,6 +616,9 @@ fn validate_plan_context(
         }
         if candidate.renderer_manifest_sha256 != request.renderer_manifest_sha256 {
             return Err(RepairPlannerError::RendererManifestMismatch);
+        }
+        if candidate.preservation_profile_sha256 != request.preservation_profile_sha256 {
+            return Err(RepairPlannerError::SymbolicEvidenceRejected);
         }
     }
     for influence in influences {
@@ -675,11 +694,14 @@ pub fn build_locality_repair_plan(
 
         let mut missing_influence_event_indices = Vec::new();
         let mut measured_influence_support_frames = 0u64;
+        let mut measured_influence_interval_count = 0usize;
         let mut measured_influence_receipts = Vec::new();
         for event_index in &candidate.changed_event_indices {
             if let Some(evidence) = influence_by_event.get(event_index) {
                 measured_influence_support_frames =
                     measured_influence_support_frames.saturating_add(evidence.support_frames);
+                measured_influence_interval_count = measured_influence_interval_count
+                    .saturating_add(evidence.support_interval_count);
                 measured_influence_receipts.push(evidence.report_receipt_sha256.clone());
             } else {
                 missing_influence_event_indices.push(*event_index);
@@ -697,6 +719,8 @@ pub fn build_locality_repair_plan(
             }
         }
         let mut unmeasured_protected_pairs = Vec::new();
+        let mut selected_but_unmeasured_protected_pairs = Vec::new();
+        let mut unselected_protected_pairs = Vec::new();
         let mut max_protected_pcm_interaction_rms = 0.0f64;
         let mut max_protected_spectral_interaction_rms = 0.0f64;
         let mut measured_interaction_receipts = Vec::new();
@@ -708,9 +732,14 @@ pub fn build_locality_repair_plan(
                     .max(evidence.max_spectral_interaction_rms);
                 measured_interaction_receipts.push(evidence.report_receipt_sha256.clone());
             } else {
-                // It is still unknown whether this pair was selected, omitted,
-                // or not materialized by EVAL-019. Do not call it non-interacting.
-                let _was_selected = selected_probe_pairs.contains(&pair);
+                // A selected pair still awaits an actual four-coalition
+                // EVAL-018 result. A non-selected pair remains unprobed.
+                // Neither class is interpreted as non-interacting.
+                if selected_probe_pairs.contains(&pair) {
+                    selected_but_unmeasured_protected_pairs.push(pair);
+                } else {
+                    unselected_protected_pairs.push(pair);
+                }
                 unmeasured_protected_pairs.push(pair);
             }
         }
@@ -722,10 +751,14 @@ pub fn build_locality_repair_plan(
         } else if !missing_influence_event_indices.is_empty() {
             reasons.push("one or more changed source events lack replay-verified EVAL-017 evidence".to_owned());
             RepairProposalState::MissingEventInfluence
-        } else if unmeasured_protected_pairs.len()
-            > config.maximum_unmeasured_protected_pairs
+        } else if (request.require_complete_protected_pair_evidence
+            && !unmeasured_protected_pairs.is_empty())
+            || unmeasured_protected_pairs.len() > config.maximum_unmeasured_protected_pairs
         {
-            reasons.push("changed↔protected event pairs remain unmeasured; acquire the requested EVAL-018 probes".to_owned());
+            reasons.push(
+                "changed↔protected event pairs remain unmeasured; acquire selected probes and/or expand the EVAL-019 plan"
+                    .to_owned(),
+            );
             RepairProposalState::NeedsAdditionalProbes
         } else {
             reasons.push("symbolic contract and current evidence qualify this candidate for a new render; post-render acceptance remains separate".to_owned());
@@ -741,6 +774,7 @@ pub fn build_locality_repair_plan(
                 changed_event_count: candidate.changed_event_indices.len(),
                 pitch_magnitude_semitones: candidate.pitch_magnitude_semitones,
                 measured_influence_support_frames,
+                measured_influence_interval_count,
                 max_protected_pcm_interaction_rms,
                 max_protected_spectral_interaction_rms,
                 estimated_probe_render_count: probe_plan.estimated_render_count,
@@ -750,6 +784,8 @@ pub fn build_locality_repair_plan(
             measured_interaction_receipts,
             missing_influence_event_indices,
             unmeasured_protected_pairs,
+            selected_but_unmeasured_protected_pairs,
+            unselected_protected_pairs,
             selected_probe_plan_sha256: probe_plan.plan_receipt_sha256.clone(),
             reasons,
         });
@@ -788,6 +824,9 @@ pub fn build_locality_repair_plan(
         request,
         config,
         probe_plan_sha256: probe_plan.plan_receipt_sha256.clone(),
+        probe_all_possible_pair_count: probe_plan.all_possible_pair_count,
+        probe_unprobed_pair_count: probe_plan.unprobed_pair_count,
+        estimated_probe_render_count: probe_plan.estimated_render_count,
         proposals,
         pareto_frontier_candidate_ids,
         preferred_candidate_id,
@@ -801,6 +840,7 @@ fn dominates(left: &RepairObjectiveVector, right: &RepairObjectiveVector) -> boo
     let no_worse = left.changed_event_count <= right.changed_event_count
         && left.pitch_magnitude_semitones <= right.pitch_magnitude_semitones
         && left.measured_influence_support_frames <= right.measured_influence_support_frames
+        && left.measured_influence_interval_count <= right.measured_influence_interval_count
         && left.max_protected_pcm_interaction_rms <= right.max_protected_pcm_interaction_rms
         && left.max_protected_spectral_interaction_rms <= right.max_protected_spectral_interaction_rms
         && left.estimated_probe_render_count <= right.estimated_probe_render_count
@@ -808,6 +848,7 @@ fn dominates(left: &RepairObjectiveVector, right: &RepairObjectiveVector) -> boo
     let strictly_better = left.changed_event_count < right.changed_event_count
         || left.pitch_magnitude_semitones < right.pitch_magnitude_semitones
         || left.measured_influence_support_frames < right.measured_influence_support_frames
+        || left.measured_influence_interval_count < right.measured_influence_interval_count
         || left.max_protected_pcm_interaction_rms < right.max_protected_pcm_interaction_rms
         || left.max_protected_spectral_interaction_rms < right.max_protected_spectral_interaction_rms
         || left.estimated_probe_render_count < right.estimated_probe_render_count
@@ -868,7 +909,6 @@ mod tests {
             contract_sha256: digest(&format!("contract-{id}")),
             renderer_manifest_sha256: digest("manifest"),
             preservation_profile_sha256: digest("preservation-profile"),
-            operation: SupportedEditOperation::PitchAt,
             changed_event_indices: changed.to_vec(),
             pitch_magnitude_semitones: magnitude,
         }
@@ -921,6 +961,7 @@ mod tests {
             source_score_sha256: digest("source"),
             instruction_sha256: digest("instruction"),
             renderer_manifest_sha256: digest("manifest"),
+            preservation_profile_sha256: digest("preservation-profile"),
             renderer_identity_sha256: digest("renderer"),
             renderer_config_sha256: digest("config"),
             probe_renderer_profile_sha256: digest("probe-profile"),
@@ -961,6 +1002,14 @@ mod tests {
         ).unwrap();
         assert_eq!(result.proposals[0].state, RepairProposalState::NeedsAdditionalProbes);
         assert_eq!(result.proposals[0].unmeasured_protected_pairs, vec![(0, 2), (0, 3)]);
+        assert_eq!(
+            result.proposals[0].selected_but_unmeasured_protected_pairs,
+            vec![(0, 2)]
+        );
+        assert_eq!(
+            result.proposals[0].unselected_protected_pairs,
+            vec![(0, 3)]
+        );
         assert!(result.proposals[0].objectives.unmeasured_protected_pairs > 0);
     }
 
@@ -997,6 +1046,9 @@ mod tests {
         assert_eq!(result.proposals[0].state, RepairProposalState::ReadyForCandidateRender);
         assert_eq!(result.preferred_candidate_id.as_deref(), Some("c1"));
         assert_eq!(result.proposals[0].objectives.unmeasured_protected_pairs, 0);
+        assert_eq!(result.probe_all_possible_pair_count, 6);
+        assert_eq!(result.probe_unprobed_pair_count, 3);
+        assert_eq!(result.estimated_probe_render_count, 8);
     }
 
     #[test]
