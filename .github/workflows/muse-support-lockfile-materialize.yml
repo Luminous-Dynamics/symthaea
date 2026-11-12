@@ -8,6 +8,11 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - ".github/workflows/muse-support-lockfile-materialize.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/muse-support-lockfile-materialize.yml"
   workflow_dispatch:
 
 permissions:
