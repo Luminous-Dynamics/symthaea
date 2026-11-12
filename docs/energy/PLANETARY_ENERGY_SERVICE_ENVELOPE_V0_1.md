@@ -521,6 +521,25 @@ cargo run -p xtask -- planetary-reference-audit \
 
 This checks unique source/metric identities, HTTPS source pointers, admitted evidence classes, source resolution, unit presence, value type, explicit system boundary and non-empty caveats. It does not retrieve or independently reproduce the source measurements, validate vendor/project claims, normalize cost-year assumptions or conclude that one technology is better. PASS means only that the snapshot is source-bound and its comparison metadata is complete enough for review.
 
+### 14.3 Source and competitive-reference audit
+
+The reference command checks both the source discovery register and the competitive metric snapshot:
+
+```bash
+cargo run -p xtask -- planetary-reference-audit
+```
+
+To write a machine-readable report:
+
+```bash
+cargo run -p xtask -- planetary-reference-audit \
+  --source-register research/planetary-energy/source-register-v0.1.json \
+  --competitive-snapshot benchmarks/planetary-energy-service/v0.1/competitive-reference-snapshot.json \
+  --out reports/planetary-energy/reference-audit.json
+```
+
+It verifies unique source/reference/metric identities, required evidence and claim-boundary metadata, HTTPS source pointers, non-empty units and system boundaries, caveats, and metric-to-source references. It does not authenticate external URLs, reproduce a paper, verify the truth of a reported number, or validate a technology.
+
 ### Tests and claim ceiling
 
 Focused tests are authored under `xtask/src/planetary_energy.rs` and can be run with:
