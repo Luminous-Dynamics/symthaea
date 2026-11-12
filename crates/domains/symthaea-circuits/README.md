@@ -85,3 +85,12 @@ The `mimo_impedance_passport` module validates complete multi-port impedance swe
 Measured sweeps require instrument, calibration-certificate, channel-map and synchronization digests. Matrix lookup is exact-knot only; interpolation and extrapolation are not authorized. Missing cross-port responses are errors, never implicit zeros. Derived impedances are point estimates; supplied voltage/current error bounds are retained but not propagated into a formal complex interval enclosure.
 
 See `docs/research/AIRROAD_PDCM_MIMO_PASSPORT_001_V0_1.md`.
+
+
+## MIMO impedance complex hard-bound enclosures
+
+The `mimo_impedance_enclosure` module propagates deterministic absolute complex-phasor error discs through each MIMO impedance quotient `Z_ij = V_i / I_j`. It requires an explicit deterministic hard-bound method reference; statistical-only uncertainty is rejected. Each current disc must exclude zero.
+
+V0.1 uses axis-aligned voltage/current rectangles plus an independently bounded radial denominator interval and outward-rounded binary64 interval arithmetic. This returns a conservative real/imaginary rectangle for every matrix element. Voltage/current dependence is treated as independent sets, which can widen the result. It is not a covariance or probability calculation, nor an exact quotient image. Off-knot interpolation is not performed.
+
+See `docs/research/AIRROAD_MIMO_UQ_001_V0_1.md`.
