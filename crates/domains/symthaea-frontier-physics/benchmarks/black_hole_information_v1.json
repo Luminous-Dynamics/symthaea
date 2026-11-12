@@ -522,6 +522,45 @@
         "unsupported_models_return_unresolved": true
       },
       "implementation_status": "not_implemented"
+    },
+    {
+      "id": "QI-3H",
+      "name": "joint U(1) hydrodynamic, operator-front and entanglement analysis",
+      "status": "source_authored_tests_pending_rust_execution",
+      "model": "Same fixed-charge local brickwork circuit family; domain-wall product-state density/current trajectories, local-X operator spreading measured with local-Z squared commutators, and half-chain entropy from the domain-wall quench",
+      "observables": [
+        "charge_density_gradient_second_moment_by_layer",
+        "effective_charge_diffusion_coefficient_D_from_gradient_width_slope_over_2",
+        "left_and_right_local_Z_OTOC_threshold_front_positions",
+        "left_and_right_butterfly_front_velocities_vB",
+        "half_chain_entropy_growth_rate",
+        "Page_normalized_entanglement_velocity_vE",
+        "linear_fit_R_squared_for_D_vB_left_vB_right_and_vE",
+        "boundary_censoring_of_operator_front_positions",
+        "charge_continuity_norm_and_operator_norm_residuals"
+      ],
+      "definitions": {
+        "diffusion_width": "Var of |n_(i+1)-n_i| over bond-centre positions, normalized by total absolute density gradient",
+        "diffusion_estimator": "Fit width_variance(t)=intercept+2*D*t over the preregistered layer interval",
+        "butterfly_front": "Furthest site on each side of the source where ensemble-mean normalized squared commutator with local Z exceeds the preregistered threshold; boundary-censored points excluded from velocity fits",
+        "entanglement_velocity": "Slope of half-chain entropy vs layer, divided by the exact symmetry-resolved Page mean for the same (N,K,A=N/2)"
+      },
+      "acceptance": {
+        "same_register_and_fixed_charge_for_all_three_observables": true,
+        "operator_front_threshold": "Frozen before examining depth-dependent front trajectories; range (0,2]",
+        "fit_windows": "Frozen before fitting; inclusive layer/depth intervals recorded in the receipt",
+        "no_boundary_censored_points_in_vB_fits": true,
+        "linear_fit_R_squared_reported_not_hidden": true,
+        "density_continuity_residual": 1e-9,
+        "domain_wall_norm_drift": 1e-9,
+        "domain_wall_charge_drift": 1e-9,
+        "operator_hilbert_schmidt_norm_drift": 1e-9,
+        "no_universal_claim_from_one_register_or_one_depth_window": true
+      },
+      "implementation_status": "joint analysis API, fit diagnostics, boundary-censoring and input validation tests authored; Rust execution pending",
+      "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
+      "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/u1_hydrodynamic_scrambling_v1.json",
+      "claim_ceiling": "Finite-size random U(1)-conserving qubit-chain diagnostics. Fitted D, vB and vE are effective circuit-specific parameters; they are not black-hole transport coefficients, universal constants or gravitational observables."
     }
   ],
   "negative_controls": [
@@ -563,7 +602,12 @@
     "infer asymptotic operator-front velocity from one system size or one random seed",
     "initialize the sequential-emission scrambling benchmark from a Haar-random fixed-charge state and then claim entropy growth from a low-entropy black hole",
     "call QI-4A mutual-information decoupling a successful recovery decoder",
-    "substitute Pinsker's mutual-information upper bound for the directly measured trace distance"
+    "substitute Pinsker's mutual-information upper bound for the directly measured trace distance",
+    "fit diffusion coefficient after late-time finite-size reflection without reporting fit-window sensitivity",
+    "include boundary-censored OTOC fronts in butterfly velocity regression",
+    "call an OTOC threshold velocity a universal butterfly velocity without threshold and time-window sensitivity",
+    "compare entanglement growth across different N,K or local gate ensembles without matching Page normalization and gate schedule",
+    "infer gravitational black-hole diffusion, Hawking information flow or a universal vB/vE relation from a small closed spin chain"
   ],
   "competitive_baselines": [
     {
@@ -715,7 +759,8 @@
       "QI_3O_operator_error_taxonomy": "source_authored_not_executed",
       "QI_3_sequential_product_state_initialization": "source_authored_not_executed",
       "QI_4A_direct_decoupling_trace_distance": "source_authored_not_executed",
-      "QI_4A_quantum_Pinsker_consistency": "source_authored_not_executed"
+      "QI_4A_quantum_Pinsker_consistency": "source_authored_not_executed",
+      "QI_3H_joint_U1_hydrodynamic_scrambling_analysis": "source_authored_tests_pending_rust_execution"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
@@ -724,7 +769,8 @@
       "hayden_preskill_recovery_decoders": "not implemented; current QI-4A diagnostic has no recovery map, entanglement-fidelity measurement, or decoder cost",
       "mps_entropy_from_validated_schmidt_spectrum": "not_qualified",
       "island_or_qes_calculation": "not_implemented",
-      "energy_conserving_circuits": "U(1)-conserving equal-gap qubit gate family and sequential factor-transfer toy model authored; Rust execution pending"
+      "energy_conserving_circuits": "U(1)-conserving equal-gap qubit gate family and sequential factor-transfer toy model authored; Rust execution pending",
+      "QI_3H_thermodynamic_limit_scaling": "no cross-N finite-size scaling or thermodynamic-limit coefficient qualification yet"
     },
     "resource_limits": {
       "dense_state_qubits_max": 20,
