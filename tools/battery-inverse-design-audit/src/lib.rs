@@ -1138,7 +1138,8 @@ mod tests {
         let mut second = vec![b, a];
 
         for item in first.iter_mut().chain(second.iter_mut()) {
-            item.hard_gates.retain(|gate| gate.gate_id != "physical_safety");
+            item.hard_gates
+                .retain(|gate| gate.gate_id != "physical_safety");
         }
 
         let one = audit_design_portfolio(&scenarios(), &objectives(), &evidence(), &first).expect("first order");
