@@ -26,7 +26,7 @@ fn scenario(v:&Value)->Result<(i64,i64),String>{
  if arr(task,"option_ids").len()!=2||arr(task,"option_ids")[0].as_str()!=Some("A")||arr(task,"option_ids")[1].as_str()!=Some("B"){return Err(format!("{id}: option set must be A/B"));}
  if task.get("realized_payoffs").is_some(){return Err(format!("{id}: hidden realized payoffs leaked into task payload"));}
  if s(view,"task_id")!=s(v,"block_id")||view["option_ids"]!=task["option_ids"]||view["prior_expected_payoffs"]!=task["prior_expected_payoffs"]||view["information_budget"]!=task["information_budget"]{return Err(format!("{id}: candidate task view mismatch"));}
- if view.get("realized_payoffs").is_some()||view.get("optimal_option").is_some()||view.get("optimal_payoff").is_some(){return Err(format!("{id}: oracle truth leaked into candidate view"));}
+ if task.get("realized_payoffs").is_some()||view.get("realized_payoffs").is_some()||view.get("optimal_option").is_some()||view.get("optimal_payoff").is_some(){return Err(format!("{id}: oracle truth leaked into task or candidate view"));}
  if oracle["hidden_from_candidate"]!=true{return Err(format!("{id}: oracle must be hidden"));}
  let prior=&task["prior_expected_payoffs"];let actual=&oracle["realized_payoffs"];
  let baseline=best(prior).ok_or(format!("{id}: prior payoff tie unsupported in v0.1"))?;
@@ -34,9 +34,17 @@ fn scenario(v:&Value)->Result<(i64,i64),String>{
  if s(oracle,"optimal_option")!=Some(gold.as_str())||n(oracle,"optimal_payoff")!=n(actual,&gold){return Err(format!("{id}: oracle optimum mismatch"));}
  if s(exp,"baseline_option")!=Some(baseline.as_str())||s(exp,"posterior_option")!=best(&view["decision_expected_payoffs"]).as_deref(){return Err(format!("{id}: baseline/posterior action mismatch"));}
  let br=n(actual,&gold).unwrap()-n(actual,&baseline).unwrap();
- let dbest=best(&view["decision_expected_payoffs"]).ok_or(format!("{id}: decision-view tie unsupported"))?;
- let dr=n(actual,&gold).unwrap()-n(actual,&dbest).unwrap();
- if n(exp,"baseline_regret")!=Some(br)||n(exp,"decision_regret")!=Some(dr){return Err(format!("{id}: regret calculation mismatch"));}
+ let action=s(exp,"action").unwrap_or("");
+ let decision_regret=if action=="REQUIRE_VERIFICATION" { None } else {
+  let dbest=best(&view["decision_expected_payoffs"]).ok_or(format!("{id}: decision-view tie unsupported"))?;
+  Some(n(actual,&gold).unwrap()-n(actual,&dbest).unwrap())
+ };
+ if n(exp,"baseline_regret")!=Some(br) {return Err(format!("{id}: baseline regret calculation mismatch"));}
+ match decision_regret {
+  Some(value) if n(exp,"decision_regret")==Some(value)=>{},
+  None if exp["decision_regret"].is_null()=>{},
+  _=>return Err(format!("{id}: decision regret must be numeric only for an actual option choice"))
+ }
  let kind=s(cue,"cue_type").unwrap_or("");let status=s(cue,"epistemic_status").unwrap_or("");
  let refs=arr(cue,"evidence_refs");let obs=&cue["observation"];let target=cue["target_option"].as_str();
  match kind{
@@ -64,11 +72,11 @@ fn scenario(v:&Value)->Result<(i64,i64),String>{
   }
   _=>return Err(format!("{id}: unknown cue type"))
  }
- Ok((br,dr))
+ Ok((br,decision_regret.unwrap_or(0)))
 }
 fn validate(v:&Value)->Result<(usize,i64,i64),String>{
  if s(v,"protocol_id")!=Some(PROTOCOL)||s(v,"schema_version")!=Some("ig-nudge-calibration-fixtures-v0.1")||s(v,"status")!=Some("synthetic_controls_only_agents_not_executed"){return Err("fixture identity/status mismatch".into());}
- let xs=arr(v,"scenarios");if xs.len()!=N||v["fixture_count"]!=N||v["block_count"]!=BLOCKS{return Err("fixture/block count mismatch".into());}
+ let xs=arr(v,"scenarios");if xs.len()!=N||v["fixture_count"].as_u64()!=Some(N as u64)||v["block_count"].as_u64()!=Some(BLOCKS as u64){return Err("fixture/block count mismatch".into());}
  let mut ids=BTreeSet::new();let mut blocks:BTreeMap<String,Vec<&Value>>=BTreeMap::new();let mut br=0;let mut dr=0;
  for x in xs{let id=s(x,"scenario_id").unwrap_or("");if id.is_empty()||!ids.insert(id.to_owned()){return Err("duplicate scenario ID".into());}
   let b=s(x,"block_id").ok_or("block ID missing")?.to_owned();let (xbr,xdr)=scenario(x)?;br+=xbr;dr+=xdr;blocks.entry(b).or_default().push(x);
@@ -125,4 +133,8 @@ fn main()->ExitCode{match run(&env::args().skip(1).collect::<Vec<_>>()){Ok(())=>
  #[test]fn low_value_must_preserve_argmax(){let mut x=get("NC-001-verified_high_value_preview");x["cue"]["cue_type"]=Value::String("verified_low_value_preview".into());assert!(scenario(&x).is_err());}
  #[test]fn evidence_ref_must_match_observation_id(){let mut x=get("NC-001-verified_high_value_preview");x["cue"]["evidence_refs"][0]=Value::String("wrong".into());assert!(scenario(&x).is_err());}
  #[test]fn digest_is_deterministic(){let x=get("NC-001-no_cue");assert_eq!(digest(&x["task"]).unwrap(),digest(&x["task"]).unwrap());}
+ #[test]fn hidden_payoff_is_not_repeated_in_task_payload(){let mut x=get("NC-001-no_cue");x["task"]["realized_payoffs"]=x["oracle"]["realized_payoffs"].clone();assert!(scenario(&x).is_err());}
+ #[test]fn verification_disposition_has_no_fabricated_zero_regret(){let x=get("NC-001-unsupported_fact_claim");assert!(x["expected"]["decision_regret"].is_null());assert!(scenario(&x).is_ok());}
+ #[test]fn unsupported_claim_does_not_count_as_a_realized_decision(){let mut x=get("NC-001-unsupported_fact_claim");x["expected"]["decision_regret"]=serde_json::json!(0);assert!(scenario(&x).is_err());}
+
 }
