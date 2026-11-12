@@ -31,6 +31,7 @@ enum LabelState {
 #[derive(Debug)]
 struct GroundTruthReport {
     states: BTreeMap<String, LabelState>,
+    composition_column_count: usize,
     known_complete_compositions: usize,
     known_incomplete_compositions: usize,
     composition_sum_residuals: Vec<(String, f64)>,
@@ -94,10 +95,13 @@ fn parse_ground_truth<R: Read>(reader: R) -> Result<GroundTruthReport, String> {
         .from_reader(reader);
     let headers = csv.headers().map_err(|error| error.to_string())?.clone();
     let id_index = label_index(&headers)?;
-    let status_index = headers.iter().position(|value| {
-        let value = normalize_header(value);
-        value.contains("unknown") && value.contains("outlier")
-    });
+    let status_index = headers
+        .iter()
+        .position(|value| {
+            let value = normalize_header(value);
+            value.contains("unknown") && value.contains("outlier")
+        })
+        .ok_or_else(|| "ground-truth CSV is missing the required unknown/outlier status column".to_owned())?;
     let composition_indices: Vec<usize> = headers
         .iter()
         .enumerate()
@@ -129,8 +133,8 @@ fn parse_ground_truth<R: Read>(reader: R) -> Result<GroundTruthReport, String> {
             return Err(format!("duplicate ground-truth specimen ID {sample_id}"));
         }
 
-        let status = status_index
-            .and_then(|index| row.get(index))
+        let status = row
+            .get(status_index)
             .unwrap_or_default()
             .trim()
             .to_ascii_lowercase();
@@ -177,6 +181,7 @@ fn parse_ground_truth<R: Read>(reader: R) -> Result<GroundTruthReport, String> {
 
     Ok(GroundTruthReport {
         states,
+        composition_column_count: composition_indices.len(),
         known_complete_compositions,
         known_incomplete_compositions,
         composition_sum_residuals,
@@ -383,6 +388,7 @@ fn validate_source_metadata(
     sample_count: usize,
     unknown_count: usize,
     outlier_count: usize,
+    composition_column_count: usize,
     wavelength_count: usize,
 ) -> Result<(), String> {
     if metadata.get("source_id").and_then(Value::as_str) != Some(DATASET_ID) {
@@ -394,6 +400,7 @@ fn validate_source_metadata(
         ("expected_sample_count", sample_count),
         ("expected_unknown_count", unknown_count),
         ("expected_outlier_count", outlier_count),
+        ("expected_composition_column_count", composition_column_count),
         ("expected_wavelength_count", wavelength_count),
     ] {
         let expected = metadata
@@ -518,6 +525,7 @@ fn run(inputs: Inputs) -> Result<Value, Box<dyn Error>> {
         sample_count,
         unknown_count,
         outlier_count,
+        ground_truth.composition_column_count,
         wavelength_count,
     )
     .map_err(|error| format!("source metadata rejected: {error}"))?;
@@ -552,6 +560,7 @@ fn run(inputs: Inputs) -> Result<Value, Box<dyn Error>> {
             "unknown": unknown_count,
             "outlier": outlier_count,
             "known_complete_compositions": ground_truth.known_complete_compositions,
+            "composition_column_count": ground_truth.composition_column_count,
             "known_incomplete_compositions": ground_truth.known_incomplete_compositions,
             "composition_sum_residuals": residuals
         },
@@ -659,6 +668,13 @@ mod tests {
         assert_eq!(report.counts.get("train"), Some(&1));
         assert_eq!(report.counts.get("validation"), Some(&1));
         assert_eq!(report.counts.get("test"), Some(&2));
+    }
+
+    #[test]
+    fn rejects_ground_truth_without_explicit_unknown_outlier_status_column() {
+        let bad = GT.replace("Unknown or outlier?;", "");
+        let error = parse_ground_truth(bad.as_bytes()).unwrap_err();
+        assert!(error.contains("missing the required unknown/outlier status column"));
     }
 
     #[test]
