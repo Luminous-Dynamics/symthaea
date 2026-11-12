@@ -55,6 +55,7 @@ The fixture is `data/research/thermal_store_accounting_fixtures_v0_1.json`. It u
 Each scenario has:
 - a unique scenario ID and technology label;
 - a functional heat-service boundary (service identity/type, outlet temperature, optional pressure/flow, delivery duration, trace digest);
+- an exact wall-plug energy-boundary contract identity, including which conversion and auxiliary systems are inside the meter perimeter;
 - a metering mode;
 - wall-plug meter inputs with unique input and meter-boundary identities;
 - explicit primary-process and auxiliary meter roles, or one exclusive total meter;
@@ -63,7 +64,7 @@ Each scenario has:
 - stored energy withdrawn, useful delivered heat and discharge losses;
 - expected disposition.
 
-The branch-meter rule is intentionally strict: an auxiliary meter must be present. A true zero auxiliary draw must be represented by an explicit meter observation of zero. An absent meter or unknown energy is not equivalent to zero.
+The wall-plug boundary contract ID is mandatory and participates in comparability. Two scenarios can each close their own accounting yet remain NOT_COMPARABLE when their input metering perimeters differ. The branch-meter rule is intentionally strict: an auxiliary meter must be present. A true zero auxiliary draw must be represented by an explicit meter observation of zero. An absent meter or unknown energy is not equivalent to zero.
 
 ### Accounting identities
 
@@ -95,7 +96,7 @@ It is not electricity-to-electricity round-trip efficiency, and it is not a ther
 | `COMPARABLE` | Both scenarios pass and their entire service contracts match exactly |
 | `NOT_COMPARABLE` | Valid individual scenarios do not deliver the same declared service |
 
-A `PASS` on a synthetic case does not reproduce an experiment. A `COMPARABLE` disposition means only that the frozen service contract matches; it does not establish technical merit or commercial competitiveness.
+A `PASS` on a synthetic case does not reproduce an experiment. A `COMPARABLE` disposition means only that the frozen service and wall-plug energy-boundary contracts match; it does not establish technical merit or commercial competitiveness.
 
 ## 5. Frozen synthetic reference results
 
@@ -112,7 +113,7 @@ The current fixture deliberately contains:
 - unknown energy unit;
 - a valid exclusive-total-meter scenario.
 
-The two same-service reference rows currently compute:
+The same-service reference rows currently compute:
 - resistance fixture: 732,804 ppm (73.2804%);
 - plasma fixture: 675,609 ppm (67.5609%).
 
