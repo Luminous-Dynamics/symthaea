@@ -2144,7 +2144,6 @@ pub fn simulate_small_hayden_preskill_petz_recovery(
     petz_recovery_from_scrambler(&scrambler, seed, tolerance)
 }
 
-
 /// Operational one-step rotated-Petz recovery result. The real parameter t
 /// selects the modular rotation rho_A^(-1/2 - i t/2); t=0 is the ordinary
 /// Petz recovery map. The decoder still receives only A=E tensor R.
@@ -2207,7 +2206,9 @@ pub fn sample_small_hayden_preskill_rotated_petz_ensemble(
 ) -> Result<HaydenPreskillRotatedPetzEnsembleSummary, QuantumInformationError> {
     validate_tolerance(tolerance)?;
     if sample_count < 2 {
-        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(
+            sample_count,
+        ));
     }
     if !modular_parameter.is_finite() {
         return Err(QuantumInformationError::InvalidTolerance(modular_parameter));
@@ -2230,8 +2231,7 @@ pub fn sample_small_hayden_preskill_rotated_petz_ensemble(
         m2 += delta * (sample.entanglement_fidelity - mean);
         minimum = minimum.min(sample.entanglement_fidelity);
         maximum = maximum.max(sample.entanglement_fidelity);
-        maximum_power_residual =
-            maximum_power_residual.max(sample.inverse_modular_power_residual);
+        maximum_power_residual = maximum_power_residual.max(sample.inverse_modular_power_residual);
         maximum_trace_residual = maximum_trace_residual.max(sample.trace_preservation_residual);
     }
     Ok(HaydenPreskillRotatedPetzEnsembleSummary {
@@ -2265,8 +2265,7 @@ fn rotated_petz_recovery_from_scrambler(
                 for message in 0..2 {
                     let input = (message << 1) | early_radiation;
                     let output = (emitted << 1) | b_prime;
-                    kraus[accessible * 2 + message] =
-                        scrambler[output][input] * inverse_sqrt_two;
+                    kraus[accessible * 2 + message] = scrambler[output][input] * inverse_sqrt_two;
                 }
             }
         }
@@ -2284,12 +2283,7 @@ fn rotated_petz_recovery_from_scrambler(
         }
     }
     let (modular_inverse_power, inverse_modular_power_residual) =
-        complex_hermitian_complex_power_4(
-            rho_a,
-            -0.5,
-            -0.5 * modular_parameter,
-            tolerance,
-        )?;
+        complex_hermitian_complex_power_4(rho_a, -0.5, -0.5 * modular_parameter, tolerance)?;
 
     let mut recovery_kraus = [[Complex64::new(0.0, 0.0); 8]; 2];
     for b_prime in 0..2 {
@@ -2349,7 +2343,9 @@ fn rotated_petz_recovery_from_scrambler(
         || entanglement_fidelity < -tolerance
         || entanglement_fidelity > 1.0 + tolerance
     {
-        return Err(QuantumInformationError::InvalidPageEntropy(entanglement_fidelity));
+        return Err(QuantumInformationError::InvalidPageEntropy(
+            entanglement_fidelity,
+        ));
     }
 
     Ok(HaydenPreskillRotatedPetzRecoverySample {
@@ -2507,17 +2503,11 @@ mod rotated_petz_recovery_tests {
     #[test]
     fn zero_modular_rotation_reproduces_ordinary_petz_fidelity() {
         for seed in 0..16 {
-            let petz = simulate_small_hayden_preskill_petz_recovery(
-                0x7E70 + seed,
-                TOLERANCE,
-            )
-            .unwrap();
-            let rotated = simulate_small_hayden_preskill_rotated_petz_recovery(
-                0x7E70 + seed,
-                0.0,
-                TOLERANCE,
-            )
-            .unwrap();
+            let petz =
+                simulate_small_hayden_preskill_petz_recovery(0x7E70 + seed, TOLERANCE).unwrap();
+            let rotated =
+                simulate_small_hayden_preskill_rotated_petz_recovery(0x7E70 + seed, 0.0, TOLERANCE)
+                    .unwrap();
             assert!((rotated.entanglement_fidelity - petz.entanglement_fidelity).abs() < 1e-8);
             assert!(rotated.inverse_modular_power_residual < 1e-8);
             assert!(rotated.trace_preservation_residual < 1e-8);
@@ -2544,11 +2534,9 @@ mod rotated_petz_recovery_tests {
     #[test]
     fn rotated_petz_ensemble_reports_uncertainty_and_is_seed_reproducible() {
         let first =
-            sample_small_hayden_preskill_rotated_petz_ensemble(8, 0xB047, 0.75, TOLERANCE)
-                .unwrap();
+            sample_small_hayden_preskill_rotated_petz_ensemble(8, 0xB047, 0.75, TOLERANCE).unwrap();
         let repeated =
-            sample_small_hayden_preskill_rotated_petz_ensemble(8, 0xB047, 0.75, TOLERANCE)
-                .unwrap();
+            sample_small_hayden_preskill_rotated_petz_ensemble(8, 0xB047, 0.75, TOLERANCE).unwrap();
         assert_eq!(first, repeated);
         assert_eq!(first.sample_count, 8);
         assert!((0.0..=1.0).contains(&first.mean_entanglement_fidelity));
