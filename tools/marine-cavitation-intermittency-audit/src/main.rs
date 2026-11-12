@@ -48,7 +48,47 @@ struct WaterCondition {
     instrument_id: String,
     calibration_certificate_sha256: String,
     evidence_sha256: String,
-    nuclei_distribution_evidence_sha256: Option<String>,
+    nuclei_distribution: Option<NucleiDistribution>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
+struct NucleiDistribution {
+    measurement_id: String,
+    method_id: String,
+    instrument_id: String,
+    calibration_certificate_sha256: String,
+    evidence_sha256: String,
+    sample_volume_ml: f64,
+    number_concentration_equivalence_tolerance_per_ml: f64,
+    wasserstein1_equivalence_tolerance_um: f64,
+    bins: Vec<NucleiBin>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
+struct NucleiBin {
+    diameter_lower_um: f64,
+    diameter_upper_um: f64,
+    number_concentration_per_ml: f64,
+    expanded_uncertainty_per_ml: f64,
+}
+
+#[derive(Debug, Serialize)]
+struct NucleiDistributionComparison {
+    reference_run_id: String,
+    run_id: String,
+    disposition: &'static str,
+    reference_total_number_concentration_per_ml: Option<f64>,
+    run_total_number_concentration_per_ml: Option<f64>,
+    absolute_total_number_concentration_difference_per_ml: Option<f64>,
+    total_number_concentration_difference_lower_per_ml: Option<f64>,
+    total_number_concentration_difference_upper_per_ml: Option<f64>,
+    total_number_concentration_equivalence_tolerance_per_ml: Option<f64>,
+    wasserstein1_distance_um: Option<f64>,
+    wasserstein1_distance_lower_um: Option<f64>,
+    wasserstein1_distance_upper_um: Option<f64>,
+    wasserstein1_equivalence_tolerance_um: Option<f64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -149,6 +189,7 @@ struct AuditReport {
     claim_ceiling: &'static str,
     run_reports: Vec<RunReport>,
     nuclei_distribution_coverage_fraction: f64,
+    nuclei_distribution_comparisons: Vec<NucleiDistributionComparison>,
     run_to_run_energy_mean_sd_db: Option<f64>,
     run_to_run_energy_mean_range_db: Option<f64>,
     reasons: Vec<String>,
@@ -288,6 +329,154 @@ fn ittc_background_corrected_spl(
     }
 }
 
+fn cdf_bounds(distribution: &NucleiDistribution, boundary_index: usize) -> (f64, f64) {
+    let prefix_lower: f64 = distribution.bins[..=boundary_index]
+        .iter()
+        .map(|bin| (bin.number_concentration_per_ml - bin.expanded_uncertainty_per_ml).max(0.0))
+        .sum();
+    let prefix_upper: f64 = distribution.bins[..=boundary_index]
+        .iter()
+        .map(|bin| bin.number_concentration_per_ml + bin.expanded_uncertainty_per_ml)
+        .sum();
+    let suffix_lower: f64 = distribution.bins[boundary_index + 1..]
+        .iter()
+        .map(|bin| (bin.number_concentration_per_ml - bin.expanded_uncertainty_per_ml).max(0.0))
+        .sum();
+    let suffix_upper: f64 = distribution.bins[boundary_index + 1..]
+        .iter()
+        .map(|bin| bin.number_concentration_per_ml + bin.expanded_uncertainty_per_ml)
+        .sum();
+    let lower_denominator = prefix_lower + suffix_upper;
+    let upper_denominator = prefix_upper + suffix_lower;
+    let lower = if lower_denominator > 0.0 {
+        prefix_lower / lower_denominator
+    } else {
+        0.0
+    };
+    let upper = if upper_denominator > 0.0 {
+        prefix_upper / upper_denominator
+    } else {
+        1.0
+    };
+    (lower, upper)
+}
+
+fn distribution_total(distribution: &NucleiDistribution) -> (f64, f64) {
+    let value = distribution.bins.iter()
+        .map(|bin| bin.number_concentration_per_ml)
+        .sum();
+    let uncertainty = distribution.bins.iter()
+        .map(|bin| bin.expanded_uncertainty_per_ml)
+        .sum();
+    (value, uncertainty)
+}
+
+fn compare_nuclei_distributions(
+    reference_run_id: &str,
+    run_id: &str,
+    reference: &NucleiDistribution,
+    candidate: &NucleiDistribution,
+) -> NucleiDistributionComparison {
+    let metadata_matches = reference.method_id == candidate.method_id
+        && reference.instrument_id == candidate.instrument_id
+        && reference.calibration_certificate_sha256 == candidate.calibration_certificate_sha256
+        && (reference.number_concentration_equivalence_tolerance_per_ml
+            - candidate.number_concentration_equivalence_tolerance_per_ml).abs() <= 1.0e-12
+        && (reference.wasserstein1_equivalence_tolerance_um
+            - candidate.wasserstein1_equivalence_tolerance_um).abs() <= 1.0e-12;
+    let bins_match = reference.bins.len() == candidate.bins.len()
+        && reference.bins.iter().zip(&candidate.bins).all(|(left, right)| {
+            (left.diameter_lower_um - right.diameter_lower_um).abs() <= 1.0e-9
+                && (left.diameter_upper_um - right.diameter_upper_um).abs() <= 1.0e-9
+        });
+    if !metadata_matches || !bins_match {
+        return NucleiDistributionComparison {
+            reference_run_id: reference_run_id.to_string(),
+            run_id: run_id.to_string(),
+            disposition: "incomparable_distribution_method_or_binning",
+            reference_total_number_concentration_per_ml: None,
+            run_total_number_concentration_per_ml: None,
+            absolute_total_number_concentration_difference_per_ml: None,
+            total_number_concentration_difference_lower_per_ml: None,
+            total_number_concentration_difference_upper_per_ml: None,
+            total_number_concentration_equivalence_tolerance_per_ml: Some(
+                reference.number_concentration_equivalence_tolerance_per_ml
+            ),
+            wasserstein1_distance_um: None,
+            wasserstein1_distance_lower_um: None,
+            wasserstein1_distance_upper_um: None,
+            wasserstein1_equivalence_tolerance_um: Some(reference.wasserstein1_equivalence_tolerance_um),
+        };
+    }
+
+    let (reference_total, reference_total_u) = distribution_total(reference);
+    let (candidate_total, candidate_total_u) = distribution_total(candidate);
+    let total_delta = (candidate_total - reference_total).abs();
+    let total_uncertainty = reference_total_u + candidate_total_u;
+    let total_lower = (total_delta - total_uncertainty).max(0.0);
+    let total_upper = total_delta + total_uncertainty;
+    let total_tolerance = reference.number_concentration_equivalence_tolerance_per_ml;
+
+    let mut w1 = 0.0;
+    let mut w1_lower = 0.0;
+    let mut w1_upper = 0.0;
+    for index in 0..reference.bins.len().saturating_sub(1) {
+        let reference_center = (reference.bins[index].diameter_lower_um
+            + reference.bins[index].diameter_upper_um) / 2.0;
+        let next_center = (reference.bins[index + 1].diameter_lower_um
+            + reference.bins[index + 1].diameter_upper_um) / 2.0;
+        let width = next_center - reference_center;
+        let reference_total_central = distribution_total(reference).0;
+        let candidate_total_central = distribution_total(candidate).0;
+        let reference_cdf = reference.bins[..=index].iter()
+            .map(|bin| bin.number_concentration_per_ml)
+            .sum::<f64>() / reference_total_central;
+        let candidate_cdf = candidate.bins[..=index].iter()
+            .map(|bin| bin.number_concentration_per_ml)
+            .sum::<f64>() / candidate_total_central;
+        let (reference_lower, reference_upper) = cdf_bounds(reference, index);
+        let (candidate_lower, candidate_upper) = cdf_bounds(candidate, index);
+        let central_difference = (reference_cdf - candidate_cdf).abs();
+        let lower_difference = (reference_lower - candidate_upper)
+            .max(candidate_lower - reference_upper)
+            .max(0.0);
+        let upper_difference = (reference_lower - candidate_upper)
+            .abs()
+            .max((reference_upper - candidate_lower).abs());
+        w1 += central_difference * width;
+        w1_lower += lower_difference * width;
+        w1_upper += upper_difference * width;
+    }
+    let w1_tolerance = reference.wasserstein1_equivalence_tolerance_um;
+    let total_outside = total_lower > total_tolerance;
+    let total_unresolved = total_upper > total_tolerance;
+    let w1_outside = w1_lower > w1_tolerance;
+    let w1_unresolved = w1_upper > w1_tolerance;
+    let disposition = if total_outside || w1_outside {
+        "outside_equivalence_tolerance"
+    } else if total_unresolved || w1_unresolved {
+        "uncertainty_overlaps_equivalence_tolerance"
+    } else {
+        "within_equivalence_tolerance"
+    };
+
+    NucleiDistributionComparison {
+        reference_run_id: reference_run_id.to_string(),
+        run_id: run_id.to_string(),
+        disposition,
+        reference_total_number_concentration_per_ml: Some(reference_total),
+        run_total_number_concentration_per_ml: Some(candidate_total),
+        absolute_total_number_concentration_difference_per_ml: Some(total_delta),
+        total_number_concentration_difference_lower_per_ml: Some(total_lower),
+        total_number_concentration_difference_upper_per_ml: Some(total_upper),
+        total_number_concentration_equivalence_tolerance_per_ml: Some(total_tolerance),
+        wasserstein1_distance_um: Some(w1),
+        wasserstein1_distance_lower_um: Some(w1_lower),
+        wasserstein1_distance_upper_um: Some(w1_upper),
+        wasserstein1_equivalence_tolerance_um: Some(w1_tolerance),
+    }
+}
+
 fn validate_case(case: &Case) -> Vec<String> {
     let mut errors = Vec::new();
     if case.schema_version != SCHEMA_VERSION {
@@ -361,13 +550,39 @@ fn validate_case(case: &Case) -> Vec<String> {
                 errors.push(format!("run {}: {label} digest must be 64 hexadecimal characters", run.run_id));
             }
         }
-        if let Some(digest) = &water.nuclei_distribution_evidence_sha256
-            && !is_sha256(digest)
-        {
-            errors.push(format!(
-                "run {}: nuclei-distribution evidence digest must be 64 hexadecimal characters",
-                run.run_id
-            ));
+        if let Some(distribution) = &water.nuclei_distribution {
+            if distribution.measurement_id.trim().is_empty()
+                || distribution.method_id.trim().is_empty()
+                || distribution.instrument_id.trim().is_empty()
+                || !is_sha256(&distribution.calibration_certificate_sha256)
+                || !is_sha256(&distribution.evidence_sha256)
+                || !finite_positive(distribution.sample_volume_ml)
+                || !finite_positive(distribution.number_concentration_equivalence_tolerance_per_ml)
+                || !finite_positive(distribution.wasserstein1_equivalence_tolerance_um)
+                || distribution.bins.is_empty()
+            {
+                errors.push(format!("run {} has incomplete or invalid nuclei number/size distribution evidence", run.run_id));
+            }
+            let mut previous_upper: Option<f64> = None;
+            let mut total_concentration = 0.0;
+            for bin in &distribution.bins {
+                if !bin.diameter_lower_um.is_finite()
+                    || bin.diameter_lower_um < 0.0
+                    || !finite_positive(bin.diameter_upper_um)
+                    || bin.diameter_upper_um <= bin.diameter_lower_um
+                    || !bin.number_concentration_per_ml.is_finite()
+                    || bin.number_concentration_per_ml < 0.0
+                    || !finite_positive(bin.expanded_uncertainty_per_ml)
+                    || previous_upper.is_some_and(|upper| (bin.diameter_lower_um - upper).abs() > 1.0e-9)
+                {
+                    errors.push(format!("run {} has invalid, unordered or non-contiguous nuclei distribution bins", run.run_id));
+                }
+                previous_upper = Some(bin.diameter_upper_um);
+                total_concentration += bin.number_concentration_per_ml;
+            }
+            if !finite_positive(total_concentration) {
+                errors.push(format!("run {} nuclei distribution has no positive measured number concentration", run.run_id));
+            }
         }
         for (label, digest) in [
             ("timebase receipt", &run.timebase_receipt_sha256),
