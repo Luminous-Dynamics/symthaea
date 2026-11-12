@@ -33,6 +33,8 @@ pub enum QuantumInformationError {
     InvalidPageEntropy(f64),
     InvalidEnsembleSampleCount(usize),
     InvalidCircuitTopology,
+    InvalidExcitationSector { excitations: usize, number_of_qubits: usize },
+    EvaporationRegisterLimit { requested: usize, maximum: usize },
     UnitaryConstructionFailure,
     InvalidTolerance(f64),
     NonFiniteState { index: usize },
@@ -58,6 +60,8 @@ impl fmt::Display for QuantumInformationError {
             Self::InvalidPageEntropy(value) => write!(f, "Page reference entropy is invalid: {value}"),
             Self::InvalidEnsembleSampleCount(count) => write!(f, "Haar ensemble needs at least two samples, got {count}"),
             Self::InvalidCircuitTopology => write!(f, "circuit topology requires at least two qubits"),
+            Self::InvalidExcitationSector { excitations, number_of_qubits } => write!(f, "excitation sector {excitations} is invalid for {number_of_qubits} qubits"),
+            Self::EvaporationRegisterLimit { requested, maximum } => write!(f, "sequential evaporation register has {requested} qubits; dense complementary diagnostics support at most {maximum}"),
             Self::UnitaryConstructionFailure => write!(f, "failed to construct a numerically independent Haar unitary basis"),
             Self::InvalidTolerance(t) => write!(f, "invalid tolerance {t}"),
             Self::NonFiniteState { index } => write!(f, "non-finite state amplitude at index {index}"),
@@ -1023,5 +1027,394 @@ mod tests {
             Complex64::new(0.0, 0.0), Complex64::new(-0.1, 0.0),
         ]).unwrap();
         assert!(matches!(rho.spectrum(TOL), Err(QuantumInformationError::NonPositive { .. })));
+    }
+}
+
+
+/// One checkpoint in a closed, charge-conserving sequential-emission toy model.
+/// The global state remains pure; emitted tensor factors are never acted on
+/// after their emission step. Entropies are evaluated on both sides of the
+/// B|R cut while each side fits the dense reduced-state ceiling.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SequentialEvaporationSample {
+    pub emission_count: usize,
+    pub newly_emitted_qubit: Option<usize>,
+    /// Static tensor-factor labels still belonging to the active black-hole register.
+    pub black_hole_qubits: Vec<usize>,
+    /// Static tensor-factor labels collected as radiation, in emission order.
+    pub radiation_qubits: Vec<usize>,
+    pub radiation_entropy_nats: f64,
+    pub black_hole_entropy_nats: f64,
+    pub entropy_complementarity_residual_nats: f64,
+    pub radiation_purity: f64,
+    pub black_hole_purity: f64,
+    pub state_norm_squared: f64,
+    /// Expectation of N = sum_i |1><1|_i for equal-gap qubits.
+    pub total_excitation_expectation: f64,
+    pub total_excitation_variance: f64,
+    pub two_qubit_gates_this_step: usize,
+    pub total_two_qubit_gates: usize,
+}
+
+/// Reproducible finite-register sequential-emission experiment.
+///
+/// This is a U(1)-conserving qubit-chain toy model, not Hawking radiation:
+/// the initial state is Haar-random inside a fixed excitation sector, a
+/// charge-preserving two-qubit unitary acts on the active boundary pair, and
+/// the first active tensor factor is then frozen into R. Later gates act only
+/// on the remaining B factors. The equal-gap Hamiltonian is H = omega * N.
+/// No gravitational dynamics, redshift, backreaction, or QES is represented.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SequentialEvaporationResult {
+    pub number_of_qubits: usize,
+    pub initial_excitations: usize,
+    pub seed: u64,
+    pub total_two_qubit_gates: usize,
+    pub samples: Vec<SequentialEvaporationSample>,
+}
+
+/// Simulate a sequential B -> B' tensor-factor transfer with exact U(1)
+/// symmetry in every two-qubit gate.
+///
+/// The model is deliberately limited to 12 qubits so both complementary
+/// reduced density matrices can be computed directly (dimension <= 64) at
+/// every nontrivial cut. Use a tensor-network backend for larger registers.
+pub fn simulate_u1_conserving_sequential_evaporation(
+    number_of_qubits: usize,
+    initial_excitations: usize,
+    seed: u64,
+    tolerance: f64,
+) -> Result<SequentialEvaporationResult, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    if number_of_qubits < 2 {
+        return Err(QuantumInformationError::InvalidCircuitTopology);
+    }
+    if number_of_qubits > MAX_DENSE_STATE_QUBITS {
+        return Err(QuantumInformationError::DenseStateQubitLimit {
+            requested: number_of_qubits,
+            maximum: MAX_DENSE_STATE_QUBITS,
+        });
+    }
+    const MAX_COMPLEMENTARY_EVAPORATION_QUBITS: usize = 12;
+    if number_of_qubits > MAX_COMPLEMENTARY_EVAPORATION_QUBITS {
+        return Err(QuantumInformationError::EvaporationRegisterLimit {
+            requested: number_of_qubits,
+            maximum: MAX_COMPLEMENTARY_EVAPORATION_QUBITS,
+        });
+    }
+    if initial_excitations > number_of_qubits {
+        return Err(QuantumInformationError::InvalidExcitationSector {
+            excitations: initial_excitations,
+            number_of_qubits,
+        });
+    }
+
+    let dimension = 1usize << number_of_qubits;
+    let mut rng = ChaCha20Rng::seed_from_u64(seed);
+    let mut amplitudes = vec![Complex64::new(0.0, 0.0); dimension];
+
+    // A normalized complex-Gaussian vector restricted to one Hamming-weight
+    // sector is Haar distributed on that fixed-charge subspace.
+    for (basis, amplitude) in amplitudes.iter_mut().enumerate() {
+        if basis.count_ones() as usize == initial_excitations {
+            *amplitude = complex_standard_normal(&mut rng);
+        }
+    }
+    let initial_norm_squared: f64 = amplitudes.iter().map(|value| value.norm_sqr()).sum();
+    if !initial_norm_squared.is_finite() || initial_norm_squared <= 0.0 {
+        return Err(QuantumInformationError::NonFiniteState { index: dimension });
+    }
+    let inverse_initial_norm = initial_norm_squared.sqrt().recip();
+    for amplitude in &mut amplitudes {
+        *amplitude *= inverse_initial_norm;
+    }
+
+    let mut black_hole_qubits = (0..number_of_qubits).collect::<Vec<_>>();
+    let mut radiation_qubits = Vec::with_capacity(number_of_qubits);
+    let mut samples = Vec::with_capacity(number_of_qubits + 1);
+    let mut total_two_qubit_gates = 0usize;
+
+    for emission_count in 0..=number_of_qubits {
+        let mut newly_emitted_qubit = None;
+        let mut gates_this_step = 0usize;
+
+        if emission_count > 0 {
+            // Interact only the active boundary pair. The outgoing factor is
+            // then removed from the active set before the next step.
+            if black_hole_qubits.len() >= 2 {
+                let gate = u1_conserving_unitary_4(&mut rng)?;
+                apply_two_qubit_unitary(
+                    &mut amplitudes,
+                    number_of_qubits,
+                    black_hole_qubits[0],
+                    black_hole_qubits[1],
+                    &gate,
+                )?;
+                gates_this_step = 1;
+                total_two_qubit_gates += 1;
+            }
+            let emitted = black_hole_qubits.remove(0);
+            radiation_qubits.push(emitted);
+            newly_emitted_qubit = Some(emitted);
+        }
+
+        let state_norm_squared: f64 =
+            amplitudes.iter().map(|value| value.norm_sqr()).sum();
+        if !state_norm_squared.is_finite() {
+            return Err(QuantumInformationError::NonFiniteState { index: dimension });
+        }
+        if (state_norm_squared - 1.0).abs() > tolerance {
+            return Err(QuantumInformationError::NormalizationError {
+                norm_squared: state_norm_squared,
+                tolerance,
+            });
+        }
+
+        let (radiation_entropy_nats, black_hole_entropy_nats,
+            radiation_purity, black_hole_purity) =
+            if radiation_qubits.is_empty() || black_hole_qubits.is_empty() {
+                // The unpartitioned global state is pure at the two endpoints.
+                (0.0, 0.0, 1.0, 1.0)
+            } else {
+                let radiation = DensityMatrix::from_pure_state(
+                    &amplitudes,
+                    number_of_qubits,
+                    &radiation_qubits,
+                    tolerance,
+                )?;
+                let black_hole = DensityMatrix::from_pure_state(
+                    &amplitudes,
+                    number_of_qubits,
+                    &black_hole_qubits,
+                    tolerance,
+                )?;
+                (
+                    radiation.von_neumann_entropy(tolerance)?,
+                    black_hole.von_neumann_entropy(tolerance)?,
+                    radiation.diagnostics(tolerance)?.purity,
+                    black_hole.diagnostics(tolerance)?.purity,
+                )
+            };
+
+        let (total_excitation_expectation, total_excitation_variance) =
+            total_excitation_moments(&amplitudes);
+        samples.push(SequentialEvaporationSample {
+            emission_count,
+            newly_emitted_qubit,
+            black_hole_qubits: black_hole_qubits.clone(),
+            radiation_qubits: radiation_qubits.clone(),
+            radiation_entropy_nats,
+            black_hole_entropy_nats,
+            entropy_complementarity_residual_nats:
+                (radiation_entropy_nats - black_hole_entropy_nats).abs(),
+            radiation_purity,
+            black_hole_purity,
+            state_norm_squared,
+            total_excitation_expectation,
+            total_excitation_variance,
+            two_qubit_gates_this_step: gates_this_step,
+            total_two_qubit_gates,
+        });
+    }
+
+    Ok(SequentialEvaporationResult {
+        number_of_qubits,
+        initial_excitations,
+        seed,
+        total_two_qubit_gates,
+        samples,
+    })
+}
+
+/// Draw a unit-variance circular complex Gaussian from two independent
+/// standard normal variates. Overall scale cancels in Haar normalization.
+fn complex_standard_normal(rng: &mut ChaCha20Rng) -> Complex64 {
+    let u1 = rng.gen_range(0.0_f64..1.0_f64).max(f64::MIN_POSITIVE);
+    let u2 = rng.gen_range(0.0_f64..1.0_f64);
+    let radius = (-2.0 * u1.ln()).sqrt();
+    let phase = core::f64::consts::TAU * u2;
+    Complex64::new(radius * phase.cos(), radius * phase.sin())
+}
+
+/// Haar-random element of U(1) x U(2) x U(1), embedded in the two-qubit
+/// computational basis. It commutes exactly with N_pair = n_1 + n_2.
+fn u1_conserving_unitary_4(
+    rng: &mut ChaCha20Rng,
+) -> Result<[[Complex64; 4]; 4], QuantumInformationError> {
+    let mut columns = [[Complex64::new(0.0, 0.0); 2]; 2];
+    for column in 0..2 {
+        let mut accepted = false;
+        for _attempt in 0..8 {
+            let mut vector = [
+                complex_standard_normal(rng),
+                complex_standard_normal(rng),
+            ];
+            if column == 1 {
+                let overlap = columns[0][0].conj() * vector[0]
+                    + columns[0][1].conj() * vector[1];
+                vector[0] -= columns[0][0] * overlap;
+                vector[1] -= columns[0][1] * overlap;
+            }
+            let norm_squared = vector[0].norm_sqr() + vector[1].norm_sqr();
+            if norm_squared.is_finite() && norm_squared > 1e-24 {
+                let inverse_norm = norm_squared.sqrt().recip();
+                columns[column][0] = vector[0] * inverse_norm;
+                columns[column][1] = vector[1] * inverse_norm;
+                accepted = true;
+                break;
+            }
+        }
+        if !accepted {
+            return Err(QuantumInformationError::UnitaryConstructionFailure);
+        }
+    }
+
+    let mut unitary = [[Complex64::new(0.0, 0.0); 4]; 4];
+    for sector_state in 0..2 {
+        let phase = core::f64::consts::TAU * rng.gen_range(0.0_f64..1.0_f64);
+        let value = Complex64::new(phase.cos(), phase.sin());
+        if sector_state == 0 {
+            unitary[0][0] = value;
+        } else {
+            unitary[3][3] = value;
+        }
+    }
+    // The one-excitation sector is spanned by |01>, |10>.
+    for row in 0..2 {
+        for column in 0..2 {
+            unitary[row + 1][column + 1] = columns[column][row];
+        }
+    }
+    Ok(unitary)
+}
+
+/// Expected excitation number and variance of the computational-basis
+/// number operator. A fixed-sector initial state should retain zero variance.
+fn total_excitation_moments(amplitudes: &[Complex64]) -> (f64, f64) {
+    let mut mean = 0.0;
+    let mut second_moment = 0.0;
+    for (basis, amplitude) in amplitudes.iter().enumerate() {
+        let probability = amplitude.norm_sqr();
+        let excitations = basis.count_ones() as f64;
+        mean += probability * excitations;
+        second_moment += probability * excitations * excitations;
+    }
+    (mean, (second_moment - mean * mean).max(0.0))
+}
+
+#[cfg(test)]
+mod sequential_evaporation_tests {
+    use super::*;
+
+    const TOLERANCE: f64 = 1e-10;
+
+    #[test]
+    fn u1_gate_is_unitary_and_has_no_cross_charge_matrix_elements() {
+        let mut rng = ChaCha20Rng::seed_from_u64(0xC0A5E);
+        let gate = u1_conserving_unitary_4(&mut rng).unwrap();
+        for row in 0..4 {
+            for column in 0..4 {
+                let row_charge = (row.count_ones()) as usize;
+                let column_charge = (column.count_ones()) as usize;
+                if row_charge != column_charge {
+                    assert!(gate[row][column].norm() < 1e-14);
+                }
+            }
+        }
+        for left in 0..4 {
+            for right in 0..4 {
+                let mut overlap = Complex64::new(0.0, 0.0);
+                for row in 0..4 {
+                    overlap += gate[row][left].conj() * gate[row][right];
+                }
+                let expected = if left == right { 1.0 } else { 0.0 };
+                assert!((overlap.re - expected).abs() < 1e-12);
+                assert!(overlap.im.abs() < 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn sequential_emission_preserves_charge_norm_and_complementary_entropy() {
+        let result = simulate_u1_conserving_sequential_evaporation(
+            8, 4, 0xE_AA0, TOLERANCE,
+        ).unwrap();
+        assert_eq!(result.samples.len(), 9);
+        assert_eq!(result.total_two_qubit_gates, 7);
+        for (step, sample) in result.samples.iter().enumerate() {
+            assert_eq!(sample.emission_count, step);
+            assert_eq!(
+                sample.black_hole_qubits.len() + sample.radiation_qubits.len(),
+                8,
+            );
+            assert!((sample.state_norm_squared - 1.0).abs() < TOLERANCE);
+            assert!((sample.total_excitation_expectation - 4.0).abs() < TOLERANCE);
+            assert!(sample.total_excitation_variance < TOLERANCE);
+            assert!(sample.entropy_complementarity_residual_nats < TOLERANCE);
+            assert!(sample.radiation_entropy_nats >= -TOLERANCE);
+            assert!(sample.black_hole_entropy_nats >= -TOLERANCE);
+        }
+    }
+
+    #[test]
+    fn emitted_qubits_are_a_monotonic_disjoint_prefix_and_gate_budget_is_exact() {
+        let result = simulate_u1_conserving_sequential_evaporation(
+            7, 3, 0x51A7E, TOLERANCE,
+        ).unwrap();
+        let mut seen = vec![false; 7];
+        for (step, sample) in result.samples.iter().enumerate() {
+            assert_eq!(sample.radiation_qubits.len(), step);
+            assert_eq!(sample.black_hole_qubits.len(), 7 - step);
+            for &qubit in &sample.radiation_qubits {
+                assert!(!seen[qubit], "qubit {qubit} was emitted more than once");
+                seen[qubit] = true;
+            }
+            for &qubit in &sample.black_hole_qubits {
+                assert!(!seen[qubit], "an emitted qubit re-entered the active register");
+            }
+            assert_eq!(
+                sample.two_qubit_gates_this_step,
+                usize::from(step > 0 && step < 7),
+            );
+        }
+        assert!(seen.into_iter().all(|emitted| emitted));
+    }
+
+    #[test]
+    fn vacuum_and_fully_filled_sectors_remain_unentangled() {
+        for excitations in [0, 6] {
+            let result = simulate_u1_conserving_sequential_evaporation(
+                6, excitations, 0xF00D + excitations as u64, TOLERANCE,
+            ).unwrap();
+            for sample in result.samples {
+                assert!(sample.radiation_entropy_nats.abs() < TOLERANCE);
+                assert!(sample.black_hole_entropy_nats.abs() < TOLERANCE);
+                assert!((sample.radiation_purity - 1.0).abs() < TOLERANCE);
+                assert!((sample.black_hole_purity - 1.0).abs() < TOLERANCE);
+            }
+        }
+    }
+
+    #[test]
+    fn sequential_model_rejects_unsupported_register_or_charge_sector() {
+        assert!(matches!(
+            simulate_u1_conserving_sequential_evaporation(13, 6, 1, TOLERANCE),
+            Err(QuantumInformationError::EvaporationRegisterLimit { .. })
+        ));
+        assert!(matches!(
+            simulate_u1_conserving_sequential_evaporation(8, 9, 1, TOLERANCE),
+            Err(QuantumInformationError::InvalidExcitationSector { .. })
+        ));
+    }
+
+    #[test]
+    fn sequential_model_is_reproducible_for_a_frozen_seed() {
+        let first = simulate_u1_conserving_sequential_evaporation(
+            8, 3, 0xDEC0DE, TOLERANCE,
+        ).unwrap();
+        let repeated = simulate_u1_conserving_sequential_evaporation(
+            8, 3, 0xDEC0DE, TOLERANCE,
+        ).unwrap();
+        assert_eq!(first, repeated);
     }
 }
