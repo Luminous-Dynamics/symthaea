@@ -2,7 +2,7 @@
 
 **Status:** research contract / known-answer reference vectors  
 **Owner:** Symthaea AIRROAD programme  
-**Issue:** https://github.com/Luminous-Dynamics/symthaea/issues/11712  
+**Issue:** https://github.com/Luminous-Dynamics/symthaea/issues/11714  
 **Claim ceiling:** synthetic reduced-order mathematics only; no physical aircraft, converter, battery, protection or flight validation.
 
 ## 1. Purpose and boundary
