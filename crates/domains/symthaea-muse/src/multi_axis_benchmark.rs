@@ -165,7 +165,10 @@ pub struct ClusteredConfidenceIntervalV1 {
 pub struct MetricValueV1 {
     pub metric_id: String,
     pub value: f64,
+    /// Number of samples included in this metric value.
     pub sample_count: u64,
+    /// Digest of the exact sample IDs included, preventing silent cherry-picking.
+    pub evaluated_sample_manifest_sha256: String,
     pub confidence_interval: Option<ClusteredConfidenceIntervalV1>,
 }
 
@@ -227,6 +230,7 @@ pub enum BenchmarkValidationError {
     ReportDigestMismatch,
     IncompatibleProtocol,
     MissingComparableMetric { metric_id: String },
+    IncompatibleMetricCoverage { metric_id: String },
     SerializationFailed,
 }
 
@@ -517,6 +521,10 @@ pub fn validate_benchmark_run_report(
                     metric_id: metric.metric_id.clone(),
                 });
             }
+            validate_digest(
+                "metric.evaluated_sample_manifest_sha256",
+                &metric.evaluated_sample_manifest_sha256,
+            )?;
             if !metric.value.is_finite()
                 || metric.sample_count == 0
                 || metric.sample_count > slice.sample_count
@@ -607,6 +615,14 @@ pub fn compare_benchmark_reports(
         })?;
     let left_value = overall_metric(left, metric_id)?;
     let right_value = overall_metric(right, metric_id)?;
+    if left_value.sample_count != right_value.sample_count
+        || left_value.evaluated_sample_manifest_sha256
+            != right_value.evaluated_sample_manifest_sha256
+    {
+        return Err(BenchmarkValidationError::IncompatibleMetricCoverage {
+            metric_id: metric_id.to_string(),
+        });
+    }
     let winner_system_id = match definition.direction {
         MetricDirectionV1::HigherIsBetter if left_value.value > right_value.value => {
             Some(left.system.system_id.clone())
@@ -749,6 +765,7 @@ mod tests {
                             metric_id: "mv2h".into(),
                             value: mv2h,
                             sample_count: 373,
+                            evaluated_sample_manifest_sha256: digest('7'),
                             confidence_interval: Some(ClusteredConfidenceIntervalV1 {
                                 lower: (mv2h - 0.02).max(0.0),
                                 upper: (mv2h + 0.02).min(1.0),
@@ -784,6 +801,7 @@ mod tests {
                             metric_id: "mv2h".into(),
                             value: mv2h,
                             sample_count: 100,
+                            evaluated_sample_manifest_sha256: digest('8'),
                             confidence_interval: None,
                         },
                     ],
@@ -889,4 +907,19 @@ mod tests {
             })
         );
     }
+
+    #[test]
+    fn comparison_rejects_different_abstention_or_sample_subsets() {
+        let left = report("system-a", 0.60, EvaluationTrackV1::Blind);
+        let mut right = report("system-b", 0.70, EvaluationTrackV1::Blind);
+        right.slices[0].metrics[0].evaluated_sample_manifest_sha256 = digest('4');
+        right.report_sha256 = benchmark_run_report_commitment(&right).unwrap();
+        assert_eq!(
+            compare_benchmark_reports(&left, &right, "mv2h"),
+            Err(BenchmarkValidationError::IncompatibleMetricCoverage {
+                metric_id: "mv2h".into()
+            })
+        );
+    }
+
 }
