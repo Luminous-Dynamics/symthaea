@@ -54,6 +54,7 @@ pub enum EvidenceAdmission {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EvidenceRecord {
     pub evidence_id: String,
+    pub evidence_class: EvidenceClass,
     pub source_digest: String,
     pub claim_scope: String,
     pub validity_domain: String,
@@ -349,11 +350,17 @@ fn validate_manifest<'a>(
                     )));
                 }
 
-                require_evidence(
+                let metric_evidence = require_evidence(
                     &evidence_by_id,
                     &observation.evidence_id,
                     &format!("candidate {} objective {}", candidate.id, objective.id),
                 )?;
+                if observation.evidence_class != metric_evidence.evidence_class {
+                    return Err(AuditError(format!(
+                        "candidate {} objective {} evidence class does not match registry",
+                        candidate.id, objective.id
+                    )));
+                }
             }
         }
 
@@ -808,6 +815,7 @@ mod tests {
                     lower_bound: values[0] + offset - 1.0,
                     upper_bound: values[0] + offset + 1.0,
                     evidence_id: "SYNTH-EVIDENCE".into(),
+                    evidence_class: EvidenceClass::SyntheticFixture,
                 },
                 MetricObservation {
                     objective_id: "throughput".into(),
@@ -817,6 +825,7 @@ mod tests {
                     lower_bound: values[1] + offset - 10.0,
                     upper_bound: values[1] + offset + 10.0,
                     evidence_id: "SYNTH-EVIDENCE".into(),
+                    evidence_class: EvidenceClass::SyntheticFixture,
                 },
                 MetricObservation {
                     objective_id: "cost".into(),
@@ -826,6 +835,7 @@ mod tests {
                     lower_bound: values[2] - offset - 1.0,
                     upper_bound: values[2] - offset + 1.0,
                     evidence_id: "SYNTH-EVIDENCE".into(),
+                    evidence_class: EvidenceClass::SyntheticFixture,
                 },
             ]
         };
