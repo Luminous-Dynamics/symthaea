@@ -18,6 +18,7 @@
     "minimum_runs",
     "minimum_usable_windows_per_run",
     "operating_condition_id",
+    "reference_run_id",
     "runs",
     "schema_version",
     "service_fingerprint_sha256",
@@ -94,6 +95,10 @@
     "maximum_sync_alignment_uncertainty_s": {
       "type": "number",
       "exclusiveMinimum": 0
+    },
+    "reference_run_id": {
+      "type": "string",
+      "minLength": 1
     }
   },
   "$defs": {
