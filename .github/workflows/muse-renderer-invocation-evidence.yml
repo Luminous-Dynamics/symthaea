@@ -1,17 +1,20 @@
-name: Muse Renderer Invocation Evidence
+name: Muse Renderer and Counterfactual Evidence
 
 on:
   push:
     branches:
       - "research/mel-mr-eval-016-*"
       - "research/mel-mr-eval-017-*"
+      - "research/mel-mr-eval-018-*"
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse/src/fluid_render.rs"
       - "crates/domains/symthaea-muse/src/renderer_execution_receipt.rs"
       - "crates/domains/symthaea-muse/src/counterfactual_acoustic_influence.rs"
+      - "crates/domains/symthaea-muse/src/pairwise_event_interaction.rs"
       - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
       - ".github/workflows/muse-renderer-invocation-evidence.yml"
   pull_request:
@@ -19,9 +22,11 @@ on:
       - "Cargo.toml"
       - "Cargo.lock"
       - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse/src/fluid_render.rs"
       - "crates/domains/symthaea-muse/src/renderer_execution_receipt.rs"
       - "crates/domains/symthaea-muse/src/counterfactual_acoustic_influence.rs"
+      - "crates/domains/symthaea-muse/src/pairwise_event_interaction.rs"
       - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
       - ".github/workflows/muse-renderer-invocation-evidence.yml"
   workflow_dispatch:
@@ -30,14 +35,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: muse-renderer-invocation-evidence-${{ github.event.pull_request.number || github.ref }}
+  group: muse-renderer-counterfactual-evidence-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   qualify:
-    name: exact-head-renderer-invocation-tests
+    name: exact-head-renderer-and-counterfactual-tests
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
     steps:
       - name: Check out exact event head
         uses: actions/checkout@v4
@@ -61,21 +66,23 @@ jobs:
       - name: Verify Cargo workspace metadata resolves
         run: cargo metadata --locked --no-deps --format-version 1 > /tmp/muse-workspace-metadata.json
 
-      - name: Run renderer invocation and temp-path tests
+      - name: Check Muse formatting
+        run: cargo fmt --manifest-path crates/domains/symthaea-muse/Cargo.toml -- --check
+
+      - name: Run FluidSynth invocation and temp-path tests
         run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib fluid_render::tests
 
       - name: Run renderer receipt tests
         run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib renderer_execution_receipt::tests
 
-      - name: Run counterfactual acoustic influence tests
+      - name: Run single-event counterfactual influence tests
         run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib counterfactual_acoustic_influence::tests
 
-      - name: Check format of the new influence verifier
-        continue-on-error: true
-        run: rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/counterfactual_acoustic_influence.rs
+      - name: Run pairwise factorial interaction tests
+        run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib pairwise_event_interaction::tests
 
       - name: Compile the Muse Studio binary
         run: cargo check --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features studio --bin muse_studio
 
-      - name: Run Clippy for the Muse Studio binary
+      - name: Run Clippy for Muse Studio
         run: cargo clippy --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features studio --bin muse_studio -- -D warnings
