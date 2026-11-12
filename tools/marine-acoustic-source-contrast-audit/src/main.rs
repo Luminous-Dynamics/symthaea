@@ -584,7 +584,8 @@ mod tests {
                 evidence_sha256: if source == SourceKind::PropellerCavitation {
                     digest(target_digest)
                 } else {
-                    digest(char::from(b'a' + index as u8))
+                    let non_target_digest_chars = ['b', 'c', 'd', 'e', 'f', '0'];
+                    digest(non_target_digest_chars[index - 1])
                 },
                 measured_value: if source == SourceKind::PropellerCavitation && state == "cavitating" {
                     1.0
@@ -775,6 +776,16 @@ mod tests {
             .unwrap();
         target.measured_value = 0.15;
         assert_eq!(audit(&input).disposition, "UNRESOLVED_MIXTURE");
+    }
+
+    #[test]
+    fn all_source_state_evidence_digests_are_valid_hex_and_distinct() {
+        let input = case();
+        let digests: Vec<_> = input.baseline.source_states.iter()
+            .map(|state| state.evidence_sha256.as_str())
+            .collect();
+        assert!(digests.iter().all(|digest| is_sha256(digest)));
+        assert_eq!(digests.iter().collect::<BTreeSet<_>>().len(), digests.len());
     }
 
     #[test]
