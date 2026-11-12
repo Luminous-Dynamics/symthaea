@@ -10,7 +10,7 @@
 
 use crate::barline_eval::{MeasureKind, MeasureMap, MeasureMapStatus, MeasureSpan, RationalBeat};
 use crate::evidence_digest::{canonical_json_sha256, sha256_hex};
-use midly::{Smf, Timing};
+use midly::{MidiMessage, Smf, Timing, TrackEventKind};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -106,6 +106,7 @@ pub enum MidiMeasureSidecarError {
     DuplicatePartId { part_id: String },
     DuplicateTrackIndex { track_index: usize },
     TrackIndexOutOfRange { track_index: usize, track_count: usize },
+    MissingTrackMeasureMap { track_index: usize },
     EmptyMeasureList { part_id: String },
     TickOutOfRange { tick: u64 },
     EmptyOrReversedMeasure { part_id: String, measure_index: usize },
@@ -269,6 +270,21 @@ pub fn parse_midi_measure_sidecar(
                 measures: spans,
             },
         });
+    }
+
+    // Every note-bearing source track must have explicit structural
+    // coverage. Empty conductor/metadata tracks do not become score parts.
+    for (track_index, track) in smf.tracks.iter().enumerate() {
+        let contains_note_events = track.iter().any(|event| match event.kind {
+            TrackEventKind::Midi { message, .. } => matches!(
+                message,
+                MidiMessage::NoteOn { .. } | MidiMessage::NoteOff { .. }
+            ),
+            _ => false,
+        });
+        if contains_note_events && !track_indices.contains(&track_index) {
+            return Err(MidiMeasureSidecarError::MissingTrackMeasureMap { track_index });
+        }
     }
 
     Ok(MidiMeasureSidecarReceiptV1 {
@@ -656,4 +672,40 @@ mod tests {
             &tampered
         ).unwrap());
     }
+
+    #[test]
+    fn note_bearing_tracks_cannot_be_omitted_from_measure_sidecar() {
+        let mut midi = Vec::new();
+        midi.extend_from_slice(b"MThd");
+        midi.extend_from_slice(&6_u32.to_be_bytes());
+        midi.extend_from_slice(&1_u16.to_be_bytes());
+        midi.extend_from_slice(&2_u16.to_be_bytes());
+        midi.extend_from_slice(&480_u16.to_be_bytes());
+        midi.extend_from_slice(b"MTrk");
+        midi.extend_from_slice(&4_u32.to_be_bytes());
+        midi.extend_from_slice(&[0x00, 0xFF, 0x2F, 0x00]);
+        midi.extend_from_slice(b"MTrk");
+        midi.extend_from_slice(&13_u32.to_be_bytes());
+        midi.extend_from_slice(&[
+            0, 0x90, 60, 64,
+            0x83, 0x60, 0x80, 60, 64,
+            0, 0xFF, 0x2F, 0,
+        ]);
+        let json = sidecar(
+            &midi,
+            480,
+            vec![MidiPartMeasureSidecarV1 {
+                part_id: "Conductor".into(),
+                source_track_index: 0,
+                measures: vec![measure(0, 1920)],
+            }],
+        );
+        assert_eq!(
+            parse_midi_measure_sidecar(&midi, &json, "midi-test-clock"),
+            Err(MidiMeasureSidecarError::MissingTrackMeasureMap {
+                track_index: 1
+            })
+        );
+    }
+
 }
