@@ -988,6 +988,10 @@ async fn main() {
         )
         .route("/api/music/imports", get(imported_works))
         .route("/api/music/import/{id}", get(imported_work))
+        .route(
+            "/api/music/import/{id}/notation-graph",
+            get(imported_work_notation_graph),
+        )
         .route("/api/music/import/{id}/audio", get(imported_work_audio))
         .route("/api/teaching", get(teaching_summary))
         .route("/api/teaching/{lesson_id}/audio", get(teaching_audio))
@@ -2374,8 +2378,9 @@ async fn import_music(
     mut multipart: Multipart,
 ) -> Result<Json<symthaea_muse_protocol::ImportedWorkSummary>, (StatusCode, String)> {
     use symthaea_muse_protocol::{
-        AuthorizationBasis, ContributionManifest, ContributionScope, ImportedWorkId,
-        ImportedWorkSummary, MusicalContentLicense, default_instrumentation_note,
+        AuthorizationBasis, ContributionManifest, ContributionScope, ImportedNotationStructureSummary,
+        ImportedWorkId, ImportedWorkSummary, MusicalContentLicense,
+        default_instrumentation_note,
     };
 
     let mut title = None;
@@ -2485,10 +2490,24 @@ async fn import_music(
     // per-candidate render in spawn_blocking; see fluidsynth_candidate_wav's
     // call site) so a large import can't stall unrelated Studio requests.
     tokio::task::spawn_blocking(move || {
-        let score = symthaea_muse::symbolic_import::parse_symbolic(&source, format.clone())
-            .map_err(|error| (StatusCode::UNPROCESSABLE_ENTITY, error))?;
-        let analysis = symthaea_muse::symbolic_import::analyze(&score);
         let source_sha256 = sha256_hex(&source);
+        let score_clock_id = format!("source-score-clock:{source_sha256}");
+        let structured = symthaea_muse::symbolic_import::parse_symbolic_with_structure(
+            &source,
+            format.clone(),
+            &score_clock_id,
+        )
+        .map_err(|error| (StatusCode::UNPROCESSABLE_ENTITY, error))?;
+        if structured.source_sha256 != source_sha256 {
+            return Err(internal("symbolic importer source digest changed during import"));
+        }
+        let score = structured.score;
+        let (notation_structure, notation_graph_json) =
+            summarize_imported_notation_structure(
+                &source_sha256,
+                structured.notation_structure,
+            )?;
+        let analysis = symthaea_muse::symbolic_import::analyze(&score);
         let score_sha256 = serialized_sha256(&score)
             .map_err(|status| (status, "could not serialize the imported score".to_owned()))?;
         let identity_material = format!("{source_sha256}\0{title}\0{contributor}");
@@ -2539,6 +2558,7 @@ async fn import_music(
             audio_available: true,
             audio_renderer: audio_renderer.to_string(),
             instrumentation_note: default_instrumentation_note(),
+            notation_structure: Some(notation_structure),
         };
 
         // Unique per call (not just per-process) -- two concurrent imports
@@ -2557,6 +2577,9 @@ async fn import_music(
             std::fs::write(staging.join(format!("source.{extension}")), &source)?;
             std::fs::write(staging.join("score.json"), score_json)?;
             std::fs::write(staging.join("summary.json"), summary_json)?;
+            if let Some(notation_graph_json) = &notation_graph_json {
+                std::fs::write(staging.join("notation-graph.json"), notation_graph_json)?;
+            }
             std::fs::write(staging.join("audition.wav"), &wav)?;
             std::fs::rename(&staging, &destination)
         })();
@@ -2585,6 +2608,113 @@ async fn import_music(
     .await
     .map_err(internal)?
     .map(Json)
+}
+
+fn summarize_imported_notation_structure(
+    source_sha256: &str,
+    structure: symthaea_muse::symbolic_import::ImportedNotationStructureV1,
+) -> Result<
+    (
+        symthaea_muse_protocol::ImportedNotationStructureSummary,
+        Option<Vec<u8>>,
+    ),
+    (StatusCode, String),
+> {
+    use symthaea_muse_protocol::ImportedNotationStructureSummary;
+
+    match structure {
+        symthaea_muse::symbolic_import::ImportedNotationStructureV1::MusicXmlPartGraphs(
+            graphs,
+        ) => {
+            let part_count = graphs.len();
+            let mut supported_part_count = 0usize;
+            let mut unavailable_part_ids = Vec::new();
+            let mut measure_count = 0usize;
+            let mut barline_event_count = 0usize;
+            let mut non_controlling_measure_count = 0usize;
+            for graph in &graphs {
+                match graph.map.status {
+                    symthaea_muse::barline_eval::MeasureMapStatus::Supported => {
+                        supported_part_count += 1;
+                    }
+                    _ => unavailable_part_ids.push(graph.part_id.clone()),
+                }
+                measure_count += graph.map.measures.len();
+                barline_event_count += graph.barline_events.len();
+                non_controlling_measure_count +=
+                    graph.non_controlling_measure_indices.len();
+            }
+            let unknown_part_count = part_count.saturating_sub(supported_part_count);
+            let status = if unknown_part_count == 0 && part_count > 0 {
+                "supported"
+            } else if supported_part_count > 0 {
+                "partially_unknown"
+            } else {
+                "unknown"
+            };
+            let graph_sha256 = symthaea_muse::evidence_digest::canonical_json_sha256(&graphs)
+                .map_err(internal)?;
+            let graph_json = serde_json::to_vec_pretty(&graphs).map_err(internal)?;
+            let explanation = (unknown_part_count > 0).then(|| {
+                "One or more parts lack a fully resolvable explicit measure map; inspect the per-part graph status before scoring or editing.".to_owned()
+            });
+            Ok((
+                ImportedNotationStructureSummary {
+                    schema: "muse-imported-notation-structure-v1".into(),
+                    status: status.into(),
+                    source_sha256: source_sha256.into(),
+                    graph_sha256: Some(graph_sha256),
+                    part_count,
+                    supported_part_count,
+                    unknown_part_count,
+                    measure_count,
+                    barline_event_count,
+                    non_controlling_measure_count,
+                    unavailable_part_ids,
+                    explanation,
+                },
+                Some(graph_json),
+            ))
+        }
+        symthaea_muse::symbolic_import::ImportedNotationStructureV1::Unknown {
+            reason,
+        } => Ok((
+            ImportedNotationStructureSummary {
+                schema: "muse-imported-notation-structure-v1".into(),
+                status: "unknown".into(),
+                source_sha256: source_sha256.into(),
+                graph_sha256: None,
+                part_count: 0,
+                supported_part_count: 0,
+                unknown_part_count: 0,
+                measure_count: 0,
+                barline_event_count: 0,
+                non_controlling_measure_count: 0,
+                unavailable_part_ids: Vec::new(),
+                explanation: Some(reason),
+            },
+            None,
+        )),
+        symthaea_muse::symbolic_import::ImportedNotationStructureV1::Unsupported {
+            reason,
+        } => Ok((
+            ImportedNotationStructureSummary {
+                schema: "muse-imported-notation-structure-v1".into(),
+                status: "unsupported".into(),
+                source_sha256: source_sha256.into(),
+                graph_sha256: None,
+                part_count: 0,
+                supported_part_count: 0,
+                unknown_part_count: 0,
+                measure_count: 0,
+                barline_event_count: 0,
+                non_controlling_measure_count: 0,
+                unavailable_part_ids: Vec::new(),
+                explanation: Some(reason),
+            },
+            None,
+        )),
+    }
 }
 
 fn read_import_summary(
@@ -2626,6 +2756,37 @@ async fn imported_works()
     }
     works.sort_by_key(|work| std::cmp::Reverse(work.manifest.imported_at_unix_ms));
     Ok(Json(works))
+}
+
+async fn imported_work_notation_graph(
+    AxPath(id): AxPath<String>,
+) -> Result<Json<Vec<symthaea_muse::musicxml_barline_adapter::MusicXmlPartNotationGraphV1>>, StatusCode>
+{
+    let summary = read_import_summary(&id)?;
+    let expected_digest = summary
+        .notation_structure
+        .as_ref()
+        .and_then(|structure| structure.graph_sha256.as_deref())
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let bytes = std::fs::read(
+        Path::new(IMPORT_ROOT).join(&id).join("notation-graph.json"),
+    )
+    .map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            StatusCode::NOT_FOUND
+        } else {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    })?;
+    let graphs: Vec<symthaea_muse::musicxml_barline_adapter::MusicXmlPartNotationGraphV1> =
+        serde_json::from_slice(&bytes).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let actual_digest =
+        symthaea_muse::evidence_digest::canonical_json_sha256(&graphs)
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if actual_digest != expected_digest {
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+    Ok(Json(graphs))
 }
 
 async fn imported_work_audio(AxPath(id): AxPath<String>) -> Result<Response, StatusCode> {
