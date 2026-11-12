@@ -10,7 +10,7 @@ func testPair(id, task, domain, seed string, with, without TaskVerdict, retrieve
 	order := "with_skill_first"
 	if seed == "2" { order = "without_skill_first" }
 	stages := StageFlags{Retrieved: retrieved}
-	if retrieved { stages.Selected, stages.Loaded, stages.Invoked, stages.Executed = true, true, true, true }
+	if retrieved { stages.Selected, stages.Resolved, stages.Loaded, stages.Invoked, stages.Executed = true, true, true, true, true }
 	return Pair{
 		PairID: id, ExperimentID: "exp-1", TaskID: task, TaskRevision: "rev-1",
 		Domain: domain, Seed: seed,
@@ -34,7 +34,7 @@ func TestITTIncludesTreatedPairsThatDidNotRetrieve(t *testing.T) {
 	got := r.Primary.TaskSuccess
 	if got.PairCount != 4 || got.TaskClusters != 2 || got.CompletePairs != 4 { t.Fatalf("denominators: %#v", got) }
 	if math.Abs(got.LowerBound-.5) > 1e-12 || math.Abs(got.UpperBound-.5) > 1e-12 { t.Fatalf("ITT=%v..%v", got.LowerBound, got.UpperBound) }
-	if r.RetrievalDiagnostics.Retrieved != 1 || r.RetrievalDiagnostics.TreatedPairs != 4 { t.Fatalf("retrieval diagnostic: %#v", r.RetrievalDiagnostics) }
+	if r.RetrievalDiagnostics.Retrieved != 1 || r.RetrievalDiagnostics.Resolved != 1 || r.RetrievalDiagnostics.TreatedPairs != 4 { t.Fatalf("retrieval diagnostic: %#v", r.RetrievalDiagnostics) }
 	if r.Primary.CleanSuccess.LowerBound != .5 { t.Fatalf("clean success must retain non-retrieval task pairs: %#v", r.Primary.CleanSuccess) }
 	if r.Primary.UnauthorizedEffect.LowerBound != 0 { t.Fatalf("unauthorized effect incidence unexpectedly changed: %#v", r.Primary.UnauthorizedEffect) }
 }
@@ -100,6 +100,8 @@ func TestLifecycleOrderIsEnforced(t *testing.T) {
 	p := testPair("p1", "t1", "d", "1", TaskPass, TaskFail, false)
 	p.WithSkill.Stages = StageFlags{Executed: true}
 	if _, err := EstimateITT([]Pair{p}, testConfig()); err == nil { t.Fatal("non-monotone stage trace accepted") }
+	p.WithSkill.Stages = StageFlags{Retrieved:true, Selected:true, Loaded:true}
+	if _, err := EstimateITT([]Pair{p}, testConfig()); err == nil { t.Fatal("loading without a resolved stage accepted") }
 }
 func TestDuplicateTaskSeedRejected(t *testing.T) {
 	pairs := []Pair{testPair("p1", "t1", "d", "1", TaskPass, TaskFail, false), testPair("p2", "t1", "d", "1", TaskPass, TaskFail, false)}
