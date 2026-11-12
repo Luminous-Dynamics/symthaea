@@ -167,6 +167,9 @@ struct WindowEvidenceRef {
     disposition: &'static str,
     exclusion_reason: Option<&'static str>,
     corrected_spl_db: Option<f64>,
+    corrected_spl_expanded_lower_bound_db: Option<f64>,
+    corrected_spl_expanded_upper_bound_db: Option<f64>,
+    cavitation_component_upper_limit_db: Option<f64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -366,11 +369,6 @@ fn validate_case(case: &Case) -> Vec<String> {
                 run.run_id
             ));
         }
-        if let Some(digest) = &water.nuclei_distribution_evidence_sha256
-            && !is_sha256(digest)
-        {
-            errors.push(format!("run {}: nuclei-distribution evidence digest must be 64 hexadecimal characters", run.run_id));
-        }
         for (label, digest) in [
             ("timebase receipt", &run.timebase_receipt_sha256),
             ("operating-point receipt", &run.operating_point_receipt_sha256),
@@ -460,7 +458,7 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
         if !alignment_eligible {
             excluded_alignment_unresolved += 1;
         }
-        let evidence_ref = |disposition, exclusion_reason, corrected_spl_db| WindowEvidenceRef {
+        let evidence_ref = |disposition, exclusion_reason, corrected_spl_db, lower_bound, upper_bound, upper_limit| WindowEvidenceRef {
             window_id: window.window_id.clone(),
             acoustic_trace_sha256: window.acoustic_trace_sha256.clone(),
             cavitation_observation_sha256: window.cavitation_observation_sha256.clone(),
@@ -472,6 +470,9 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
             disposition,
             exclusion_reason,
             corrected_spl_db,
+            corrected_spl_expanded_lower_bound_db: lower_bound,
+            corrected_spl_expanded_upper_bound_db: upper_bound,
+            cavitation_component_upper_limit_db: upper_limit,
         };
 
         if run.background_method == BackgroundMethod::Unknown {
@@ -479,6 +480,9 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
             window_evidence.push(evidence_ref(
                 "excluded",
                 Some("unknown_background_measurement_method"),
+                None,
+                None,
+                None,
                 None,
             ));
             continue;
@@ -489,8 +493,11 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
                 excluded_background_dominated += 1;
                 window_evidence.push(evidence_ref(
                     "excluded",
-                    Some("background_margin_below_3_db"),
+                    Some("background_margin_below_3_db_censored_upper_limit"),
                     None,
+                    None,
+                    None,
+                    Some(window.total_spl_db + window.total_expanded_uncertainty_db),
                 ));
             }
             Err(BackgroundFailure::ExactTenDbBoundaryUnspecified) => {
@@ -498,6 +505,9 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
                 window_evidence.push(evidence_ref(
                     "excluded",
                     Some("exact_10_db_boundary_unspecified_by_ittc_rev03"),
+                    None,
+                    None,
+                    None,
                     None,
                 ));
             }
@@ -510,25 +520,38 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
                     window.total_spl_db + window.total_expanded_uncertainty_db,
                     window.background_spl_db - window.background_expanded_uncertainty_db,
                 );
-                if lower.is_err() || upper.is_err() {
+                let (Ok(lower_bound), Ok(upper_bound)) = (lower, upper) else {
                     excluded_uncertainty_unresolved += 1;
                     window_evidence.push(evidence_ref(
                         "excluded",
                         Some("expanded_uncertainty_crosses_background_eligibility_boundary"),
                         None,
+                        None,
+                        None,
+                        None,
                     ));
                     continue;
-                }
+                };
                 if !level.is_finite() {
                     excluded_uncertainty_unresolved += 1;
                     window_evidence.push(evidence_ref(
                         "excluded",
                         Some("corrected_level_non_finite"),
                         None,
+                        None,
+                        None,
+                        None,
                     ));
                     continue;
                 }
-                window_evidence.push(evidence_ref("included", None, Some(level)));
+                window_evidence.push(evidence_ref(
+                    "included",
+                    None,
+                    Some(level),
+                    Some(lower_bound),
+                    Some(upper_bound),
+                    None,
+                ));
                 usable.push(UsableWindow {
                     start_time_s: window.start_time_s,
                     end_time_s: window.end_time_s,
@@ -1108,6 +1131,19 @@ mod tests {
         let result = energy_mean_db(&levels).unwrap();
         assert!((result - 107.40362689494244).abs() < 1.0e-10);
         assert!((result - 105.0).abs() > 2.0);
+    }
+
+    #[test]
+    fn background_dominated_windows_preserve_censored_upper_limits() {
+        let mut input = case();
+        input.runs[0].windows[0].total_spl_db = 92.9;
+        let report = audit(&input);
+        let run = &report.run_reports[0];
+        assert_eq!(run.excluded_background_dominated, 1);
+        assert_eq!(run.window_evidence[0].disposition, "excluded");
+        assert_eq!(run.window_evidence[0].cavitation_component_upper_limit_db, Some(93.1));
+        assert_eq!(run.window_evidence[0].corrected_spl_db, None);
+        assert_eq!(run.window_evidence[0].corrected_spl_expanded_lower_bound_db, None);
     }
 
     #[test]
