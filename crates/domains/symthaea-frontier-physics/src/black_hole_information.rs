@@ -2480,8 +2480,7 @@ fn diagnose_hayden_preskill_petz_general_optimality(
                 for message in 0..2 {
                     let input = (message << 1) | early_radiation;
                     let output = (emitted << 1) | b_prime;
-                    kraus[accessible * 2 + message] =
-                        scrambler[output][input] * inverse_sqrt_two;
+                    kraus[accessible * 2 + message] = scrambler[output][input] * inverse_sqrt_two;
                 }
             }
         }
@@ -2491,9 +2490,9 @@ fn diagnose_hayden_preskill_petz_general_optimality(
         for accessible in 0..4 {
             for logical_out in 0..2 {
                 for logical_in in 0..2 {
-                    weighted_kraus[environment][accessible * 2 + logical_in] +=
-                        channel_kraus[environment][accessible * 2 + logical_out]
-                            * sqrt_sigma[logical_out * 2 + logical_in];
+                    weighted_kraus[environment][accessible * 2 + logical_in] += channel_kraus
+                        [environment][accessible * 2 + logical_out]
+                        * sqrt_sigma[logical_out * 2 + logical_in];
                 }
             }
         }
@@ -2508,8 +2507,7 @@ fn diagnose_hayden_preskill_petz_general_optimality(
                         contraction += weighted_kraus[environment_row]
                             [accessible * 2 + logical_row]
                             .conj()
-                            * weighted_kraus[environment_column]
-                                [accessible * 2 + logical_column];
+                            * weighted_kraus[environment_column][accessible * 2 + logical_column];
                     }
                     let row = logical_row * 2 + environment_row;
                     let column = logical_column * 2 + environment_column;
@@ -2524,16 +2522,12 @@ fn diagnose_hayden_preskill_petz_general_optimality(
     for row in 0..4 {
         qec_trace += qec_matrix[row * 4 + row];
         for column in 0..4 {
-            qec_hermiticity_residual = qec_hermiticity_residual.max(
-                (qec_matrix[row * 4 + column] - qec_matrix[column * 4 + row].conj()).norm(),
-            );
+            qec_hermiticity_residual = qec_hermiticity_residual
+                .max((qec_matrix[row * 4 + column] - qec_matrix[column * 4 + row].conj()).norm());
         }
     }
-    let qec_trace_residual =
-        (qec_trace - Complex64::new(1.0, 0.0)).norm();
-    if qec_trace_residual > tolerance * 100.0
-        || qec_hermiticity_residual > tolerance * 100.0
-    {
+    let qec_trace_residual = (qec_trace - Complex64::new(1.0, 0.0)).norm();
+    if qec_trace_residual > tolerance * 100.0 || qec_hermiticity_residual > tolerance * 100.0 {
         return Err(QuantumInformationError::NonHermitian {
             residual: qec_trace_residual.max(qec_hermiticity_residual),
             tolerance: tolerance * 100.0,
@@ -2562,9 +2556,7 @@ fn diagnose_hayden_preskill_petz_general_optimality(
     for row in 0..2 {
         for column in 0..2 {
             auxiliary_t_hermiticity_residual = auxiliary_t_hermiticity_residual
-                .max((auxiliary_t[row * 2 + column]
-                    - auxiliary_t[column * 2 + row].conj())
-                    .norm());
+                .max((auxiliary_t[row * 2 + column] - auxiliary_t[column * 2 + row].conj()).norm());
         }
     }
 
@@ -2599,12 +2591,10 @@ fn diagnose_hayden_preskill_petz_general_optimality(
     let b_scale = b_eigenvalues
         .iter()
         .fold(1.0_f64, |scale, value| scale.max(value.abs()));
-    let b_positive_semidefinite_violation =
-        (-b_minimum_hermitian_part_eigenvalue).max(0.0);
+    let b_positive_semidefinite_violation = (-b_minimum_hermitian_part_eigenvalue).max(0.0);
     let threshold = tolerance * 100.0 * b_scale;
     let petz_is_entanglement_fidelity_optimal =
-        b_hermiticity_residual <= threshold
-            && b_minimum_hermitian_part_eigenvalue >= -threshold;
+        b_hermiticity_residual <= threshold && b_minimum_hermitian_part_eigenvalue >= -threshold;
     let mut commutator_squared = 0.0;
     let rho_sigma = complex_matrix2_multiply(&rho, &sigma);
     let sigma_rho = complex_matrix2_multiply(&sigma, &rho);
@@ -2629,12 +2619,7 @@ fn diagnose_hayden_preskill_petz_general_optimality(
 type ComplexMatrix2 = [Complex64; 4];
 
 fn flatten_complex_matrix2(matrix: [[Complex64; 2]; 2]) -> ComplexMatrix2 {
-    [
-        matrix[0][0],
-        matrix[0][1],
-        matrix[1][0],
-        matrix[1][1],
-    ]
+    [matrix[0][0], matrix[0][1], matrix[1][0], matrix[1][1]]
 }
 
 fn complex_matrix2_multiply(left: &ComplexMatrix2, right: &ComplexMatrix2) -> ComplexMatrix2 {
@@ -2683,9 +2668,7 @@ fn complex_hermitian_sqrt_and_inverse_sqrt_2(
             tolerance,
         });
     }
-    let discriminant = ((matrix[0].re - matrix[3].re).powi(2)
-        + 4.0 * matrix[1].norm_sqr())
-    .sqrt();
+    let discriminant = ((matrix[0].re - matrix[3].re).powi(2) + 4.0 * matrix[1].norm_sqr()).sqrt();
     let maximum_eigenvalue = 0.5 * (trace + discriminant);
     let minimum_eigenvalue = determinant / maximum_eigenvalue;
     if !minimum_eigenvalue.is_finite() || minimum_eigenvalue <= tolerance {
