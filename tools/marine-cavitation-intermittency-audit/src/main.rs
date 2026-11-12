@@ -925,9 +925,6 @@ mod tests {
     fn stable_water_susceptibility_allows_distributional_comparison() {
         let mut input = case();
         make_measured(&mut input);
-        for run in &mut input.runs {
-            run.water_condition.nuclei_distribution_evidence_sha256 = Some(digest('8'));
-        }
         assert_eq!(audit(&input).disposition, "DISTRIBUTIONAL_SUMMARY_ONLY");
     }
 
@@ -974,7 +971,6 @@ mod tests {
             run.water_condition.measure = SusceptibilityMeasure::TotalGasContent;
             run.water_condition.value = 40.0;
             run.water_condition.unit = "percent_saturation".to_string();
-            run.water_condition.nuclei_distribution_evidence_sha256 = Some(digest('8'));
         }
         assert_eq!(audit(&input).disposition, "DISTRIBUTIONAL_SUMMARY_ONLY");
     }
