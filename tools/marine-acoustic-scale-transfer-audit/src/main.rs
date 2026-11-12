@@ -1363,6 +1363,44 @@ mod tests {
     }
 
     #[test]
+    fn unselected_grouping_dimensions_are_not_used_as_leakage_keys() {
+        let mut case = fixture_case();
+        case.validation_split.grouping_dimensions = vec![GroupingDimension::VesselId];
+        case.validation_split.groups[1].model_facility_id =
+            case.validation_split.groups[0].model_facility_id.clone();
+        assert_eq!(audit(&case).disposition, "incomplete");
+    }
+
+    #[test]
+    fn empty_split_role_or_duplicate_grouping_dimension_is_invalid() {
+        let mut case = fixture_case();
+        case.validation_split.groups.retain(|group| group.role == SplitRole::HeldOut);
+        assert_eq!(audit(&case).disposition, "invalid");
+        let mut case = fixture_case();
+        case.validation_split.grouping_dimensions.push(GroupingDimension::VesselId);
+        assert_eq!(audit(&case).disposition, "invalid");
+    }
+
+    #[test]
+    fn malformed_split_manifest_digest_is_invalid() {
+        let mut case = fixture_case();
+        case.validation_split.split_manifest_sha256 = "missing".to_string();
+        assert_eq!(audit(&case).disposition, "invalid");
+    }
+
+    #[test]
+    fn pair_reports_preserve_group_role_and_manifest_identity() {
+        let case = fixture_case();
+        let report = audit(&case);
+        assert_eq!(report.split_manifest_sha256, case.validation_split.split_manifest_sha256);
+        assert_eq!(report.grouping_dimensions.len(), 7);
+        assert_eq!(report.pair_reports[0].benchmark_group_id, "cal-group");
+        assert_eq!(report.pair_reports[0].split_role, "calibration");
+        assert_eq!(report.pair_reports[1].benchmark_group_id, "held-out-group");
+        assert_eq!(report.pair_reports[1].split_role, "held_out");
+    }
+
+    #[test]
     fn grouped_holdout_manifest_separates_all_selected_dimensions() {
         let report = audit(&fixture_case());
         assert_eq!(report.calibration_group_count, 1);
