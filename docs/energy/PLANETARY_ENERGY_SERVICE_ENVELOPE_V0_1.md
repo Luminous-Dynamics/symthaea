@@ -475,3 +475,11 @@ cargo test -p xtask
 The orbit and service commands use the existing `serde`, `serde_json`, `sha2` and `anyhow` dependencies. A corpus-level PASS means its expected synthetic/reference dispositions were reproduced; it does not mean all included candidates are feasible. Neither command validates a solar array, power system, battery, radiator, site, material process or ISRU plant.
 
 The service receipt values in the synthetic fixture are deliberately synthetic. Production use must first bind exact source model, configuration, timebase, evidence class, units, uncertainty and capability receipt identity from the upstream owner. A non-empty capability-receipt identifier is only a reference string; it is not proof that the receipt exists, is authentic, is current, or is qualified.
+
+## 15. Competitive frontier and machine-readable source ledger
+
+The component and programme comparators are summarized in [PLANETARY_ENERGY_COMPETITIVE_FRONTIER_2026_11_12.md](PLANETARY_ENERGY_COMPETITIVE_FRONTIER_2026_11_12.md). This records NASA 2026 space-cell/array data, NASA vertical lunar-array programme references, Blue Alchemist and SoMo regolith-to-PV work, autonomous perovskite manufacturing, and NLR terrestrial fleet performance. Each comparator is explicitly boundary- and evidence-class-qualified.
+
+The structured reference data is in [`competitive-reference-snapshot.json`](../../benchmarks/planetary-energy-service/v0.1/competitive-reference-snapshot.json). Do not compare values across unlike boundaries or promote a programme goal to achieved hardware performance.
+
+The strongest next lunar surface baseline is not an isolated PV module: it is a vertical/retractable array + site illumination/history + storage + power distribution + thermal management + dust/retraction/repair. NASA's public 10-kW VSAT design reference and 50-kW / >75 W/kg second-generation solicitation target are useful comparison anchors, but not deployed lunar operating results.
