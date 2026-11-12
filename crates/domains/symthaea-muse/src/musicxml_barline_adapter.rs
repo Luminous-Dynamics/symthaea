@@ -187,8 +187,8 @@ pub fn parse_musicxml_measure_map(
 ///
 /// `non_controlling_measure_indices` records the zero-based measure indices
 /// whose left barline MusicXML explicitly declares non-coincident with other
-/// parts. The contained score-clock ID is part-qualified so a consumer cannot
-/// accidentally evaluate one part against another part's barline sequence.
+/// parts. All per-part maps share the same score-clock identity; the separate
+/// part ID prevents accidental mixing of note/measure ownership.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MusicXmlPartMeasureMapV1 {
     pub part_id: String,
