@@ -349,11 +349,17 @@ It records dataset/research identity, public scope, license state, limitations, 
 
 ### RGBench — real garment physics, not just simple cloth
 
-The AAAI-26 RGBench paper describes a 6,000+ garment mesh corpus, a measured material-property pipeline and the GarmentDynamics FEM-based cloth simulator. It evaluates dual-arm grasp, fling and fold and reports bidirectional Chamfer/Hausdorff measures. The paper reports approximately 20% lower simulation error and approximately 3× faster simulation than its evaluated baselines. These are author-reported results, not a Luminous result.
+The AAAI-26 RGBench paper describes a 6,000+ garment-mesh corpus, a measured material-property pipeline and the GarmentDynamics FEM-based cloth simulator. It evaluates dual-arm grasp, fling and fold and reports bidirectional Chamfer/Hausdorff measures. The paper reports approximately 20% lower simulation error and approximately 3× faster simulation than its evaluated baselines. These are author-reported results, not a Luminous result.
 
-A critical availability distinction: the current [public Hugging Face evaluation release](https://huggingface.co/datasets/RGBench/RGBench-Cloth-Sim2Real-v1) contains nine real-captured garments, three actions and approximately 100 evaluation samples. It includes camera extrinsics/initial poses, bimanual joint/end-effector records, segmented point clouds and OBJ/USD meshes. The dataset card lists CC-BY-4.0. The larger 6k+ mesh library and GarmentDynamics are described as forthcoming follow-up releases. Two released garments are excluded from the paper's published baseline results because of non-manifold meshes.
+There are now **two distinct public RGBench datasets**, and their scope and rights must not be conflated:
 
-**Our immediate goal:** reproduce the available public evaluation package and the exact metric definitions before attempting to beat the paper. Keep the public nine-garment subset separate from any future paper-scale assets.
+1. **Real-capture evaluation package:** [RGBench-Cloth-Sim2Real-v1](https://huggingface.co/datasets/RGBench/RGBench-Cloth-Sim2Real-v1) contains nine captured garment identities, three bimanual actions and 98 capture sessions (the card describes approximately 100 evaluation samples). It contains camera calibration/initial pose, robot joint/end-effector CSVs, segmented cloth point clouds and matching OBJ/USD meshes. The dataset card lists **CC-BY-4.0**. The two non-manifold garments `grey_sunwear` and `khaki_blazer` are excluded from the paper's published baseline results.
+
+2. **Garment asset research subset:** [RGBench/garment_assets](https://huggingface.co/datasets/RGBench/garment_assets) is a separate release with 2,794 rows, 504 classes and approximately 25.5 GB of OBJ and Style3D assets. Style3D files carry measured stretch stiffness, bending stiffness, area density and thickness. Its license is a **project-specific non-commercial research license**, not CC-BY-4.0. The dataset page describes it as a research subset of the industrial asset library; the full 4,000+ industrial models remain contact/licensing-only. Parsing and simulator post-processing scripts are described as forthcoming. Do not infer that 2,794 rows equal 2,794 unique garment designs.
+
+The paper's 6,000+ mesh count also draws on other sources, including ClothesNet; those source datasets must be obtained and used under their own original terms. The **GarmentDynamics simulator remains forthcoming** as a separate open release; the RGBench GitHub repository already supplies an evaluation harness and PyBullet/Isaac Sim wrappers.
+
+**Our immediate goal:** reproduce the real-capture evaluation package and exact metrics first, then inspect the asset research subset under its restrictive non-commercial license to calibrate material/mesh intake. Keep these two lanes separate. No external RGBench data has been downloaded or ingested by Luminous.
 
 The next qualification layer must extend beyond global point-cloud distance:
 - local geometry around seams, hems, cuffs, collars, closures and fold lines;
