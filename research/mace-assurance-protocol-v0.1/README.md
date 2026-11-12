@@ -17,11 +17,13 @@ The matrix package defines four SUT layers (foundation model, interaction/access
 
 The compiler selects rows when infrastructure-profile and scenario scopes both intersect the declared profile. It composes duplicates conservatively: mandatory is OR; N/A permission is AND. The composite declaration also binds the exact request traversal order and one configuration digest for every selected infrastructure and scenario profile. It hashes the complete catalogue after canonicalizing row and scope order, then binds that digest, the selected profile, traversal and constituent configs to the inventory identity. Even an edit to a currently unselected catalogue row changes the digest; changing traversal or any constituent configuration changes identity too. This does not prove catalogue completeness. Catalogue ownership and independent review remain external governance requirements.
 
+The `cmd/mace-profilec/` CLI accepts one strict JSON request (`mace-profile-compile-request-v1`) and emits the compiled profile, complete catalogue digest, mandatory-control inventory and inventory digest. Duplicate JSON keys, unknown fields, trailing values, and unknown schemas are rejected. The sample in `fixtures/profile-compile-request.json` is deliberately illustrative, not a policy catalogue endorsed as complete.
+
 ## Verify
 
 Requires Go 1.23 or newer and no third-party Go modules.
 
-Run `./verify.sh` from this directory. The script checks gofmt, unit tests, the race detector and go vet.
+Run `./verify.sh` from this directory. The script checks gofmt, unit tests, the race detector, go vet, and executable JSONL/profile compiler fixtures.
 
 ## Claim boundary
 
