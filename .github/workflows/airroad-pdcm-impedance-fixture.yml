@@ -6,6 +6,9 @@ on:
       - "docs/research/AIRROAD_PDCM_IMPEDANCE_001_V0_1.md"
       - "docs/research/fixtures/airroad-pdcm-two-converter-shared-source-v0.1.json"
       - "tools/airroad-pdcm-impedance-qualifier/verify_two_converter_fixture.py"
+      - "crates/domains/symthaea-circuits/src/dc_bus_interaction.rs"
+      - "crates/domains/symthaea-circuits/src/lib.rs"
+      - "crates/domains/symthaea-circuits/README.md"
       - ".github/workflows/airroad-pdcm-impedance-fixture.yml"
   push:
     branches:
@@ -14,6 +17,9 @@ on:
       - "docs/research/AIRROAD_PDCM_IMPEDANCE_001_V0_1.md"
       - "docs/research/fixtures/airroad-pdcm-two-converter-shared-source-v0.1.json"
       - "tools/airroad-pdcm-impedance-qualifier/verify_two_converter_fixture.py"
+      - "crates/domains/symthaea-circuits/src/dc_bus_interaction.rs"
+      - "crates/domains/symthaea-circuits/src/lib.rs"
+      - "crates/domains/symthaea-circuits/README.md"
       - ".github/workflows/airroad-pdcm-impedance-fixture.yml"
 
 permissions:
