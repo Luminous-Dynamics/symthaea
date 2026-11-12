@@ -64,7 +64,10 @@ def main():
             assert column["column_payload_digest"].strip()
             injected = cp(column["injected_current_a"])
             assert injected != (Fraction(0), Fraction(0))
-            assert q(column["absolute_error_bound_a"]) >= 0
+            current_error = q(column["absolute_error_bound_a"])
+            assert current_error >= 0
+            current_magnitude_squared = injected[0] * injected[0] + injected[1] * injected[1]
+            assert current_error * current_error < current_magnitude_squared
 
             observed = {}
             for output in column["voltage_observations"]:
@@ -102,6 +105,7 @@ def main():
     assert controls["measured-without-calibration"] == "not_evaluable_missing_calibration"
     assert controls["off-knot-query"] == "not_evaluable_unsupported_frequency"
     assert controls["zero-excitation"] == "not_evaluable_invalid_excitation"
+    assert controls["current-uncertainty-includes-zero"] == "not_evaluable_excitation_uncertainty_covers_zero"
 
     print("PASS exact 2x2 matrix point estimates at both recorded knots")
     print("PASS complete excitation columns and output response rows")
