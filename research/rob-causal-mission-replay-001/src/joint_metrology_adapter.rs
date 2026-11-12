@@ -20,7 +20,8 @@ pub enum QualificationDisposition {
 pub enum EnergyClosureDisposition {
     Balanced,
     Unknown,
-    OutsideUncertainty,
+    Inconclusive,
+    Invalid,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,17 +55,23 @@ pub struct JointInstrumentReceipt {
     pub sampling_spec_valid: bool,
 }
 
-/// The caller integrates raw samples using the declared sign conventions and
-/// uncertainty propagation. This adapter never infers omitted flows.
+/// Status returned by the upstream first-law / energy-boundary owner.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UpstreamEnergyDisposition {
+    Balanced,
+    Inconclusive,
+    Invalid,
+    Unknown,
+}
+
+/// Boundary and first-law receipt. This adapter consumes the upstream result;
+/// it does not duplicate energy integration or the first-law evaluator.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnergyBoundaryReceipt {
     pub boundary_manifest_digest: String,
     pub boundary_complete: bool,
-    pub electrical_input_uj: u64,
-    pub shaft_work_output_uj: u64,
-    pub heat_out_uj: u64,
-    pub delta_stored_energy_uj: i64,
-    pub combined_uncertainty_uj: u64,
+    pub closure_disposition: UpstreamEnergyDisposition,
+    pub closure_receipt_digest: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,8 +94,7 @@ pub struct JointMetrologyEvidence {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EnergyClosureResult {
     pub boundary_complete: bool,
-    pub residual_uj: i128,
-    pub combined_uncertainty_uj: u64,
+    pub receipt_digest: Option<String>,
     pub disposition: EnergyClosureDisposition,
 }
 
@@ -139,23 +145,30 @@ fn required_digest(
     }
 }
 
-/// Compute electrical minus shaft work, heat out and stored-energy change.
-pub fn energy_closure(receipt: EnergyBoundaryReceipt) -> EnergyClosureResult {
-    let residual = i128::from(receipt.electrical_input_uj)
-        - i128::from(receipt.shaft_work_output_uj)
-        - i128::from(receipt.heat_out_uj)
-        - i128::from(receipt.delta_stored_energy_uj);
-    let disposition = if !receipt.boundary_complete {
+/// Consume the upstream first-law result without reimplementing its model.
+pub fn energy_closure(receipt: &EnergyBoundaryReceipt) -> EnergyClosureResult {
+    let disposition = if !receipt.boundary_complete
+        || receipt.boundary_manifest_digest.trim().is_empty()
+    {
         EnergyClosureDisposition::Unknown
-    } else if residual.abs() > i128::from(receipt.combined_uncertainty_uj) {
-        EnergyClosureDisposition::OutsideUncertainty
     } else {
-        EnergyClosureDisposition::Balanced
+        match receipt.closure_disposition {
+            UpstreamEnergyDisposition::Balanced
+                if !receipt.closure_receipt_digest.trim().is_empty() =>
+            {
+                EnergyClosureDisposition::Balanced
+            }
+            UpstreamEnergyDisposition::Balanced | UpstreamEnergyDisposition::Unknown => {
+                EnergyClosureDisposition::Unknown
+            }
+            UpstreamEnergyDisposition::Inconclusive => EnergyClosureDisposition::Inconclusive,
+            UpstreamEnergyDisposition::Invalid => EnergyClosureDisposition::Invalid,
+        }
     };
     EnergyClosureResult {
         boundary_complete: receipt.boundary_complete,
-        residual_uj: residual,
-        combined_uncertainty_uj: receipt.combined_uncertainty_uj,
+        receipt_digest: (!receipt.closure_receipt_digest.trim().is_empty())
+            .then(|| receipt.closure_receipt_digest.clone()),
         disposition,
     }
 }
@@ -317,19 +330,25 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
         );
     }
 
-    let energy = energy_closure(evidence.energy);
+    let energy = energy_closure(&evidence.energy);
     match energy.disposition {
         EnergyClosureDisposition::Balanced => {}
         EnergyClosureDisposition::Unknown => push(
             &mut findings,
             FindingSeverity::Unknown,
-            "JOINT_ENERGY_BOUNDARY_INCOMPLETE",
+            "JOINT_ENERGY_BOUNDARY_INCOMPLETE_OR_UNKNOWN",
             mission_id,
         ),
-        EnergyClosureDisposition::OutsideUncertainty => push(
+        EnergyClosureDisposition::Inconclusive => push(
             &mut findings,
             FindingSeverity::Unknown,
-            "JOINT_ENERGY_RESIDUAL_OUTSIDE_UNCERTAINTY",
+            "JOINT_ENERGY_CLOSURE_INCONCLUSIVE",
+            mission_id,
+        ),
+        EnergyClosureDisposition::Invalid => push(
+            &mut findings,
+            FindingSeverity::Invalid,
+            "JOINT_ENERGY_CLOSURE_INVALID",
             mission_id,
         ),
     }
@@ -668,11 +687,8 @@ mod tests {
             energy: EnergyBoundaryReceipt {
                 boundary_manifest_digest: "energy-boundary".to_owned(),
                 boundary_complete: true,
-                electrical_input_uj: 100_000_000,
-                shaft_work_output_uj: 70_000_000,
-                heat_out_uj: 25_000_000,
-                delta_stored_energy_uj: 5_000_000,
-                combined_uncertainty_uj: 100_000,
+                closure_disposition: UpstreamEnergyDisposition::Balanced,
+                closure_receipt_digest: "first-law-receipt".to_owned(),
             },
             expected_predecessor_reserve_digest: "reserve-0".to_owned(),
             physical_state_reset: false,
@@ -705,19 +721,31 @@ mod tests {
         evidence.energy.boundary_complete = false;
         let report = qualify_joint_metrology(&evidence);
         assert_eq!(report.disposition, QualificationDisposition::Unknown);
-        assert_eq!(report.energy.residual_uj, 0);
+        assert_eq!(report.energy.receipt_digest.as_deref(), Some("first-law-receipt"));
         assert_eq!(report.energy.disposition, EnergyClosureDisposition::Unknown);
     }
 
     #[test]
-    fn energy_residual_outside_declared_uncertainty_is_not_a_pass() {
+    fn upstream_energy_closure_inconclusive_is_not_a_pass() {
         let mut evidence = valid_evidence();
-        evidence.energy.shaft_work_output_uj += 1_000_000;
+        evidence.energy.closure_disposition = UpstreamEnergyDisposition::Inconclusive;
         let report = qualify_joint_metrology(&evidence);
         assert_eq!(report.disposition, QualificationDisposition::Unknown);
         assert_eq!(
             report.energy.disposition,
-            EnergyClosureDisposition::OutsideUncertainty
+            EnergyClosureDisposition::Inconclusive
+        );
+    }
+
+    #[test]
+    fn upstream_energy_closure_invalid_rejects_joint_qualification() {
+        let mut evidence = valid_evidence();
+        evidence.energy.closure_disposition = UpstreamEnergyDisposition::Invalid;
+        let report = qualify_joint_metrology(&evidence);
+        assert_eq!(report.disposition, QualificationDisposition::Rejected);
+        assert_eq!(
+            report.energy.disposition,
+            EnergyClosureDisposition::Invalid
         );
     }
 
@@ -855,12 +883,12 @@ mod tests {
     }
 
     #[test]
-    fn signed_storage_change_is_accounted_without_unsigned_underflow() {
-        let mut evidence = valid_evidence();
-        evidence.energy.delta_stored_energy_uj = -2_000_000;
-        evidence.energy.heat_out_uj = 32_000_000;
-        let report = qualify_joint_metrology(&evidence);
-        assert_eq!(report.energy.residual_uj, 0);
+    fn balanced_first_law_receipt_is_carried_without_recomputing_energy() {
+        let report = qualify_joint_metrology(&valid_evidence());
+        assert_eq!(
+            report.energy.receipt_digest.as_deref(),
+            Some("first-law-receipt")
+        );
         assert_eq!(report.energy.disposition, EnergyClosureDisposition::Balanced);
     }
 }
