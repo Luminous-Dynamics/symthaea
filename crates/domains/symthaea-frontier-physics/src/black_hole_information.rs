@@ -4089,24 +4089,24 @@ pub fn simulate_u1_conserving_sequential_evaporation(
                 // The unpartitioned global state is pure at the two endpoints.
                 (0.0, 0.0, 1.0, 1.0)
             } else {
-                let radiation = DensityMatrix::from_pure_state(
+                // For a globally pure state, complementary reductions have
+                // identical nonzero spectra, entropy, and purity. Construct
+                // only the smaller side so 1|(N-1) cuts remain within the
+                // dense 64-dimensional reduced-state limit.
+                let smaller = if radiation_qubits.len() <= black_hole_qubits.len() {
+                    &radiation_qubits
+                } else {
+                    &black_hole_qubits
+                };
+                let reduced = DensityMatrix::from_pure_state(
                     &amplitudes,
                     number_of_qubits,
-                    &radiation_qubits,
+                    smaller,
                     tolerance,
                 )?;
-                let black_hole = DensityMatrix::from_pure_state(
-                    &amplitudes,
-                    number_of_qubits,
-                    &black_hole_qubits,
-                    tolerance,
-                )?;
-                (
-                    radiation.von_neumann_entropy(tolerance)?,
-                    black_hole.von_neumann_entropy(tolerance)?,
-                    radiation.diagnostics(tolerance)?.purity,
-                    black_hole.diagnostics(tolerance)?.purity,
-                )
+                let entropy = reduced.von_neumann_entropy(tolerance)?;
+                let purity = reduced.diagnostics(tolerance)?.purity;
+                (entropy, entropy, purity, purity)
             };
 
         let (total_excitation_expectation, total_excitation_variance) =
@@ -4422,9 +4422,20 @@ mod symmetry_resolved_page_tests {
                 < 1e-14
         );
         assert!(
-            (symmetry_resolved_page_average_entropy_nats(4, 2, 2).unwrap() - 77.0 / 60.0).abs()
+            (symmetry_resolved_page_average_entropy_nats(4, 2, 2).unwrap() - 19.0 / 20.0).abs()
                 < 1e-13
         );
+    }
+
+    #[test]
+    fn fixed_charge_page_reference_matches_charge_block_dirichlet_decomposition() {
+        // N=4, K=2, A=2 has charge-block dimensions (1,4,1) and
+        // exact Haar-average entropy 19/20 nats from the Dirichlet/Page sum.
+        let expected = 19.0 / 20.0;
+        let actual = symmetry_resolved_page_average_entropy_nats(4, 2, 2).unwrap();
+        assert!((actual - expected).abs() < 1e-13);
+        let complement = symmetry_resolved_page_average_entropy_nats(4, 2, 2).unwrap();
+        assert!((actual - complement).abs() < 1e-14);
     }
 
     #[test]
