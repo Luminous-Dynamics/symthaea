@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
 use std::process;
@@ -17,6 +17,7 @@ struct Case {
     scaling: ScalingSelection,
     similarity: SimilarityEvidence,
     frequency_match_tolerance_fraction: f64,
+    validation_split: ValidationSplit,
     pairs: Vec<ScalePair>,
 }
 
@@ -136,6 +137,79 @@ fn cavitation_pattern_name(value: &CavitationPattern) -> &'static str {
 
 #[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
+enum SplitRole {
+    Calibration,
+    HeldOut,
+}
+
+fn split_role_name(value: SplitRole) -> &'static str {
+    match value {
+        SplitRole::Calibration => "calibration",
+        SplitRole::HeldOut => "held_out",
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone, PartialOrd, Ord)]
+#[serde(rename_all = "snake_case")]
+enum GroupingDimension {
+    ModelFacilityId,
+    FullScaleTrialSiteId,
+    VesselId,
+    PropellerDesignId,
+    PropellerRevision,
+    CampaignId,
+    OperatingConditionFamilyId,
+}
+
+fn grouping_dimension_name(value: GroupingDimension) -> &'static str {
+    match value {
+        GroupingDimension::ModelFacilityId => "model_facility_id",
+        GroupingDimension::FullScaleTrialSiteId => "full_scale_trial_site_id",
+        GroupingDimension::VesselId => "vessel_id",
+        GroupingDimension::PropellerDesignId => "propeller_design_id",
+        GroupingDimension::PropellerRevision => "propeller_revision",
+        GroupingDimension::CampaignId => "campaign_id",
+        GroupingDimension::OperatingConditionFamilyId => "operating_condition_family_id",
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ValidationSplit {
+    split_manifest_sha256: String,
+    protocol_id: String,
+    grouping_dimensions: Vec<GroupingDimension>,
+    groups: Vec<BenchmarkGroup>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BenchmarkGroup {
+    group_id: String,
+    role: SplitRole,
+    model_facility_id: String,
+    full_scale_trial_site_id: String,
+    vessel_id: String,
+    propeller_design_id: String,
+    propeller_revision: String,
+    campaign_id: String,
+    operating_condition_family_id: String,
+}
+
+fn group_value(group: &BenchmarkGroup, dimension: GroupingDimension) -> &str {
+    match dimension {
+        GroupingDimension::ModelFacilityId => &group.model_facility_id,
+        GroupingDimension::FullScaleTrialSiteId => &group.full_scale_trial_site_id,
+        GroupingDimension::VesselId => &group.vessel_id,
+        GroupingDimension::PropellerDesignId => &group.propeller_design_id,
+        GroupingDimension::PropellerRevision => &group.propeller_revision,
+        GroupingDimension::CampaignId => &group.campaign_id,
+        GroupingDimension::OperatingConditionFamilyId => &group.operating_condition_family_id,
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
+#[serde(rename_all = "snake_case")]
 enum CavitationPattern {
     Sheet,
     Cloud,
@@ -158,6 +232,7 @@ enum PatternComparability {
 #[serde(deny_unknown_fields)]
 struct ScalePair {
     pair_id: String,
+    benchmark_group_id: String,
     cavitation_pattern: CavitationPattern,
     cavitation_pattern_comparability: PatternComparability,
     model: ModelRun,
@@ -238,6 +313,15 @@ struct AuditReport {
     spectrum_representation: &'static str,
     disposition: &'static str,
     comparison_outcome: &'static str,
+    calibration_comparison_outcome: &'static str,
+    held_out_comparison_outcome: &'static str,
+    split_manifest_sha256: String,
+    split_protocol_id: String,
+    grouping_dimensions: Vec<&'static str>,
+    calibration_group_count: usize,
+    held_out_group_count: usize,
+    calibration_pair_count: usize,
+    held_out_pair_count: usize,
     unique_model_rotation_rates: usize,
     pair_reports: Vec<PairReport>,
     reasons: Vec<String>,
@@ -247,6 +331,8 @@ struct AuditReport {
 #[derive(Debug, Serialize)]
 struct PairReport {
     pair_id: String,
+    benchmark_group_id: String,
+    split_role: &'static str,
     model_run_id: String,
     full_scale_run_id: String,
     model_hydrophone_instrument_id: String,
@@ -472,10 +558,75 @@ fn validate_case(case: &Case) -> Vec<String> {
         errors.push("at least one matched model/full-scale pair is required".to_string());
     }
 
+    if !is_sha256(&case.validation_split.split_manifest_sha256) {
+        errors.push("validation split manifest digest must be 64 hexadecimal characters".to_string());
+    }
+    if case.validation_split.protocol_id.trim().is_empty() {
+        errors.push("validation split protocol_id is required".to_string());
+    }
+    if case.validation_split.grouping_dimensions.is_empty() {
+        errors.push("at least one validation grouping dimension is required".to_string());
+    }
+    let mut selected_dimensions = BTreeSet::new();
+    for dimension in &case.validation_split.grouping_dimensions {
+        if !selected_dimensions.insert(*dimension) {
+            errors.push(format!("duplicate validation grouping dimension {}", grouping_dimension_name(*dimension)));
+        }
+    }
+
+    let mut group_map: BTreeMap<String, &BenchmarkGroup> = BTreeMap::new();
+    let mut calibration_groups = Vec::new();
+    let mut held_out_groups = Vec::new();
+    for group in &case.validation_split.groups {
+        if group.group_id.trim().is_empty() || group_map.insert(group.group_id.clone(), group).is_some() {
+            errors.push(format!("empty or duplicate validation group_id {}", group.group_id));
+        }
+        for (label, value) in [
+            ("model_facility_id", &group.model_facility_id),
+            ("full_scale_trial_site_id", &group.full_scale_trial_site_id),
+            ("vessel_id", &group.vessel_id),
+            ("propeller_design_id", &group.propeller_design_id),
+            ("propeller_revision", &group.propeller_revision),
+            ("campaign_id", &group.campaign_id),
+            ("operating_condition_family_id", &group.operating_condition_family_id),
+        ] {
+            if value.trim().is_empty() {
+                errors.push(format!("validation group {}: {} is required", group.group_id, label));
+            }
+        }
+        match group.role {
+            SplitRole::Calibration => calibration_groups.push(group),
+            SplitRole::HeldOut => held_out_groups.push(group),
+        }
+    }
+    if calibration_groups.is_empty() || held_out_groups.is_empty() {
+        errors.push("validation split requires at least one calibration group and one held-out group".to_string());
+    }
+    for dimension in &case.validation_split.grouping_dimensions {
+        let calibration_values: BTreeSet<&str> = calibration_groups
+            .iter()
+            .map(|group| group_value(group, *dimension))
+            .collect();
+        for group in &held_out_groups {
+            if calibration_values.contains(group_value(group, *dimension)) {
+                errors.push(format!(
+                    "validation leakage: {}={} appears in both calibration and held-out groups",
+                    grouping_dimension_name(*dimension),
+                    group_value(group, *dimension)
+                ));
+            }
+        }
+    }
+
     let mut pair_ids = BTreeSet::new();
+    let mut referenced_groups = BTreeSet::new();
     for pair in &case.pairs {
         if pair.pair_id.trim().is_empty() || !pair_ids.insert(pair.pair_id.clone()) {
             errors.push(format!("empty or duplicate pair_id: {}", pair.pair_id));
+        }
+        referenced_groups.insert(pair.benchmark_group_id.clone());
+        if !group_map.contains_key(&pair.benchmark_group_id) {
+            errors.push(format!("{}: benchmark_group_id {} is not declared in the split manifest", pair.pair_id, pair.benchmark_group_id));
         }
         for (label, value) in [
             ("model diameter", pair.model.diameter_m),
@@ -589,7 +740,47 @@ fn validate_case(case: &Case) -> Vec<String> {
             errors.push(format!("{}: model and full-scale band_id sets must match exactly", pair.pair_id));
         }
     }
+    for group_id in group_map.keys() {
+        if !referenced_groups.contains(group_id) {
+            errors.push(format!("validation split group {} is not referenced by any pair", group_id));
+        }
+    }
     errors
+}
+
+fn role_comparison_outcome(pair_reports: &[PairReport], role: SplitRole) -> &'static str {
+    let selected: Vec<&PairReport> = pair_reports
+        .iter()
+        .filter(|pair| pair.split_role == split_role_name(role))
+        .collect();
+    if selected.is_empty() {
+        return "not_evaluated";
+    }
+    if selected.iter().any(|pair| pair.band_reports.iter().any(|band| band.comparison == "frequency_mismatch")) {
+        "frequency_mismatch"
+    } else if selected.iter().any(|pair| pair.band_reports.iter().any(|band| {
+        band.comparison == "uncertainty_interval_unresolved"
+            || band.comparison == "background_threshold_boundary_unspecified"
+            || band.comparison == "background_dominated_unusable"
+    })) {
+        "uncertainty_or_background_unresolved"
+    } else if selected.iter().any(|pair| pair.band_reports.iter().any(|band| band.comparison == "prediction_only")) {
+        "prediction_only"
+    } else if selected.iter().any(|pair| pair.band_reports.iter().any(|band| band.comparison == "intervals_disjoint")) {
+        "at_least_one_band_disjoint"
+    } else if selected.iter().all(|pair| !pair.band_reports.is_empty() && pair.band_reports.iter().all(|band| band.comparison == "intervals_overlap")) {
+        "all_declared_bands_overlap"
+    } else {
+        "not_evaluated"
+    }
+}
+
+fn calibration_groups_count(split: &ValidationSplit) -> usize {
+    split.groups.iter().filter(|group| group.role == SplitRole::Calibration).count()
+}
+
+fn held_out_groups_count(split: &ValidationSplit) -> usize {
+    split.groups.iter().filter(|group| group.role == SplitRole::HeldOut).count()
 }
 
 fn audit(case: &Case) -> AuditReport {
@@ -886,8 +1077,13 @@ fn audit(case: &Case) -> AuditReport {
             });
         }
 
+        let group = case.validation_split.groups.iter()
+            .find(|group| group.group_id == pair.benchmark_group_id)
+            .expect("validation group references are checked before audit");
         pair_reports.push(PairReport {
             pair_id: pair.pair_id.clone(),
+            benchmark_group_id: pair.benchmark_group_id.clone(),
+            split_role: split_role_name(group.role),
             model_run_id: pair.model.run_id.clone(),
             full_scale_run_id: pair.full_scale.run_id.clone(),
             model_hydrophone_instrument_id: pair.model.hydrophone_instrument_id.clone(),
@@ -951,6 +1147,10 @@ fn audit(case: &Case) -> AuditReport {
         "computational_comparison_only"
     };
 
+    let calibration_comparison_outcome = role_comparison_outcome(&pair_reports, SplitRole::Calibration);
+    let held_out_comparison_outcome = role_comparison_outcome(&pair_reports, SplitRole::HeldOut);
+    let calibration_pair_count = pair_reports.iter().filter(|pair| pair.split_role == "calibration").count();
+    let held_out_pair_count = pair_reports.iter().filter(|pair| pair.split_role == "held_out").count();
     let comparison_outcome = if any_frequency_mismatch {
         "frequency_mismatch"
     } else if any_unresolved_band {
@@ -976,6 +1176,15 @@ fn audit(case: &Case) -> AuditReport {
         spectrum_representation: spectrum_representation_name(&case.scaling.representation),
         disposition,
         comparison_outcome,
+        calibration_comparison_outcome,
+        held_out_comparison_outcome,
+        split_manifest_sha256: case.validation_split.split_manifest_sha256.clone(),
+        split_protocol_id: case.validation_split.protocol_id.clone(),
+        grouping_dimensions: case.validation_split.grouping_dimensions.iter().map(|dimension| grouping_dimension_name(*dimension)).collect(),
+        calibration_group_count: calibration_groups_count(&case.validation_split),
+        held_out_group_count: held_out_groups_count(&case.validation_split),
+        calibration_pair_count,
+        held_out_pair_count,
         unique_model_rotation_rates,
         pair_reports,
         reasons,
@@ -1035,6 +1244,7 @@ mod tests {
         {
             pairs.push(ScalePair {
                 pair_id: format!("pair-{}", index + 1),
+                benchmark_group_id: if index == 0 { "cal-group".to_string() } else { "held-out-group".to_string() },
                 cavitation_pattern: CavitationPattern::Sheet,
                 cavitation_pattern_comparability: PatternComparability::Matched,
                 model: ModelRun {
@@ -1111,8 +1321,115 @@ mod tests {
                 facility_transfer_function: FacilityTransferState::MeasuredAndApplied,
             },
             frequency_match_tolerance_fraction: 0.01,
+            validation_split: ValidationSplit {
+                split_manifest_sha256: digest.to_string(),
+                protocol_id: "leave-one-facility-vessel-propeller-campaign-condition-out".to_string(),
+                grouping_dimensions: vec![
+                    GroupingDimension::ModelFacilityId,
+                    GroupingDimension::FullScaleTrialSiteId,
+                    GroupingDimension::VesselId,
+                    GroupingDimension::PropellerDesignId,
+                    GroupingDimension::PropellerRevision,
+                    GroupingDimension::CampaignId,
+                    GroupingDimension::OperatingConditionFamilyId,
+                ],
+                groups: vec![
+                    BenchmarkGroup {
+                        group_id: "cal-group".to_string(),
+                        role: SplitRole::Calibration,
+                        model_facility_id: "model-facility-cal".to_string(),
+                        full_scale_trial_site_id: "sea-trial-site-cal".to_string(),
+                        vessel_id: "vessel-cal".to_string(),
+                        propeller_design_id: "design-cal".to_string(),
+                        propeller_revision: "revision-cal".to_string(),
+                        campaign_id: "campaign-cal".to_string(),
+                        operating_condition_family_id: "condition-family-cal".to_string(),
+                    },
+                    BenchmarkGroup {
+                        group_id: "held-out-group".to_string(),
+                        role: SplitRole::HeldOut,
+                        model_facility_id: "model-facility-held".to_string(),
+                        full_scale_trial_site_id: "sea-trial-site-held".to_string(),
+                        vessel_id: "vessel-held".to_string(),
+                        propeller_design_id: "design-held".to_string(),
+                        propeller_revision: "revision-held".to_string(),
+                        campaign_id: "campaign-held".to_string(),
+                        operating_condition_family_id: "condition-family-held".to_string(),
+                    },
+                ],
+            },
             pairs,
         }
+    }
+
+    #[test]
+    fn grouped_holdout_manifest_separates_all_selected_dimensions() {
+        let report = audit(&fixture_case());
+        assert_eq!(report.calibration_group_count, 1);
+        assert_eq!(report.held_out_group_count, 1);
+        assert_eq!(report.calibration_pair_count, 1);
+        assert_eq!(report.held_out_pair_count, 1);
+        assert_eq!(report.calibration_comparison_outcome, "all_declared_bands_overlap");
+        assert_eq!(report.held_out_comparison_outcome, "all_declared_bands_overlap");
+        assert_eq!(report.split_protocol_id, "leave-one-facility-vessel-propeller-campaign-condition-out");
+    }
+
+    #[test]
+    fn selected_model_facility_overlap_is_rejected() {
+        let mut case = fixture_case();
+        case.validation_split.groups[1].model_facility_id =
+            case.validation_split.groups[0].model_facility_id.clone();
+        assert_eq!(audit(&case).disposition, "invalid");
+    }
+
+    #[test]
+    fn selected_vessel_and_propeller_revision_overlap_is_rejected() {
+        let mut case = fixture_case();
+        case.validation_split.groups[1].vessel_id =
+            case.validation_split.groups[0].vessel_id.clone();
+        assert_eq!(audit(&case).disposition, "invalid");
+        let mut case = fixture_case();
+        case.validation_split.groups[1].propeller_revision =
+            case.validation_split.groups[0].propeller_revision.clone();
+        assert_eq!(audit(&case).disposition, "invalid");
+    }
+
+    #[test]
+    fn missing_or_unreferenced_group_assignment_is_rejected() {
+        let mut case = fixture_case();
+        case.pairs[0].benchmark_group_id = "missing-group".to_string();
+        assert_eq!(audit(&case).disposition, "invalid");
+        let mut case = fixture_case();
+        case.validation_split.groups.push(BenchmarkGroup {
+            group_id: "unused-group".to_string(),
+            role: SplitRole::HeldOut,
+            model_facility_id: "facility-unused".to_string(),
+            full_scale_trial_site_id: "site-unused".to_string(),
+            vessel_id: "vessel-unused".to_string(),
+            propeller_design_id: "design-unused".to_string(),
+            propeller_revision: "revision-unused".to_string(),
+            campaign_id: "campaign-unused".to_string(),
+            operating_condition_family_id: "condition-unused".to_string(),
+        });
+        assert_eq!(audit(&case).disposition, "invalid");
+    }
+
+    #[test]
+    fn calibration_outlier_does_not_change_held_out_comparison_outcome() {
+        let mut case = fixture_case();
+        case.pairs[0].full_scale.bands[0].source_level_db = 150.0;
+        let report = audit(&case);
+        assert_eq!(report.calibration_comparison_outcome, "at_least_one_band_disjoint");
+        assert_eq!(report.held_out_comparison_outcome, "all_declared_bands_overlap");
+    }
+
+    #[test]
+    fn held_out_outlier_does_not_change_calibration_comparison_outcome() {
+        let mut case = fixture_case();
+        case.pairs[1].full_scale.bands[0].source_level_db = 150.0;
+        let report = audit(&case);
+        assert_eq!(report.calibration_comparison_outcome, "all_declared_bands_overlap");
+        assert_eq!(report.held_out_comparison_outcome, "at_least_one_band_disjoint");
     }
 
     #[test]
