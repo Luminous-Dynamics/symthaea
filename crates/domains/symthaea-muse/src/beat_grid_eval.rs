@@ -90,6 +90,15 @@ pub struct BeatGridTimingErrorSummaryV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BeatGridIntervalErrorSummaryV1 {
+    pub adjacent_interval_pair_count: u32,
+    pub mean_absolute_error_ms: Option<f64>,
+    pub median_absolute_error_ms: Option<f64>,
+    pub p95_absolute_error_ms: Option<f64>,
+    pub mean_absolute_relative_error_percent: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BeatGridReferenceScoreV1 {
     pub reference_id: String,
     pub annotation_source: String,
@@ -106,6 +115,9 @@ pub struct BeatGridReferenceScoreV1 {
     pub downbeat_metric: Option<BeatGridEventMetricV1>,
     pub beat_timing_error: BeatGridTimingErrorSummaryV1,
     pub downbeat_timing_error: Option<BeatGridTimingErrorSummaryV1>,
+    /// Interval error uses only adjacent one-to-one beat matches, preventing
+    /// missing/extra events from being silently interpreted as tempo drift.
+    pub inter_beat_interval_error: BeatGridIntervalErrorSummaryV1,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -135,6 +147,7 @@ pub struct BeatGridEvaluationReportV1 {
 pub enum BeatGridEvaluationIssueV1 {
     InvalidConfig { field: String },
     NoReferences,
+    EmptyReferenceBeats { index: usize },
     TooManyReferences { count: usize, maximum: usize },
     InvalidReferenceId { index: usize },
     InvalidAnnotationSource { index: usize },
@@ -207,7 +220,12 @@ fn validate_times(
     field: &str,
     allow_empty: bool,
 ) -> Result<(), BeatGridEvaluationIssueV1> {
-    if (!allow_empty && values.is_empty()) || values.len() > BEAT_GRID_MAX_EVENTS_PER_SEQUENCE_V1 {
+    if !allow_empty && values.is_empty() {
+        return Err(BeatGridEvaluationIssueV1::EmptyReferenceBeats {
+            index: 0,
+        });
+    }
+    if values.len() > BEAT_GRID_MAX_EVENTS_PER_SEQUENCE_V1 {
         return Err(BeatGridEvaluationIssueV1::TooManyEvents {
             count: values.len(),
             maximum: BEAT_GRID_MAX_EVENTS_PER_SEQUENCE_V1,
@@ -285,8 +303,17 @@ fn validate_inputs(
         validate_times(
             &reference.beat_times_seconds,
             "reference.beat_times_seconds",
-            false,
-        )?;
+            true,
+        )
+        .map_err(|issue| match issue {
+            BeatGridEvaluationIssueV1::EmptyReferenceBeats { .. } => {
+                BeatGridEvaluationIssueV1::EmptyReferenceBeats { index }
+            }
+            other => other,
+        })?;
+        if reference.beat_times_seconds.is_empty() {
+            return Err(BeatGridEvaluationIssueV1::EmptyReferenceBeats { index });
+        }
         validate_times(
             &reference.downbeat_times_seconds,
             "reference.downbeat_times_seconds",
@@ -428,6 +455,45 @@ fn timing_error_summary(
     }
 }
 
+fn interval_error_summary(
+    reference: &[f64],
+    estimated: &[f64],
+    matching: &[(usize, usize)],
+) -> BeatGridIntervalErrorSummaryV1 {
+    let mut errors_ms = Vec::new();
+    let mut relative_errors_percent = Vec::new();
+    for pair in matching.windows(2) {
+        let (reference_left, estimated_left) = pair[0];
+        let (reference_right, estimated_right) = pair[1];
+        if reference_right != reference_left + 1 || estimated_right != estimated_left + 1 {
+            continue;
+        }
+        let reference_interval = reference[reference_right] - reference[reference_left];
+        let estimated_interval = estimated[estimated_right] - estimated[estimated_left];
+        let absolute_ms = (estimated_interval - reference_interval).abs() * 1_000.0;
+        errors_ms.push(absolute_ms);
+        if reference_interval > 0.0 {
+            relative_errors_percent.push(
+                (estimated_interval - reference_interval).abs() / reference_interval * 100.0,
+            );
+        }
+    }
+    let mut sorted_errors = errors_ms.clone();
+    let median_error = median(&mut sorted_errors);
+    BeatGridIntervalErrorSummaryV1 {
+        adjacent_interval_pair_count: u32::try_from(errors_ms.len()).unwrap_or(u32::MAX),
+        mean_absolute_error_ms: (!errors_ms.is_empty())
+            .then_some(errors_ms.iter().sum::<f64>() / errors_ms.len() as f64),
+        median_absolute_error_ms: median_error,
+        p95_absolute_error_ms: percentile(&sorted_errors, 0.95),
+        mean_absolute_relative_error_percent: (!relative_errors_percent.is_empty())
+            .then_some(
+                relative_errors_percent.iter().sum::<f64>()
+                    / relative_errors_percent.len() as f64,
+            ),
+    }
+}
+
 fn cemgil_score(
     reference: &[f64],
     estimated: &[f64],
@@ -499,6 +565,8 @@ fn score_one_reference(
     );
     let beat_timing_error =
         timing_error_summary(&reference_beats, &estimated_beats, &beat_matches);
+    let inter_beat_interval_error =
+        interval_error_summary(&reference_beats, &estimated_beats, &beat_matches);
 
     let cemgil = cemgil_score(
         &reference_beats,
@@ -556,6 +624,7 @@ fn score_one_reference(
         downbeat_metric,
         beat_timing_error,
         downbeat_timing_error,
+        inter_beat_interval_error,
     }
 }
 
@@ -583,9 +652,10 @@ fn aggregate_scores(
     let mut pairwise = Vec::new();
     for left_index in 0..references.len() {
         for right_index in left_index + 1..references.len() {
-            if references[left_index].annotation_group
-                != references[right_index].annotation_group
-            {
+            let Some(left_group) = references[left_index].annotation_group.as_ref() else {
+                continue;
+            };
+            if references[right_index].annotation_group.as_ref() != Some(left_group) {
                 continue;
             }
             let matches = match_events(
@@ -758,7 +828,7 @@ mod tests {
         let predicted = [0.07, 0.57, 1.07, 1.57];
         let report = evaluate_beat_grid_v1(
             &prediction(&predicted, &[]),
-            &[reference("a", None, &reference, &[])],
+            &[reference("a", None, &reference_times, &[])],
             BeatGridEvaluationConfigV1::default(),
         )
         .unwrap();
@@ -878,10 +948,10 @@ mod tests {
 
     #[test]
     fn explicit_five_second_trim_is_applied_to_both_sequences() {
-        let reference = [0.0, 0.5, 1.0, 5.0, 5.5, 6.0];
-        let prediction = [0.1, 0.6, 5.0, 5.5, 6.0];
+        let reference_times = [0.0, 0.5, 1.0, 5.0, 5.5, 6.0];
+        let predicted_times = [0.1, 0.6, 5.0, 5.5, 6.0];
         let report = evaluate_beat_grid_v1(
-            &prediction(&prediction, &[]),
+            &prediction(&predicted_times, &[]),
             &[reference("a", None, &reference, &[])],
             BeatGridEvaluationConfigV1 {
                 minimum_evaluation_time_ms: Some(5_000),
@@ -891,6 +961,53 @@ mod tests {
         .unwrap();
         assert_eq!(report.reference_scores[0].beat_f_measure.f1, 1.0);
         assert_eq!(report.reference_scores[0].reference_beat_count, 3);
+    }
+
+    #[test]
+    fn empty_reference_beat_annotation_is_rejected() {
+        let references = [reference("empty", None, &[], &[])];
+        assert_eq!(
+            evaluate_beat_grid_v1(
+                &prediction(&[], &[]),
+                &references,
+                BeatGridEvaluationConfigV1::default(),
+            )
+            .unwrap_err(),
+            BeatGridEvaluationIssueV1::EmptyReferenceBeats { index: 0 }
+        );
+    }
+
+    #[test]
+    fn inter_beat_interval_error_is_reported_only_for_adjacent_matches() {
+        let reference = [0.0, 0.5, 1.0, 1.5, 2.0];
+        let predicted = [0.0, 0.51, 1.02, 1.53, 2.04];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&predicted, &[]),
+            &[reference("a", None, &reference, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        let summary = &report.reference_scores[0].inter_beat_interval_error;
+        assert_eq!(summary.adjacent_interval_pair_count, 4);
+        assert!((summary.mean_absolute_error_ms.unwrap() - 10.0).abs() < 1e-9);
+        assert!((summary.mean_absolute_relative_error_percent.unwrap() - 2.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn references_without_explicit_shared_group_are_not_cross_compared() {
+        let a = [0.0, 0.5, 1.0];
+        let b = [0.0, 0.6, 1.2];
+        let references = [
+            reference("a", None, &a, &[]),
+            reference("b", None, &b, &[]),
+        ];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&a, &[]),
+            &references,
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        assert!(report.median_pairwise_reference_agreement.is_none());
     }
 
     #[test]
