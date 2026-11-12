@@ -466,13 +466,13 @@ impl EfficiencyMap2D {
 
                     if lower_witness
                         .as_ref()
-                        .is_none_or(|current| candidate_lower.efficiency_bound < current.efficiency_bound)
+                        .is_none_or(|current| {\n                            candidate_lower.efficiency_bound < current.efficiency_bound\n                        })
                     {
                         lower_witness = Some(candidate_lower);
                     }
                     if upper_witness
                         .as_ref()
-                        .is_none_or(|current| candidate_upper.efficiency_bound > current.efficiency_bound)
+                        .is_none_or(|current| {\n                            candidate_upper.efficiency_bound > current.efficiency_bound\n                        })
                     {
                         upper_witness = Some(candidate_upper);
                     }
