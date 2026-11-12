@@ -29,7 +29,11 @@ struct MidiEvent {
 
 #[derive(Debug, Clone)]
 enum MidiEventType {
-    NoteOn { note: u8, velocity: u8 },
+    NoteOn {
+        note: u8,
+        velocity: u8,
+        source_event_index: Option<usize>,
+    },
     NoteOff { note: u8 },
     Tempo(u32),            // microseconds per beat
     TimeSignature(u8, u8), // numerator, denominator power of 2
@@ -44,6 +48,7 @@ struct ScheduledNote {
     off: u64,
     pitch: u8,
     velocity: u8,
+    source_event_index: Option<usize>,
 }
 
 /// Build NoteOn/NoteOff events for `notes` on `channel`, resolving the
@@ -92,6 +97,7 @@ fn sanitized_note_events(channel: u8, mut notes: Vec<ScheduledNote>) -> Vec<Midi
             event_type: MidiEventType::NoteOn {
                 note: note.pitch,
                 velocity: note.velocity,
+                source_event_index: note.source_event_index,
             },
         });
         events.push(MidiEvent {
@@ -249,6 +255,7 @@ pub fn export_midi_voices(
                 off: on + 120, // short duration
                 pitch: note,
                 velocity: vel,
+                source_event_index: None,
             }
         })
         .collect();
@@ -401,10 +408,19 @@ fn export_performance_midi_impl(
                 },
             },
         ];
+        if voice.notes.len() != voice.source_event_indices.len() {
+            return Err(format!(
+                "performed MIDI lineage length mismatch for {}: {} notes, {} source IDs",
+                voice.name,
+                voice.notes.len(),
+                voice.source_event_indices.len()
+            ));
+        }
         let scheduled: Vec<ScheduledNote> = voice
             .notes
             .iter()
-            .map(|n| {
+            .zip(voice.source_event_indices.iter())
+            .map(|(n, source_event_index)| {
                 let on = secs_to_ticks(n.start_time, score.tempo_bpm);
                 let off = secs_to_ticks(n.start_time + n.duration, score.tempo_bpm).max(on + 1);
                 ScheduledNote {
@@ -412,6 +428,7 @@ fn export_performance_midi_impl(
                     off,
                     pitch: freq_to_midi(n.frequency),
                     velocity: (n.velocity * 127.0).clamp(1.0, 127.0) as u8,
+                    source_event_index: *source_event_index,
                 }
             })
             .collect();
@@ -456,6 +473,7 @@ fn export_performance_midi_impl(
                     off: on + 120,
                     pitch: hit.drum.gm_note(),
                     velocity: (hit.velocity * 127.0).clamp(1.0, 127.0) as u8,
+                    source_event_index: None,
                 }
             })
             .collect();
@@ -550,6 +568,7 @@ pub fn export_score_midi(
     };
 
     let beats_to_ticks = |beats: f64| (beats * TICKS_PER_BEAT as f64).round() as u64;
+    let ordered_score_events = score.events();
     let mut tracks = vec![tempo_track];
     for (role, name, channel, instrument) in [
         (TheoryRole::Melody, "Melody", 0u8, melody_i),
@@ -564,10 +583,23 @@ pub fn export_score_midi(
             channel,
             event_type: MidiEventType::ProgramChange(instrument.gm_program()),
         }];
-        let scheduled: Vec<ScheduledNote> = score
-            .voice(role)
+        let role_notes = score.voice(role);
+        let source_indices: Vec<usize> = ordered_score_events
             .iter()
-            .map(|n| {
+            .enumerate()
+            .filter_map(|(index, event)| (event.role == role).then_some(index))
+            .collect();
+        if role_notes.len() != source_indices.len() {
+            return Err(format!(
+                "symbolic MIDI lineage length mismatch for {name}: {} notes, {} source IDs",
+                role_notes.len(),
+                source_indices.len()
+            ));
+        }
+        let scheduled: Vec<ScheduledNote> = role_notes
+            .iter()
+            .zip(source_indices)
+            .map(|(n, source_event_index)| {
                 let on = beats_to_ticks(n.onset.beats());
                 let off = beats_to_ticks((n.onset + n.duration).beats()).max(on + 1);
                 ScheduledNote {
@@ -575,6 +607,7 @@ pub fn export_score_midi(
                     off,
                     pitch: n.pitch.midi(),
                     velocity: (n.velocity * 127.0).clamp(1.0, 127.0) as u8,
+                    source_event_index: Some(source_event_index),
                 }
             })
             .collect();
@@ -607,6 +640,7 @@ fn notes_to_track(name: &str, channel: u8, program: u8, notes: &[&Note], tempo_b
                 off,
                 pitch: freq_to_midi(note.frequency),
                 velocity: (note.velocity * 127.0).clamp(1.0, 127.0) as u8,
+                source_event_index: None,
             }
         })
         .collect();
@@ -664,7 +698,24 @@ fn encode_track(track: &Track) -> Vec<u8> {
         last_tick = event.tick;
 
         match &event.event_type {
-            MidiEventType::NoteOn { note, velocity } => {
+            MidiEventType::NoteOn {
+                note,
+                velocity,
+                source_event_index,
+            } => {
+                if let Some(source_event_index) = source_event_index {
+                    let payload = crate::performed_event_map::encode_midi_lineage_marker_payload(
+                        *source_event_index,
+                        0,
+                    );
+                    // Sequencer-specific marker shares the NoteOn tick and is
+                    // immediately followed by that NoteOn with zero delta.
+                    data.push(0xFF);
+                    data.push(0x7F);
+                    write_vlq(&mut data, payload.len() as u32);
+                    data.extend_from_slice(&payload);
+                    write_vlq(&mut data, 0);
+                }
                 data.push(0x90 | (event.channel & 0x0F));
                 data.push(*note & 0x7F);
                 data.push(*velocity & 0x7F);
@@ -768,12 +819,14 @@ mod tests {
                 off: 10,
                 pitch: 60,
                 velocity: 100,
+                source_event_index: None,
             },
             ScheduledNote {
                 on: 5,
                 off: 15,
                 pitch: 60,
                 velocity: 90,
+                source_event_index: None,
             },
         ];
         let events = sanitized_note_events(0, notes);
@@ -808,12 +861,14 @@ mod tests {
                 off: 10,
                 pitch: 60,
                 velocity: 100,
+                source_event_index: None,
             },
             ScheduledNote {
                 on: 0,
                 off: 8,
                 pitch: 60,
                 velocity: 90,
+                source_event_index: None,
             },
         ];
         let events = sanitized_note_events(0, notes);
@@ -845,12 +900,14 @@ mod tests {
                 off: 20,
                 pitch: 60,
                 velocity: 100,
+                source_event_index: None,
             },
             ScheduledNote {
                 on: 5,
                 off: 15,
                 pitch: 64,
                 velocity: 90,
+                source_event_index: None,
             },
         ];
         let events = sanitized_note_events(0, notes);
@@ -872,12 +929,14 @@ mod tests {
                 off: 10,
                 pitch: 60,
                 velocity: 100,
+                source_event_index: None,
             },
             ScheduledNote {
                 on: 20,
                 off: 15,
                 pitch: 62,
                 velocity: 100,
+                source_event_index: None,
             },
         ];
         let events = sanitized_note_events(0, notes);
@@ -895,6 +954,7 @@ mod tests {
                 event_type: MidiEventType::NoteOn {
                     note: 64,
                     velocity: 90,
+                    source_event_index: None,
                 },
             },
             MidiEvent {
@@ -943,6 +1003,59 @@ mod tests {
             })
             .count();
         assert_eq!(note_ons, 9);
+        let _ = std::fs::remove_file(&path);
+    }
+
+    #[cfg(feature = "theory")]
+    #[test]
+    fn score_export_lineage_markers_round_trip_through_event_map_verifier() {
+        use symthaea_music_theory::score::VoiceRole as TheoryRole;
+        use symthaea_music_theory::{MusicalIntent, Style};
+        let mut score = symthaea_music_theory::compose(&MusicalIntent::default());
+        let mut selected_notes = Vec::new();
+        for role in [
+            TheoryRole::Melody,
+            TheoryRole::Harmony,
+            TheoryRole::Bass,
+            TheoryRole::CounterMelody,
+        ] {
+            if let Some(note) = score.voice(role).first() {
+                selected_notes.push(note.clone());
+            }
+        }
+        score.notes = selected_notes;
+        let expected_events = score.events();
+        assert!(!expected_events.is_empty());
+
+        let path = std::env::temp_dir().join(format!(
+            "muse_score_lineage_test_{}.mid",
+            std::process::id()
+        ));
+        export_score_midi(&score, Style::Classical, 0, &path).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        let target_score_sha256 = "a".repeat(64);
+        let total_frames = u64::from(48_000u32) * 3_600;
+        let map = crate::performed_event_map::PerformedEventMap::from_midi_bytes(
+            &bytes,
+            &target_score_sha256,
+            48_000,
+            total_frames,
+        )
+        .expect("exported MIDI markers must parse into event lineage");
+        let expected_midi_pitches: Vec<u8> = expected_events
+            .iter()
+            .map(|event| event.pitch.midi())
+            .collect();
+        assert_eq!(map.events.len(), expected_events.len());
+        map.verify_for_score_and_pitches(
+            &target_score_sha256,
+            &map.performed_midi_sha256,
+            48_000,
+            total_frames,
+            expected_events.len(),
+            &expected_midi_pitches,
+        )
+        .expect("serialized MIDI must retain exact source IDs and pitches");
         let _ = std::fs::remove_file(&path);
     }
 

@@ -4059,6 +4059,25 @@ fn performance_bundle_payload(
     state: &MusicalState,
 ) -> (ListenPerformanceBundle, Vec<BundleWarning>) {
     let voices = symthaea_muse::theory_realize::perform_with_spec(score, spec, seed, state);
+    let ordered_score_events = score.events();
+    // Translate the same global event indices used by the contract verifier
+    // back to the UI's existing role-local symbolic-note IDs. Each role's
+    // subsequence is stable in both Score::events() and Score::voice(role).
+    let mut role_indices = [0usize; 4];
+    let symbolic_id_by_global_index: Vec<String> = ordered_score_events
+        .iter()
+        .map(|event| {
+            let (slot, role) = match event.role {
+                VoiceRole::Bass => (0, VoiceRole::Bass),
+                VoiceRole::Harmony => (1, VoiceRole::Harmony),
+                VoiceRole::CounterMelody => (2, VoiceRole::CounterMelody),
+                VoiceRole::Melody => (3, VoiceRole::Melody),
+            };
+            let role_index = role_indices[slot];
+            role_indices[slot] += 1;
+            symbolic_note_id(role, role_index)
+        })
+        .collect();
     let symbolic = symbolic_notes(score);
     let symbolic_times: HashMap<&str, (f64, f64)> = symbolic
         .iter()
@@ -4088,24 +4107,38 @@ fn performance_bundle_payload(
             "Melody" => Some(VoiceRole::Melody),
             _ => None,
         };
+        let source_event_indices = voice.source_event_indices;
         if let Some(role) = source_role {
-            let expected = score.voice(role).len();
-            if expected != voice.notes.len() {
+            let missing_source_indices: Vec<usize> = ordered_score_events
+                .iter()
+                .enumerate()
+                .filter_map(|(index, event)| {
+                    (event.role == role
+                        && !source_event_indices
+                            .iter()
+                            .flatten()
+                            .any(|mapped_index| *mapped_index == index))
+                    .then_some(index)
+                })
+                .collect();
+            if !missing_source_indices.is_empty() {
                 warnings.push(BundleWarning {
-                    code: "performance-source-count-mismatch".to_string(),
+                    code: "performance-source-lineage-incomplete".to_string(),
                     message: format!(
-                        "{} emitted {} performed events for {expected} symbolic events; source IDs after the shared prefix were withheld.",
+                        "{} left {} source score event(s) without a primary performed note; unresolved global score event indices: {:?}.",
                         voice.name,
-                        voice.notes.len()
+                        missing_source_indices.len(),
+                        missing_source_indices
                     ),
                 });
             }
         }
         for (note_index, note) in voice.notes.into_iter().enumerate() {
-            let source_note_id = source_role.and_then(|role| {
-                (score.voice(role).len() == summaries.last().map_or(0, |v| v.note_count))
-                    .then(|| symbolic_note_id(role, note_index))
-            });
+            let source_note_id = source_event_indices
+                .get(note_index)
+                .copied()
+                .flatten()
+                .and_then(|global_index| symbolic_id_by_global_index.get(global_index).cloned());
             let nominal = source_note_id
                 .as_deref()
                 .and_then(|id| symbolic_times.get(id).copied());
@@ -4128,7 +4161,7 @@ fn performance_bundle_payload(
     (
         ListenPerformanceBundle {
             duration_seconds: duration,
-            mapping_method: "ordered-primary-score-voice-v1; renderer-added-voices-unmapped"
+            mapping_method: "explicit-score-event-lineage-v2; renderer-added-voices-unmapped; dropped-events-reported"
                 .to_string(),
             voices: summaries,
             notes: events,
