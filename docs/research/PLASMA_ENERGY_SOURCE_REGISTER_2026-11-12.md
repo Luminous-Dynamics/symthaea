@@ -302,3 +302,68 @@ The ≤10 kWh/kg H2 cracking figure is a study-specific techno-economic threshol
 - Fusion Science and Technology Roadmap (DOE, 2026): https://www.energy.gov/articles/energy-department-releases-finalized-fusion-science-and-technology-roadmap-accelerate
 - NIF FY2025 annual report (LLNL): https://annual.llnl.gov/fy-2025/national-ignition-facility-2025
 - Comprehensive fusion milestone framework (2025): https://doi.org/10.1063/5.0287340
+
+
+## 9. Evidence update — 2026-11-12
+
+This update adds important newer comparators and changes the recommended research ranking. Source-reported figures below are not Luminous measurements or reproductions.
+
+### 9.1 Ammonia cracking: conversion is not energy efficiency
+
+A second 2025 microwave-plasma study examined pure ammonia at reduced pressure (typically 50–500 mbar):
+
+- DOI: https://doi.org/10.1016/j.ijhydene.2025.03.118
+- It reports a lowest energy cost of 33 kWh/kg H2 at 28% dissociation (reported energy efficiency 13%) and 50 kWh/kg H2 for full dissociation.
+- It discusses both electron-impact and thermal dissociation, surface reactions and strong spatial gradients.
+
+This is a distinct reactor, pressure and operating condition from the atmospheric-pressure 2025 torch above. Do not pool the 25, 33 and 50 kWh/kg values as a single trend line. Their value is to establish a source-specific challenge corpus and reveal the trade-off among conversion, output composition and energy consumption.
+
+A 2026 experimental/kinetic study of non-equilibrium plasma-driven NH3 decomposition (Fuel, Volume 405, DOI https://doi.org/10.1016/j.fuel.2025.136427) reports a modified low-temperature kinetic model with 53.4% better predictions for the stated task and identifies excited Ar* pathways as important in the proposed reaction mechanism. The next benchmark should compare the published chemistry/kinetics against a deliberately simpler baseline on held-out operating conditions; the paper's reported prediction improvement is not transferable as a universal model-accuracy claim.
+
+### 9.2 Ammonia synthesis: vibrational-state coupling is a high-value hypothesis
+
+A 2026 plasma-electrocatalytic nitrogen-reduction study (JACS, DOI https://doi.org/10.1021/jacs.6c04148) reports an integrated plasma-electrolysis configuration. Among 14 screened metals, Ag is reported to achieve an NH3 production rate of 7.7 ± 0.8 nmol s-1 cm-2 and electrochemical Faradaic efficiency of 86 ± 14% under the selected conditions. Plasma/electrolysis on-off controls and 15N2 isotope labelling support the supplied N2 as the nitrogen source.
+
+This points to a more interesting paradigm than simply maximize plasma power: deliberately engineer long-lived vibrationally excited nitrogen and couple it to a downstream catalyst/electrode interface. However, reported area productivity and electrochemical Faradaic efficiency are not full-chain kWh/kg NH3, industrial throughput, lifetime or plant economics. Require all of those before claiming competitive ammonia production.
+
+The 6 October 2026 review of non-Haber-Bosch ammonia technologies (DOI https://doi.org/10.1016/j.gerr.2026.100219) specifically warns that ampere-scale plasma-NOx/electrochemical demonstrations do not yet establish full-system superiority over green-hydrogen Haber-Bosch. It should be a source for the comparator matrix, not a shortcut to a superiority claim.
+
+### 9.3 Methane pyrolysis: deprioritize plasma unless a distinct use case survives
+
+Azadmehr et al., *A comprehensive review of direct-heating modalities for low-emission hydrogen production via methane pyrolysis*, Journal of Analytical and Applied Pyrolysis, June 2026, DOI https://doi.org/10.1016/j.jaap.2026.107776, curates 156 experimental data sets from 26 peer-reviewed sources and compares microwave, plasma, resistive/combustion and shock-wave heating.
+
+Its reported Pareto analysis favours shock-wave heating for its cost/conversion weighting (approximately 92% methane conversion at approximately USD 0.70/kg H2), while microwave heating is favoured when selectivity is included (approximately 91% conversion, 99% selectivity and approximately USD 1.09/kg H2). Plasma and resistive/combustion configurations are reported as displaced from the Pareto front in the studied data/assumptions.
+
+**Decision:** do not prioritize plasma-assisted methane pyrolysis as a lead Luminous project. First reproduce the review's curated data and objective/boundary choices; only reopen plasma if a specific duty, feedstock, carbon-product requirement or integration case changes the Pareto result.
+
+### 9.4 High-temperature thermal storage: industrial incumbent is already strong
+
+Rondo reported that its 100 MWh heat battery entered commercial operation on 16 October 2025, delivering continuous steam from off-grid solar. Rondo reports operation above 1000 °C and over 97% round-trip thermal efficiency after a 10-week initial operation period:
+https://www.rondo.com/news-press/rondo-powers-up-worlds-largest-industrial-heat-battery
+
+These are **manufacturer-reported operational claims**, not independently audited time-series results in this source. The exact meter and efficiency boundary must be established before using the >97% number as a matched benchmark. It is not electricity-to-electricity round-trip efficiency.
+
+Sandia documents a two-tank particle thermal-storage system up to 6 MWh and 800 °C, as well as a radial packed-bed facility up to 800 °C:
+https://energy.sandia.gov/programs/renewable-energy/concentrating-solar-thermal-technologies/thermal-energy-storage-tes/
+
+Riahi et al. (Journal of Energy Storage, July 2026, DOI https://doi.org/10.1016/j.est.2026.122533) experimentally investigates an electrically charged packed-bed store operating over 25–700 °C with air-based discharge. The study reports that charge rate and the resulting temperature profile materially affect discharge performance.
+
+The August 2026 HT-TES review (DOI https://doi.org/10.1016/j.applthermaleng.2026.132532) identifies sensible solid media and molten salts as more mature than latent/thermochemical alternatives for industrial heat above 500 °C.
+
+**Decision:** the first thermal-store benchmark must use resistance/Joule heating as the incumbent and a source-pinned experimental packed-bed or particle store. Plasma is an optional challenger, not the reference. A higher temperature is not a performance win unless it produces more useful service under a matched duty.
+
+### 9.5 Fusion blanket MHD: a particularly strong model-qualification target
+
+A September 2026 paper (Hua et al., DOI https://doi.org/10.1016/j.fusengdes.2026.115888) reports reduced-order MHD modelling in SAM and high-fidelity MHD in NekRS for fusion liquid-metal blanket applications, with analytical/cross-code comparisons and validation against historical Argonne Liquid Metal Experiment data.
+
+A 2025 KIT/MEKKA WCLL mock-up study (DOI https://doi.org/10.1016/j.fusengdes.2025.115216) reports measured pressure distributions and a component-resolved total pressure-drop correlation for a scaled test-blanket manifold.
+
+This is a more immediate and falsifiable work package than attempting a new general MHD code. It is now tracked separately as Symthaea [PLASMA-MHD-BENCH-001 #11733](https://github.com/Luminous-Dynamics/symthaea/issues/11733).
+
+### 9.6 New executable/benchmark workstreams
+
+- [PLASMA-ENERGY-001 #11718](https://github.com/Luminous-Dynamics/symthaea/issues/11718): whole-system plasma energy conversion, storage and dispatch.
+- [THERMAL-STORE-INDUSTRIAL-001 #11734](https://github.com/Luminous-Dynamics/symthaea/issues/11734): matched industrial high-temperature store and heater comparison.
+- [PLASMA-MHD-BENCH-001 #11733](https://github.com/Luminous-Dynamics/symthaea/issues/11733): liquid-metal blanket MHD solver and experiment qualification.
+
+The new source-and-boundary work does not change the claim ceiling: source inspection, literature comparison, synthetic accounting, solver output, measured observation and physical qualification remain distinct stages.
