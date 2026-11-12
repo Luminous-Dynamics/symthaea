@@ -2273,7 +2273,25 @@ mod tests {
             counterfactual_evidence.receipt_sha256()
         );
         assert_eq!(report.counterfactual_event_map_receipt_sha256, counterfactual.map.receipt_sha256);
+        assert!(report.measurements.len() == report.total_channel_windows);
         assert!(verify_counterfactual_influence(&report, &experiment, &calibration).unwrap());
+
+        let mut changed_trace = report.clone();
+        changed_trace.measurements[0].release_detected =
+            !changed_trace.measurements[0].release_detected;
+        let changed_trace = seal_report(changed_trace).unwrap();
+        assert_eq!(
+            verify_counterfactual_influence(&changed_trace, &experiment, &calibration).unwrap_err(),
+            CounterfactualInfluenceError::InfluenceReplayMismatch
+        );
+
+        let mut changed_policy = report.clone();
+        changed_policy.analysis.support_policy.maximum_gap_windows += 1;
+        let changed_policy = seal_report(changed_policy).unwrap();
+        assert_eq!(
+            verify_counterfactual_influence(&changed_policy, &experiment, &calibration).unwrap_err(),
+            CounterfactualInfluenceError::InfluenceReplayMismatch
+        );
     }
 
     #[test]
