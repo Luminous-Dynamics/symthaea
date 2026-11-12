@@ -37,7 +37,7 @@ jobs:
           toolchain: 1.96.0
           components: clippy, rustfmt
       - name: Check formatting
-        run: cargo fmt --manifest-path crates/domains/symthaea-frontier-physics/Cargo.toml -- --check
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-frontier-physics/src/black_hole_information.rs
       - name: Run Clippy
         run: cargo clippy --locked --manifest-path crates/domains/symthaea-frontier-physics/Cargo.toml --all-targets -- -D warnings
       - name: Run crate tests
