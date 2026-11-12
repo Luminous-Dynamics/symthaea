@@ -842,7 +842,7 @@ mod tests {
         let predicted = [0.0, 0.01, 0.5, 1.0];
         let report = evaluate_beat_grid_v1(
             &prediction(&predicted, &[]),
-            &[reference("a", None, &reference, &[])],
+            &[reference("a", None, &reference_times, &[])],
             BeatGridEvaluationConfigV1::default(),
         )
         .unwrap();
