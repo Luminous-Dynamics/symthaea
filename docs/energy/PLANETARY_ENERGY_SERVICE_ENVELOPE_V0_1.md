@@ -63,16 +63,16 @@ Every transition requires its own model, boundary, evidence and uncertainty.
 
 The first benchmark release contains seven analytic orbital-distance cases and one site-specific lunar layer:
 
-| Case | Distance used | Nominal normal-incidence top-of-atmosphere flux | Role |
-|---|---:|---:|---|
-| Earth reference | 1.0 AU | 1,361 W/m² | Terrestrial baseline before atmosphere/weather |
-| Moon orbital reference | 1.0 AU | 1,361 W/m² | Solar resource baseline; local terrain and polar geometry dominate site variation |
-| Mars mean-distance screen | 1.524 AU | 585.987 W/m² | Solar/storage/fission hybrid stress case |
-| Main belt inner study point | 2.2 AU | 281.198 W/m² | Array-area and mass scaling |
-| Main belt reference study point | 2.7 AU | 186.694 W/m² | Reference asteroid-belt trade |
-| Main belt outer study point | 3.2 AU | 132.910 W/m² | Lower-flux belt sensitivity |
-| Jupiter-distance control | 5.2 AU | 50.333 W/m² | Low-solar-flux / firm-power comparison |
-| Saturn-distance control | 9.5 AU | 15.080 W/m² | Very-low-solar-flux / firm-power comparison |
+| Case | Distance used | Normal-incidence flux | Ideal collector-area multiplier vs 1 AU | Role |
+|---|---:|---:|---:|---|
+| Earth reference | 1.0 AU | 1,361 W/m² | 1.00× | Terrestrial baseline before atmosphere/weather |
+| Moon orbital reference | 1.0 AU | 1,361 W/m² | 1.00× | Solar resource baseline; local terrain and polar geometry dominate site variation |
+| Mars mean-distance screen | 1.524 AU | 585.987 W/m² | 2.323× | Solar/storage/fission hybrid stress case |
+| Main belt inner study point | 2.2 AU | 281.198 W/m² | 4.84× | Array-area and mass scaling |
+| Main belt reference study point | 2.7 AU | 186.694 W/m² | 7.29× | Reference asteroid-belt trade |
+| Main belt outer study point | 3.2 AU | 132.910 W/m² | 10.24× | Lower-flux belt sensitivity |
+| Jupiter-distance control | 5.2 AU | 50.333 W/m² | 27.04× | Low-solar-flux / firm-power comparison |
+| Saturn-distance control | 9.5 AU | 15.080 W/m² | 90.25× | Very-low-solar-flux / firm-power comparison |
 
 These are **analytic screening values**, calculated from the explicitly declared approximation:
 
@@ -80,7 +80,7 @@ These are **analytic screening values**, calculated from the explicitly declared
 S(r)=rac{1361}{r^2};mathrm{W/m^2}
 ]
 
-where (r) is distance in astronomical units. They are not site measurements, ephemerides, panel-plane irradiance, annual energy, delivered electricity or mission power predictions. Real analyses must use time-resolved ephemerides and exact mission epochs. Earth and Mars additionally require atmosphere/weather/dust models. The lunar surface requires terrain horizon, solar-disc visibility, local slope and panel orientation. An asteroid's heliocentric distance and composition are specific to the target object and epoch.
+where (r) is distance in astronomical units. They are not site measurements, ephemerides, panel-plane irradiance, annual energy, delivered electricity or mission power predictions. The ideal incident-power collector-area multiplier is \`r²\`: 7.29× at 2.7 AU and 90.25× at 9.5 AU, before any angle, atmospheric, conversion, storage, thermal, structural or reliability penalties. Real analyses must use time-resolved ephemerides and exact mission epochs. Earth and Mars additionally require atmosphere/weather/dust models. The lunar surface requires terrain horizon, solar-disc visibility, local slope and panel orientation. An asteroid's heliocentric distance and composition are specific to the target object and epoch.
 
 The machine-readable seed cases are in [`benchmarks/planetary-energy-service/v0.1/orbit-reference-cases.json`](../../benchmarks/planetary-energy-service/v0.1/orbit-reference-cases.json).
 
