@@ -34,8 +34,14 @@ pub struct ComplexValue {
 }
 
 impl ComplexValue {
-    const ZERO: Self = Self { real: 0.0, imag: 0.0 };
-    const ONE: Self = Self { real: 1.0, imag: 0.0 };
+    const ZERO: Self = Self {
+        real: 0.0,
+        imag: 0.0,
+    };
+    const ONE: Self = Self {
+        real: 1.0,
+        imag: 0.0,
+    };
 
     fn multiply(self, rhs: Self) -> Self {
         Self {
@@ -118,11 +124,9 @@ pub fn analyze_two_port_loop(
         open_loop_rhp_pole_count += 1;
     }
 
-    let diagonal_siso_is_incomplete =
-        parameters.residue_12 != 0.0 || parameters.residue_21 != 0.0;
+    let diagonal_siso_is_incomplete = parameters.residue_12 != 0.0 || parameters.residue_21 != 0.0;
 
-    let has_both_cross_channels =
-        parameters.residue_12 != 0.0 && parameters.residue_21 != 0.0;
+    let has_both_cross_channels = parameters.residue_12 != 0.0 && parameters.residue_21 != 0.0;
 
     let closed_loop_characteristic = if has_both_cross_channels {
         let a1 = -(parameters.pole_12_per_s + parameters.pole_21_per_s);
@@ -217,17 +221,12 @@ pub fn evaluate_two_port_frequency_response(
 
     Ok(TwoPortFrequencyResponse {
         angular_frequency_rad_s,
-        return_ratio_matrix: [
-            [ComplexValue::ZERO, l12],
-            [l21, ComplexValue::ZERO],
-        ],
+        return_ratio_matrix: [[ComplexValue::ZERO, l12], [l21, ComplexValue::ZERO]],
         determinant_i_plus_l: determinant,
     })
 }
 
-fn validate_parameters(
-    parameters: TwoPortLoopParameters,
-) -> Result<(), MimoReferenceError> {
+fn validate_parameters(parameters: TwoPortLoopParameters) -> Result<(), MimoReferenceError> {
     for (name, value) in [
         ("residue_12", parameters.residue_12),
         ("pole_12_per_s", parameters.pole_12_per_s),
