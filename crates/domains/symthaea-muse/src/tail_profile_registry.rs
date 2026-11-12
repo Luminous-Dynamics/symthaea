@@ -13,10 +13,9 @@
 //! Current EVAL-025 reports explicitly mark downstream routing incomplete.
 //! Those reports must not produce a VerifiedTailProfile.
 
-use crate::audio_preservation::FrameInterval;
 use crate::counterfactual_influence::{
     CounterfactualInfluenceInput, CounterfactualInfluenceSegmentedReport,
-    EventIntervention, InfluenceSegmentationConfig, VerifiedRepeatabilityCalibration,
+    EventIntervention, InfluenceDisposition, InfluenceSegmentationConfig, VerifiedRepeatabilityCalibration,
     verify_counterfactual_influence_segmented,
 };
 use serde::{Deserialize, Serialize};
@@ -382,6 +381,12 @@ pub fn verify_tail_event_observation(
     if report.base_report.intervention != EventIntervention::Remove {
         return Err(TailProfileError::UnsupportedOperation);
     }
+    if report.base_report.disposition != InfluenceDisposition::EffectDetected {
+        return Err(TailProfileError::InvalidEvidence("no_effect_above_repeatability_floor"));
+    }
+    if report.hysteresis_support_intervals.is_empty() {
+        return Err(TailProfileError::InvalidEvidence("missing_hysteresis_support"));
+    }
     if report.base_report.source_event_id != input.source_event_id
         || report.base_report.source_score_sha256 != source_lineage.observed_source_score_sha256
         || input.baseline_renderer_evidence.source_score_sha256()
@@ -390,6 +395,12 @@ pub fn verify_tail_event_observation(
             != evidence.renderer_identity_sha256
         || input.baseline_renderer_evidence.renderer_config_sha256()
             != evidence.renderer_config_sha256
+        || input.counterfactual_renderer_evidence.renderer_identity_sha256()
+            != evidence.renderer_identity_sha256
+        || input.counterfactual_renderer_evidence.renderer_config_sha256()
+            != evidence.renderer_config_sha256
+        || input.counterfactual_renderer_evidence.source_score_sha256()
+            != source_lineage.observed_source_score_sha256
         || input.baseline_audio.sample_rate_hz != evidence.sample_rate_hz
         || input.baseline_audio.channels != evidence.channels
         || report.base_report.sample_rate_hz != evidence.sample_rate_hz
@@ -739,6 +750,21 @@ pub struct SignedTailProfile {
     pub signature: Vec<u8>,
 }
 
+fn signed_profile_message(signed: &SignedTailProfile) -> Result<Vec<u8>, TailProfileError> {
+    let metadata = serde_json::to_vec(&(
+        signed.profile.profile_sha256.as_str(),
+        signed.publisher_key_id.as_str(),
+        signed.issued_at_unix_seconds,
+        signed.expires_at_unix_seconds,
+    ))
+    .map_err(|_| TailProfileError::SerializationFailure)?;
+    let mut message = Vec::with_capacity(PROFILE_DOMAIN.len() + metadata.len());
+    message.extend_from_slice(PROFILE_DOMAIN);
+    message.extend_from_slice(&(metadata.len() as u64).to_le_bytes());
+    message.extend_from_slice(&metadata);
+    Ok(message)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TailProfileRegistryEntry {
     pub profile_sha256: String,
@@ -872,9 +898,10 @@ pub fn resolve_verified_tail_profile(
     if entry.revoked_at_unix_seconds.is_some_and(|time| time <= now_unix_seconds) {
         return Err(TailProfileError::ProfileRevoked);
     }
-    let mut message = Vec::with_capacity(PROFILE_DOMAIN.len() + profile.profile_sha256.len());
-    message.extend_from_slice(PROFILE_DOMAIN);
-    message.extend_from_slice(profile.profile_sha256.as_bytes());
+    if signed.issued_at_unix_seconds > signed.expires_at_unix_seconds {
+        return Err(TailProfileError::ProfileExpired);
+    }
+    let message = signed_profile_message(signed)?;
     if !verifier.verify(&signed.publisher_key_id, &message, &signed.signature) {
         return Err(TailProfileError::ProfileSignatureInvalid);
     }
@@ -1105,10 +1132,7 @@ mod tests {
             expires_at_unix_seconds: 500,
             signature: Vec::new(),
         };
-        let mut message = Vec::new();
-        message.extend_from_slice(PROFILE_DOMAIN);
-        message.extend_from_slice(profile.profile_sha256.as_bytes());
-        signed.signature = Sha256::digest(message).to_vec();
+        signed.signature = Sha256::digest(signed_profile_message(&signed).unwrap()).to_vec();
         let mut registry = TailProfileRegistrySnapshot {
             version: TAIL_PROFILE_REGISTRY_VERSION.to_owned(),
             created_at_unix_seconds: 90,
@@ -1129,6 +1153,19 @@ mod tests {
             &signed, &registry, &registry.registry_sha256, &profile.topology, 200, &verifier
         ).unwrap();
         assert_eq!(verified.guard_frames(), profile.guard_frames);
+        let mut validity_tamper = signed.clone();
+        validity_tamper.expires_at_unix_seconds += 10_000;
+        assert_eq!(
+            resolve_verified_tail_profile(
+                &validity_tamper,
+                &registry,
+                &registry.registry_sha256,
+                &profile.topology,
+                200,
+                &verifier,
+            ).unwrap_err(),
+            TailProfileError::ProfileSignatureInvalid
+        );
         let mut revoked = registry.clone();
         revoked.revoked_publisher_key_ids.push("test-key".to_owned());
         revoked.registry_sha256 = registry_digest(&revoked).unwrap();
@@ -1153,10 +1190,7 @@ mod tests {
             expires_at_unix_seconds: 500,
             signature: Vec::new(),
         };
-        let mut message = Vec::new();
-        message.extend_from_slice(PROFILE_DOMAIN);
-        message.extend_from_slice(profile.profile_sha256.as_bytes());
-        signed.signature = Sha256::digest(message).to_vec();
+        signed.signature = Sha256::digest(signed_profile_message(&signed).unwrap()).to_vec();
         let mut registry = TailProfileRegistrySnapshot {
             version: TAIL_PROFILE_REGISTRY_VERSION.to_owned(),
             created_at_unix_seconds: 90,
