@@ -192,6 +192,36 @@ For every candidate method, run the same frozen data/design portfolio and publis
 - For sodium-ion, optimize cold-climate useful service and supply resilience; do not attempt to win a lithium-ion energy-density contest on a different system boundary.
 - For thermal propagation, software target is zero false-green evidence transfer; physical acceptance remains standard- and authority-specific.
 
+### Track G — low-pressure ASSB practical-cell translation and manufacturability
+
+Owner: Symthaea [ASSB-PRACTICAL-TRANSLATION-001 #11759](https://github.com/Luminous-Dynamics/symthaea/issues/11759), composing SSE-001 #4993, ION-001 #4996, MAT-INTERFACE-001 #6227, MAT-PSPP #6224, MAT-013 #4344 and MAT-UQ #6225.
+
+**Why this is distinct:** material conductivity and symmetric-cell cycling do not establish complete-cell operation, practical pressure, 5 Ah cell performance, manufacturable electrolyte thickness, usable low-temperature energy or repeated-line yield. The missing benchmark is the translation boundary.
+
+Research anchors:
+- Lee et al., *Nature Communications*, published 7 November 2026: near-ambient sulfide ASSB operation at room temperature under ≤0.3 MPa and 2.4 mAh/cm² with NMC811 at 0.1C, using coupled composite-electrolyte mechanical reinforcement and porous-carbon current-collector stress relaxation. This is a paper-specific demonstrator, not an EV fast-charge, ≥5 Ah, >1,000-cycle or factory-yield claim. https://www.nature.com/articles/s41467-026-79393-w
+- USABC October 21, 2025 solid-electrolyte goals provide an automotive target: material conductivity >10 mS/cm at 30°C and >1 mS/cm at 0°C; electronic conductivity <1×10⁻⁸ mS/cm; critical current density >13 mA/cm²; thermal stability >250°C; <10% conductivity loss after a 72 h water-stability test at −40°C dew point; <$10/kg at a 75 kt/year scale assumption. Cell goals include <2 MPa pressure, >70% of 30°C usable energy at −20°C on a C/3 discharge without assistance, <20 μm electrolyte sheet, >15-year calendar life and >1,000 DST cycles. The RFPI footnote specifies cells of 5 Ah or more. These are USABC development goals, not current average product performance. https://uscar.org/wp-content/uploads/2025/12/USABC-Electrolyte-RFPI.pdf
+- IEA Global EV Outlook 2026 reports 1.2 TWh EV battery deployment in 2025, >4 TWh global Li-ion nameplate capacity by year-end, >80% of capacity in China, and says >90% average manufacturing yield is required to compete; new factories may take more than five years to approach nominal output. This is industrial context, not an ASSB-specific yield series. https://www.iea.org/reports/global-ev-outlook-2026/electric-vehicle-batteries
+- For AI-driven life evaluation, Discovery Learning reports 7.2% cycle-life test error on 123 industrial large-format pouch cells, using first-50-cycle features for 51% of prototypes, and estimates time/energy savings under its own assumptions. Reproduce the exact data split, feature cutoff and target before claiming to match or beat it. https://www.nature.com/articles/s41586-025-09951-7
+
+Paradigm shift:
+- Treat ASSB as a **coupled electro-chemo-mechanical-manufacturing system**, not an electrolyte leaderboard.
+- Keep fabrication pressure and operating stack pressure separate.
+- Compare pressure-only effects only while holding design revision, batch, manufacturing line, process revision and pressure measurement method fixed; stratify a process change as a separate DOE factor.
+- Require complete-cell mass and external-volume boundaries including inactive cathode/anode fractions, current collectors, tabs, case and seals.
+- Keep sulfide, halide, oxide, polymer/composite, silicon-anode and hybrid solid–liquid lanes separate; hybrid cells cannot be promoted as all-solid-state.
+- Split by cell design, cell format, batch, production line and laboratory—not random cycles from the same cell.
+
+Near-term benchmark ladder:
+1. Reproduce the 7 November 2026 ≤0.3 MPa / 2.4 mAh/cm² paper's exact test boundary where data rights and methods permit.
+2. Match the USABC <2 MPa, <20 μm and ≥5 Ah cell-level goal boundaries; separately report material-level conductivity and stability tests.
+3. Progress from symmetric/half-cell mechanistic work to complete full cells; no cell-level Wh/kg or Wh/L claim without complete-cell measured mass/volume and usable discharge energy.
+4. Demonstrate independent-cell and independent-batch repeatability, with observed EOL, right-censored and invalid outcomes separate.
+5. Qualify manufacturing over multiple lots and lines; target >90% first-pass yield before making scale/cost claims.
+6. Benchmark prospective design/lifetime models against random, DOE/factorial, descriptor regression and Discovery Learning-style transfer baselines at equal data, experiment, time and energy budgets.
+
+First audit slice is in branch `research/assb-practical-translation-v0.1`: schema, fixture and a Rust read-only contract. It now rejects fabrication-pressure, batch, line, process-revision, design-revision and measurement-method confounding and audits inactive electrode mass plus complete-cell volume. Its evidence remains synthetic until exact-head tests pass; no electrochemical performance claim is made.
+
 ## Additional materials frontier: sodium-ion and zero-excess sodium-metal
 
 A new bounded materials lane has been opened in Symthaea [SODIUM-BATTERY-MISSION-001 #11694](https://github.com/Luminous-Dynamics/symthaea/issues/11694) / draft [PR #11695](https://github.com/Luminous-Dynamics/symthaea/pull/11695).
