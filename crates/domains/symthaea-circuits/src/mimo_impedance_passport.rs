@@ -301,8 +301,7 @@ pub fn validate_mimo_impedance_sweep(
                     driven_port_id: column.driven_port_id.clone(),
                 });
             }
-            if !column.absolute_error_bound_a.is_finite() || column.absolute_error_bound_a < 0.0
-            {
+            if !column.absolute_error_bound_a.is_finite() || column.absolute_error_bound_a < 0.0 {
                 return Err(PortMatrixError::InvalidUncertaintyBound {
                     frequency_index,
                     driven_port_id: column.driven_port_id.clone(),
