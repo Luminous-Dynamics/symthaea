@@ -881,8 +881,8 @@ mod tests {
         let plasma_summary = audit_source_value(&plasma, "plasma-source-cases").unwrap();
         let hts_summary = audit_source_value(&hts, "hts-source-cases").unwrap();
 
-        assert_eq!(plasma_summary.case_count, 28);
-        assert_eq!(plasma_summary.negative_control_count, 28);
+        assert_eq!(plasma_summary.case_count, 29);
+        assert_eq!(plasma_summary.negative_control_count, 29);
         let plasma_case_ids: BTreeSet<_> = plasma
             .get("cases")
             .and_then(Value::as_array)
@@ -895,6 +895,7 @@ mod tests {
             "PLASMA-MICROFLUIDIC-MEMBRANE-CHIP-2025",
             "PLASMA-ARRAY-LTCC-43-CELL-10CM-2025",
             "PLASMA-ARRAY-INDIVIDUAL-RF-IGNITION-5-CELL-2023",
+            "PLASMA-PORTABLE-MOBIPLAS-ARGON-2024",
         ] {
             assert!(plasma_case_ids.contains(expected), "missing {expected}");
         }
