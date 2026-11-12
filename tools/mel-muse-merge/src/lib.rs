@@ -367,7 +367,7 @@ pub fn analyze_merge(
             );
         }
         if either_requires_revalidation(left, right) {
-            return revalidation_decision(context);
+            return revalidation_decision(context, left, right);
         }
         return MergeDecision::new(
             MergeOutcome::Conflict,
