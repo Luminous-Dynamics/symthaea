@@ -662,7 +662,8 @@ fn run(inputs: Inputs) -> Result<Value, Box<dyn Error>> {
             "counts": split_report.counts,
             "unknown_and_outlier_in_train": false
         },
-        "claim_ceiling": "File integrity, specimen joins, source metadata and specimen-level split integrity only; composition labels are not independently authenticated and no model or physical sorting performance is qualified."
+        "label_handling": "unknown and outlier are distinct; blank fibre-percentage cells remain sparse/missing and are never zero-imputed or normalized",
+        "claim_ceiling": "File integrity, specimen joins, ROI coordinates, source metadata and specimen-level split integrity only; composition labels are supplier-sourced and not independently authenticated; no model or physical sorting performance is qualified."
     });
 
     if let Some(parent) = inputs.output.parent() {
@@ -712,9 +713,32 @@ mod tests {
         "sample_C;0.3;0.4;0.5\n",
         "sample_D;0.4;0.5;0.6\n"
     );
+    const COORDINATES: &str = concat!(
+        "Label;y_start;y_end;x_start;x_end\n",
+        "sample_A;10;40;20;60\n",
+        "sample_B;11;41;21;61\n",
+        "sample_C;12;42;22;62\n",
+        "sample_D;13;43;23;63\n"
+    );
 
     fn small_ground_truth() -> GroundTruthReport {
         parse_ground_truth(GT.as_bytes()).unwrap()
+    }
+
+    fn valid_source_metadata() -> Value {
+        json!({
+            "source_id": DATASET_ID,
+            "dataset_doi": "10.5281/zenodo.18269172",
+            "rights_status": "verified_for_internal_use",
+            "rights_review_ref": "SYNTHETIC-RIGHTS-REVIEW-001",
+            "expected_sample_count": 4,
+            "expected_unknown_count": 1,
+            "expected_outlier_count": 1,
+            "expected_composition_column_count": 2,
+            "expected_wavelength_count": 3,
+            "expected_image_width": 379,
+            "expected_max_image_height": 414
+        })
     }
 
     fn small_split() -> Value {
@@ -838,6 +862,106 @@ mod tests {
         let bad = GT.replace("60;40", "120;40");
         let error = parse_ground_truth(bad.as_bytes()).unwrap_err();
         assert!(error.contains("outside 0..100 percent"));
+    }
+
+    #[test]
+    fn source_metadata_matches_specimen_label_and_instrument_dimensions() {
+        let report = small_ground_truth();
+        let metadata = valid_source_metadata();
+        validate_source_metadata(
+            &metadata,
+            report.states.len(),
+            1,
+            1,
+            report.composition_column_count,
+            3,
+            379,
+            414
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn rejects_source_metadata_with_wrong_specimen_count() {
+        let report = small_ground_truth();
+        let mut metadata = valid_source_metadata();
+        metadata["expected_sample_count"] = json!(71);
+        let error = validate_source_metadata(
+            &metadata,
+            report.states.len(),
+            1,
+            1,
+            report.composition_column_count,
+            3,
+            379,
+            414
+        )
+        .unwrap_err();
+        assert!(error.contains("expected_sample_count"));
+    }
+
+    #[test]
+    fn rejects_source_metadata_with_wrong_unknown_or_outlier_counts() {
+        let report = small_ground_truth();
+        let mut metadata = valid_source_metadata();
+        metadata["expected_unknown_count"] = json!(0);
+        let error = validate_source_metadata(
+            &metadata,
+            report.states.len(),
+            1,
+            1,
+            report.composition_column_count,
+            3,
+            379,
+            414
+        )
+        .unwrap_err();
+        assert!(error.contains("expected_unknown_count"));
+    }
+
+    #[test]
+    fn rejects_source_metadata_with_wrong_composition_column_count() {
+        let report = small_ground_truth();
+        let mut metadata = valid_source_metadata();
+        metadata["expected_composition_column_count"] = json!(11);
+        let error = validate_source_metadata(
+            &metadata,
+            report.states.len(),
+            1,
+            1,
+            report.composition_column_count,
+            3,
+            379,
+            414
+        )
+        .unwrap_err();
+        assert!(error.contains("expected_composition_column_count"));
+    }
+
+    #[test]
+    fn rejects_source_metadata_for_wrong_dataset_id() {
+        let report = small_ground_truth();
+        let mut metadata = valid_source_metadata();
+        metadata["source_id"] = json!("SOME-OTHER-DATASET");
+        let error = validate_source_metadata(
+            &metadata,
+            report.states.len(),
+            1,
+            1,
+            report.composition_column_count,
+            3,
+            379,
+            414
+        )
+        .unwrap_err();
+        assert!(error.contains("source_id"));
+    }
+
+    #[test]
+    fn rejects_coordinates_outside_published_image_dimensions() {
+        let bad = COORDINATES.replace("sample_A;10;40;20;60", "sample_A;10;40;20;380");
+        let error = parse_spectra_coordinates(bad.as_bytes(), 379, 414).unwrap_err();
+        assert!(error.contains("invalid x-coordinate interval"));
     }
 
     #[test]
