@@ -39,6 +39,10 @@ enum PositiveAzimuth { ClockwiseViewedFromAft, CounterClockwiseViewedFromAft }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+enum AxialPositiveDirection { TowardBow, TowardStern }
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 enum BlockageMethod { WireScreen, DummyHull, FullHull, OtherDeclared }
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
@@ -58,6 +62,7 @@ struct Case {
     coordinate_frame: CoordinateFrame,
     angular_origin: AngularOrigin,
     positive_azimuth: PositiveAzimuth,
+    axial_positive_direction: AxialPositiveDirection,
     tolerances: ComponentTolerances,
     max_fourier_harmonic: usize,
     blockage: BlockageEvidence,
@@ -119,6 +124,12 @@ struct WakeField {
     instrument_or_solver_id: String,
     calibration_or_solver_validation_sha256: String,
     raw_data_sha256: String,
+    coordinate_frame: CoordinateFrame,
+    angular_origin: AngularOrigin,
+    positive_azimuth: PositiveAzimuth,
+    axial_positive_direction: AxialPositiveDirection,
+    area_weight_method_id: String,
+    area_weight_evidence_sha256: String,
     points: Vec<WakePoint>,
 }
 
@@ -168,6 +179,8 @@ struct BlockageReport {
     area_blockage_ratio: f64,
     below_ittc_twenty_percent_recommendation: bool,
     review_state: &'static str,
+    review_required: bool,
+    review_assessment_eligible: bool,
     review_evidence_sha256: Option<String>,
     interpretation: &'static str,
 }
@@ -196,6 +209,10 @@ struct ComponentMetric {
     p95_absolute_error: Option<f64>,
     maximum_absolute_error: Option<f64>,
     tolerance: f64,
+    area_weight_sum: f64,
+    unweighted_bias: Option<f64>,
+    unweighted_mean_absolute_error: Option<f64>,
+    unweighted_rmse: Option<f64>,
     definitely_outside_cells: usize,
     unresolved_cells: usize,
     within_tolerance_cells: usize,
@@ -246,6 +263,11 @@ struct MetricAccumulator {
     residuals: Vec<f64>,
     lower_abs: Vec<f64>,
     upper_abs: Vec<f64>,
+    weighted_values: Vec<(f64, f64)>,
+    weighted_residual_sum: f64,
+    weighted_absolute_sum: f64,
+    weighted_square_sum: f64,
+    weight_sum: f64,
     bias_sum: f64,
     outside: usize,
     unresolved: usize,
@@ -258,6 +280,11 @@ impl MetricAccumulator {
             residuals: Vec::new(),
             lower_abs: Vec::new(),
             upper_abs: Vec::new(),
+            weighted_values: Vec::new(),
+            weighted_residual_sum: 0.0,
+            weighted_absolute_sum: 0.0,
+            weighted_square_sum: 0.0,
+            weight_sum: 0.0,
             bias_sum: 0.0,
             outside: 0,
             unresolved: 0,
@@ -265,13 +292,18 @@ impl MetricAccumulator {
         }
     }
 
-    fn push(&mut self, delta: f64, uncertainty: f64, tolerance: f64) -> &'static str {
+    fn push(&mut self, delta: f64, uncertainty: f64, tolerance: f64, area_weight: f64) -> &'static str {
         let absolute = delta.abs();
         let lower = (absolute - uncertainty).max(0.0);
         let upper = absolute + uncertainty;
         self.residuals.push(delta);
         self.lower_abs.push(lower);
         self.upper_abs.push(upper);
+        self.weighted_values.push((absolute, area_weight));
+        self.weighted_residual_sum += delta * area_weight;
+        self.weighted_absolute_sum += absolute * area_weight;
+        self.weighted_square_sum += delta * delta * area_weight;
+        self.weight_sum += area_weight;
         self.bias_sum += delta;
         if lower > tolerance {
             self.outside += 1;
