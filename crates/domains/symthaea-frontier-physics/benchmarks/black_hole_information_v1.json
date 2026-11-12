@@ -66,7 +66,8 @@
     ],
     "charge_symmetry": "U(1) excitation-number conservation for equal-gap qubits; each local gate is block diagonal on pair excitation sectors 0, 1, 2",
     "emission_semantics": "After the boundary-pair unitary, one active tensor factor is appended to radiation and excluded from all later gates",
-    "complementarity": "For the closed globally pure register, calculate S(R) and S(B) independently at every nontrivial cut and report their absolute difference"
+    "complementarity": "For the closed globally pure register, calculate S(R) and S(B) independently at every nontrivial cut and report their absolute difference",
+    "energy_ledger": "For equal-gap qubits with H = hbar*omega*N, record N_R and N_B separately and verify N = N_R + N_B at every emission step; report per-emission occupation expectation."
   },
   "benchmark_ladder": [
     {
@@ -171,7 +172,11 @@
         "complementary_entropy_residual",
         "total_excitation_expectation_and_variance",
         "emitted_register_immutability",
-        "charge_preserving_gate_commutator_residual"
+        "charge_preserving_gate_commutator_residual",
+        "radiation_excitation_expectation_by_emission_step",
+        "remaining_register_excitation_expectation_by_emission_step",
+        "emitted_qubit_occupation_expectation",
+        "excitation_ledger_residual"
       ],
       "acceptance": {
         "global_unitarity_and_state_norm_drift_reported_per_step": true,
@@ -181,7 +186,12 @@
         "charge_preserving_gate_commutator_frobenius_residual": 1e-12,
         "total_excitation_expectation_drift": 1e-10,
         "total_excitation_variance": 1e-10,
-        "complementary_entropy_residual_nats": 1e-9
+        "complementary_entropy_residual_nats": 1e-9,
+        "excitation_ledger_residual": 1e-10,
+        "emitted_qubit_occupation_range": [
+          0,
+          1
+        ]
       },
       "implementation_status": "closed-register scramblers plus U(1)-conserving sequential factor-transfer source authored; Rust execution pending",
       "source_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/random_circuit_scrambling_v1.json",
@@ -304,7 +314,8 @@
     "charge_nonconserving_two_qubit_gate",
     "emitted_register_reinteracted_after_emission",
     "initial_state_outside_declared_microcanonical_sector",
-    "radiation_black_hole_entropy_complementarity_failure"
+    "radiation_black_hole_entropy_complementarity_failure",
+    "energy_partition_ledger_mismatch"
   ],
   "competitive_baselines": [
     {
@@ -443,7 +454,8 @@
       "QI-2_page_haar_average_reference_formula": "authored_not_executed",
       "QI-2_seeded_haar_random_state_sampler_and_ensemble_statistics": "authored_not_executed",
       "QI-3_seeded_local_and_all_to_all_random_two_qubit_scramblers": "partial_source_authored_not_executed",
-      "QI_3_U1_conserving_sequential_register_transfer": "source_authored_not_executed"
+      "QI_3_U1_conserving_sequential_register_transfer": "source_authored_not_executed",
+      "QI_3_sequential_emission_energy_ledger": "source_authored_not_executed"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
