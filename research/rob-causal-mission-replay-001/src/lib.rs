@@ -96,6 +96,8 @@ pub struct DecisionRecord {
     pub source_observation_ids: Vec<String>,
     /// Loss model digest.
     pub loss_model_digest: String,
+    /// Policy digest that selected the action.
+    pub policy_digest: String,
     /// Task-loss scale identity.
     pub loss_scale_id: String,
     /// Candidate action-domain manifest digest.
@@ -161,6 +163,8 @@ pub struct ActionChunkRecord {
     pub action_id: String,
     /// Policy/model digest.
     pub model_digest: String,
+    /// Policy implementation/configuration digest.
+    pub policy_digest: String,
     /// Candidate action-domain digest.
     pub action_domain_digest: String,
     /// Prefix digest the proposal expected to have executed.
@@ -210,6 +214,10 @@ pub struct ActuatorApplication {
     pub request_id: Option<String>,
     /// Actuator identity.
     pub actuator_id: String,
+    /// Actuator hardware/configuration digest.
+    pub actuator_configuration_digest: String,
+    /// Low-level controller configuration digest.
+    pub controller_configuration_digest: String,
     /// Controller/actuator application receipt digest.
     pub application_receipt_digest: String,
 }
@@ -240,6 +248,8 @@ pub struct PhysicalTransition {
     pub thermal_model_digest: String,
     /// Thermal snapshot digest.
     pub thermal_snapshot_digest: String,
+    /// Sensor calibration digest used for this per-node snapshot.
+    pub thermal_sensor_calibration_digest: String,
     /// Actual thermal-node IDs included in the snapshot.
     pub thermal_node_ids: Vec<String>,
     /// Topology receipt disposition.
@@ -604,6 +614,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         if decision.decision_id.trim().is_empty()
             || decision.selected_action_id.trim().is_empty()
             || decision.loss_model_digest.trim().is_empty()
+            || decision.policy_digest.trim().is_empty()
             || decision.loss_scale_id.trim().is_empty()
             || decision.action_domain_digest.trim().is_empty()
             || decision.calibration_id.trim().is_empty()
@@ -705,6 +716,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             || chunk.stamp.tick > decision.valid_through_tick
             || chunk.action_id != decision.selected_action_id
             || chunk.model_digest != decision.loss_model_digest
+            || chunk.policy_digest != decision.policy_digest
             || chunk.action_domain_digest != decision.action_domain_digest
         {
             push_finding(
@@ -832,6 +844,8 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         let findings_before = findings.len();
         if application.command_id.trim().is_empty()
             || application.actuator_id.trim().is_empty()
+            || application.actuator_configuration_digest.trim().is_empty()
+            || application.controller_configuration_digest.trim().is_empty()
             || application.application_receipt_digest.trim().is_empty()
         {
             push_finding(
@@ -1048,6 +1062,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         let decision_receipt_complete = !decision.calibration_id.trim().is_empty()
             && !decision.calibration_digest.trim().is_empty()
             && !decision.loss_model_digest.trim().is_empty()
+            && !decision.policy_digest.trim().is_empty()
             && !decision.loss_scale_id.trim().is_empty()
             && !decision.action_domain_digest.trim().is_empty();
         let chunk_binding_ok = chunk.stamp.sequence > decision.stamp.sequence
@@ -1055,6 +1070,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             && chunk.decision_id == application.decision_id
             && chunk.action_id == application.action_id
             && chunk.model_digest == decision.loss_model_digest
+            && chunk.policy_digest == decision.policy_digest
             && chunk.action_domain_digest == decision.action_domain_digest
             && chunk.expected_executed_prefix_digest == chunk.observed_executed_prefix_digest;
 
@@ -1097,6 +1113,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             || transition.resulting_state_digest.trim().is_empty()
             || transition.thermal_model_digest.trim().is_empty()
             || transition.thermal_snapshot_digest.trim().is_empty()
+            || transition.thermal_sensor_calibration_digest.trim().is_empty()
         {
             push_finding(
                 &mut findings,
@@ -1298,6 +1315,7 @@ mod tests {
                 selected_action_id: "walk-forward".to_owned(),
                 source_observation_ids: vec!["obs-1".to_owned()],
                 loss_model_digest: "loss-model-sha256".to_owned(),
+                policy_digest: "policy-sha256".to_owned(),
                 loss_scale_id: "mission-loss-v1".to_owned(),
                 action_domain_digest: "action-domain-sha256".to_owned(),
                 calibration_id: "calibration-1".to_owned(),
@@ -1315,6 +1333,7 @@ mod tests {
                 request_id: None,
                 action_id: "walk-forward".to_owned(),
                 model_digest: "loss-model-sha256".to_owned(),
+                policy_digest: "policy-sha256".to_owned(),
                 action_domain_digest: "action-domain-sha256".to_owned(),
                 expected_executed_prefix_digest: "prefix-0".to_owned(),
                 observed_executed_prefix_digest: "prefix-0".to_owned(),
@@ -1333,6 +1352,8 @@ mod tests {
                 source_observation_ids: vec!["obs-1".to_owned()],
                 request_id: None,
                 actuator_id: "left-knee".to_owned(),
+                actuator_configuration_digest: "actuator-config-sha256".to_owned(),
+                controller_configuration_digest: "controller-config-sha256".to_owned(),
                 application_receipt_digest: "apply-sha256".to_owned(),
             }],
             physical_transitions: vec![PhysicalTransition {
@@ -1343,6 +1364,7 @@ mod tests {
                 resulting_state_digest: "reserve-1".to_owned(),
                 thermal_model_digest: "thermal-model-sha256".to_owned(),
                 thermal_snapshot_digest: "thermal-snapshot-sha256".to_owned(),
+                thermal_sensor_calibration_digest: "thermal-sensor-cal-sha256".to_owned(),
                 thermal_node_ids: vec!["motor".to_owned(), "driver".to_owned()],
                 topology: TopologyDisposition::Known,
             }],
