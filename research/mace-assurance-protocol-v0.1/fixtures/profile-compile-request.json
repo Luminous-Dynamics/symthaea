@@ -1,0 +1,26 @@
+{
+  "schema_version": "mace-profile-compile-request-v1",
+  "profile": {
+    "layers": ["foundation-model", "interaction-access", "execution-scheduling"],
+    "traversal_order": ["foundation-model", "interaction-access", "execution-scheduling"],
+    "scenarios": ["tool-using", "devops-development"],
+    "layer_config_sha256": {
+      "foundation-model": "1111111111111111111111111111111111111111111111111111111111111111",
+      "interaction-access": "2222222222222222222222222222222222222222222222222222222222222222",
+      "execution-scheduling": "3333333333333333333333333333333333333333333333333333333333333333"
+    },
+    "scenario_config_sha256": {
+      "tool-using": "4444444444444444444444444444444444444444444444444444444444444444",
+      "devops-development": "5555555555555555555555555555555555555555555555555555555555555555"
+    }
+  },
+  "catalog": {
+    "schema_version": "mace-profile-catalog-v2",
+    "catalog_id": "example-catalog-v1",
+    "obligations": [
+      {"criterion":{"id":"task-oracle","mandatory":true},"layers":["foundation-model"],"scenarios":["tool-using","devops-development"]},
+      {"criterion":{"id":"tool-boundary","mandatory":true},"layers":["interaction-access"],"scenarios":["tool-using","devops-development"]},
+      {"criterion":{"id":"runtime-identity","mandatory":true},"layers":["execution-scheduling"],"scenarios":["devops-development"]}
+    ]
+  }
+}
