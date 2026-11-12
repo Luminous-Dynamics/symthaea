@@ -46,7 +46,7 @@ The source audit requires:
 This is metadata integrity only. The DEC-specific gate records that fusion-born electrical output was not demonstrated/attributed in the source case. This does not assert that a physical fusion-born contribution was exactly zero; unknown contributions remain unquantified. It prevents externally heated plasma recovery or a laboratory fundamental-unit experiment being silently promoted to demonstrated fusion-born energy recovery. It does not independently check paper contents, reproduce reported values, or establish that a source supports every interpretation in its case description.
 
 Current frozen input:
-- plasma-energy register: 24 cases / 24 controls, including five direct-energy-conversion cases, one separate D–³He/DT fuel-mixture neutron-partition model, and thermal-processing/ETES comparison references;
+- plasma-energy register: 28 cases / 28 controls, including five direct-energy-conversion cases, one D–³He/DT fuel-mixture model, four miniature/modular low-temperature plasma device references, and thermal-processing/ETES comparison references;
 - HTS fusion magnet register: 6 cases / 12 controls.
 
 ## 3. Synthetic thermal-store fixture
@@ -148,3 +148,17 @@ The next validation step is to execute the exact-head Rust tests on a Rust-capab
 The plasma source register includes a 2026 numerical ARC-class tokamak fuel-mixture study comparing D–T with 50% D / 50% ³He. It reports a 525 MW model comparison with source-specific temperatures/densities, average energy per reaction and neutron fractions. A derived arithmetic check records the modeled charged-energy fractions and their ratio.
 
 This is not a DEC experiment. The D–³He primary reaction produces charged alpha/proton products, but the D–³He fuel mixture still produces neutrons through D–D and secondary D–T reactions. The fuel-partition record is explicitly origin-tagged and keeps `fusion_born_output_demonstrated=false` because it contains no direct-converter experiment. Its much lower modelled neutron share is bought with a much higher temperature/density point and unresolved ignition/stability requirements in the source model. The charged-energy fraction must not be promoted to a converter efficiency or plant net electricity.
+
+
+## Miniaturized and modular plasma device source cases
+
+The source register now adds four external laboratory references under `LOW_TEMPERATURE_PLASMA_MINIATURIZATION` and `LOW_TEMPERATURE_PLASMA_NUMBERING_UP`:
+
+- The 2026 low-cost helium APPJ reference reports a 100 g / 15 × 10 × 2 cm power supply, 54 mm glass tube, 2 L/min helium flow, less than USD 45 component cost and source-specific in-vitro results. The source explicitly leaves long-term electrode wear/drift and practical treatment-area limits unresolved.
+- The 2025 membrane-stabilized microfluidic DBD chip reports 7.31–11.32 nm gold nanoparticle sizes with 1.8 nm standard deviation. This does not establish industrial throughput or whole-system energy performance.
+- The 43-element LTCC CAP array demonstrates a 10 × 10 cm treatment region, with a source-specific 91% CFU decrease on a named biofilm coupon under its conditions.
+- The 2023 RF microplasma array demonstrates five individually ignitable/quenchable cells; expansion to tens or hundreds of cells is discussed by the authors but not a demonstrated scale-out result.
+
+The new negative controls prevent low parts cost from becoming lifecycle qualification, particle-size precision from becoming industrial throughput, one biofilm endpoint from becoming universal efficacy, and a five-cell demonstration from becoming a hundred-cell array claim.
+
+The programme is [MICROPLASMA-001 #11780](https://github.com/Luminous-Dynamics/symthaea/issues/11780).
