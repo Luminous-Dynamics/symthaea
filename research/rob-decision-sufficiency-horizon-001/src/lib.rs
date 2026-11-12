@@ -458,7 +458,7 @@ fn assess_tick(
     }
     let numerator = (calibration.calibration_episode_count as u128 + 1)
         * (1_000_000 - calibration.alpha_ppm) as u128;
-    let required_rank = (numerator + 999_999) / 1_000_000;
+    let required_rank = numerator.div_ceil(1_000_000);
     if required_rank > calibration.calibration_episode_count as u128 {
         return Ok(TickDisposition::Unknown {
             reason: UnknownReason::CalibrationSampleTooSmall {
@@ -613,8 +613,9 @@ pub fn decision_sufficiency_horizon(
 ) -> Result<HorizonResult, ReferenceError> {
     contract.validate()?;
     let first = steps.first().ok_or(ReferenceError::EmptyHorizon)?;
-    if let Some(first_calibration) = first.calibration.as_ref() {
-        if steps.len() as u64 > first_calibration.maximum_horizon_ticks {
+    if let Some(first_calibration) = first.calibration.as_ref()
+        && steps.len() as u64 > first_calibration.maximum_horizon_ticks
+    {
             return Ok(HorizonResult {
                 first_tick: first.tick,
                 last_sufficient_tick: None,
@@ -636,7 +637,6 @@ pub fn decision_sufficiency_horizon(
                     },
                 }],
             });
-        }
     }
 
     let anchor_action_id = first.selected_action_id.as_str();
@@ -702,8 +702,9 @@ pub fn decision_sufficiency_horizon(
             return Ok(result);
         }
 
-        if let Some(calibration) = evidence.calibration.as_ref() {
-            if steps.len() as u64 > calibration.maximum_horizon_ticks {
+        if let Some(calibration) = evidence.calibration.as_ref()
+            && steps.len() as u64 > calibration.maximum_horizon_ticks
+        {
                 let reason = UnknownReason::HorizonExceedsCalibrationScope {
                     observed_ticks: steps.len(),
                     maximum_ticks: calibration.maximum_horizon_ticks,
@@ -717,7 +718,6 @@ pub fn decision_sufficiency_horizon(
                 result.stopped_at_tick = Some(evidence.tick);
                 result.stop_reason = Some(HorizonStopReason::EvidenceUnknown(reason));
                 return Ok(result);
-            }
         }
 
         let disposition = assess_tick(contract, evidence)?;
