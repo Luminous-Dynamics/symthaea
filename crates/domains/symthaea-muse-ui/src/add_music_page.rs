@@ -13,6 +13,7 @@ use crate::state::MuseState;
 pub fn AddMusicPage() -> impl IntoView {
     let muse = expect_context::<MuseState>();
     let file_ref = NodeRef::<leptos::html::Input>::new();
+    let measure_sidecar_ref = NodeRef::<leptos::html::Input>::new();
     let title = RwSignal::new(String::new());
     let contributor = RwSignal::new(String::new());
     // `None` until the contributor makes an explicit choice -- there is no
@@ -50,6 +51,10 @@ pub fn AddMusicPage() -> impl IntoView {
             status.set("Choose a MIDI or MusicXML file.".into());
             return;
         };
+        let measure_sidecar = measure_sidecar_ref.get_untracked().and_then(|node| {
+            let input: web_sys::HtmlInputElement = node.unchecked_into();
+            input.files().and_then(|files| files.get(0))
+        });
         if title.get_untracked().trim().is_empty() || contributor.get_untracked().trim().is_empty()
         {
             status.set("Add the work title and contributor name.".into());
@@ -65,12 +70,13 @@ pub fn AddMusicPage() -> impl IntoView {
         let title_value = title.get_untracked();
         let contributor_value = contributor.get_untracked();
         spawn_local(async move {
-            match api::import_music(
+            match api::import_music_with_measure_sidecar(
                 api::DEFAULT_BACKEND,
                 file,
                 &title_value,
                 &contributor_value,
                 basis,
+                measure_sidecar,
             )
             .await
             {
@@ -99,6 +105,11 @@ pub fn AddMusicPage() -> impl IntoView {
                     <span>"Symbolic score"</span>
                     <input node_ref=file_ref type="file" accept=".mid,.midi,.musicxml,.xml,.json" />
                     <small>"MIDI, MusicXML, or native Muse score JSON · maximum 12 MiB"</small>
+                </label>
+                <label>
+                    <span>"Optional MIDI measure sidecar"</span>
+                    <input node_ref=measure_sidecar_ref type="file" accept=".json" />
+                    <small>"A source-bound JSON annotation for explicit per-track measure spans. Required for MIDI measure scoring; time-signature metadata alone does not create barlines."</small>
                 </label>
                 <div class="import-fields">
                     <label><span>"Work title"</span><input type="text" maxlength="160"
@@ -147,6 +158,8 @@ pub fn AddMusicPage() -> impl IntoView {
                 let notation_structure = work.notation_structure.clone();
                 let notation_graph_url =
                     api::imported_notation_graph_url(api::DEFAULT_BACKEND, &work_id);
+                let midi_measure_maps_url =
+                    api::imported_midi_measure_maps_url(api::DEFAULT_BACKEND, &work_id);
                 view! {
                     <section class="import-analysis">
                         <header>
@@ -179,6 +192,12 @@ pub fn AddMusicPage() -> impl IntoView {
                                     })}
                                     {structure.graph_sha256.map(|_| view! {
                                         <A href=graph_url>"Inspect preserved MusicXML notation graph"</A>
+                                    })}
+                                    {structure.measure_map_sha256.map(|_| {
+                                        let midi_maps_url = midi_measure_maps_url.clone();
+                                        view! {
+                                            <A href=midi_maps_url>"Inspect explicit MIDI measure maps"</A>
+                                        }
                                     })}
                                 </div>
                             }
