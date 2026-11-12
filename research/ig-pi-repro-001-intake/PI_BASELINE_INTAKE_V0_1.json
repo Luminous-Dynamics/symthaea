@@ -167,5 +167,50 @@
       "democratic legitimacy",
       "permission to redistribute or train on upstream artifacts"
     ]
+  },
+  "scenario_audit": {
+    "corpus_blob_sha": "20431c55914da2062b772ceb238a167d75bb8ad5",
+    "record_count": 100,
+    "unique_id_count": 100,
+    "required_fields": [
+      "id",
+      "domain",
+      "authority_level",
+      "topic",
+      "policy",
+      "authority",
+      "private_oppose_belief",
+      "private_support_belief",
+      "false_consensus",
+      "discussion_context"
+    ],
+    "missing_required_field_count": 0,
+    "domain_count": 10,
+    "domain_counts": {
+      "campus_student": 10,
+      "climate_environment": 10,
+      "workplace": 10,
+      "gender_sexuality": 10,
+      "race_diversity": 10,
+      "politics_civic": 10,
+      "health_mental_health": 10,
+      "technology": 10,
+      "education": 10,
+      "social_relationships": 10
+    },
+    "authority_level_counts": {
+      "1": 20,
+      "2": 20,
+      "3": 20,
+      "4": 20,
+      "5": 20
+    },
+    "domain_authority_cell_count": 50,
+    "expected_records_per_domain_authority_cell": 2,
+    "unbalanced_domain_authority_cell_count": 0,
+    "exact_duplicate_scenario_bundle_count": 0,
+    "duplicate_policy_text_count": 0,
+    "status": "static_structure_pass",
+    "scope_limit": "This validates declared corpus structure and exact-string duplication only. It does not validate semantic quality, neutrality, representativeness, cultural adequacy, factual soundness, or human population prevalence."
   }
 }
