@@ -1,0 +1,284 @@
+{
+  "schema": "luminous.airroad.post_fault_supply_envelope.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_integer_reference",
+  "units": {
+    "power": "W",
+    "time": "s",
+    "energy": "J"
+  },
+  "identity_template": {
+    "configuration_digest": "sha256:configuration",
+    "operating_point_digest": "sha256:operating-point",
+    "post_fault_topology_digest": "sha256:post-fault-topology",
+    "fault_event_digest": "sha256:fault-event",
+    "critical_load_manifest_digest": "sha256:critical-load-manifest",
+    "source_capability_digest": "sha256:source-capability",
+    "storage_state_digest": "sha256:storage-state",
+    "critical_load_ids": [
+      "critical-propulsion"
+    ]
+  },
+  "cases": [
+    {
+      "id": "sustained-source-plus-storage",
+      "usable_storage_energy_lower_j": 2000000,
+      "critical_load_ids": [
+        "critical-propulsion"
+      ],
+      "segments": [
+        {
+          "segment_id": "initial-recovery",
+          "start_seconds": 0,
+          "duration_seconds": 60,
+          "non_storage_source_capacity_lower_w": 70000,
+          "storage_discharge_power_lower_w": 30000,
+          "critical_loads": [
+            {
+              "load_id": "critical-propulsion",
+              "demand_upper_w": 90000,
+              "path": {
+                "status": "confirmed_available",
+                "path_digest": "sha256:path-a"
+              }
+            }
+          ]
+        },
+        {
+          "segment_id": "continued-mission",
+          "start_seconds": 60,
+          "duration_seconds": 120,
+          "non_storage_source_capacity_lower_w": 70000,
+          "storage_discharge_power_lower_w": 10000,
+          "critical_loads": [
+            {
+              "load_id": "critical-propulsion",
+              "demand_upper_w": 75000,
+              "path": {
+                "status": "confirmed_available",
+                "path_digest": "sha256:path-b"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "disposition": "sustained_electrical_supply",
+        "total_duration_seconds": 180,
+        "maximum_storage_power_required_w": 20000,
+        "required_storage_energy_j": 1800000,
+        "remaining_storage_energy_lower_j": 200000
+      }
+    },
+    {
+      "id": "power-shortfall-despite-path",
+      "usable_storage_energy_lower_j": 2000000,
+      "critical_load_ids": [
+        "critical-propulsion"
+      ],
+      "segments": [
+        {
+          "segment_id": "power-limited",
+          "start_seconds": 0,
+          "duration_seconds": 60,
+          "non_storage_source_capacity_lower_w": 70000,
+          "storage_discharge_power_lower_w": 15000,
+          "critical_loads": [
+            {
+              "load_id": "critical-propulsion",
+              "demand_upper_w": 90000,
+              "path": {
+                "status": "confirmed_available",
+                "path_digest": "sha256:path-c"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "disposition": "not_sustained_power_limit",
+        "segment_id": "power-limited",
+        "required_storage_power_w": 20000,
+        "available_storage_power_lower_w": 15000,
+        "unmet_power_w": 5000
+      }
+    },
+    {
+      "id": "energy-exhaustion-despite-power-capability",
+      "usable_storage_energy_lower_j": 500000,
+      "critical_load_ids": [
+        "critical-propulsion"
+      ],
+      "segments": [
+        {
+          "segment_id": "energy-limited",
+          "start_seconds": 0,
+          "duration_seconds": 360,
+          "non_storage_source_capacity_lower_w": 70000,
+          "storage_discharge_power_lower_w": 10000,
+          "critical_loads": [
+            {
+              "load_id": "critical-propulsion",
+              "demand_upper_w": 80000,
+              "path": {
+                "status": "confirmed_available",
+                "path_digest": "sha256:path-d"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "disposition": "not_sustained_energy_limit",
+        "segment_id": "energy-limited",
+        "required_storage_energy_j": 3600000,
+        "usable_storage_energy_lower_j": 500000,
+        "deficit_energy_j": 3100000,
+        "reserve_depletion_time_seconds": 50
+      }
+    },
+    {
+      "id": "confirmed-path-loss",
+      "usable_storage_energy_lower_j": 1000000,
+      "critical_load_ids": [
+        "critical-propulsion"
+      ],
+      "segments": [
+        {
+          "segment_id": "isolated-load",
+          "start_seconds": 0,
+          "duration_seconds": 1,
+          "non_storage_source_capacity_lower_w": 100000,
+          "storage_discharge_power_lower_w": 100000,
+          "critical_loads": [
+            {
+              "load_id": "critical-propulsion",
+              "demand_upper_w": 10000,
+              "path": {
+                "status": "confirmed_unavailable",
+                "evidence_digest": "sha256:no-route"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "disposition": "not_sustained_path",
+        "segment_id": "isolated-load",
+        "load_id": "critical-propulsion",
+        "evidence_digest": "sha256:no-route"
+      }
+    },
+    {
+      "id": "unknown-path-is-not-pass",
+      "usable_storage_energy_lower_j": 1000000,
+      "critical_load_ids": [
+        "critical-propulsion"
+      ],
+      "segments": [
+        {
+          "segment_id": "path-unknown",
+          "start_seconds": 0,
+          "duration_seconds": 1,
+          "non_storage_source_capacity_lower_w": 100000,
+          "storage_discharge_power_lower_w": 100000,
+          "critical_loads": [
+            {
+              "load_id": "critical-propulsion",
+              "demand_upper_w": 10000,
+              "path": {
+                "status": "unknown"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "disposition": "not_evaluable_path",
+        "segment_id": "path-unknown",
+        "load_id": "critical-propulsion"
+      }
+    },
+    {
+      "id": "multiple-critical-loads-aggregate",
+      "usable_storage_energy_lower_j": 1000,
+      "critical_load_ids": [
+        "critical-a",
+        "critical-b"
+      ],
+      "segments": [
+        {
+          "segment_id": "two-loads",
+          "start_seconds": 0,
+          "duration_seconds": 1,
+          "non_storage_source_capacity_lower_w": 100,
+          "storage_discharge_power_lower_w": 100,
+          "critical_loads": [
+            {
+              "load_id": "critical-a",
+              "demand_upper_w": 80,
+              "path": {
+                "status": "confirmed_available",
+                "path_digest": "sha256:path-a"
+              }
+            },
+            {
+              "load_id": "critical-b",
+              "demand_upper_w": 70,
+              "path": {
+                "status": "confirmed_available",
+                "path_digest": "sha256:path-b"
+              }
+            }
+          ]
+        }
+      ],
+      "expected": {
+        "disposition": "sustained_electrical_supply",
+        "total_duration_seconds": 1,
+        "maximum_storage_power_required_w": 50,
+        "required_storage_energy_j": 50,
+        "remaining_storage_energy_lower_j": 950
+      }
+    }
+  ],
+  "validation_negative_controls": [
+    {
+      "id": "empty-configuration-digest",
+      "mutate": "configuration_digest empty",
+      "expected": "empty_identity"
+    },
+    {
+      "id": "load-manifest-mismatch",
+      "mutate": "segment references an undeclared critical load",
+      "expected": "load_manifest_mismatch"
+    },
+    {
+      "id": "noncontiguous-segments",
+      "mutate": "second segment starts at t=2 when previous segment ends at t=1",
+      "expected": "non_contiguous_timeline"
+    },
+    {
+      "id": "segment-ordering",
+      "mutate": "swap segment order without updating start times",
+      "expected": "non_contiguous_timeline"
+    },
+    {
+      "id": "duplicate-segment-id",
+      "mutate": "reuse a segment id",
+      "expected": "duplicate_segment_id"
+    },
+    {
+      "id": "duplicate-load",
+      "mutate": "repeat one critical load id in a segment",
+      "expected": "duplicate_load_in_segment"
+    }
+  ],
+  "limitations": [
+    "Piecewise-constant conservative power bounds only.",
+    "No charging, regeneration or source-recovery credit.",
+    "No protection curve, transient fault current or network solver.",
+    "No battery electrochemistry or thermal model.",
+    "No thrust, control-authority or flight-safety determination."
+  ]
+}
