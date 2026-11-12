@@ -2887,6 +2887,39 @@ async fn imported_work_notation_graph(
     Ok(Json(graphs))
 }
 
+async fn imported_work_midi_measure_maps(
+    AxPath(id): AxPath<String>,
+) -> Result<Json<symthaea_muse::midi_measure_sidecar::MidiMeasureSidecarReceiptV1>, StatusCode>
+{
+    let summary = read_import_summary(&id)?;
+    let expected_digest = summary
+        .notation_structure
+        .as_ref()
+        .and_then(|structure| structure.measure_map_sha256.as_deref())
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let bytes = std::fs::read(
+        Path::new(IMPORT_ROOT).join(&id).join("midi-measure-maps.json"),
+    )
+    .map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            StatusCode::NOT_FOUND
+        } else {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    })?;
+    let receipt: symthaea_muse::midi_measure_sidecar::MidiMeasureSidecarReceiptV1 =
+        serde_json::from_slice(&bytes).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let actual_digest =
+        symthaea_muse::midi_measure_sidecar::midi_measure_sidecar_commitment(&receipt)
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if actual_digest.as_str() != expected_digest
+        || receipt.midi_sha256 != summary.manifest.source_sha256
+    {
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+    Ok(Json(receipt))
+}
+
 async fn imported_work_audio(AxPath(id): AxPath<String>) -> Result<Response, StatusCode> {
     read_import_summary(&id)?;
     let bytes = std::fs::read(Path::new(IMPORT_ROOT).join(id).join("audition.wav"))
