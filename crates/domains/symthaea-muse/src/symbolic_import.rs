@@ -515,7 +515,7 @@ mod tests {
     }
 
     #[test]
-    fn notation_availability_is_not_inferred_for_non_musicxml_imports() {
+    fn musicxml_import_exposes_explicit_graph_without_inferring_from_score_meter() {
         let xml = br#"<score-partwise><part id="P1"><measure number="1">
             <attributes><divisions>1</divisions><key><fifths>0</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
             <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
@@ -529,6 +529,47 @@ mod tests {
         assert!(matches!(
             imported.notation_structure,
             ImportedNotationStructureV1::MusicXmlPartGraphs(_)
+        ));
+    }
+
+
+    #[test]
+    fn musescore_json_import_keeps_score_but_marks_measure_structure_unknown() {
+        let score = Score::new(Key::major(PitchClass::new(0)), 120.0, 4);
+        let bytes = serde_json::to_vec(&score).unwrap();
+        let imported = parse_symbolic_with_structure(
+            &bytes,
+            SymbolicImportFormat::MuseScore,
+            "musescore-score-clock",
+        ).unwrap();
+        assert_eq!(imported.score.meter, 4);
+        assert_eq!(imported.source_sha256, sha256_hex(&bytes));
+        assert!(matches!(
+            imported.notation_structure,
+            ImportedNotationStructureV1::Unknown { .. }
+        ));
+    }
+
+    #[test]
+    fn midi_import_keeps_score_but_requires_explicit_barline_sidecar() {
+        // One quarter-note C4, with no time-signature or barline sidecar.
+        let midi: [u8; 35] = [
+            b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 0, 0, 1, 1, 0xE0,
+            b'M', b'T', b'r', b'k', 0, 0, 0, 13,
+            0, 0x90, 60, 64,
+            0x83, 0x60, 0x80, 60, 64,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let imported = parse_symbolic_with_structure(
+            &midi,
+            SymbolicImportFormat::Midi,
+            "midi-score-clock",
+        ).unwrap();
+        assert_eq!(imported.score.notes.len(), 1);
+        assert_eq!(imported.source_sha256, sha256_hex(&midi));
+        assert!(matches!(
+            imported.notation_structure,
+            ImportedNotationStructureV1::Unknown { .. }
         ));
     }
 
