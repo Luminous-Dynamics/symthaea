@@ -530,6 +530,10 @@ pub fn admit_batch(
         }
     }
 
+    if next_cursor_robot_id.is_none() {
+        next_cursor_robot_id = cursor.last_robot_id.clone();
+    }
+
     let service_floor_robots: BTreeSet<String> = requests
         .iter()
         .filter(|request| request.service_floor_due)
