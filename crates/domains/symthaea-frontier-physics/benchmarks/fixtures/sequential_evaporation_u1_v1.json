@@ -1,0 +1,111 @@
+{
+  "schema": "luminous.black_hole_information.sequential_evaporation_u1.v1",
+  "status": "authored_contract_not_executed",
+  "model": "finite-dimensional closed pure-state qubit chain with sequential tensor-factor emission",
+  "claim_ceiling": "This is a U(1)-conserving quantum-circuit toy model. It is not Hawking radiation, a gravitational evaporation calculation, a Page-island derivation, or evidence for a four-dimensional black-hole information solution.",
+  "conventions": {
+    "qubit_ordering": "most_significant_bit_first",
+    "pair_gate_basis": [
+      "00",
+      "01",
+      "10",
+      "11"
+    ],
+    "entropy_units": "nats",
+    "equal_gap_hamiltonian": "H = hbar*omega*sum_i |1><1|_i",
+    "total_charge": "N = sum_i |1><1|_i",
+    "initial_state": "Haar-random pure state restricted to the exact Hamming-weight-k (fixed-N) subspace"
+  },
+  "evolution": {
+    "each_emission_step": [
+      "Apply a seeded Haar element of U(1) x U(2) x U(1) to the first two active black-hole qubits.",
+      "Move the first active tensor factor into the collected radiation register.",
+      "Never apply any later gate to an emitted tensor factor."
+    ],
+    "final_single_qubit": "The final active qubit is transferred without another two-qubit gate.",
+    "gate_family": "Block diagonal in pair excitation sectors: a phase on |00>, a Haar U(2) on span{|01>,|10>}, and a phase on |11>.",
+    "state_representation": "One full 2^N pure-state vector with an explicit B/R partition; emission is a factor relabelling after a unitary boundary interaction."
+  },
+  "qualification_observables": [
+    "state_norm_squared_at_every_emission",
+    "total_excitation_expectation_and_variance_at_every_emission",
+    "radiation_von_neumann_entropy",
+    "remaining_register_von_neumann_entropy",
+    "complementary_entropy_residual",
+    "radiation_and_remaining_register_purity",
+    "emitted_qubit_identity_and_immutability",
+    "two_qubit_gate_count",
+    "seed_reproducibility"
+  ],
+  "reference_controls": [
+    {
+      "id": "U1-CTRL-001",
+      "case": "vacuum_sector",
+      "number_of_qubits": 6,
+      "initial_excitations": 0,
+      "expected": "zero entanglement at every cut; N expectation 0; variance 0"
+    },
+    {
+      "id": "U1-CTRL-002",
+      "case": "fully_filled_sector",
+      "number_of_qubits": 6,
+      "initial_excitations": 6,
+      "expected": "zero entanglement at every cut; N expectation 6; variance 0"
+    },
+    {
+      "id": "U1-CTRL-003",
+      "case": "pair_gate_charge_blocks",
+      "expected": "all matrix elements between different pair-excitation sectors vanish; U dagger U = identity; [U,N_pair] = 0"
+    },
+    {
+      "id": "U1-CTRL-004",
+      "case": "closed_pure_register_complementarity",
+      "expected": "S(R) = S(B) at each emission step within independently declared numerical tolerance"
+    },
+    {
+      "id": "U1-CTRL-005",
+      "case": "late_radiation_state",
+      "expected": "after the final factor transfer, the collected radiation is the full pure state; entropy 0 and purity 1"
+    }
+  ],
+  "benchmark_case": {
+    "id": "U1-EVAP-8Q-K4",
+    "number_of_qubits": 8,
+    "initial_excitations": 4,
+    "seed_hex": "0xE_AA0",
+    "status": "source_authored_rust_execution_pending",
+    "purpose": "finite-size sequential boundary-emission trajectory with charge conservation and independent B/R entropy comparison"
+  },
+  "resource_limits": {
+    "maximum_total_qubits": 12,
+    "maximum_complementary_reduced_dimension": 64,
+    "note": "The bound ensures both sides of every nontrivial bipartition fit the current dense reduced-density-matrix backend."
+  },
+  "negative_controls": [
+    "replace a U(1)-conserving gate with an unrestricted Haar U(4) gate",
+    "apply a gate to a previously emitted radiation qubit",
+    "prepare a state with support outside the declared excitation sector",
+    "renormalize an evolved state after a deliberately non-unitary perturbation",
+    "report a Page-island or Hawking result from this circuit"
+  ],
+  "required_receipt": {
+    "fields": [
+      "source_sha",
+      "branch",
+      "seed",
+      "compiler_version",
+      "target_triple",
+      "cargo_options",
+      "sample_count",
+      "state_norm_drift",
+      "charge_drift",
+      "charge_variance",
+      "S_R_by_step",
+      "S_B_by_step",
+      "complementarity_residual_by_step",
+      "runtime",
+      "peak_memory"
+    ],
+    "ci_policy": "queued, missing, or skipped checks are not passes"
+  }
+}
