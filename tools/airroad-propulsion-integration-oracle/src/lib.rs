@@ -104,11 +104,6 @@ struct CoreResult {
     motor_shaft_evidence: MotorShaftCoordinateMapEvidence,
     #[cfg(test)]
     drive_config: MotorShaftDemandConfig,
-    #[cfg(test)]
-    drive_input: DriveInput,
-    #[cfg(test)]
-    transmission: TransmissionKinematics,
-    rotor_shaft_power_w: f64,
     transmission_loss_w: f64,
     duration_s: f64,
     drive_envelope: MotorShaftDemandEnvelope,
@@ -322,11 +317,6 @@ fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationErro
         motor_shaft_evidence,
         #[cfg(test)]
         drive_config,
-        #[cfg(test)]
-        drive_input,
-        #[cfg(test)]
-        transmission,
-        rotor_shaft_power_w,
         transmission_loss_w,
         duration_s: drive_input.duration_s,
         drive_envelope,
@@ -583,6 +573,8 @@ mod tests {
         );
         assert!(report.motor_observation.torque_absolute_uncertainty_nm > 0.0);
         assert!(report.motor_observation.speed_absolute_uncertainty_rpm > 0.0);
+        let core = build_core(100_000.0).unwrap();
+        assert_eq!(core.coordinate_envelope.intersected_cells.len(), 1);
     }
 
     #[test]
@@ -593,7 +585,7 @@ mod tests {
         let torque_lower = torque - core.observation.torque_absolute_uncertainty_nm;
         let torque_upper = torque + core.observation.torque_absolute_uncertainty_nm;
         let speed_lower = speed - core.observation.speed_absolute_uncertainty_rpm;
-        let speed_upper = speed + core.observation.speed_absolute_speed_bound_rpm;
+        let speed_upper = speed + core.observation.speed_absolute_uncertainty_rpm;
         let crossing_map = EfficiencyMap2D::new(
             "synthetic-crossing-map",
             "synthetic-crossing-map-digest",
