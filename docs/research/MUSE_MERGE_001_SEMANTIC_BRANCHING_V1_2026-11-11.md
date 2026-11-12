@@ -366,6 +366,43 @@ Keep all scores separate. A system can be an excellent generator and a poor edit
 - Qualify output through #9044 / #11389.
 - Calibrate merge explanations and preservation reports with blinded musicians under #9184.
 
+## 13.1 Initial reference evaluator authored (12 November 2026)
+
+A bounded standard-library-only Rust reference preflight evaluator is now authored at:
+
+- `tools/mel-muse-merge/Cargo.toml`
+- `tools/mel-muse-merge/src/lib.rs`
+- `tools/mel-muse-merge/README.md`
+- `.github/workflows/muse-merge-reference.yml`
+
+The crate declares its own nested Cargo workspace so it can be built independently of the large parent workspace. It exposes explicit enums for authority, artifact integrity, intent, transaction state, merge outcome and stable reason codes. Its input is a declared patch footprint: stable targets, reads, writes, musical dependency keys, authorization state, integrity state and revalidation requirements.
+
+The initial implementation covers:
+- exact same-key idempotent replay as reuse of an existing result, not a second mutation;
+- stale base/branch-head rejection;
+- missing/revoked authority rejection and unknown authority abstention;
+- artifact digest mismatch and unknown-evidence abstention;
+- direct write/write conflicts;
+- read/write dependency conflicts;
+- cross-part musical dependency conflicts;
+- human escalation for two valid alternative proposals;
+- revalidation-required candidate outcomes for stale performance receipts or changed projections;
+- an explicit registry for operation pairs qualified by a separate proof/test suite;
+- no commit authority in any preflight result.
+
+**20 Rust unit tests are authored**, including tests corresponding to the 15 frozen fixture IDs, symmetry checks, qualified-operation-pair handling, manifest ID/outcome consistency, unknown authority and unavailable-revalidation controls.
+
+The 15-case JSON fixture manifest now carries the evaluator's decision inputs, and its Draft 2020-12 schema has been extended accordingly.
+
+### Validation boundary
+
+- The five crate/workflow files and the updated fixture/schema have been committed and read back from the dedicated research branch.
+- The Rust crate has no external dependencies; its Cargo lockfile contains only the package itself.
+- No local Cargo/rustc/rustfmt is available in the current authoring environment.
+- The exact-head workflow is queued; compilation, formatting, tests and Clippy are **not yet claimed as passed**.
+- The test harness currently checks manifest case IDs and declared outcomes by text inclusion; it does not deserialize or execute the JSON cases. The Rust unit tests construct their typed counterparts directly.
+- A SafeAutomaticMerge result means only that the declared footprint preflight found no conflict. It never authorizes a commit. Actual patch application, both-order result equivalence, invariant checking, durable compare-and-set, commit and independent replay remain future stages.
+
 ## 14. Claim ceiling
 
 This programme may establish that a declared set of musical edit operations can be merged with deterministic, replayable preservation and conflict guarantees under stated assumptions.
