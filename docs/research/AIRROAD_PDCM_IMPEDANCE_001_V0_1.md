@@ -82,6 +82,65 @@ lambda_{pm}=rac{-7pmsqrt{57}}4
 
 Since (sqrt{57}>7), the larger root is positive. The complete coupled system is therefore small-signal unstable, despite each converter branch being locally stable against a stiff bus.
 
+## Frequency-domain source/load view
+
+The same linearization can be expressed as an exact source/load impedance interconnection.
+
+Let (h_i=P_i/\bar V_i^2) denote the magnitude of the constant-power load's negative incremental conductance at its equilibrium. With the bus voltage (\hat v_0) treated as the perturbation input to branch (i), the branch equations give:
+
+\[
+\frac{\hat v_i}{\hat v_0}=\frac{G_i}{C_i s+G_i-h_i}
+\]
+
+and the current drawn from the bus is:
+
+\[
+\hat i_i=G_i(\hat v_0-\hat v_i)
+\]
+
+so the branch input admittance is:
+
+\[
+Y_i(s)=\frac{\hat i_i}{\hat v_0}
+=G_i\frac{C_i s-h_i}{C_i s+G_i-h_i}
+\]
+
+The source and common bus capacitor have Thevenin impedance:
+
+\[
+Z_s(s)=\frac{1}{G_s+C_0s}
+\]
+
+With the sign convention that positive branch current is drawn from the bus, the common-mode return ratio is:
+
+\[
+L(s)=Z_s(s)\left(Y_1(s)+Y_2(s)\right)
+\]
+
+and the closed-loop characteristic condition is (1+L(s)=0).
+
+For the frozen symmetric case, (G_s=G_1=G_2=C_0=C_1=C_2=1) and (h_1=h_2=1/2). Therefore:
+
+\[
+Z_s(s)=\frac{1}{s+1},\qquad
+Y_1(s)=Y_2(s)=\frac{s-1/2}{s+1/2}
+\]
+
+\[
+L(s)=\frac{2(s-1/2)}{(s+1)(s+1/2)}
+\]
+
+The closed-loop characteristic polynomial is:
+
+\[
+(s+1)(s+1/2)+2(s-1/2)
+=s^2+\frac72s-\frac12
+\]
+
+which has the positive root ((-7+\sqrt{57})/4). This reproduces the common-mode instability obtained from the exact Jacobian.
+
+This is a symmetric SISO common-mode reduction of this particular two-branch network. It does not establish a general scalar impedance criterion for asymmetric branches or a multi-port network. Those cases require a frozen port/sign convention and an independently checked MIMO return-ratio or full state-space formulation.
+
 The full characteristic polynomial is:
 
 [
