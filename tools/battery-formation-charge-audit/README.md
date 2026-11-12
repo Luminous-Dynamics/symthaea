@@ -2,7 +2,7 @@
 
 Dependency-free Rust reference auditor for factorial formation/charging campaign manifests.
 
-It checks exact design/formation/charge identities, full factor-pair coverage, reference-arm identity, cell/lot/line uniqueness, declared holdout-group isolation, prediction-time cutoff, right-censoring/competing-failure semantics and evidence-class/metrology requirements.
+It checks exact design/formation/charge identities, full factor-pair coverage per design revision, one reference arm per design, complete treatment arms in each declared lot/line block, cell/lot/line uniqueness, typed holdout-group isolation, per-feature observation-cycle/evidence receipts, right-censoring/competing-failure semantics and evidence-class/metrology requirements.
 
 ## Run from repository root
 
