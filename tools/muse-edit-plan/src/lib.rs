@@ -140,12 +140,23 @@ pub struct ObservationRequirement {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TargetRegion {
+    /// Semantic entities to be changed, e.g. a stem, track, voice or event set.
+    pub target_ids: BTreeSet<String>,
+    /// Optional half-open sample-frame interval [start, end).
+    pub start_sample: Option<u64>,
+    pub end_sample_exclusive: Option<u64>,
+    pub scope: MutationScope,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EditStageRequest {
     pub stage_id: String,
     pub operation_id: String,
     pub inputs: Vec<InputBinding>,
     pub output_artifact_type: String,
     pub modality: Modality,
+    pub target_region: TargetRegion,
     pub maximum_permitted_mutation_scope: MutationScope,
     pub required_capabilities: BTreeSet<String>,
     pub protected_properties: BTreeSet<String>,
@@ -193,6 +204,10 @@ pub struct OperatorProfile {
     pub output_artifact_type: String,
     pub capabilities: BTreeSet<String>,
     pub maximum_mutation_scope: MutationScope,
+    /// Whether the adapter can confine changes to requested semantic entity IDs.
+    pub supports_target_ids: bool,
+    /// Whether the adapter can confine changes to an exact half-open sample-frame interval.
+    pub supports_sample_range: bool,
     pub preservation_guarantees: BTreeSet<String>,
     pub emitted_receipts: BTreeSet<String>,
     pub supported_preconditions: BTreeSet<String>,
@@ -337,6 +352,7 @@ pub struct PlanNode {
     pub kind: PlanNodeKind,
     pub depends_on: Vec<String>,
     pub stage_id: Option<String>,
+    pub target_region: Option<TargetRegion>,
     pub profile: Option<ProfileIdentity>,
     pub profile_independence_group: Option<String>,
     pub input_artifact_types: Vec<String>,
@@ -417,11 +433,12 @@ impl CompiledPlan {
             let postconditions = join_atoms(&node.postconditions.iter().cloned().collect::<Vec<_>>());
             let receipts = join_atoms(&node.receipt_obligations.iter().cloned().collect::<Vec<_>>());
             lines.push(format!(
-                "node\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                "node\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}\\t{}",
                 atom(&node.node_id),
                 node.kind.label(),
                 join_atoms(&node.depends_on),
                 stage,
+                node.target_region.as_ref().map(canonical_target_region).map(|value| atom(&value)).unwrap_or_default(),
                 profile,
                 node.profile_independence_group.as_deref().map(atom).unwrap_or_default(),
                 input_types,
@@ -453,6 +470,16 @@ fn atom(value: &str) -> String {
 
 fn join_atoms(values: &[String]) -> String {
     values.iter().map(|value| atom(value)).collect::<Vec<_>>().join(",")
+}
+
+fn canonical_target_region(region: &TargetRegion) -> String {
+    format!(
+        "{}:{}:{}:{}",
+        region.scope.label(),
+        join_atoms(&region.target_ids.iter().cloned().collect::<Vec<_>>()),
+        region.start_sample.map(|value| value.to_string()).unwrap_or_default(),
+        region.end_sample_exclusive.map(|value| value.to_string()).unwrap_or_default()
+    )
 }
 
 fn valid_identifier(value: &str) -> bool {
@@ -549,6 +576,33 @@ fn validate_request(request: &EditRequest) -> Result<(), CompileError> {
                 "stage {} has no typed inputs",
                 stage.stage_id
             )));
+        }
+        if stage.target_region.target_ids.is_empty()
+            && stage.target_region.start_sample.is_none()
+            && stage.target_region.end_sample_exclusive.is_none()
+        {
+            return Err(CompileError::InvalidRequest(format!(
+                "stage {} must specify target IDs or a sample-frame interval",
+                stage.stage_id
+            )));
+        }
+        if stage.target_region.target_ids.iter().any(|id| !valid_identifier(id))
+            || stage.target_region.scope > stage.maximum_permitted_mutation_scope
+        {
+            return Err(CompileError::InvalidRequest(format!(
+                "stage {} has an invalid target region or exceeds its scope ceiling",
+                stage.stage_id
+            )));
+        }
+        match (stage.target_region.start_sample, stage.target_region.end_sample_exclusive) {
+            (Some(start), Some(end)) if start < end => {}
+            (None, None) => {}
+            _ => {
+                return Err(CompileError::InvalidRequest(format!(
+                    "stage {} must use a valid half-open sample interval",
+                    stage.stage_id
+                )));
+            }
         }
         let identifier_sets = [
             &stage.required_capabilities,
@@ -818,6 +872,12 @@ fn operator_compatibility_reasons(
             stage.maximum_permitted_mutation_scope.label()
         ));
     }
+    if !stage.target_region.target_ids.is_empty() && !profile.supports_target_ids {
+        reasons.push("operator cannot confine edits to requested target IDs".to_string());
+    }
+    if stage.target_region.start_sample.is_some() && !profile.supports_sample_range {
+        reasons.push("operator cannot confine edits to the requested sample range".to_string());
+    }
     if !profile.preservation_guarantees.is_superset(&stage.protected_properties) {
         reasons.push("protected-property guarantee is missing".to_string());
     }
@@ -1044,6 +1104,11 @@ fn canonical_request_contract(request: &EditRequest) -> String {
             stage.maximum_permitted_mutation_scope.label(),
             stage.reproducibility_seed.map(|seed| seed.to_string()).unwrap_or_default()
         ));
+        lines.push(format!(
+            "target_region\t{}\t{}",
+            atom(&stage.stage_id),
+            atom(&canonical_target_region(&stage.target_region))
+        ));
 
         let mut inputs = stage.inputs;
         inputs.sort_by(|a, b| a.input_id.cmp(&b.input_id));
@@ -1227,6 +1292,7 @@ pub fn compile_plan(
             kind: PlanNodeKind::VerifySource,
             depends_on: Vec::new(),
             stage_id: None,
+            target_region: None,
             profile: None,
             profile_independence_group: None,
             input_artifact_types: vec![source.artifact_type.clone()],
@@ -1276,6 +1342,7 @@ pub fn compile_plan(
             kind: PlanNodeKind::Mutate,
             depends_on: dependencies.into_iter().collect(),
             stage_id: Some(stage_id.clone()),
+            target_region: Some(stage.target_region.clone()),
             profile: Some(operator.identity.clone()),
             profile_independence_group: Some(operator.independence_group.clone()),
             input_artifact_types: input_types,
@@ -1313,6 +1380,7 @@ pub fn compile_plan(
                 kind: PlanNodeKind::Observe,
                 depends_on: vec![node_id.clone()],
                 stage_id: Some(stage_id.clone()),
+                target_region: None,
                 profile: Some(observer.identity.clone()),
                 profile_independence_group: Some(observer.independence_group.clone()),
                 input_artifact_types: vec![stage.output_artifact_type.clone()],
@@ -1338,6 +1406,7 @@ pub fn compile_plan(
             kind: PlanNodeKind::StageQualification,
             depends_on: stage_gate_dependencies.into_iter().collect(),
             stage_id: Some(stage_id.clone()),
+            target_region: Some(stage.target_region.clone()),
             profile: None,
             profile_independence_group: None,
             input_artifact_types: vec![stage.output_artifact_type.clone()],
@@ -1366,6 +1435,7 @@ pub fn compile_plan(
         kind: PlanNodeKind::FinalQualification,
         depends_on: final_dependencies.into_iter().collect(),
         stage_id: None,
+        target_region: None,
         profile: None,
         profile_independence_group: None,
         input_artifact_types: vec!["candidate_artifact_and_evidence_set".to_string()],
@@ -1493,6 +1563,8 @@ mod tests {
             output_artifact_type: "audio/wav".to_string(),
             capabilities: BTreeSet::from(["stem_isolation".to_string()]),
             maximum_mutation_scope: scope,
+            supports_target_ids: true,
+            supports_sample_range: true,
             preservation_guarantees: BTreeSet::from(["non_target_stems".to_string()]),
             emitted_receipts: BTreeSet::from(["render_execution_receipt".to_string()]),
             supported_preconditions: BTreeSet::from(["source_digest_verified".to_string()]),
@@ -1542,6 +1614,12 @@ mod tests {
             }],
             output_artifact_type: "audio/wav".to_string(),
             modality: Modality::Music,
+            target_region: TargetRegion {
+                target_ids: BTreeSet::from(["stem:vocals".to_string()]),
+                start_sample: None,
+                end_sample_exclusive: None,
+                scope: MutationScope::Stem,
+            },
             maximum_permitted_mutation_scope: MutationScope::Stem,
             required_capabilities: BTreeSet::from(["stem_isolation".to_string()]),
             protected_properties: BTreeSet::from(["non_target_stems".to_string()]),
@@ -1601,6 +1679,33 @@ mod tests {
     }
 
     #[test]
+    #[test]
+    fn rejects_operator_without_exact_target_id_locality() {
+        let mut registry = registry();
+        registry.operators[0].supports_target_ids = false;
+        assert!(matches!(compile_plan(&request(), &registry), Err(CompileError::Unsupported { .. })));
+    }
+
+    #[test]
+    fn rejects_operator_without_sample_range_locality() {
+        let mut request = request();
+        request.stages[0].target_region.start_sample = Some(1_000);
+        request.stages[0].target_region.end_sample_exclusive = Some(9_000);
+        let mut registry = registry();
+        registry.operators[0].supports_sample_range = false;
+        assert!(matches!(compile_plan(&request, &registry), Err(CompileError::Unsupported { .. })));
+    }
+
+    #[test]
+    fn exact_target_region_is_bound_into_canonical_manifest() {
+        let first = compile_plan(&request(), &registry()).unwrap();
+        let mut changed = request();
+        changed.stages[0].target_region.target_ids =
+            BTreeSet::from(["stem:drums".to_string()]);
+        let second = compile_plan(&changed, &registry()).unwrap();
+        assert_ne!(first.canonical_manifest(), second.canonical_manifest());
+    }
+
     fn rejects_an_operator_that_can_mutate_a_broader_scope() {
         let mut registry = registry();
         registry.operators[0].maximum_mutation_scope = MutationScope::Track;
