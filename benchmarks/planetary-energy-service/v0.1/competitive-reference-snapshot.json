@@ -117,6 +117,13 @@
       "url": "https://www.nature.com/articles/s44453-026-00053-w",
       "source_class": "peer_reviewed_review",
       "published_year": 2026
+    },
+    {
+      "reference_id": "moonglass-perovskite-device-2025",
+      "source": "Moon photovoltaics utilizing lunar regolith and halide perovskites, Device 3 (2025), 100747",
+      "url": "https://doi.org/10.1016/j.device.2025.100747",
+      "source_class": "peer_reviewed_experimental_and_modelled_study",
+      "published_year": 2025
     }
   ],
   "metrics": [
@@ -461,6 +468,88 @@
         "Not an independently verified complete lunar-installed-system value.",
         "Confirm whether tanks, insulation, electrolyzer, fuel cell, fluid, thermal management, controls and service life are included.",
         "The review notes unresolved durability and long-duration lunar operation."
+      ]
+    },
+    {
+      "metric_id": "moonglass-perovskite-am0-pce-superstrate",
+      "metric": "AM0_power_conversion_efficiency",
+      "unit": "percent",
+      "value": {
+        "low": 8.5,
+        "high": 8.6
+      },
+      "boundary": "Experimental halide-perovskite cell on 2-mm anorthositic-regolith-derived moonglass, superstrate configuration",
+      "evidence_class": "peer_reviewed_experimental_study",
+      "reference_id": "moonglass-perovskite-device-2025",
+      "caveats": [
+        "Research cell, not module or deployed array; performance is limited by moonglass optical absorption and contact resistance."
+      ]
+    },
+    {
+      "metric_id": "moonglass-perovskite-am0-pce-izo",
+      "metric": "AM0_power_conversion_efficiency",
+      "unit": "percent",
+      "value": 12.1,
+      "boundary": "Experimental perovskite cell on anorthositic-regolith-derived moonglass using IZO substrate configuration",
+      "evidence_class": "peer_reviewed_experimental_study",
+      "reference_id": "moonglass-perovskite-device-2025",
+      "caveats": [
+        "Research cell result; contact layers were not fully optimized and it is not a module or lunar-qualified product."
+      ]
+    },
+    {
+      "metric_id": "moonglass-perovskite-proton-retention",
+      "metric": "initial_efficiency_retention_after_proton_irradiation",
+      "unit": "percent",
+      "value": 99.6,
+      "boundary": "Moonglass-based perovskite cell after exposure to 2 × 10^12 68-MeV protons/cm²",
+      "evidence_class": "peer_reviewed_experimental_study",
+      "reference_id": "moonglass-perovskite-device-2025",
+      "caveats": [
+        "Specific irradiation species, energy and dose; not a complete lunar radiation lifetime or operational stability qualification."
+      ]
+    },
+    {
+      "metric_id": "moonglass-perovskite-thin-glass-pce-projection",
+      "metric": "AM0_power_conversion_efficiency",
+      "unit": "percent",
+      "value": {
+        "low": 21.5,
+        "high": 22.7
+      },
+      "boundary": "Modelled projection for approximately 0.1-mm moonglass and improved transport layers/interfaces",
+      "evidence_class": "peer_reviewed_model_projection",
+      "reference_id": "moonglass-perovskite-device-2025",
+      "caveats": [
+        "Simulated/projected performance, not an experimentally demonstrated device."
+      ]
+    },
+    {
+      "metric_id": "moonglass-lunar-transport-mass-saving",
+      "metric": "material_transport_mass_reduction",
+      "unit": "percent",
+      "value": 99,
+      "boundary": "Study's proposed lunar manufacturing scenario comparing moonglass/perovskite with Earth-supplied conventional PV material transport",
+      "evidence_class": "peer_reviewed_scenario_estimate",
+      "reference_id": "moonglass-perovskite-device-2025",
+      "caveats": [
+        "Author-reported scenario estimate; reproduce the imported-material inventory and include process equipment, tools, spares, deployment and lifetime replacement before using as a complete system result."
+      ]
+    },
+    {
+      "metric_id": "moonglass-perovskite-launched-mass-specific-power",
+      "metric": "power_per_launched_mass",
+      "unit": "W/g",
+      "value": {
+        "low": 22,
+        "high": 50
+      },
+      "boundary": "Study-calculated power-per-launched-mass ratio for its proposed lunar moonglass/perovskite concept",
+      "evidence_class": "peer_reviewed_scenario_estimate",
+      "reference_id": "moonglass-perovskite-device-2025",
+      "caveats": [
+        "This is a launched-mass boundary estimate, not measured module/array W/kg or complete installed plant specific power.",
+        "The estimate depends on local regolith processing and imported precursor assumptions; do not compare directly with spacecraft-array W/kg without matching boundaries."
       ]
     }
   ]
