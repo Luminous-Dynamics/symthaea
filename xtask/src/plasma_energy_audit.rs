@@ -460,6 +460,9 @@ fn evaluate_scenario(scenario: &ThermalScenario) -> ScenarioResult {
     {
         return reject("post-hold energy does not close to useful delivered heat plus discharge loss");
     }
+    if discharge.useful_heat_delivered_j == 0 {
+        return reject("positive-duration heat service cannot PASS with zero useful heat delivered");
+    }
 
     let Some(all_losses_j) = charge
         .charge_conversion_loss_j
@@ -1061,6 +1064,38 @@ mod tests {
     }
 
     #[test]
+    fn zero_useful_heat_cannot_pass_a_positive_duration_service() {
+        let mut scenario = base_scenario();
+        scenario.discharge.useful_heat_delivered_j = 0;
+        scenario.discharge.discharge_loss_j = scenario.discharge.stored_energy_withdrawn_j;
+        assert_eq!(
+            evaluate_scenario(&scenario).disposition,
+            ScenarioDisposition::Rejected
+        );
+    }
+
+    #[test]
+    fn source_manifest_rejects_http_scheme_without_authority() {
+        let source = serde_json::json!({
+            "programme": "TEST",
+            "claim_ceiling": "SOURCE_ONLY",
+            "evidence_classes": ["PUBLISHED_LAB_EXPERIMENT"],
+            "cases": [{
+                "case_id": "case-1",
+                "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+                "luminous_reproduction": false,
+                "source": {"url": "https://"}
+            }],
+            "negative_controls": [{
+                "control_id": "nc-1",
+                "expected_disposition": "REJECTED"
+            }]
+        });
+        let error = audit_source_value(&source, "invalid-source-url.json").unwrap_err();
+        assert!(error.to_string().contains("non-empty authority"));
+    }
+
+    #[test]
     fn source_manifest_rejects_missing_source_url() {
         let source = serde_json::json!({
             "programme": "TEST",
@@ -1080,6 +1115,23 @@ mod tests {
         let error = audit_source_value(&source, "test.json").unwrap_err();
         assert!(error.to_string().contains("valid HTTP(S) source URL"));
     }
+}
+
+fn has_http_authority(url: &str) -> bool {
+    if url.trim() != url {
+        return false;
+    }
+    let Some(remainder) = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))
+    else {
+        return false;
+    };
+    let authority = remainder
+        .split(|character| character == '/' || character == '?' || character == '#')
+        .next()
+        .unwrap_or_default();
+    !authority.is_empty() && !authority.chars().any(char::is_whitespace)
 }
 
 fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifestSummary> {
@@ -1152,8 +1204,8 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             .get("source")
             .and_then(|source| source.get("url"))
             .and_then(Value::as_str)
-            .filter(|url| url.starts_with("https://") || url.starts_with("http://"))
-            .with_context(|| format!("{display_name}: case {case_id} has no valid HTTP(S) source URL"))?;
+            .filter(|url| has_http_authority(url))
+            .with_context(|| format!("{display_name}: case {case_id} has no valid HTTP(S) source URL with a non-empty authority"))?;
         ensure!(!source_url.trim().is_empty(), "{display_name}: case {case_id} has empty source URL");
 
         if case.get("lane").and_then(Value::as_str) == Some("FUSION_DIRECT_ENERGY_CONVERSION") {
