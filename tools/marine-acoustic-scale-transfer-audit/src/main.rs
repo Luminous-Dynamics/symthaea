@@ -1027,8 +1027,8 @@ mod tests {
         let digest = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
         let mut pairs = Vec::new();
         for (index, (model_rpm, full_rpm, model_frequency, full_frequency, total, background, measured)) in [
-            (20.0, 1.0, 200.0, 10.0, 110.0, 100.0, 115.56242509439325),
-            (22.0, 1.1, 220.0, 11.0, 111.0, 101.0, 116.56242509439325),
+            (20.0, 1.0, 200.0, 10.0, 109.9, 100.0, 115.45177041730598),
+            (22.0, 1.1, 220.0, 11.0, 110.9, 101.0, 116.45177041730598),
         ]
         .into_iter()
         .enumerate()
@@ -1278,7 +1278,7 @@ mod tests {
     #[test]
     fn background_correction_uses_linear_energy_subtraction() {
         let corrected = ittc_cavitation_spl(109.9, 100.0).unwrap();
-        assert!((corrected - 109.5468).abs() < 0.001);
+        assert!((corrected - 109.43117050402635).abs() < 1e-9);
         let at_three_db = ittc_cavitation_spl(103.0, 100.0).unwrap();
         assert!(at_three_db < 103.0);
         assert_eq!(ittc_cavitation_spl(110.0001, 100.0), Ok(110.0001));
