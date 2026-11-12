@@ -356,15 +356,16 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "measurement_id",
-        "method_id",
-        "instrument_id",
+        "bins",
         "calibration_certificate_sha256",
         "evidence_sha256",
-        "sample_volume_ml",
+        "expanded_uncertainty_confidence_level",
+        "instrument_id",
+        "measurement_id",
+        "method_id",
         "number_concentration_equivalence_tolerance_per_ml",
-        "wasserstein1_equivalence_tolerance_um",
-        "bins"
+        "sample_volume_ml",
+        "wasserstein1_equivalence_tolerance_um"
       ],
       "properties": {
         "measurement_id": {
@@ -403,6 +404,11 @@
           "items": {
             "$ref": "#/$defs/nucleiBin"
           }
+        },
+        "expanded_uncertainty_confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
         }
       }
     },
