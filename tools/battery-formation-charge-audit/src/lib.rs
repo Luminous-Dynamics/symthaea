@@ -543,7 +543,16 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
     let mut line_digests = BTreeMap::new();
     let mut split_by_group = BTreeMap::<HoldoutGroup, DataSplit>::new();
     let mut used_holdout_groups = BTreeSet::<HoldoutGroup>::new();
-    let mut arms_by_block = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut expected_arms_by_design =
+        BTreeMap::<(String, String), BTreeSet<String>>::new();
+    let mut arms_by_design_block =
+        BTreeMap::<(String, String, String), BTreeSet<String>>::new();
+    for arm in &manifest.arms {
+        expected_arms_by_design
+            .entry((arm.design_id.clone(), arm.design_revision.clone()))
+            .or_default()
+            .insert(arm.arm_id.clone());
+    }
     let mut observed_eol_count = 0;
     let mut right_censored_count = 0;
     let mut competing_failure_count = 0;
@@ -590,6 +599,7 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
             require_nonempty(&feature.feature_id, "feature ID")?;
             if feature.available_cycle == 0
                 || feature.available_cycle > cell.feature_cutoff_cycle
+                || feature.available_cycle > cell.cycles_observed
             {
                 return Err(AuditError(format!(
                     "cell {} feature {} was not available by its declared prediction cutoff",
@@ -663,8 +673,12 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
             BlockAxis::Lot => cell.lot_id.clone(),
             BlockAxis::Line => cell.line_id.clone(),
         };
-        arms_by_block
-            .entry(block_id)
+        arms_by_design_block
+            .entry((
+                cell.design_id.clone(),
+                cell.design_revision.clone(),
+                block_id,
+            ))
             .or_default()
             .insert(cell.arm_id.clone());
 
@@ -707,12 +721,19 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         }
     }
 
-    let expected_arm_ids: BTreeSet<String> =
-        manifest.arms.iter().map(|arm| arm.arm_id.clone()).collect();
-    for (block_id, block_arm_ids) in &arms_by_block {
-        if block_arm_ids != &expected_arm_ids {
+    for ((design_id, design_revision, block_id), block_arm_ids) in
+        &arms_by_design_block
+    {
+        let expected_arm_ids = expected_arms_by_design
+            .get(&(design_id.clone(), design_revision.clone()))
+            .ok_or_else(|| {
+                AuditError(format!(
+                    "block {block_id} has unknown design {design_id}@{design_revision}"
+                ))
+            })?;
+        if block_arm_ids != expected_arm_ids {
             return Err(AuditError(format!(
-                "block {block_id} does not contain the full protocol-arm set"
+                "block {block_id} for design {design_id}@{design_revision} does not contain the full protocol-arm set"
             )));
         }
     }
@@ -753,7 +774,7 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         cell_count: manifest.cells.len(),
         lot_count: lot_digests.len(),
         line_count: line_digests.len(),
-        block_count: arms_by_block.len(),
+        block_count: arms_by_design_block.len(),
         holdout_group_count: used_holdout_groups.len(),
         observed_eol_count,
         right_censored_count,
@@ -936,6 +957,33 @@ mod tests {
             cell
         });
         assert!(audit_campaign(&value).is_err());
+    }
+
+    #[test]
+    fn different_designs_can_have_complete_arm_sets_in_separate_blocks() {
+        let mut value = fixture();
+        let mut second_arms = value.arms.clone();
+        let original_arms = second_arms.clone();
+        for arm in &mut second_arms {
+            arm.arm_id = format!("design-b-{}", arm.arm_id);
+            arm.design_id = "CELL-DESIGN-B".into();
+            arm.design_revision = "r1".into();
+        }
+        let mut second_cells = Vec::new();
+        for (index, original) in original_arms.iter().enumerate() {
+            let mut cell = value.cells[index].clone();
+            cell.cell_id = format!("CELL-B-{:03}", index + 1);
+            cell.arm_id = format!("design-b-{}", original.arm_id);
+            cell.design_id = "CELL-DESIGN-B".into();
+            cell.design_revision = "r1".into();
+            cell.lot_id = "LOT-D".into();
+            cell.lot_lineage_digest = digest('8');
+            cell.split = DataSplit::Prospective;
+            second_cells.push(cell);
+        }
+        value.arms.extend(second_arms);
+        value.cells.extend(second_cells);
+        assert!(audit_campaign(&value).is_ok());
     }
 
     #[test]
