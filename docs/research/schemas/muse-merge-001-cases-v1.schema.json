@@ -159,7 +159,8 @@
         "requires_render_revalidation",
         "base_matches",
         "commit_state",
-        "revalidation_available"
+        "revalidation_available",
+        "idempotency_replay_verified"
       ],
       "properties": {
         "id": {
@@ -212,6 +213,9 @@
           ]
         },
         "revalidation_available": {
+          "type": "boolean"
+        },
+        "idempotency_replay_verified": {
           "type": "boolean"
         }
       }
