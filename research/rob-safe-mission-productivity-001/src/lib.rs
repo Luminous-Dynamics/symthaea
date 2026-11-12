@@ -102,9 +102,7 @@ pub struct ScorecardContract {
 
 impl ScorecardContract {
     pub fn validate(self) -> Result<(), EvaluationError> {
-        if self.minimum_causal_closure_ppm == 0
-            || self.minimum_causal_closure_ppm > 1_000_000
-        {
+        if self.minimum_causal_closure_ppm == 0 || self.minimum_causal_closure_ppm > 1_000_000 {
             return Err(EvaluationError::InvalidClosureThreshold(
                 self.minimum_causal_closure_ppm,
             ));
@@ -188,12 +186,16 @@ fn nonempty(value: &str, field: &'static str) -> Result<(), EvaluationError> {
 }
 
 fn checked_add(target: &mut u64, value: u64) -> Result<(), EvaluationError> {
-    *target = target.checked_add(value).ok_or(EvaluationError::MetricOverflow)?;
+    *target = target
+        .checked_add(value)
+        .ok_or(EvaluationError::MetricOverflow)?;
     Ok(())
 }
 
 fn checked_add_u128(target: &mut u128, value: u128) -> Result<(), EvaluationError> {
-    *target = target.checked_add(value).ok_or(EvaluationError::MetricOverflow)?;
+    *target = target
+        .checked_add(value)
+        .ok_or(EvaluationError::MetricOverflow)?;
     Ok(())
 }
 
@@ -209,10 +211,7 @@ fn closure_ppm(examined: u64, closed: u64) -> Option<u32> {
     ppm(closed, examined)
 }
 
-fn closure_is_qualified(
-    trial: &MissionTrial,
-    minimum_causal_closure_ppm: u32,
-) -> bool {
+fn closure_is_qualified(trial: &MissionTrial, minimum_causal_closure_ppm: u32) -> bool {
     trial.actuator_applications_examined > 0
         && trial.actuator_applications_linked == trial.actuator_applications_examined
         && ppm(
@@ -226,10 +225,7 @@ fn physical_safe_success(trial: &MissionTrial) -> bool {
     trial.task_completed && trial.terminal_safe && !trial.hard_safety_violation
 }
 
-fn evidence_qualified_safe_success(
-    trial: &MissionTrial,
-    contract: ScorecardContract,
-) -> bool {
+fn evidence_qualified_safe_success(trial: &MissionTrial, contract: ScorecardContract) -> bool {
     physical_safe_success(trial)
         && trial.thermal_evidence == EvidenceState::Qualified
         && trial.recovery_evidence == EvidenceState::Qualified
@@ -264,9 +260,15 @@ fn validate_trial(
         ("workload_digest", trial.identity.workload_digest.as_str()),
         ("scenario_digest", trial.identity.scenario_digest.as_str()),
         ("seed_id", trial.identity.seed_id.as_str()),
-        ("initial_state_digest", trial.identity.initial_state_digest.as_str()),
+        (
+            "initial_state_digest",
+            trial.identity.initial_state_digest.as_str(),
+        ),
         ("model_digest", trial.identity.model_digest.as_str()),
-        ("control_policy_digest", trial.identity.control_policy_digest.as_str()),
+        (
+            "control_policy_digest",
+            trial.identity.control_policy_digest.as_str(),
+        ),
         ("hardware_digest", trial.identity.hardware_digest.as_str()),
         (
             "observation_budget_digest",
@@ -280,10 +282,14 @@ fn validate_trial(
         nonempty(value, name)?;
     }
     if !mission_ids.insert(trial.mission_id.clone()) {
-        return Err(EvaluationError::DuplicateMissionId(trial.mission_id.clone()));
+        return Err(EvaluationError::DuplicateMissionId(
+            trial.mission_id.clone(),
+        ));
     }
     if !pair_ids.insert(trial.identity.pair_id.clone()) {
-        return Err(EvaluationError::DuplicatePairId(trial.identity.pair_id.clone()));
+        return Err(EvaluationError::DuplicatePairId(
+            trial.identity.pair_id.clone(),
+        ));
     }
     if trial.elapsed_ns == 0 {
         return Err(EvaluationError::InvalidDuration(trial.mission_id.clone()));
@@ -408,8 +414,7 @@ pub fn evaluate_fleet(
         let physical_safe = physical_safe_success(trial);
         let evidence_safe = evidence_qualified_safe_success(trial, contract);
         let slo = slo_qualified(trial, contract);
-        let starvation_breach =
-            trial.longest_starvation_ticks > trial.starvation_limit_ticks;
+        let starvation_breach = trial.longest_starvation_ticks > trial.starvation_limit_ticks;
 
         checked_add(&mut total.missions, 1)?;
         if trial.task_completed {
@@ -511,9 +516,7 @@ pub fn evaluate_fleet(
             trial.actuator_applications_causally_closed,
         )?;
 
-        let robot = robots
-            .entry(trial.identity.robot_id.clone())
-            .or_default();
+        let robot = robots.entry(trial.identity.robot_id.clone()).or_default();
         checked_add(&mut robot.missions, 1)?;
         if physical_safe {
             checked_add(&mut robot.physical_safe_successes, 1)?;
@@ -684,7 +687,9 @@ fn rate_delta(
 ) -> RateDelta {
     let baseline = ppm(baseline_count, baseline_total);
     let candidate = ppm(candidate_count, candidate_total);
-    let delta = baseline.zip(candidate).map(|(b, c)| i64::from(c) - i64::from(b));
+    let delta = baseline
+        .zip(candidate)
+        .map(|(b, c)| i64::from(c) - i64::from(b));
     RateDelta {
         baseline_ppm: baseline,
         candidate_ppm: candidate,
@@ -767,7 +772,9 @@ pub fn compare_fleet_arms(
         candidate_by_pair.insert(trial.identity.pair_id.as_str(), trial);
     }
     if baseline_by_pair.len() != candidate_by_pair.len() {
-        return Err(EvaluationError::PairSetMismatch("pair cardinality".to_owned()));
+        return Err(EvaluationError::PairSetMismatch(
+            "pair cardinality".to_owned(),
+        ));
     }
     for (pair_id, baseline_trial) in &baseline_by_pair {
         let Some(candidate_trial) = candidate_by_pair.get(pair_id) else {
@@ -838,46 +845,39 @@ pub fn compare_fleet_arms(
             c.causal_closure.applications_causally_closed,
             c.causal_closure.applications_examined,
         );
-        let class_noninferior = physical.delta_ppm.is_some_and(|d| {
-            d >= -(i64::from(comparison_contract.max_physical_safe_success_drop_ppm))
-        }) && slo.delta_ppm.is_some_and(|d| {
-            d >= -(i64::from(comparison_contract.max_slo_safe_success_drop_ppm))
-        }) && deadline.delta_ppm.is_some_and(|d| {
-            d <= i64::from(comparison_contract.max_deadline_miss_increase_ppm)
-        }) && hard.delta_ppm.is_some_and(|d| {
-            d <= i64::from(comparison_contract.max_hard_violation_increase_ppm)
-        }) && service.delta_ppm.is_some_and(|d| {
-            d <= i64::from(comparison_contract.max_service_floor_breach_increase_ppm)
-        }) && closure.delta_ppm.is_some_and(|d| {
-            d >= -(i64::from(comparison_contract.max_causal_closure_drop_ppm))
-        });
+        let class_noninferior =
+            physical.delta_ppm.is_some_and(|d| {
+                d >= -(i64::from(comparison_contract.max_physical_safe_success_drop_ppm))
+            }) && slo.delta_ppm.is_some_and(|d| {
+                d >= -(i64::from(comparison_contract.max_slo_safe_success_drop_ppm))
+            }) && deadline.delta_ppm.is_some_and(|d| {
+                d <= i64::from(comparison_contract.max_deadline_miss_increase_ppm)
+            }) && hard.delta_ppm.is_some_and(|d| {
+                d <= i64::from(comparison_contract.max_hard_violation_increase_ppm)
+            }) && service.delta_ppm.is_some_and(|d| {
+                d <= i64::from(comparison_contract.max_service_floor_breach_increase_ppm)
+            }) && closure.delta_ppm.is_some_and(|d| {
+                d >= -(i64::from(comparison_contract.max_causal_closure_drop_ppm))
+            });
         candidate_point_estimate_noninferior &= class_noninferior;
         let bp = b.work_units_per_gpu_hour_milli;
         let cp = c.work_units_per_gpu_hour_milli;
         let productivity_delta = bp.zip(cp).map(|(bv, cv)| i128::from(cv) - i128::from(bv));
         let br = b.work_units_per_robot_hour_milli;
         let cr = c.work_units_per_robot_hour_milli;
-        let robot_hour_delta = br
-            .zip(cr)
-            .map(|(bv, cv)| i128::from(cv) - i128::from(bv));
+        let robot_hour_delta = br.zip(cr).map(|(bv, cv)| i128::from(cv) - i128::from(bv));
         match (productivity_delta, robot_hour_delta) {
             (Some(gpu_delta), Some(robot_delta))
-                if gpu_delta >= 0
-                    && robot_delta >= 0
-                    && (gpu_delta > 0 || robot_delta > 0) =>
+                if gpu_delta >= 0 && robot_delta >= 0 && (gpu_delta > 0 || robot_delta > 0) =>
             {
                 productivity_improved_classes.push(class.clone());
             }
-            (Some(gpu_delta), Some(robot_delta))
-                if gpu_delta < 0 || robot_delta < 0 =>
-            {
+            (Some(gpu_delta), Some(robot_delta)) if gpu_delta < 0 || robot_delta < 0 => {
                 productivity_regressed_classes.push(class.clone());
             }
             _ => {}
         }
-        if productivity_delta.is_none_or(|d| d < 0)
-            || robot_hour_delta.is_none_or(|d| d < 0)
-        {
+        if productivity_delta.is_none_or(|d| d < 0) || robot_hour_delta.is_none_or(|d| d < 0) {
             point_estimate_pareto_dominates_productivity = false;
         }
         per_task_class.insert(
@@ -951,19 +951,20 @@ pub fn compare_fleet_arms(
             c.causal_closure.applications_causally_closed,
             c.causal_closure.applications_examined,
         );
-        let robot_ok = physical.delta_ppm.is_some_and(|d| {
-            d >= -(i64::from(comparison_contract.max_physical_safe_success_drop_ppm))
-        }) && slo.delta_ppm.is_some_and(|d| {
-            d >= -(i64::from(comparison_contract.max_slo_safe_success_drop_ppm))
-        }) && hard.delta_ppm.is_some_and(|d| {
-            d <= i64::from(comparison_contract.max_hard_violation_increase_ppm)
-        }) && deadline.delta_ppm.is_some_and(|d| {
-            d <= i64::from(comparison_contract.max_deadline_miss_increase_ppm)
-        }) && service.delta_ppm.is_some_and(|d| {
-            d <= i64::from(comparison_contract.max_service_floor_breach_increase_ppm)
-        }) && closure.delta_ppm.is_some_and(|d| {
-            d >= -(i64::from(comparison_contract.max_causal_closure_drop_ppm))
-        });
+        let robot_ok =
+            physical.delta_ppm.is_some_and(|d| {
+                d >= -(i64::from(comparison_contract.max_physical_safe_success_drop_ppm))
+            }) && slo.delta_ppm.is_some_and(|d| {
+                d >= -(i64::from(comparison_contract.max_slo_safe_success_drop_ppm))
+            }) && hard.delta_ppm.is_some_and(|d| {
+                d <= i64::from(comparison_contract.max_hard_violation_increase_ppm)
+            }) && deadline.delta_ppm.is_some_and(|d| {
+                d <= i64::from(comparison_contract.max_deadline_miss_increase_ppm)
+            }) && service.delta_ppm.is_some_and(|d| {
+                d <= i64::from(comparison_contract.max_service_floor_breach_increase_ppm)
+            }) && closure.delta_ppm.is_some_and(|d| {
+                d >= -(i64::from(comparison_contract.max_causal_closure_drop_ppm))
+            });
         candidate_point_estimate_noninferior &= robot_ok;
         per_robot.insert(
             robot_id.clone(),
@@ -1061,15 +1062,12 @@ mod tests {
 
     #[test]
     fn complete_trace_receives_physical_and_evidence_qualified_safe_success() {
-        let score = evaluate_fleet("candidate", &[trial("p1", "r1", "candidate")], contract())
-            .unwrap();
+        let score =
+            evaluate_fleet("candidate", &[trial("p1", "r1", "candidate")], contract()).unwrap();
         assert_eq!(score.physical_safe_successes, 1);
         assert_eq!(score.evidence_qualified_safe_successes, 1);
         assert_eq!(score.slo_qualified_missions, 1);
-        assert_eq!(
-            score.causal_closure.closure_ppm,
-            Some(1_000_000)
-        );
+        assert_eq!(score.causal_closure.closure_ppm, Some(1_000_000));
     }
 
     #[test]
@@ -1090,14 +1088,8 @@ mod tests {
         input.actuator_applications_causally_closed = 9;
         let score = evaluate_fleet("candidate", &[input], contract()).unwrap();
         assert_eq!(score.slo_qualified_missions, 0);
-        assert_eq!(
-            score.task_classes["delivery"].productive_work_units,
-            0
-        );
-        assert_eq!(
-            score.causal_closure.closure_ppm,
-            Some(900_000)
-        );
+        assert_eq!(score.task_classes["delivery"].productive_work_units, 0);
+        assert_eq!(score.causal_closure.closure_ppm, Some(900_000));
     }
 
     #[test]
@@ -1146,8 +1138,12 @@ mod tests {
         let mut second = trial("p2", "r2", "candidate");
         second.identity.task_class = "inspection".to_owned();
         second.identity.work_unit_id = "inspected-metre-v1".to_owned();
-        let score = evaluate_fleet("candidate", &[trial("p1", "r1", "candidate"), second], contract())
-            .unwrap();
+        let score = evaluate_fleet(
+            "candidate",
+            &[trial("p1", "r1", "candidate"), second],
+            contract(),
+        )
+        .unwrap();
         assert_eq!(score.task_classes.len(), 2);
         assert_eq!(
             score.task_classes["delivery"].work_unit_id,
@@ -1231,7 +1227,9 @@ mod tests {
                 contract(),
                 comparison_contract(),
             ),
-            Err(EvaluationError::PairSetMismatch("pair cardinality".to_owned()))
+            Err(EvaluationError::PairSetMismatch(
+                "pair cardinality".to_owned()
+            ))
         );
     }
 
@@ -1308,7 +1306,6 @@ mod tests {
         let score = evaluate_fleet("candidate", &[many, one], contract()).unwrap();
         assert_eq!(score.causal_closure.closure_ppm, Some(990_099));
     }
-
 
     #[test]
     fn invalid_energy_is_reported_separately_from_unknown_energy() {
