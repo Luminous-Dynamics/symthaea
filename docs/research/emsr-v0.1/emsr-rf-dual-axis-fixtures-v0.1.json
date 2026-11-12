@@ -1,0 +1,805 @@
+{
+  "schema": "emsr.rf-dual-axis-fixture-pack",
+  "version": "0.1.0",
+  "state": "DESIGN_NOT_EXECUTED",
+  "fixtures": [
+    {
+      "id": "RF-AXIS-001",
+      "assessment": {
+        "assessment_id": "rf-axis-001",
+        "profile_id": "EMSR-RF-OPENSET-001",
+        "acquisition": {
+          "qualification": "QUALIFIED",
+          "acquisition_profile_id": "rf-acquisition-profile:synthetic-v0.1",
+          "receiver_id": "receiver:synthetic-rx-01",
+          "front_end_id": "front-end:synthetic-fe-01",
+          "firmware_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "configuration_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "clock_quality": "QUALIFIED",
+          "checks": [
+            {
+              "check_id": "calibration_current",
+              "result": "PASS",
+              "evidence_ref": "evidence:qualified-capture-synthetic"
+            },
+            {
+              "check_id": "sample_integrity",
+              "result": "PASS",
+              "evidence_ref": "evidence:qualified-capture-synthetic"
+            },
+            {
+              "check_id": "clock_quality",
+              "result": "PASS",
+              "evidence_ref": "evidence:qualified-capture-synthetic"
+            }
+          ]
+        },
+        "recognition": {
+          "disposition": "KNOWN_CLASS",
+          "class_vocabulary_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "model_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "input_window_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "candidate_class": "modulation_family_a",
+          "confidence": 0.96
+        },
+        "derived": {
+          "consumer_disposition": "KNOWN_CLASS",
+          "candidate_admitted": true,
+          "reason_codes": [
+            "qualified_known_class"
+          ]
+        },
+        "evidence": {
+          "acquisition_evidence_refs": [
+            "evidence:qualified-capture-synthetic"
+          ],
+          "recognition_evidence_refs": [
+            "evidence:synthetic-model-output"
+          ],
+          "as_of": "2026-11-07T15:00:00Z"
+        },
+        "claim_ceiling": [
+          "synthetic_fixture_only",
+          "no_physical_rf_source_identity",
+          "no_gnss_pnt_integrity_or_operational_authority"
+        ]
+      },
+      "expected": {
+        "consumer_disposition": "KNOWN_CLASS",
+        "candidate_admitted": true,
+        "reason_code": "qualified_known_class"
+      }
+    },
+    {
+      "id": "RF-AXIS-002",
+      "assessment": {
+        "assessment_id": "rf-axis-002",
+        "profile_id": "EMSR-RF-OPENSET-001",
+        "acquisition": {
+          "qualification": "QUALIFIED",
+          "acquisition_profile_id": "rf-acquisition-profile:synthetic-v0.1",
+          "receiver_id": "receiver:synthetic-rx-01",
+          "front_end_id": "front-end:synthetic-fe-01",
+          "firmware_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "configuration_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "clock_quality": "QUALIFIED",
+          "checks": [
+            {
+              "check_id": "calibration_current",
+              "result": "PASS",
+              "evidence_ref": "evidence:qualified-capture-synthetic"
+            },
+            {
+              "check_id": "sample_integrity",
+              "result": "PASS",
+              "evidence_ref": "evidence:qualified-capture-synthetic"
+            },
+            {
+              "check_id": "clock_quality",
+              "result": "PASS",
+              "evidence_ref": "evidence:qualified-capture-synthetic"
+            }
+          ]
+        },
+        "recognition": {
+          "disposition": "UNKNOWN_CLASS",
+          "class_vocabulary_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "model_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "input_window_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "candidate_class": null,
+          "confidence": 0.12
+        },
+        "derived": {
+          "consumer_disposition": "UNKNOWN_CLASS",
+          "candidate_admitted": false,
+          "reason_codes": [
+            "qualified_unknown_class"
+          ]
+        },
+        "evidence": {
+          "acquisition_evidence_refs": [
+            "evidence:qualified-capture-synthetic"
+          ],
+          "recognition_evidence_refs": [
+            "evidence:synthetic-model-output"
+          ],
+          "as_of": "2026-11-07T15:00:00Z"
+        },
+        "claim_ceiling": [
+          "synthetic_fixture_only",
+          "no_physical_rf_source_identity",
+          "no_gnss_pnt_integrity_or_operational_authority"
+        ]
+      },
+      "expected": {
+        "consumer_disposition": "UNKNOWN_CLASS",
+        "candidate_admitted": false,
+        "reason_code": "qualified_unknown_class"
+      }
+    },
+    {
+      "id": "RF-AXIS-003",
+      "assessment": {
+        "assessment_id": "rf-axis-003",
+        "profile_id": "EMSR-RF-OPENSET-001",
+        "acquisition": {
+          "qualification": "QUALIFIED",
+          "acquisition_profile_id": "rf-acquisition-profile:synthetic-v0.1",
+          "receiver_id": "receiver:synthetic-rx-01",
+          "front_end_id": "front-end:synthetic-fe-01",
+          "firmware_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "configuration_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "clock_quality": "QUALIFIED",
+          "checks": [
+            {
+              "check_id": "calibration_current",
+              "result": "PASS",
+              "evidence_ref": "evidence:qualified-capture-synthetic"
+            },
+            {
+              "check_id": "sample_integrity",
+              "result": "PASS",
+              "evidence_ref": "evidence:qualified-capture-synthetic"
+            },
+            {
+              "check_id": "clock_quality",
+              "result": "PASS",
+              "evidence_ref": "evidence:qualified-capture-synthetic"
+            }
+          ]
+        },
+        "recognition": {
+          "disposition": "INDETERMINATE",
+          "class_vocabulary_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "model_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "input_window_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "candidate_class": null,
+          "confidence": 0.51
+        },
+        "derived": {
+          "consumer_disposition": "INDETERMINATE",
+          "candidate_admitted": false,
+          "reason_codes": [
+            "qualified_indeterminate"
+          ]
+        },
+        "evidence": {
+          "acquisition_evidence_refs": [
+            "evidence:qualified-capture-synthetic"
+          ],
+          "recognition_evidence_refs": [
+            "evidence:synthetic-model-output"
+          ],
+          "as_of": "2026-11-07T15:00:00Z"
+        },
+        "claim_ceiling": [
+          "synthetic_fixture_only",
+          "no_physical_rf_source_identity",
+          "no_gnss_pnt_integrity_or_operational_authority"
+        ]
+      },
+      "expected": {
+        "consumer_disposition": "INDETERMINATE",
+        "candidate_admitted": false,
+        "reason_code": "qualified_indeterminate"
+      }
+    },
+    {
+      "id": "RF-AXIS-004",
+      "assessment": {
+        "assessment_id": "rf-axis-004",
+        "profile_id": "EMSR-RF-OPENSET-001",
+        "acquisition": {
+          "qualification": "DEGRADED",
+          "acquisition_profile_id": "rf-acquisition-profile:synthetic-v0.1",
+          "receiver_id": "receiver:synthetic-rx-01",
+          "front_end_id": "front-end:synthetic-fe-01",
+          "firmware_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "configuration_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "clock_quality": "DEGRADED",
+          "checks": [
+            {
+              "check_id": "calibration_current",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            },
+            {
+              "check_id": "sample_integrity",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            },
+            {
+              "check_id": "clock_quality",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            }
+          ]
+        },
+        "recognition": {
+          "disposition": "KNOWN_CLASS",
+          "class_vocabulary_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "model_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "input_window_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "candidate_class": "modulation_family_a",
+          "confidence": 0.99
+        },
+        "derived": {
+          "consumer_disposition": "DEGRADED_ACQUISITION",
+          "candidate_admitted": false,
+          "reason_codes": [
+            "degraded_acquisition_overrides_known_candidate"
+          ]
+        },
+        "evidence": {
+          "acquisition_evidence_refs": [
+            "evidence:capture-fault-synthetic"
+          ],
+          "recognition_evidence_refs": [
+            "evidence:synthetic-model-output"
+          ],
+          "as_of": "2026-11-07T15:00:00Z"
+        },
+        "claim_ceiling": [
+          "synthetic_fixture_only",
+          "no_physical_rf_source_identity",
+          "no_gnss_pnt_integrity_or_operational_authority"
+        ]
+      },
+      "expected": {
+        "consumer_disposition": "DEGRADED_ACQUISITION",
+        "candidate_admitted": false,
+        "reason_code": "degraded_acquisition_overrides_known_candidate"
+      }
+    },
+    {
+      "id": "RF-AXIS-005",
+      "assessment": {
+        "assessment_id": "rf-axis-005",
+        "profile_id": "EMSR-RF-OPENSET-001",
+        "acquisition": {
+          "qualification": "DEGRADED",
+          "acquisition_profile_id": "rf-acquisition-profile:synthetic-v0.1",
+          "receiver_id": "receiver:synthetic-rx-01",
+          "front_end_id": "front-end:synthetic-fe-01",
+          "firmware_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "configuration_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "clock_quality": "DEGRADED",
+          "checks": [
+            {
+              "check_id": "calibration_current",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            },
+            {
+              "check_id": "sample_integrity",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            },
+            {
+              "check_id": "clock_quality",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            }
+          ]
+        },
+        "recognition": {
+          "disposition": "UNKNOWN_CLASS",
+          "class_vocabulary_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "model_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "input_window_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "candidate_class": null,
+          "confidence": 0.34
+        },
+        "derived": {
+          "consumer_disposition": "DEGRADED_ACQUISITION",
+          "candidate_admitted": false,
+          "reason_codes": [
+            "degraded_acquisition_overrides_unknown_candidate"
+          ]
+        },
+        "evidence": {
+          "acquisition_evidence_refs": [
+            "evidence:capture-fault-synthetic"
+          ],
+          "recognition_evidence_refs": [
+            "evidence:synthetic-model-output"
+          ],
+          "as_of": "2026-11-07T15:00:00Z"
+        },
+        "claim_ceiling": [
+          "synthetic_fixture_only",
+          "no_physical_rf_source_identity",
+          "no_gnss_pnt_integrity_or_operational_authority"
+        ]
+      },
+      "expected": {
+        "consumer_disposition": "DEGRADED_ACQUISITION",
+        "candidate_admitted": false,
+        "reason_code": "degraded_acquisition_overrides_unknown_candidate"
+      }
+    },
+    {
+      "id": "RF-AXIS-006",
+      "assessment": {
+        "assessment_id": "rf-axis-006",
+        "profile_id": "EMSR-RF-OPENSET-001",
+        "acquisition": {
+          "qualification": "DEGRADED",
+          "acquisition_profile_id": "rf-acquisition-profile:synthetic-v0.1",
+          "receiver_id": "receiver:synthetic-rx-01",
+          "front_end_id": "front-end:synthetic-fe-01",
+          "firmware_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "configuration_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "clock_quality": "DEGRADED",
+          "checks": [
+            {
+              "check_id": "calibration_current",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            },
+            {
+              "check_id": "sample_integrity",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            },
+            {
+              "check_id": "clock_quality",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            }
+          ]
+        },
+        "recognition": {
+          "disposition": "INDETERMINATE",
+          "class_vocabulary_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "model_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "input_window_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "candidate_class": null,
+          "confidence": 0.47
+        },
+        "derived": {
+          "consumer_disposition": "DEGRADED_ACQUISITION",
+          "candidate_admitted": false,
+          "reason_codes": [
+            "degraded_acquisition_overrides_indeterminate"
+          ]
+        },
+        "evidence": {
+          "acquisition_evidence_refs": [
+            "evidence:capture-fault-synthetic"
+          ],
+          "recognition_evidence_refs": [
+            "evidence:synthetic-model-output"
+          ],
+          "as_of": "2026-11-07T15:00:00Z"
+        },
+        "claim_ceiling": [
+          "synthetic_fixture_only",
+          "no_physical_rf_source_identity",
+          "no_gnss_pnt_integrity_or_operational_authority"
+        ]
+      },
+      "expected": {
+        "consumer_disposition": "DEGRADED_ACQUISITION",
+        "candidate_admitted": false,
+        "reason_code": "degraded_acquisition_overrides_indeterminate"
+      }
+    },
+    {
+      "id": "RF-AXIS-007",
+      "assessment": {
+        "assessment_id": "rf-axis-007",
+        "profile_id": "EMSR-RF-OPENSET-001",
+        "acquisition": {
+          "qualification": "UNQUALIFIED",
+          "acquisition_profile_id": "rf-acquisition-profile:synthetic-v0.1",
+          "receiver_id": "receiver:synthetic-rx-01",
+          "front_end_id": "front-end:synthetic-fe-01",
+          "firmware_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "configuration_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "clock_quality": "DEGRADED",
+          "checks": [
+            {
+              "check_id": "calibration_current",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            },
+            {
+              "check_id": "sample_integrity",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            },
+            {
+              "check_id": "clock_quality",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            }
+          ]
+        },
+        "recognition": {
+          "disposition": "KNOWN_CLASS",
+          "class_vocabulary_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "model_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "input_window_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "candidate_class": "modulation_family_b",
+          "confidence": 0.999
+        },
+        "derived": {
+          "consumer_disposition": "DEGRADED_ACQUISITION",
+          "candidate_admitted": false,
+          "reason_codes": [
+            "unqualified_acquisition_blocks_candidate"
+          ]
+        },
+        "evidence": {
+          "acquisition_evidence_refs": [
+            "evidence:capture-fault-synthetic"
+          ],
+          "recognition_evidence_refs": [
+            "evidence:synthetic-model-output"
+          ],
+          "as_of": "2026-11-07T15:00:00Z"
+        },
+        "claim_ceiling": [
+          "synthetic_fixture_only",
+          "no_physical_rf_source_identity",
+          "no_gnss_pnt_integrity_or_operational_authority"
+        ]
+      },
+      "expected": {
+        "consumer_disposition": "DEGRADED_ACQUISITION",
+        "candidate_admitted": false,
+        "reason_code": "unqualified_acquisition_blocks_candidate"
+      }
+    },
+    {
+      "id": "RF-AXIS-008",
+      "assessment": {
+        "assessment_id": "rf-axis-008",
+        "profile_id": "EMSR-RF-OPENSET-001",
+        "acquisition": {
+          "qualification": "UNQUALIFIED",
+          "acquisition_profile_id": "rf-acquisition-profile:synthetic-v0.1",
+          "receiver_id": "receiver:synthetic-rx-01",
+          "front_end_id": "front-end:synthetic-fe-01",
+          "firmware_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "configuration_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "clock_quality": "DEGRADED",
+          "checks": [
+            {
+              "check_id": "calibration_current",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            },
+            {
+              "check_id": "sample_integrity",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            },
+            {
+              "check_id": "clock_quality",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            }
+          ]
+        },
+        "recognition": {
+          "disposition": "UNKNOWN_CLASS",
+          "class_vocabulary_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "model_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "input_window_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "candidate_class": null,
+          "confidence": 0.61
+        },
+        "derived": {
+          "consumer_disposition": "DEGRADED_ACQUISITION",
+          "candidate_admitted": false,
+          "reason_codes": [
+            "unqualified_acquisition_blocks_unknown_claim"
+          ]
+        },
+        "evidence": {
+          "acquisition_evidence_refs": [
+            "evidence:capture-fault-synthetic"
+          ],
+          "recognition_evidence_refs": [
+            "evidence:synthetic-model-output"
+          ],
+          "as_of": "2026-11-07T15:00:00Z"
+        },
+        "claim_ceiling": [
+          "synthetic_fixture_only",
+          "no_physical_rf_source_identity",
+          "no_gnss_pnt_integrity_or_operational_authority"
+        ]
+      },
+      "expected": {
+        "consumer_disposition": "DEGRADED_ACQUISITION",
+        "candidate_admitted": false,
+        "reason_code": "unqualified_acquisition_blocks_unknown_claim"
+      }
+    },
+    {
+      "id": "RF-AXIS-009",
+      "assessment": {
+        "assessment_id": "rf-axis-009",
+        "profile_id": "EMSR-RF-OPENSET-001",
+        "acquisition": {
+          "qualification": "UNQUALIFIED",
+          "acquisition_profile_id": "rf-acquisition-profile:synthetic-v0.1",
+          "receiver_id": "receiver:synthetic-rx-01",
+          "front_end_id": "front-end:synthetic-fe-01",
+          "firmware_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "configuration_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "clock_quality": "DEGRADED",
+          "checks": [
+            {
+              "check_id": "calibration_current",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            },
+            {
+              "check_id": "sample_integrity",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            },
+            {
+              "check_id": "clock_quality",
+              "result": "FAIL",
+              "evidence_ref": "evidence:capture-fault-synthetic"
+            }
+          ]
+        },
+        "recognition": {
+          "disposition": "INDETERMINATE",
+          "class_vocabulary_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "model_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "input_window_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "candidate_class": null,
+          "confidence": 0.39
+        },
+        "derived": {
+          "consumer_disposition": "DEGRADED_ACQUISITION",
+          "candidate_admitted": false,
+          "reason_codes": [
+            "unqualified_acquisition_takes_precedence"
+          ]
+        },
+        "evidence": {
+          "acquisition_evidence_refs": [
+            "evidence:capture-fault-synthetic"
+          ],
+          "recognition_evidence_refs": [
+            "evidence:synthetic-model-output"
+          ],
+          "as_of": "2026-11-07T15:00:00Z"
+        },
+        "claim_ceiling": [
+          "synthetic_fixture_only",
+          "no_physical_rf_source_identity",
+          "no_gnss_pnt_integrity_or_operational_authority"
+        ]
+      },
+      "expected": {
+        "consumer_disposition": "DEGRADED_ACQUISITION",
+        "candidate_admitted": false,
+        "reason_code": "unqualified_acquisition_takes_precedence"
+      }
+    },
+    {
+      "id": "RF-AXIS-010",
+      "assessment": {
+        "assessment_id": "rf-axis-010",
+        "profile_id": "EMSR-RF-OPENSET-001",
+        "acquisition": {
+          "qualification": "UNKNOWN",
+          "acquisition_profile_id": "rf-acquisition-profile:synthetic-v0.1",
+          "receiver_id": "receiver:synthetic-rx-01",
+          "front_end_id": "front-end:synthetic-fe-01",
+          "firmware_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "configuration_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "clock_quality": "UNKNOWN",
+          "checks": [
+            {
+              "check_id": "calibration_current",
+              "result": "UNKNOWN",
+              "evidence_ref": null
+            },
+            {
+              "check_id": "sample_integrity",
+              "result": "UNKNOWN",
+              "evidence_ref": null
+            },
+            {
+              "check_id": "clock_quality",
+              "result": "UNKNOWN",
+              "evidence_ref": null
+            }
+          ]
+        },
+        "recognition": {
+          "disposition": "KNOWN_CLASS",
+          "class_vocabulary_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "model_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "input_window_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "candidate_class": "modulation_family_a",
+          "confidence": 0.98
+        },
+        "derived": {
+          "consumer_disposition": "DEGRADED_ACQUISITION",
+          "candidate_admitted": false,
+          "reason_codes": [
+            "missing_acquisition_evidence_blocks_class_admission"
+          ]
+        },
+        "evidence": {
+          "acquisition_evidence_refs": [],
+          "recognition_evidence_refs": [
+            "evidence:synthetic-model-output"
+          ],
+          "as_of": "2026-11-07T15:00:00Z"
+        },
+        "claim_ceiling": [
+          "synthetic_fixture_only",
+          "no_physical_rf_source_identity",
+          "no_gnss_pnt_integrity_or_operational_authority"
+        ]
+      },
+      "expected": {
+        "consumer_disposition": "DEGRADED_ACQUISITION",
+        "candidate_admitted": false,
+        "reason_code": "missing_acquisition_evidence_blocks_class_admission"
+      }
+    },
+    {
+      "id": "RF-AXIS-011",
+      "assessment": {
+        "assessment_id": "rf-axis-011",
+        "profile_id": "EMSR-RF-OPENSET-001",
+        "acquisition": {
+          "qualification": "UNKNOWN",
+          "acquisition_profile_id": "rf-acquisition-profile:synthetic-v0.1",
+          "receiver_id": "receiver:synthetic-rx-01",
+          "front_end_id": "front-end:synthetic-fe-01",
+          "firmware_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "configuration_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "clock_quality": "UNKNOWN",
+          "checks": [
+            {
+              "check_id": "calibration_current",
+              "result": "UNKNOWN",
+              "evidence_ref": null
+            },
+            {
+              "check_id": "sample_integrity",
+              "result": "UNKNOWN",
+              "evidence_ref": null
+            },
+            {
+              "check_id": "clock_quality",
+              "result": "UNKNOWN",
+              "evidence_ref": null
+            }
+          ]
+        },
+        "recognition": {
+          "disposition": "UNKNOWN_CLASS",
+          "class_vocabulary_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "model_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "input_window_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "candidate_class": null,
+          "confidence": 0.22
+        },
+        "derived": {
+          "consumer_disposition": "DEGRADED_ACQUISITION",
+          "candidate_admitted": false,
+          "reason_codes": [
+            "missing_acquisition_evidence_blocks_unknown_admission"
+          ]
+        },
+        "evidence": {
+          "acquisition_evidence_refs": [],
+          "recognition_evidence_refs": [
+            "evidence:synthetic-model-output"
+          ],
+          "as_of": "2026-11-07T15:00:00Z"
+        },
+        "claim_ceiling": [
+          "synthetic_fixture_only",
+          "no_physical_rf_source_identity",
+          "no_gnss_pnt_integrity_or_operational_authority"
+        ]
+      },
+      "expected": {
+        "consumer_disposition": "DEGRADED_ACQUISITION",
+        "candidate_admitted": false,
+        "reason_code": "missing_acquisition_evidence_blocks_unknown_admission"
+      }
+    },
+    {
+      "id": "RF-AXIS-012",
+      "assessment": {
+        "assessment_id": "rf-axis-012",
+        "profile_id": "EMSR-RF-OPENSET-001",
+        "acquisition": {
+          "qualification": "UNKNOWN",
+          "acquisition_profile_id": "rf-acquisition-profile:synthetic-v0.1",
+          "receiver_id": "receiver:synthetic-rx-01",
+          "front_end_id": "front-end:synthetic-fe-01",
+          "firmware_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "configuration_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "clock_quality": "UNKNOWN",
+          "checks": [
+            {
+              "check_id": "calibration_current",
+              "result": "UNKNOWN",
+              "evidence_ref": null
+            },
+            {
+              "check_id": "sample_integrity",
+              "result": "UNKNOWN",
+              "evidence_ref": null
+            },
+            {
+              "check_id": "clock_quality",
+              "result": "UNKNOWN",
+              "evidence_ref": null
+            }
+          ]
+        },
+        "recognition": {
+          "disposition": "INDETERMINATE",
+          "class_vocabulary_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "model_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "input_window_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "candidate_class": null,
+          "confidence": 0.5
+        },
+        "derived": {
+          "consumer_disposition": "DEGRADED_ACQUISITION",
+          "candidate_admitted": false,
+          "reason_codes": [
+            "unknown_acquisition_precedes_recognition"
+          ]
+        },
+        "evidence": {
+          "acquisition_evidence_refs": [],
+          "recognition_evidence_refs": [
+            "evidence:synthetic-model-output"
+          ],
+          "as_of": "2026-11-07T15:00:00Z"
+        },
+        "claim_ceiling": [
+          "synthetic_fixture_only",
+          "no_physical_rf_source_identity",
+          "no_gnss_pnt_integrity_or_operational_authority"
+        ]
+      },
+      "expected": {
+        "consumer_disposition": "DEGRADED_ACQUISITION",
+        "candidate_admitted": false,
+        "reason_code": "unknown_acquisition_precedes_recognition"
+      }
+    }
+  ]
+}
