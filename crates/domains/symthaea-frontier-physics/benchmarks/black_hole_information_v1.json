@@ -331,7 +331,7 @@
     },
     {
       "id": "QI-3T",
-      "name": "U(1) domain-wall transport and charge diffusion",
+      "name": "U(1) domain-wall transport and model-discriminating dynamic scaling",
       "status": "source_authored_not_executed",
       "model": "even-length half-filled 1D spin-1/2 chain, initial |111...1000...0> product state, nearest-neighbour brickwork gates sampled independently from U(1) x U(2) x U(1)",
       "observables": [
@@ -342,7 +342,12 @@
         "domain_wall_imbalance",
         "half_chain_von_neumann_entropy",
         "half_chain_purity",
-        "multi_seed_mean_and_standard_error"
+        "multi_seed_mean_and_standard_error",
+        "domain_wall_gradient_width_squared_by_layer",
+        "log_log_width_growth_exponent_alpha",
+        "dynamic_exponent_z_equals_2_over_alpha",
+        "leave_one_seed_out_jackknife_standard_error_and_confidence_interval",
+        "finite_size_depth_ratio"
       ],
       "acceptance": {
         "maximum_local_continuity_residual": 1e-10,
@@ -354,7 +359,16 @@
         "diffusive_domain_wall_imbalance_exponent_target": [
           0.4,
           0.6
-        ]
+        ],
+        "dynamic_exponent_definition": "For gradient-width second moment w^2(t) proportional to t^alpha, estimate alpha by a preregistered log-log least-squares fit and report z=2/alpha.",
+        "seed_uncertainty": "Leave-one-seed-out jackknife for z; also report width-squared standard error at each layer.",
+        "finite_size_scaling_study": "Run N={6,8,10,12}, K=N/2, with the preregistered scaled window t/N in [0.5,2], 64 seeds per size, and exact source/seed/config receipts. Compare z(N) and confidence intervals; do not classify a universality class from one N.",
+        "regime_interpretation": {
+          "diffusive": "z approximately 2",
+          "ballistic": "z approximately 1",
+          "kpz_like_superdiffusive": "z approximately 1.5",
+          "classification_rule": "Only name a regime when confidence intervals and cross-size stability distinguish candidate exponents; otherwise report unresolved/anomalous."
+        }
       },
       "implementation": {
         "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
@@ -362,9 +376,14 @@
           "simulate_u1_domain_wall_transport",
           "sample_u1_domain_wall_transport_ensemble"
         ],
-        "status": "source_authored_and_independent_NumPy_equation_check; Rust execution pending"
+        "status": "source_authored_and_independent_NumPy_equation_check; Rust execution pending",
+        "dynamic_scaling_api": "analyze_u1_domain_wall_dynamic_exponent",
+        "dynamic_scaling_status": "source_authored_not_executed",
+        "dynamic_scaling_uncertainty": "leave-one-seed-out jackknife",
+        "dynamic_scaling_fit": "log(mean per-seed gradient-width second moment) versus log(layer); z=2/slope"
       },
-      "claim_ceiling": "A finite closed U(1)-conserving qubit-chain transport/scrambling benchmark. Not a black-hole evaporation model, a gravitational Page curve, a QES/island calculation or a recovery decoder."
+      "claim_ceiling": "A finite closed U(1)-conserving qubit-chain transport/scrambling benchmark. Not a black-hole evaporation model, a gravitational Page curve, a QES/island calculation or a recovery decoder.",
+      "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/u1_domain_wall_dynamic_scaling_v1.json"
     },
     {
       "id": "QI-3O",
@@ -707,7 +726,11 @@
     "include boundary-censored OTOC fronts in butterfly velocity regression",
     "call an OTOC threshold velocity a universal butterfly velocity without threshold and time-window sensitivity",
     "compare entanglement growth across different N,K or local gate ensembles without matching Page normalization and gate schedule",
-    "infer gravitational black-hole diffusion, Hawking information flow or a universal vB/vE relation from a small closed spin chain"
+    "infer gravitational black-hole diffusion, Hawking information flow or a universal vB/vE relation from a small closed spin chain",
+    "assume linear width-squared growth and report diffusion before estimating the log-log dynamic exponent",
+    "fit a time window selected after looking at z and call the result preregistered",
+    "report one-size z as a thermodynamic-limit universality class",
+    "ignore finite-size saturation or seed uncertainty"
   ],
   "competitive_baselines": [
     {
@@ -886,7 +909,8 @@
       "QI_2S_unequal_block_analytic_control": "source_authored_not_executed; N=4 K=1 A=1 and A=3 return 11/24 nats",
       "QI_4O_Petz_optimality_commutator_criterion": "source_authored_5_tests_added_runner_pending",
       "QI_4O_QEC_matrix_and_auxiliary_T": "source_authored_independent_numpy_crosscheck_runner_pending",
-      "QI_4O_support_aware_QEC_square_root": "source_authored_not_executed"
+      "QI_4O_support_aware_QEC_square_root": "source_authored_not_executed",
+      "QI_3T_seed_jackknife_dynamic_exponent": "source_authored_not_executed"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
