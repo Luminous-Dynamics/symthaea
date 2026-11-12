@@ -1,0 +1,193 @@
+{
+  "schema": "luminous.airroad.dc_rl_fault_transient.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_analytical_reference",
+  "model": {
+    "source_voltage_v": {
+      "numerator": "600",
+      "denominator": "1"
+    },
+    "source_feeder_resistance_ohm": {
+      "numerator": "1",
+      "denominator": "20"
+    },
+    "fault_resistance_ohm": {
+      "numerator": "1",
+      "denominator": "20"
+    },
+    "total_resistance_ohm": {
+      "numerator": "1",
+      "denominator": "10"
+    },
+    "series_inductance_h": {
+      "numerator": "1",
+      "denominator": "1000"
+    },
+    "initial_current_a": {
+      "numerator": "0",
+      "denominator": "1"
+    },
+    "clearing_time_s": {
+      "numerator": "1",
+      "denominator": "200"
+    },
+    "time_constant_s": {
+      "numerator": "1",
+      "denominator": "100"
+    },
+    "normalized_clearing_time": {
+      "numerator": "1",
+      "denominator": "2"
+    },
+    "prospective_steady_current_a": {
+      "numerator": "6000",
+      "denominator": "1"
+    },
+    "clearing_time_provenance": "synthetic_fixture_only_not_protection_evidence",
+    "assumptions": [
+      "constant positive source voltage",
+      "constant positive series resistance",
+      "constant positive series inductance",
+      "zero initial branch current",
+      "constant resistance fault",
+      "external clearing time is a fixed analytical fixture input"
+    ],
+    "excluded_physics": [
+      "dc-link capacitor discharge",
+      "converter control and current limiting",
+      "multiple feeding sources",
+      "distributed cable wave propagation",
+      "dc arc",
+      "breaker transient recovery voltage",
+      "semiconductor and conductor thermal damage"
+    ]
+  },
+  "exponential_bounds": {
+    "exp_minus_half": {
+      "lower_order": 13,
+      "lower": {
+        "numerator": "30940193045449",
+        "denominator": "51011754393600"
+      },
+      "upper_order": 12,
+      "upper": {
+        "numerator": "47600296993",
+        "denominator": "78479622144"
+      }
+    },
+    "exp_minus_one": {
+      "lower_order": 13,
+      "lower": {
+        "numerator": "63633137",
+        "denominator": "172972800"
+      },
+      "upper_order": 14,
+      "upper": {
+        "numerator": "2467007773",
+        "denominator": "6706022400"
+      }
+    }
+  },
+  "expected_enclosures": {
+    "clearing_current_a": {
+      "lower": {
+        "numerator": "3859915643875",
+        "denominator": "1634992128"
+      },
+      "upper": {
+        "numerator": "100357806740755",
+        "denominator": "42509795328"
+      }
+    },
+    "branch_i2t_a2s": {
+      "lower": {
+        "numerator": "1312980673325",
+        "denominator": "125239296"
+      },
+      "upper": {
+        "numerator": "9284649048925",
+        "denominator": "885620736"
+      }
+    },
+    "fault_resistor_energy_j": {
+      "lower": {
+        "numerator": "262596134665",
+        "denominator": "500957184"
+      },
+      "upper": {
+        "numerator": "1856929809785",
+        "denominator": "3542482944"
+      }
+    },
+    "source_feeder_resistor_energy_j": {
+      "lower": {
+        "numerator": "262596134665",
+        "denominator": "500957184"
+      },
+      "upper": {
+        "numerator": "1856929809785",
+        "denominator": "3542482944"
+      }
+    },
+    "inductor_stored_energy_j": {
+      "lower": {
+        "numerator": "119191590222647646600125",
+        "denominator": "42771188137951494144"
+      },
+      "upper": {
+        "numerator": "402867574952589188631118801",
+        "denominator": "144566615906276050206720"
+      }
+    },
+    "source_delivered_energy_j": {
+      "lower": {
+        "numerator": "27171579243245",
+        "denominator": "7084965888"
+      },
+      "upper": {
+        "numerator": "1045060740125",
+        "denominator": "272498688"
+      }
+    }
+  },
+  "negative_controls": [
+    {
+      "id": "zero-or-negative-input",
+      "expected": "reject"
+    },
+    {
+      "id": "resistance-sum-mismatch",
+      "expected": "reject"
+    },
+    {
+      "id": "unsupported-normalized-time",
+      "expected": "reject"
+    },
+    {
+      "id": "nonzero-initial-current",
+      "expected": "reject"
+    },
+    {
+      "id": "missing-clearing-provenance",
+      "expected": "not_evaluable_for_protection_join"
+    },
+    {
+      "id": "stale-device-topology-identity",
+      "expected": "not_evaluable"
+    },
+    {
+      "id": "negative-or-invalid-i2t",
+      "expected": "reject"
+    },
+    {
+      "id": "capacitor-or-arc-claim-from-rl",
+      "expected": "reject"
+    }
+  ],
+  "claim_ceiling": [
+    "Synthetic constant-source single-branch RL analytical reference only.",
+    "No protection device response is inferred.",
+    "No capacitor discharge, converter control, multiple source, cable wave, arc or breaker recovery model is included.",
+    "No aircraft safety, airworthiness, certification or energized fault testing claim."
+  ]
+}
