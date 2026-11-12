@@ -18,6 +18,13 @@ pub enum Admission {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TestLevel {
+    FullCell,
+    SymmetricCell,
+    HalfCell,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProtocolMode {
     CommonProtocol,
     LabNative,
@@ -81,7 +88,7 @@ pub struct CellIdentity {
     pub blinded_sample_code: String,
     pub design_id: String,
     pub design_revision: String,
-    pub test_level: String,
+    pub test_level: TestLevel,
     pub material_lot_id: String,
     pub process_revision: String,
 }
@@ -292,6 +299,15 @@ fn validate_outcome(
                     "synthetic outcome requires synthetic evidence class".into(),
                 ));
             }
+            if observation.exposure_cycles == 0
+                || observation
+                    .event_cycle
+                    .is_some_and(|cycle| cycle == 0 || cycle > observation.exposure_cycles)
+            {
+                return Err(AuditError(
+                    "synthetic outcome requires a valid observed exposure/event window".into(),
+                ));
+            }
         }
     }
     Ok(())
@@ -301,6 +317,7 @@ fn group_comparability(
     mode: ProtocolMode,
     rows: &[&Observation],
     cells: &BTreeMap<&str, &CellIdentity>,
+    fixtures: &BTreeMap<&str, &Fixture>,
     evidence: &BTreeMap<&str, &EvidenceRecord>,
 ) -> Result<GroupReport, AuditError> {
     let group_id = rows[0].replicate_group_id.as_str();
@@ -333,8 +350,15 @@ fn group_comparability(
     if mode == ProtocolMode::CommonProtocol {
         let first = rows[0];
         let first_cell = cells[first.cell_id.as_str()];
+        let first_fixture = fixtures[first.fixture_id.as_str()];
         for row in rows.iter().skip(1) {
             let cell = cells[row.cell_id.as_str()];
+            let fixture = fixtures[row.fixture_id.as_str()];
+            if fixture.measurement_method != first_fixture.measurement_method {
+                return Err(AuditError(format!(
+                    "COMMON_PROTOCOL group {group_id} mixes pressure measurement methods"
+                )));
+            }
             if row.protocol_revision != first.protocol_revision
                 || row.condition_digest != first.condition_digest
                 || row.pressure_setpoint_mpa.to_bits() != first.pressure_setpoint_mpa.to_bits()
@@ -572,6 +596,19 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
             &observation.evidence_id,
             &format!("observation {}", observation.observation_id),
         )?;
+        let calibration = admitted(
+            &evidence,
+            &fixture.calibration_evidence_id,
+            &format!("fixture {}", fixture.fixture_id),
+        )?;
+        if source.evidence_class != EvidenceClass::Synthetic
+            && calibration.evidence_class == EvidenceClass::Synthetic
+        {
+            return Err(AuditError(format!(
+                "physical observation {} cannot rely on synthetic fixture calibration",
+                observation.observation_id
+            )));
+        }
         validate_outcome(observation, source)?;
         match observation.outcome_status {
             OutcomeStatus::SyntheticOutcome => synthetic_observation_count += 1,
@@ -594,7 +631,13 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
     let mut groups = Vec::new();
     let mut cross_lab_candidate_group_count = 0;
     for rows in group_rows.values() {
-        let report = group_comparability(rows[0].protocol_mode, rows, &cell_map, &evidence)?;
+        let report = group_comparability(
+            rows[0].protocol_mode,
+            rows,
+            &cell_map,
+            &fixture_map,
+            &evidence,
+        )?;
         if report.comparability == GroupComparability::CandidateCrossLabVarianceAnalysis {
             cross_lab_candidate_group_count += 1;
         }
@@ -668,7 +711,7 @@ mod tests {
             blinded_sample_code: code.into(),
             design_id: "ASSB-REF-A".into(),
             design_revision: "r1".into(),
-            test_level: "full_cell".into(),
+            test_level: TestLevel::FullCell,
             material_lot_id: "REF-LOT-01".into(),
             process_revision: "PROCESS-r1".into(),
         }
@@ -837,6 +880,38 @@ mod tests {
             report.groups[0].comparability,
             GroupComparability::KnownAnswerFixtureOnly
         );
+    }
+
+    #[test]
+    fn common_protocol_requires_comparable_pressure_measurement_methods() {
+        let mut manifest = fixture_manifest();
+        manifest.fixtures[1].measurement_method = "different-sensor-method".into();
+        assert!(audit_manifest(&manifest).is_err());
+    }
+
+    #[test]
+    fn physical_observation_cannot_rely_on_synthetic_fixture_calibration() {
+        let mut manifest = fixture_manifest();
+        for record in &mut manifest.evidence {
+            if record.evidence_class == EvidenceClass::Synthetic
+                && !record.evidence_id.starts_with("SYNTHETIC-CAL")
+            {
+                record.evidence_class = EvidenceClass::PhysicalMeasurement;
+                record.metrology_ref = Some(format!("MET-{}", record.evidence_id));
+            }
+        }
+        for observation in &mut manifest.observations {
+            observation.outcome_status = OutcomeStatus::RightCensored;
+            observation.event_cycle = None;
+        }
+        assert!(audit_manifest(&manifest).is_err());
+    }
+
+    #[test]
+    fn synthetic_event_cycle_must_be_inside_exposure_window() {
+        let mut manifest = fixture_manifest();
+        manifest.observations[0].event_cycle = Some(101);
+        assert!(audit_manifest(&manifest).is_err());
     }
 
     #[test]
