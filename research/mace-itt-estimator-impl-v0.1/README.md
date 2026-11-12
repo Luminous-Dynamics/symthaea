@@ -25,7 +25,7 @@ Repeated seeds are averaged within task; task clusters then receive equal weight
 
 Every endpoint accepts binary outcomes and indeterminate. Indeterminate outcomes remain as [0,1] and propagate through pair differences and task-macro aggregation. The estimator reports lower and upper partial-identification bounds; it does not silently replace them with a complete-case point estimate.
 
-Task-cluster bootstrap percentile intervals are computed for the lower and upper identification endpoints. If fewer than two task clusters exist, the point bounds are reported and confidence intervals are null; a single task does not support between-task uncertainty estimation.
+Task-cluster bootstrap percentile intervals are computed for the lower and upper identification endpoints. Each component interval uses two-sided 97.5% percentile limits; Bonferroni provides at least 95% joint coverage for the two-endpoint confidence region under the bootstrap approximation. If fewer than two task clusters exist, the point bounds are reported and confidence intervals are null; a single task does not support between-task uncertainty estimation. Complete-pair counts are tracked at the pair level, even when another seed in the same task is incomplete.
 
 ## Assignment roster
 
