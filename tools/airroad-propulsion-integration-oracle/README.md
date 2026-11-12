@@ -67,3 +67,17 @@ cargo fmt --manifest-path tools/airroad-propulsion-integration-oracle/Cargo.toml
 cargo test --manifest-path tools/airroad-propulsion-integration-oracle/Cargo.toml --locked
 cargo clippy --manifest-path tools/airroad-propulsion-integration-oracle/Cargo.toml --all-targets --locked -- -D warnings
 ```
+
+
+## Coordinate-aware metrology-to-bus envelope (v0.3 draft)
+
+This follow-on composes the coordinate-bound map and motor-shaft demand APIs:
+
+1. Calibrated, synchronized motor-shaft torque/RPM observations produce a nominal operating point plus absolute coordinate bounds.
+2. The map oracle enumerates every closed bilinear cell intersecting that full rectangle, rejects any partial out-of-domain rectangle, and returns the global efficiency bounds plus cell/witness provenance. Unlike the earlier same-cell four-corner adapter, a rectangle crossing a torque or speed grid line is now supported by explicit per-cell corner enumeration.
+3. The drive oracle consumes the same nominal point and coordinate bounds at the **motor-shaft output boundary**, propagating them with the map efficiency envelope to minimum/nominal/upper DC-bus demand. It does not apply gearbox efficiency again; the rotor-side to motor-side conversion and transmission loss remain separately accounted from the gearbox kinematics.
+4. The electrical ledger uses the upper DC-demand scenario for the conservative synthetic propulsion load; transmission, motor and inverter heat sources remain separately identified in the heat-allocation ledger.
+
+The lower/upper combinations use rectangular absolute bounds, not a probabilistic distribution. They may be conservative where torque, speed and efficiency co-vary. The current APIs use f64 interpolation and interval endpoint arithmetic; they are not yet directed-rounded formal floating-point enclosures. No physical validation is implied.
+
+The exact Git revisions for the coordinate-aware map and drive APIs are pinned in Cargo.toml and Cargo.lock. The fixture remains synthetic and single-substep; it is not a complete mission electro-thermal validation.
