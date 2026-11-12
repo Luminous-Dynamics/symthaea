@@ -12,7 +12,6 @@ on:
       - "docs/research/AIRROAD_PDCM_ASYMMETRIC_001_V0_1.md"
       - "docs/research/fixtures/airroad-pdcm-asymmetric-two-converter-v0.1.json"
       - "tools/airroad-pdcm-impedance-qualifier/verify_asymmetric_fixture.py"
-      - "crates/domains/symthaea-circuits/src/dc_bus_interaction.rs"
       - ".github/workflows/airroad-pdcm-impedance-fixture.yml"
   push:
     branches:
@@ -28,7 +27,6 @@ on:
       - "docs/research/AIRROAD_PDCM_ASYMMETRIC_001_V0_1.md"
       - "docs/research/fixtures/airroad-pdcm-asymmetric-two-converter-v0.1.json"
       - "tools/airroad-pdcm-impedance-qualifier/verify_asymmetric_fixture.py"
-      - "crates/domains/symthaea-circuits/src/dc_bus_interaction.rs"
       - ".github/workflows/airroad-pdcm-impedance-fixture.yml"
 
 permissions:
