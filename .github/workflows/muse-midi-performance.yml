@@ -5,6 +5,7 @@ on:
     paths:
       - "crates/domains/symthaea-muse/src/midi_performance.rs"
       - "crates/domains/symthaea-muse/src/transcription_eval.rs"
+      - "crates/domains/symthaea-muse/src/beat_grid_eval.rs"
       - "crates/domains/symthaea-muse/src/lib.rs"
       - "crates/domains/symthaea-muse/Cargo.toml"
       - "crates/domains/symthaea-music-theory/src/orchestration.rs"
@@ -19,6 +20,7 @@ on:
       - "research/melothaea-part-separation-eval-v1"
       - "research/melothaea-midi-meter-parse-v1"
       - "research/melothaea-measure-phase-eval-v1"
+      - "research/melothaea-beat-grid-eval-v1"
     paths:
       - "crates/domains/symthaea-muse/src/midi_performance.rs"
       - "crates/domains/symthaea-muse/src/transcription_eval.rs"
@@ -71,3 +73,6 @@ jobs:
 
       - name: Run focused MIDI transcription evaluation tests
         run: cargo test --locked -p symthaea-muse --features theory transcription_eval::tests::
+
+      - name: Run focused beat-grid evaluation tests
+        run: cargo test --locked -p symthaea-muse --features theory beat_grid_eval::tests::
