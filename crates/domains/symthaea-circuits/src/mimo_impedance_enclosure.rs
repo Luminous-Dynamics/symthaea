@@ -155,7 +155,9 @@ pub struct MimoImpedanceSweepEnclosure {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MatrixEnclosureError {
     Passport(PortMatrixError),
-    StatisticalOnlyBounds { method_reference: String },
+    StatisticalOnlyBounds {
+        method_reference: String,
+    },
     MissingHardBoundMethodReference,
     UnsupportedFrequencyKnot,
     CurrentUncertaintyIncludesZero {
@@ -683,8 +685,10 @@ mod tests {
     #[test]
     fn current_disc_touching_zero_is_not_evaluable() {
         let mut sweep = fixture();
-        sweep.frequency_slices[0].columns[0].injected_current_a =
-            ComplexValue { real: 1.0, imag: 0.0 };
+        sweep.frequency_slices[0].columns[0].injected_current_a = ComplexValue {
+            real: 1.0,
+            imag: 0.0,
+        };
         sweep.frequency_slices[0].columns[0].absolute_error_bound_a = 1.0;
         assert!(matches!(
             enclose_mimo_impedance_matrix_at_exact_frequency(&sweep, 0.0, &semantics()),
