@@ -67,10 +67,7 @@ pub struct FiniteDistribution {
 
 impl FiniteDistribution {
     /// Validate an already-normalized probability vector without changing it.
-    pub fn new(
-        probabilities: Vec<f64>,
-        tolerance: f64,
-    ) -> Result<Self, DistributionError> {
+    pub fn new(probabilities: Vec<f64>, tolerance: f64) -> Result<Self, DistributionError> {
         validate_tolerance(tolerance)?;
         validate_weights(&probabilities)?;
 
@@ -234,6 +231,9 @@ mod tests {
             FiniteDistribution::uniform(0),
             Err(DistributionError::Empty)
         );
-        assert_eq!(FiniteDistribution::uniform(4).unwrap().as_slice(), &[0.25; 4]);
+        assert_eq!(
+            FiniteDistribution::uniform(4).unwrap().as_slice(),
+            &[0.25; 4]
+        );
     }
 }
