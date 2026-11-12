@@ -1141,7 +1141,9 @@ mod tests {
         let run = &report.run_reports[0];
         assert_eq!(run.excluded_background_dominated, 1);
         assert_eq!(run.window_evidence[0].disposition, "excluded");
-        assert_eq!(run.window_evidence[0].cavitation_component_upper_limit_db, Some(93.1));
+        let upper_limit = run.window_evidence[0].cavitation_component_upper_limit_db.unwrap();
+        assert!((upper_limit - 93.1).abs() < 1.0e-12);
+        assert_eq!(run.usable_windows, 7);
         assert_eq!(run.window_evidence[0].corrected_spl_db, None);
         assert_eq!(run.window_evidence[0].corrected_spl_expanded_lower_bound_db, None);
     }
@@ -1364,7 +1366,11 @@ mod tests {
         let report = audit(&input);
         let first = &report.run_reports[0].window_evidence[0];
         assert_eq!(first.disposition, "excluded");
-        assert_eq!(first.exclusion_reason, Some("background_margin_below_3_db"));
+        assert_eq!(
+            first.exclusion_reason,
+            Some("background_margin_below_3_db_censored_upper_limit")
+        );
+        assert!(first.cavitation_component_upper_limit_db.is_some());
         assert_eq!(first.corrected_spl_db, None);
     }
 
