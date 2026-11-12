@@ -60,6 +60,7 @@ struct NucleiDistribution {
     calibration_certificate_sha256: String,
     evidence_sha256: String,
     sample_volume_ml: f64,
+    expanded_uncertainty_confidence_level: f64,
     number_concentration_equivalence_tolerance_per_ml: f64,
     wasserstein1_equivalence_tolerance_um: f64,
     bins: Vec<NucleiBin>,
@@ -78,6 +79,14 @@ struct NucleiBin {
 struct NucleiDistributionComparison {
     reference_run_id: String,
     run_id: String,
+    reference_measurement_id: String,
+    run_measurement_id: String,
+    measurement_method_id: String,
+    instrument_id: String,
+    calibration_certificate_sha256: String,
+    reference_evidence_sha256: String,
+    run_evidence_sha256: String,
+    expanded_uncertainty_confidence_level: Option<f64>,
     disposition: &'static str,
     reference_total_number_concentration_per_ml: Option<f64>,
     run_total_number_concentration_per_ml: Option<f64>,
@@ -380,6 +389,7 @@ fn compare_nuclei_distributions(
     let metadata_matches = reference.method_id == candidate.method_id
         && reference.instrument_id == candidate.instrument_id
         && reference.calibration_certificate_sha256 == candidate.calibration_certificate_sha256
+        && (reference.expanded_uncertainty_confidence_level - candidate.expanded_uncertainty_confidence_level).abs() <= 1.0e-12
         && (reference.number_concentration_equivalence_tolerance_per_ml
             - candidate.number_concentration_equivalence_tolerance_per_ml).abs() <= 1.0e-12
         && (reference.wasserstein1_equivalence_tolerance_um
@@ -393,6 +403,14 @@ fn compare_nuclei_distributions(
         return NucleiDistributionComparison {
             reference_run_id: reference_run_id.to_string(),
             run_id: run_id.to_string(),
+            reference_measurement_id: reference.measurement_id.clone(),
+            run_measurement_id: candidate.measurement_id.clone(),
+            measurement_method_id: reference.method_id.clone(),
+            instrument_id: reference.instrument_id.clone(),
+            calibration_certificate_sha256: reference.calibration_certificate_sha256.clone(),
+            reference_evidence_sha256: reference.evidence_sha256.clone(),
+            run_evidence_sha256: candidate.evidence_sha256.clone(),
+            expanded_uncertainty_confidence_level: None,
             disposition: "incomparable_distribution_method_or_binning",
             reference_total_number_concentration_per_ml: None,
             run_total_number_concentration_per_ml: None,
@@ -463,6 +481,14 @@ fn compare_nuclei_distributions(
     NucleiDistributionComparison {
         reference_run_id: reference_run_id.to_string(),
         run_id: run_id.to_string(),
+        reference_measurement_id: reference.measurement_id.clone(),
+        run_measurement_id: candidate.measurement_id.clone(),
+        measurement_method_id: reference.method_id.clone(),
+        instrument_id: reference.instrument_id.clone(),
+        calibration_certificate_sha256: reference.calibration_certificate_sha256.clone(),
+        reference_evidence_sha256: reference.evidence_sha256.clone(),
+        run_evidence_sha256: candidate.evidence_sha256.clone(),
+        expanded_uncertainty_confidence_level: Some(reference.expanded_uncertainty_confidence_level),
         disposition,
         reference_total_number_concentration_per_ml: Some(reference_total),
         run_total_number_concentration_per_ml: Some(candidate_total),
@@ -557,6 +583,9 @@ fn validate_case(case: &Case) -> Vec<String> {
                 || !is_sha256(&distribution.calibration_certificate_sha256)
                 || !is_sha256(&distribution.evidence_sha256)
                 || !finite_positive(distribution.sample_volume_ml)
+                || !distribution.expanded_uncertainty_confidence_level.is_finite()
+                || distribution.expanded_uncertainty_confidence_level <= 0.0
+                || distribution.expanded_uncertainty_confidence_level >= 1.0
                 || !finite_positive(distribution.number_concentration_equivalence_tolerance_per_ml)
                 || !finite_positive(distribution.wasserstein1_equivalence_tolerance_um)
                 || distribution.bins.len() < 2
@@ -1200,6 +1229,7 @@ mod tests {
             calibration_certificate_sha256: digest('a'),
             evidence_sha256: digest(if run_index == 0 { 'b' } else { 'c' }),
             sample_volume_ml: 10.0,
+            expanded_uncertainty_confidence_level: 0.95,
             number_concentration_equivalence_tolerance_per_ml: 100.0,
             wasserstein1_equivalence_tolerance_um: 0.10,
             bins: vec![
@@ -1349,6 +1379,9 @@ mod tests {
         assert!((comparison.absolute_total_number_concentration_difference_per_ml.unwrap()).abs() < 1e-12);
         assert!((comparison.wasserstein1_distance_um.unwrap() - 0.25).abs() < 1e-12);
         assert_eq!(comparison.disposition, "outside_equivalence_tolerance");
+        assert_eq!(comparison.expanded_uncertainty_confidence_level, Some(0.95));
+        assert_ne!(comparison.reference_measurement_id, comparison.run_measurement_id);
+        assert_ne!(comparison.reference_evidence_sha256, comparison.run_evidence_sha256);
     }
 
     #[test]
@@ -1363,6 +1396,20 @@ mod tests {
         let comparison = &report.nuclei_distribution_comparisons[0];
         assert_eq!(comparison.wasserstein1_distance_um, Some(0.0));
         assert!(comparison.total_number_concentration_difference_lower_per_ml.unwrap() > 100.0);
+    }
+
+    #[test]
+    fn nuclei_distribution_uncertainty_confidence_level_mismatch_is_incomparable() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        input.runs[1].water_condition.nuclei_distribution.as_mut().unwrap()
+            .expanded_uncertainty_confidence_level = 0.99;
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPARABLE_CONDITION");
+        assert_eq!(
+            report.nuclei_distribution_comparisons[0].disposition,
+            "incomparable_distribution_method_or_binning"
+        );
     }
 
     #[test]
