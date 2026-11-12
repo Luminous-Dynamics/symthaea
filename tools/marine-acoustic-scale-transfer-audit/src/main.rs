@@ -955,11 +955,6 @@ fn audit(case: &Case) -> AuditReport {
         reasons.push("at least two distinct model-scale propeller rotation rates are required".to_string());
     }
 
-    let mut any_prediction_only = false;
-    let mut any_unresolved_band = false;
-    let mut any_disjoint_band = false;
-    let mut any_frequency_mismatch = false;
-
     for pair in &case.pairs {
         let frequency_factor = (pair.full_scale.rpm_hz / pair.model.rpm_hz)
             * (pair.full_scale.cavitation_number_n_d / pair.model.cavitation_number_n_d).sqrt();
@@ -978,7 +973,7 @@ fn audit(case: &Case) -> AuditReport {
             ) {
                 Ok(value) => value,
                 Err(failure) => {
-                    any_unresolved_band = true;
+                    
                     let comparison = match failure {
                         BackgroundCorrectionFailure::BackgroundDominated => "background_dominated_unusable",
                         BackgroundCorrectionFailure::ExactTenDbBoundaryUnspecified => "background_threshold_boundary_unspecified",
@@ -1019,7 +1014,7 @@ fn audit(case: &Case) -> AuditReport {
             );
 
             let Some(full_band) = pair.full_scale.bands.iter().find(|b| b.band_id == model_band.band_id) else {
-                any_prediction_only = true;
+                
                 band_reports.push(BandReport {
                     band_id: model_band.band_id.clone(),
                     frequency_regime: frequency_regime_name(&model_band.frequency_regime),
@@ -1046,7 +1041,7 @@ fn audit(case: &Case) -> AuditReport {
             let relative_frequency_error =
                 (full_band.center_frequency_hz - mapped_frequency).abs() / mapped_frequency;
             if relative_frequency_error > case.frequency_match_tolerance_fraction {
-                any_frequency_mismatch = true;
+                
                 band_reports.push(BandReport {
                     band_id: model_band.band_id.clone(),
                     frequency_regime: frequency_regime_name(&model_band.frequency_regime),
@@ -1082,7 +1077,7 @@ fn audit(case: &Case) -> AuditReport {
             )
             .ok();
             let (Some(net_lower), Some(net_upper)) = (predicted_lower, predicted_upper) else {
-                any_unresolved_band = true;
+                
                 band_reports.push(BandReport {
                     band_id: model_band.band_id.clone(),
                     frequency_regime: frequency_regime_name(&model_band.frequency_regime),
@@ -1120,7 +1115,7 @@ fn audit(case: &Case) -> AuditReport {
             let observed_upper = full_band.source_level_db + full_band.source_level_u95_db;
             let overlaps = predicted_lower <= observed_upper && observed_lower <= predicted_upper;
             if !overlaps {
-                any_disjoint_band = true;
+                
             }
             band_reports.push(BandReport {
                 band_id: model_band.band_id.clone(),
@@ -1174,17 +1169,21 @@ fn audit(case: &Case) -> AuditReport {
         });
     }
 
-    if any_frequency_mismatch {
-        reasons.push("one or more full-scale bands do not match the ITTC-mapped model frequency".to_string());
+    for pair_report in &mut pair_reports {
+        pair_report.band_reports.sort_by(|left, right| left.band_id.cmp(&right.band_id));
     }
-    if any_unresolved_band {
-        reasons.push("one or more propagated prediction intervals are unresolved".to_string());
+    pair_reports.sort_by(|left, right| left.pair_id.cmp(&right.pair_id));
+
+    let calibration_comparison_outcome = role_comparison_outcome(&pair_reports, SplitRole::Calibration);
+    let held_out_comparison_outcome = role_comparison_outcome(&pair_reports, SplitRole::HeldOut);
+
+    // Calibration diagnostics are retained but must never change the blind
+    // held-out decision. The top-level outcome is held-out-only.
+    if calibration_comparison_outcome != "all_declared_bands_overlap" {
+        reasons.push(format!("calibration cohort comparison: {}", calibration_comparison_outcome));
     }
-    if any_prediction_only {
-        reasons.push("one or more model-scale bands have no corresponding full-scale observation".to_string());
-    }
-    if any_disjoint_band {
-        reasons.push("one or more measured full-scale bands are outside the propagated prediction interval".to_string());
+    if held_out_comparison_outcome != "all_declared_bands_overlap" {
+        reasons.push(format!("held-out cohort comparison: {}", held_out_comparison_outcome));
     }
 
     let disposition = if has_dissimilarity
@@ -1202,22 +1201,19 @@ fn audit(case: &Case) -> AuditReport {
         || has_unknown_background_method
         || has_pattern_incomplete
         || unique_model_rotation_rates < 2
-        || any_unresolved_band
-        || any_frequency_mismatch
+        || held_out_comparison_outcome == "frequency_mismatch"
+        || held_out_comparison_outcome == "uncertainty_or_background_unresolved"
+        || held_out_comparison_outcome == "not_evaluated"
     {
         "incomplete"
-    } else if any_prediction_only {
+    } else if held_out_comparison_outcome == "prediction_only" {
         "prediction_only"
-    } else if any_disjoint_band {
+    } else if held_out_comparison_outcome == "at_least_one_band_disjoint" {
         "comparison_outside_declared_uncertainty"
     } else {
         "computational_comparison_only"
     };
 
-    for pair_report in &mut pair_reports {
-        pair_report.band_reports.sort_by(|left, right| left.band_id.cmp(&right.band_id));
-    }
-    pair_reports.sort_by(|left, right| left.pair_id.cmp(&right.pair_id));
     reasons.sort();
     reasons.dedup();
     let mut grouping_dimensions: Vec<&'static str> = case.validation_split.grouping_dimensions
@@ -1226,23 +1222,9 @@ fn audit(case: &Case) -> AuditReport {
         .collect();
     grouping_dimensions.sort_unstable();
 
-    let calibration_comparison_outcome = role_comparison_outcome(&pair_reports, SplitRole::Calibration);
-    let held_out_comparison_outcome = role_comparison_outcome(&pair_reports, SplitRole::HeldOut);
     let calibration_pair_count = pair_reports.iter().filter(|pair| pair.split_role == "calibration").count();
     let held_out_pair_count = pair_reports.iter().filter(|pair| pair.split_role == "held_out").count();
-    let comparison_outcome = if any_frequency_mismatch {
-        "frequency_mismatch"
-    } else if any_unresolved_band {
-        "uncertainty_unresolved"
-    } else if any_prediction_only {
-        "prediction_only"
-    } else if any_disjoint_band {
-        "at_least_one_band_disjoint"
-    } else if pair_reports.iter().all(|p| !p.band_reports.is_empty()) {
-        "all_declared_bands_overlap"
-    } else {
-        "not_evaluated"
-    };
+    let comparison_outcome = held_out_comparison_outcome;
 
     AuditReport {
         schema_version: SCHEMA_VERSION,
@@ -1560,22 +1542,36 @@ mod tests {
         assert_eq!(audit(&case).disposition, "invalid");
     }
 
+    fn make_measured_and_reviewed(case: &mut Case) {
+        case.evidence_kind = EvidenceKind::Measured;
+        case.source.rights_status = RightsStatus::PublicOrPermitted;
+        case.source.independently_reviewed = true;
+    }
+
     #[test]
     fn calibration_outlier_does_not_change_held_out_comparison_outcome() {
         let mut case = fixture_case();
+        make_measured_and_reviewed(&mut case);
+        let baseline = audit(&case);
+        assert_eq!(baseline.disposition, "computational_comparison_only");
         case.pairs[0].full_scale.bands[0].source_level_db = 150.0;
         let report = audit(&case);
         assert_eq!(report.calibration_comparison_outcome, "at_least_one_band_disjoint");
         assert_eq!(report.held_out_comparison_outcome, "all_declared_bands_overlap");
+        assert_eq!(report.disposition, "computational_comparison_only");
+        assert_eq!(report.comparison_outcome, "all_declared_bands_overlap");
     }
 
     #[test]
     fn held_out_outlier_does_not_change_calibration_comparison_outcome() {
         let mut case = fixture_case();
+        make_measured_and_reviewed(&mut case);
         case.pairs[1].full_scale.bands[0].source_level_db = 150.0;
         let report = audit(&case);
         assert_eq!(report.calibration_comparison_outcome, "all_declared_bands_overlap");
         assert_eq!(report.held_out_comparison_outcome, "at_least_one_band_disjoint");
+        assert_eq!(report.disposition, "comparison_outside_declared_uncertainty");
+        assert_eq!(report.comparison_outcome, "at_least_one_band_disjoint");
     }
 
     #[test]
