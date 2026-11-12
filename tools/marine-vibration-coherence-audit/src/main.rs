@@ -142,6 +142,11 @@ struct AuditReport {
     vibration_reference_orientation: String,
     pressure_calibration_certificate_sha256: String,
     vibration_calibration_certificate_sha256: String,
+    pressure_raw_trace_sha256: String,
+    vibration_raw_trace_sha256: String,
+    shared_timebase_id: String,
+    sample_rate_hz: f64,
+    sample_count: u64,
     estimator_id: String,
     estimator_version: String,
     cross_spectrum_convention: String,
@@ -187,6 +192,8 @@ struct BandReport {
     coherent_pressure_psd_level_db_re_1upa2_per_hz: Option<f64>,
     residual_pressure_psd_level_db_re_1upa2_per_hz: Option<f64>,
     uncertainty_status: &'static str,
+    marginal_uncertainty_coverage_level: f64,
+    uncertainty_interpretation: &'static str,
     interpretation: &'static str,
 }
 
@@ -349,6 +356,7 @@ fn validate_case(case: &Case) -> Vec<String> {
     if finite_positive(case.pressure_channel.sample_rate_hz)
         && finite_positive(estimator.frequency_resolution_hz)
         && estimator.segment_length_samples > 0
+        && estimator.segment_length_samples <= case.pressure_channel.sample_count
     {
         let expected_resolution = case.pressure_channel.sample_rate_hz / estimator.segment_length_samples as f64;
         let relative_error = (estimator.frequency_resolution_hz - expected_resolution).abs() / expected_resolution;
@@ -379,6 +387,11 @@ fn validate_case(case: &Case) -> Vec<String> {
                 && band.frequency_hz >= case.pressure_channel.sample_rate_hz / 2.0)
         {
             errors.push(format!("band {} frequency must be strictly increasing, positive and below Nyquist", band.band_id));
+        } else if finite_positive(estimator.frequency_resolution_hz) {
+            let grid_index = band.frequency_hz / estimator.frequency_resolution_hz;
+            if (grid_index - grid_index.round()).abs() > 1.0e-6 {
+                errors.push(format!("band {} frequency is not on the declared FFT frequency grid", band.band_id));
+            }
         }
         previous_frequency = band.frequency_hz;
         if band.pressure_psd_unit != PRESSURE_PSD_UNIT
@@ -452,6 +465,13 @@ fn calculate_band(
     let p_upper = p + input.pressure_psd_expanded_uncertainty;
     let a_lower = a - input.acceleration_psd_expanded_uncertainty;
     let a_upper = a + input.acceleration_psd_expanded_uncertainty;
+    if !cross_uncertainty_radius.is_finite()
+        || !cross_upper.is_finite()
+        || !p_upper.is_finite()
+        || !a_upper.is_finite()
+    {
+        return Err(format!("band {} uncertainty arithmetic overflowed", input.band_id));
+    }
     let coherent_lower = cross_lower.powi(2) / a_upper;
     let coherent_upper = cross_upper.powi(2) / a_lower;
     let residual_lower = p_lower - coherent_upper;
@@ -509,6 +529,8 @@ fn calculate_band(
         coherent_pressure_psd_level_db_re_1upa2_per_hz: db_re_reference(coherent_psd, PRESSURE_REFERENCE_PA.powi(2)),
         residual_pressure_psd_level_db_re_1upa2_per_hz: db_re_reference(residual_psd, PRESSURE_REFERENCE_PA.powi(2)),
         uncertainty_status,
+        marginal_uncertainty_coverage_level: input.uncertainty_coverage_level,
+        uncertainty_interpretation: "conservative_marginal_interval_envelopes_only_no_joint_coverage_or_independence_assumption",
         interpretation: "linear_spectral_component_coherent_with_the_declared_accelerometer_reference_not_unique_physical_source_attribution",
     };
     Ok(ComputedBand {
@@ -593,6 +615,11 @@ fn audit(case: &Case) -> AuditReport {
         vibration_reference_orientation: case.vibration_channel.orientation.clone(),
         pressure_calibration_certificate_sha256: case.pressure_channel.calibration_certificate_sha256.clone(),
         vibration_calibration_certificate_sha256: case.vibration_channel.calibration_certificate_sha256.clone(),
+        pressure_raw_trace_sha256: case.pressure_channel.raw_trace_sha256.clone(),
+        vibration_raw_trace_sha256: case.vibration_channel.raw_trace_sha256.clone(),
+        shared_timebase_id: case.pressure_channel.timebase_id.clone(),
+        sample_rate_hz: case.pressure_channel.sample_rate_hz,
+        sample_count: case.pressure_channel.sample_count,
         estimator_id: case.estimator.estimator_id.clone(),
         estimator_version: case.estimator.estimator_version.clone(),
         cross_spectrum_convention: case.cross_spectrum_convention.clone(),
