@@ -69,16 +69,34 @@ pub enum SupplyProfileError {
     NoCriticalLoads,
     DuplicateCriticalLoadId(String),
     NonCanonicalCriticalLoadOrder,
-    NonCanonicalSegmentLoadOrder { segment_id: String },
+    NonCanonicalSegmentLoadOrder {
+        segment_id: String,
+    },
     NoSegments,
     EmptySegmentId,
     DuplicateSegmentId(String),
-    ZeroDuration { segment_id: String },
-    NonContiguousTimeline { segment_id: String, expected_start_s: u64 },
-    EmptyLoadSet { segment_id: String },
-    DuplicateLoadInSegment { segment_id: String, load_id: String },
-    LoadManifestMismatch { segment_id: String, load_id: String },
-    InvalidPathEvidence { segment_id: String, load_id: String },
+    ZeroDuration {
+        segment_id: String,
+    },
+    NonContiguousTimeline {
+        segment_id: String,
+        expected_start_s: u64,
+    },
+    EmptyLoadSet {
+        segment_id: String,
+    },
+    DuplicateLoadInSegment {
+        segment_id: String,
+        load_id: String,
+    },
+    LoadManifestMismatch {
+        segment_id: String,
+        load_id: String,
+    },
+    InvalidPathEvidence {
+        segment_id: String,
+        load_id: String,
+    },
     EnergyAccountingOverflow,
 }
 
@@ -176,8 +194,8 @@ pub fn evaluate_post_fault_supply(
                 .ok_or(SupplyProfileError::EnergyAccountingOverflow)?;
         }
 
-        let storage_power_required_w = critical_load_power_upper_w
-            .saturating_sub(segment.non_storage_source_capacity_lower_w);
+        let storage_power_required_w =
+            critical_load_power_upper_w.saturating_sub(segment.non_storage_source_capacity_lower_w);
         maximum_storage_power_required_w =
             maximum_storage_power_required_w.max(storage_power_required_w);
 
@@ -186,8 +204,7 @@ pub fn evaluate_post_fault_supply(
                 segment_id: segment.segment_id.clone(),
                 required_storage_power_w: storage_power_required_w,
                 available_storage_power_lower_w: segment.storage_discharge_power_lower_w,
-                unmet_power_w: storage_power_required_w
-                    - segment.storage_discharge_power_lower_w,
+                unmet_power_w: storage_power_required_w - segment.storage_discharge_power_lower_w,
             });
         }
 
@@ -200,8 +217,9 @@ pub fn evaluate_post_fault_supply(
 
         if next_energy > profile.usable_storage_energy_lower_j {
             let excess_energy_j = next_energy - profile.usable_storage_energy_lower_j;
-            let remaining_before_segment =
-                profile.usable_storage_energy_lower_j.saturating_sub(cumulative_storage_energy_j);
+            let remaining_before_segment = profile
+                .usable_storage_energy_lower_j
+                .saturating_sub(cumulative_storage_energy_j);
             let seconds_until_reserve_depletion = if storage_power_required_w == 0 {
                 0
             } else {
@@ -243,13 +261,31 @@ pub fn evaluate_post_fault_supply(
 fn validate_profile(profile: &PostFaultSupplyProfile) -> Result<(), SupplyProfileError> {
     for (field, value) in [
         ("schema_version", profile.schema_version.as_str()),
-        ("configuration_digest", profile.configuration_digest.as_str()),
-        ("operating_point_digest", profile.operating_point_digest.as_str()),
-        ("post_fault_topology_digest", profile.post_fault_topology_digest.as_str()),
+        (
+            "configuration_digest",
+            profile.configuration_digest.as_str(),
+        ),
+        (
+            "operating_point_digest",
+            profile.operating_point_digest.as_str(),
+        ),
+        (
+            "post_fault_topology_digest",
+            profile.post_fault_topology_digest.as_str(),
+        ),
         ("fault_event_digest", profile.fault_event_digest.as_str()),
-        ("critical_load_manifest_digest", profile.critical_load_manifest_digest.as_str()),
-        ("source_capability_digest", profile.source_capability_digest.as_str()),
-        ("storage_state_digest", profile.storage_state_digest.as_str()),
+        (
+            "critical_load_manifest_digest",
+            profile.critical_load_manifest_digest.as_str(),
+        ),
+        (
+            "source_capability_digest",
+            profile.source_capability_digest.as_str(),
+        ),
+        (
+            "storage_state_digest",
+            profile.storage_state_digest.as_str(),
+        ),
     ] {
         if value.trim().is_empty() {
             return Err(SupplyProfileError::EmptyIdentity(field));
@@ -260,9 +296,7 @@ fn validate_profile(profile: &PostFaultSupplyProfile) -> Result<(), SupplyProfil
         return Err(SupplyProfileError::NoCriticalLoads);
     }
     for (index, load_id) in profile.critical_load_ids.iter().enumerate() {
-        if index > 0
-            && profile.critical_load_ids[index - 1].as_str() >= load_id.as_str()
-        {
+        if index > 0 && profile.critical_load_ids[index - 1].as_str() >= load_id.as_str() {
             return Err(SupplyProfileError::NonCanonicalCriticalLoadOrder);
         }
         if load_id.trim().is_empty() {
@@ -309,8 +343,7 @@ fn validate_profile(profile: &PostFaultSupplyProfile) -> Result<(), SupplyProfil
         let mut observed_load_ids = Vec::with_capacity(segment.critical_loads.len());
         for (load_index, load) in segment.critical_loads.iter().enumerate() {
             if load_index > 0
-                && segment.critical_loads[load_index - 1].load_id.as_str()
-                    >= load.load_id.as_str()
+                && segment.critical_loads[load_index - 1].load_id.as_str() >= load.load_id.as_str()
             {
                 return Err(SupplyProfileError::NonCanonicalSegmentLoadOrder {
                     segment_id: segment.segment_id.clone(),
@@ -548,10 +581,7 @@ mod tests {
                 ],
             }],
         );
-        p.critical_load_ids = vec![
-            "critical-a".to_string(),
-            "critical-b".to_string(),
-        ];
+        p.critical_load_ids = vec!["critical-a".to_string(), "critical-b".to_string()];
         assert_eq!(
             evaluate_post_fault_supply(&p).unwrap(),
             ElectricalSupplyDisposition::SustainedElectricalSupply {
