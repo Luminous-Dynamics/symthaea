@@ -724,6 +724,7 @@ mod tests {
             measured_influence_intervals: Vec::new(),
             qualified_support_intervals: Vec::new(),
             qualified_support_by_channel: Vec::new(),
+            measurements: Vec::new(),
             disposition: InfluenceDisposition::NoEffectAboveNoiseFloor,
             receipt_sha256: digest("influence-report"),
         };
