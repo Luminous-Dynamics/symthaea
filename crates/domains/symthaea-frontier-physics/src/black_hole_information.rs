@@ -5316,6 +5316,277 @@ mod symmetry_resolved_page_tests {
     }
 }
 
+
+
+/// Per-layer width statistics for a domain-wall charge profile. Width squared
+/// is the second central moment of the absolute discrete density gradient.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1DomainWallWidthPoint {
+    pub layer: usize,
+    pub mean_width_squared_sites_squared: f64,
+    pub standard_error_width_squared: f64,
+}
+
+/// Dynamic-scaling estimate from a preregistered domain-wall time window.
+/// The fit is log(width_squared) = intercept + alpha*log(time), with
+/// width_squared proportional to t^(2/z), so z=2/alpha.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1DomainWallDynamicScalingResult {
+    pub number_of_qubits: usize,
+    pub initial_left_excitations: usize,
+    pub sample_count: usize,
+    pub first_seed: u64,
+    pub fit_start_layer: usize,
+    pub fit_end_layer: usize,
+    pub width_points: Vec<U1DomainWallWidthPoint>,
+    pub log_log_fit: U1LinearFit,
+    pub mean_squared_width_growth_exponent: f64,
+    pub dynamic_exponent_z: f64,
+    /// Leave-one-seed-out jackknife standard error for z.
+    pub dynamic_exponent_standard_error_jackknife: f64,
+    /// Normal approximation around the jackknife estimate, not an exact
+    /// finite-sample coverage guarantee.
+    pub dynamic_exponent_confidence_95_approx: [f64; 2],
+    pub absolute_distance_to_diffusive_z2: f64,
+    pub absolute_distance_to_ballistic_z1: f64,
+    pub absolute_distance_to_kpz_z1p5: f64,
+    pub finite_size_depth_ratio: f64,
+}
+
+/// Estimate transport dynamic exponent z from independent domain-wall
+/// realizations. The method uses the per-realization second moment of the
+/// density-gradient profile, averages width squared across seeds, then fits
+/// log(width squared) against log(layer) in the caller-declared window.
+///
+/// This avoids assuming diffusion before measuring the exponent:
+/// z approximately 2 is diffusive, z approximately 1 is ballistic, and
+/// z approximately 3/2 is compatible with KPZ-like superdiffusive scaling.
+/// Those are comparison hypotheses, not automatic physical classifications.
+///
+/// Uncertainty is estimated with a leave-one-seed-out jackknife. The selected
+/// time window must be fixed before inspecting the fit. Finite-size saturation
+/// and early-time circuit transients must be studied by repeating this
+/// calculation at several register sizes and windows.
+pub fn analyze_u1_domain_wall_dynamic_exponent(
+    number_of_qubits: usize,
+    depth: usize,
+    sample_count: usize,
+    first_seed: u64,
+    fit_start_layer: usize,
+    fit_end_layer: usize,
+    tolerance: f64,
+) -> Result<U1DomainWallDynamicScalingResult, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    if sample_count < 3 {
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+    }
+    if fit_start_layer == 0
+        || fit_end_layer <= fit_start_layer
+        || fit_end_layer > depth
+        || fit_end_layer - fit_start_layer + 1 < 3
+    {
+        return Err(QuantumInformationError::InvalidHydrodynamicFit {
+            observable: "domain_wall_dynamic_scaling_window",
+        });
+    }
+
+    let initial_left_excitations = number_of_qubits / 2;
+    let mut per_seed_widths = Vec::with_capacity(sample_count);
+    for sample_index in 0..sample_count {
+        let trajectory = simulate_u1_domain_wall_transport(
+            number_of_qubits,
+            initial_left_excitations,
+            depth,
+            first_seed.wrapping_add(sample_index as u64),
+            tolerance,
+        )?;
+        let widths = (fit_start_layer..=fit_end_layer)
+            .map(|layer| {
+                domain_wall_gradient_width_squared(&trajectory.samples[layer].density_profile)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        per_seed_widths.push(widths);
+    }
+
+    let point_count = fit_end_layer - fit_start_layer + 1;
+    let mut width_points = Vec::with_capacity(point_count);
+    let mut mean_widths = vec![0.0; point_count];
+    for point_index in 0..point_count {
+        let mut mean = 0.0;
+        let mut m2 = 0.0;
+        for (sample_index, sample) in per_seed_widths.iter().enumerate() {
+            let count = (sample_index + 1) as f64;
+            let delta = sample[point_index] - mean;
+            mean += delta / count;
+            m2 += delta * (sample[point_index] - mean);
+        }
+        let standard_error = (m2 / (sample_count - 1) as f64 / sample_count as f64).sqrt();
+        let layer = fit_start_layer + point_index;
+        mean_widths[point_index] = mean;
+        width_points.push(U1DomainWallWidthPoint {
+            layer,
+            mean_width_squared_sites_squared: mean,
+            standard_error_width_squared: standard_error,
+        });
+    }
+
+    let fit_dynamic_exponent = |widths: &[f64]| {
+        let mut log_points = Vec::with_capacity(widths.len());
+        for (index, width_squared) in widths.iter().enumerate() {
+            let time = (fit_start_layer + index) as f64;
+            if !width_squared.is_finite() || *width_squared <= 0.0 {
+                return Err(QuantumInformationError::InvalidHydrodynamicFit {
+                    observable: "nonpositive_domain_wall_width_squared",
+                });
+            }
+            log_points.push((time.ln(), width_squared.ln()));
+        }
+        let fit = fit_line(&log_points, "domain_wall_log_log_fit")?;
+        if !fit.slope.is_finite() || fit.slope <= 0.0 {
+            return Err(QuantumInformationError::InvalidHydrodynamicFit {
+                observable: "nonpositive_dynamic_scaling_exponent",
+            });
+        }
+        Ok((fit, 2.0 / fit.slope))
+    };
+
+    let (log_log_fit, dynamic_exponent_z) = fit_dynamic_exponent(&mean_widths)?;
+    let mut jackknife_estimates = Vec::with_capacity(sample_count);
+    for omitted in 0..sample_count {
+        let mut leave_one_out_means = vec![0.0; point_count];
+        for point_index in 0..point_count {
+            let mut sum = 0.0;
+            for (sample_index, sample) in per_seed_widths.iter().enumerate() {
+                if sample_index != omitted {
+                    sum += sample[point_index];
+                }
+            }
+            leave_one_out_means[point_index] = sum / (sample_count - 1) as f64;
+        }
+        jackknife_estimates.push(fit_dynamic_exponent(&leave_one_out_means)?.1);
+    }
+    let jackknife_mean = jackknife_estimates.iter().sum::<f64>() / sample_count as f64;
+    let jackknife_sum_squared = jackknife_estimates
+        .iter()
+        .map(|value| (value - jackknife_mean).powi(2))
+        .sum::<f64>();
+    let jackknife_standard_error =
+        (((sample_count - 1) as f64 / sample_count as f64) * jackknife_sum_squared).sqrt();
+
+    Ok(U1DomainWallDynamicScalingResult {
+        number_of_qubits,
+        initial_left_excitations,
+        sample_count,
+        first_seed,
+        fit_start_layer,
+        fit_end_layer,
+        width_points,
+        log_log_fit,
+        mean_squared_width_growth_exponent: log_log_fit.slope,
+        dynamic_exponent_z,
+        dynamic_exponent_standard_error_jackknife: jackknife_standard_error,
+        dynamic_exponent_confidence_95_approx: [
+            dynamic_exponent_z - 1.96 * jackknife_standard_error,
+            dynamic_exponent_z + 1.96 * jackknife_standard_error,
+        ],
+        absolute_distance_to_diffusive_z2: (dynamic_exponent_z - 2.0).abs(),
+        absolute_distance_to_ballistic_z1: (dynamic_exponent_z - 1.0).abs(),
+        absolute_distance_to_kpz_z1p5: (dynamic_exponent_z - 1.5).abs(),
+        finite_size_depth_ratio: fit_end_layer as f64 / number_of_qubits as f64,
+    })
+}
+
+fn domain_wall_gradient_width_squared(
+    density_profile: &[f64],
+) -> Result<f64, QuantumInformationError> {
+    if density_profile.len() < 2 || density_profile.iter().any(|value| !value.is_finite()) {
+        return Err(QuantumInformationError::InvalidHydrodynamicFit {
+            observable: "domain_wall_density_profile",
+        });
+    }
+    let gradient_weights = density_profile
+        .windows(2)
+        .map(|pair| (pair[1] - pair[0]).abs())
+        .collect::<Vec<_>>();
+    let total_weight: f64 = gradient_weights.iter().sum();
+    if !total_weight.is_finite() || total_weight <= 1e-14 {
+        return Err(QuantumInformationError::InvalidHydrodynamicFit {
+            observable: "domain_wall_gradient_width",
+        });
+    }
+    let centroid = gradient_weights
+        .iter()
+        .enumerate()
+        .map(|(bond, weight)| (bond as f64 + 0.5) * weight)
+        .sum::<f64>()
+        / total_weight;
+    Ok(gradient_weights
+        .iter()
+        .enumerate()
+        .map(|(bond, weight)| weight * ((bond as f64 + 0.5) - centroid).powi(2))
+        .sum::<f64>()
+        / total_weight)
+}
+
+#[cfg(test)]
+mod u1_domain_wall_dynamic_scaling_tests {
+    use super::*;
+
+    const TOLERANCE: f64 = 1e-10;
+
+    #[test]
+    fn domain_wall_dynamic_exponent_reports_seed_uncertainty_and_reference_distances() {
+        let result =
+            analyze_u1_domain_wall_dynamic_exponent(6, 12, 8, 0xD1FF, 2, 12, TOLERANCE).unwrap();
+        assert_eq!(result.number_of_qubits, 6);
+        assert_eq!(result.initial_left_excitations, 3);
+        assert_eq!(result.sample_count, 8);
+        assert_eq!(result.width_points.len(), 11);
+        assert_eq!(result.log_log_fit.point_count, 11);
+        assert!(result.dynamic_exponent_z.is_finite());
+        assert!(result.dynamic_exponent_standard_error_jackknife.is_finite());
+        assert!(result.dynamic_exponent_standard_error_jackknife >= 0.0);
+        assert!(result.log_log_fit.r_squared.is_finite());
+        assert_eq!(
+            result.absolute_distance_to_diffusive_z2,
+            (result.dynamic_exponent_z - 2.0).abs(),
+        );
+        assert_eq!(
+            result.absolute_distance_to_ballistic_z1,
+            (result.dynamic_exponent_z - 1.0).abs(),
+        );
+        assert_eq!(
+            result.absolute_distance_to_kpz_z1p5,
+            (result.dynamic_exponent_z - 1.5).abs(),
+        );
+    }
+
+    #[test]
+    fn domain_wall_dynamic_exponent_is_seed_reproducible() {
+        let first =
+            analyze_u1_domain_wall_dynamic_exponent(6, 10, 6, 0xF1A5, 2, 10, TOLERANCE).unwrap();
+        let repeated =
+            analyze_u1_domain_wall_dynamic_exponent(6, 10, 6, 0xF1A5, 2, 10, TOLERANCE).unwrap();
+        assert_eq!(first, repeated);
+    }
+
+    #[test]
+    fn domain_wall_dynamic_exponent_rejects_short_or_invalid_windows() {
+        assert!(matches!(
+            analyze_u1_domain_wall_dynamic_exponent(6, 10, 2, 7, 2, 10, TOLERANCE),
+            Err(QuantumInformationError::InvalidEnsembleSampleCount(2))
+        ));
+        assert!(matches!(
+            analyze_u1_domain_wall_dynamic_exponent(6, 10, 6, 7, 0, 10, TOLERANCE),
+            Err(QuantumInformationError::InvalidHydrodynamicFit { .. })
+        ));
+        assert!(matches!(
+            analyze_u1_domain_wall_dynamic_exponent(6, 10, 6, 7, 8, 10, TOLERANCE),
+            Err(QuantumInformationError::InvalidHydrodynamicFit { .. })
+        ));
+    }
+}
+
 #[cfg(test)]
 mod u1_hydrodynamic_scrambling_tests {
     use super::*;
