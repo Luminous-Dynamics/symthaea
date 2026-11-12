@@ -1,17 +1,20 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! JEPA engine state: weight storage, energy tracking, telemetry.
+//! JEPA engine state: weight storage, configured energy estimates, telemetry.
 
 use serde::{Deserialize, Serialize};
 
 /// Persistent state for the JEPA engine.
 ///
 /// Holds flattened weight matrices for the context encoder, predictor, and
-/// target encoder, plus energy and loss tracking for thermodynamic telemetry.
+/// target encoder, plus configured energy-estimate and loss tracking. The
+/// energy value is a scenario proxy unless a measured hardware value was
+/// supplied by the caller.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JepaState {
-    /// Total energy spent by JEPA forward passes (joules, monotonically increasing).
+    /// Total configured energy estimate accumulated across forwards. Nominally
+    /// in joules, but not device-measured unless backed by an external measurement.
     pub total_energy_spent: f64,
 
     /// Cumulative cosine loss across all forward passes.
