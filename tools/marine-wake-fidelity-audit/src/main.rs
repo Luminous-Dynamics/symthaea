@@ -854,19 +854,28 @@ fn audit(case: &Case) -> AuditReport {
         reasons.push("target and realized wake fields do not have exactly the same polar grid; interpolation is prohibited in v0.1".to_string());
         unresolved = true;
     }
-    if case.target.scale_basis != case.realized.scale_basis {
+    let coordinate_mismatch = case.target.reference_velocity_mps != case.realized.reference_velocity_mps
+        || case.target.propeller_revision != case.realized.propeller_revision
+        || case.target.condition_fingerprint_sha256 != case.realized.condition_fingerprint_sha256
+        || !field_coordinates_match_each_other(&case.target, &case.realized)
+        || !field_coordinates_match_case(&case.target, case)
+        || !field_coordinates_match_case(&case.realized, case);
+    if coordinate_mismatch {
+        reasons.push("target and realized operating-point, reference-velocity or coordinate-frame identities differ".to_string());
+        unresolved = true;
+    }
+    let scale_mismatch = case.target.scale_basis != case.realized.scale_basis;
+    if scale_mismatch {
         reasons.push("model-scale and full-scale wake fields cannot be compared without an explicit scale-transfer method".to_string());
         unresolved = true;
     }
-    let coordinate_mismatch = case.target.reference_velocity_mps != case.realized.reference_velocity_mps
-        || case.target.propeller_revision != case.realized.propeller_revision
-        || case.target.condition_fingerprint_sha256 != case.realized.condition_fingerprint_sha256;
-    if coordinate_mismatch {
-        reasons.push("target and realized operating-point or reference-velocity identities differ".to_string());
+    let quadrature_mismatch = grid_matches && !same_quadrature(&case.target, &case.realized);
+    if quadrature_mismatch {
+        reasons.push("target and realized polar grids use different area-weight methods or weights; area-integrated comparisons are withheld".to_string());
         unresolved = true;
     }
 
-    if grid_matches && !coordinate_mismatch && errors.is_empty() {
+    if grid_matches && !coordinate_mismatch && !scale_mismatch && !quadrature_mismatch && errors.is_empty() {
         let coverage=[0,1,2].map(|index| {
             case.target.points.iter().zip(&case.realized.points).all(|(t,r)| component(t,index).is_some()&&component(r,index).is_some())
         });
@@ -900,8 +909,11 @@ fn audit(case: &Case) -> AuditReport {
     }
 
     if let Some(blockage)=&blockage {
-        if !blockage.below_ittc_twenty_percent_recommendation {
-            reasons.push("area blockage is >=20%; a reviewed assessment is present but this does not constitute an acoustic blockage correction".to_string());
+        if blockage.review_required && !blockage.review_assessment_eligible {
+            reasons.push("area blockage is >=20%; a reviewed blockage assessment digest is required before comparison".to_string());
+            unresolved = true;
+        } else if !blockage.below_ittc_twenty_percent_recommendation {
+            reasons.push("area blockage is >=20%; a reviewed assessment is present, but this does not constitute an acoustic blockage correction".to_string());
         }
     }
     if case.evidence_kind==EvidenceKind::Synthetic {
@@ -916,7 +928,7 @@ fn audit(case: &Case) -> AuditReport {
         &&case.realized.points.iter().all(|p|p.vx_over_vref.is_some()&&p.vr_over_vref.is_some()&&p.vt_over_vref.is_some());
     let disposition=if !errors.is_empty() {
         "INVALID"
-    } else if has_definite_failure {
+    } else if has_definite_failure || coordinate_mismatch || scale_mismatch || quadrature_mismatch || !grid_matches {
         "INCOMPARABLE"
     } else if case.evidence_kind==EvidenceKind::Synthetic || unresolved {
         if !full_vector && component_metrics.iter().any(|m|m.component=="axial") {
@@ -946,6 +958,8 @@ fn audit(case: &Case) -> AuditReport {
             area_blockage_ratio:0.0,
             below_ittc_twenty_percent_recommendation:false,
             review_state:review_name(case.blockage.review_state),
+            review_required:false,
+            review_assessment_eligible:false,
             review_evidence_sha256:case.blockage.review_evidence_sha256.clone(),
             interpretation:"invalid_blockage_geometry",
         }),
