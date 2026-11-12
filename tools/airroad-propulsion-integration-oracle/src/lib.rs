@@ -5,11 +5,11 @@
 //! oracles. This crate qualifies software hand-offs only; it is not a physical
 //! motor, battery, thermal, aircraft, safety, or certification model.
 //!
-//! Observation torque/RPM bounds are propagated through the map by querying
-//! the four corners of their uncertainty rectangle. This is valid only while
-//! all corners remain in the same bilinear map cell; cell-crossing intervals
-//! fail closed. Other drivetrain and mission-demand uncertainties are outside
-//! this fixture's propagated envelope.
+//! Observation torque/RPM bounds are passed to the coordinate-aware map
+//! oracle, which enumerates every intersected bilinear cell and rejects any
+//! partial out-of-domain rectangle. The resulting efficiency envelope is
+//! propagated through a motor-shaft demand consumer without reapplying gearbox
+//! efficiency. This is a synthetic substep, not physical or mission validation.
 
 #![forbid(unsafe_code)]
 
