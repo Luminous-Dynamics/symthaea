@@ -217,7 +217,6 @@ pub fn enclose_mimo_impedance_sweep(
     semantics: &ErrorBoundSemantics,
 ) -> Result<MimoImpedanceSweepEnclosure, MatrixEnclosureError> {
     let method_reference = validate_semantics(semantics)?;
-    validate_mimo_impedance_sweep(sweep)?;
     let evidence_class = validate_mimo_impedance_sweep(sweep)?.evidence_class;
 
     let mut frequency_matrices = Vec::with_capacity(sweep.frequency_slices.len());
@@ -726,16 +725,31 @@ mod tests {
     }
 
     #[test]
+    fn missing_cross_port_observation_blocks_the_entire_matrix_enclosure() {
+        let mut sweep = fixture();
+        sweep.frequency_slices[0].columns[0]
+            .voltage_observations
+            .pop();
+        assert!(matches!(
+            enclose_mimo_impedance_matrix_at_exact_frequency(&sweep, 0.0, &semantics()),
+            Err(MatrixEnclosureError::Passport(
+                PortMatrixError::MissingOutputObservation { .. }
+            ))
+        ));
+    }
+
+    #[test]
     fn tiny_current_that_underflows_squared_denominator_is_not_evaluable() {
         let mut sweep = fixture();
         sweep.frequency_slices[0].columns[0].injected_current_a =
             ComplexValue { real: 1.0e-300, imag: 0.0 };
         sweep.frequency_slices[0].columns[0].absolute_error_bound_a = 0.0;
-        assert!(matches!(
+        assert_eq!(
             enclose_mimo_impedance_matrix_at_exact_frequency(&sweep, 0.0, &semantics()),
-            Err(MatrixEnclosureError::ElementArithmeticFailure { .. })
-                | Err(MatrixEnclosureError::DenominatorIntervalIncludesZero)
-        ));
+            Err(MatrixEnclosureError::Passport(
+                PortMatrixError::ZeroOrUnrepresentableExcitation
+            ))
+        );
     }
 
     #[test]
