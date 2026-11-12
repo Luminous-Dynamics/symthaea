@@ -58,9 +58,24 @@ jobs:
       - name: Verify Cargo workspace metadata resolves
         run: cargo metadata --locked --no-deps --format-version 1 > /tmp/muse-workspace-metadata.json
 
-      - name: Check Muse formatting (legacy workspace debt is non-blocking)
-        continue-on-error: true
-        run: cargo fmt --manifest-path crates/domains/symthaea-muse/Cargo.toml -- --check
+      # Cargo.lock is known stale in the shared workspace (tracked by #8067).
+      # Resolve with Cargo on this exact checkout, retain the generated lock as
+      # an artifact, then run all checks with --locked. A final clean-lock gate
+      # remains blocking; the artifact is used to review/commit the minimal
+      # Cargo-generated delta before claiming reproducibility.
+      - name: Resolve diagnostic lockfile with pinned Cargo
+        run: cargo metadata --manifest-path crates/domains/symthaea-muse/Cargo.toml --format-version 1 > /tmp/muse-resolved-metadata.json
+
+      - name: Preserve Cargo-generated lockfile for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: muse-cargo-lockfile-bootstrap
+          path: Cargo.lock
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Check formatting of changed Muse Rust files only
+        run: rustfmt --check --edition 2024 crates/domains/symthaea-muse/src/fluid_render.rs crates/domains/symthaea-muse/src/renderer_execution_receipt.rs crates/domains/symthaea-muse/src/bin/muse_studio.rs
 
       - name: Run renderer invocation and temp-path tests
         run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib fluid_render::tests
@@ -73,3 +88,6 @@ jobs:
 
       - name: Run Clippy for the Muse Studio binary
         run: cargo clippy --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features studio --bin muse_studio -- -D warnings
+
+      - name: Require committed Cargo.lock to match the pinned Cargo resolution
+        run: git diff --exit-code -- Cargo.lock
