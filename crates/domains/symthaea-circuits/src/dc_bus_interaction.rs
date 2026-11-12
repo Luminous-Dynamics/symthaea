@@ -142,17 +142,10 @@ pub fn analyze(
     let j20 = g2 / p.input_2_capacitance_f;
     let j22 = (-g2 + h2) / p.input_2_capacitance_f;
 
-    let jacobian = [
-        [j00, j01, j02],
-        [j10, j11, 0.0],
-        [j20, 0.0, j22],
-    ];
+    let jacobian = [[j00, j01, j02], [j10, j11, 0.0], [j20, 0.0, j22]];
 
     let trace = j00 + j11 + j22;
-    let principal_minors =
-        (j00 * j11 - j01 * j10)
-        + (j00 * j22 - j02 * j20)
-        + (j11 * j22);
+    let principal_minors = (j00 * j11 - j01 * j10) + (j00 * j22 - j02 * j20) + (j11 * j22);
     let determinant = j00 * j11 * j22 - j01 * j10 * j22 - j02 * j11 * j20;
 
     // det(sI - J) = s^3 - tr(J)s^2 + sum(principal minors)s - det(J).
@@ -184,7 +177,9 @@ pub fn analyze(
     let isolated_1 = (-g1 + h1) / p.input_1_capacitance_f;
     let isolated_2 = (-g2 + h2) / p.input_2_capacitance_f;
     if !isolated_1.is_finite() || !isolated_2.is_finite() {
-        return Err(InteractionError::NonFiniteDerivedValue("isolated_branch_poles"));
+        return Err(InteractionError::NonFiniteDerivedValue(
+            "isolated_branch_poles",
+        ));
     }
 
     Ok(InteractionAnalysis {
@@ -309,10 +304,8 @@ fn check_equilibrium(
     tolerance_a: f64,
 ) -> Result<(), InteractionError> {
     let source_current = (p.source_voltage_v - op.bus_voltage_v) / p.source_resistance_ohm;
-    let branch_1_current =
-        (op.bus_voltage_v - op.input_1_voltage_v) / p.feeder_1_resistance_ohm;
-    let branch_2_current =
-        (op.bus_voltage_v - op.input_2_voltage_v) / p.feeder_2_resistance_ohm;
+    let branch_1_current = (op.bus_voltage_v - op.input_1_voltage_v) / p.feeder_1_resistance_ohm;
+    let branch_2_current = (op.bus_voltage_v - op.input_2_voltage_v) / p.feeder_2_resistance_ohm;
     let load_1_current = p.load_1_power_w / op.input_1_voltage_v;
     let load_2_current = p.load_2_power_w / op.input_2_voltage_v;
 
@@ -322,7 +315,9 @@ fn check_equilibrium(
         branch_2_current - load_2_current,
     ];
     if residuals.iter().any(|value| !value.is_finite()) {
-        return Err(InteractionError::NonFiniteDerivedValue("equilibrium_residual"));
+        return Err(InteractionError::NonFiniteDerivedValue(
+            "equilibrium_residual",
+        ));
     }
     if residuals.iter().any(|value| value.abs() > tolerance_a) {
         return Err(InteractionError::InvalidOperatingPointResidual);
