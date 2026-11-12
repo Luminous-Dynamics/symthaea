@@ -1,0 +1,891 @@
+{
+  "schema_version": "0.1.0",
+  "case_id": "synthetic-wake-analytic-001",
+  "evidence_kind": "synthetic",
+  "source": {
+    "dataset_id": "synthetic-analytic-wake",
+    "citation": "Synthetic analytic known-answer fixture; not measured data",
+    "raw_data_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "rights_status": "public_or_permitted",
+    "independently_reviewed": false
+  },
+  "propeller": {
+    "revision": "prop-r7",
+    "diameter_m": 0.25,
+    "hub_ratio": 0.2
+  },
+  "condition_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "reference_velocity_mps": 5,
+  "coordinate_frame": "propeller_looking_forward_from_aft",
+  "angular_origin": "top_dead_centre",
+  "positive_azimuth": "clockwise_viewed_from_aft",
+  "axial_positive_direction": "toward_stern",
+  "tolerances": {
+    "axial": 0.04,
+    "radial": 0.02,
+    "tangential": 0.02,
+    "nominal_wake_fraction": 0.04
+  },
+  "max_fourier_harmonic": 2,
+  "blockage": {
+    "section_shape": "rectangular",
+    "section_width_m": 0.5,
+    "section_height_m": 0.5,
+    "method": "wire_screen",
+    "review_state": "not_required"
+  },
+  "target": {
+    "field_id": "target",
+    "method": "five_hole_pitot",
+    "scale_basis": "model_scale",
+    "propeller_revision": "prop-r7",
+    "condition_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "reference_velocity_mps": 5,
+    "instrument_or_solver_id": "target-system",
+    "calibration_or_solver_validation_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "raw_data_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "coordinate_frame": "propeller_looking_forward_from_aft",
+    "angular_origin": "top_dead_centre",
+    "positive_azimuth": "clockwise_viewed_from_aft",
+    "axial_positive_direction": "toward_stern",
+    "area_weight_method_id": "annular-sector-midpoint-v1",
+    "area_weight_evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "points": [
+      {
+        "r_over_r": 0.3,
+        "azimuth_deg": 0,
+        "area_weight": 0.02734375,
+        "vx_over_vref": {
+          "value": 0.86,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.3,
+        "azimuth_deg": 45,
+        "area_weight": 0.02734375,
+        "vx_over_vref": {
+          "value": 0.8412132034355964,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.0070710678118654745,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 1.5308084989341916e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.3,
+        "azimuth_deg": 90,
+        "area_weight": 0.02734375,
+        "vx_over_vref": {
+          "value": 0.8099999999999999,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.01,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.3,
+        "azimuth_deg": 135,
+        "area_weight": 0.02734375,
+        "vx_over_vref": {
+          "value": 0.7987867965644035,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.007071067811865476,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -4.592425496802574e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.3,
+        "azimuth_deg": 180,
+        "area_weight": 0.02734375,
+        "vx_over_vref": {
+          "value": 0.7999999999999999,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 1.2246467991473532e-18,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.3,
+        "azimuth_deg": 225,
+        "area_weight": 0.02734375,
+        "vx_over_vref": {
+          "value": 0.7987867965644035,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.0070710678118654745,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 7.654042494670958e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.3,
+        "azimuth_deg": 270,
+        "area_weight": 0.02734375,
+        "vx_over_vref": {
+          "value": 0.8099999999999999,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.01,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.3,
+        "azimuth_deg": 315,
+        "area_weight": 0.02734375,
+        "vx_over_vref": {
+          "value": 0.8412132034355964,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.007071067811865477,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -1.0715659492539341e-17,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.6,
+        "azimuth_deg": 0,
+        "area_weight": 0.040690104166666664,
+        "vx_over_vref": {
+          "value": 0.86,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.6,
+        "azimuth_deg": 45,
+        "area_weight": 0.040690104166666664,
+        "vx_over_vref": {
+          "value": 0.8412132034355964,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.0070710678118654745,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 1.5308084989341916e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.6,
+        "azimuth_deg": 90,
+        "area_weight": 0.040690104166666664,
+        "vx_over_vref": {
+          "value": 0.8099999999999999,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.01,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.6,
+        "azimuth_deg": 135,
+        "area_weight": 0.040690104166666664,
+        "vx_over_vref": {
+          "value": 0.7987867965644035,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.007071067811865476,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -4.592425496802574e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.6,
+        "azimuth_deg": 180,
+        "area_weight": 0.040690104166666664,
+        "vx_over_vref": {
+          "value": 0.7999999999999999,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 1.2246467991473532e-18,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.6,
+        "azimuth_deg": 225,
+        "area_weight": 0.040690104166666664,
+        "vx_over_vref": {
+          "value": 0.7987867965644035,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.0070710678118654745,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 7.654042494670958e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.6,
+        "azimuth_deg": 270,
+        "area_weight": 0.040690104166666664,
+        "vx_over_vref": {
+          "value": 0.8099999999999999,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.01,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.6,
+        "azimuth_deg": 315,
+        "area_weight": 0.040690104166666664,
+        "vx_over_vref": {
+          "value": 0.8412132034355964,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.007071067811865477,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -1.0715659492539341e-17,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.9,
+        "azimuth_deg": 0,
+        "area_weight": 0.056966145833333336,
+        "vx_over_vref": {
+          "value": 0.86,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.9,
+        "azimuth_deg": 45,
+        "area_weight": 0.056966145833333336,
+        "vx_over_vref": {
+          "value": 0.8412132034355964,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.0070710678118654745,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 1.5308084989341916e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.9,
+        "azimuth_deg": 90,
+        "area_weight": 0.056966145833333336,
+        "vx_over_vref": {
+          "value": 0.8099999999999999,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.01,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.9,
+        "azimuth_deg": 135,
+        "area_weight": 0.056966145833333336,
+        "vx_over_vref": {
+          "value": 0.7987867965644035,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.007071067811865476,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -4.592425496802574e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.9,
+        "azimuth_deg": 180,
+        "area_weight": 0.056966145833333336,
+        "vx_over_vref": {
+          "value": 0.7999999999999999,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 1.2246467991473532e-18,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.9,
+        "azimuth_deg": 225,
+        "area_weight": 0.056966145833333336,
+        "vx_over_vref": {
+          "value": 0.7987867965644035,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.0070710678118654745,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 7.654042494670958e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.9,
+        "azimuth_deg": 270,
+        "area_weight": 0.056966145833333336,
+        "vx_over_vref": {
+          "value": 0.8099999999999999,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.01,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.9,
+        "azimuth_deg": 315,
+        "area_weight": 0.056966145833333336,
+        "vx_over_vref": {
+          "value": 0.8412132034355964,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.007071067811865477,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -1.0715659492539341e-17,
+          "expanded_uncertainty": 0.003
+        }
+      }
+    ]
+  },
+  "realized": {
+    "field_id": "realized",
+    "method": "rans",
+    "scale_basis": "model_scale",
+    "propeller_revision": "prop-r7",
+    "condition_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "reference_velocity_mps": 5,
+    "instrument_or_solver_id": "realized-system",
+    "calibration_or_solver_validation_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "raw_data_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "coordinate_frame": "propeller_looking_forward_from_aft",
+    "angular_origin": "top_dead_centre",
+    "positive_azimuth": "clockwise_viewed_from_aft",
+    "axial_positive_direction": "toward_stern",
+    "area_weight_method_id": "annular-sector-midpoint-v1",
+    "area_weight_evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "points": [
+      {
+        "r_over_r": 0.3,
+        "azimuth_deg": 0,
+        "area_weight": 0.02734375,
+        "vx_over_vref": {
+          "value": 0.865,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.3,
+        "azimuth_deg": 45,
+        "area_weight": 0.02734375,
+        "vx_over_vref": {
+          "value": 0.8462132034355964,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.0070710678118654745,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 1.5308084989341916e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.3,
+        "azimuth_deg": 90,
+        "area_weight": 0.02734375,
+        "vx_over_vref": {
+          "value": 0.815,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.01,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.3,
+        "azimuth_deg": 135,
+        "area_weight": 0.02734375,
+        "vx_over_vref": {
+          "value": 0.8037867965644035,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.007071067811865476,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -4.592425496802574e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.3,
+        "azimuth_deg": 180,
+        "area_weight": 0.02734375,
+        "vx_over_vref": {
+          "value": 0.8049999999999999,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 1.2246467991473532e-18,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.3,
+        "azimuth_deg": 225,
+        "area_weight": 0.02734375,
+        "vx_over_vref": {
+          "value": 0.8037867965644035,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.0070710678118654745,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 7.654042494670958e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.3,
+        "azimuth_deg": 270,
+        "area_weight": 0.02734375,
+        "vx_over_vref": {
+          "value": 0.815,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.01,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.3,
+        "azimuth_deg": 315,
+        "area_weight": 0.02734375,
+        "vx_over_vref": {
+          "value": 0.8462132034355964,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.007071067811865477,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -1.0715659492539341e-17,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.6,
+        "azimuth_deg": 0,
+        "area_weight": 0.040690104166666664,
+        "vx_over_vref": {
+          "value": 0.865,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.6,
+        "azimuth_deg": 45,
+        "area_weight": 0.040690104166666664,
+        "vx_over_vref": {
+          "value": 0.8462132034355964,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.0070710678118654745,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 1.5308084989341916e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.6,
+        "azimuth_deg": 90,
+        "area_weight": 0.040690104166666664,
+        "vx_over_vref": {
+          "value": 0.815,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.01,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.6,
+        "azimuth_deg": 135,
+        "area_weight": 0.040690104166666664,
+        "vx_over_vref": {
+          "value": 0.8037867965644035,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.007071067811865476,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -4.592425496802574e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.6,
+        "azimuth_deg": 180,
+        "area_weight": 0.040690104166666664,
+        "vx_over_vref": {
+          "value": 0.8049999999999999,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 1.2246467991473532e-18,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.6,
+        "azimuth_deg": 225,
+        "area_weight": 0.040690104166666664,
+        "vx_over_vref": {
+          "value": 0.8037867965644035,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.0070710678118654745,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 7.654042494670958e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.6,
+        "azimuth_deg": 270,
+        "area_weight": 0.040690104166666664,
+        "vx_over_vref": {
+          "value": 0.815,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.01,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.6,
+        "azimuth_deg": 315,
+        "area_weight": 0.040690104166666664,
+        "vx_over_vref": {
+          "value": 0.8462132034355964,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.007071067811865477,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -1.0715659492539341e-17,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.9,
+        "azimuth_deg": 0,
+        "area_weight": 0.056966145833333336,
+        "vx_over_vref": {
+          "value": 0.865,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.9,
+        "azimuth_deg": 45,
+        "area_weight": 0.056966145833333336,
+        "vx_over_vref": {
+          "value": 0.8462132034355964,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.0070710678118654745,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 1.5308084989341916e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.9,
+        "azimuth_deg": 90,
+        "area_weight": 0.056966145833333336,
+        "vx_over_vref": {
+          "value": 0.815,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.01,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.9,
+        "azimuth_deg": 135,
+        "area_weight": 0.056966145833333336,
+        "vx_over_vref": {
+          "value": 0.8037867965644035,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 0.007071067811865476,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -4.592425496802574e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.9,
+        "azimuth_deg": 180,
+        "area_weight": 0.056966145833333336,
+        "vx_over_vref": {
+          "value": 0.8049999999999999,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": 1.2246467991473532e-18,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.9,
+        "azimuth_deg": 225,
+        "area_weight": 0.056966145833333336,
+        "vx_over_vref": {
+          "value": 0.8037867965644035,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.0070710678118654745,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": 7.654042494670958e-18,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.9,
+        "azimuth_deg": 270,
+        "area_weight": 0.056966145833333336,
+        "vx_over_vref": {
+          "value": 0.815,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.01,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -0.025,
+          "expanded_uncertainty": 0.003
+        }
+      },
+      {
+        "r_over_r": 0.9,
+        "azimuth_deg": 315,
+        "area_weight": 0.056966145833333336,
+        "vx_over_vref": {
+          "value": 0.8462132034355964,
+          "expanded_uncertainty": 0.005
+        },
+        "vr_over_vref": {
+          "value": -0.007071067811865477,
+          "expanded_uncertainty": 0.003
+        },
+        "vt_over_vref": {
+          "value": -1.0715659492539341e-17,
+          "expanded_uncertainty": 0.003
+        }
+      }
+    ]
+  }
+}
