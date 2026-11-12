@@ -4126,8 +4126,6 @@ mod symmetry_resolved_page_tests {
     }
 }
 
-
-
 #[cfg(test)]
 mod u1_hydrodynamic_scrambling_tests {
     use super::*;
@@ -4136,10 +4134,8 @@ mod u1_hydrodynamic_scrambling_tests {
 
     #[test]
     fn joint_hydrodynamic_analysis_reports_diffusion_butterfly_and_entanglement_fits() {
-        let domain_wall = sample_u1_domain_wall_transport_ensemble(
-            6, 3, 8, 8, 0xD1FF, TOLERANCE,
-        )
-        .unwrap();
+        let domain_wall =
+            sample_u1_domain_wall_transport_ensemble(6, 3, 8, 8, 0xD1FF, TOLERANCE).unwrap();
         let operator_depths = (0..=3)
             .map(|depth| {
                 sample_u1_operator_spreading_ensemble(
@@ -4162,23 +4158,39 @@ mod u1_hydrodynamic_scrambling_tests {
             operator_front_end_depth: 3,
             operator_front_threshold: 0.25,
         };
-        let analysis = analyze_u1_hydrodynamic_scrambling(
-            &domain_wall,
-            &operator_depths,
-            &config,
-        )
-        .unwrap();
+        let analysis =
+            analyze_u1_hydrodynamic_scrambling(&domain_wall, &operator_depths, &config).unwrap();
 
         assert_eq!(analysis.number_of_qubits, 6);
         assert_eq!(analysis.total_excitations, 3);
         assert_eq!(analysis.source_qubit, 2);
         assert_eq!(analysis.domain_wall_sample_count, 8);
         assert_eq!(analysis.operator_sample_count_per_depth, 8);
-        assert!(analysis.effective_charge_diffusion_coefficient_sites_squared_per_layer.is_finite());
-        assert!(analysis.entanglement_entropy_growth_rate_nats_per_layer.is_finite());
-        assert!(analysis.effective_entanglement_velocity_sites_per_layer.is_finite());
-        assert!(analysis.left_operator_butterfly_velocity_sites_per_layer.is_finite());
-        assert!(analysis.right_operator_butterfly_velocity_sites_per_layer.is_finite());
+        assert!(
+            analysis
+                .effective_charge_diffusion_coefficient_sites_squared_per_layer
+                .is_finite()
+        );
+        assert!(
+            analysis
+                .entanglement_entropy_growth_rate_nats_per_layer
+                .is_finite()
+        );
+        assert!(
+            analysis
+                .effective_entanglement_velocity_sites_per_layer
+                .is_finite()
+        );
+        assert!(
+            analysis
+                .left_operator_butterfly_velocity_sites_per_layer
+                .is_finite()
+        );
+        assert!(
+            analysis
+                .right_operator_butterfly_velocity_sites_per_layer
+                .is_finite()
+        );
         assert!(analysis.symmetry_resolved_page_half_chain_entropy_nats > 0.0);
         assert_eq!(analysis.charge_diffusion_width_fit.point_count, 7);
         assert_eq!(analysis.entanglement_growth_fit.point_count, 7);
@@ -4188,26 +4200,21 @@ mod u1_hydrodynamic_scrambling_tests {
         assert!(analysis.maximum_domain_wall_norm_drift < 1e-9);
         assert!(analysis.maximum_domain_wall_charge_drift < 1e-9);
         assert!(analysis.maximum_operator_norm_drift < 1e-9);
-        assert!(analysis.operator_front_positions.iter().any(|sample| {
-            sample.left_boundary_censored || sample.right_boundary_censored
-        }));
+        assert!(
+            analysis
+                .operator_front_positions
+                .iter()
+                .any(|sample| { sample.left_boundary_censored || sample.right_boundary_censored })
+        );
     }
 
     #[test]
     fn hydrodynamic_analysis_rejects_incompatible_registers_and_bad_windows() {
-        let domain_wall = sample_u1_domain_wall_transport_ensemble(
-            6, 3, 4, 4, 0xD1FF, TOLERANCE,
-        )
-        .unwrap();
+        let domain_wall =
+            sample_u1_domain_wall_transport_ensemble(6, 3, 4, 4, 0xD1FF, TOLERANCE).unwrap();
         let wrong_register = vec![
-            sample_u1_operator_spreading_ensemble(
-                4, 1, 0, 4, 0xA100, TOLERANCE,
-            )
-            .unwrap(),
-            sample_u1_operator_spreading_ensemble(
-                4, 1, 1, 4, 0xA101, TOLERANCE,
-            )
-            .unwrap(),
+            sample_u1_operator_spreading_ensemble(4, 1, 0, 4, 0xA100, TOLERANCE).unwrap(),
+            sample_u1_operator_spreading_ensemble(4, 1, 1, 4, 0xA101, TOLERANCE).unwrap(),
         ];
         let config = U1HydrodynamicAnalysisConfig {
             diffusion_start_layer: 1,
@@ -4224,25 +4231,15 @@ mod u1_hydrodynamic_scrambling_tests {
         ));
 
         let matching_operator = vec![
-            sample_u1_operator_spreading_ensemble(
-                6, 2, 0, 4, 0xA200, TOLERANCE,
-            )
-            .unwrap(),
-            sample_u1_operator_spreading_ensemble(
-                6, 2, 1, 4, 0xA201, TOLERANCE,
-            )
-            .unwrap(),
+            sample_u1_operator_spreading_ensemble(6, 2, 0, 4, 0xA200, TOLERANCE).unwrap(),
+            sample_u1_operator_spreading_ensemble(6, 2, 1, 4, 0xA201, TOLERANCE).unwrap(),
         ];
         let invalid_config = U1HydrodynamicAnalysisConfig {
             diffusion_start_layer: 0,
             ..config
         };
         assert!(matches!(
-            analyze_u1_hydrodynamic_scrambling(
-                &domain_wall,
-                &matching_operator,
-                &invalid_config,
-            ),
+            analyze_u1_hydrodynamic_scrambling(&domain_wall, &matching_operator, &invalid_config,),
             Err(QuantumInformationError::InvalidHydrodynamicFit { .. })
         ));
     }
