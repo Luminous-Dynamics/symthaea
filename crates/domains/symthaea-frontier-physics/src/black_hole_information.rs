@@ -1052,6 +1052,13 @@ pub struct SequentialEvaporationSample {
     /// Expectation of N = sum_i |1><1|_i for equal-gap qubits.
     pub total_excitation_expectation: f64,
     pub total_excitation_variance: f64,
+    /// Expected excitation number carried by each side of the B|R partition.
+    pub radiation_excitation_expectation: f64,
+    pub black_hole_excitation_expectation: f64,
+    /// Absolute mismatch in the additive excitation ledger N = N_R + N_B.
+    pub energy_partition_residual: f64,
+    /// Occupation expectation of the factor emitted at this step, if any.
+    pub newly_emitted_excitation_expectation: Option<f64>,
     pub two_qubit_gates_this_step: usize,
     pub total_two_qubit_gates: usize,
 }
@@ -1198,6 +1205,15 @@ pub fn simulate_u1_conserving_sequential_evaporation(
 
         let (total_excitation_expectation, total_excitation_variance) =
             total_excitation_moments(&amplitudes);
+        let radiation_excitation_expectation =
+            subsystem_excitation_expectation(&amplitudes, number_of_qubits, &radiation_qubits);
+        let black_hole_excitation_expectation =
+            subsystem_excitation_expectation(&amplitudes, number_of_qubits, &black_hole_qubits);
+        let energy_partition_residual = (total_excitation_expectation
+            - radiation_excitation_expectation - black_hole_excitation_expectation).abs();
+        let newly_emitted_excitation_expectation = newly_emitted_qubit.map(|qubit| {
+            subsystem_excitation_expectation(&amplitudes, number_of_qubits, &[qubit])
+        });
         samples.push(SequentialEvaporationSample {
             emission_count,
             newly_emitted_qubit,
@@ -1212,6 +1228,10 @@ pub fn simulate_u1_conserving_sequential_evaporation(
             state_norm_squared,
             total_excitation_expectation,
             total_excitation_variance,
+            radiation_excitation_expectation,
+            black_hole_excitation_expectation,
+            energy_partition_residual,
+            newly_emitted_excitation_expectation,
             two_qubit_gates_this_step: gates_this_step,
             total_two_qubit_gates,
         });
@@ -1288,6 +1308,21 @@ fn u1_conserving_unitary_4(
     Ok(unitary)
 }
 
+
+/// Expected number of excitations in a selected tensor-factor subsystem.
+fn subsystem_excitation_expectation(
+    amplitudes: &[Complex64],
+    number_of_qubits: usize,
+    subsystem_qubits: &[usize],
+) -> f64 {
+    let masks = subsystem_qubits.iter()
+        .map(|qubit| 1usize << (number_of_qubits - 1 - qubit))
+        .collect::<Vec<_>>();
+    amplitudes.iter().enumerate().map(|(basis, amplitude)| {
+        amplitude.norm_sqr() * masks.iter().filter(|mask| basis & **mask != 0).count() as f64
+    }).sum()
+}
+
 /// Expected excitation number and variance of the computational-basis
 /// number operator. A fixed-sector initial state should retain zero variance.
 fn total_excitation_moments(amplitudes: &[Complex64]) -> (f64, f64) {
@@ -1350,6 +1385,16 @@ mod sequential_evaporation_tests {
             assert!((sample.state_norm_squared - 1.0).abs() < TOLERANCE);
             assert!((sample.total_excitation_expectation - 4.0).abs() < TOLERANCE);
             assert!(sample.total_excitation_variance < TOLERANCE);
+            assert!((sample.radiation_excitation_expectation
+                + sample.black_hole_excitation_expectation - 4.0).abs() < TOLERANCE);
+            assert!(sample.energy_partition_residual < TOLERANCE);
+            assert_eq!(
+                sample.newly_emitted_excitation_expectation.is_some(),
+                step > 0,
+            );
+            if let Some(occupation) = sample.newly_emitted_excitation_expectation {
+                assert!((0.0..=1.0).contains(&occupation));
+            }
             assert!(sample.entropy_complementarity_residual_nats < TOLERANCE);
             assert!(sample.radiation_entropy_nats >= -TOLERANCE);
             assert!(sample.black_hole_entropy_nats >= -TOLERANCE);
