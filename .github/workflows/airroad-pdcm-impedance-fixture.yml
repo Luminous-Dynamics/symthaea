@@ -25,6 +25,10 @@ on:
       - "crates/domains/symthaea-circuits/src/dc_bus_interaction.rs"
       - "crates/domains/symthaea-circuits/src/lib.rs"
       - "crates/domains/symthaea-circuits/README.md"
+      - "docs/research/AIRROAD_PDCM_MIMO_001_V0_1.md"
+      - "docs/research/fixtures/airroad-pdcm-mimo-hidden-dynamics-v0.1.json"
+      - "tools/airroad-pdcm-impedance-qualifier/verify_mimo_hidden_dynamics.py"
+      - "crates/domains/symthaea-circuits/src/dc_bus_mimo_reference.rs"
       - ".github/workflows/airroad-pdcm-impedance-fixture.yml"
 
 permissions:
