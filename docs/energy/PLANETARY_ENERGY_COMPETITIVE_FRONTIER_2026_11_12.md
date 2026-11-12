@@ -242,3 +242,43 @@ Sources:
 ## 12. Claim ceiling
 
 This document reports current source-defined SOTA, programme designs and research targets as of 12 November 2026. It does not establish that any Luminous design beats these values or is physically feasible. No simulator result, source audit, synthetic case or AI-generated architecture is physical validation or approval. Claims require exact configuration identity, comparable functional boundaries, independent measurement, held-out conditions and reproducible artifacts.
+
+
+## 13. Low-optical-impact and spectrally compatible energy infrastructure
+
+A new system requirement is being tracked in [PLANETARY-OPTICAL-IMPACT-001 #11796](https://github.com/Luminous-Dynamics/symthaea/issues/11796): minimize unwanted glare, specular glints, diffuse stray light and observer-directed thermal contamination while preserving useful power, heat rejection, safety indicators and scientific transparency. This is **environmental/scientific non-interference**, not covert concealment or evasion of legitimate observers.
+
+### Engineering baselines
+
+- NASA GSFC-STD-1000H §5.15 requires applicable optical systems to have end-to-end stray-light modelling and system-level tests. Its rationale includes surface scattering, thermal self-emission, hardware glints, unintended optical paths, vignetting and as-built surface properties.
+- IAU CPS recommendations set reflected-sunlight brightness guidance for satellite orbital contexts, call for minimizing high-amplitude flares, and recommend public wavelength-dependent BRDF-based radiometric models. Its V-band magnitude criterion is an orbital reference, not a universal lunar surface glare or biological safety limit.
+- NASA thermal-control guidance makes an important distinction: solar absorptivity and IR emissivity are separate. Radiators typically need low solar absorptivity but high IR emissivity, and coating properties can drift over mission life.
+
+Sources:
+- NASA GSFC-STD-1000H: https://standards.nasa.gov/sites/default/files/standards/GSFC/H/0/GSFC-STD-1000RevH_Approved.pdf
+- IAU CPS: https://cps.iau.org/documents/44/Consolidated-CPS-Recommendations.pdf
+- NASA thermal control: https://www.nasa.gov/smallsat-institute/sst-soa/thermal-control/
+
+### New adaptive thermal materials references
+
+A 2026 W:VO2 smart optical solar reflector paper reports a flexible 10 × 10 cm² demonstrator with solar absorptance approximately 0.22, hot-state IR emissivity approximately 0.80 and emissivity contrast approximately 0.33. It reports adhesion, bending, thermal-cycle, proton/electron exposure and humidity testing on coupons. These results do not establish lunar qualification or visible-band BRDF compliance.
+
+A separate 2026 2D-network VO2 metasurface radiator paper reports solar absorptance around 0.26 and adaptive thermal emissivity from approximately 0.28 to 0.92. It combines material measurements, terrestrial tests and orbital thermal modelling; it does not establish an operational lunar radiator.
+
+Sources:
+- W:VO2 flexible meta-OSR: https://doi.org/10.1002/nap2.70011
+- 2D-network VO2 adaptive radiator: https://doi.org/10.1002/lpor.71614
+
+### PESE translation
+
+- Maintain a spectral-angular property record for every optical/thermal surface: wavelength, incidence angle, observation angle, BRDF/BTDF, temperature, surface roughness, material lot and as-built configuration.
+- Define observer-specific budgets for telescopes, star trackers, rover cameras, lidar, spectrometers, habitat windows and thermal radiometers.
+- Keep visible/NIR reflection separate from thermal-IR emission. A dark visible surface is not necessarily thermally quiet.
+- Co-design solar collection surfaces and thermal radiators separately. Low-glare PV glass should not be selected at the expense of photon collection; a low-emissivity film should not be used as a radiator when it cannot reject the required heat.
+- Preserve emergency/navigation indicators. Optical emitters require independently verified interlocks and fail-safe-off behavior; unknown safety state blocks operation.
+- Preserve public source/BRDF/ephemeris information for scientific coordination rather than rewarding hidden or evasive operation.
+
+### Benchmark target
+
+For selected matched bands and geometries, a proposed stretch objective is ≥10 dB reduction in peak observer-directed glint relative to a documented baseline with ≤2% loss of net delivered electrical service and no thermal/safety regression. This is a research target, not a standard or achieved performance. Full spectral/angular measurement and end-to-end model-to-test correlation are required.
+
