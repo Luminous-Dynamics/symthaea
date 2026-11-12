@@ -69,7 +69,8 @@
     "complementarity": "For the closed globally pure register, calculate S(R) and S(B) independently at every nontrivial cut and report their absolute difference",
     "energy_ledger": "For equal-gap qubits with H = hbar*omega*N, record N_R and N_B separately and verify N = N_R + N_B at every emission step; report per-emission occupation expectation.",
     "symmetry_resolved_page_reference": "For a U(1)-conserving fixed-total-excitation model compare only with the exact Haar average inside that same charge sector; the unconstrained Page formula is an invalid equilibrium comparator unless symmetry breaking is explicitly part of the model.",
-    "symmetry_sector_reference": "A fixed-charge pure-state ensemble has a symmetry-resolved Page average; do not substitute the unconstrained Haar Page formula."
+    "symmetry_sector_reference": "A fixed-charge pure-state ensemble has a symmetry-resolved Page average; do not substitute the unconstrained Haar Page formula.",
+    "domain_wall_transport": "Measure site occupations and oriented bond currents at every nearest-neighbour brickwork layer. Enforce delta n_i = j_(i-1->i) - j_(i->i+1) and independently verify that integrated central-cut current equals the loss of charge from the left half. Entropy growth alone is not a transport diagnostic."
   },
   "benchmark_ladder": [
     {
@@ -193,7 +194,8 @@
         "one_dimensional_brickwork_random_circuits",
         "energy_conserving_circuits_when_explicitly_implemented",
         "U1_conserving_fixed_charge_microcanonical_boundary_emission",
-        "U1_conserving_finite_depth_random_circuits_from_fixed_charge_product_states"
+        "U1_conserving_finite_depth_random_circuits_from_fixed_charge_product_states",
+        "U1_conserving_1d_domain_wall_transport_quench"
       ],
       "observables": [
         "radiation_von_neumann_entropy_by_emission_step",
@@ -221,7 +223,17 @@
         "subsystem_entropy_by_depth_and_topology",
         "sample_variance_and_standard_error_by_depth",
         "total_charge_expectation_and_variance",
-        "gap_to_symmetry_resolved_Page_equilibrium"
+        "gap_to_symmetry_resolved_Page_equilibrium",
+        "site_excitation_density_profile_by_layer",
+        "oriented_nearest_neighbour_bond_currents",
+        "local_discrete_charge_continuity_residual",
+        "left_half_excitation_expectation",
+        "domain_wall_imbalance_decay",
+        "integrated_central_cut_transport",
+        "half_chain_entropy_and_purity_by_layer",
+        "independent_seed_density_profile_standard_error",
+        "independent_seed_transport_standard_error",
+        "independent_seed_entropy_standard_error"
       ],
       "acceptance": {
         "global_unitarity_and_state_norm_drift_reported_per_step": true,
@@ -244,9 +256,15 @@
         "u1_circuit_charge_variance": 1e-10,
         "u1_circuit_norm_drift": 1e-10,
         "u1_circuit_equilibrium_comparator": "symmetry_resolved_Page_for_same_(N,K,A); unconstrained_Page_is_invalid",
-        "u1_circuit_mixing_claim_requires": "depth sweep, independent seed ensembles, uncertainty intervals, and convergence/stationarity test"
+        "u1_circuit_mixing_claim_requires": "depth sweep, independent seed ensembles, uncertainty intervals, and convergence/stationarity test",
+        "local_charge_continuity_max_residual": 1e-10,
+        "global_charge_expectation_drift": 1e-10,
+        "fixed_sector_charge_variance": 1e-10,
+        "integrated_cut_current_left_charge_ledger": 1e-10,
+        "density_profile_cross_implementation_error": 1e-8,
+        "transport_diffusion_exponent": "only claim exponent after multi-size, multi-seed, intermediate-time finite-size scaling; target 0.5 +/- 0.1 for diffusive domain-wall imbalance"
       },
-      "implementation_status": "closed-register scramblers, symmetry-resolved Haar/Page oracle and sampler, U(1)-conserving finite-depth circuits from fixed-charge product states, and sequential factor-transfer toy model authored; Rust execution pending",
+      "implementation_status": "Page/Haar, closed and U1-conserving circuits, sequential factor transfer, and domain-wall transport source plus ensemble statistics authored; Rust runner validation pending",
       "source_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/random_circuit_scrambling_v1.json",
       "claim_ceiling": "Finite-dimensional unitary circuits with exact excitation conservation and a symmetry-sector Haar reference. This is not Hawking emission, gravitational backreaction, an island/QES calculation, or a four-dimensional black-hole evaporation derivation.",
       "sequential_evaporation_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/sequential_evaporation_u1_v1.json",
@@ -256,6 +274,43 @@
         "caveat": "The oracle is a kinematic equilibrium reference. The chosen local or boundary-emission circuit must independently demonstrate mixing toward it; no convergence is presumed."
       },
       "source_fixture_u1_circuit": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/u1_scrambling_circuit_v1.json"
+    },
+    {
+      "id": "QI-3T",
+      "name": "U(1) domain-wall transport and charge diffusion",
+      "status": "source_authored_not_executed",
+      "model": "even-length half-filled 1D spin-1/2 chain, initial |111...1000...0> product state, nearest-neighbour brickwork gates sampled independently from U(1) x U(2) x U(1)",
+      "observables": [
+        "site_charge_density_profile",
+        "signed_bond_currents",
+        "discrete_local_continuity_residual",
+        "central_cut_integrated_transport",
+        "domain_wall_imbalance",
+        "half_chain_von_neumann_entropy",
+        "half_chain_purity",
+        "multi_seed_mean_and_standard_error"
+      ],
+      "acceptance": {
+        "maximum_local_continuity_residual": 1e-10,
+        "maximum_total_charge_drift": 1e-10,
+        "maximum_fixed_sector_charge_variance": 1e-10,
+        "integrated_central_current_matches_left_charge_loss": 1e-10,
+        "density_profile_matches_independent_implementation": 1e-8,
+        "diffusive_scaling_claim_requires": "N sweep, independent seed ensembles, predeclared intermediate-time window, finite-size control and uncertainty intervals",
+        "diffusive_domain_wall_imbalance_exponent_target": [
+          0.4,
+          0.6
+        ]
+      },
+      "implementation": {
+        "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
+        "APIs": [
+          "simulate_u1_domain_wall_transport",
+          "sample_u1_domain_wall_transport_ensemble"
+        ],
+        "status": "source_authored_and_independent_NumPy_equation_check; Rust execution pending"
+      },
+      "claim_ceiling": "A finite closed U(1)-conserving qubit-chain transport/scrambling benchmark. Not a black-hole evaporation model, a gravitational Page curve, a QES/island calculation or a recovery decoder."
     },
     {
       "id": "QI-4",
@@ -379,7 +434,11 @@
     "fixed_charge_equilibrium_claim_without_depth_and_seed_convergence",
     "fixed_charge_Haar_sample_compared_to_unconstrained_Page_mean",
     "initialize finite-depth scrambling run from an already-Haar-random fixed-charge state and misinterpret invariant entropy as scrambling growth",
-    "use the symmetry-resolved Page mean as a hard entropy ceiling for individual samples rather than as an ensemble mean"
+    "use the symmetry-resolved Page mean as a hard entropy ceiling for individual samples rather than as an ensemble mean",
+    "report a domain-wall diffusion exponent without multi-size finite-size scaling and uncertainty",
+    "infer charge transport from entanglement entropy alone",
+    "omit the central-cut charge ledger while reporting integrated current",
+    "compare 1D domain-wall transport against all-to-all gates as though both had the same spatial metric"
   ],
   "competitive_baselines": [
     {
@@ -523,7 +582,8 @@
       "QI_3_symmetry_resolved_Page_equilibrium_oracle": "source_authored_not_executed",
       "QI_2S_symmetry_resolved_Page_oracle": "source_authored_not_executed",
       "QI_2S_seeded_fixed_charge_Haar_sampler": "source_authored_not_executed",
-      "QI_3_U1_finite_depth_scrambling": "source_authored_not_executed"
+      "QI_3_U1_finite_depth_scrambling": "source_authored_not_executed",
+      "QI_3T_U1_domain_wall_transport": "source_authored_not_executed"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
