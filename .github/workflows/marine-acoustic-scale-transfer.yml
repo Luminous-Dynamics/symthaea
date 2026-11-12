@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   audit:
@@ -28,7 +28,7 @@ jobs:
         with:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          persist-credentials: true
+          persist-credentials: false
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
@@ -54,20 +54,3 @@ jobs:
       - name: Validate fixture JSON and schema JSON syntax
         run: |
           python3 -c "import json; json.load(open('docs/research/marine/marine-acoustic-scale-transfer-v0.1.0.schema.json')); json.load(open('docs/research/marine/fixtures/synthetic-marine-acoustic-scale-transfer-v0.1.0.json'))"
-      - name: Commit canonical rustfmt output
-        if: success() && github.event_name == 'pull_request'
-        env:
-          GITHUB_HEAD_REF: ${{ github.head_ref }}
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git fetch origin "${GITHUB_HEAD_REF}"
-          git rebase "origin/${GITHUB_HEAD_REF}"
-          git add tools/marine-acoustic-scale-transfer-audit/src/main.rs tools/marine-acoustic-scale-transfer-audit/Cargo.lock
-          if git diff --cached --quiet; then
-            echo "Rust source already matches rustfmt."
-          else
-            git commit -m "style(marine): apply canonical rustfmt output"
-            git push origin "HEAD:${GITHUB_HEAD_REF}"
-            echo "Committed formatted source: $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
-          fi
