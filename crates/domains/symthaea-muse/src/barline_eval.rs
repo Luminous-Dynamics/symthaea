@@ -97,9 +97,13 @@ impl RationalBeat {
         Self::new(num, den)
     }
 
-    fn cmp_exact(self, other: Self) -> Ordering {
+    pub fn compare_exact(self, other: Self) -> Ordering {
         (i128::from(self.num) * i128::from(other.den))
             .cmp(&(i128::from(other.num) * i128::from(self.den)))
+    }
+
+    fn cmp_exact(self, other: Self) -> Ordering {
+        self.compare_exact(other)
     }
 
     fn within(self, other: Self, tolerance: Self) -> Result<bool, EvaluationError> {
