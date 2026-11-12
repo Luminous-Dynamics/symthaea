@@ -530,6 +530,9 @@ fn validate_case(case: &Case) -> Vec<String> {
 fn audit(case: &Case) -> AuditReport {
     let validation_errors = validate_case(case);
     let unique_model_rotation_rates = distinct_model_rotation_rate_count(&case.pairs);
+    let has_unknown_background_method = case.pairs.iter().any(|pair| {
+        pair.model.background_measurement_method == BackgroundMeasurementMethod::Unknown
+    });
 
     if !validation_errors.is_empty() {
         return AuditReport {
@@ -819,6 +822,7 @@ fn audit(case: &Case) -> AuditReport {
         || case.similarity.gas_nuclei_state != SimilarityState::Qualified
         || case.similarity.reynolds_scale_review != ReviewState::Reviewed
         || case.similarity.facility_transfer_function != FacilityTransferState::MeasuredAndApplied
+        || has_unknown_background_method
         || unique_model_rotation_rates < 2
         || any_unresolved_band
         || any_frequency_mismatch
@@ -1027,6 +1031,16 @@ mod tests {
             schema["$defs"]["modelBand"]["additionalProperties"],
             false
         );
+        assert!(schema["$defs"]["modelRun"]["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value == "background_measurement_method"));
+        assert!(schema["$defs"]["modelRun"]["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value == "background_trace_sha256"));
     }
 
     #[test]
@@ -1090,6 +1104,9 @@ mod tests {
     fn background_correction_uses_linear_energy_subtraction() {
         let corrected = ittc_cavitation_spl(110.0, 100.0).unwrap();
         assert!((corrected - 109.54242509439325).abs() < 1e-9);
+        let at_three_db = ittc_cavitation_spl(103.0, 100.0).unwrap();
+        assert!(at_three_db < 103.0);
+        assert_eq!(ittc_cavitation_spl(110.0001, 100.0), Some(110.0001));
     }
 
     #[test]
@@ -1116,9 +1133,17 @@ mod tests {
     }
 
     #[test]
-    fn background_unknown_method_and_missing_trace_are_not_eligible() {
+    fn unknown_background_method_is_incomplete() {
         let mut case = fixture_case();
         case.pairs[0].model.background_measurement_method = BackgroundMeasurementMethod::Unknown;
+        let report = audit(&case);
+        assert_eq!(report.disposition, "incomplete");
+        assert!(report.reasons.iter().any(|reason| reason.contains("background measurement method")));
+    }
+
+    #[test]
+    fn malformed_background_trace_digest_is_invalid() {
+        let mut case = fixture_case();
         case.pairs[0].model.background_trace_sha256 = "missing".to_string();
         let report = audit(&case);
         assert_eq!(report.disposition, "invalid");
