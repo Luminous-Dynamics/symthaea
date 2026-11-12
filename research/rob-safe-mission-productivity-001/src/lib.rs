@@ -154,6 +154,7 @@ pub struct RobotServiceScorecard {
     pub missions: u64,
     pub physical_safe_successes: u64,
     pub slo_qualified_missions: u64,
+    pub hard_safety_violations: u64,
     pub critical_deadline_misses: u64,
     pub service_floor_breaches: u64,
     pub longest_starvation_ticks: u64,
@@ -339,6 +340,7 @@ struct RobotAccumulator {
     missions: u64,
     physical_safe_successes: u64,
     slo_qualified_missions: u64,
+    hard_safety_violations: u64,
     critical_deadline_misses: u64,
     service_floor_breaches: u64,
     longest_starvation_ticks: u64,
@@ -386,19 +388,17 @@ pub fn evaluate_fleet(
 
     for trial in trials {
         validate_trial(trial, arm_id, &mut mission_ids, &mut pair_ids)?;
-        if let Some(existing_unit) = task_work_units.get(&trial.identity.task_class) {
-            if existing_unit != &trial.identity.work_unit_id {
-                return Err(EvaluationError::PairIdentityMismatch(format!(
-                    "incomparable work units within task class {}",
-                    trial.identity.task_class
-                )));
-            }
-        } else {
-            task_work_units.insert(
-                trial.identity.task_class.clone(),
-                trial.identity.work_unit_id.clone(),
-            );
+        if let Some(existing_unit) = task_work_units.get(&trial.identity.task_class)
+            && existing_unit != &trial.identity.work_unit_id
+        {
+            return Err(EvaluationError::PairIdentityMismatch(format!(
+                "incomparable work units within task class {}",
+                trial.identity.task_class
+            )));
         }
+        task_work_units
+            .entry(trial.identity.task_class.clone())
+            .or_insert_with(|| trial.identity.work_unit_id.clone());
         let physical_safe = physical_safe_success(trial);
         let evidence_safe = evidence_qualified_safe_success(trial, contract);
         let slo = slo_qualified(trial, contract);
@@ -509,6 +509,9 @@ pub fn evaluate_fleet(
         if slo {
             checked_add(&mut robot.slo_qualified_missions, 1)?;
         }
+        if trial.hard_safety_violation {
+            checked_add(&mut robot.hard_safety_violations, 1)?;
+        }
         if trial.critical_deadline_miss {
             checked_add(&mut robot.critical_deadline_misses, 1)?;
         }
@@ -604,6 +607,7 @@ pub fn evaluate_fleet(
                 missions: a.missions,
                 physical_safe_successes: a.physical_safe_successes,
                 slo_qualified_missions: a.slo_qualified_missions,
+                hard_safety_violations: a.hard_safety_violations,
                 critical_deadline_misses: a.critical_deadline_misses,
                 service_floor_breaches: a.service_floor_breaches,
                 longest_starvation_ticks: a.longest_starvation_ticks,
@@ -695,6 +699,7 @@ pub struct RobotComparison {
     pub robot_id: String,
     pub physical_safe_success: RateDelta,
     pub slo_qualified_safe_success: RateDelta,
+    pub hard_safety_violation: RateDelta,
     pub critical_deadline_miss: RateDelta,
     pub service_floor_breach: RateDelta,
     pub causal_closure: RateDelta,
@@ -849,6 +854,7 @@ pub fn compare_fleet_arms(
                 task_class: class,
                 physical_safe_success: physical,
                 slo_qualified_safe_success: slo,
+                hard_safety_violation: hard,
                 critical_deadline_miss: deadline,
                 hard_safety_violation: hard,
                 service_floor_breach: service,
@@ -889,6 +895,12 @@ pub fn compare_fleet_arms(
             c.slo_qualified_missions,
             c.missions,
         );
+        let hard = rate_delta(
+            b.hard_safety_violations,
+            b.missions,
+            c.hard_safety_violations,
+            c.missions,
+        );
         let deadline = rate_delta(
             b.critical_deadline_misses,
             b.missions,
@@ -911,6 +923,8 @@ pub fn compare_fleet_arms(
             d >= -(i64::from(comparison_contract.max_physical_safe_success_drop_ppm))
         }) && slo.delta_ppm.is_some_and(|d| {
             d >= -(i64::from(comparison_contract.max_slo_safe_success_drop_ppm))
+        }) && hard.delta_ppm.is_some_and(|d| {
+            d <= i64::from(comparison_contract.max_hard_violation_increase_ppm)
         }) && deadline.delta_ppm.is_some_and(|d| {
             d <= i64::from(comparison_contract.max_deadline_miss_increase_ppm)
         }) && service.delta_ppm.is_some_and(|d| {
@@ -1087,7 +1101,9 @@ mod tests {
         let class = &score.task_classes["delivery"];
         assert_eq!(class.productive_work_units, 1);
         assert_eq!(class.gpu_micros, 7_200_000_000);
+        assert_eq!(class.elapsed_ns, 20_000_000_000);
         assert_eq!(class.work_units_per_gpu_hour_milli, Some(500));
+        assert_eq!(class.work_units_per_robot_hour_milli, Some(180_000));
     }
 
     #[test]
@@ -1215,6 +1231,10 @@ mod tests {
         .unwrap();
         assert!(!report.candidate_noninferior);
         assert!(!report.pareto_dominates_productivity);
+        assert_eq!(
+            report.per_robot["r1"].hard_safety_violation.delta_ppm,
+            Some(1_000_000)
+        );
     }
 
     #[test]
