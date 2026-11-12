@@ -86,7 +86,6 @@ struct NucleiDistributionComparison {
     calibration_certificate_sha256: String,
     reference_evidence_sha256: String,
     run_evidence_sha256: String,
-    expanded_uncertainty_confidence_level: Option<f64>,
     disposition: &'static str,
     uncertainty_interpretation: &'static str,
     declared_binwise_expanded_uncertainty_confidence_level: Option<f64>,
@@ -415,7 +414,6 @@ fn compare_nuclei_distributions(
             calibration_certificate_sha256: reference.calibration_certificate_sha256.clone(),
             reference_evidence_sha256: reference.evidence_sha256.clone(),
             run_evidence_sha256: candidate.evidence_sha256.clone(),
-            expanded_uncertainty_confidence_level: None,
             disposition: "incomparable_distribution_method_or_binning",
             uncertainty_interpretation: "not_computed",
             declared_binwise_expanded_uncertainty_confidence_level: None,
@@ -1426,7 +1424,8 @@ mod tests {
         assert!((comparison.absolute_total_number_concentration_difference_per_ml.unwrap()).abs() < 1e-12);
         assert!((comparison.wasserstein1_distance_um.unwrap() - 0.25).abs() < 1e-12);
         assert_eq!(comparison.disposition, "outside_equivalence_tolerance");
-        assert_eq!(comparison.expanded_uncertainty_confidence_level, Some(0.95));
+        assert_eq!(comparison.declared_binwise_expanded_uncertainty_confidence_level, Some(0.95));
+        assert!(comparison.uncertainty_interpretation.contains("no joint confidence level"));
         assert_ne!(comparison.reference_measurement_id, comparison.run_measurement_id);
         assert_ne!(comparison.reference_evidence_sha256, comparison.run_evidence_sha256);
     }
