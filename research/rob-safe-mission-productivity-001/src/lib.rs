@@ -722,17 +722,24 @@ pub struct RobotComparison {
     pub candidate_longest_starvation_ticks: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StatisticalStatus {
+    /// Matched point estimates only; no confidence interval or hypothesis test was computed.
+    PointEstimatesOnly,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FleetComparison {
     pub baseline_arm_id: String,
     pub candidate_arm_id: String,
+    pub statistical_status: StatisticalStatus,
     pub matched_missions: u64,
     pub per_task_class: BTreeMap<String, TaskClassComparison>,
     pub per_robot: BTreeMap<String, RobotComparison>,
     /// Hard/non-inferiority conditions across every task class and robot.
-    pub candidate_noninferior: bool,
+    pub candidate_point_estimate_noninferior: bool,
     /// Pareto result over task-class productivity, not a pooled scalar utility.
-    pub pareto_dominates_productivity: bool,
+    pub point_estimate_pareto_dominates_productivity: bool,
     pub productivity_improved_classes: Vec<String>,
     pub productivity_regressed_classes: Vec<String>,
 }
@@ -774,8 +781,8 @@ pub fn compare_fleet_arms(
     let mut per_task_class = BTreeMap::new();
     let mut productivity_improved_classes = Vec::new();
     let mut productivity_regressed_classes = Vec::new();
-    let mut candidate_noninferior = true;
-    let mut pareto_dominates_productivity = true;
+    let mut candidate_point_estimate_noninferior = true;
+    let mut point_estimate_pareto_dominates_productivity = true;
     let task_classes: BTreeSet<String> = baseline_score
         .task_classes
         .keys()
@@ -844,7 +851,7 @@ pub fn compare_fleet_arms(
         }) && closure.delta_ppm.is_some_and(|d| {
             d >= -(i64::from(comparison_contract.max_causal_closure_drop_ppm))
         });
-        candidate_noninferior &= class_noninferior;
+        candidate_point_estimate_noninferior &= class_noninferior;
         let bp = b.work_units_per_gpu_hour_milli;
         let cp = c.work_units_per_gpu_hour_milli;
         let productivity_delta = bp.zip(cp).map(|(bv, cv)| i128::from(cv) - i128::from(bv));
@@ -871,7 +878,7 @@ pub fn compare_fleet_arms(
         if productivity_delta.is_none_or(|d| d < 0)
             || robot_hour_delta.is_none_or(|d| d < 0)
         {
-            pareto_dominates_productivity = false;
+            point_estimate_pareto_dominates_productivity = false;
         }
         per_task_class.insert(
             class.clone(),
@@ -957,7 +964,7 @@ pub fn compare_fleet_arms(
         }) && closure.delta_ppm.is_some_and(|d| {
             d >= -(i64::from(comparison_contract.max_causal_closure_drop_ppm))
         });
-        candidate_noninferior &= robot_ok;
+        candidate_point_estimate_noninferior &= robot_ok;
         per_robot.insert(
             robot_id.clone(),
             RobotComparison {
@@ -972,17 +979,18 @@ pub fn compare_fleet_arms(
             },
         );
     }
-    pareto_dominates_productivity &=
-        candidate_noninferior && !productivity_improved_classes.is_empty();
+    point_estimate_pareto_dominates_productivity &=
+        candidate_point_estimate_noninferior && !productivity_improved_classes.is_empty();
 
     Ok(FleetComparison {
         baseline_arm_id: baseline_arm.to_owned(),
         candidate_arm_id: candidate_arm.to_owned(),
+        statistical_status: StatisticalStatus::PointEstimatesOnly,
         matched_missions: baseline.len() as u64,
         per_task_class,
         per_robot,
-        candidate_noninferior,
-        pareto_dominates_productivity,
+        candidate_point_estimate_noninferior,
+        point_estimate_pareto_dominates_productivity,
         productivity_improved_classes,
         productivity_regressed_classes,
     })
@@ -1200,10 +1208,10 @@ mod tests {
             comparison_contract(),
         )
         .unwrap();
-        assert!(report.candidate_noninferior);
+        assert!(report.candidate_point_estimate_noninferior);
         assert_eq!(report.per_task_class.len(), 1);
         assert_eq!(report.per_robot.len(), 2);
-        assert!(!report.pareto_dominates_productivity);
+        assert!(!report.point_estimate_pareto_dominates_productivity);
     }
 
     #[test]
@@ -1256,8 +1264,8 @@ mod tests {
             comparison_contract(),
         )
         .unwrap();
-        assert!(!report.candidate_noninferior);
-        assert!(!report.pareto_dominates_productivity);
+        assert!(!report.candidate_point_estimate_noninferior);
+        assert!(!report.point_estimate_pareto_dominates_productivity);
         assert_eq!(
             report.per_robot["r1"].hard_safety_violation.delta_ppm,
             Some(1_000_000)
@@ -1278,8 +1286,8 @@ mod tests {
             comparison_contract(),
         )
         .unwrap();
-        assert!(report.candidate_noninferior);
-        assert!(report.pareto_dominates_productivity);
+        assert!(report.candidate_point_estimate_noninferior);
+        assert!(report.point_estimate_pareto_dominates_productivity);
         assert_eq!(report.productivity_improved_classes, vec!["delivery"]);
     }
 
@@ -1356,6 +1364,6 @@ mod tests {
             comparison_contract(),
         )
         .unwrap();
-        assert!(!report.candidate_noninferior);
+        assert!(!report.candidate_point_estimate_noninferior);
     }
 }
