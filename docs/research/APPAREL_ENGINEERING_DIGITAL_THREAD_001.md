@@ -400,3 +400,18 @@ The associated work is [Symthaea #11743 — TEXTILE-SORT-FUSION-001](https://git
 6. Compare robotic seam tracking with the published ±2.5 mm study only on matched tasks and measurements.
 
 No dataset has been declared ingested or reproduced by this specification. Rights/terms, attribution and exact file checksums must be reviewed and recorded before any external data is committed or redistributed.
+
+
+## 15. Semantic adversarial corpus
+
+A synthetic semantic-control corpus now accompanies the structural schema and example:
+
+`docs/research/fixtures/apparel_engineering_thread_v0_1/semantic_cases.example.json`
+
+It contains 16 negative controls and two positive controls. The negative cases cover pattern-revision drift, unresolved BOM material references, duplicate pattern-piece IDs, measured tests without result evidence, model-to-physical evidence promotion, prototype-to-production scope inflation, material-lot substitutions, unknown composition, visual-category/fibre conflation, recovery without physical output-lot proof, expired NIR calibration, lot over-allocation, unit conversion without a basis, synthetic-to-physical evidence promotion, disclosure violations and repair without dependent requalification.
+
+The positive controls make two things explicit:
+- one article can be supported within its own tested scope without claiming batch-wide production capability;
+- a sensor can correctly abstain and request a remeasurement rather than force an unsupported material class.
+
+These cases are expected outcomes for a future semantic validator; they are not yet executable tests. The current structural schema alone cannot enforce the cross-field causal/applicability rules. A dedicated semantic validator remains a P0 implementation task.
