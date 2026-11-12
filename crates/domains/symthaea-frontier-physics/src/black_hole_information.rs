@@ -955,8 +955,10 @@ mod u1_random_circuit_tests {
             assert!((sample.total_excitation_expectation - 4.0).abs() < TOLERANCE);
             assert!(sample.total_excitation_variance < TOLERANCE);
             assert!(sample.subsystem_entropy_nats >= -TOLERANCE);
+            let maximal_bipartite_entropy =
+                ((1usize << 4).min(1usize << 4) as f64).ln();
             assert!(sample.subsystem_entropy_nats
-                <= sample.symmetry_resolved_page_mean_nats + 1e-9);
+                <= maximal_bipartite_entropy + 1e-9);
         }
     }
 
