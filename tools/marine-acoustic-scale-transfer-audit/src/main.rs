@@ -1114,9 +1114,6 @@ fn audit(case: &Case) -> AuditReport {
             let observed_lower = full_band.source_level_db - full_band.source_level_u95_db;
             let observed_upper = full_band.source_level_db + full_band.source_level_u95_db;
             let overlaps = predicted_lower <= observed_upper && observed_lower <= predicted_upper;
-            if !overlaps {
-                
-            }
             band_reports.push(BandReport {
                 band_id: model_band.band_id.clone(),
                 frequency_regime: frequency_regime_name(&model_band.frequency_regime),
