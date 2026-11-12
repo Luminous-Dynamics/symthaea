@@ -48,10 +48,10 @@ jobs:
         run: cargo fmt --manifest-path crates/domains/symthaea-muse/Cargo.toml -- --check
 
       - name: Run renderer invocation, receipt, and temp-path tests
-        run: cargo test --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib fluid_render::tests --locked
+        run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib fluid_render::tests
 
       - name: Run renderer receipt tests
-        run: cargo test --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib renderer_execution_receipt::tests --locked
+        run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib renderer_execution_receipt::tests
 
       - name: Run Clippy for Muse library and tests
-        run: cargo clippy --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib --tests --locked -- -D warnings
+        run: cargo clippy --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib --tests -- -D warnings
