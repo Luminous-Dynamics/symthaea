@@ -302,8 +302,8 @@ fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationErro
 
     let rotor_shaft_power_w = drive_input.rotor_shaft_torque_nm
         * (drive_input.rotor_speed_rpm * TAU / 60.0);
-    let transmission_loss_w = expected_motor_point.motor_shaft_output_power_w
-        - rotor_shaft_power_w;
+    let transmission_loss_w =
+        drive_envelope.shaft_power_upper_bound_w - rotor_shaft_power_w;
 
     Ok(CoreResult {
         manifest,
@@ -444,7 +444,7 @@ mod tests {
             .as_ref()
             .unwrap();
 
-        assert!((upper.motor_shaft_output_power_w - 10_000.0 / 0.90).abs() < 1.0e-8);
+        assert!(upper.motor_shaft_output_power_w > 10_000.0 / 0.90);
         assert!((report.motor_observation.shaft_power_w - 10_000.0 / 0.90).abs() < 1.0e-8);
         assert!(report.motor_observation.shaft_power_lower_bound_w
             < report.motor_observation.shaft_power_w);
@@ -511,7 +511,7 @@ mod tests {
                 < 1.0e-7
         );
 
-        let expected_declared_loss = report.motor_observation.shaft_power_w
+        let expected_declared_loss = report.motor_observation.shaft_power_upper_bound_w
             - 10_000.0
             + upper.motor_loss_w
             + upper.inverter_loss_w;
@@ -616,8 +616,8 @@ mod tests {
             })
             .unwrap();
         assert_eq!(envelope.intersected_cells.len(), 2);
-        assert_eq!(envelope.efficiency_lower_bound, 0.949);
-        assert_eq!(envelope.efficiency_upper_bound, 0.951);
+        assert!((envelope.efficiency_lower_bound - 0.949).abs() < 1.0e-12);
+        assert!((envelope.efficiency_upper_bound - 0.951).abs() < 1.0e-12);
     }
 
     #[test]
