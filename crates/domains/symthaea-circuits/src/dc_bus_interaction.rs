@@ -418,6 +418,32 @@ mod tests {
     }
 
     #[test]
+    fn low_power_symmetric_network_passes_routh_hurwitz() {
+        let p = NetworkParameters {
+            source_voltage_v: 1.15,
+            source_resistance_ohm: 1.0,
+            bus_capacitance_f: 1.0,
+            feeder_1_resistance_ohm: 1.0,
+            feeder_2_resistance_ohm: 1.0,
+            input_1_capacitance_f: 1.0,
+            input_2_capacitance_f: 1.0,
+            load_1_power_w: 0.05,
+            load_2_power_w: 0.05,
+        };
+        let op = OperatingPoint {
+            bus_voltage_v: 1.05,
+            input_1_voltage_v: 1.0,
+            input_2_voltage_v: 1.0,
+        };
+        let result = analyze(p, op, 1e-12).expect("stable operating point");
+        assert_eq!(result.stability, StabilityDisposition::HurwitzStable);
+        assert!(result.characteristic_coefficients[1] > 0.0);
+        assert!(result.characteristic_coefficients[2] > 0.0);
+        assert!(result.characteristic_coefficients[3] > 0.0);
+        assert!(result.routh_hurwitz_delta > 0.0);
+    }
+
+    #[test]
     fn invalid_operating_point_and_frequency_fail_closed() {
         let (p, mut op) = fixture();
         op.input_1_voltage_v = 1.2;
