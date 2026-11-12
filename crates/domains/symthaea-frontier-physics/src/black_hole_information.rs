@@ -1807,7 +1807,7 @@ pub fn sample_u1_domain_wall_transport_ensemble(
             layer: layer_index,
             sample_count,
             mean_density_profile: density_mean,
-            density_profile_standard_error,
+            density_profile_standard_error: density_standard_error,
             mean_bond_currents: current_mean,
             bond_current_standard_error,
             mean_domain_wall_imbalance: imbalance_mean,
