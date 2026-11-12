@@ -269,6 +269,27 @@ pub(crate) fn verify_renderer_audio_binding(
     excluded_source_event_index: Option<usize>,
     audio: &AudioView<'_>,
 ) -> Result<VerifiedRendererAudioBinding, CounterfactualInfluenceError> {
+    let excluded = excluded_source_event_index.into_iter().collect::<Vec<_>>();
+    verify_renderer_audio_binding_excluding_set(
+        receipt,
+        inputs,
+        performed_event_map_bytes,
+        expected_score_event_count,
+        expected_primary_midi_by_score_index,
+        &excluded,
+        audio,
+    )
+}
+
+pub(crate) fn verify_renderer_audio_binding_excluding_set(
+    receipt: &RendererExecutionReceipt,
+    inputs: RendererReceiptInputs<'_>,
+    performed_event_map_bytes: &[u8],
+    expected_score_event_count: usize,
+    expected_primary_midi_by_score_index: &[u8],
+    excluded_source_event_indices: &[usize],
+    audio: &AudioView<'_>,
+) -> Result<VerifiedRendererAudioBinding, CounterfactualInfluenceError> {
     let frames = validate_audio(audio)?;
     if receipt.backend != crate::renderer_execution_receipt::RendererBackend::FluidSynth {
         // NativeMuse needs its own exact performed-schedule parser before it
@@ -289,24 +310,25 @@ pub(crate) fn verify_renderer_audio_binding(
     if expected_primary_midi_by_score_index.len() != expected_score_event_count {
         return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
     }
-    match excluded_source_event_index {
-        None => parsed_map.verify_for_score_and_pitches(
+    if excluded_source_event_indices.is_empty() {
+        parsed_map.verify_for_score_and_pitches(
             &receipt.score_sha256,
             &parsed_map.performed_midi_sha256,
             audio.sample_rate_hz,
             frames as u64,
             expected_score_event_count,
             expected_primary_midi_by_score_index,
-        ),
-        Some(excluded_index) => parsed_map.verify_for_score_excluding_and_pitches(
+        )
+    } else {
+        parsed_map.verify_for_score_excluding_set_and_pitches(
             &receipt.score_sha256,
             &parsed_map.performed_midi_sha256,
             audio.sample_rate_hz,
             frames as u64,
             expected_score_event_count,
-            excluded_index,
+            excluded_source_event_indices,
             expected_primary_midi_by_score_index,
-        ),
+        )
     }
     .map_err(|_| CounterfactualInfluenceError::RendererReceiptInvalid)?;
 
@@ -320,7 +342,7 @@ pub(crate) fn verify_renderer_audio_binding(
     {
         return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
     }
-    if excluded_source_event_index.is_none()
+    if excluded_source_event_indices.is_empty()
         && receipt.performed_event_map_sha256.as_deref()
             != Some(parsed_map.receipt_sha256.as_str())
     {
@@ -384,13 +406,49 @@ pub fn verify_renderer_audio_binding_for_score(
         .iter()
         .map(|event| event.pitch.midi())
         .collect();
-    verify_renderer_audio_binding(
+    let excluded = excluded_source_event_index.into_iter().collect::<Vec<_>>();
+    verify_renderer_audio_binding_excluding_set(
         receipt,
         inputs,
         performed_event_map_bytes,
         expected_primary_midi_by_score_index.len(),
         &expected_primary_midi_by_score_index,
-        excluded_source_event_index,
+        &excluded,
+        audio,
+    )
+}
+
+/// Verify renderer output against a typed Score after excluding an exact set
+/// of source events. This is the production-facing event-coalition gate used
+/// by pairwise/higher-order counterfactual experiments.
+#[cfg(feature = "theory")]
+pub fn verify_renderer_audio_binding_for_score_excluding_set(
+    receipt: &RendererExecutionReceipt,
+    inputs: RendererReceiptInputs<'_>,
+    performed_event_map_bytes: &[u8],
+    score: &symthaea_music_theory::Score,
+    excluded_source_event_indices: &[usize],
+    audio: &AudioView<'_>,
+) -> Result<VerifiedRendererAudioBinding, CounterfactualInfluenceError> {
+    let serialized_score = serde_json::to_vec(score)
+        .map_err(|_| CounterfactualInfluenceError::SerializationFailure)?;
+    if inputs.score_bytes != serialized_score.as_slice()
+        || receipt.score_sha256 != sha256_hex(&serialized_score)
+    {
+        return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
+    }
+    let expected_primary_midi_by_score_index: Vec<u8> = score
+        .events()
+        .iter()
+        .map(|event| event.pitch.midi())
+        .collect();
+    verify_renderer_audio_binding_excluding_set(
+        receipt,
+        inputs,
+        performed_event_map_bytes,
+        expected_primary_midi_by_score_index.len(),
+        &expected_primary_midi_by_score_index,
+        excluded_source_event_indices,
         audio,
     )
 }
