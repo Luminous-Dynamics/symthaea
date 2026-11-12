@@ -997,6 +997,10 @@ fn parse_part(
                 // notational-boundary graph. Never discard internal bars or
                 // repeat/ending/playback semantics while claiming Supported.
                 let location = element.attribute("location").unwrap_or("right");
+                let known_children = [
+                    "bar-style", "footnote", "level", "wavy-line", "segno", "coda",
+                    "fermata", "ending", "repeat",
+                ];
                 let has_unmodelled_semantics = element.children().any(|child| {
                     child.is_element()
                         && matches!(
@@ -1005,9 +1009,17 @@ fn parse_part(
                         )
                 }) || element.attribute("segno").is_some()
                     || element.attribute("coda").is_some();
+                let has_unknown_children = element.children().any(|child| {
+                    child.is_element() && !known_children.contains(&child.tag_name().name())
+                });
+                let known_attributes = ["id", "location", "segno", "coda", "divisions", "staff"];
+                let has_unknown_attributes = element.attributes()
+                    .any(|attribute| !known_attributes.contains(&attribute.name()));
                 if location == "middle"
                     || !matches!(location, "left" | "right")
                     || has_unmodelled_semantics
+                    || has_unknown_children
+                    || has_unknown_attributes
                 {
                     has_unmodelled_barline_events = true;
                 }
@@ -1613,6 +1625,24 @@ mod tests {
         assert!(!validate_musicxml_notation_graph_replay(
             xml.as_bytes(), "sha256:sealed-graph", "score-clock", &tampered_repeat
         ).unwrap());
+    }
+
+
+    #[test]
+    fn map_only_api_withholds_unknown_barline_extensions() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><rest/><duration>16</duration></note>
+            <barline location="right" custom="vendor-x"><future-marker>opaque</future-marker></barline>
+        </measure></part></score-partwise>"#;
+        let map = parse(xml);
+        assert!(matches!(map.status, MeasureMapStatus::Unknown { .. }));
+        let graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "sha256:extension", "score-clock"
+        ).unwrap();
+        assert_eq!(graph[0].map.status, MeasureMapStatus::Supported);
+        assert_eq!(graph[0].barline_events[0].unrecognized_attributes.len(), 1);
+        assert_eq!(graph[0].barline_events[0].unrecognized_children.len(), 1);
     }
 
 }
