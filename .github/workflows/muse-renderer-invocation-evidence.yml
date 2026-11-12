@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - "research/mel-mr-eval-016-*"
+      - "research/mel-mr-eval-017-*"
     paths:
       - "Cargo.toml"
       - "Cargo.lock"
@@ -66,6 +67,9 @@ jobs:
 
       - name: Run renderer receipt tests
         run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib renderer_execution_receipt::tests
+
+      - name: Run counterfactual acoustic influence tests
+        run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib counterfactual_acoustic_influence::tests
 
       - name: Run Clippy for Muse library and tests
         run: cargo clippy --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib --tests -- -D warnings
