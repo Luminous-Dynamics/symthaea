@@ -1609,14 +1609,16 @@ pub fn measure_counterfactual_influence(
         let rms_threshold = calibration
             .analysis
             .minimum_rms_delta
-            .max(cell.maximum_noop_rms_delta * calibration.analysis.noise_floor_multiplier);
+            .max(cell.maximum_noop_rms_delta * calibration.analysis.noise_floor_multiplier)
+            .max(f32::EPSILON);
         let spectral_threshold = calibration
             .analysis
             .minimum_spectral_distance
             .max(
                 cell.maximum_noop_spectral_distance
                     * calibration.analysis.noise_floor_multiplier,
-            );
+            )
+            .max(f32::EPSILON);
         let release_ratio = calibration.analysis.support_policy.release_ratio_ppm as f32
             / 1_000_000.0;
         let release_rms_threshold = rms_threshold * release_ratio;
