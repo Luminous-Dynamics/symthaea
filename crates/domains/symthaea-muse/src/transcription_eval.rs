@@ -2787,22 +2787,42 @@ mod tests {
     #[test]
     fn measure_phase_is_withheld_when_later_meter_changes_are_present() {
         let reference = reference_artifact(&[(60, 0, 480)], 40);
-        let midi = build_midi(&[(60, 0, 480)], 40, &[(0, 500_000)]);
-        let mut parsed = parse_transcribed_midi_v1(&midi).unwrap();
-        parsed.time_signature_points.push(MidiTimeSignaturePointV1 {
-            start_tick: 1_920,
-            source_track_index: 0,
-            numerator: 3,
-            denominator_power: 2,
-            denominator: 4,
-            clocks_per_click: 24,
-            thirtyseconds_per_quarter: 8,
-        });
-        let summary = meter_metadata_summary_v1(&reference, &parsed);
-        assert_eq!(summary.prediction_meter_point_count, 2);
+        let conductor = vec![
+            0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20,
+            0x00, 0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08,
+            0x8f, 0x00, 0xff, 0x58, 0x04, 0x03, 0x02, 0x18, 0x08,
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let note_track = vec![
+            0x00, 0xc0, 40,
+            0x00, 0x90, 60, 100,
+            0x83, 0x60, 0x80, 60, 0x00,
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let tracks = vec![conductor, note_track];
+        let mut midi = Vec::new();
+        midi.extend_from_slice(b"MThd");
+        midi.extend_from_slice(&6u32.to_be_bytes());
+        midi.extend_from_slice(&1u16.to_be_bytes());
+        midi.extend_from_slice(&2u16.to_be_bytes());
+        midi.extend_from_slice(&MIDI_TRANSCRIPTION_TEST_PPQ.to_be_bytes());
+        for track in tracks {
+            midi.extend_from_slice(b"MTrk");
+            midi.extend_from_slice(&(track.len() as u32).to_be_bytes());
+            midi.extend_from_slice(&track);
+        }
+
+        let report = evaluate_midi_transcription_v1(
+            &midi,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.meter_metadata.prediction_meter_point_count, 2);
+        assert_eq!(report.meter_metadata.prediction_initial_matches_reference, Some(true));
         // The score-level phase diagnostic is deliberately unavailable when
         // the measure lattice is piecewise and not modelled by V1.
-        assert_ne!(summary.prediction_meter_point_count, 1);
+        assert!(report.measure_phase.is_none());
     }
 
     #[test]
