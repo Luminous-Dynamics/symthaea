@@ -6,6 +6,7 @@ const SCHEMA_VERSION: &str = "0.1.0";
 const EARTH_RADIUS_M: f64 = 6_371_000.0;
 const TIME_TOLERANCE_S: f64 = 1.0e-6;
 const SEL_QUANTITY_ID: &str = "sound_exposure_level_db_re_1upa2_s";
+const SEL_QUANTITY_ID: &str = "sound_exposure_level_db_re_1upa2_s";
 
 #[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -102,6 +103,7 @@ struct AcousticContribution {
     event_id: String,
     receiver_id: String,
     band_id: String,
+    center_frequency_hz: f64,
     start_time_s: f64,
     end_time_s: f64,
     duration_s: f64,
@@ -133,6 +135,8 @@ struct AmbientObservation {
     independently_reviewed: bool,
     receiver_id: String,
     band_id: String,
+    quantity_id: String,
+    center_frequency_hz: f64,
     start_time_s: f64,
     end_time_s: f64,
     duration_s: f64,
@@ -152,6 +156,7 @@ struct ExposureLimit {
     limit_id: String,
     receiver_id: String,
     band_id: String,
+    quantity_id: String,
     upper_sel_threshold_db: f64,
     requirement_reference: String,
 }
@@ -176,6 +181,7 @@ struct AuditReport {
 struct ExposurePartitionReport {
     receiver_id: String,
     band_id: String,
+    center_frequency_hz: f64,
     contribution_count: usize,
     unique_source_event_count: usize,
     unique_temporal_coverage_s: f64,
@@ -214,6 +220,7 @@ struct ContributionReport {
     event_id: String,
     receiver_id: String,
     band_id: String,
+    center_frequency_hz: f64,
     vessel_id: String,
     vessel_revision: String,
     propeller_revision: String,
@@ -429,8 +436,15 @@ fn validate_case(case: &Case) -> Vec<String> {
         }
         let event = event.unwrap();
         let receiver = receiver.unwrap();
-        if !event.source_levels.iter().any(|band| band.band_id == contribution.band_id) {
-            errors.push(format!("contribution {} has no matching source-level band", contribution.contribution_id));
+        if !event.source_levels.iter().any(|band| {
+            band.band_id == contribution.band_id
+                && (band.center_frequency_hz - contribution.center_frequency_hz).abs()
+                    <= 1.0e-9_f64.max(band.center_frequency_hz * 1.0e-9)
+        }) {
+            errors.push(format!("contribution {} has no matching source-level band/centre frequency", contribution.contribution_id));
+        }
+        if !finite_positive(contribution.center_frequency_hz) {
+            errors.push(format!("contribution {} has invalid centre frequency", contribution.contribution_id));
         }
         if contribution.environment_fingerprint_sha256 != case.period.environment_fingerprint_sha256 {
             errors.push(format!("contribution {} environment fingerprint differs from the frozen period", contribution.contribution_id));
@@ -501,6 +515,8 @@ fn validate_case(case: &Case) -> Vec<String> {
         if observation.observation_id.trim().is_empty() || !ambient_ids.insert(observation.observation_id.clone())
             || !receivers.iter().any(|receiver| receiver == &observation.receiver_id)
             || observation.band_id.trim().is_empty()
+            || observation.quantity_id != "received_spl_db_re_1upa"
+            || !finite_positive(observation.center_frequency_hz)
             || !observation.ambient_only_basis.eq("independently_measured_ambient_reference")
             || observation.measurement_method_id.trim().is_empty()
             || observation.instrument_id.trim().is_empty()
@@ -530,6 +546,7 @@ fn validate_case(case: &Case) -> Vec<String> {
         if limit.limit_id.trim().is_empty() || !limits.insert(limit.limit_id.clone())
             || !receivers.contains(&limit.receiver_id)
             || limit.band_id.trim().is_empty()
+            || limit.quantity_id != SEL_QUANTITY_ID
             || !limit.upper_sel_threshold_db.is_finite()
             || limit.requirement_reference.trim().is_empty()
         {
@@ -746,6 +763,7 @@ fn audit(case:&Case)->AuditReport {
             event_id:item.input.event_id.clone(),
             receiver_id:item.input.receiver_id.clone(),
             band_id:item.input.band_id.clone(),
+            center_frequency_hz:item.input.center_frequency_hz,
             vessel_id:item.source_event.vessel_id.clone(),
             vessel_revision:item.source_event.vessel_revision.clone(),
             propeller_revision:item.source_event.propeller_revision.clone(),
@@ -792,6 +810,7 @@ fn audit(case:&Case)->AuditReport {
         partitions.push(ExposurePartitionReport {
             receiver_id:receiver_id.clone(),
             band_id:band_id.clone(),
+            center_frequency_hz:contributions[0].input.center_frequency_hz,
             contribution_count:contributions.len(),
             unique_source_event_count:unique_events.len(),
             unique_temporal_coverage_s:unique_coverage,
@@ -1004,6 +1023,7 @@ mod tests {
             event_id:event_id.to_string(),
             receiver_id:"receiver-1".to_string(),
             band_id:"one-third-octave-125Hz".to_string(),
+            center_frequency_hz:125.0,
             start_time_s:start,
             end_time_s:end,
             duration_s:end-start,
@@ -1035,6 +1055,8 @@ mod tests {
             independently_reviewed:true,
             receiver_id:"receiver-1".to_string(),
             band_id:"one-third-octave-125Hz".to_string(),
+            quantity_id:"received_spl_db_re_1upa".to_string(),
+            center_frequency_hz:125.0,
             start_time_s:0.0,
             end_time_s:100.0,
             duration_s:100.0,
@@ -1074,6 +1096,7 @@ mod tests {
                 limit_id:"ship-sel-limit".to_string(),
                 receiver_id:"receiver-1".to_string(),
                 band_id:"one-third-octave-125Hz".to_string(),
+                quantity_id:SEL_QUANTITY_ID.to_string(),
                 upper_sel_threshold_db:80.0,
                 requirement_reference:"scenario-limit:receiver-1-125hz".to_string(),
             }],
@@ -1130,6 +1153,23 @@ mod tests {
         input.contributions[1].end_time_s=20.0;
         assert!((audit(&input).partitions[0].maximum_simultaneous_ship_received_level_db.unwrap()-60.0).abs()<1e-12);
         assert!((audit(&input).partitions[0].unique_temporal_coverage_s-20.0).abs()<1e-12);
+    }
+
+    #[test]
+    fn source_and_ambient_band_centre_frequency_must_match() {
+        let mut input=case();
+        input.ambient_observations[0].center_frequency_hz=250.0;
+        assert_eq!(audit(&input).disposition,"INVALID");
+        let mut input=case();
+        input.contributions[0].center_frequency_hz=250.0;
+        assert_eq!(audit(&input).disposition,"INVALID");
+    }
+
+    #[test]
+    fn exposure_limit_must_name_sel_quantity() {
+        let mut input=case();
+        input.exposure_limits[0].quantity_id="received_spl_db_re_1upa".to_string();
+        assert_eq!(audit(&input).disposition,"INVALID");
     }
 
     #[test]
