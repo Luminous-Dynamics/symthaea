@@ -23,8 +23,9 @@ The synthetic fixture is intentionally rejected as measured validation. Exit cod
 
 Background handling follows ITTC Rev.03 §2.5.3 per spectral band:
 - below 3 dB signal/background margin: background-dominated; do not scale the band;
-- 3 dB through 10 dB inclusive: subtract background in the linear-energy domain;
-- above 10 dB: no background correction is required.
+- 3 dB inclusive to below 10 dB: subtract background in the linear-energy domain;
+- above 10 dB: no background correction is required;
+- exactly 10 dB: ITTC Rev.03 gives no disposition; v0.1 reports INCOMPLETE rather than silently correcting or accepting the band.
 
 Each model-scale run declares a background measurement method (bare hub or pressure-suppressed) and a separate background raw-trace digest. Unknown methods and malformed trace provenance block comparison. Uncertainty endpoint propagation reapplies these thresholds; when the lower signal/background margin becomes unusable, the predicted interval remains unresolved instead of silently treating that band as valid.
 
