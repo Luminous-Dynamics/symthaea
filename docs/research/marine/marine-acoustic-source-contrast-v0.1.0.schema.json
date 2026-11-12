@@ -5,20 +5,21 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version",
-    "case_id",
-    "evidence_kind",
-    "source",
-    "target_source",
-    "predeclared_intervention",
-    "design_strategy",
-    "intervention_protocol_sha256",
-    "service_fingerprint_sha256",
-    "environment_fingerprint_sha256",
-    "unobserved_sources",
     "band_frequency_tolerance_fraction",
     "baseline",
-    "candidate"
+    "candidate",
+    "case_id",
+    "design_evidence_sha256",
+    "design_strategy",
+    "environment_fingerprint_sha256",
+    "evidence_kind",
+    "intervention_protocol_sha256",
+    "predeclared_intervention",
+    "schema_version",
+    "service_fingerprint_sha256",
+    "source",
+    "target_source",
+    "unobserved_sources"
   ],
   "properties": {
     "schema_version": {
@@ -78,6 +79,9 @@
     },
     "candidate": {
       "$ref": "#/$defs/observation"
+    },
+    "design_evidence_sha256": {
+      "$ref": "#/$defs/digest"
     }
   },
   "$defs": {
