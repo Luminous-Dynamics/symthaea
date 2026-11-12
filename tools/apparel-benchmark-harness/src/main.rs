@@ -393,6 +393,31 @@ fn validate_semantic_corpus(corpus: &Value) -> Result<(usize, usize), Vec<String
     if get_str(corpus, "fixture_class") != Some("synthetic") {
         errors.push("semantic corpus must remain explicitly synthetic".into());
     }
+
+    let coverage = corpus.get("execution_coverage").unwrap_or(&Value::Null);
+    let mut declared_coverage = BTreeSet::new();
+    for field in ["executable_case_ids", "not_yet_executed_case_ids"] {
+        let Some(items) = coverage.get(field).and_then(Value::as_array) else {
+            errors.push(format!("execution_coverage.{field} must be an array"));
+            continue;
+        };
+        for item in items {
+            let Some(id) = item.as_str() else {
+                errors.push(format!("execution_coverage.{field} entries must be strings"));
+                continue;
+            };
+            if !ids.contains(id) {
+                errors.push(format!("execution_coverage.{field} contains unknown case {id}"));
+            }
+            if !declared_coverage.insert(id.to_owned()) {
+                errors.push(format!("execution_coverage duplicates case {id}"));
+            }
+        }
+    }
+    if declared_coverage.len() != ids.len() {
+        errors.push("execution_coverage must classify every semantic case exactly once".into());
+    }
+
     if errors.is_empty() {
         Ok((negatives, positives))
     } else {
