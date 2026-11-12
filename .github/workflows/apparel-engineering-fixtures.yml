@@ -59,14 +59,21 @@ jobs:
       - name: Assert locked dependency graph
         run: cargo metadata --manifest-path tools/apparel-benchmark-harness/Cargo.toml --locked --no-deps --format-version 1 > /dev/null
 
-      - name: Format focused auditor
-        run: rustfmt --edition 2024 --check tools/apparel-benchmark-harness/src/main.rs
+      - name: Format focused auditors
+        run: |
+          rustfmt --edition 2024 --check tools/apparel-benchmark-harness/src/main.rs
+          rustfmt --edition 2024 --check tools/apparel-benchmark-harness/src/textile_dataset_audit.rs
 
       - name: Test Draft 2020-12 schema and semantic contract
         run: cargo test --manifest-path tools/apparel-benchmark-harness/Cargo.toml --locked --bin apparel_thread_audit
 
-      - name: Clippy focused auditor
-        run: cargo clippy --manifest-path tools/apparel-benchmark-harness/Cargo.toml --locked --bin apparel_thread_audit -- -D warnings
+      - name: Test specimen-level textile dataset auditor
+        run: cargo test --manifest-path tools/apparel-benchmark-harness/Cargo.toml --locked --bin textile_dataset_audit
+
+      - name: Clippy focused auditors
+        run: |
+          cargo clippy --manifest-path tools/apparel-benchmark-harness/Cargo.toml --locked --bin apparel_thread_audit -- -D warnings
+          cargo clippy --manifest-path tools/apparel-benchmark-harness/Cargo.toml --locked --bin textile_dataset_audit -- -D warnings
 
       - name: Emit exact-head apparel receipt
         run: |
