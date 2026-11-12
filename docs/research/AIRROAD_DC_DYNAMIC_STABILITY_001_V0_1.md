@@ -2,7 +2,7 @@
 
 **Status:** research contract / known-answer reference vectors  
 **Owner:** Symthaea AIRROAD programme  
-**Issue:** https://github.com/Luminous-Dynamics/symthaea/issues/11712  
+**Tracking PR:** https://github.com/Luminous-Dynamics/symthaea/pull/11712  
 **Claim ceiling:** synthetic reduced-order mathematics only; no physical aircraft, converter, battery, protection or flight validation.
 
 ## 1. Purpose and boundary
@@ -142,6 +142,24 @@ Common parameters:
 | critical-fold | 2,500 W | 0 V² | 50 V (double) | Critical / marginal; eigenvalue zero |
 | no-equilibrium | 2,501 W | −4 V² | none | No steady-state equilibrium |
 
+### Scaled 400 V / 1.5 MW fixture
+
+The fifth fixture uses case-specific inputs rather than the common 100 V parameters:
+
+| Input | Value |
+|---|---:|
+| \(V_s\) | 400 V |
+| \(R_s\) | 0.02 Ω |
+| \(C\) | 0.005 F |
+| \(P\) | 1.5 MW |
+| \(P_{critical}\) | 2.0 MW |
+| \(\Delta\) | 40,000 V² |
+| Equilibria | 300 V (stable), 100 V (unstable) |
+| Currents | 5 kA, 15 kA |
+| Eigenvalues | \(-20,000/3\;s^{-1}\), \(+20,000\;s^{-1}\) |
+
+This is a scale-diverse analytical fixture, not an aircraft bus specification.
+
 Additional exact known answers:
 
 ### Case stable-and-unstable-roots
@@ -195,17 +213,17 @@ The first implementation must fail closed for:
 - malformed units or dimensionally inconsistent input;
 - arithmetic overflow or non-finite intermediate values;
 - unsupported parameter magnitudes outside the frozen reference profile;
-- any transient trajectory reaching or crossing a declared \(V_{min}>0\) domain boundary;
+- any future transient trajectory reaching or crossing a declared \(V_{min}>0\) domain boundary;
 - a negative discriminant when the caller requests a feasible steady-state equilibrium;
 - an attempted classification of the repeated-root case as robustly stable.
 
-The ideal constant-power expression \(P/V\) is singular at zero voltage. The implementation must preserve this domain boundary and report a typed non-PASS / domain-exit result. It must not clamp \(V\) to an arbitrary epsilon and continue while retaining a feasibility claim.
+The ideal constant-power expression \(P/V\) is singular at zero voltage. Any future transient API must preserve this domain boundary and report a typed non-PASS / domain-exit result. It must not clamp \(V\) to an arbitrary epsilon and continue while retaining a feasibility claim.
 
 If a later converter model current-limits or folds back at undervoltage, that is a different, explicitly versioned load law with its own state transitions and independent reference cases. It must not be silently substituted into this V0.1 model.
 
 ## 7. Tier-0 acceptance
 
-- Exact-rational oracle agreement with all four frozen equilibrium cases; the binary64 API must classify the clearly separated cases and abstain (non-PASS) on the fold/near-fold ambiguity band.
+- Exact-rational oracle agreement with all five frozen equilibrium cases and their phase-line sign probes; the binary64 API must classify clearly separated cases and abstain (non-PASS) on the fold/near-fold ambiguity band.
 - Correct root ordering and source/load current closure.
 - Correct local stability sign for each distinct root.
 - Critical-fold classification is marginal / non-hyperbolic, never robust PASS.
@@ -213,6 +231,7 @@ If a later converter model current-limits or folds back at undervoltage, that is
 - Zero accepted invalid, non-finite or unsupported parameter paths.
 - Deterministic canonical input/output encoding and replay.
 - Independent rational oracle does not import or reuse the production Rust equations or intermediate values.
+- Every frozen phase-line probe is re-evaluated from the exact ODE and its sign must match the declared increasing/decreasing/equilibrium result.
 - Floating-point results report absolute error and ULP distance separately from classification correctness.
 - Tests include sign mutations, unit mutations, exact-fold and adjacent representable values, overflow and domain-exit controls.
 
@@ -253,6 +272,12 @@ Zhao et al., *Small-Signal Stability Analysis and Control Design for eVTOL PDCM*
 - relative steady-state bus-voltage error reduced from 7.42% to 0.83% in its studied single-point-failure case when VDCM droop was combined with keeping the opposite rotor pair operating.
 
 These are study-specific results for the authors' model, controller and HIL setup. They are not universal eVTOL design constants or Luminous performance results.
+
+### Hardware-in-the-loop / PHIL reference points
+
+Zhao et al. report eVTOL-specific HIL evidence in the 16 October 2026 paper above. A separate March 2026 preprint by Syed et al., [*Distributed Adaptive Control for DC Power Distribution in Hybrid-Electric Aircraft: Design and Experimental Validation*](https://arxiv.org/abs/2603.17518), describes distributed adaptive/passivity-based DC-bus voltage regulation and proportional source load-sharing under uncertain line resistance and inductance, evaluated against other controllers in a power-hardware-in-the-loop environment. It is a hybrid-electric aircraft comparator and a preprint, not an eVTOL certification result.
+
+NASA's [Electric Aircraft Testbed (NEAT)](https://www.nasa.gov/eap-labs-and-testbeds/neat/) demonstrates the physical-infrastructure level required for meaningful comparison: reconfigurable full-scale electrical powertrain testing, AC/DC/bidirectional DC power, batteries, load banks, ground-loop paths, altitude simulation and cooling support. Luminous should not claim to replace such facilities. The nearer-term path is a guarded low-energy rig and matched PHIL evidence, followed by collaboration with a qualified laboratory for higher-power tests.
 
 ### Additional electrical-system comparator
 
