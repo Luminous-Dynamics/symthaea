@@ -471,10 +471,7 @@ mod tests {
     fn near_fold_ambiguity_does_not_become_a_false_pass() {
         let p = parameters(2_500.0 + f64::EPSILON * 8_192.0);
         let analysis = analyze(p, 60.0).expect("finite but boundary-ambiguous input");
-        assert_eq!(
-            analysis.result,
-            EquilibriumResult::NumericallyIndeterminate
-        );
+        assert_eq!(analysis.result, EquilibriumResult::NumericallyIndeterminate);
     }
 
     #[test]
