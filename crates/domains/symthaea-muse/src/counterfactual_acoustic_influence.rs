@@ -1457,6 +1457,7 @@ mod tests {
                 source_score_sha256: &source_score_digest,
                 source_event_id: "score_event_index:3",
                 intervention: CounterfactualIntervention::Remove,
+                symbolic_intervention_receipt_sha256: DIGEST_E,
                 baseline_schedule_sha256: &baseline_schedule_digest,
                 counterfactual_schedule_sha256: &counterfactual_schedule_digest,
             },
