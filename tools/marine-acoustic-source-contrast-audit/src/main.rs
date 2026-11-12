@@ -121,6 +121,10 @@ struct SourceStateEvidence {
     observable_kind: String,
     observable_id: String,
     evidence_sha256: String,
+    measured_value: f64,
+    unit: String,
+    expanded_uncertainty: f64,
+    equivalence_tolerance: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -138,8 +142,18 @@ struct BandMeasurement {
 struct AuditReport {
     schema_version: &'static str,
     case_id: String,
+    source_dataset_id: String,
+    source_data_sha256: String,
     target_source: &'static str,
     design_evidence_sha256: String,
+    baseline_hydrophone_instrument_id: String,
+    calibration_certificate_sha256: String,
+    timebase_receipt_sha256: String,
+    baseline_acoustic_trace_sha256: String,
+    candidate_acoustic_trace_sha256: String,
+    service_fingerprint_sha256: String,
+    environment_fingerprint_sha256: String,
+    design_strategy: &'static str,
     disposition: &'static str,
     identifiability: &'static str,
     baseline_run_id: String,
@@ -204,8 +218,15 @@ fn validate_observation(observation: &Observation, label: &str, errors: &mut Vec
         if state.state.trim().is_empty()
             || state.observable_kind.trim().is_empty()
             || state.observable_id.trim().is_empty()
+            || state.unit.trim().is_empty()
         {
-            errors.push(format!("{label}: {} state and independent observable identity are required", state.source.name()));
+            errors.push(format!("{label}: {} state, unit and independent observable identity are required", state.source.name()));
+        }
+        if !state.measured_value.is_finite()
+            || !finite_positive(state.expanded_uncertainty)
+            || !finite_positive(state.equivalence_tolerance)
+        {
+            errors.push(format!("{label}: {} measured value, expanded uncertainty and equivalence tolerance must be finite and positive", state.source.name()));
         }
         if !is_sha256(&state.evidence_sha256) {
             errors.push(format!("{label}: {} evidence digest is malformed", state.source.name()));
@@ -319,18 +340,30 @@ fn audit(case: &Case) -> AuditReport {
                 let source_observable_changed = expected_sources.iter().any(|source| {
                     let base = baseline_sources.get(source).expect("complete source inventory checked");
                     let cand = candidate_sources.get(source).expect("complete source inventory checked");
-                    base.observable_kind != cand.observable_kind || base.observable_id != cand.observable_id
+                    base.observable_kind != cand.observable_kind
+                        || base.observable_id != cand.observable_id
+                        || base.unit != cand.unit
+                        || (base.equivalence_tolerance - cand.equivalence_tolerance).abs() > 1.0e-12
                 });
                 let non_target_changed = expected_sources
                     .iter()
                     .filter(|source| **source != case.target_source)
                     .any(|source| {
-                        baseline_sources.get(source).map(|x| x.state.as_str())
-                            != candidate_sources.get(source).map(|x| x.state.as_str())
+                        let base = baseline_sources.get(source).expect("complete source inventory checked");
+                        let cand = candidate_sources.get(source).expect("complete source inventory checked");
+                        base.state != cand.state
+                            || (base.measured_value - cand.measured_value).abs()
+                                + base.expanded_uncertainty
+                                + cand.expanded_uncertainty
+                                > base.equivalence_tolerance
                     });
+                let target_change_resolved =
+                    (target_baseline.measured_value - target_candidate.measured_value).abs()
+                        > target_baseline.expanded_uncertainty
+                            + target_candidate.expanded_uncertainty;
 
                 if source_observable_changed {
-                    reasons.push("one or more source-state observable identities changed between baseline and candidate".to_string());
+                    reasons.push("one or more source-state observable identities, units or predeclared equivalence tolerances changed between baseline and candidate".to_string());
                     identifiability = "INCOMPARABLE";
                 } else if non_target_changed {
                     reasons.push("at least one non-target source state changed between baseline and candidate".to_string());
@@ -340,9 +373,10 @@ fn audit(case: &Case) -> AuditReport {
                     identifiability = "UNRESOLVED_MIXTURE";
                 } else if !case.predeclared_intervention
                     || target_baseline.state == target_candidate.state
+                    || !target_change_resolved
                     || case.design_strategy == DesignStrategy::Uncontrolled
                 {
-                    reasons.push("no predeclared, discriminating and controlled target-source intervention is evidenced".to_string());
+                    reasons.push("no predeclared, independently resolved and controlled target-source intervention is evidenced".to_string());
                     identifiability = "UNRESOLVED_MIXTURE";
                 } else if case.design_strategy == DesignStrategy::MatchedRepeated {
                     reasons.push("matched repeated contrast is recorded, but randomization/counterbalancing is not established".to_string());
@@ -433,8 +467,23 @@ fn audit(case: &Case) -> AuditReport {
     AuditReport {
         schema_version: SCHEMA_VERSION,
         case_id: case.case_id.clone(),
+        source_dataset_id: case.source.dataset_id.clone(),
+        source_data_sha256: case.source.raw_data_sha256.clone(),
         target_source: case.target_source.name(),
         design_evidence_sha256: case.design_evidence_sha256.clone(),
+        baseline_hydrophone_instrument_id: case.baseline.hydrophone_instrument_id.clone(),
+        calibration_certificate_sha256: case.baseline.calibration_certificate_sha256.clone(),
+        timebase_receipt_sha256: case.baseline.timebase_receipt_sha256.clone(),
+        baseline_acoustic_trace_sha256: case.baseline.acoustic_trace_sha256.clone(),
+        candidate_acoustic_trace_sha256: case.candidate.acoustic_trace_sha256.clone(),
+        service_fingerprint_sha256: case.service_fingerprint_sha256.clone(),
+        environment_fingerprint_sha256: case.environment_fingerprint_sha256.clone(),
+        design_strategy: match case.design_strategy {
+            DesignStrategy::Randomized => "randomized",
+            DesignStrategy::Counterbalanced => "counterbalanced",
+            DesignStrategy::MatchedRepeated => "matched_repeated",
+            DesignStrategy::Uncontrolled => "uncontrolled",
+        },
         disposition,
         identifiability,
         baseline_run_id: case.baseline.run_id.clone(),
@@ -497,12 +546,31 @@ mod tests {
             (SourceKind::AmbientBackground, "matched"),
         ]
         .into_iter()
-        .map(|(source, state)| SourceStateEvidence {
-            source,
-            state: state.to_string(),
-            observable_kind: "independent_sensor_or_state_record".to_string(),
-            observable_id: format!("obs-{}", source.name()),
-            evidence_sha256: digest(target_digest),
+        .map(|(source, state)| {
+            let (unit, baseline_value, expanded_uncertainty, equivalence_tolerance) = match source {
+                SourceKind::PropellerCavitation => ("cavitation_state_index", 0.0, 0.05, 0.10),
+                SourceKind::PropellerHydrodynamic => ("wake_metric_index", 1.0, 0.01, 0.05),
+                SourceKind::PrimeMover => ("operating_state_index", 1.0, 0.01, 0.05),
+                SourceKind::ShaftGearbox => ("vibration_metric_index", 1.0, 0.01, 0.05),
+                SourceKind::AuxiliaryMachinery => ("load_fraction", 0.5, 0.01, 0.05),
+                SourceKind::HullAppendageFlow => ("flow_metric_index", 1.0, 0.01, 0.05),
+                SourceKind::AmbientBackground => ("received_spl_db_re_1upa", 90.0, 0.5, 1.5),
+            };
+            SourceStateEvidence {
+                source,
+                state: state.to_string(),
+                observable_kind: "independent_sensor_or_state_record".to_string(),
+                observable_id: format!("obs-{}", source.name()),
+                evidence_sha256: digest(target_digest),
+                measured_value: if source == SourceKind::PropellerCavitation && state == "cavitating" {
+                    1.0
+                } else {
+                    baseline_value
+                },
+                unit: unit.to_string(),
+                expanded_uncertainty,
+                equivalence_tolerance,
+            }
         })
         .collect()
     }
@@ -558,6 +626,28 @@ mod tests {
 
     fn make_measured(case: &mut Case) {
         case.evidence_kind = EvidenceKind::Measured;
+    }
+
+    #[test]
+    fn non_target_numeric_observable_outside_equivalence_tolerance_is_incomparable() {
+        let mut input = case();
+        make_measured(&mut input);
+        let auxiliary = input.candidate.source_states.iter_mut()
+            .find(|state| state.source == SourceKind::AuxiliaryMachinery)
+            .unwrap();
+        auxiliary.measured_value += 0.20;
+        assert_eq!(audit(&input).disposition, "INCOMPARABLE");
+    }
+
+    #[test]
+    fn target_state_change_inside_expanded_uncertainty_is_unresolved() {
+        let mut input = case();
+        make_measured(&mut input);
+        let target = input.candidate.source_states.iter_mut()
+            .find(|state| state.source == SourceKind::PropellerCavitation)
+            .unwrap();
+        target.measured_value = 0.05;
+        assert_eq!(audit(&input).disposition, "UNRESOLVED_MIXTURE");
     }
 
     #[test]
