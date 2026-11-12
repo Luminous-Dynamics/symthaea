@@ -65,4 +65,4 @@ Terminal safe-stop, energy closure, command response and other physical qualific
 
 The event records now bind policy digest to the decision and action chunk, actuator/controller configuration digests to the application, and thermal sensor calibration to the physical transition. These are checked by the independent replay before an application can count as linked/closed.
 
-Current source-level corpus: 28 core causal-replay tests and 17 single-joint metrology-join tests. Exact-head Rust 1.96 CI remains the execution gate.
+Current source corpus: 28 core causal-replay tests and 17 single-joint metrology-join tests. The exact-head Rust 1.96 workflow completed successfully: formatting passed, **45/45 tests passed**, and strict Clippy passed. This is software/reference qualification only; no physical trial or safety certification is implied.
