@@ -60,6 +60,14 @@
     "validation_design_group_ids": [],
     "test_design_group_ids": [
       "DESIGN-B"
+    ],
+    "train_protocol_group_ids": [
+      "PROTO-1",
+      "PROTO-2"
+    ],
+    "validation_protocol_group_ids": [],
+    "test_protocol_group_ids": [
+      "PROTO-2"
     ]
   },
   "predictions": [
