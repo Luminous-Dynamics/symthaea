@@ -543,10 +543,8 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
     let mut line_digests = BTreeMap::new();
     let mut split_by_group = BTreeMap::<HoldoutGroup, DataSplit>::new();
     let mut used_holdout_groups = BTreeSet::<HoldoutGroup>::new();
-    let mut expected_arms_by_design =
-        BTreeMap::<(String, String), BTreeSet<String>>::new();
-    let mut arms_by_design_block =
-        BTreeMap::<(String, String, String), BTreeSet<String>>::new();
+    let mut expected_arms_by_design = BTreeMap::<(String, String), BTreeSet<String>>::new();
+    let mut arms_by_design_block = BTreeMap::<(String, String, String), BTreeSet<String>>::new();
     for arm in &manifest.arms {
         expected_arms_by_design
             .entry((arm.design_id.clone(), arm.design_revision.clone()))
@@ -597,7 +595,8 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         )?;
         for feature in &cell.feature_observations {
             require_nonempty(&feature.feature_id, "feature ID")?;
-            if feature.available_cycle == 0 || feature.available_cycle > cell.feature_cutoff_cycle
+            if feature.available_cycle == 0
+                || feature.available_cycle > cell.feature_cutoff_cycle
                 || feature.available_cycle > cell.cycles_observed
             {
                 return Err(AuditError(format!(
@@ -720,9 +719,7 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         }
     }
 
-    for ((design_id, design_revision, block_id), block_arm_ids) in
-        &arms_by_design_block
-    {
+    for ((design_id, design_revision, block_id), block_arm_ids) in &arms_by_design_block {
         let expected_arm_ids = expected_arms_by_design
             .get(&(design_id.clone(), design_revision.clone()))
             .ok_or_else(|| {
