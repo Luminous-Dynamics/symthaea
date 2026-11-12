@@ -406,7 +406,6 @@
       "model": "Reference Q is initially maximally entangled with injected message M; black-hole register B is initially entangled with explicit early radiation R; a declared scrambler acts on M tensor B; emitted factors E are made accessible while remaining B' is inaccessible to the decoder.",
       "observables": [
         "mutual_information_Q_Bprime",
-        "decoupling_trace_distance_Q_Bprime",
         "accessible_reference_radiation_mutual_information",
         "entanglement_fidelity_after_recovery",
         "average_message_state_fidelity",
@@ -418,7 +417,8 @@
         "decoder_peak_memory",
         "charge_sector_leakage",
         "noise_sensitivity",
-        "quantum_Pinsker_upper_bound_and_slack"
+        "quantum_Pinsker_upper_bound_and_slack",
+        "direct_decoupling_trace_distance_Q_Bprime"
       ],
       "decoder_baselines": [
         "exact_small_dimension_optimal_recovery_via_SDP_or_channel_optimization",
@@ -444,11 +444,14 @@
           "recovery claim made using mutual information only",
           "fidelity reported without gate count/depth/runtime"
         ],
-        "direct_decoupling_measurement": "trace distance 1/2||rho_QBprime-rho_Q tensor rho_Bprime||_1 from signed Hermitian spectrum; do not infer it from mutual information",
+        "direct_decoupling_measurement": "Compute 1/2||rho_QBprime - rho_Q tensor rho_Bprime||_1 from the signed Hermitian spectrum of the difference; do not infer trace distance from mutual information.",
         "quantum_pinsker": "D_trace <= sqrt(I(Q:Bprime)/2) with mutual information in nats; violations beyond declared tolerance fail",
-        "no_decoder_claim_from_decoupling": true
+        "no_decoder_claim_from_decoupling": true,
+        "pinsker_reference": "For natural-log mutual information in nats, require D_trace <= sqrt(I(Q:Bprime)/2), with declared numerical tolerance.",
+        "fixture": "hayden_preskill_decoupling_u4_v1.json records the Q,M,B,R register convention, accessible set A=E tensor R, direct trace-distance formula, and independent 32-seed NumPy comparator."
       },
-      "implementation_status": "QI-4A one-step four-qubit reference/early-radiation/scrambler diagnostic reports mutual information, direct Q-Bprime trace distance, Pinsker consistency and information complementarity; no recovery decoder has been implemented"
+      "implementation_status": "QI-4A source-authored one-step four-qubit decoupling experiment measures I(Q:B'), I(Q:A), direct trace distance D_tr(rho_QB', rho_Q tensor rho_B'), Pinsker consistency and pure-state information complementarity; no recovery map or decoder implemented",
+      "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json"
     },
     {
       "id": "QI-5",
@@ -717,8 +720,8 @@
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
       "finite_depth_random_circuit_ensembles": "seeded_Haar_U4_brickwork_and_all_to_all_matching_source_authored_not_executed; sequential_evaporation_and_energy_conserving_variants_not_implemented",
-      "sequential_unitary_evaporation_model": "U(1)-conserving product-state boundary-emission source authored, with explicit initial occupied-site list; no Rust execution receipts",
-      "hayden_preskill_recovery_decoders": "not implemented; current QI-4A diagnostic measures one-step decoupling information and trace distance only",
+      "sequential_unitary_evaporation_model": "U(1)-conserving sequential factor-transfer source uses a seeded low-entanglement product state in a fixed Hamming-weight sector; Rust execution pending",
+      "hayden_preskill_recovery_decoders": "not implemented; current QI-4A diagnostic has no recovery map, entanglement-fidelity measurement, or decoder cost",
       "mps_entropy_from_validated_schmidt_spectrum": "not_qualified",
       "island_or_qes_calculation": "not_implemented",
       "energy_conserving_circuits": "U(1)-conserving equal-gap qubit gate family and sequential factor-transfer toy model authored; Rust execution pending"
