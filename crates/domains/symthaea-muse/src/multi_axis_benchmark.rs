@@ -214,6 +214,7 @@ pub enum BenchmarkValidationError {
     DuplicateGroupId { group_id: String },
     TrainingEvaluationOverlap { group_id: String },
     MissingHeldOutGroups,
+    InvalidSplitPolicy,
     HeldOutGroupNotEvaluated { group_id: String },
     RandomExcerptCannotClaimOutOfDistribution,
     PlaybackMetricRequiresRenderer,
@@ -321,18 +322,35 @@ pub fn validate_benchmark_protocol(
             group_id: group_id.clone(),
         });
     }
-    if protocol.split.claim == GeneralizationClaimV1::OutOfDistribution {
-        if protocol.split.grouping_unit == GroupingUnitV1::RandomExcerpt {
-            return Err(BenchmarkValidationError::RandomExcerptCannotClaimOutOfDistribution);
+    if training.is_empty() || evaluation.is_empty() {
+        return Err(BenchmarkValidationError::InvalidSplitPolicy);
+    }
+    match protocol.split.claim {
+        GeneralizationClaimV1::InDistribution => {
+            if protocol.split.grouping_unit != GroupingUnitV1::RandomExcerpt
+                || !protocol.split.held_out_group_ids.is_empty()
+            {
+                return Err(BenchmarkValidationError::InvalidSplitPolicy);
+            }
         }
-        if protocol.split.held_out_group_ids.is_empty() {
-            return Err(BenchmarkValidationError::MissingHeldOutGroups);
-        }
-        for group_id in &protocol.split.held_out_group_ids {
-            if !evaluation.contains(group_id) || training.contains(group_id) {
-                return Err(BenchmarkValidationError::HeldOutGroupNotEvaluated {
-                    group_id: group_id.clone(),
-                });
+        GeneralizationClaimV1::OutOfDistribution => {
+            if protocol.split.grouping_unit == GroupingUnitV1::RandomExcerpt {
+                return Err(BenchmarkValidationError::RandomExcerptCannotClaimOutOfDistribution);
+            }
+            if protocol.split.held_out_group_ids.is_empty() {
+                return Err(BenchmarkValidationError::MissingHeldOutGroups);
+            }
+            let held_out: BTreeSet<String> =
+                protocol.split.held_out_group_ids.iter().cloned().collect();
+            if held_out != evaluation {
+                return Err(BenchmarkValidationError::InvalidSplitPolicy);
+            }
+            for group_id in &protocol.split.held_out_group_ids {
+                if !evaluation.contains(group_id) || training.contains(group_id) {
+                    return Err(BenchmarkValidationError::HeldOutGroupNotEvaluated {
+                        group_id: group_id.clone(),
+                    });
+                }
             }
         }
     }
@@ -615,7 +633,12 @@ pub fn compare_benchmark_reports(
         })?;
     let left_value = overall_metric(left, metric_id)?;
     let right_value = overall_metric(right, metric_id)?;
-    if left_value.sample_count != right_value.sample_count
+    let left_overall = left.slices.iter().find(|slice| slice.is_overall)
+        .ok_or(BenchmarkValidationError::MissingOverallSlice)?;
+    let right_overall = right.slices.iter().find(|slice| slice.is_overall)
+        .ok_or(BenchmarkValidationError::MissingOverallSlice)?;
+    if left_overall.sample_count != right_overall.sample_count
+        || left_value.sample_count != right_value.sample_count
         || left_value.evaluated_sample_manifest_sha256
             != right_value.evaluated_sample_manifest_sha256
     {
@@ -920,6 +943,38 @@ mod tests {
             Err(BenchmarkValidationError::IncompatibleMetricCoverage {
                 metric_id: "mv2h".into()
             })
+        );
+    }
+
+
+    #[test]
+    fn mixed_ood_evaluation_groups_cannot_be_labeled_fully_held_out() {
+        let mut protocol = protocol(EvaluationTrackV1::Blind);
+        protocol.split.evaluation_group_ids.push("Haydn".into());
+        assert_eq!(
+            validate_benchmark_protocol(&protocol),
+            Err(BenchmarkValidationError::TrainingEvaluationOverlap {
+                group_id: "Haydn".into()
+            })
+        );
+
+        let mut protocol = protocol(EvaluationTrackV1::Blind);
+        protocol.split.evaluation_group_ids.push("Tchaikovsky".into());
+        assert_eq!(
+            validate_benchmark_protocol(&protocol),
+            Err(BenchmarkValidationError::InvalidSplitPolicy)
+        );
+    }
+
+    #[test]
+    fn in_distribution_claim_requires_random_excerpt_split() {
+        let mut protocol = protocol(EvaluationTrackV1::Blind);
+        protocol.split.claim = GeneralizationClaimV1::InDistribution;
+        protocol.split.grouping_unit = GroupingUnitV1::Composer;
+        protocol.split.held_out_group_ids.clear();
+        assert_eq!(
+            validate_benchmark_protocol(&protocol),
+            Err(BenchmarkValidationError::InvalidSplitPolicy)
         );
     }
 
