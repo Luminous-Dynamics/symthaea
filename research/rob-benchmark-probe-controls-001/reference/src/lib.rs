@@ -1108,10 +1108,7 @@ mod tests {
         audit.candidate_clusters[0].tally.unknown = 1;
         audit.candidate_clusters[0].tally.task_failures -= 1;
         let report = audit_probe_controls(&audit).unwrap();
-        assert_eq!(
-            report.disposition,
-            ProbeAuditDisposition::Inconclusive
-        );
+        assert_eq!(report.disposition, ProbeAuditDisposition::Inconclusive);
         assert!(!report.probes[0].evidence_complete);
     }
 
