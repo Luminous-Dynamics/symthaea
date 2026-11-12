@@ -63,7 +63,6 @@
             "required": [
               "option_ids",
               "prior_expected_payoffs",
-              "preview_value_class",
               "information_budget"
             ],
             "properties": {
@@ -75,12 +74,6 @@
               },
               "prior_expected_payoffs": {
                 "$ref": "#/$defs/payoffs"
-              },
-              "preview_value_class": {
-                "enum": [
-                  "high",
-                  "low"
-                ]
               },
               "information_budget": {
                 "type": "integer",

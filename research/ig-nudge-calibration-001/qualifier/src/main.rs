@@ -55,7 +55,7 @@ fn validate_scenario(v: &Value) -> Result<(), String> {
     let id = strv(v, "scenario_id").ok_or("scenario_id missing")?;
     let task = &v["task"]; let view = &v["candidate_view"]; let oracle = &v["oracle"];
     let cue = &v["cue"]; let expected = &v["expected"];
-    if !exact_keys(task, &["option_ids","prior_expected_payoffs","preview_value_class","information_budget"]) {
+    if !exact_keys(task, &["option_ids","prior_expected_payoffs","information_budget"]) {
         return Err(format!("{id}: task keys do not match closed contract"));
     }
     if !exact_keys(view, &["task_id","option_ids","prior_expected_payoffs","information_budget","delivered_cue"]) {
@@ -117,8 +117,7 @@ fn validate_scenario(v: &Value) -> Result<(), String> {
             posterior[option]=Value::from(value);
             let posterior_option=best(&posterior).ok_or(format!("{id}: posterior tie not admitted"))?;
             let changed=posterior_option!=baseline;
-            let value_class=if changed{"high"}else{"low"};
-            if strv(task,"preview_value_class")!=Some(value_class) || changed!=(cue_type=="verified_high_value_preview") {
+            if changed!=(cue_type=="verified_high_value_preview") {
                 return Err(format!("{id}: high/low preview class does not match decision-argmax change"));
             }
             if policy!="incorporate_verified_information" || action!=posterior_option.as_str() {
@@ -269,4 +268,14 @@ mod tests{
     #[test]fn low_value_label_requires_argmax_invariance(){let mut x=fixture("NC-001-verified_high_value_preview");x["cue"]["cue_type"]=Value::String("verified_low_value_preview".into());x["candidate_view"]["delivered_cue"]=x["cue"].clone();assert!(validate_scenario(&x).is_err());}
     #[test]fn evidence_reference_must_match_observation_id(){let mut x=fixture("NC-001-verified_high_value_preview");x["cue"]["evidence_refs"][0]=Value::String("wrong".into());x["candidate_view"]["delivered_cue"]=x["cue"].clone();assert!(validate_scenario(&x).is_err());}
     #[test]fn content_digest_is_deterministic(){let x=fixture("NC-001-no_cue");assert_eq!(digest(&x["candidate_view"]).unwrap(),digest(&x["candidate_view"]).unwrap());}
+    #[test]fn high_and_low_preview_arms_use_distinct_observations(){
+        let h=fixture("NC-001-verified_high_value_preview");
+        let l=fixture("NC-001-verified_low_value_preview");
+        assert_ne!(h["cue"]["observation"]["option_id"],l["cue"]["observation"]["option_id"]);
+    }
+    #[test]fn value_class_is_derived_not_supplied_as_task_metadata(){
+        let x=fixture("NC-001-verified_high_value_preview");
+        assert!(x["task"].get("preview_value_class").is_none());
+    }
+
 }

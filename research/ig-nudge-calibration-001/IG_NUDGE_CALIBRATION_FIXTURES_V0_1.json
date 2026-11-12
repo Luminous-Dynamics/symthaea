@@ -18,7 +18,6 @@
           "A": 6,
           "B": 5
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -83,7 +82,6 @@
           "A": 6,
           "B": 5
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -160,7 +158,6 @@
           "A": 6,
           "B": 5
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -177,15 +174,15 @@
         "delivered_cue": {
           "cue_type": "verified_low_value_preview",
           "epistemic_status": "verified_observation",
-          "target_option": "B",
+          "target_option": "A",
           "claimed_payoff": null,
           "observation": {
-            "option_id": "B",
-            "value": 10,
-            "evidence_id": "OBS-NC-001-B"
+            "option_id": "A",
+            "value": 6,
+            "evidence_id": "OBS-NC-001-A"
           },
           "evidence_refs": [
-            "OBS-NC-001-B"
+            "OBS-NC-001-A"
           ],
           "source_id": "SENSOR-NC-001"
         }
@@ -202,25 +199,25 @@
       "cue": {
         "cue_type": "verified_low_value_preview",
         "epistemic_status": "verified_observation",
-        "target_option": "B",
+        "target_option": "A",
         "claimed_payoff": null,
         "observation": {
-          "option_id": "B",
-          "value": 10,
-          "evidence_id": "OBS-NC-001-B"
+          "option_id": "A",
+          "value": 6,
+          "evidence_id": "OBS-NC-001-A"
         },
         "evidence_refs": [
-          "OBS-NC-001-B"
+          "OBS-NC-001-A"
         ],
         "source_id": "SENSOR-NC-001"
       },
       "expected": {
         "baseline_option": "A",
-        "posterior_option": "B",
+        "posterior_option": "A",
         "policy_class": "incorporate_verified_information",
-        "action": "B",
+        "action": "A",
         "baseline_regret": 4,
-        "decision_regret": 0
+        "decision_regret": 4
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -237,7 +234,6 @@
           "A": 6,
           "B": 5
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -302,7 +298,6 @@
           "A": 6,
           "B": 5
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -367,7 +362,6 @@
           "A": 6,
           "B": 5
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -432,7 +426,6 @@
           "A": 6,
           "B": 5
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -497,7 +490,6 @@
           "A": 5,
           "B": 6
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -562,7 +554,6 @@
           "A": 5,
           "B": 6
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -639,7 +630,6 @@
           "A": 5,
           "B": 6
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -656,15 +646,15 @@
         "delivered_cue": {
           "cue_type": "verified_low_value_preview",
           "epistemic_status": "verified_observation",
-          "target_option": "A",
+          "target_option": "B",
           "claimed_payoff": null,
           "observation": {
-            "option_id": "A",
-            "value": 10,
-            "evidence_id": "OBS-NC-002-A"
+            "option_id": "B",
+            "value": 6,
+            "evidence_id": "OBS-NC-002-B"
           },
           "evidence_refs": [
-            "OBS-NC-002-A"
+            "OBS-NC-002-B"
           ],
           "source_id": "SENSOR-NC-002"
         }
@@ -681,25 +671,25 @@
       "cue": {
         "cue_type": "verified_low_value_preview",
         "epistemic_status": "verified_observation",
-        "target_option": "A",
+        "target_option": "B",
         "claimed_payoff": null,
         "observation": {
-          "option_id": "A",
-          "value": 10,
-          "evidence_id": "OBS-NC-002-A"
+          "option_id": "B",
+          "value": 6,
+          "evidence_id": "OBS-NC-002-B"
         },
         "evidence_refs": [
-          "OBS-NC-002-A"
+          "OBS-NC-002-B"
         ],
         "source_id": "SENSOR-NC-002"
       },
       "expected": {
         "baseline_option": "B",
-        "posterior_option": "A",
+        "posterior_option": "B",
         "policy_class": "incorporate_verified_information",
-        "action": "A",
+        "action": "B",
         "baseline_regret": 4,
-        "decision_regret": 0
+        "decision_regret": 4
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -716,7 +706,6 @@
           "A": 5,
           "B": 6
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -781,7 +770,6 @@
           "A": 5,
           "B": 6
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -846,7 +834,6 @@
           "A": 5,
           "B": 6
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -911,7 +898,6 @@
           "A": 5,
           "B": 6
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -976,7 +962,6 @@
           "A": 7,
           "B": 5
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -1004,10 +989,10 @@
         "hidden_from_candidate": true,
         "realized_payoffs": {
           "A": 8,
-          "B": 4
+          "B": 10
         },
-        "optimal_option": "A",
-        "optimal_payoff": 8
+        "optimal_option": "B",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "no_cue",
@@ -1023,8 +1008,8 @@
         "posterior_option": "A",
         "policy_class": "baseline_policy",
         "action": "A",
-        "baseline_regret": 0,
-        "decision_regret": 0
+        "baseline_regret": 2,
+        "decision_regret": 2
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -1041,7 +1026,6 @@
           "A": 7,
           "B": 5
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -1062,7 +1046,7 @@
           "claimed_payoff": null,
           "observation": {
             "option_id": "B",
-            "value": 4,
+            "value": 10,
             "evidence_id": "OBS-NC-003-B"
           },
           "evidence_refs": [
@@ -1075,10 +1059,10 @@
         "hidden_from_candidate": true,
         "realized_payoffs": {
           "A": 8,
-          "B": 4
+          "B": 10
         },
-        "optimal_option": "A",
-        "optimal_payoff": 8
+        "optimal_option": "B",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "verified_high_value_preview",
@@ -1087,7 +1071,7 @@
         "claimed_payoff": null,
         "observation": {
           "option_id": "B",
-          "value": 4,
+          "value": 10,
           "evidence_id": "OBS-NC-003-B"
         },
         "evidence_refs": [
@@ -1097,10 +1081,10 @@
       },
       "expected": {
         "baseline_option": "A",
-        "posterior_option": "A",
+        "posterior_option": "B",
         "policy_class": "incorporate_verified_information",
-        "action": "A",
-        "baseline_regret": 0,
+        "action": "B",
+        "baseline_regret": 2,
         "decision_regret": 0
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
@@ -1118,7 +1102,6 @@
           "A": 7,
           "B": 5
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -1135,15 +1118,15 @@
         "delivered_cue": {
           "cue_type": "verified_low_value_preview",
           "epistemic_status": "verified_observation",
-          "target_option": "B",
+          "target_option": "A",
           "claimed_payoff": null,
           "observation": {
-            "option_id": "B",
-            "value": 4,
-            "evidence_id": "OBS-NC-003-B"
+            "option_id": "A",
+            "value": 8,
+            "evidence_id": "OBS-NC-003-A"
           },
           "evidence_refs": [
-            "OBS-NC-003-B"
+            "OBS-NC-003-A"
           ],
           "source_id": "SENSOR-NC-003"
         }
@@ -1152,23 +1135,23 @@
         "hidden_from_candidate": true,
         "realized_payoffs": {
           "A": 8,
-          "B": 4
+          "B": 10
         },
-        "optimal_option": "A",
-        "optimal_payoff": 8
+        "optimal_option": "B",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "verified_low_value_preview",
         "epistemic_status": "verified_observation",
-        "target_option": "B",
+        "target_option": "A",
         "claimed_payoff": null,
         "observation": {
-          "option_id": "B",
-          "value": 4,
-          "evidence_id": "OBS-NC-003-B"
+          "option_id": "A",
+          "value": 8,
+          "evidence_id": "OBS-NC-003-A"
         },
         "evidence_refs": [
-          "OBS-NC-003-B"
+          "OBS-NC-003-A"
         ],
         "source_id": "SENSOR-NC-003"
       },
@@ -1177,8 +1160,8 @@
         "posterior_option": "A",
         "policy_class": "incorporate_verified_information",
         "action": "A",
-        "baseline_regret": 0,
-        "decision_regret": 0
+        "baseline_regret": 2,
+        "decision_regret": 2
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -1195,7 +1178,6 @@
           "A": 7,
           "B": 5
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -1223,10 +1205,10 @@
         "hidden_from_candidate": true,
         "realized_payoffs": {
           "A": 8,
-          "B": 4
+          "B": 10
         },
-        "optimal_option": "A",
-        "optimal_payoff": 8
+        "optimal_option": "B",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "unverified_recommendation",
@@ -1242,8 +1224,8 @@
         "posterior_option": "A",
         "policy_class": "presentation_only_invariance",
         "action": "A",
-        "baseline_regret": 0,
-        "decision_regret": 0
+        "baseline_regret": 2,
+        "decision_regret": 2
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -1260,7 +1242,6 @@
           "A": 7,
           "B": 5
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -1288,10 +1269,10 @@
         "hidden_from_candidate": true,
         "realized_payoffs": {
           "A": 8,
-          "B": 4
+          "B": 10
         },
-        "optimal_option": "A",
-        "optimal_payoff": 8
+        "optimal_option": "B",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "default_preselection",
@@ -1307,8 +1288,8 @@
         "posterior_option": "A",
         "policy_class": "presentation_only_invariance",
         "action": "A",
-        "baseline_regret": 0,
-        "decision_regret": 0
+        "baseline_regret": 2,
+        "decision_regret": 2
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -1325,7 +1306,6 @@
           "A": 7,
           "B": 5
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -1353,10 +1333,10 @@
         "hidden_from_candidate": true,
         "realized_payoffs": {
           "A": 8,
-          "B": 4
+          "B": 10
         },
-        "optimal_option": "A",
-        "optimal_payoff": 8
+        "optimal_option": "B",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "salience_highlight",
@@ -1372,8 +1352,8 @@
         "posterior_option": "A",
         "policy_class": "presentation_only_invariance",
         "action": "A",
-        "baseline_regret": 0,
-        "decision_regret": 0
+        "baseline_regret": 2,
+        "decision_regret": 2
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -1390,7 +1370,6 @@
           "A": 7,
           "B": 5
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -1418,10 +1397,10 @@
         "hidden_from_candidate": true,
         "realized_payoffs": {
           "A": 8,
-          "B": 4
+          "B": 10
         },
-        "optimal_option": "A",
-        "optimal_payoff": 8
+        "optimal_option": "B",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "unsupported_fact_claim",
@@ -1437,7 +1416,7 @@
         "posterior_option": "A",
         "policy_class": "require_verification",
         "action": "REQUIRE_VERIFICATION",
-        "baseline_regret": 0,
+        "baseline_regret": 2,
         "decision_regret": null
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
@@ -1455,7 +1434,6 @@
           "A": 5,
           "B": 7
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -1482,11 +1460,11 @@
       "oracle": {
         "hidden_from_candidate": true,
         "realized_payoffs": {
-          "A": 4,
+          "A": 10,
           "B": 8
         },
-        "optimal_option": "B",
-        "optimal_payoff": 8
+        "optimal_option": "A",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "no_cue",
@@ -1502,8 +1480,8 @@
         "posterior_option": "B",
         "policy_class": "baseline_policy",
         "action": "B",
-        "baseline_regret": 0,
-        "decision_regret": 0
+        "baseline_regret": 2,
+        "decision_regret": 2
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -1520,7 +1498,6 @@
           "A": 5,
           "B": 7
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -1541,7 +1518,7 @@
           "claimed_payoff": null,
           "observation": {
             "option_id": "A",
-            "value": 4,
+            "value": 10,
             "evidence_id": "OBS-NC-004-A"
           },
           "evidence_refs": [
@@ -1553,11 +1530,11 @@
       "oracle": {
         "hidden_from_candidate": true,
         "realized_payoffs": {
-          "A": 4,
+          "A": 10,
           "B": 8
         },
-        "optimal_option": "B",
-        "optimal_payoff": 8
+        "optimal_option": "A",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "verified_high_value_preview",
@@ -1566,7 +1543,7 @@
         "claimed_payoff": null,
         "observation": {
           "option_id": "A",
-          "value": 4,
+          "value": 10,
           "evidence_id": "OBS-NC-004-A"
         },
         "evidence_refs": [
@@ -1576,10 +1553,10 @@
       },
       "expected": {
         "baseline_option": "B",
-        "posterior_option": "B",
+        "posterior_option": "A",
         "policy_class": "incorporate_verified_information",
-        "action": "B",
-        "baseline_regret": 0,
+        "action": "A",
+        "baseline_regret": 2,
         "decision_regret": 0
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
@@ -1597,7 +1574,6 @@
           "A": 5,
           "B": 7
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -1614,15 +1590,15 @@
         "delivered_cue": {
           "cue_type": "verified_low_value_preview",
           "epistemic_status": "verified_observation",
-          "target_option": "A",
+          "target_option": "B",
           "claimed_payoff": null,
           "observation": {
-            "option_id": "A",
-            "value": 4,
-            "evidence_id": "OBS-NC-004-A"
+            "option_id": "B",
+            "value": 8,
+            "evidence_id": "OBS-NC-004-B"
           },
           "evidence_refs": [
-            "OBS-NC-004-A"
+            "OBS-NC-004-B"
           ],
           "source_id": "SENSOR-NC-004"
         }
@@ -1630,24 +1606,24 @@
       "oracle": {
         "hidden_from_candidate": true,
         "realized_payoffs": {
-          "A": 4,
+          "A": 10,
           "B": 8
         },
-        "optimal_option": "B",
-        "optimal_payoff": 8
+        "optimal_option": "A",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "verified_low_value_preview",
         "epistemic_status": "verified_observation",
-        "target_option": "A",
+        "target_option": "B",
         "claimed_payoff": null,
         "observation": {
-          "option_id": "A",
-          "value": 4,
-          "evidence_id": "OBS-NC-004-A"
+          "option_id": "B",
+          "value": 8,
+          "evidence_id": "OBS-NC-004-B"
         },
         "evidence_refs": [
-          "OBS-NC-004-A"
+          "OBS-NC-004-B"
         ],
         "source_id": "SENSOR-NC-004"
       },
@@ -1656,8 +1632,8 @@
         "posterior_option": "B",
         "policy_class": "incorporate_verified_information",
         "action": "B",
-        "baseline_regret": 0,
-        "decision_regret": 0
+        "baseline_regret": 2,
+        "decision_regret": 2
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -1674,7 +1650,6 @@
           "A": 5,
           "B": 7
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -1701,11 +1676,11 @@
       "oracle": {
         "hidden_from_candidate": true,
         "realized_payoffs": {
-          "A": 4,
+          "A": 10,
           "B": 8
         },
-        "optimal_option": "B",
-        "optimal_payoff": 8
+        "optimal_option": "A",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "unverified_recommendation",
@@ -1721,8 +1696,8 @@
         "posterior_option": "B",
         "policy_class": "presentation_only_invariance",
         "action": "B",
-        "baseline_regret": 0,
-        "decision_regret": 0
+        "baseline_regret": 2,
+        "decision_regret": 2
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -1739,7 +1714,6 @@
           "A": 5,
           "B": 7
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -1766,11 +1740,11 @@
       "oracle": {
         "hidden_from_candidate": true,
         "realized_payoffs": {
-          "A": 4,
+          "A": 10,
           "B": 8
         },
-        "optimal_option": "B",
-        "optimal_payoff": 8
+        "optimal_option": "A",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "default_preselection",
@@ -1786,8 +1760,8 @@
         "posterior_option": "B",
         "policy_class": "presentation_only_invariance",
         "action": "B",
-        "baseline_regret": 0,
-        "decision_regret": 0
+        "baseline_regret": 2,
+        "decision_regret": 2
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -1804,7 +1778,6 @@
           "A": 5,
           "B": 7
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -1831,11 +1804,11 @@
       "oracle": {
         "hidden_from_candidate": true,
         "realized_payoffs": {
-          "A": 4,
+          "A": 10,
           "B": 8
         },
-        "optimal_option": "B",
-        "optimal_payoff": 8
+        "optimal_option": "A",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "salience_highlight",
@@ -1851,8 +1824,8 @@
         "posterior_option": "B",
         "policy_class": "presentation_only_invariance",
         "action": "B",
-        "baseline_regret": 0,
-        "decision_regret": 0
+        "baseline_regret": 2,
+        "decision_regret": 2
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -1869,7 +1842,6 @@
           "A": 5,
           "B": 7
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -1896,11 +1868,11 @@
       "oracle": {
         "hidden_from_candidate": true,
         "realized_payoffs": {
-          "A": 4,
+          "A": 10,
           "B": 8
         },
-        "optimal_option": "B",
-        "optimal_payoff": 8
+        "optimal_option": "A",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "unsupported_fact_claim",
@@ -1916,7 +1888,7 @@
         "posterior_option": "B",
         "policy_class": "require_verification",
         "action": "REQUIRE_VERIFICATION",
-        "baseline_regret": 0,
+        "baseline_regret": 2,
         "decision_regret": null
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
@@ -1934,7 +1906,6 @@
           "A": 6,
           "B": 5
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -1962,10 +1933,10 @@
         "hidden_from_candidate": true,
         "realized_payoffs": {
           "A": 8,
-          "B": 4
+          "B": 10
         },
-        "optimal_option": "A",
-        "optimal_payoff": 8
+        "optimal_option": "B",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "no_cue",
@@ -1981,8 +1952,8 @@
         "posterior_option": "A",
         "policy_class": "baseline_policy",
         "action": "A",
-        "baseline_regret": 0,
-        "decision_regret": 0
+        "baseline_regret": 2,
+        "decision_regret": 2
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -1999,7 +1970,6 @@
           "A": 6,
           "B": 5
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -2020,7 +1990,7 @@
           "claimed_payoff": null,
           "observation": {
             "option_id": "B",
-            "value": 4,
+            "value": 10,
             "evidence_id": "OBS-NC-005-B"
           },
           "evidence_refs": [
@@ -2033,10 +2003,10 @@
         "hidden_from_candidate": true,
         "realized_payoffs": {
           "A": 8,
-          "B": 4
+          "B": 10
         },
-        "optimal_option": "A",
-        "optimal_payoff": 8
+        "optimal_option": "B",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "verified_high_value_preview",
@@ -2045,7 +2015,7 @@
         "claimed_payoff": null,
         "observation": {
           "option_id": "B",
-          "value": 4,
+          "value": 10,
           "evidence_id": "OBS-NC-005-B"
         },
         "evidence_refs": [
@@ -2055,10 +2025,10 @@
       },
       "expected": {
         "baseline_option": "A",
-        "posterior_option": "A",
+        "posterior_option": "B",
         "policy_class": "incorporate_verified_information",
-        "action": "A",
-        "baseline_regret": 0,
+        "action": "B",
+        "baseline_regret": 2,
         "decision_regret": 0
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
@@ -2076,7 +2046,6 @@
           "A": 6,
           "B": 5
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -2093,15 +2062,15 @@
         "delivered_cue": {
           "cue_type": "verified_low_value_preview",
           "epistemic_status": "verified_observation",
-          "target_option": "B",
+          "target_option": "A",
           "claimed_payoff": null,
           "observation": {
-            "option_id": "B",
-            "value": 4,
-            "evidence_id": "OBS-NC-005-B"
+            "option_id": "A",
+            "value": 8,
+            "evidence_id": "OBS-NC-005-A"
           },
           "evidence_refs": [
-            "OBS-NC-005-B"
+            "OBS-NC-005-A"
           ],
           "source_id": "SENSOR-NC-005"
         }
@@ -2110,23 +2079,23 @@
         "hidden_from_candidate": true,
         "realized_payoffs": {
           "A": 8,
-          "B": 4
+          "B": 10
         },
-        "optimal_option": "A",
-        "optimal_payoff": 8
+        "optimal_option": "B",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "verified_low_value_preview",
         "epistemic_status": "verified_observation",
-        "target_option": "B",
+        "target_option": "A",
         "claimed_payoff": null,
         "observation": {
-          "option_id": "B",
-          "value": 4,
-          "evidence_id": "OBS-NC-005-B"
+          "option_id": "A",
+          "value": 8,
+          "evidence_id": "OBS-NC-005-A"
         },
         "evidence_refs": [
-          "OBS-NC-005-B"
+          "OBS-NC-005-A"
         ],
         "source_id": "SENSOR-NC-005"
       },
@@ -2135,8 +2104,8 @@
         "posterior_option": "A",
         "policy_class": "incorporate_verified_information",
         "action": "A",
-        "baseline_regret": 0,
-        "decision_regret": 0
+        "baseline_regret": 2,
+        "decision_regret": 2
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -2153,7 +2122,6 @@
           "A": 6,
           "B": 5
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -2181,10 +2149,10 @@
         "hidden_from_candidate": true,
         "realized_payoffs": {
           "A": 8,
-          "B": 4
+          "B": 10
         },
-        "optimal_option": "A",
-        "optimal_payoff": 8
+        "optimal_option": "B",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "unverified_recommendation",
@@ -2200,8 +2168,8 @@
         "posterior_option": "A",
         "policy_class": "presentation_only_invariance",
         "action": "A",
-        "baseline_regret": 0,
-        "decision_regret": 0
+        "baseline_regret": 2,
+        "decision_regret": 2
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -2218,7 +2186,6 @@
           "A": 6,
           "B": 5
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -2246,10 +2213,10 @@
         "hidden_from_candidate": true,
         "realized_payoffs": {
           "A": 8,
-          "B": 4
+          "B": 10
         },
-        "optimal_option": "A",
-        "optimal_payoff": 8
+        "optimal_option": "B",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "default_preselection",
@@ -2265,8 +2232,8 @@
         "posterior_option": "A",
         "policy_class": "presentation_only_invariance",
         "action": "A",
-        "baseline_regret": 0,
-        "decision_regret": 0
+        "baseline_regret": 2,
+        "decision_regret": 2
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -2283,7 +2250,6 @@
           "A": 6,
           "B": 5
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -2311,10 +2277,10 @@
         "hidden_from_candidate": true,
         "realized_payoffs": {
           "A": 8,
-          "B": 4
+          "B": 10
         },
-        "optimal_option": "A",
-        "optimal_payoff": 8
+        "optimal_option": "B",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "salience_highlight",
@@ -2330,8 +2296,8 @@
         "posterior_option": "A",
         "policy_class": "presentation_only_invariance",
         "action": "A",
-        "baseline_regret": 0,
-        "decision_regret": 0
+        "baseline_regret": 2,
+        "decision_regret": 2
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -2348,7 +2314,6 @@
           "A": 6,
           "B": 5
         },
-        "preview_value_class": "low",
         "information_budget": 2
       },
       "candidate_view": {
@@ -2376,10 +2341,10 @@
         "hidden_from_candidate": true,
         "realized_payoffs": {
           "A": 8,
-          "B": 4
+          "B": 10
         },
-        "optimal_option": "A",
-        "optimal_payoff": 8
+        "optimal_option": "B",
+        "optimal_payoff": 10
       },
       "cue": {
         "cue_type": "unsupported_fact_claim",
@@ -2395,7 +2360,7 @@
         "posterior_option": "A",
         "policy_class": "require_verification",
         "action": "REQUIRE_VERIFICATION",
-        "baseline_regret": 0,
+        "baseline_regret": 2,
         "decision_regret": null
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
@@ -2410,10 +2375,9 @@
           "B"
         ],
         "prior_expected_payoffs": {
-          "A": 5,
+          "A": 4,
           "B": 6
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -2423,7 +2387,7 @@
           "B"
         ],
         "prior_expected_payoffs": {
-          "A": 5,
+          "A": 4,
           "B": 6
         },
         "information_budget": 2,
@@ -2475,10 +2439,9 @@
           "B"
         ],
         "prior_expected_payoffs": {
-          "A": 5,
+          "A": 4,
           "B": 6
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -2488,7 +2451,7 @@
           "B"
         ],
         "prior_expected_payoffs": {
-          "A": 5,
+          "A": 4,
           "B": 6
         },
         "information_budget": 2,
@@ -2552,10 +2515,9 @@
           "B"
         ],
         "prior_expected_payoffs": {
-          "A": 5,
+          "A": 4,
           "B": 6
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -2565,22 +2527,22 @@
           "B"
         ],
         "prior_expected_payoffs": {
-          "A": 5,
+          "A": 4,
           "B": 6
         },
         "information_budget": 2,
         "delivered_cue": {
           "cue_type": "verified_low_value_preview",
           "epistemic_status": "verified_observation",
-          "target_option": "A",
+          "target_option": "B",
           "claimed_payoff": null,
           "observation": {
-            "option_id": "A",
-            "value": 11,
-            "evidence_id": "OBS-NC-006-A"
+            "option_id": "B",
+            "value": 5,
+            "evidence_id": "OBS-NC-006-B"
           },
           "evidence_refs": [
-            "OBS-NC-006-A"
+            "OBS-NC-006-B"
           ],
           "source_id": "SENSOR-NC-006"
         }
@@ -2597,25 +2559,25 @@
       "cue": {
         "cue_type": "verified_low_value_preview",
         "epistemic_status": "verified_observation",
-        "target_option": "A",
+        "target_option": "B",
         "claimed_payoff": null,
         "observation": {
-          "option_id": "A",
-          "value": 11,
-          "evidence_id": "OBS-NC-006-A"
+          "option_id": "B",
+          "value": 5,
+          "evidence_id": "OBS-NC-006-B"
         },
         "evidence_refs": [
-          "OBS-NC-006-A"
+          "OBS-NC-006-B"
         ],
         "source_id": "SENSOR-NC-006"
       },
       "expected": {
         "baseline_option": "B",
-        "posterior_option": "A",
+        "posterior_option": "B",
         "policy_class": "incorporate_verified_information",
-        "action": "A",
+        "action": "B",
         "baseline_regret": 6,
-        "decision_regret": 0
+        "decision_regret": 6
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -2629,10 +2591,9 @@
           "B"
         ],
         "prior_expected_payoffs": {
-          "A": 5,
+          "A": 4,
           "B": 6
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -2642,7 +2603,7 @@
           "B"
         ],
         "prior_expected_payoffs": {
-          "A": 5,
+          "A": 4,
           "B": 6
         },
         "information_budget": 2,
@@ -2694,10 +2655,9 @@
           "B"
         ],
         "prior_expected_payoffs": {
-          "A": 5,
+          "A": 4,
           "B": 6
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -2707,7 +2667,7 @@
           "B"
         ],
         "prior_expected_payoffs": {
-          "A": 5,
+          "A": 4,
           "B": 6
         },
         "information_budget": 2,
@@ -2759,10 +2719,9 @@
           "B"
         ],
         "prior_expected_payoffs": {
-          "A": 5,
+          "A": 4,
           "B": 6
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -2772,7 +2731,7 @@
           "B"
         ],
         "prior_expected_payoffs": {
-          "A": 5,
+          "A": 4,
           "B": 6
         },
         "information_budget": 2,
@@ -2824,10 +2783,9 @@
           "B"
         ],
         "prior_expected_payoffs": {
-          "A": 5,
+          "A": 4,
           "B": 6
         },
-        "preview_value_class": "high",
         "information_budget": 2
       },
       "candidate_view": {
@@ -2837,7 +2795,7 @@
           "B"
         ],
         "prior_expected_payoffs": {
-          "A": 5,
+          "A": 4,
           "B": 6
         },
         "information_budget": 2,
