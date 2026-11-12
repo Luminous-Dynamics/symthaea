@@ -491,7 +491,9 @@
         "Extract the exact incident particle species, energy distribution, denominator, voltage/current operating points, source power, grid/interception losses and uncertainty.",
         "The reported >80% is a source-reported result and is not a universal target, net electricity or whole-plant efficiency."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "particle_energy_origin": "LOW_PARAMETER_LABORATORY_CHARGED_PARTICLE_SOURCE",
+      "fusion_born_output_observed": false
     },
     {
       "case_id": "FUSION-DEC-REALTA-WHAM-2026",
@@ -554,7 +556,9 @@
         "Exact collector-terminal traces, source-power traces, conditioning losses, auxiliary loads and uncertainty are not supplied in the news announcement.",
         "Future multi-stage, multi-kilowatt/megawatt and >90% efficiency targets are not prototype measurements."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "particle_energy_origin": "EXTERNALLY_HEATED_DEUTERIUM_PLASMA",
+      "fusion_born_output_observed": false
     },
     {
       "case_id": "HTTES-REFRACTORY-950-1800C-MODELLING-2026",
@@ -669,7 +673,9 @@
         "Low-beam-density efficiency is not directly comparable to later prototype or plant system efficiencies.",
         "This is not a fusion-born alpha-particle or whole-plant electricity demonstration."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "particle_energy_origin": "LABORATORY_HYDROGEN_PLASMA_SOURCE",
+      "fusion_born_output_observed": false
     },
     {
       "case_id": "FUSION-DEC-LLNL-TMX-1983",
@@ -743,7 +749,9 @@
         "Use source-reported 48% net efficiency only with the 138 W incident and 12 W suppressor boundary.",
         "TMX end-loss plasma is not a D-T fusion-born alpha-particle or plant-level result."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "particle_energy_origin": "TMX_EXPERIMENTAL_END_LOSS_PLASMA",
+      "fusion_born_output_observed": false
     },
     {
       "case_id": "FUSION-DEC-HELION-INDUCTIVE-RECOVERY-2026",
@@ -784,7 +792,9 @@
         "Do not infer measured fusion-born recapture fraction or a net-electricity demonstration from an architecture description.",
         "Must separate recovered electrical input energy from fusion-origin energy."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "particle_energy_origin": "MANUFACTURER_ARCHITECTURE_CLAIM_NO_PUBLIC_ORIGIN_RESOLVED_OUTPUT",
+      "fusion_born_output_observed": false
     }
   ],
   "negative_controls": [
