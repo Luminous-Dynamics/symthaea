@@ -70,11 +70,51 @@
     },
     "composition": {
       "type": "object",
-      "additionalProperties": {
-        "type": "string",
-        "format": "uri"
-      },
-      "minProperties": 8
+      "additionalProperties": false,
+      "required": [
+        "contagion_issue",
+        "contagion_pr",
+        "communication_topology_issue",
+        "revision_ledger_issue",
+        "confidence_calibration_pr",
+        "delibbench_issue",
+        "summary_issue",
+        "opinion_shift_issue"
+      ],
+      "properties": {
+        "contagion_issue": {
+          "type": "string",
+          "format": "uri"
+        },
+        "contagion_pr": {
+          "type": "string",
+          "format": "uri"
+        },
+        "communication_topology_issue": {
+          "type": "string",
+          "format": "uri"
+        },
+        "revision_ledger_issue": {
+          "type": "string",
+          "format": "uri"
+        },
+        "confidence_calibration_pr": {
+          "type": "string",
+          "format": "uri"
+        },
+        "delibbench_issue": {
+          "type": "string",
+          "format": "uri"
+        },
+        "summary_issue": {
+          "type": "string",
+          "format": "uri"
+        },
+        "opinion_shift_issue": {
+          "type": "string",
+          "format": "uri"
+        }
+      }
     },
     "stages": {
       "type": "array",
