@@ -157,3 +157,24 @@ No duplicate energy ledger, calibration registry, plasma solver, sensor authorit
 ## Execution note
 
 The first artefact tranche intentionally contains one synthetic fixture and this benchmark contract only. No physical experiment is claimed. Rust compilation, tests and CI have not been run or inferred from this document.
+
+## Offline evaluator
+
+The S0 fixture is consumed by the Rust-native xtask command:
+
+    cargo run -p xtask -- plasma-surface-bondability-audit
+    cargo run -p xtask -- plasma-surface-bondability-audit --json
+
+The evaluator checks:
+- explicit SYNTHETIC evidence class and false physical-reproduction flag;
+- exact service-profile and energy-boundary identities;
+- required subsystem completeness and subsystem-to-total energy closure;
+- complete declared delay groups and at least three replicates per delay;
+- bond acceptance fraction at each delay and the continuous bondability window;
+- substrate-property retention gates;
+- expected arm / pair dispositions and fail-closed comparability;
+- contact angle retained as a diagnostic only; it is not part of winner selection.
+
+Ten Rust unit tests are authored for fixture replay, bondability-window calculation, untreated controls, over-treatment rejection, contact-angle invariance, missing loads, energy mismatch, insufficient replicates, and service / energy boundary mismatch.
+
+**Execution status:** the exact branch files and fixture are fetched back and the JSON is parsed / structurally checked. This execution environment does not contain cargo, rustc or rustfmt. The Rust module and ten tests are authored but are not compiled or executed; no CI result or physical validation is claimed.
