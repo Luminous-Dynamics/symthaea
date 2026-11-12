@@ -41,7 +41,7 @@ The qualifier checks a bounded schema header and explicit structural invariants.
 
 - Each private baseline row is a recorded elicited output, not hidden model state.
 - Peer estimates exclude the estimating agent; the denominator includes missing records as UNKNOWN and abstentions as ABSTAIN.
-- ABSTAIN and UNKNOWN are retained as explicit categories but are not treated as substantive preferences when identifying a unique plurality.
+- ABSTAIN is a recorded response excluded by the declared aggregation rule. UNKNOWN is a missing private record: it remains in the scoring denominator and blocks inference of the complete private plurality.
 - A phantom-consensus oracle is true only when an agent's estimated unique peer plurality differs from the unique plurality in the other agents' recorded private baseline. Ties / no unique plurality do not become an artificial majority.
 - Verifiable task accuracy is separate from peer-belief accuracy.
 - Normative-pluralism tasks have no gold preference. The benchmark checks representation, not agreement with a preferred policy.
