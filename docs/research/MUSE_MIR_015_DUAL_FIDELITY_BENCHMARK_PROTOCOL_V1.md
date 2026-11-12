@@ -147,7 +147,7 @@ A metric value must carry a protocol ID, unit, direction, tolerance/matching rul
 - exact evaluated-sample digests and counts;
 - report and protocol commitments.
 
-The comparison function requires an identical protocol fingerprint and exact metric-sample manifest. It compares one named metric at a time and never produces a composite winner score. A protocol mismatch, track mismatch, renderer mismatch or different evaluated sample set prevents ranking.
+The comparison function requires an identical protocol fingerprint, identical overall sample counts and exact metric-sample manifest. It compares one named metric at a time and never produces a composite winner score. A protocol mismatch, track mismatch, renderer mismatch or different evaluated sample set prevents ranking. Out-of-distribution claims require a non-random grouping unit and an evaluation group set exactly equal to the declared held-out group set; in-distribution claims use random-excerpt splits.
 
 These digests commit the report content; they do not authenticate the dataset or independently prove the split. Provenance and rights authorization remain separate evidence requirements.
 
@@ -164,4 +164,4 @@ These digests commit the report content; they do not authenticate the dataset or
 
 ## Qualification boundary
 
-The Rust validator and tests are authored, not compiled or executed in this environment. The code validates report provenance, split disjointness and comparison compatibility; it does not itself compute MV2H, CLEWS, score F1, human correction time or confidence intervals. Those metric engines and data collection protocols must be independently implemented and qualified. No MUSE SOTA claim is made here.
+The Rust validator and tests are authored, not compiled or executed in this environment. The code includes 11 authored validator tests for valid OOD receipts, group leakage, invalid OOD split claims, in-distribution grouping, missing renderer identity, metric-protocol mismatch, exact sample-subset mismatch, report/protocol tampering, fraction-range errors, and one-metric comparison. It validates report provenance, split disjointness and comparison compatibility; it does not itself compute MV2H, CLEWS, score F1, human correction time or confidence intervals. Those metric engines and data collection protocols must be independently implemented and qualified. No MUSE SOTA claim is made here.
