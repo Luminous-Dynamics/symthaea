@@ -174,7 +174,9 @@ fn validate_evidence_registry<'a>(
     evidence: &'a [EvidenceRecord],
 ) -> Result<BTreeMap<&'a str, &'a EvidenceRecord>, AuditError> {
     if evidence.is_empty() {
-        return Err(AuditError("at least one evidence record is required".into()));
+        return Err(AuditError(
+            "at least one evidence record is required".into(),
+        ));
     }
 
     validate_unique_nonempty(
@@ -202,7 +204,9 @@ fn require_evidence<'a>(
     owner: &str,
 ) -> Result<&'a EvidenceRecord, AuditError> {
     records.get(evidence_id).copied().ok_or_else(|| {
-        AuditError(format!("{owner} references unknown evidence ID {evidence_id}"))
+        AuditError(format!(
+            "{owner} references unknown evidence ID {evidence_id}"
+        ))
     })
 }
 
@@ -935,8 +939,13 @@ mod tests {
                 .retain(|gate| gate.gate_id != "physical_safety");
         }
 
-        let result = audit_design_portfolio(&scenarios(), &objectives(), &evidence(), &eligible_candidates)
-            .expect("valid finite portfolio");
+        let result = audit_design_portfolio(
+            &scenarios(),
+            &objectives(),
+            &evidence(),
+            &eligible_candidates,
+        )
+        .expect("valid finite portfolio");
 
         assert_eq!(
             result.pareto_front_ids,
@@ -1039,7 +1048,8 @@ mod tests {
             allow_no_experiment: true,
         };
 
-        let selection = select_experiment(&options, &evidence(), &budget).expect("no-op is admissible");
+        let selection =
+            select_experiment(&options, &evidence(), &budget).expect("no-op is admissible");
         assert_eq!(selection.experiment_id, None);
     }
 
@@ -1062,13 +1072,8 @@ mod tests {
             .expect("physical safety gate")
             .evidence_id = "PHYSICAL-SAFETY-REPORT".into();
 
-        let result = audit_design_portfolio(
-            &scenarios(),
-            &objectives(),
-            &records,
-            &[item],
-        )
-        .expect("physical evidence registry is well formed");
+        let result = audit_design_portfolio(&scenarios(), &objectives(), &records, &[item])
+            .expect("physical evidence registry is well formed");
 
         assert_eq!(result.eligible_candidate_ids, vec!["a".to_string()]);
         assert_eq!(result.pareto_front_ids, vec!["a".to_string()]);
@@ -1082,13 +1087,8 @@ mod tests {
             .expect("nominal scenario")[0]
             .evidence_id = "UNREGISTERED-EVIDENCE".into();
 
-        let error = audit_design_portfolio(
-            &scenarios(),
-            &objectives(),
-            &evidence(),
-            &[item],
-        )
-        .expect_err("unknown evidence ID must fail closed");
+        let error = audit_design_portfolio(&scenarios(), &objectives(), &evidence(), &[item])
+            .expect_err("unknown evidence ID must fail closed");
 
         assert!(error.0.contains("references unknown evidence ID"));
     }
@@ -1099,18 +1099,15 @@ mod tests {
         records[0].admission = EvidenceAdmission::AdmittedForResearch;
         let item = candidate("a", [300.0, 1800.0, 100.0], GateDisposition::Unknown);
 
-        let result = audit_design_portfolio(
-            &scenarios(),
-            &objectives(),
-            &records,
-            &[item],
-        )
-        .expect("well-formed but research-only evidence remains auditable");
+        let result = audit_design_portfolio(&scenarios(), &objectives(), &records, &[item])
+            .expect("well-formed but research-only evidence remains auditable");
 
         assert!(result.eligible_candidate_ids.is_empty());
-        assert!(result.rejected[0]
-            .reasons
-            .contains(&RejectionReason::MetricEvidenceNotAdmitted("energy".into())));
+        assert!(
+            result.rejected[0]
+                .reasons
+                .contains(&RejectionReason::MetricEvidenceNotAdmitted("energy".into()))
+        );
     }
 
     #[test]
@@ -1119,13 +1116,8 @@ mod tests {
         records[0].source_digest = "not-a-digest".into();
         let item = candidate("a", [300.0, 1800.0, 100.0], GateDisposition::Unknown);
 
-        let error = audit_design_portfolio(
-            &scenarios(),
-            &objectives(),
-            &records,
-            &[item],
-        )
-        .expect_err("invalid digest syntax must fail closed");
+        let error = audit_design_portfolio(&scenarios(), &objectives(), &records, &[item])
+            .expect_err("invalid digest syntax must fail closed");
 
         assert!(error.0.contains("lowercase 64-character SHA-256"));
     }
@@ -1142,9 +1134,10 @@ mod tests {
                 .retain(|gate| gate.gate_id != "physical_safety");
         }
 
-        let one = audit_design_portfolio(&scenarios(), &objectives(), &evidence(), &first).expect("first order");
-        let two =
-            audit_design_portfolio(&scenarios(), &objectives(), &evidence(), &second).expect("second order");
+        let one = audit_design_portfolio(&scenarios(), &objectives(), &evidence(), &first)
+            .expect("first order");
+        let two = audit_design_portfolio(&scenarios(), &objectives(), &evidence(), &second)
+            .expect("second order");
 
         assert_eq!(one.pareto_front_ids, two.pareto_front_ids);
         assert_eq!(one.scores, two.scores);
