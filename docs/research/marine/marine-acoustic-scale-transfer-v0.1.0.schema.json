@@ -175,16 +175,18 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "run_id",
-        "timebase_receipt_sha256",
+        "background_measurement_method",
+        "background_trace_sha256",
+        "bands",
+        "cavitation_number_n_d",
+        "diameter_m",
         "operating_point_receipt_sha256",
         "raw_trace_sha256",
-        "diameter_m",
         "rpm_hz",
         "rpm_u95_hz",
-        "cavitation_number_n_d",
+        "run_id",
         "source_reference_distance_m",
-        "bands"
+        "timebase_receipt_sha256"
       ],
       "properties": {
         "run_id": {
@@ -226,6 +228,16 @@
         "rpm_u95_hz": {
           "type": "number",
           "exclusiveMinimum": 0
+        },
+        "background_measurement_method": {
+          "enum": [
+            "bare_hub",
+            "pressure_suppressed",
+            "unknown"
+          ]
+        },
+        "background_trace_sha256": {
+          "$ref": "#/$defs/digest"
         }
       }
     },
