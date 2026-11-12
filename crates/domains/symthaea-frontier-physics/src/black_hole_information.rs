@@ -2093,6 +2093,8 @@ mod hayden_preskill_decoupling_tests {
             >= -TOLERANCE);
         assert!(sample.reference_accessible_radiation_mutual_information_nats
             >= -TOLERANCE);
+        assert!((sample.reference_black_hole_joint_entropy_nats
+            - sample.accessible_radiation_entropy_nats).abs() < TOLERANCE);
         assert!(sample.information_complementarity_residual_nats < TOLERANCE);
     }
 
@@ -2118,6 +2120,20 @@ mod hayden_preskill_decoupling_tests {
             >= 0.0);
         assert!(summary.maximum_information_complementarity_residual_nats
             < TOLERANCE);
+    }
+
+    #[test]
+    fn information_failures_have_specific_error_messages() {
+        let mutual_information = QuantumInformationError::InvalidMutualInformation {
+            value: -0.01,
+            tolerance: 1e-10,
+        };
+        let identity = QuantumInformationError::InformationIdentityError {
+            residual: 0.02,
+            tolerance: 1e-9,
+        };
+        assert!(mutual_information.to_string().contains("mutual information"));
+        assert!(identity.to_string().contains("information complementarity residual"));
     }
 
     #[test]
