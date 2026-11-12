@@ -708,7 +708,7 @@ mod tests {
         assert_eq!(report.structural_disposition, "ELIGIBLE", "{:?}", report.incomplete_reasons);
         let corrected = report.pair_results[0].band_results[0]
             .background_corrected_model_source_level_db.expect("background-corrected level");
-        assert!((corrected - 118.349).abs() < 0.01);
+        assert!((corrected - 120.0).abs() < 1.0e-12);
         assert_eq!(report.overall_disposition, "VALIDATED_WITHIN_DECLARED_UNCERTAINTY");
         assert!(report.pair_results.iter().flat_map(|p| p.band_results.iter())
             .all(|b| b.within_declared_uncertainty == Some(true)));
@@ -876,7 +876,7 @@ mod tests {
     #[test]
     fn duplicate_rotation_rate_strata_are_not_counted_twice() {
         let mut case = synthetic_case();
-        case.model_campaign.model_rotation_rates_rps = vec![10.0, 10.0];
+        case.model_campaign.model_rotation_rates_rps = vec![10.0, 10.0, 12.0];
         let report = audit(&case);
         assert_eq!(report.structural_disposition, "INCOMPLETE");
     }
