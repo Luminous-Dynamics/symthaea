@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "manifest_id": "APPAREL-TEXTILE-BENCHMARK-SOURCES-2026-11-12",
-  "purpose": "Versioned source register for research baselines in cloth simulation, robotic garment manipulation, textile sorting and sewing. This manifest does not declare any dataset ingested or authorize redistribution. This revision adds OpenTextile-NIR, two inverse-design research comparators, a design-sorting mismatch study and a 2026 critical fabric-design review. Reported percentages/metrics are source-specific and must not be treated as universal or reproduced Luminous results. This revision adds apparel scheduling comparators spanning dual-resource MIP/CP/heuristics, textile steam-aware multi-objective RL, source-load coordination, multi-line flow shops and human-centered scheduling. Published case results are scope-specific and are not a common leaderboard. This revision adds ASTM D6673-10 pattern interchange, the Knitout v0.6 machine-independent knitting instruction format and an open parametric sweater reference generator. These formats cover different layers and must not be conflated as a complete garment digital thread. This revision adds human-AI sustainable fashion co-design, sketch-to-parametric garment generation, spatially varying ease/pattern extraction, controllable fashion diffusion and multimodal sketch/text-to-pattern sources. These are distinct levels of the workflow; image generation, editable pattern generation, 3D fit evaluation and physical product qualification must not be conflated.",
+  "purpose": "Versioned source register for research baselines in cloth simulation, robotic garment manipulation, textile sorting and sewing. This manifest does not declare any dataset ingested or authorize redistribution. This revision adds OpenTextile-NIR, two inverse-design research comparators, a design-sorting mismatch study and a 2026 critical fabric-design review. Reported percentages/metrics are source-specific and must not be treated as universal or reproduced Luminous results. This revision adds apparel scheduling comparators spanning dual-resource MIP/CP/heuristics, textile steam-aware multi-objective RL, source-load coordination, multi-line flow shops and human-centered scheduling. Published case results are scope-specific and are not a common leaderboard. This revision adds ASTM D6673-10 pattern interchange, the Knitout v0.6 machine-independent knitting instruction format and an open parametric sweater reference generator. These formats cover different layers and must not be conflated as a complete garment digital thread. This revision adds human-AI sustainable fashion co-design, sketch-to-parametric garment generation, spatially varying ease/pattern extraction, controllable fashion diffusion and multimodal sketch/text-to-pattern sources. These are distinct levels of the workflow; image generation, editable pattern generation, 3D fit evaluation and physical product qualification must not be conflated. This revision adds textile-reinforced concrete and digital construction sources: process classification, hybrid textile/SHCC placement, robotic rebar insertion/grouting, in-process mesh placement, robotic steel reinforcement/welding and textile-waste cementitious composites. These are structural-material benchmarks, distinct from apparel qualification.",
   "sources": [
     {
       "source_id": "RGBENCH-REAL-GARMENT-EVAL-V1",
@@ -783,6 +783,222 @@
       ],
       "intended_use": "multimodal sketch/text-to-pattern research comparator",
       "redistribution_action": "check article license, repository and training asset rights before reuse"
+    },
+    {
+      "source_id": "TRC-DIGITAL-FABRICATION-REVIEW-2026",
+      "name": "Textile- and carbon-reinforced concrete in digital fabrication",
+      "source_kind": "technical_textile_construction_review",
+      "paper_url": "https://doi.org/10.1617/s11527-026-03285-0",
+      "publication_date": "2026-09-25",
+      "license_status": "open_access_article; review source, reuse terms to be verified",
+      "reported_scope": {
+        "routes": [
+          "extrusion",
+          "non_planar_deposition",
+          "robotic_spraying",
+          "digital_casting",
+          "removable_and_stay_in_place_formwork",
+          "flexible_formwork",
+          "particle_bed",
+          "injection_printing"
+        ],
+        "reinforcement_architectures": [
+          "flexible_textiles",
+          "stabilized_grids",
+          "mineral_impregnated_rovings",
+          "spatial_preforms"
+        ],
+        "comparison_axes": [
+          "matrix_penetration",
+          "bond",
+          "cover_and_position",
+          "accessibility",
+          "inspectability",
+          "automation",
+          "structural_evidence",
+          "durability",
+          "process_chain_complexity",
+          "environmental_performance"
+        ]
+      },
+      "known_limitations": [
+        "review synthesis, not one head-to-head benchmark",
+        "route-specific structural tests are not directly comparable",
+        "process-parallel integration may add voids or hinder inspection"
+      ],
+      "intended_use": "classification and matched-process benchmark taxonomy for textile/carbon reinforcement in digital construction",
+      "redistribution_action": "cite paper; inspect article and figure/table reuse terms before reproduction"
+    },
+    {
+      "source_id": "3DCP-TEXTILE-REINFORCEMENT-CLASSIFICATION-2026",
+      "name": "Concrete printing with textile reinforcement: approaches, classification, and testing",
+      "source_kind": "technical_textile_construction_review",
+      "paper_url": "https://doi.org/10.1016/j.cemconres.2026.108340",
+      "publication_date": "2026-10",
+      "license_status": "open access Creative Commons as listed by journal; verify specific license metadata",
+      "reported_scope": {
+        "taxonomy": [
+          "single_step_during_concrete_shaping",
+          "two_step_before_or_after_shaping"
+        ],
+        "focus": [
+          "reinforcement configuration",
+          "bond mechanisms",
+          "mechanical performance",
+          "testing methods",
+          "anisotropy",
+          "process constraints"
+        ]
+      },
+      "known_limitations": [
+        "review taxonomy rather than unified quantitative benchmark",
+        "underlying data reported available on request",
+        "full process/structural comparisons remain method-specific"
+      ],
+      "intended_use": "benchmark taxonomy and evidence classification for reinforcement integration sequence",
+      "redistribution_action": "cite article and verify exact CC license before reusing figures/tables"
+    },
+    {
+      "source_id": "TEXTILE-SHCC-HYBRID-3DCP-2026",
+      "name": "Multi-material 3D concrete printing: automated hybrid reinforcements using textile and strain-hardening cementitious composites",
+      "source_kind": "automated_textile_reinforcement_experiment",
+      "paper_url": "https://doi.org/10.1016/j.cemconcomp.2025.106361",
+      "publication_date": "2026-01",
+      "license_status": "publisher access/reuse terms to be verified",
+      "reported_scope": {
+        "process": "three-channel nozzle for automated mortar printing and textile placement",
+        "reinforcement": [
+          "carbon_textile",
+          "highly_flowable_SHCC_bonding_agent"
+        ],
+        "reported_outcomes": [
+          "flexural performance",
+          "ductility",
+          "crack resistance",
+          "predictive flexural model"
+        ]
+      },
+      "known_limitations": [
+        "specific matrix/textile/process configuration",
+        "do not generalize results without matched reinforcement, matrix, span and loading",
+        "not a production-scale qualification"
+      ],
+      "intended_use": "matched benchmark for hybrid textile+matrix placement and flexural coupon/component tests",
+      "redistribution_action": "check supplement, data and reuse rights before implementing exact protocol"
+    },
+    {
+      "source_id": "ROBOTIC-REBAR-INSERTION-GROUTING-2026",
+      "name": "Robotic rebar insertion and grouting for reinforcement of 3D printed concrete",
+      "source_kind": "robotic_construction_reinforcement_experiment",
+      "paper_url": "https://doi.org/10.1016/j.addma.2026.105078",
+      "publication_date": "2026-02-05",
+      "license_status": "open access CC as listed by publisher; verify exact license",
+      "reported_scope": {
+        "robotics": [
+          "robotic_arm",
+          "surface_detection",
+          "force_control",
+          "vertical_rebar_insertion",
+          "grouting"
+        ],
+        "tests": [
+          "pull_out_tests",
+          "failure_mode_characterization"
+        ]
+      },
+      "known_limitations": [
+        "steel rebar, not textile placement",
+        "reinforcement anchorage and insertion only; not a complete structural 3D-printing qualification"
+      ],
+      "intended_use": "adjacent robotic placement/force-control and pull-out failure-mode comparator",
+      "redistribution_action": "cite paper; check supplemental data license before reuse"
+    },
+    {
+      "source_id": "IN_PROCESS-MESH-REINFORCEMENT-3DCP-2026",
+      "name": "In-process reinforcement method for 3D-printed concrete layers",
+      "source_kind": "in_process_reinforcement_experiment",
+      "paper_url": "https://doi.org/10.1016/j.autcon.2026.106958",
+      "publication_date": "2026-07",
+      "license_status": "publisher access/reuse terms to be verified",
+      "reported_scope": {
+        "process": "dedicated printhead inserts mesh within concrete layers",
+        "reported_outcomes": [
+          "improved_green_strength",
+          "increased_beam_deformability"
+        ],
+        "automation": "in-process mesh placement"
+      },
+      "known_limitations": [
+        "mesh reinforcement is not equivalent to all textile architectures",
+        "measure interface, position, voids and structural behavior for the target profile"
+      ],
+      "intended_use": "benchmark comparator for in-layer reinforcement printhead and placement accuracy",
+      "redistribution_action": "verify article/supplement data rights"
+    },
+    {
+      "source_id": "ROBOTIC-STEEL-REINFORCEMENT-WELD-3DCP-2026",
+      "name": "Integrating arc stud welding and spatial steel reinforcement into 3D concrete printing for robotic fabrication",
+      "source_kind": "robotic_construction_manufacturing_experiment",
+      "paper_url": "https://doi.org/10.1016/j.autcon.2026.107113",
+      "publication_date": "2026-10",
+      "license_status": "publisher access/reuse terms to be verified",
+      "reported_scope": {
+        "automation": [
+          "coordinated_printing_robot",
+          "welding_robot"
+        ],
+        "process": [
+          "3D_concrete_printing",
+          "spatial_steel_reinforcement",
+          "arc_stud_welding"
+        ],
+        "equipment": [
+          "variable_fork_shaped_printing_nozzle",
+          "specialized_welding_pistol"
+        ],
+        "output": "prototypical coordinated robotic fabrication mock-up"
+      },
+      "known_limitations": [
+        "steel reinforcement and welding rather than textile integration",
+        "prototype evidence not building-code qualification",
+        "structural interfaces and safety remain separately assessed"
+      ],
+      "intended_use": "industrial robotics coordination comparator for shaping, reinforcement and joining",
+      "redistribution_action": "check figures/data and licensing before reuse"
+    },
+    {
+      "source_id": "TEXTILE-WASTE-CEMENTITIOUS-COMPOSITES-REVIEW-2026",
+      "name": "Textile waste reinforced cementitious composites: state of the art and future perspectives",
+      "source_kind": "textile_waste_construction_review",
+      "paper_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13476324/",
+      "publication_date": "2026",
+      "license_status": "open access; confirm article-specific reuse license",
+      "reported_scope": {
+        "studies_screened": 23,
+        "literature_window": "2015 to February 2026",
+        "reported_trends": [
+          "flexural_strength",
+          "toughness",
+          "post_cracking_capacity",
+          "thermal_performance"
+        ],
+        "reported_risks": [
+          "compressive_strength_reduction_from_porosity",
+          "weak_fiber_matrix_interface"
+        ],
+        "gaps": [
+          "long_term_durability",
+          "full_scale_evaluation",
+          "comprehensive_life_cycle_assessment"
+        ]
+      },
+      "known_limitations": [
+        "review spans heterogeneous matrices/fibre formats/processes",
+        "textile waste feedstock variability and contaminants require qualification",
+        "environmental benefits are scenario-dependent"
+      ],
+      "intended_use": "circular textile-to-construction materials research and material qualification taxonomy",
+      "redistribution_action": "review article license and individual cited dataset rights before any material data reuse"
     }
   ],
   "split_policy": [
@@ -794,5 +1010,5 @@
   ],
   "cross_dataset_rule": "TexSortML visual garment-family labels are not fibre-composition labels. NIR-SORT composition observations are not garment-category labels. Fusion is permitted only with matched item identity, independent measurement provenance and explicit missing/unknown states.",
   "claim_ceiling": "This source register is a research intake manifest. It does not prove that any dataset has been downloaded, parsed, reproduced, licensed for redistribution, or evaluated by Luminous Dynamics. The companion RGBench garment asset subset is separately licensed for non-commercial research; do not treat its rights as inherited from the CC-BY-4.0 capture set.",
-  "revision": "2026-11-12-r5"
+  "revision": "2026-11-12-r6"
 }
