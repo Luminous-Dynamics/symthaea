@@ -87,6 +87,7 @@ pub struct ExtensionReceiptV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QualificationErrorV1 {
     InvalidIdentifier,
+    InvalidProfile,
     ZeroDimension,
     StateDimensionExceeded,
     LieDimensionExceeded,
@@ -338,8 +339,8 @@ fn validate_lie_algebra<const N: usize>(
         for j in 0..dimension {
             for k in 0..dimension {
                 closure_checks += 1;
-                if algebra.structure_constants[i][j][k]
-                    != -algebra.structure_constants[j][i][k]
+                if i128::from(algebra.structure_constants[i][j][k])
+                    != -i128::from(algebra.structure_constants[j][i][k])
                 {
                     return Err(QualificationErrorV1::LieStructureNotAntisymmetric);
                 }
@@ -408,6 +409,14 @@ fn validate_profile<const N: usize>(
     {
         return Err(QualificationErrorV1::InvalidIdentifier);
     }
+    if profile.maximum_state_dimension == 0
+        || profile.maximum_lie_generators == 0
+        || profile.maximum_component_order == 0
+        || profile.maximum_absolute_entry <= 0
+        || profile.maximum_work_units == 0
+    {
+        return Err(QualificationErrorV1::InvalidProfile);
+    }
     if N == 0 {
         return Err(QualificationErrorV1::ZeroDimension);
     }
@@ -421,46 +430,57 @@ fn validate_profile<const N: usize>(
         return Err(QualificationErrorV1::ComponentOrderExceeded);
     }
 
+    let entry_limit = profile.maximum_absolute_entry as u64;
+    let outside_profile = |value: &i64| value.unsigned_abs() > entry_limit;
     for generator in &extension.lie_algebra.generators {
-        if generator
-            .iter()
-            .flatten()
-            .any(|entry| entry.abs() > profile.maximum_absolute_entry)
-        {
+        if generator.iter().flatten().any(outside_profile) {
+            return Err(QualificationErrorV1::EntryOutOfProfile);
+        }
+    }
+    for row in &extension.lie_algebra.structure_constants {
+        if row.iter().flatten().any(outside_profile) {
             return Err(QualificationErrorV1::EntryOutOfProfile);
         }
     }
     for state in &extension.component_representation.state_matrices {
-        if state
-            .iter()
-            .flatten()
-            .any(|entry| entry.abs() > profile.maximum_absolute_entry)
-        {
+        if state.iter().flatten().any(outside_profile) {
             return Err(QualificationErrorV1::EntryOutOfProfile);
         }
     }
     for adjoint in &extension.component_representation.adjoint_matrices {
-        if adjoint.iter().flatten().any(|entry| entry.abs() > profile.maximum_absolute_entry) {
+        if adjoint.iter().flatten().any(outside_profile) {
             return Err(QualificationErrorV1::EntryOutOfProfile);
         }
     }
 
+    // Upper-bound the actual verifier loops before any quadratic/cubic work.
+    // Group associativity: O(g^3); Jacobi and bracket automorphism:
+    // O(d^5); matrix products: O(N^3) per composition/conjugation.
     let d = extension.lie_algebra.generators.len();
     let group_order = extension.component_group.multiplication.len();
+    let g2 = group_order.checked_mul(group_order).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let g3 = g2.checked_mul(group_order).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
     let d2 = d.checked_mul(d).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
     let d3 = d2.checked_mul(d).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let d4 = d3.checked_mul(d).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let d5 = d4.checked_mul(d).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
     let n2 = N.checked_mul(N).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
-    let gd = group_order.checked_mul(d).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
-    let g2n = group_order
-        .checked_mul(group_order)
-        .and_then(|value| value.checked_mul(n2))
+    let n3 = n2.checked_mul(N).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let g_d5 = group_order.checked_mul(d5).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let g_d_n3 = group_order
+        .checked_mul(d)
+        .and_then(|value| value.checked_mul(n3))
         .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
-    let required = group_order
-        .checked_mul(group_order)
-        .and_then(|value| value.checked_mul(group_order))
-        .and_then(|value| value.checked_mul(d3))
-        .and_then(|value| value.checked_add(g2n))
-        .and_then(|value| value.checked_add(gd.checked_mul(d2)?))
+    let g2_d3 = g2.checked_mul(d3).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let g2_n3 = g2.checked_mul(n3).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let d2_n3 = d2.checked_mul(n3).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let required = g3
+        .checked_add(d5)
+        .and_then(|value| value.checked_add(g_d5))
+        .and_then(|value| value.checked_add(g_d_n3.checked_mul(2)?))
+        .and_then(|value| value.checked_add(g2_d3))
+        .and_then(|value| value.checked_add(g2_n3))
+        .and_then(|value| value.checked_add(d2_n3))
         .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
     if required > profile.maximum_work_units {
         return Err(QualificationErrorV1::WorkBudgetExceeded);
@@ -493,16 +513,13 @@ pub fn verify_split_extension<const N: usize>(
     }
 
     let state_identity = state_identity::<N>();
-    let adjoint_identity = vec![
-        (0..lie_dimension)
-            .map(|row| {
-                (0..lie_dimension)
-                    .map(|col| if row == col { 1_i64 } else { 0_i64 })
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>(),
-    ]
-    .remove(0);
+    let adjoint_identity: Vec<Vec<i64>> = (0..lie_dimension)
+        .map(|row| {
+            (0..lie_dimension)
+                .map(|column| if row == column { 1_i64 } else { 0_i64 })
+                .collect()
+        })
+        .collect();
 
     if representations.state_matrices[extension.component_group.identity] != state_identity {
         return Err(QualificationErrorV1::StateRepresentationIdentityViolation);
