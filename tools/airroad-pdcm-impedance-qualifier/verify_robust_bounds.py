@@ -42,6 +42,10 @@ def main() -> None:
         h = (q(case["negative_incremental_conductance"]["lower"]),
              q(case["negative_incremental_conductance"]["upper"]))
 
+        for name, interval in [("Gs", gs), ("G", g), ("h", h)]:
+            assert interval[0] > 0, (case["id"], name, "non-positive lower")
+            assert interval[0] <= interval[1], (case["id"], name, "inverted interval")
+
         lo, hi, status, margin = disposition(gs, g, h)
         assert lo == q(case["threshold_lower"]), case["id"]
         assert hi == q(case["threshold_upper"]), case["id"]
