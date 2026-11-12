@@ -499,7 +499,14 @@ mod tests {
             .iter()
             .find(|case| case.case_id == "saturn-distance-control")
             .expect("Saturn control exists");
-        assert!((saturn.ideal_area_multiplier_for_equal_incident_power.unwrap() - 90.25).abs() < 1e-6);
+        assert!(
+            (saturn
+                .ideal_area_multiplier_for_equal_incident_power
+                .unwrap()
+                - 90.25)
+                .abs()
+                < 1e-6
+        );
     }
 
     #[test]
@@ -810,7 +817,10 @@ pub fn audit_service_corpus(bytes: &[u8]) -> Result<ServiceAuditReport> {
                     invalid = true;
                     findings.push(finding(
                         "EMPTY_THERMAL_SERVICE_ID",
-                        format!("interval {} has an empty thermal service id", interval.interval_id),
+                        format!(
+                            "interval {} has an empty thermal service id",
+                            interval.interval_id
+                        ),
                     ));
                 } else if !thermal_ids.insert(thermal.service_id.clone()) {
                     invalid = true;
@@ -862,14 +872,20 @@ pub fn audit_service_corpus(bytes: &[u8]) -> Result<ServiceAuditReport> {
                         unknown = true;
                         findings.push(finding(
                             "UNKNOWN_THERMAL_SUPPLY_TEMPERATURE",
-                            format!("thermal service {} lacks a delivered temperature", thermal.service_id),
+                            format!(
+                                "thermal service {} lacks a delivered temperature",
+                                thermal.service_id
+                            ),
                         ));
                     }
                     Some(value) if !value.is_finite() => {
                         invalid = true;
                         findings.push(finding(
                             "INVALID_THERMAL_SUPPLY_TEMPERATURE",
-                            format!("thermal service {} has a non-finite delivered temperature", thermal.service_id),
+                            format!(
+                                "thermal service {} has a non-finite delivered temperature",
+                                thermal.service_id
+                            ),
                         ));
                     }
                     Some(value)
@@ -1088,7 +1104,10 @@ pub fn run_service_audit(input: &Path, output: Option<&Path>) -> Result<()> {
 
     if report.status != "PASS" {
         bail!(
-            "service-envelope audit BLOCKED: {} corpus finding(s), {} expected-disposition mismatch(es)",
+            concat!(
+                "service-envelope audit BLOCKED: {} corpus finding(s), ",
+                "{} expected-disposition mismatch(es)"
+            ),
             report.corpus_findings.len(),
             report.expectation_mismatch_count
         );
