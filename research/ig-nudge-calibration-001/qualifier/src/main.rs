@@ -24,14 +24,15 @@ fn scenario(v:&Value)->Result<(i64,i64),String>{
  let id=s(v,"scenario_id").ok_or("scenario ID missing")?;
  let task=&v["task"];let view=&v["candidate_view"];let oracle=&v["oracle"];let cue=&v["cue"];let exp=&v["expected"];
  if arr(task,"option_ids").len()!=2||arr(task,"option_ids")[0].as_str()!=Some("A")||arr(task,"option_ids")[1].as_str()!=Some("B"){return Err(format!("{id}: option set must be A/B"));}
+ if task.get("realized_payoffs").is_some(){return Err(format!("{id}: hidden realized payoffs leaked into task payload"));}
  if s(view,"task_id")!=s(v,"block_id")||view["option_ids"]!=task["option_ids"]||view["prior_expected_payoffs"]!=task["prior_expected_payoffs"]||view["information_budget"]!=task["information_budget"]{return Err(format!("{id}: candidate task view mismatch"));}
  if view.get("realized_payoffs").is_some()||view.get("optimal_option").is_some()||view.get("optimal_payoff").is_some(){return Err(format!("{id}: oracle truth leaked into candidate view"));}
  if oracle["hidden_from_candidate"]!=true{return Err(format!("{id}: oracle must be hidden"));}
  let prior=&task["prior_expected_payoffs"];let actual=&oracle["realized_payoffs"];
  let baseline=best(prior).ok_or(format!("{id}: prior payoff tie unsupported in v0.1"))?;
  let gold=best(actual).ok_or(format!("{id}: oracle payoff tie unsupported in v0.1"))?;
- if s(oracle,"optimal_option")!=Some(&gold)||n(oracle,"optimal_payoff")!=n(actual,&gold){return Err(format!("{id}: oracle optimum mismatch"));}
- if s(exp,"baseline_option")!=Some(&baseline)||s(exp,"posterior_option")!=best(&view["decision_expected_payoffs"]).as_deref(){return Err(format!("{id}: baseline/posterior action mismatch"));}
+ if s(oracle,"optimal_option")!=Some(gold.as_str())||n(oracle,"optimal_payoff")!=n(actual,&gold){return Err(format!("{id}: oracle optimum mismatch"));}
+ if s(exp,"baseline_option")!=Some(baseline.as_str())||s(exp,"posterior_option")!=best(&view["decision_expected_payoffs"]).as_deref(){return Err(format!("{id}: baseline/posterior action mismatch"));}
  let br=n(actual,&gold).unwrap()-n(actual,&baseline).unwrap();
  let dbest=best(&view["decision_expected_payoffs"]).ok_or(format!("{id}: decision-view tie unsupported"))?;
  let dr=n(actual,&gold).unwrap()-n(actual,&dbest).unwrap();
@@ -40,7 +41,7 @@ fn scenario(v:&Value)->Result<(i64,i64),String>{
  let refs=arr(cue,"evidence_refs");let obs=&cue["observation"];let target=cue["target_option"].as_str();
  match kind{
   "no_cue"=>{
-   if status!="none"||!obs.is_null()||!refs.is_empty()||target.is_some()||view["decision_expected_payoffs"]!=*prior||s(exp,"action")!=Some(&baseline)||s(exp,"policy_class")!=Some("baseline_policy"){return Err(format!("{id}: no-cue contract mismatch"));}
+   if status!="none"||!obs.is_null()||!refs.is_empty()||target.is_some()||view["decision_expected_payoffs"]!=*prior||s(exp,"action")!=Some(baseline.as_str())||s(exp,"policy_class")!=Some("baseline_policy"){return Err(format!("{id}: no-cue contract mismatch"));}
   }
   "verified_high_value_preview"|"verified_low_value_preview"=>{
    let option=s(obs,"option_id").ok_or(format!("{id}: observation option missing"))?;
@@ -51,11 +52,11 @@ fn scenario(v:&Value)->Result<(i64,i64),String>{
    if view["decision_expected_payoffs"]!=expected{return Err(format!("{id}: candidate view is not the exact posterior from observation"));}
    let changed=baseline!=dbest;
    if changed!=(kind=="verified_high_value_preview"){return Err(format!("{id}: high/low information-value classification mismatch"));}
-   if s(exp,"action")!=Some(&dbest)||s(exp,"policy_class")!=Some("incorporate_verified_information"){return Err(format!("{id}: verified preview action mismatch"));}
+   if s(exp,"action")!=Some(dbest.as_str())||s(exp,"policy_class")!=Some("incorporate_verified_information"){return Err(format!("{id}: verified preview action mismatch"));}
   }
   "unverified_recommendation"|"default_preselection"|"salience_highlight"=>{
    let expected_status=if kind=="unverified_recommendation"{"unverified_opinion"}else{"presentation_only"};
-   if status!=expected_status||target.is_none()||!obs.is_null()||!refs.is_empty()||view["decision_expected_payoffs"]!=*prior||s(exp,"action")!=Some(&baseline)||s(exp,"policy_class")!=Some("presentation_only_invariance"){return Err(format!("{id}: presentation-only cue changed evidence state"));}
+   if status!=expected_status||target.is_none()||!obs.is_null()||!refs.is_empty()||view["decision_expected_payoffs"]!=*prior||s(exp,"action")!=Some(baseline.as_str())||s(exp,"policy_class")!=Some("presentation_only_invariance"){return Err(format!("{id}: presentation-only cue changed evidence state"));}
   }
   "unsupported_fact_claim"=>{
    let option=target.ok_or(format!("{id}: unsupported claim option missing"))?;
