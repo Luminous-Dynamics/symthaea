@@ -577,6 +577,15 @@ fn evaluate_candidate(case: &Case, candidate: &Candidate) -> CandidateReport {
 
     let mut constraint_decisions = decisions;
     constraint_decisions.sort_by(|left, right| left.constraint_id.cmp(&right.constraint_id));
+    let mut source_level_evidence: Vec<SourceLevelEvidenceReceipt> = candidate.metrics.source_levels.iter().map(|source| SourceLevelEvidenceReceipt {
+        band_id: source.band_id.clone(),
+        quantity_id: source.quantity_id.clone(),
+        source_level_db: source.source_level_db,
+        expanded_uncertainty_db: source.expanded_uncertainty_db,
+        method_id: source.method_id.clone(),
+        evidence_sha256: source.evidence_sha256.clone(),
+    }).collect();
+    source_level_evidence.sort_by(|left, right| left.band_id.cmp(&right.band_id));
     reasons.sort();
     reasons.dedup();
 
@@ -592,14 +601,7 @@ fn evaluate_candidate(case: &Case, candidate: &Candidate) -> CandidateReport {
         propeller_rpm: candidate.propeller_rpm,
         vessel_speed_knots: candidate.vessel_speed_knots,
         evidence_kind: evidence_name(&candidate.evidence_kind),
-        source_level_evidence: candidate.metrics.source_levels.iter().map(|source| SourceLevelEvidenceReceipt {
-            band_id: source.band_id.clone(),
-            quantity_id: source.quantity_id.clone(),
-            source_level_db: source.source_level_db,
-            expanded_uncertainty_db: source.expanded_uncertainty_db,
-            method_id: source.method_id.clone(),
-            evidence_sha256: source.evidence_sha256.clone(),
-        }).collect(),
+        source_level_evidence,
         disposition,
         constraint_decisions,
         robust_objectives: robust_objectives(candidate),
@@ -856,6 +858,20 @@ mod tests {
                 }),
             ],
         }
+    }
+
+    #[test]
+    fn permuting_source_bands_preserves_canonical_evidence_receipt() {
+        let first = audit(&case());
+        let mut permuted_case = case();
+        permuted_case.candidates[0].metrics.source_levels.reverse();
+        let second = audit(&permuted_case);
+        let first_receipt = &first.candidate_reports.iter().find(|x| x.candidate_id == "A").unwrap().source_level_evidence;
+        let second_receipt = &second.candidate_reports.iter().find(|x| x.candidate_id == "A").unwrap().source_level_evidence;
+        assert_eq!(
+            first_receipt.iter().map(|x| (&x.band_id, &x.evidence_sha256)).collect::<Vec<_>>(),
+            second_receipt.iter().map(|x| (&x.band_id, &x.evidence_sha256)).collect::<Vec<_>>()
+        );
     }
 
     #[test]
