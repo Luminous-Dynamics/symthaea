@@ -460,6 +460,101 @@
         "Exact geometry, case data, OpenFOAM version and validation split must be extracted."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "FUSION-DEC-ENN-ELECTROSTATIC-UNIT-2026",
+      "lane": "FUSION_DIRECT_ENERGY_CONVERSION",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Experimental study on electrostatic direct conversion of kinetic energy of charged energetic particles to electric energy",
+        "publisher": "Plasma Science and Technology",
+        "publication_date": "2026-05-11",
+        "volume": "28(5)",
+        "article_number": "054001",
+        "doi": "10.1088/2058-6272/ae445a",
+        "url": "https://doi.org/10.1088/2058-6272/ae445a",
+        "publisher_article": "https://pst.hfcas.ac.cn/en/article/doi/10.1088/2058-6272/ae445a"
+      },
+      "observations": [
+        {
+          "metric": "reported_fundamental_unit_energy_conversion_efficiency",
+          "value": 80,
+          "qualifier": "greater than 80%; denominator, particle species/energy distribution and full test boundary must be extracted from the paper before quantitative reproduction",
+          "unit": "percent",
+          "relation": "greater_than"
+        }
+      ],
+      "source_conclusion": "The paper reports low-parameter electrostatic DEC unit experiments undertaken before fusion alpha particles had been observed in the experiments. It validates a fundamental charged-particle conversion principle, not direct conversion of fusion-born alpha particles or a fusion plant.",
+      "comparison_status": "PUBLISHED_FUNDAMENTAL_UNIT_EXPERIMENT_NOT_ALPHA_OR_PLANT_DEMONSTRATION",
+      "blockers": [
+        "The abstract states that fusion alpha particles had not yet been observed in these experiments.",
+        "Extract the exact incident particle species, energy distribution, denominator, voltage/current operating points, source power, grid/interception losses and uncertainty.",
+        "The reported >80% is a source-reported result and is not a universal target, net electricity or whole-plant efficiency."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "FUSION-DEC-REALTA-WHAM-2026",
+      "lane": "FUSION_DIRECT_ENERGY_CONVERSION",
+      "evidence_class": "MANUFACTURER_REPORTED_OPERATIONAL_CLAIM",
+      "source": {
+        "title": "A Fusion First: Realta Demos Direct Energy Conversion",
+        "publisher": "Realta Fusion",
+        "publication_date": "2026-06-30",
+        "url": "https://realtafusion.com/insight/a-fusion-first-realta-demos-direct-energy-conversion/",
+        "secondary_sources": [
+          {
+            "title": "Realta Fusion makes electricity, but not through heat conversion",
+            "publisher": "American Nuclear Society / Nuclear Newswire",
+            "publication_date": "2026-07-06",
+            "url": "https://www.ans.org/news/article-8179/realta-fusion-makes-electricity-but-not-through-heat-conversion/"
+          }
+        ]
+      },
+      "configuration": {
+        "device": "Wisconsin HTS Axisymmetric Mirror (WHAM)",
+        "installation_date": "2026-06-19",
+        "plasma_fuel": "deuterium",
+        "converter": "single-stage electrostatic three-grid",
+        "grids": [
+          "grounded grid",
+          "electron-repulsion grid",
+          "ion collector grid"
+        ]
+      },
+      "observations": [
+        {
+          "metric": "converter_terminal_voltage",
+          "value": 100,
+          "qualifier": "around 100 V; prototype report, exact trace/meter uncertainty not published in the announcement",
+          "unit": "V"
+        },
+        {
+          "metric": "converter_current",
+          "value": null,
+          "reported_value_text": "multiple amperes",
+          "qualifier": "manufacturer-reported prototype operating observation",
+          "unit": "A"
+        },
+        {
+          "metric": "converter_output_power",
+          "value": null,
+          "reported_value_text": "hundreds of watts",
+          "qualifier": "manufacturer-reported prototype output; exact time-series and meter boundary not included in announcement",
+          "unit": "W"
+        }
+      ],
+      "source_conclusion": "Realta reports a WHAM demonstration of electrostatic conversion on a D-only mirror plasma. The company explicitly says most energy recovered in this prototype came from externally supplied plasma heating and sustainment, not fusion-born energy. It explicitly states that this was not net-electricity production or large-scale conversion of fusion-born power.",
+      "fusion_born_particle_conversion_observed": false,
+      "comparison_status": "PROTOTYPE_DEC_OF_EXTERNALLY_HEATED_D_PLASMA_NOT_FUSION_BORN_NET_ELECTRICITY",
+      "blockers": [
+        "This D-only WHAM demonstration does not demonstrate D-T fusion-born alpha-particle conversion.",
+        "Most recovered energy was reported to originate from external plasma heating/sustainment.",
+        "The output is not whole-device or plant net electrical power.",
+        "Exact collector-terminal traces, source-power traces, conditioning losses, auxiliary loads and uncertainty are not supplied in the news announcement.",
+        "Future multi-stage, multi-kilowatt/megawatt and >90% efficiency targets are not prototype measurements."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -517,6 +612,21 @@
       "control_id": "NC-011",
       "condition": "Promote any source register entry into a Luminous reproduction or measured observation.",
       "expected_disposition": "REJECT_CLAIM_CEILING_VIOLATION"
+    },
+    {
+      "control_id": "NC-DEC-001",
+      "condition": "Promote ENN's reported >80% low-parameter fundamental-unit efficiency to fusion-born alpha-particle conversion or plant efficiency.",
+      "expected_disposition": "REJECT_EVIDENCE_SCOPE_AND_DENOMINATOR_MISMATCH"
+    },
+    {
+      "control_id": "NC-DEC-002",
+      "condition": "Promote Realta WHAM's hundreds-of-watts externally heated D-plasma prototype output to fusion-born net electricity.",
+      "expected_disposition": "REJECT_ENERGY_ORIGIN_AND_SYSTEM_BOUNDARY_MISMATCH"
+    },
+    {
+      "control_id": "NC-DEC-003",
+      "condition": "Treat all 17.6 MeV of D-T reaction energy as charged-particle energy available to electrostatic DEC.",
+      "expected_disposition": "REJECT_NEUTRON_ALPHA_PARTITION_MISMATCH"
     }
   ],
   "derived_reference_checks": [
@@ -537,6 +647,24 @@
         "reported_energy_to_reaction_enthalpy_ratio": 5.923896386591206
       },
       "interpretation": "The standard-state reaction enthalpy is a thermodynamic lower-bound reference for the chemical reaction duty. The reported microwave energy is about 5.9 times this enthalpy. This ratio is not an efficiency: the reported process value has a source-specific meter boundary, and sensible heating, losses, plasma coupling, gas handling, separation and other loads are not reconciled here.",
+      "luminous_measurement": false
+    },
+    {
+      "check_id": "DT-DEC-ENERGY-ORIGIN-PARTITION-001",
+      "reaction": "D + T -> alpha + neutron",
+      "evidence_class": "DERIVED_ARITHMETIC_FROM_PUBLISHED_NUCLEAR_REACTION_ENERGY_PARTITION",
+      "inputs": {
+        "total_reaction_energy_MeV": 17.6,
+        "alpha_kinetic_energy_MeV": 3.5,
+        "neutron_kinetic_energy_MeV": 14.1
+      },
+      "derivation": {
+        "alpha_energy_fraction": 0.19886363636363635,
+        "neutron_energy_fraction": 0.8011363636363635,
+        "alpha_energy_percent": 19.886363636363633,
+        "neutron_energy_percent": 80.11363636363636
+      },
+      "interpretation": "Only the charged alpha product's kinetic-energy component is directly accessible to an electrostatic charged-particle converter in the basic D-T reaction partition. The neutron component is neutral and must be treated as a separate blanket/thermal path unless a separately qualified neutral-particle conversion mechanism is specified. This arithmetic does not imply the alpha energy is captured by a converter: confinement, plasma heating, exhaust fraction, interception, conversion, conditioning and whole-plant parasitics remain separate.",
       "luminous_measurement": false
     }
   ]
