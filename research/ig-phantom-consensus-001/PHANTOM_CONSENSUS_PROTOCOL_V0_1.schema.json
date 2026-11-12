@@ -16,7 +16,8 @@
     "task_classes",
     "metric_ids",
     "qualification_gates",
-    "claim_ceiling"
+    "claim_ceiling",
+    "implementation_status"
   ],
   "properties": {
     "protocol_id": {
@@ -156,6 +157,32 @@
         },
         "excluded": {
           "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "implementation_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "implemented_metric_ids",
+        "deferred_metric_ids"
+      ],
+      "properties": {
+        "implemented_metric_ids": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "deferred_metric_ids": {
+          "type": "array",
+          "minItems": 6,
+          "uniqueItems": true,
           "items": {
             "type": "string"
           }
