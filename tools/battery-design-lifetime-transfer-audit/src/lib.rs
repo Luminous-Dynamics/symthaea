@@ -29,6 +29,9 @@ pub struct SplitManifest {
     pub train_design_group_ids: Vec<String>,
     pub validation_design_group_ids: Vec<String>,
     pub test_design_group_ids: Vec<String>,
+    pub train_protocol_group_ids: Vec<String>,
+    pub validation_protocol_group_ids: Vec<String>,
+    pub test_protocol_group_ids: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -220,6 +223,23 @@ fn exact_group_ids(
     Ok(groups)
 }
 
+fn exact_protocol_group_ids(
+    cell_ids: &BTreeSet<String>,
+    cell_by_id: &BTreeMap<&str, &CellObservation>,
+    label: &str,
+) -> Result<BTreeSet<String>, AuditError> {
+    let mut groups = BTreeSet::new();
+
+    for cell_id in cell_ids {
+        let cell = cell_by_id.get(cell_id.as_str()).ok_or_else(|| {
+            AuditError(format!("{label} references unknown cell {cell_id}"))
+        })?;
+        groups.insert(cell.protocol_group_id.clone());
+    }
+
+    Ok(groups)
+}
+
 fn validate_split(
     split: &SplitManifest,
     cell_by_id: &BTreeMap<&str, &CellObservation>,
@@ -300,13 +320,68 @@ fn validate_split(
         ));
     }
 
+    let declared_train_protocols = unique_ids(
+        split.train_protocol_group_ids.iter().map(String::as_str),
+        "train protocol group ID",
+    )?;
+    let declared_validation_protocols = unique_ids(
+        split.validation_protocol_group_ids.iter().map(String::as_str),
+        "validation protocol group ID",
+    )?;
+    let declared_test_protocols = unique_ids(
+        split.test_protocol_group_ids.iter().map(String::as_str),
+        "test protocol group ID",
+    )?;
+
+    let actual_train_protocols =
+        exact_protocol_group_ids(&train, cell_by_id, "train partition")?;
+    let actual_validation_protocols =
+        exact_protocol_group_ids(&validation, cell_by_id, "validation partition")?;
+    let actual_test_protocols = exact_protocol_group_ids(&test, cell_by_id, "test partition")?;
+
+    if declared_train_protocols != actual_train_protocols
+        || declared_validation_protocols != actual_validation_protocols
+        || declared_test_protocols != actual_test_protocols
+    {
+        return Err(AuditError(
+            "declared protocol-group partitions do not match physical cell membership".into(),
+        ));
+    }
+
+    if split.kind == SplitKind::LeaveOneCellOut && test.len() != 1 {
+        return Err(AuditError(
+            "leave-one-cell-out split must hold out exactly one physical cell".into(),
+        ));
+    }
+
     if split.kind == SplitKind::LeaveOneDesignGroupOut
-        && (!actual_train_groups.is_disjoint(&actual_validation_groups)
+        && (actual_test_groups.len() != 1
+            || !actual_train_groups.is_disjoint(&actual_validation_groups)
             || !actual_train_groups.is_disjoint(&actual_test_groups)
             || !actual_validation_groups.is_disjoint(&actual_test_groups))
     {
         return Err(AuditError(
-            "design-group identity leaks across a leave-one-design-group-out split".into(),
+            "leave-one-design-group-out split must hold out exactly one unseen design group".into(),
+        ));
+    }
+
+    if split.kind == SplitKind::LeaveOneProtocolOut
+        && (actual_test_protocols.len() != 1
+            || !actual_train_protocols.is_disjoint(&actual_validation_protocols)
+            || !actual_train_protocols.is_disjoint(&actual_test_protocols)
+            || !actual_validation_protocols.is_disjoint(&actual_test_protocols))
+    {
+        return Err(AuditError(
+            "leave-one-protocol-out split must hold out exactly one unseen protocol group".into(),
+        ));
+    }
+
+    if split.kind == SplitKind::Prospective
+        && (!actual_train_groups.is_disjoint(&actual_test_groups)
+            || !actual_validation_groups.is_disjoint(&actual_test_groups))
+    {
+        return Err(AuditError(
+            "prospective test designs must be unseen during model development".into(),
         ));
     }
 
@@ -670,6 +745,9 @@ mod tests {
                 train_design_group_ids: vec!["DESIGN-A".into(), "DESIGN-C".into()],
                 validation_design_group_ids: vec![],
                 test_design_group_ids: vec!["DESIGN-B".into()],
+                train_protocol_group_ids: vec!["P1".into(), "P2".into()],
+                validation_protocol_group_ids: vec![],
+                test_protocol_group_ids: vec!["P2".into()],
             },
             predictions: vec![CycleLifePrediction {
                 cell_id: "B1".into(),
@@ -743,6 +821,59 @@ mod tests {
 
         let error = audit_design_lifetime_manifest(&manifest).expect_err("design leakage fails");
         assert!(error.0.contains("leaks across"));
+    }
+
+    #[test]
+    fn rejects_protocol_group_leakage_in_leave_one_protocol_out() {
+        let mut manifest = valid_manifest();
+        manifest.split.kind = SplitKind::LeaveOneProtocolOut;
+        manifest.split.train_cell_ids = vec!["A1".into(), "A2".into(), "B1".into()];
+        manifest.split.test_cell_ids = vec!["C1".into()];
+        manifest.split.train_design_group_ids =
+            vec!["DESIGN-A".into(), "DESIGN-B".into()];
+        manifest.split.test_design_group_ids = vec!["DESIGN-C".into()];
+        manifest.split.train_protocol_group_ids = vec!["P1".into(), "P2".into()];
+        manifest.split.test_protocol_group_ids = vec!["P2".into()];
+
+        let error =
+            audit_design_lifetime_manifest(&manifest).expect_err("protocol leakage fails");
+        assert!(error.0.contains("leave-one-protocol-out split"));
+    }
+
+    #[test]
+    fn rejects_multiple_design_groups_in_leave_one_design_group_out_test() {
+        let mut manifest = valid_manifest();
+        manifest.cells.push(CellObservation {
+            cell_id: "D1".into(),
+            design_group_id: "DESIGN-D".into(),
+            protocol_group_id: "P3".into(),
+            feature_available_through_cycle: 50,
+            prediction_cutoff_cycle: 50,
+            feature_evidence_ref: "SYNTH-D1".into(),
+        });
+        manifest.split.test_cell_ids.push("D1".into());
+        manifest.split.test_design_group_ids.push("DESIGN-D".into());
+        manifest.split.test_protocol_group_ids.push("P3".into());
+        manifest.outcomes.push(CycleLifeOutcome {
+            cell_id: "D1".into(),
+            kind: OutcomeKind::EventObserved,
+            observed_through_cycle: 1200,
+            event_cycle: Some(1200),
+            event_code: None,
+        });
+        manifest.predictions.push(CycleLifePrediction {
+            cell_id: "D1".into(),
+            design_group_id: "DESIGN-D".into(),
+            prediction_cutoff_cycle: 50,
+            predicted_cycle_life: 1100.0,
+            lower_cycle_life: 1000.0,
+            upper_cycle_life: 1200.0,
+            model_evidence_ref: "SYNTH-MODEL".into(),
+        });
+
+        let error = audit_design_lifetime_manifest(&manifest)
+            .expect_err("multiple held-out design groups fail LODO semantics");
+        assert!(error.0.contains("exactly one unseen design group"));
     }
 
     #[test]
