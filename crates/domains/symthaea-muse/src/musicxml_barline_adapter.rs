@@ -117,13 +117,22 @@ pub fn parse_musicxml_measure_map(
     }
 
     let reference = &normalized_parts[0];
-    if normalized_parts.iter().flatten().any(|measure| {
-        measure.non_controlling || measure.has_unmodelled_barline_events
-    }) {
+    if normalized_parts.iter().flatten().any(|measure| measure.non_controlling) {
         return Ok(unknown_map(
             source_id,
             score_clock_id,
             "a part declares non-controlling measures; use per-part measure maps",
+        ));
+    }
+    if normalized_parts
+        .iter()
+        .flatten()
+        .any(|measure| measure.has_unmodelled_barline_events)
+    {
+        return Ok(unknown_map(
+            source_id,
+            score_clock_id,
+            "barline events require the MusicXML notation-graph API",
         ));
     }
     for (part_index, measures) in normalized_parts.iter().enumerate().skip(1) {
@@ -269,9 +278,16 @@ pub fn parse_musicxml_part_measure_maps(
                 }
                 (MeasureMapStatus::Supported, spans, indices)
             }
-            Some(_) => (
+            Some(parsed) if parsed.is_empty() => (
                 MeasureMapStatus::Unknown {
                     reason: "part contains no explicit measure containers".into(),
+                },
+                Vec::new(),
+                Vec::new(),
+            ),
+            Some(_) => (
+                MeasureMapStatus::Unknown {
+                    reason: "barline events require the MusicXML notation-graph API".into(),
                 },
                 Vec::new(),
                 Vec::new(),
@@ -1429,7 +1445,7 @@ mod tests {
                 <note><rest/><duration>8</duration></note>
                 <barline location="middle" id="mid-1"><bar-style>dashed</bar-style></barline>
                 <note><rest/><duration>8</duration></note>
-                <barline location="right" id="end-1"><bar-style>light-heavy</bar-style><ending number="1" type="start">1.</ending><repeat direction="backward" times="2"/></barline>
+                <barline location="right" id="end-1" divisions="4" custom="x"><bar-style>light-heavy</bar-style><footnote>closing note</footnote><level>1</level><wavy-line type="start" number="2" placement="above"/><segno id="S1"/><coda id="C1"/><fermata type="upright">normal</fermata><ending number="1" type="start">1.</ending><repeat direction="backward" times="2"/></barline>
             </measure>
             <measure number="2" implicit="yes">
                 <note><rest/><duration>4</duration></note>
@@ -1459,6 +1475,18 @@ mod tests {
         assert_eq!(right.ending.as_ref().and_then(|value| value.number.as_deref()), Some("1"));
         assert_eq!(right.repeat.as_ref().and_then(|value| value.direction.as_deref()), Some("backward"));
         assert_eq!(right.repeat.as_ref().and_then(|value| value.times.as_deref()), Some("2"));
+        assert_eq!(right.divisions_override.as_deref(), Some("4"));
+        assert_eq!(right.segno.as_deref(), Some("S1"));
+        assert_eq!(right.coda.as_deref(), Some("C1"));
+        assert_eq!(right.fermatas.len(), 1);
+        assert_eq!(right.fermatas[0].fermata_type.as_deref(), Some("upright"));
+        assert_eq!(right.fermatas[0].content.as_deref(), Some("normal"));
+        assert_eq!(right.wavy_lines.len(), 1);
+        assert_eq!(right.wavy_lines[0].line_type.as_deref(), Some("start"));
+        assert_eq!(right.annotations.len(), 2);
+        assert_eq!(right.annotations[0].element, "footnote");
+        assert_eq!(right.annotations[0].text.as_deref(), Some("closing note"));
+        assert!(right.unrecognized_attributes.contains(&("custom".into(), "x".into())));
         assert!(right.annotations.is_empty());
         assert!(right.fermatas.is_empty());
         assert!(right.wavy_lines.is_empty());
