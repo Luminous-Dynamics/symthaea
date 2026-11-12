@@ -360,7 +360,11 @@ pub enum ProbeAuditError {
     /// Duplicate candidate/probe arm identifier.
     DuplicateArmId(String),
     /// Candidate/probe cluster count differs from the frozen manifest.
-    ClusterCountMismatch { arm_id: String, expected: usize, observed: usize },
+    ClusterCountMismatch {
+        arm_id: String,
+        expected: usize,
+        observed: usize,
+    },
     /// Duplicate or empty independent-cluster identifier.
     DuplicateOrEmptyClusterId(String),
     /// Distinct cluster IDs reused one episode-set or independence receipt.
@@ -410,7 +414,10 @@ fn validate_scope(scope: &ProbeAuditScope) -> Result<(), ProbeAuditError> {
     require_nonempty("benchmark_version", &scope.benchmark_version)?;
     require_nonempty("task_manifest_digest", &scope.task_manifest_digest)?;
     require_nonempty("scenario_manifest_digest", &scope.scenario_manifest_digest)?;
-    require_nonempty("robot_configuration_digest", &scope.robot_configuration_digest)?;
+    require_nonempty(
+        "robot_configuration_digest",
+        &scope.robot_configuration_digest,
+    )?;
     require_nonempty("evaluator_digest", &scope.evaluator_digest)?;
     require_nonempty("resource_budget_digest", &scope.resource_budget_digest)?;
     require_nonempty(
@@ -439,11 +446,17 @@ fn validate_arm_manifest(
 ) -> Result<(), ProbeAuditError> {
     require_nonempty("arm_id", &manifest.arm_id)?;
     require_nonempty("model_artifact_digest", &manifest.model_artifact_digest)?;
-    require_nonempty("architecture_audit_digest", &manifest.architecture_audit_digest)?;
+    require_nonempty(
+        "architecture_audit_digest",
+        &manifest.architecture_audit_digest,
+    )?;
     require_nonempty("policy_digest", &manifest.policy_digest)?;
     require_nonempty("harness_digest", &manifest.harness_digest)?;
     require_nonempty("training_split_digest", &manifest.training_split_digest)?;
-    require_nonempty("calibration_split_digest", &manifest.calibration_split_digest)?;
+    require_nonempty(
+        "calibration_split_digest",
+        &manifest.calibration_split_digest,
+    )?;
     require_nonempty("evaluation_split_digest", &manifest.evaluation_split_digest)?;
 
     for (field, observed, expected) in [
@@ -562,9 +575,7 @@ fn index_clusters<'a>(
                 cluster.cluster_id.clone(),
             ));
         }
-        cluster
-            .tally
-            .validate(arm_id, &cluster.cluster_id)?;
+        cluster.tally.validate(arm_id, &cluster.cluster_id)?;
         if indexed
             .insert(cluster.cluster_id.clone(), cluster)
             .is_some()
@@ -595,8 +606,7 @@ fn paired_cluster_gaps(
             != probe_cluster.paired_episode_manifest_digest
             || candidate_cluster.independence_receipt_digest
                 != probe_cluster.independence_receipt_digest
-            || candidate_cluster.independence_disposition
-                != probe_cluster.independence_disposition
+            || candidate_cluster.independence_disposition != probe_cluster.independence_disposition
         {
             return Err(ProbeAuditError::PairingMismatch(cluster_id.clone()));
         }
@@ -621,8 +631,7 @@ fn paired_cluster_gaps(
                 .clone(),
             candidate_safe_success_ppm: candidate_rate,
             probe_safe_success_ppm: probe_rate,
-            candidate_minus_probe_gap_ppm: i64::from(candidate_rate)
-                - i64::from(probe_rate),
+            candidate_minus_probe_gap_ppm: i64::from(candidate_rate) - i64::from(probe_rate),
             independence_disposition: candidate_cluster.independence_disposition,
             candidate_unknown: candidate_cluster.tally.unknown,
             probe_unknown: probe_cluster.tally.unknown,
@@ -683,10 +692,7 @@ fn summarize_probe(
             .get(&gap.cluster_id)
             .ok_or_else(|| ProbeAuditError::MissingCluster(gap.cluster_id.clone()))?;
 
-        total_add(
-            &mut total_episodes,
-            u64::from(candidate.tally.episodes),
-        )?;
+        total_add(&mut total_episodes, u64::from(candidate.tally.episodes))?;
         total_add(
             &mut candidate_successes,
             u64::from(candidate.tally.safe_successes),
@@ -726,11 +732,9 @@ fn summarize_probe(
 
     cluster_gaps.sort_by(|a, b| a.cluster_id.cmp(&b.cluster_id));
     let median = median_range(&qualified_gaps);
-    let enough_clusters = usize::from(qualified_count)
-        >= usize::from(scope.minimum_qualified_clusters);
-    let evidence_complete = complete
-        && enough_clusters
-        && usize::from(qualified_count) == expected;
+    let enough_clusters =
+        usize::from(qualified_count) >= usize::from(scope.minimum_qualified_clusters);
+    let evidence_complete = complete && enough_clusters && usize::from(qualified_count) == expected;
 
     let uses_privileged_inputs = probe
         .manifest
@@ -780,9 +784,7 @@ fn summarize_probe(
 /// The reported median is descriptive over independent-cluster paired gaps.
 /// This function intentionally does not calculate p-values, confidence
 /// intervals, statistical power, or benchmark-wide validity dispositions.
-pub fn audit_probe_controls(
-    input: &ProbeAuditInput,
-) -> Result<ProbeAuditReport, ProbeAuditError> {
+pub fn audit_probe_controls(input: &ProbeAuditInput) -> Result<ProbeAuditReport, ProbeAuditError> {
     validate_scope(&input.scope)?;
     validate_arm_manifest(&input.scope, &input.candidate_manifest, true)?;
     if input.probes.is_empty() {
@@ -946,11 +948,7 @@ mod tests {
             ),
             candidate_clusters: clusters(9, "candidate"),
             probes: vec![ProbeRun {
-                manifest: manifest(
-                    "probe",
-                    ModelFamily::SingleFeatureLookup,
-                    vec![family],
-                ),
+                manifest: manifest("probe", ModelFamily::SingleFeatureLookup, vec![family]),
                 clusters: clusters(probe_successes, "probe"),
             }],
         }
@@ -1089,10 +1087,7 @@ mod tests {
         audit.probes[0].clusters[0].independence_disposition = EvidenceDisposition::Unknown;
         audit.candidate_clusters[0].independence_disposition = EvidenceDisposition::Unknown;
         let report = audit_probe_controls(&audit).unwrap();
-        assert_eq!(
-            report.disposition,
-            ProbeAuditDisposition::Inconclusive
-        );
+        assert_eq!(report.disposition, ProbeAuditDisposition::Inconclusive);
         assert_eq!(report.probes[0].qualified_independent_cluster_count, 3);
     }
 
@@ -1154,8 +1149,7 @@ mod tests {
     #[test]
     fn duplicate_cluster_identity_is_rejected() {
         let mut audit = input(8, InputFamily::TaskMetadata);
-        audit.probes[0].clusters[1].cluster_id =
-            audit.probes[0].clusters[0].cluster_id.clone();
+        audit.probes[0].clusters[1].cluster_id = audit.probes[0].clusters[0].cluster_id.clone();
         assert!(matches!(
             audit_probe_controls(&audit),
             Err(ProbeAuditError::DuplicateOrEmptyClusterId(cluster))
@@ -1212,15 +1206,19 @@ mod tests {
                 family: InputFamily::ActionHistory
             }) if arm_id == "probe"
         ));
-        audit.candidate_manifest.input_families.push(InputFamily::ActionHistory);
+        audit
+            .candidate_manifest
+            .input_families
+            .push(InputFamily::ActionHistory);
         assert!(audit_probe_controls(&audit).is_ok());
     }
 
     #[test]
     fn one_cluster_receipt_cannot_be_reused_for_another_cluster() {
         let mut audit = input(8, InputFamily::TaskMetadata);
-        audit.candidate_clusters[1].paired_episode_manifest_digest =
-            audit.candidate_clusters[0].paired_episode_manifest_digest.clone();
+        audit.candidate_clusters[1].paired_episode_manifest_digest = audit.candidate_clusters[0]
+            .paired_episode_manifest_digest
+            .clone();
         assert!(matches!(
             audit_probe_controls(&audit),
             Err(ProbeAuditError::DuplicateClusterReceipt(cluster))
