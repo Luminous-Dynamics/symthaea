@@ -518,5 +518,26 @@
       "condition": "Promote any source register entry into a Luminous reproduction or measured observation.",
       "expected_disposition": "REJECT_CLAIM_CEILING_VIOLATION"
     }
+  ],
+  "derived_reference_checks": [
+    {
+      "check_id": "NH3-STOICHIOMETRIC-REACTION-ENTHALPY-001",
+      "reaction": "2 NH3 -> N2 + 3 H2",
+      "source_case_id": "NH3-CRACK-MW-ATM-2025",
+      "evidence_class": "DERIVED_ARITHMETIC_FROM_PUBLISHED_THERMOCHEMISTRY",
+      "inputs": {
+        "reaction_enthalpy_kJ_per_stoichiometric_reaction": 91.88,
+        "hydrogen_molar_mass_g_per_mol": 2.01588,
+        "hydrogen_moles_per_reaction": 3,
+        "reported_microwave_energy_kWh_per_kg_H2": 25
+      },
+      "derivation": {
+        "hydrogen_mass_per_reaction_kg": 0.00604764,
+        "minimum_reaction_enthalpy_kWh_per_kg_H2": 4.220195352604027,
+        "reported_energy_to_reaction_enthalpy_ratio": 5.923896386591206
+      },
+      "interpretation": "The standard-state reaction enthalpy is a thermodynamic lower-bound reference for the chemical reaction duty. The reported microwave energy is about 5.9 times this enthalpy. This ratio is not an efficiency: the reported process value has a source-specific meter boundary, and sensible heating, losses, plasma coupling, gas handling, separation and other loads are not reconciled here.",
+      "luminous_measurement": false
+    }
   ]
 }
