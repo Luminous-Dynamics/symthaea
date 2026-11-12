@@ -110,6 +110,13 @@
       "url": "https://ntrs.nasa.gov/citations/20240011011",
       "source_class": "government_design_reference",
       "published_year": 2024
+    },
+    {
+      "reference_id": "npj-lunar-energy-review-2026",
+      "source": "Lunar surface energy infrastructure: from in-situ resource utilization to deep space exploration, npj Space Exploration",
+      "url": "https://www.nature.com/articles/s44453-026-00053-w",
+      "source_class": "peer_reviewed_review",
+      "published_year": 2026
     }
   ],
   "metrics": [
@@ -424,6 +431,36 @@
       "reference_id": "nasa-lunar-laser-power-beaming-2024",
       "caveats": [
         "System design limit from the study; not measured hardware landed mass."
+      ]
+    },
+    {
+      "metric_id": "lunar-pvt-solar-utilization-review-value",
+      "metric": "overall_solar_energy_utilization_gain",
+      "unit": "percent",
+      "value": 50,
+      "boundary": "One PV/T configuration summarized by the 2026 lunar energy infrastructure review; review-reported, source-specific study metric",
+      "evidence_class": "peer_reviewed_review_report_of_primary_study",
+      "reference_id": "npj-lunar-energy-review-2026",
+      "caveats": [
+        "Approximate result from one cited configuration; not a universal PV/T gain or a lunar field demonstration.",
+        "Retrieve the primary study and reproduce its numerator, denominator, temperature grade, irradiance and useful-heat boundary before comparison."
+      ]
+    },
+    {
+      "metric_id": "lunar-regenerative-fuel-cell-specific-energy-review-range",
+      "metric": "regenerative_fuel_cell_specific_energy",
+      "unit": "Wh/kg",
+      "value": {
+        "low": 400,
+        "high": 1000
+      },
+      "boundary": "RFC technology range summarized by the 2026 lunar energy infrastructure review; system boundary requires primary-source verification",
+      "evidence_class": "peer_reviewed_review_report_of_secondary_technology_range",
+      "reference_id": "npj-lunar-energy-review-2026",
+      "caveats": [
+        "Not an independently verified complete lunar-installed-system value.",
+        "Confirm whether tanks, insulation, electrolyzer, fuel cell, fluid, thermal management, controls and service life are included.",
+        "The review notes unresolved durability and long-duration lunar operation."
       ]
     }
   ]
