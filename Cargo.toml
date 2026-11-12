@@ -15,6 +15,11 @@ members = [
 # members despite being listed below, because of this). `default-members`
 # below may still reference "." — only the `members` array triggers the bug.
 exclude = [
+    # The broad crates/core/* glob currently matches source-only directories
+    # without Cargo manifests. Exclude these exact paths until crate ownership
+    # is resolved; do not add placeholder manifests just to satisfy metadata.
+    "crates/core/symthaea",
+    "crates/core/symthaea-observation-attestation",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
