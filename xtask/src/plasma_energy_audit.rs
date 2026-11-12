@@ -922,6 +922,57 @@ mod tests {
         assert!(error.to_string().contains("undeclared evidence class"));
     }
 
+    fn minimal_dec_source_case(
+        particle_energy_origin: Option<&str>,
+        fusion_born_output_observed: Option<bool>,
+    ) -> Value {
+        let mut case = serde_json::json!({
+            "case_id": "dec-case-1",
+            "lane": "FUSION_DIRECT_ENERGY_CONVERSION",
+            "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+            "source": {"url": "https://example.org/dec"},
+            "comparison_status": "SOURCE_SPECIFIC_NOT_MATCHED",
+            "luminous_reproduction": false
+        });
+        if let Some(origin) = particle_energy_origin {
+            case["particle_energy_origin"] = Value::String(origin.to_owned());
+        }
+        if let Some(observed) = fusion_born_output_observed {
+            case["fusion_born_output_observed"] = Value::Bool(observed);
+        }
+        case
+    }
+
+    fn minimal_source_manifest_with_case(case: Value) -> Value {
+        serde_json::json!({
+            "programme": "TEST",
+            "claim_ceiling": "SOURCE_ONLY",
+            "evidence_classes": ["PUBLISHED_LAB_EXPERIMENT"],
+            "cases": [case],
+            "negative_controls": [{
+                "control_id": "nc-1",
+                "expected_disposition": "REJECTED"
+            }]
+        })
+    }
+
+    #[test]
+    fn dec_source_case_requires_explicit_particle_energy_origin() {
+        let source = minimal_source_manifest_with_case(minimal_dec_source_case(None, Some(false)));
+        let error = audit_source_value(&source, "dec-origin.json").unwrap_err();
+        assert!(error.to_string().contains("particle_energy_origin"));
+    }
+
+    #[test]
+    fn dec_source_case_cannot_silently_claim_fusion_born_output() {
+        let source = minimal_source_manifest_with_case(minimal_dec_source_case(
+            Some("EXTERNALLY_HEATED_DEUTERIUM_PLASMA"),
+            Some(true),
+        ));
+        let error = audit_source_value(&source, "dec-origin.json").unwrap_err();
+        assert!(error.to_string().contains("fusion_born_output_observed=false"));
+    }
+
     #[test]
     fn source_manifest_rejects_duplicate_case_and_control_ids() {
         let duplicate_case = serde_json::json!({
@@ -1065,6 +1116,28 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             .filter(|url| url.starts_with("https://") || url.starts_with("http://"))
             .with_context(|| format!("{display_name}: case {case_id} has no valid HTTP(S) source URL"))?;
         ensure!(!source_url.trim().is_empty(), "{display_name}: case {case_id} has empty source URL");
+
+        if case.get("lane").and_then(Value::as_str) == Some("FUSION_DIRECT_ENERGY_CONVERSION") {
+            let particle_origin = case
+                .get("particle_energy_origin")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .with_context(|| {
+                    format!("{display_name}: DEC case {case_id} has no explicit particle_energy_origin")
+                })?;
+            ensure!(
+                !particle_origin.trim().is_empty(),
+                "{display_name}: DEC case {case_id} has an empty particle_energy_origin"
+            );
+            ensure!(
+                case.get("fusion_born_output_observed").and_then(Value::as_bool) == Some(false),
+                "{display_name}: DEC case {case_id} must explicitly preserve fusion_born_output_observed=false until a source-matched fusion-born output is admitted"
+            );
+            ensure!(
+                case.get("comparison_status").and_then(Value::as_str).is_some(),
+                "{display_name}: DEC case {case_id} has no comparison_status"
+            );
+        }
     }
 
     let controls = root
