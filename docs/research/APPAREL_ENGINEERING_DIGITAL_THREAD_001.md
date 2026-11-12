@@ -545,3 +545,34 @@ The new source register revision is `2026-11-12-r4` with 21 sources. It explicit
 This interoperability work should preserve source-native formats and add typed, versioned sidecars for seam topology, piece-to-piece relationships, pattern-to-3D correspondence, machine profile, backend/compiler, program identity and actual execution evidence. Unsupported semantics must be reported as unsupported/lossy, never silently dropped.
 
 The key benchmark is not merely whether a file opens. It is whether the supported product semantics survive a deterministic round trip and whether the named machine profile accepts the resulting program without unsupported operations or hidden conversion.
+
+## 22. Human–AI fashion co-design and designer agency
+
+A dedicated workstream is now open: [FASHION-CO-DESIGN-001 #11753](https://github.com/Luminous-Dynamics/symthaea/issues/11753). This expands the programme from product engineering into the creative process itself, while preserving the distinction between aesthetic ideation, editable design geometry, manufacturing feasibility and physical product validation.
+
+Relevant 2026 comparators include:
+- [Human–AI co-design for sustainable fashion](https://doi.org/10.1177/24723444261488123), 23 September 2026: the study reports 4,200 design records, 350 expert-rated designs, 864 consumers and 426 production patterns. Its evaluation spans novelty, colour harmony, production complexity, waste/circularity potential and brand fit, and studies consumer response/willingness to pay. Reproduce its exact sampling, tasks, rating rubric and splits before comparing; production pattern records are not proof of physical manufacture.
+- [Sketch-to-parametric garment generation with dynamic fit evaluation](https://doi.org/10.1177/15589250261441600), 28 April 2026: reports 0.87 mm Chamfer distance, 91% detail matching, 45 ms for a 100k-vertex mesh and a designer task-time reduction from 390 to 55 minutes under its own evaluation. These are study-specific results. Local seam, notch, grain, pattern and assembly errors need their own metrics; mesh similarity alone is insufficient.
+- [EASE spatially varying garment fit and 3D-to-2D pattern extraction](https://doi.org/10.1016/j.cag.2026.104644): a comparator for local ease fields, anisotropic ease and local-global fitting/pattern extraction. Computational ease is not wearer comfort.
+- [Controllable fashion diffusion](https://doi.org/10.1002/cav.70155): pose/edge conditioning, designer-refined masks and controllable concept/prototype generation. It is an image-ideation comparator, not a pattern/production comparator.
+- [Multimodal sketch/text-to-pattern generation](https://doi.org/10.3389/frai.2026.1828627): landmark-guided pattern generation and sewing-detail representation with CLO3D digital validation. Digital validation does not establish physical fit or manufacturing acceptance.
+
+The benchmark should compare five workflows on identical design briefs, reference rights, time budgets and participant conditions:
+1. Expert designer without AI.
+2. Designer using conventional CAD/3D tools.
+3. Designer using image-only generative AI.
+4. Designer using parametric pattern/geometry generation.
+5. Designer using the full Luminous thread: concept reasoning, geometry, material/process feasibility and evidence/provenance.
+
+Score distinct outcome families rather than a single composite:
+- aesthetic/creative quality and brief adherence: blinded expert ratings, novelty, silhouette, colour/material harmony, brand/style fit and inter-rater reliability;
+- designer agency: editability, reversibility, ability to override, suggestion acceptance/rejection, perceived authorship, control over constraints and diversity of explored options;
+- engineering: valid patterns, grain/notch/seam semantics, local ease/fit, assembly feasibility, machine/material compatibility and manufacturability;
+- physical outcomes: pattern-to-article dimensional deviation, drape/fit under named conditions, seam quality and physical test evidence;
+- sustainability/circularity: measured material use, waste, route-specific sortability and repair/recovery feasibility;
+- workflow efficiency: time to viable concept, time to accepted production package, edit/rework count and physical sample iterations;
+- rights/provenance: source asset permissions, source inspiration records, AI assistance disclosure, similarity/near-duplicate review and full revision lineage.
+
+FID, CLIP similarity or a consumer preference score must not be used as a substitute for editable pattern validity or engineering qualification. Cultural and brand preferences are task-specific and should not be flattened into a universal aesthetic score.
+
+The new source register is revision `2026-11-12-r5` with 26 distinct sources. Its rights fields distinguish article access from permission to reuse datasets, generated assets, code or training material; no dataset is claimed ingested or licensed for redistribution.
