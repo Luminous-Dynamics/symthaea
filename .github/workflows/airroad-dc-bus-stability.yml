@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: airroad-dc-bus-stability-\${{ github.ref }}
+  group: airroad-dc-bus-stability-${{ github.ref }}
   cancel-in-progress: true
 
 env:
