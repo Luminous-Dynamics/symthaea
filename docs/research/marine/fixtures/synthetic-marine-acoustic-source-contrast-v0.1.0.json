@@ -1,0 +1,160 @@
+{
+  "schema_version": "0.1.0",
+  "case_id": "synthetic-source-contrast-0001",
+  "evidence_kind": "synthetic",
+  "source": {
+    "dataset_id": "synthetic-source-contrast",
+    "citation": "Synthetic known-answer fixture only; not measured data",
+    "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rights_status": "public_or_permitted",
+    "independently_reviewed": false
+  },
+  "target_source": "propeller_cavitation",
+  "predeclared_intervention": true,
+  "design_strategy": "randomized",
+  "intervention_protocol_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "unobserved_sources": [],
+  "band_frequency_tolerance_fraction": 0.01,
+  "baseline": {
+    "run_id": "baseline-1",
+    "hydrophone_instrument_id": "synthetic-hydrophone-H1",
+    "calibration_certificate_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "timebase_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "acoustic_trace_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "source_states": [
+      {
+        "source": "propeller_cavitation",
+        "state": "non_cavitating",
+        "observable_kind": "cavitation_video",
+        "observable_id": "cavitation-baseline",
+        "evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+      },
+      {
+        "source": "propeller_hydrodynamic",
+        "state": "matched",
+        "observable_kind": "wake_probe",
+        "observable_id": "wake-station",
+        "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      {
+        "source": "prime_mover",
+        "state": "running",
+        "observable_kind": "engine_state_bus",
+        "observable_id": "engine-controller",
+        "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      {
+        "source": "shaft_gearbox",
+        "state": "matched",
+        "observable_kind": "shaft_torsion_meter",
+        "observable_id": "shaft-meter",
+        "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      {
+        "source": "auxiliary_machinery",
+        "state": "matched",
+        "observable_kind": "auxiliary_state_bus",
+        "observable_id": "aux-bus",
+        "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      {
+        "source": "hull_appendage_flow",
+        "state": "matched",
+        "observable_kind": "flow_observation",
+        "observable_id": "flow-camera",
+        "evidence_sha256": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+      },
+      {
+        "source": "ambient_background",
+        "state": "matched",
+        "observable_kind": "ambient_hydrophone",
+        "observable_id": "ambient-reference",
+        "evidence_sha256": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh"
+      }
+    ],
+    "bands": [
+      {
+        "band_id": "one-third-octave-100Hz",
+        "quantity_id": "received_spl_db_re_1upa",
+        "center_frequency_hz": 100,
+        "received_level_db": 120,
+        "expanded_uncertainty_db": 0.5,
+        "confidence_level": 0.95
+      }
+    ]
+  },
+  "candidate": {
+    "run_id": "candidate-1",
+    "hydrophone_instrument_id": "synthetic-hydrophone-H1",
+    "calibration_certificate_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "timebase_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "acoustic_trace_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "source_states": [
+      {
+        "source": "propeller_cavitation",
+        "state": "cavitating",
+        "observable_kind": "cavitation_video",
+        "observable_id": "cavitation-baseline",
+        "evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+      },
+      {
+        "source": "propeller_hydrodynamic",
+        "state": "matched",
+        "observable_kind": "wake_probe",
+        "observable_id": "wake-station",
+        "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      {
+        "source": "prime_mover",
+        "state": "running",
+        "observable_kind": "engine_state_bus",
+        "observable_id": "engine-controller",
+        "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      {
+        "source": "shaft_gearbox",
+        "state": "matched",
+        "observable_kind": "shaft_torsion_meter",
+        "observable_id": "shaft-meter",
+        "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      },
+      {
+        "source": "auxiliary_machinery",
+        "state": "matched",
+        "observable_kind": "auxiliary_state_bus",
+        "observable_id": "aux-bus",
+        "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      },
+      {
+        "source": "hull_appendage_flow",
+        "state": "matched",
+        "observable_kind": "flow_observation",
+        "observable_id": "flow-camera",
+        "evidence_sha256": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+      },
+      {
+        "source": "ambient_background",
+        "state": "matched",
+        "observable_kind": "ambient_hydrophone",
+        "observable_id": "ambient-reference",
+        "evidence_sha256": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh"
+      }
+    ],
+    "bands": [
+      {
+        "band_id": "one-third-octave-100Hz",
+        "quantity_id": "received_spl_db_re_1upa",
+        "center_frequency_hz": 100,
+        "received_level_db": 117,
+        "expanded_uncertainty_db": 0.5,
+        "confidence_level": 0.95
+      }
+    ]
+  }
+}
