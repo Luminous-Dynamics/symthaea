@@ -1503,6 +1503,21 @@ mod tests {
             .unwrap()
             .iter()
             .any(|value| value == "cavitation_pattern_comparability"));
+        assert!(schema["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value == "validation_split"));
+        assert!(schema["$defs"]["validationSplit"]["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value == "split_manifest_sha256"));
+        assert!(schema["$defs"]["benchmarkGroup"]["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value == "vessel_id"));
     }
 
     #[test]
