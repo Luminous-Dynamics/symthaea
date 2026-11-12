@@ -68,7 +68,8 @@
       "requires_render_revalidation": true,
       "base_matches": true,
       "commit_state": "Prepared",
-      "revalidation_available": false
+      "revalidation_available": false,
+      "idempotency_replay_verified": false
     },
     {
       "id": "M02",
@@ -122,7 +123,8 @@
       "requires_render_revalidation": true,
       "base_matches": true,
       "commit_state": "Prepared",
-      "revalidation_available": false
+      "revalidation_available": false,
+      "idempotency_replay_verified": false
     },
     {
       "id": "M03",
@@ -178,7 +180,8 @@
       "requires_render_revalidation": true,
       "base_matches": true,
       "commit_state": "Prepared",
-      "revalidation_available": false
+      "revalidation_available": false,
+      "idempotency_replay_verified": false
     },
     {
       "id": "M04",
@@ -234,7 +237,8 @@
       "requires_render_revalidation": true,
       "base_matches": true,
       "commit_state": "Prepared",
-      "revalidation_available": false
+      "revalidation_available": false,
+      "idempotency_replay_verified": false
     },
     {
       "id": "M05",
@@ -295,7 +299,8 @@
       "requires_render_revalidation": true,
       "base_matches": true,
       "commit_state": "Prepared",
-      "revalidation_available": false
+      "revalidation_available": false,
+      "idempotency_replay_verified": false
     },
     {
       "id": "M06",
@@ -355,7 +360,8 @@
       "requires_render_revalidation": true,
       "base_matches": true,
       "commit_state": "Prepared",
-      "revalidation_available": false
+      "revalidation_available": false,
+      "idempotency_replay_verified": false
     },
     {
       "id": "M07",
@@ -413,7 +419,8 @@
       "requires_render_revalidation": true,
       "base_matches": true,
       "commit_state": "Prepared",
-      "revalidation_available": true
+      "revalidation_available": true,
+      "idempotency_replay_verified": false
     },
     {
       "id": "M08",
@@ -467,7 +474,8 @@
       "requires_render_revalidation": false,
       "base_matches": true,
       "commit_state": "Prepared",
-      "revalidation_available": false
+      "revalidation_available": false,
+      "idempotency_replay_verified": false
     },
     {
       "id": "M09",
@@ -521,7 +529,8 @@
       "requires_render_revalidation": false,
       "base_matches": false,
       "commit_state": "Prepared",
-      "revalidation_available": false
+      "revalidation_available": false,
+      "idempotency_replay_verified": false
     },
     {
       "id": "M10",
@@ -575,7 +584,8 @@
       "requires_render_revalidation": true,
       "base_matches": true,
       "commit_state": "AlreadyCommittedSameKey",
-      "revalidation_available": false
+      "revalidation_available": false,
+      "idempotency_replay_verified": true
     },
     {
       "id": "M11",
@@ -635,7 +645,8 @@
       "requires_render_revalidation": true,
       "base_matches": true,
       "commit_state": "Prepared",
-      "revalidation_available": false
+      "revalidation_available": false,
+      "idempotency_replay_verified": false
     },
     {
       "id": "M12",
@@ -689,7 +700,8 @@
       "requires_render_revalidation": true,
       "base_matches": true,
       "commit_state": "Prepared",
-      "revalidation_available": false
+      "revalidation_available": false,
+      "idempotency_replay_verified": false
     },
     {
       "id": "M13",
@@ -743,7 +755,8 @@
       "requires_render_revalidation": false,
       "base_matches": true,
       "commit_state": "AcknowledgementLost",
-      "revalidation_available": false
+      "revalidation_available": false,
+      "idempotency_replay_verified": false
     },
     {
       "id": "M14",
@@ -797,7 +810,8 @@
       "requires_render_revalidation": false,
       "base_matches": true,
       "commit_state": "Prepared",
-      "revalidation_available": false
+      "revalidation_available": false,
+      "idempotency_replay_verified": false
     },
     {
       "id": "M15",
@@ -853,7 +867,8 @@
       "requires_render_revalidation": true,
       "base_matches": true,
       "commit_state": "Prepared",
-      "revalidation_available": false
+      "revalidation_available": false,
+      "idempotency_replay_verified": false
     }
   ]
 }
