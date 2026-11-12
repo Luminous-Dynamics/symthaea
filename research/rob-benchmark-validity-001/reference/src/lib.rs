@@ -423,7 +423,10 @@ pub fn compare_paired_clusters(
             "resource_budget_digest",
             scope.resource_budget_digest.as_str(),
         ),
-        ("split_manifest_digest", scope.split_manifest_digest.as_str()),
+        (
+            "split_manifest_digest",
+            scope.split_manifest_digest.as_str(),
+        ),
         ("baseline_arm_id", comparison.baseline_arm.arm_id.as_str()),
         (
             "baseline_model_digest",
