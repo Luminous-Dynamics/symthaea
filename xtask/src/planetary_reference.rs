@@ -474,7 +474,7 @@ mod tests {
         )
         .expect("reference ledgers parse");
         assert_eq!(report.status, "PASS");
-        assert_eq!(report.source_record_count, 14);
+        assert_eq!(report.source_record_count, 19);
         assert!(report.competitive_reference_count >= 10);
         assert!(report.competitive_metric_count >= 10);
         assert!(report.findings.is_empty());
