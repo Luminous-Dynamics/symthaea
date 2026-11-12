@@ -437,7 +437,7 @@
     {
       "id": "QI-4",
       "name": "Hayden-Preskill decoupling and reference recovery",
-      "status": "QI-4A direct decoupling + QI-4P Petz recovery source and tests pass exact-head Rust 1.96 focused CI at c86955874e7c1b3324f153905770dff509a221b2",
+      "status": "QI-4A direct decoupling + QI-4P Petz recovery + QI-4O theorem-backed Petz optimality diagnostic source authored; exact-head execution pending",
       "model": "Reference Q is initially maximally entangled with injected message M; black-hole register B is initially entangled with explicit early radiation R; a declared scrambler acts on M tensor B; emitted factors E are made accessible while remaining B' is inaccessible to the decoder.",
       "observables": [
         "mutual_information_Q_Bprime",
@@ -457,7 +457,12 @@
         "Petz_recovery_entanglement_fidelity",
         "Petz_channel_trace_preservation_residual",
         "Petz_inverse_square_root_residual",
-        "Petz_recovery_ensemble_mean_standard_error_minimum_and_maximum_fidelity"
+        "Petz_recovery_ensemble_mean_standard_error_minimum_and_maximum_fidelity",
+        "Petz_optimality_QEC_matrix_hermiticity_and_trace",
+        "Petz_optimality_commutator_Frobenius_norm",
+        "Petz_auxiliary_T_hermiticity",
+        "Petz_optimality_classification_by_theorem_criterion",
+        "Petz_optimality_ensemble_mean_and_standard_error"
       ],
       "decoder_baselines": [
         "exact_small_dimension_optimal_recovery_via_SDP_or_channel_optimization",
@@ -497,16 +502,21 @@
         "petz_identity_control": "U=I_4 must return entanglement fidelity 1 within 1e-10",
         "petz_random_scrambler": "For each preregistered Haar U(4), report F_e in [0,1], inverse-square-root residual <1e-8, and trace-preservation residual <1e-8",
         "petz_baseline": "Input-independent replacement decoder I/2 has qubit entanglement fidelity 1/4",
-        "petz_no_efficiency_claim": "A two-Kraus channel representation is not a physical circuit decomposition; do not claim decoder gate complexity or hardware efficiency."
+        "petz_no_efficiency_claim": "A two-Kraus channel representation is not a physical circuit decomposition; do not claim decoder gate complexity or hardware efficiency.",
+        "petz_optimality_theorem": "For rho=sigma=I/2, evaluate [M_sigma, gamma tensor T]=0 with M_sigma[(i,k),(j,l)]=<i|sqrt(sigma)K_k^dagger K_l sqrt(sigma)|j>, gamma=sigma^(-1/2)rho, T=Tr_L[(gamma^dagger tensor I)sqrt(M_sigma)]. Petz is classified optimal only when the commutator residual is below a predeclared threshold.",
+        "petz_optimality_source": "Li et al., Phys. Rev. Lett. 134, 200602 (2025), DOI 10.1103/PhysRevLett.134.200602. The commutator criterion is the commuting-rho/sigma specialization; the general theorem uses sqrt(M_sigma)(gamma tensor T) >= 0.",
+        "petz_optimality_no_generalization": "This four-qubit channel uses rho=sigma=I/2. No result is claimed for noncommuting/non-maximally-mixed states or larger logical/environment dimensions."
       },
-      "implementation_status": "QI-4A direct trace-distance/Pinsker decoupling and QI-4P one-step Petz recovery source/ensemble; five dedicated Petz tests pass in the exact-head focused Rust run (132 crate tests total). Exact SDP optimum, rotated-Petz, charge-sector-aware recovery, and circuit synthesis remain future work.",
+      "implementation_status": "QI-4A direct trace-distance/Pinsker decoupling; QI-4P Petz recovery channel with five exact-head green tests at 132 crate tests; QI-4O implements the 2025 PRL commuting-state commutator optimality criterion for rho=sigma=I/2. Five new QI-4O tests authored; exact-head runner pending. Physical circuit synthesis and general/noncommuting-state optimal recovery remain future work.",
       "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
       "fixtures": [
         "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
-        "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_petz_recovery_u4_v1.json"
+        "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_petz_recovery_u4_v1.json",
+        "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_petz_optimality_u4_v1.json"
       ],
       "references": [
-        "https://arxiv.org/abs/2610.31501"
+        "https://arxiv.org/abs/2610.31501",
+        "https://doi.org/10.1103/PhysRevLett.134.200602"
       ]
     },
     {
@@ -864,7 +874,9 @@
       "QI_4P_Petz_recovery_ensemble_statistics": "Rust 1.96 exact-head validated; independent-seed ensemble and uncertainty tests passed",
       "QI_4P_identity_channel_analytic_control": "Rust 1.96 exact-head validated; identity channel entanglement fidelity 1 regression passed",
       "QI_3_sequential_smaller_complementary_reduction": "source_authored_not_executed; only the smaller subsystem is materialized for each pure-state cut; complementary entropy and purity are reported via Schmidt-spectrum equality",
-      "QI_2S_unequal_block_analytic_control": "source_authored_not_executed; N=4 K=1 A=1 and A=3 return 11/24 nats"
+      "QI_2S_unequal_block_analytic_control": "source_authored_not_executed; N=4 K=1 A=1 and A=3 return 11/24 nats",
+      "QI_4O_Petz_optimality_commutator_criterion": "source_authored_5_tests_added_runner_pending",
+      "QI_4O_QEC_matrix_and_auxiliary_T": "source_authored_independent_numpy_crosscheck_runner_pending"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
@@ -874,7 +886,11 @@
       "mps_entropy_from_validated_schmidt_spectrum": "not_qualified",
       "island_or_qes_calculation": "not_implemented",
       "energy_conserving_circuits": "U(1)-conserving equal-gap qubit gate family and sequential factor-transfer toy model authored; Rust execution pending",
-      "QI_3H_thermodynamic_limit_scaling": "no cross-N finite-size scaling or thermodynamic-limit coefficient qualification yet"
+      "QI_3H_thermodynamic_limit_scaling": "no cross-N finite-size scaling or thermodynamic-limit coefficient qualification yet",
+      "QI_4O_general_noncommuting_Petz_optimality": "not implemented; current theorem criterion uses rho=sigma=I/2 and commuting-state corollary only",
+      "exact_optimal_recovery_SDP": "not implemented; use the theorem criterion for cases it covers, and a separately qualified SDP/certified bound where it does not",
+      "rotated_Petz_ensemble": "not implemented",
+      "gate_level_quantum_decoder_cost": "not implemented"
     },
     "resource_limits": {
       "dense_state_qubits_max": 20,
@@ -897,9 +913,10 @@
       "last_green_focused_job": "43232825852",
       "last_green_frontier_physics_tests": "127 passed; 0 failed at the prior exact head; does not cover the five new Petz tests",
       "latest_focused_run": "43259393357",
-      "latest_focused_job": "131326291486"
+      "latest_focused_job": "131326291486",
+      "pending_QI_4O_tests": 5
     },
-    "claim_ceiling": "The one-step Petz recovery map is a mathematically explicit finite-dimensional channel A=E tensor R -> Mhat. Its construction assumes the exact scrambler is known. No physical gate-level decoder compilation, efficient decoding claim, macroscopic black-hole recovery, or QES/island result is established."
+    "claim_ceiling": "The one-step Petz recovery map is a mathematically explicit finite-dimensional channel A=E tensor R -> Mhat. A theorem-backed commutator test now evaluates whether it is entanglement-fidelity optimal for the maximally-mixed toy channel. Neither result establishes an efficient quantum circuit, larger-scale black-hole recovery, fault tolerance, or QES/island physics."
   },
   "benchmark_policy": {
     "claim_boundary": "Petz recovery fidelity, Haar/Page equilibrium, finite-depth scrambling, U(1) transport and gravitational QES/island calculations are distinct model classes. A successful recovery toy model is not an evaporation result."
