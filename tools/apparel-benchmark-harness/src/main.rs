@@ -151,6 +151,55 @@ fn validate_semantics(instance: &Value) -> Result<(), Vec<String>> {
     let claims = array(instance, "claims");
     let _claim_ids = unique_ids(claims, "claim_id", "claims", &mut errors);
 
+    let design_revision = instance.pointer("/design/revision").and_then(Value::as_str);
+    let pattern_revision = get_str(pattern, "revision");
+    if design_revision.is_some() && pattern_revision != design_revision {
+        errors.push("pattern revision must equal the current design revision".into());
+    }
+
+    for (index, material) in materials.iter().enumerate() {
+        let properties = array(material, "properties");
+        let composition_is_measured =
+            get_str(material, "composition_state") == Some("measured");
+        let measured_composition_has_evidence = properties.iter().any(|property| {
+            get_str(property, "property_id") == Some("composition")
+                && get_str(property, "status") == Some("measured")
+                && property.get("value").is_some_and(|value| !value.is_null())
+                && get_str(property, "unit").is_some_and(|value| !value.trim().is_empty())
+                && get_str(property, "evidence_ref")
+                    .is_some_and(|value| !value.trim().is_empty())
+        });
+        if composition_is_measured && !measured_composition_has_evidence {
+            errors.push(format!(
+                "materials[{index}]: measured composition requires a measured composition property with value, unit and evidence_ref"
+            ));
+        }
+        for (property_index, property) in properties.iter().enumerate() {
+            if get_str(property, "status") == Some("measured") {
+                if property.get("value").is_none_or(Value::is_null)
+                    || get_str(property, "unit").is_none_or(|value| value.trim().is_empty())
+                    || get_str(property, "evidence_ref")
+                        .is_none_or(|value| value.trim().is_empty())
+                {
+                    errors.push(format!(
+                        "materials[{index}].properties[{property_index}]: measured property requires value, unit and evidence_ref"
+                    ));
+                }
+            }
+        }
+    }
+
+    let mut operation_sequences = BTreeSet::new();
+    for (index, operation) in operations.iter().enumerate() {
+        if let Some(sequence) = operation.get("sequence").and_then(Value::as_i64)
+            && !operation_sequences.insert(sequence)
+        {
+            errors.push(format!(
+                "operations[{index}]: duplicate operation sequence {sequence}"
+            ));
+        }
+    }
+
     for (index, item) in array(instance, "bom").iter().enumerate() {
         let material_id = get_str(item, "material_id").unwrap_or_default();
         if !material_ids.contains(material_id) {
@@ -167,7 +216,6 @@ fn validate_semantics(instance: &Value) -> Result<(), Vec<String>> {
         }
     }
 
-    let design_revision = instance.pointer("/design/revision").and_then(Value::as_str);
     for (index, projection) in projections.iter().enumerate() {
         let projection_revision = get_str(projection, "source_revision");
         let status = get_str(projection, "status");
@@ -198,6 +246,22 @@ fn validate_semantics(instance: &Value) -> Result<(), Vec<String>> {
 
     let mut known_evidence = projection_ids;
     known_evidence.extend(test_ids);
+    for material in materials {
+        for property in array(material, "properties") {
+            if let Some(reference) = get_str(property, "evidence_ref")
+                && !reference.trim().is_empty()
+            {
+                known_evidence.insert(reference.to_owned());
+            }
+        }
+    }
+    for test in physical_tests {
+        if let Some(reference) = get_str(test, "evidence_ref")
+            && !reference.trim().is_empty()
+        {
+            known_evidence.insert(reference.to_owned());
+        }
+    }
     for operation in operations {
         if let Some(reference) = get_str(operation, "actual_event_ref")
             && !reference.trim().is_empty()
@@ -231,7 +295,8 @@ fn validate_semantics(instance: &Value) -> Result<(), Vec<String>> {
                     return false;
                 };
                 physical_tests.iter().any(|test| {
-                    get_str(test, "test_id") == Some(reference)
+                    (get_str(test, "test_id") == Some(reference)
+                        || get_str(test, "evidence_ref") == Some(reference))
                         && get_str(test, "status") == Some("measured")
                         && get_str(test, "evidence_ref")
                             .is_some_and(|value| !value.trim().is_empty())
@@ -657,6 +722,95 @@ mod tests {
                 .iter()
                 .any(|error| error.contains("synthetic fixture"))
         );
+    }
+
+
+    #[test]
+    fn semantic_validator_rejects_duplicate_pattern_piece_ids() {
+        let (_, mut instance, _, _) = example_inputs();
+        instance["pattern"]["pieces"][1]["piece_id"] = json!("FRONT-L");
+        let errors = validate_semantics(&instance).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("duplicate piece_id")));
+    }
+
+    #[test]
+    fn semantic_validator_rejects_duplicate_operation_sequences() {
+        let (_, mut instance, _, _) = example_inputs();
+        instance["operations"][1]["sequence"] = json!(10);
+        let errors = validate_semantics(&instance).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("duplicate operation sequence")));
+    }
+
+    #[test]
+    fn semantic_validator_rejects_design_pattern_revision_mismatch() {
+        let (_, mut instance, _, _) = example_inputs();
+        instance["pattern"]["revision"] = json!("B");
+        let errors = validate_semantics(&instance).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("pattern revision")));
+    }
+
+    #[test]
+    fn semantic_validator_rejects_measured_material_property_without_evidence() {
+        let (_, mut instance, _, _) = example_inputs();
+        instance["materials"][0]["properties"][0]["status"] = json!("measured");
+        instance["materials"][0]["properties"][0]["value"] = json!(180.0);
+        instance["materials"][0]["properties"][0]["unit"] = json!("g/m2");
+        let errors = validate_semantics(&instance).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("measured property requires")));
+    }
+
+    #[test]
+    fn semantic_validator_rejects_measured_composition_without_composition_evidence() {
+        let (_, mut instance, _, _) = example_inputs();
+        instance["materials"][0]["composition_state"] = json!("measured");
+        let errors = validate_semantics(&instance).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("measured composition requires")));
+    }
+
+    #[test]
+    fn semantic_validator_rejects_unresolved_claim_evidence() {
+        let (_, mut instance, _, _) = example_inputs();
+        instance["claims"][0]["evidence_refs"] = json!(["DOES-NOT-EXIST"]);
+        let errors = validate_semantics(&instance).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("unresolved evidence reference")));
+    }
+
+    #[test]
+    fn semantic_validator_rejects_bound_material_lot_without_quantity() {
+        let (_, mut instance, _, _) = example_inputs();
+        instance["bom"][0]["lot_binding"] = json!("bound");
+        let errors = validate_semantics(&instance).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("bound lot requires")));
+    }
+
+    #[test]
+    fn semantic_validator_accepts_physical_claim_bound_to_measured_test() {
+        let (_, mut instance, _, _) = example_inputs();
+        instance["physical_tests"][0]["status"] = json!("measured");
+        instance["physical_tests"][0]["result"] = json!(24.0);
+        instance["physical_tests"][0]["evidence_ref"] = json!("EVIDENCE-TEST-001");
+        instance["claims"][1]["evidence_refs"] = json!(["EVIDENCE-TEST-001"]);
+        instance["claims"][1]["disposition"] = json!("supported_within_scope");
+        assert!(validate_semantics(&instance).is_ok());
+    }
+
+    #[test]
+    fn semantic_validator_rejects_physical_claim_bound_only_to_model_projection() {
+        let (_, mut instance, _, _) = example_inputs();
+        instance["claims"][1]["evidence_refs"] = json!(["PROJ-DRAPE-001"]);
+        instance["claims"][1]["disposition"] = json!("supported_within_scope");
+        let errors = validate_semantics(&instance).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("physical_test claim")));
+    }
+
+    #[test]
+    fn semantic_validator_rejects_production_scope_inflation() {
+        let (_, mut instance, _, _) = example_inputs();
+        instance["claims"][0]["statement"] =
+            json!("This process is qualified for all sizes and production batches.");
+        instance["claims"][0]["disposition"] = json!("supported_within_scope");
+        let errors = validate_semantics(&instance).unwrap_err();
+        assert!(errors.iter().any(|error| error.contains("production-wide capability")));
     }
 
     #[test]
