@@ -554,3 +554,26 @@ The new source cases are in the machine-readable register as:
 - PLASMA-SCALEUP-ROADMAP-2026;
 - PLASMA-MW-MGO-REFRACTORY-PILOT-2025;
 - PLASMA-MW-CERAMIC-FIRING-2026.
+
+
+## 9.12 Grid-to-outcome thermal metrology contract
+
+The matched measurement work is now tracked as [PLASMA-THERMAL-METROLOGY-001 #11758](https://github.com/Luminous-Dynamics/symthaea/issues/11758). Its machine-readable contract is:
+
+`data/research/plasma_thermal_metrology_contract_v0_1.json`
+
+It separates two service modes that must not be conflated:
+- `THERMAL_STORE_CHARGE_HOLD_DISCHARGE`: electricity → stored heat → hold → useful delivered heat;
+- `THERMAL_MATERIAL_PROCESSING`: electricity/process-gas/plasma → material treatment → conforming product.
+
+The contract defines six measurement layers: grid-side input, power conversion/coupling, process gas/plasma coupling, material/store control volume, useful heat delivery, and product quality/throughput. Each layer binds meter/instrument identity, calibration, uncertainty, clock/time basis, raw artifact digest and applicable boundary.
+
+The source crosswalk deliberately marks current literature gaps:
+- 2025 MgO pilot furnace: material-quality outcomes are reported, but grid-side input, process-gas enthalpy and complete auxiliaries remain unknown until full-paper/source-data extraction.
+- 2026 silicate-ceramic MWP study: material outcomes and 6 kW burner specification are reported, but full grid-to-outcome energy boundary is not established.
+- 2026 refractory RTES: numerical/modelled energy boundary, not physical metrology.
+- Sandia particle-store webpage: facility capability, not a performance dataset.
+
+Ten frozen negative controls block nameplate-as-meter, absent auxiliary-as-zero, setpoint-as-sample-temperature, dried/pre-fired pooling, material-quality-as-efficiency, and other boundary errors. The JSON round-trip and identity checks passed at authoring time; this is contract validation, not instrument validation or physical experiment.
+
+This adds a practical next-step question to the science programme: what additional calibrated measurements would make a source case comparable, and which missing measurement changes the design decision? It does not authorize a high-temperature or plasma experiment.
