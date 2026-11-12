@@ -164,6 +164,16 @@ pub struct MidiTranscriptionMeterMetadataSummaryV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MidiTranscriptionMeasurePhaseSummaryV1 {
+    pub bar_length_quarters: f64,
+    pub matched_note_count: u32,
+    /// Circular note-onset difference within a bar, expressed in quarter notes.
+    pub absolute_error_quarters: MidiTranscriptionValueErrorSummaryV1,
+    /// Fraction of matched events within one 32nd-note (1/8 quarter) phase.
+    pub within_one_thirtysecond_fraction: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MidiTranscriptionEvaluationReportV1 {
     pub schema: String,
     pub algorithm: String,
@@ -181,6 +191,8 @@ pub struct MidiTranscriptionEvaluationReportV1 {
     pub prediction_tempo_point_count: u32,
     /// Exact metadata comparison, not a barline or rhythm-accuracy claim.
     pub meter_metadata: MidiTranscriptionMeterMetadataSummaryV1,
+    /// Measure-relative position diagnostic; absent without a matching explicit meter.
+    pub measure_phase: Option<MidiTranscriptionMeasurePhaseSummaryV1>,
     pub prediction_overlapping_same_pitch_note_on_count: u32,
     /// mir_eval-style onset-only metric; deliberately ignores pitch.
     pub onset_only_metrics: MidiTranscriptionMetricV1,
@@ -257,6 +269,7 @@ pub struct MidiTimeSignaturePointV1 {
 #[derive(Debug, Clone)]
 struct EvaluationNoteV1 {
     pitch_midi: u8,
+    onset_tick: u64,
     part_id: u16,
     gm_program: u8,
     velocity_midi: u8,
@@ -280,6 +293,7 @@ struct ReportCommitmentV1<'a> {
     prediction_orphan_note_off_count: u32,
     prediction_tempo_point_count: u32,
     meter_metadata: &'a MidiTranscriptionMeterMetadataSummaryV1,
+    measure_phase: &'a Option<MidiTranscriptionMeasurePhaseSummaryV1>,
     prediction_overlapping_same_pitch_note_on_count: u32,
     onset_only_metrics: &'a MidiTranscriptionMetricV1,
     offset_only_metrics: &'a MidiTranscriptionMetricV1,
@@ -1004,6 +1018,7 @@ fn reference_notes(
         }
         notes.push(EvaluationNoteV1 {
             pitch_midi: note.pitch_midi,
+            onset_tick: note.start_tick,
             part_id: note.part_id,
             gm_program: program,
             velocity_midi: note.velocity_midi,
@@ -1655,6 +1670,78 @@ fn part_separation_summary_v1(
     })
 }
 
+fn measure_phase_fraction_v1(
+    onset_tick: u64,
+    ticks_per_quarter: u16,
+    numerator: u8,
+    denominator: u16,
+) -> Option<f64> {
+    if ticks_per_quarter == 0 || numerator == 0 || denominator == 0 {
+        return None;
+    }
+    // Fractional position within a measure, computed with integer arithmetic
+    // before conversion to f64 so large MIDI tick values do not lose modulo
+    // precision. A measure contains numerator * 4 / denominator quarters.
+    let measure_tick_numerator = u128::from(ticks_per_quarter)
+        .checked_mul(u128::from(numerator))?
+        .checked_mul(4)?;
+    let scaled_tick = u128::from(onset_tick).checked_mul(u128::from(denominator))?;
+    let phase_numerator = scaled_tick % measure_tick_numerator;
+    Some(phase_numerator as f64 / measure_tick_numerator as f64)
+}
+
+fn measure_phase_summary_v1(
+    reference: &[EvaluationNoteV1],
+    predicted: &[MidiTranscribedNoteV1],
+    matching: &[(usize, usize)],
+    reference_ticks_per_quarter: u16,
+    prediction_ticks_per_quarter: u16,
+    numerator: u8,
+    denominator: u16,
+) -> Option<MidiTranscriptionMeasurePhaseSummaryV1> {
+    if matching.is_empty()
+        || reference_ticks_per_quarter == 0
+        || prediction_ticks_per_quarter == 0
+        || numerator == 0
+        || denominator == 0
+    {
+        return None;
+    }
+    let bar_length_quarters = f64::from(numerator) * 4.0 / f64::from(denominator);
+    let mut errors = Vec::with_capacity(matching.len());
+    for (reference_index, prediction_index) in matching {
+        let reference_note = reference.get(*reference_index)?;
+        let prediction_note = predicted.get(*prediction_index)?;
+        let reference_phase = measure_phase_fraction_v1(
+            reference_note.onset_tick,
+            reference_ticks_per_quarter,
+            numerator,
+            denominator,
+        )?;
+        let prediction_phase = measure_phase_fraction_v1(
+            prediction_note.onset_tick,
+            prediction_ticks_per_quarter,
+            numerator,
+            denominator,
+        )?;
+        let direct = (reference_phase - prediction_phase).abs();
+        let circular = direct.min(1.0 - direct);
+        errors.push(circular * bar_length_quarters);
+    }
+    let within_one_thirtysecond = errors
+        .iter()
+        .filter(|error| **error <= 0.125)
+        .count();
+    Some(MidiTranscriptionMeasurePhaseSummaryV1 {
+        bar_length_quarters,
+        matched_note_count: u32::try_from(errors.len()).unwrap_or(u32::MAX),
+        absolute_error_quarters: value_error_summary(&errors),
+        within_one_thirtysecond_fraction: Some(
+            within_one_thirtysecond as f64 / errors.len() as f64,
+        ),
+    })
+}
+
 fn meter_metadata_summary_v1(
     reference: &MidiPerformanceArtifactV1,
     parsed: &ParsedMidiTranscriptionV1,
@@ -1768,6 +1855,7 @@ pub fn midi_transcription_evaluation_commitment_v1(
         prediction_orphan_note_off_count: report.prediction_orphan_note_off_count,
         prediction_tempo_point_count: report.prediction_tempo_point_count,
         meter_metadata: &report.meter_metadata,
+        measure_phase: &report.measure_phase,
         prediction_overlapping_same_pitch_note_on_count:
             report.prediction_overlapping_same_pitch_note_on_count,
         onset_only_metrics: &report.onset_only_metrics,
@@ -1818,6 +1906,7 @@ pub fn evaluate_midi_transcription_v1(
         .iter()
         .map(|note| EvaluationNoteV1 {
             pitch_midi: note.pitch_midi,
+            onset_tick: note.onset_tick,
             part_id: 0,
             gm_program: note.gm_program,
             velocity_midi: note.velocity_midi,
@@ -1854,6 +1943,34 @@ pub fn evaluate_midi_transcription_v1(
         .iter()
         .map(|track| track.part_id)
         .collect();
+    let measure_phase = parsed
+        .time_signature_points
+        .iter()
+        .find(|point| point.start_tick == 0)
+        .filter(|point| {
+            point.numerator == reference.manifest.meter_numerator
+                && point.denominator == u16::from(reference.manifest.meter_denominator)
+        })
+        .and_then(|point| {
+            measure_phase_summary_v1(
+                &reference_notes,
+                &parsed.notes.iter().map(|note| EvaluationNoteV1 {
+                    pitch_midi: note.pitch_midi,
+                    onset_tick: note.onset_tick,
+                    part_id: 0,
+                    gm_program: note.gm_program,
+                    velocity_midi: note.velocity_midi,
+                    onset_seconds: note.onset_seconds,
+                    offset_seconds: note.offset_seconds,
+                }).collect::<Vec<_>>(),
+                &onset_matching,
+                reference.manifest.ticks_per_quarter,
+                parsed.ticks_per_quarter,
+                point.numerator,
+                point.denominator,
+            )
+        });
+
     let part_separation = part_separation_summary_v1(
         &reference_part_ids,
         &reference_notes,
@@ -1965,6 +2082,7 @@ pub fn evaluate_midi_transcription_v1(
         prediction_orphan_note_off_count: parsed.orphan_note_off_count,
         prediction_tempo_point_count: parsed.tempo_point_count,
         meter_metadata: meter_metadata_summary_v1(reference, &parsed),
+        measure_phase,
         prediction_overlapping_same_pitch_note_on_count:
             parsed.overlapping_same_pitch_note_on_count,
         onset_only_metrics: metric_from_matching(
@@ -2239,6 +2357,7 @@ mod tests {
     fn reference_eval_note(part_id: u16, pitch_midi: u8) -> EvaluationNoteV1 {
         EvaluationNoteV1 {
             pitch_midi,
+            onset_tick: 0,
             part_id,
             gm_program: 40,
             velocity_midi: 100,
@@ -2600,6 +2719,90 @@ mod tests {
         report.prediction_time_signature_points[0].numerator = 3;
         let tampered = midi_transcription_evaluation_commitment_v1(&report).unwrap();
         assert_ne!(original, tampered);
+    }
+
+    #[test]
+    fn measure_phase_is_invariant_to_ticks_per_quarter_representation() {
+        let reference = vec![reference_eval_note(1, 60)];
+        let predicted = vec![MidiTranscribedNoteV1 {
+            track_index: 1,
+            midi_channel: 0,
+            onset_tick: 120,
+            offset_tick: Some(240),
+            source_event_ordinal: 0,
+            gm_program: 40,
+            pitch_midi: 60,
+            velocity_midi: 100,
+            onset_seconds: 0.25,
+            offset_seconds: Some(0.5),
+        }];
+        let reference_with_tick = vec![EvaluationNoteV1 {
+            onset_tick: 240,
+            ..reference[0].clone()
+        }];
+        let summary = measure_phase_summary_v1(
+            &reference_with_tick,
+            &predicted,
+            &[(0, 0)],
+            960,
+            480,
+            4,
+            4,
+        )
+        .unwrap();
+        assert_eq!(summary.absolute_error_quarters.mean_absolute_error, Some(0.0));
+        assert_eq!(summary.within_one_thirtysecond_fraction, Some(1.0));
+    }
+
+    #[test]
+    fn measure_phase_wraps_across_whole_bar_boundaries() {
+        let reference = vec![EvaluationNoteV1 {
+            onset_tick: 3_840,
+            ..reference_eval_note(1, 60)
+        }];
+        let predicted = vec![MidiTranscribedNoteV1 {
+            track_index: 1,
+            midi_channel: 0,
+            onset_tick: 0,
+            offset_tick: Some(120),
+            source_event_ordinal: 0,
+            gm_program: 40,
+            pitch_midi: 60,
+            velocity_midi: 100,
+            onset_seconds: 0.0,
+            offset_seconds: Some(0.125),
+        }];
+        let summary =
+            measure_phase_summary_v1(&reference, &predicted, &[(0, 0)], 960, 960, 4, 4)
+                .unwrap();
+        assert_eq!(summary.absolute_error_quarters.mean_absolute_error, Some(0.0));
+    }
+
+    #[test]
+    fn evaluator_withholds_measure_phase_when_meter_is_missing() {
+        let reference = reference_artifact(&[(60, 0, 480)], 40);
+        let prediction = build_midi_with_meter(&[(60, 0, 480)], 40, None);
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert!(report.measure_phase.is_none());
+    }
+
+    #[test]
+    fn evaluator_withholds_measure_phase_when_prediction_meter_disagrees() {
+        let reference = reference_artifact(&[(60, 0, 480)], 40);
+        let prediction = build_midi_with_meter(&[(60, 0, 480)], 40, Some((3, 4)));
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.meter_metadata.prediction_initial_matches_reference, Some(false));
+        assert!(report.measure_phase.is_none());
     }
 
     #[test]
