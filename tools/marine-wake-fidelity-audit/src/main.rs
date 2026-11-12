@@ -1025,6 +1025,12 @@ mod tests {
             propeller_revision:"prop-r7".into(),condition_fingerprint_sha256:digest('1'),
             reference_velocity_mps:5.0,instrument_or_solver_id:format!("{id}-sensor"),
             calibration_or_solver_validation_sha256:digest('2'),raw_data_sha256:digest(if id=="target"{'3'}else{'4'}),
+            coordinate_frame:CoordinateFrame::PropellerLookingForwardFromAft,
+            angular_origin:AngularOrigin::TopDeadCentre,
+            positive_azimuth:PositiveAzimuth::ClockwiseViewedFromAft,
+            axial_positive_direction:AxialPositiveDirection::TowardStern,
+            area_weight_method_id:"annular-sector-midpoint-v1".into(),
+            area_weight_evidence_sha256:digest('7'),
             points:make_points(perturb,axial_only),
         }
     }
@@ -1040,6 +1046,7 @@ mod tests {
             coordinate_frame:CoordinateFrame::PropellerLookingForwardFromAft,
             angular_origin:AngularOrigin::TopDeadCentre,
             positive_azimuth:PositiveAzimuth::ClockwiseViewedFromAft,
+            axial_positive_direction:AxialPositiveDirection::TowardStern,
             tolerances:ComponentTolerances{axial:0.04,radial:0.02,tangential:0.02,nominal_wake_fraction:0.04},
             max_fourier_harmonic:2,
             blockage:BlockageEvidence{
@@ -1133,9 +1140,41 @@ mod tests {
 
     #[test]
     fn coordinate_convention_mismatch_is_incomparable(){
-        let mut input=case();input.positive_azimuth=PositiveAzimuth::CounterClockwiseViewedFromAft;
-        // The case convention is common to both fields; a future per-field mismatch is rejected by the typed contract.
-        assert_eq!(audit(&input).disposition,"INCOMPLETE");
+        let mut input=case();
+        input.evidence_kind=EvidenceKind::Measured;
+        input.realized.positive_azimuth=PositiveAzimuth::CounterClockwiseViewedFromAft;
+        assert_eq!(audit(&input).disposition,"INCOMPARABLE");
+    }
+
+    #[test]
+    fn different_area_quadrature_methods_are_incomparable() {
+        let mut input=case();
+        input.evidence_kind=EvidenceKind::Measured;
+        input.realized.area_weight_method_id="different-quadrature".into();
+        assert_eq!(audit(&input).disposition,"INCOMPARABLE");
+    }
+
+    #[test]
+    fn area_weighted_component_bias_uses_polar_cell_weights() {
+        let mut input=case();
+        input.evidence_kind=EvidenceKind::Measured;
+        input.target.points[0].area_weight += 0.01;
+        input.target.points[1].area_weight -= 0.01;
+        input.realized.points[0].area_weight += 0.01;
+        input.realized.points[1].area_weight -= 0.01;
+        input.realized.points[0].vx_over_vref.as_mut().unwrap().value += 0.05;
+        let report=audit(&input);
+        let axial=report.component_metrics.iter().find(|m|m.component=="axial").unwrap();
+        assert!(axial.area_weight_sum > 0.999);
+        assert!((axial.bias.unwrap() - 0.0068671875).abs() < 1.0e-9);
+        assert_ne!(axial.bias,axial.unweighted_bias);
+    }
+
+    #[test]
+    fn area_weight_evidence_digest_is_mandatory() {
+        let mut input=case();
+        input.target.area_weight_evidence_sha256="bad".into();
+        assert_eq!(audit(&input).disposition,"INVALID");
     }
 
     #[test]
@@ -1167,10 +1206,12 @@ mod tests {
         let mut input=case();
         input.blockage.section_width_m=Some(0.4);
         input.blockage.section_height_m=Some(0.4);
-        assert_eq!(audit(&input).disposition,"INVALID");
+        assert_eq!(audit(&input).disposition,"INCOMPLETE");
         input.blockage.review_state=BlockageReviewState::Reviewed;
         input.blockage.review_evidence_sha256=Some(digest('6'));
         let report=audit(&input);
+        assert!(report.blockage.review_required);
+        assert!(report.blockage.review_assessment_eligible);
         assert!(report.reasons.iter().any(|r|r.contains(">=20%")));
     }
 
