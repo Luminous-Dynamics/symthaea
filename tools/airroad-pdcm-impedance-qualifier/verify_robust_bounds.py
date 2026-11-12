@@ -7,7 +7,7 @@ import json
 from fractions import Fraction
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "docs/research/fixtures/airroad-pdcm-robust-stability-v0.1.json"
 
 
@@ -76,8 +76,18 @@ def main() -> None:
 
     # Strict-set monotonicity: widening h upper from 0.1 to 0.31 destroys
     # robust stability for the same source/feeder hard intervals.
+    narrow = data["cases"][0]
     widened = data["cases"][4]
+    assert narrow["disposition"] == "robustly_hurwitz_stable"
     assert widened["disposition"] == "not_established_boundary_or_overlap"
+    assert narrow["source_conductance"] == widened["source_conductance"]
+    assert narrow["feeder_conductance"] == widened["feeder_conductance"]
+    assert narrow["negative_incremental_conductance"]["lower"] == (
+        widened["negative_incremental_conductance"]["lower"]
+    )
+    assert q(widened["negative_incremental_conductance"]["upper"]) > (
+        q(narrow["negative_incremental_conductance"]["upper"])
+    )
     print("PASS interval widening weakens a robust-stable conclusion")
 
 
