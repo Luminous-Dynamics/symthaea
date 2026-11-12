@@ -293,6 +293,24 @@ fn validate_fixture(f: &Value, arms: &BTreeSet<String>) -> (Vec<String>, usize, 
     }
     (errors, reported_count, distribution_l2_sum)
 }
+fn validate_metric_status(protocol: &Value) -> Result<(), String> {
+    let all = strings(&protocol["metric_ids"]);
+    let implemented = strings(&protocol["implementation_status"]["implemented_metric_ids"]);
+    let deferred = strings(&protocol["implementation_status"]["deferred_metric_ids"]);
+    let overlap: BTreeSet<String> = implemented.intersection(&deferred).cloned().collect();
+    let combined: BTreeSet<String> = implemented.union(&deferred).cloned().collect();
+    if !overlap.is_empty() { return Err("metric implementation sets overlap".into()); }
+    if combined != all { return Err("every declared metric must be exactly implemented or deferred".into()); }
+    for required in ["peer_private_belief_l2_error", "phantom_consensus_incidence"] {
+        if !implemented.contains(required) { return Err(format!("implemented metric missing: {required}")); }
+    }
+    for required in ["private_public_gap", "collective_rationality_failure", "transparency_recovery",
+                     "signal_susceptibility", "pluralism_preservation", "run_validity"] {
+        if !deferred.contains(required) { return Err(format!("deferred metric missing: {required}")); }
+    }
+    Ok(())
+}
+
 fn main_run(args: &[String]) -> Result<Report, String> {
     if args.len() != 4 { return Err("usage: qualifier PROTOCOL PROTOCOL_SCHEMA FIXTURES FIXTURES_SCHEMA".into()); }
     let protocol: Value = serde_json::from_str(&fs::read_to_string(&args[0]).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
@@ -300,13 +318,14 @@ fn main_run(args: &[String]) -> Result<Report, String> {
     let fixtures_doc: Value = serde_json::from_str(&fs::read_to_string(&args[2]).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     let f_schema: Value = serde_json::from_str(&fs::read_to_string(&args[3]).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
 
-    let mut schema_errors = schema_header(&p_schema, PROTOCOL_SCHEMA, &["protocol_id","version","status","source","composition","stages","intervention_arms","transparency_arms","task_classes","metric_ids","qualification_gates","claim_ceiling"]);
+    let mut schema_errors = schema_header(&p_schema, PROTOCOL_SCHEMA, &["protocol_id","version","status","source","composition","stages","intervention_arms","transparency_arms","task_classes","metric_ids","implementation_status","qualification_gates","claim_ceiling"]);
     schema_errors.extend(schema_header(&f_schema, FIXTURE_SCHEMA, &["schema_version","status","protocol_id","fixture_count","fixtures"]));
     if !schema_errors.is_empty() { return Err(schema_errors.join("; ")); }
     if protocol["protocol_id"].as_str() != Some(PROTOCOL_ID) || protocol["version"].as_str() != Some("0.1.0")
         || protocol["status"].as_str() != Some("research-proposal") {
         return Err("protocol identity/version/status mismatch".into());
     }
+    validate_metric_status(&protocol)?;
     if fixtures_doc["protocol_id"].as_str() != Some(PROTOCOL_ID)
         || fixtures_doc["schema_version"].as_str() != Some("ig-phantom-consensus-fixtures-v0.1")
         || fixtures_doc["status"].as_str() != Some("synthetic_fixture_design_unexecuted") {
@@ -426,6 +445,23 @@ mod tests {
         ["no_group_signal", "neutral_public_text", "ambiguous_social_signal",
          "explicit_peer_recommendation", "fabricated_private_tally"]
             .into_iter().map(str::to_owned).collect()
+    }
+
+    fn protocol() -> Value {
+        serde_json::from_str(include_str!("../../PHANTOM_CONSENSUS_PROTOCOL_V0_1.json")).unwrap()
+    }
+
+    #[test]
+    fn protocol_accounts_for_every_metric_as_implemented_or_deferred() {
+        assert!(validate_metric_status(&protocol()).is_ok());
+    }
+
+    #[test]
+    fn protocol_cannot_claim_a_metric_that_is_still_deferred() {
+        let mut p = protocol();
+        p["implementation_status"]["implemented_metric_ids"].as_array_mut().unwrap()
+            .push(serde_json::json!("transparency_recovery"));
+        assert!(validate_metric_status(&p).is_err());
     }
 
     #[test]
