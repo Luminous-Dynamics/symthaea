@@ -23,6 +23,9 @@ exclude = [
     # This legacy directory contains source but no Cargo.toml; exclude it from the
     # crates/core/* member glob so Cargo metadata can resolve the workspace.
     "crates/core/symthaea",
+    # This legacy IIT directory contains only tests/ and has no Cargo.toml; it is
+    # not a workspace package and must not be picked up by the crates/core/* glob.
+    "crates/core/symthaea-iit",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
