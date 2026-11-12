@@ -16,7 +16,10 @@ pub struct ComplexValue {
 }
 
 impl ComplexValue {
-    const ZERO: Self = Self { real: 0.0, imag: 0.0 };
+    const ZERO: Self = Self {
+        real: 0.0,
+        imag: 0.0,
+    };
 
     fn divide(self, rhs: Self) -> Result<Self, PortMatrixError> {
         let denominator = rhs.real * rhs.real + rhs.imag * rhs.imag;
@@ -121,7 +124,9 @@ pub enum PortMatrixError {
     NoFrequencySlices,
     InvalidFrequency(usize),
     FrequenciesNotStrictlyIncreasing,
-    MissingColumns { frequency_index: usize },
+    MissingColumns {
+        frequency_index: usize,
+    },
     DuplicateDrivenPort {
         frequency_index: usize,
         port_id: String,
@@ -229,9 +234,7 @@ pub fn validate_mimo_impedance_sweep(
             || port.voltage_positive_reference.trim().is_empty()
             || port.current_positive_direction.trim().is_empty()
         {
-            return Err(PortMatrixError::InvalidPortDescriptor(
-                port.port_id.clone(),
-            ));
+            return Err(PortMatrixError::InvalidPortDescriptor(port.port_id.clone()));
         }
         if port_ids.iter().any(|existing| existing == &port.port_id) {
             return Err(PortMatrixError::DuplicatePortId(port.port_id.clone()));
@@ -287,16 +290,14 @@ pub fn validate_mimo_impedance_sweep(
                 });
             }
             if !column.injected_current_a.is_finite()
-                || (column.injected_current_a.real == 0.0
-                    && column.injected_current_a.imag == 0.0)
+                || (column.injected_current_a.real == 0.0 && column.injected_current_a.imag == 0.0)
             {
                 return Err(PortMatrixError::InvalidExcitation {
                     frequency_index,
                     driven_port_id: column.driven_port_id.clone(),
                 });
             }
-            if !column.absolute_error_bound_a.is_finite()
-                || column.absolute_error_bound_a < 0.0
+            if !column.absolute_error_bound_a.is_finite() || column.absolute_error_bound_a < 0.0
             {
                 return Err(PortMatrixError::InvalidUncertaintyBound {
                     frequency_index,
@@ -394,7 +395,11 @@ pub fn matrix_at_exact_frequency(
         .find(|candidate| candidate.angular_frequency_rad_s == angular_frequency_rad_s)
         .ok_or(PortMatrixError::UnsupportedFrequencyKnot)?;
 
-    let port_ids: Vec<String> = sweep.ports.iter().map(|port| port.port_id.clone()).collect();
+    let port_ids: Vec<String> = sweep
+        .ports
+        .iter()
+        .map(|port| port.port_id.clone())
+        .collect();
     let n = port_ids.len();
     let mut matrix = vec![vec![ComplexValue::ZERO; n]; n];
 
@@ -416,8 +421,9 @@ pub fn matrix_at_exact_frequency(
                     driven_port_id: column.driven_port_id.clone(),
                     observed_port_id: observation.observed_port_id.clone(),
                 })?;
-            matrix[row_index][column_index] =
-                observation.response_voltage_v.divide(column.injected_current_a)?;
+            matrix[row_index][column_index] = observation
+                .response_voltage_v
+                .divide(column.injected_current_a)?;
         }
     }
 
