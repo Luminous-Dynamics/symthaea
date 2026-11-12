@@ -78,7 +78,9 @@ pub struct InteractionAnalysis {
 /// and datasheet typical values are not automatically admissible hard bounds.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ConductanceIntervalSiemens {
+    /// Closed lower bound, siemens.
     pub lower_siemens: f64,
+    /// Closed upper bound, siemens.
     pub upper_siemens: f64,
 }
 
