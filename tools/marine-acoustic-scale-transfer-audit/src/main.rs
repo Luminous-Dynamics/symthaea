@@ -1871,11 +1871,22 @@ mod tests {
     }
 
     #[test]
-    fn mapped_frequency_mismatch_blocks_comparison() {
+    fn mapped_frequency_mismatch_in_calibration_does_not_change_held_out() {
         let mut case = fixture_case();
         case.pairs[0].full_scale.bands[0].center_frequency_hz = 15.0;
         let report = audit(&case);
+        assert_eq!(report.calibration_comparison_outcome, "frequency_mismatch");
+        assert_eq!(report.held_out_comparison_outcome, "all_declared_bands_overlap");
+        assert_eq!(report.comparison_outcome, "all_declared_bands_overlap");
+    }
+
+    #[test]
+    fn mapped_frequency_mismatch_in_held_out_blocks_comparison() {
+        let mut case = fixture_case();
+        case.pairs[1].full_scale.bands[0].center_frequency_hz = 15.0;
+        let report = audit(&case);
         assert_eq!(report.disposition, "incomplete");
+        assert_eq!(report.held_out_comparison_outcome, "frequency_mismatch");
         assert_eq!(report.comparison_outcome, "frequency_mismatch");
     }
 
@@ -1904,24 +1915,40 @@ mod tests {
     }
 
     #[test]
-    fn disjoint_prediction_and_observation_intervals_are_reported() {
+    fn calibration_interval_disagreement_does_not_change_held_out_outcome() {
         let mut case = fixture_case();
         case.evidence_kind = EvidenceKind::Measured;
         case.source.rights_status = RightsStatus::PublicOrPermitted;
         case.source.independently_reviewed = true;
         case.pairs[0].full_scale.bands[0].source_level_db = 150.0;
         let report = audit(&case);
+        assert_eq!(report.calibration_comparison_outcome, "at_least_one_band_disjoint");
+        assert_eq!(report.held_out_comparison_outcome, "all_declared_bands_overlap");
+        assert_eq!(report.comparison_outcome, "all_declared_bands_overlap");
+        assert_eq!(report.disposition, "computational_comparison_only");
+        assert_eq!(report.pair_reports[0].band_reports[0].comparison, "intervals_disjoint");
+    }
+
+    #[test]
+    fn held_out_disjoint_prediction_and_observation_intervals_are_reported() {
+        let mut case = fixture_case();
+        case.evidence_kind = EvidenceKind::Measured;
+        case.source.rights_status = RightsStatus::PublicOrPermitted;
+        case.source.independently_reviewed = true;
+        case.pairs[1].full_scale.bands[0].source_level_db = 150.0;
+        let report = audit(&case);
+        assert_eq!(report.held_out_comparison_outcome, "at_least_one_band_disjoint");
         assert_eq!(report.comparison_outcome, "at_least_one_band_disjoint");
         assert_eq!(report.disposition, "comparison_outside_declared_uncertainty");
-        assert_eq!(report.pair_reports[0].band_reports[0].comparison, "intervals_disjoint");
-        assert!(report.pair_reports[0].band_reports[0].signed_error_db.unwrap() < 0.0);
+        assert_eq!(report.pair_reports[1].band_reports[0].comparison, "intervals_disjoint");
+        assert!(report.pair_reports[1].band_reports[0].signed_error_db.unwrap() < 0.0);
         assert_eq!(
-            report.pair_reports[0].band_reports[0].absolute_error_db.unwrap(),
-            report.pair_reports[0].band_reports[0].signed_error_db.unwrap().abs()
+            report.pair_reports[1].band_reports[0].absolute_error_db.unwrap(),
+            report.pair_reports[1].band_reports[0].signed_error_db.unwrap().abs()
         );
         assert_eq!(
-            report.pair_reports[0].band_reports[0].scale_transfer_u95_db,
-            case.pairs[0].model.bands[0].scale_transfer_u95_db
+            report.pair_reports[1].band_reports[0].scale_transfer_u95_db,
+            case.pairs[1].model.bands[0].scale_transfer_u95_db
         );
     }
 
