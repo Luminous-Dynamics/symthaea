@@ -50,6 +50,53 @@ impl RationalBeat {
         self.num as f64 / self.den as f64
     }
 
+    /// Checked exact addition for normalized score-clock coordinates.
+    pub fn checked_add(self, other: Self) -> Result<Self, EvaluationError> {
+        let numerator = i128::from(self.num)
+            .checked_mul(i128::from(other.den))
+            .and_then(|left| {
+                i128::from(other.num)
+                    .checked_mul(i128::from(self.den))
+                    .and_then(|right| left.checked_add(right))
+            })
+            .ok_or(EvaluationError::ArithmeticOverflow)?;
+        let denominator = i128::from(self.den)
+            .checked_mul(i128::from(other.den))
+            .ok_or(EvaluationError::ArithmeticOverflow)?;
+        Self::from_i128(numerator, denominator)
+    }
+
+    /// Checked exact subtraction; negative coordinates are rejected.
+    pub fn checked_sub(self, other: Self) -> Result<Self, EvaluationError> {
+        let numerator = i128::from(self.num)
+            .checked_mul(i128::from(other.den))
+            .and_then(|left| {
+                i128::from(other.num)
+                    .checked_mul(i128::from(self.den))
+                    .and_then(|right| left.checked_sub(right))
+            })
+            .ok_or(EvaluationError::ArithmeticOverflow)?;
+        if numerator < 0 {
+            return Err(EvaluationError::NegativeDuration);
+        }
+        let denominator = i128::from(self.den)
+            .checked_mul(i128::from(other.den))
+            .ok_or(EvaluationError::ArithmeticOverflow)?;
+        Self::from_i128(numerator, denominator)
+    }
+
+    fn from_i128(numerator: i128, denominator: i128) -> Result<Self, EvaluationError> {
+        if denominator <= 0 || numerator < 0 {
+            return Err(EvaluationError::ArithmeticOverflow);
+        }
+        let divisor = gcd_i128(numerator, denominator);
+        let num = i64::try_from(numerator / divisor)
+            .map_err(|_| EvaluationError::ArithmeticOverflow)?;
+        let den = i64::try_from(denominator / divisor)
+            .map_err(|_| EvaluationError::ArithmeticOverflow)?;
+        Self::new(num, den)
+    }
+
     fn cmp_exact(self, other: Self) -> Ordering {
         (i128::from(self.num) * i128::from(other.den))
             .cmp(&(i128::from(other.num) * i128::from(self.den)))
@@ -137,6 +184,8 @@ pub enum MeasureKind {
     Pickup,
     Incomplete,
     Irregular,
+    /// A measure container is explicit, but meter is insufficient to classify its span.
+    Unclassified,
 }
 
 /// Explicit measure sequence supplied by a parser or annotation adapter.
@@ -168,6 +217,7 @@ pub enum EvaluationError {
     EmptyOrReversedMeasure { index: usize },
     NonContiguousMeasures { left_index: usize },
     ArithmeticOverflow,
+    NegativeDuration,
     InvalidTolerance,
 }
 
