@@ -2178,7 +2178,9 @@ pub fn sample_small_hayden_preskill_petz_ensemble(
 ) -> Result<HaydenPreskillPetzEnsembleSummary, QuantumInformationError> {
     validate_tolerance(tolerance)?;
     if sample_count < 2 {
-        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(
+            sample_count,
+        ));
     }
     let mut mean = 0.0;
     let mut m2 = 0.0;
@@ -2574,10 +2576,8 @@ mod hayden_preskill_decoupling_tests {
 
     #[test]
     fn petz_recovery_ensemble_reports_fidelity_uncertainty_and_seed_reproducibility() {
-        let first =
-            sample_small_hayden_preskill_petz_ensemble(16, 0x5045, TOLERANCE).unwrap();
-        let repeated =
-            sample_small_hayden_preskill_petz_ensemble(16, 0x5045, TOLERANCE).unwrap();
+        let first = sample_small_hayden_preskill_petz_ensemble(16, 0x5045, TOLERANCE).unwrap();
+        let repeated = sample_small_hayden_preskill_petz_ensemble(16, 0x5045, TOLERANCE).unwrap();
         assert_eq!(first, repeated);
         assert_eq!(first.sample_count, 16);
         assert!((0.0..=1.0).contains(&first.minimum_entanglement_fidelity));
