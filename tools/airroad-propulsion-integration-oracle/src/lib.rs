@@ -4,11 +4,16 @@
 //! Pinned, synthetic end-to-end composition of the electric propulsion evidence
 //! oracles. This crate qualifies software hand-offs only; it is not a physical
 //! motor, battery, thermal, aircraft, safety, or certification model.
+//!
+//! Observation torque/RPM bounds are preserved in the report, but this version
+//! does not combine those coordinate bounds into the DC-demand scenarios. The
+//! adverse/nominal/favourable drive scenarios vary the motor-map efficiency
+//! bound only; a later increment must propagate the full operating-point set.
 
 #![forbid(unsafe_code)]
 
 use electric_propulsion_map_oracle::{
-    EfficiencyMap2D, MapError, MapLookup, MapNode, MapQuery,
+    EfficiencyMap2D, MapLookup, MapNode, MapQuery,
 };
 use electric_propulsion_observation_oracle::{
     CalibrationStatus, MeasurementChannel, MeasurementQuantity, MeasurementSample,
@@ -389,6 +394,7 @@ pub fn run_synthetic_fixture() -> Result<IntegrationReport, IntegrationError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use electric_propulsion_map_oracle::MapError;
 
     #[test]
     fn end_to_end_fixture_preserves_evidence_and_closes_both_ledgers() {
@@ -411,6 +417,14 @@ mod tests {
 
         assert!((adverse.rotor_shaft_power_w - 10_000.0).abs() < 1.0e-8);
         assert!((report.motor_observation.shaft_power_w - 10_000.0 / 0.90).abs() < 1.0e-8);
+        assert!(
+            report.motor_observation.shaft_power_lower_bound_w
+                < report.motor_observation.shaft_power_w
+        );
+        assert!(
+            report.motor_observation.shaft_power_upper_bound_w
+                > report.motor_observation.shaft_power_w
+        );
         assert!((report.drive_envelope.motor_operating_point.motor_speed_rpm - 15_000.0).abs()
             < 1.0e-8);
         assert!(adverse.dc_bus_input_power_w > nominal.dc_bus_input_power_w);
