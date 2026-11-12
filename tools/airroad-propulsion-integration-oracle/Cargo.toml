@@ -12,8 +12,8 @@ path = "src/lib.rs"
 
 [dependencies]
 electric-propulsion-observation-oracle = { git = "https://github.com/Luminous-Dynamics/symthaea", rev = "d81f5b4f1ee050d677c3bae1c7733d5bfe73fa20" }
-electric-propulsion-map-oracle = { git = "https://github.com/Luminous-Dynamics/symthaea", rev = "b99e8cb896cbeec34698cb71e5807b033fb77c07" }
-electric-rotorcraft-drive-oracle = { git = "https://github.com/Luminous-Dynamics/symthaea", rev = "c8441438f0e00cceeb1e951ea3c4d88a9aaf3b80" }
+electric-propulsion-map-oracle = { git = "https://github.com/Luminous-Dynamics/symthaea", rev = "ccd0aead85237f824f619321dae555a6c372d788" }
+electric-rotorcraft-drive-oracle = { git = "https://github.com/Luminous-Dynamics/symthaea", rev = "cc91e1dcfbc064aeaefaa17f55753e3707d57a90" }
 electric-thermal-loss-ledger-oracle = { git = "https://github.com/Luminous-Dynamics/symthaea", rev = "2865e86a755e92a99bc534a5ea6dd13c272d8dc9" }
 
 [workspace]
