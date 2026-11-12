@@ -78,7 +78,8 @@
         "calibration_certificate_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "cavitation_pattern": "sheet",
-      "cavitation_pattern_comparability": "matched"
+      "cavitation_pattern_comparability": "matched",
+      "benchmark_group_id": "cal-group"
     },
     {
       "pair_id": "pair-2",
@@ -135,7 +136,45 @@
         "calibration_certificate_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
       },
       "cavitation_pattern": "sheet",
-      "cavitation_pattern_comparability": "matched"
+      "cavitation_pattern_comparability": "matched",
+      "benchmark_group_id": "held-out-group"
     }
-  ]
+  ],
+  "validation_split": {
+    "split_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "protocol_id": "leave-one-facility-vessel-propeller-campaign-condition-out",
+    "grouping_dimensions": [
+      "model_facility_id",
+      "full_scale_trial_site_id",
+      "vessel_id",
+      "propeller_design_id",
+      "propeller_revision",
+      "campaign_id",
+      "operating_condition_family_id"
+    ],
+    "groups": [
+      {
+        "group_id": "cal-group",
+        "role": "calibration",
+        "model_facility_id": "model-facility-cal",
+        "full_scale_trial_site_id": "sea-trial-site-cal",
+        "vessel_id": "vessel-cal",
+        "propeller_design_id": "design-cal",
+        "propeller_revision": "revision-cal",
+        "campaign_id": "campaign-cal",
+        "operating_condition_family_id": "condition-family-cal"
+      },
+      {
+        "group_id": "held-out-group",
+        "role": "held_out",
+        "model_facility_id": "model-facility-held",
+        "full_scale_trial_site_id": "sea-trial-site-held",
+        "vessel_id": "vessel-held",
+        "propeller_design_id": "design-held",
+        "propeller_revision": "revision-held",
+        "campaign_id": "campaign-held",
+        "operating_condition_family_id": "condition-family-held"
+      }
+    ]
+  }
 }
