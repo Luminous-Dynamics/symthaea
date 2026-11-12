@@ -1,0 +1,81 @@
+{
+  "schema": "luminous.black_hole_information.hayden_preskill_decoupling_u4.v1",
+  "status": "source_authored_rust_execution_pending; independent_numpy_comparator_available",
+  "claim_ceiling": "This is a four-qubit one-step random-unitary decoupling diagnostic. It is not a macroscopic black-hole model, an evaporation simulation, a QES/island calculation, or a recovery decoder.",
+  "register": {
+    "qubit_order": "MSB-first",
+    "labels": [
+      "Q",
+      "M",
+      "B",
+      "R"
+    ],
+    "initial_state": "|Phi>_QM tensor |Phi>_BR",
+    "initial_pairs": {
+      "message_reference": "( |00> + |11> ) / sqrt(2)",
+      "black_hole_early_radiation": "( |00> + |11> ) / sqrt(2)"
+    },
+    "scrambler": "seeded Haar-random U(4) applied to M tensor B",
+    "output_partition": {
+      "reference": "Q",
+      "remaining_black_hole": "B_prime = qubit 2",
+      "accessible_radiation": "A = E tensor R, where E is output qubit 1 and R is the initially collected radiation qubit 3"
+    }
+  },
+  "observables": {
+    "mutual_information": "I(Q:B') = S(Q)+S(B')-S(QB')",
+    "accessible_mutual_information": "I(Q:A) = S(Q)+S(A)-S(QA)",
+    "direct_decoupling_measure": "D_tr = 0.5 * ||rho_QB' - rho_Q tensor rho_B'||_1",
+    "quantum_pinsker": "D_tr <= sqrt(I(Q:B')/2), with entropy and relative entropy in nats",
+    "pure_state_complementarity": "I(Q:B') + I(Q:A) = 2*S(Q)"
+  },
+  "independent_numpy_comparator": {
+    "generator": "NumPy PRNG and independent complex-Gaussian Gram-Schmidt Haar U(4), direct state-vector evolution, partial traces and eigenspectrum",
+    "sample_count": 32,
+    "first_seed_hex": "0x4850",
+    "seed_schedule": "0x4850 + sample_index, sample_index 0..31",
+    "mean_trace_distance_q_bprime": 0.3032249216471937,
+    "standard_error_trace_distance_q_bprime": 0.01790722473981771,
+    "mean_mutual_information_q_bprime_nats": 0.25186688180006545,
+    "mean_pinsker_upper_bound": 0.33474364975950166,
+    "minimum_pinsker_slack": 0.0037099629019617664,
+    "maximum_information_complementarity_residual_nats": 6.661338147750939e-16,
+    "maximum_state_norm_drift": 2.220446049250313e-16,
+    "status_note": "Independent PRNG and QR/Gram-Schmidt path; these are ensemble comparators, not bitwise ChaCha20 Rust expected values."
+  },
+  "rust_contract": {
+    "function": "simulate_small_hayden_preskill_decoupling(seed,tolerance)",
+    "implementation": "direct 4x4 Hermitian difference spectrum; half the trace norm is measured, not inferred from mutual information",
+    "acceptance": {
+      "trace_distance_interval": [
+        0,
+        1
+      ],
+      "quantum_pinsker_violation": 1e-9,
+      "information_complementarity_residual_nats": 1e-9,
+      "seed_reproducibility": "exact deterministic equality for same seed"
+    },
+    "current_status": "source_authored_not_executed"
+  },
+  "negative_controls": [
+    "report mutual information as if it were the trace distance",
+    "omit the factor 1/2 from the trace norm",
+    "compare the trace distance to the Pinsker bound using log base 2 while reporting nats",
+    "give the decoder access to B_prime or hidden full-state amplitudes",
+    "claim an efficient recovery decoder from decoupling alone"
+  ],
+  "required_receipt_fields": [
+    "source_sha",
+    "seed",
+    "sample_count",
+    "state_norm",
+    "I_Q_Bprime",
+    "I_Q_accessible_radiation",
+    "trace_distance_Q_Bprime",
+    "Pinsker_upper_bound",
+    "Pinsker_slack",
+    "information_complementarity_residual",
+    "runtime",
+    "peak_memory"
+  ]
+}
