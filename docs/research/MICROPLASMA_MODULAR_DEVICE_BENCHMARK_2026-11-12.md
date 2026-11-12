@@ -250,3 +250,26 @@ Sources: https://doi.org/10.1615/PlasmaMed.2025057641 and https://www.inptdat.de
 
 
 The 2026 low-cost helium APPJ paper annotates 2 L/min helium use at approximately £0.2/min under its stated supply-cost basis—roughly £12 per operating hour if sustained. This figure is source-specific, not a universal gas price, but it demonstrates why a low component BOM does not mean a low-cost portable system. The scorecard therefore treats gas consumed per useful output and autonomous runtime as first-class metrics.
+
+
+## 11. Application down-selection: ambient-air DBD before noble-gas portability
+
+New literature changes the first process-plasma application priority. Ambient-air DBD should be the leading low-cost miniaturization candidate where the required chemistry permits it; a helium/argon APPJ remains useful for localized surface or material processing where a directed jet is required.
+
+The 2026 GAPS grid-like DBD study reports up to 4.5-log single-pass *E. coli* MG1655 bioaerosol reduction at 12.5 L/min and approximately 0.65 W discharge power. Its EEO of 2×10⁻⁴ kWh·m⁻³·order⁻¹ excludes power-supply losses. Preliminary outlet ozone is approximately 9 ppm; the authors state that downstream ozone removal and a realistic safety assessment are required. At half discharge coverage the reported reduction falls to around 2 log. These details make the source a valuable architecture reference, not a complete occupied-air cleaner.
+
+A separate ambient-air surface-DBD paper describes an approximately 48 cm³, 55 g portable reactor without a separate process-gas feed. Its surface-treatment endpoint cannot be translated into air-cleaning CADR.
+
+For an air-treatment pilot, the primary service is **post-abatement clean-air delivery**. Include grid-side supply, fans/compressors, filters, sensors and ozone/NOx abatement; pressure drop; humidity; particle-size distribution; bypass; noise; lifetime and maintenance. Compare to HEPA and UVGI under the same flow, removal, safety and installed-system boundary. The target is not simply maximum log reduction.
+
+See Symthaea PLASMA-AIR-DBD-001 (#11804).
+
+## 12. Water treatment is a separate process qualification lane
+
+The 2026 flexible coplanar DBD water-treatment paper reports >5-log *E. coli* reduction in 800 mL within 5 minutes and 3.64×10⁶ CFU/J bacterial inactivation efficiency. That is a batch microbial endpoint, not EEO, drinking-water compliance or mineralization.
+
+The 2026 plasma-liquid catalysis review identifies incomplete mineralization, toxic transformation products, catalyst deactivation/leaching, realistic-matrix effects, energy and scale-up as unresolved issues. A cross-study AOP review reports substantially higher median EEO for plasma than ozonation or UV/H₂O₂, but those are heterogeneous review medians—not matched trials. Any proposed water application must therefore demonstrate a contaminant-specific advantage after complete energy and by-product accounting.
+
+Keep microbial disinfection, refractory pollutant oxidation, plasma-catalyst synergy and pre-treatment as separate benchmark lanes. Include parent conversion, TOC/COD and carbon balance, transformation products, toxicity, residual oxidants, gas-liquid transfer, catalyst stability, energy and lifecycle cost. Stop if a matched incumbent achieves the target more safely or cheaply.
+
+See Symthaea PLASMA-WATER-QUAL-001 (#11805).
