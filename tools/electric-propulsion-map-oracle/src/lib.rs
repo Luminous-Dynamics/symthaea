@@ -13,7 +13,7 @@
 
 use std::fmt;
 
-pub const MODEL_VERSION: &str = "electric-propulsion-map-oracle-v0.2.0";
+pub const MODEL_VERSION: &str = "electric-propulsion-map-oracle-v0.3.0";
 
 /// One measured or otherwise evidence-qualified map node.
 ///
@@ -72,6 +72,62 @@ pub struct MapLookup {
     pub torque_cell_lower_index: usize,
     pub speed_cell_lower_index: usize,
     pub interpolation_weights: [f64; 4],
+}
+
+/// A rectangular absolute-bound uncertainty set around one measured operating
+/// point. Bounds are not probability distributions or confidence intervals.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MapCoordinateBounds<'a> {
+    pub configuration_digest: &'a str,
+    pub context_digest: &'a str,
+    pub nominal_motor_torque_nm: f64,
+    pub absolute_torque_bound_nm: f64,
+    pub nominal_motor_speed_rpm: f64,
+    pub absolute_speed_bound_rpm: f64,
+}
+
+/// One closed map-cell intersection with the input coordinate rectangle.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MapCellIntersection {
+    pub torque_cell_lower_index: usize,
+    pub speed_cell_lower_index: usize,
+    pub torque_lower_nm: f64,
+    pub torque_upper_nm: f64,
+    pub speed_lower_rpm: f64,
+    pub speed_upper_rpm: f64,
+}
+
+/// A coordinate and cell identifying a conservative efficiency extremum.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MapEnvelopeWitness {
+    pub motor_torque_nm: f64,
+    pub motor_speed_rpm: f64,
+    pub torque_cell_lower_index: usize,
+    pub speed_cell_lower_index: usize,
+    pub nominal_efficiency: f64,
+    pub absolute_uncertainty_bound: f64,
+    pub efficiency_bound: f64,
+}
+
+/// Efficiency bounds over every point in a rectangular torque/RPM set.
+///
+/// Extrema are obtained by evaluating every corner of every intersected
+/// bilinear cell. For a bilinear patch, extrema over a rectangle occur at its
+/// corners; the same holds for the bilinear weighted nodal-uncertainty patch.
+/// Values use this oracle's IEEE-754 f64 interpolation arithmetic.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MapCoordinateEnvelope {
+    pub model_version: &'static str,
+    pub nominal_lookup: MapLookup,
+    pub torque_lower_nm: f64,
+    pub torque_upper_nm: f64,
+    pub speed_lower_rpm: f64,
+    pub speed_upper_rpm: f64,
+    pub efficiency_lower_bound: f64,
+    pub efficiency_upper_bound: f64,
+    pub lower_witness: MapEnvelopeWitness,
+    pub upper_witness: MapEnvelopeWitness,
+    pub intersected_cells: Vec<MapCellIntersection>,
 }
 
 /// Typed non-PASS outcomes for invalid maps and unsupported queries.
@@ -167,8 +223,7 @@ impl EfficiencyMap2D {
         }
 
         for node in &nodes {
-            if !node.efficiency.is_finite() || !(0.0 < node.efficiency && node.efficiency <= 1.0)
-            {
+            if !node.efficiency.is_finite() || !(0.0 < node.efficiency && node.efficiency <= 1.0) {
                 return Err(MapError::InvalidMap(
                     "node efficiency must be finite and in (0, 1]",
                 ));
@@ -244,8 +299,7 @@ impl EfficiencyMap2D {
             efficiency += *weight * node.efficiency;
             nodal_uncertainty += *weight * node.absolute_uncertainty_bound;
         }
-        let absolute_uncertainty_bound =
-            nodal_uncertainty + self.systematic_uncertainty_bound;
+        let absolute_uncertainty_bound = nodal_uncertainty + self.systematic_uncertainty_bound;
 
         if !efficiency.is_finite()
             || !absolute_uncertainty_bound.is_finite()
@@ -272,56 +326,230 @@ impl EfficiencyMap2D {
             interpolation_weights: weights,
         })
     }
+
+    /// Evaluate a rectangular absolute-bound torque/RPM set over the complete
+    /// bilinear map support. Every intersected cell is enumerated and each
+    /// clipped cell rectangle's four corners are evaluated. For a bilinear
+    /// surface, extrema over a rectangle occur at its corners; the same holds
+    /// for the bilinear weighted nodal-uncertainty surface.
+    ///
+    /// This method does not infer a joint probability distribution or any
+    /// correlation between torque and speed. Partial out-of-domain rectangles
+    /// are rejected rather than clipped.
+    pub fn lookup_coordinate_bounds(
+        &self,
+        bounds: MapCoordinateBounds<'_>,
+    ) -> Result<MapCoordinateEnvelope, MapError> {
+        if bounds.configuration_digest != self.configuration_digest {
+            return Err(MapError::ConfigurationMismatch);
+        }
+        if bounds.context_digest != self.context_digest {
+            return Err(MapError::ContextMismatch);
+        }
+        if !bounds.nominal_motor_torque_nm.is_finite()
+            || !bounds.nominal_motor_speed_rpm.is_finite()
+            || !bounds.absolute_torque_bound_nm.is_finite()
+            || !bounds.absolute_speed_bound_rpm.is_finite()
+            || bounds.absolute_torque_bound_nm < 0.0
+            || bounds.absolute_speed_bound_rpm < 0.0
+        {
+            return Err(MapError::InvalidQuery(
+                "coordinate bounds must be finite and non-negative",
+            ));
+        }
+
+        let torque_lower_nm = bounds.nominal_motor_torque_nm - bounds.absolute_torque_bound_nm;
+        let torque_upper_nm = bounds.nominal_motor_torque_nm + bounds.absolute_torque_bound_nm;
+        let speed_lower_rpm = bounds.nominal_motor_speed_rpm - bounds.absolute_speed_bound_rpm;
+        let speed_upper_rpm = bounds.nominal_motor_speed_rpm + bounds.absolute_speed_bound_rpm;
+
+        if !torque_lower_nm.is_finite()
+            || !torque_upper_nm.is_finite()
+            || !speed_lower_rpm.is_finite()
+            || !speed_upper_rpm.is_finite()
+            || torque_lower_nm <= 0.0
+            || speed_lower_rpm <= 0.0
+            || torque_lower_nm > bounds.nominal_motor_torque_nm
+            || bounds.nominal_motor_torque_nm > torque_upper_nm
+            || speed_lower_rpm > bounds.nominal_motor_speed_rpm
+            || bounds.nominal_motor_speed_rpm > speed_upper_rpm
+        {
+            return Err(MapError::InvalidQuery(
+                "coordinate bounds overflow, are non-positive, or do not contain the nominal point",
+            ));
+        }
+
+        let nominal_lookup = self.lookup(MapQuery {
+            configuration_digest: bounds.configuration_digest,
+            context_digest: bounds.context_digest,
+            motor_torque_nm: bounds.nominal_motor_torque_nm,
+            motor_speed_rpm: bounds.nominal_motor_speed_rpm,
+        })?;
+
+        check_coordinate_domain(
+            torque_lower_nm,
+            torque_upper_nm,
+            &self.motor_torque_axis_nm,
+            "torque",
+        )?;
+        check_coordinate_domain(
+            speed_lower_rpm,
+            speed_upper_rpm,
+            &self.motor_speed_axis_rpm,
+            "speed",
+        )?;
+
+        let mut intersected_cells = Vec::new();
+        let mut lower_witness: Option<MapEnvelopeWitness> = None;
+        let mut upper_witness: Option<MapEnvelopeWitness> = None;
+
+        for speed_index in 0..self.motor_speed_axis_rpm.len() - 1 {
+            let cell_speed_lower = self.motor_speed_axis_rpm[speed_index];
+            let cell_speed_upper = self.motor_speed_axis_rpm[speed_index + 1];
+            if cell_speed_upper < speed_lower_rpm || cell_speed_lower > speed_upper_rpm {
+                continue;
+            }
+            let clipped_speed_lower = speed_lower_rpm.max(cell_speed_lower);
+            let clipped_speed_upper = speed_upper_rpm.min(cell_speed_upper);
+
+            for torque_index in 0..self.motor_torque_axis_nm.len() - 1 {
+                let cell_torque_lower = self.motor_torque_axis_nm[torque_index];
+                let cell_torque_upper = self.motor_torque_axis_nm[torque_index + 1];
+                if cell_torque_upper < torque_lower_nm || cell_torque_lower > torque_upper_nm {
+                    continue;
+                }
+                let clipped_torque_lower = torque_lower_nm.max(cell_torque_lower);
+                let clipped_torque_upper = torque_upper_nm.min(cell_torque_upper);
+
+                intersected_cells.push(MapCellIntersection {
+                    torque_cell_lower_index: torque_index,
+                    speed_cell_lower_index: speed_index,
+                    torque_lower_nm: clipped_torque_lower,
+                    torque_upper_nm: clipped_torque_upper,
+                    speed_lower_rpm: clipped_speed_lower,
+                    speed_upper_rpm: clipped_speed_upper,
+                });
+
+                let corners = [
+                    (clipped_torque_lower, clipped_speed_lower),
+                    (clipped_torque_upper, clipped_speed_lower),
+                    (clipped_torque_lower, clipped_speed_upper),
+                    (clipped_torque_upper, clipped_speed_upper),
+                ];
+                for (torque_nm, speed_rpm) in corners {
+                    let lookup = self.lookup(MapQuery {
+                        configuration_digest: bounds.configuration_digest,
+                        context_digest: bounds.context_digest,
+                        motor_torque_nm: torque_nm,
+                        motor_speed_rpm: speed_rpm,
+                    })?;
+                    let candidate_lower = MapEnvelopeWitness {
+                        motor_torque_nm: torque_nm,
+                        motor_speed_rpm: speed_rpm,
+                        torque_cell_lower_index: torque_index,
+                        speed_cell_lower_index: speed_index,
+                        nominal_efficiency: lookup.efficiency,
+                        absolute_uncertainty_bound: lookup.absolute_uncertainty_bound,
+                        efficiency_bound: lookup.efficiency_lower_bound,
+                    };
+                    let candidate_upper = MapEnvelopeWitness {
+                        efficiency_bound: lookup.efficiency_upper_bound,
+                        ..candidate_lower
+                    };
+
+                    if lower_witness.as_ref().is_none_or(|current| {
+                        candidate_lower.efficiency_bound < current.efficiency_bound
+                    }) {
+                        lower_witness = Some(candidate_lower);
+                    }
+                    if upper_witness.as_ref().is_none_or(|current| {
+                        candidate_upper.efficiency_bound > current.efficiency_bound
+                    }) {
+                        upper_witness = Some(candidate_upper);
+                    }
+                }
+            }
+        }
+
+        let lower_witness = lower_witness.ok_or(MapError::NumericalFailure)?;
+        let upper_witness = upper_witness.ok_or(MapError::NumericalFailure)?;
+
+        Ok(MapCoordinateEnvelope {
+            model_version: MODEL_VERSION,
+            nominal_lookup,
+            torque_lower_nm,
+            torque_upper_nm,
+            speed_lower_rpm,
+            speed_upper_rpm,
+            efficiency_lower_bound: lower_witness.efficiency_bound,
+            efficiency_upper_bound: upper_witness.efficiency_bound,
+            lower_witness,
+            upper_witness,
+            intersected_cells,
+        })
+    }
 }
 
-fn validate_axis(axis: &[f64], name: &'static str) -> Result<(), MapError> {
-    if axis.len() < 2 {
-        return Err(MapError::InvalidMap(
-            if name == "torque" {
-                "torque axis must contain at least two points"
-            } else {
-                "speed axis must contain at least two points"
-            },
-        ));
+fn check_coordinate_domain(
+    lower: f64,
+    upper: f64,
+    axis: &[f64],
+    name: &'static str,
+) -> Result<(), MapError> {
+    let minimum = axis[0];
+    let maximum = axis[axis.len() - 1];
+    if lower < minimum {
+        return Err(MapError::OutOfDomain {
+            axis: name,
+            value: lower,
+            minimum,
+            maximum,
+        });
     }
-    if axis.iter().any(|value| !value.is_finite()) {
-        return Err(MapError::InvalidMap(
-            if name == "torque" {
-                "torque axis must contain only finite values"
-            } else {
-                "speed axis must contain only finite values"
-            },
-        ));
-    }
-    if axis.windows(2).any(|pair| pair[1] <= pair[0]) {
-        return Err(MapError::InvalidMap(
-            if name == "torque" {
-                "torque axis must be strictly increasing"
-            } else {
-                "speed axis must be strictly increasing"
-            },
-        ));
-    }
-    if axis
-        .windows(2)
-        .any(|pair| !(pair[1] - pair[0]).is_finite())
-    {
-        return Err(MapError::InvalidMap(
-            if name == "torque" {
-                "torque axis intervals must be finite"
-            } else {
-                "speed axis intervals must be finite"
-            },
-        ));
+    if upper > maximum {
+        return Err(MapError::OutOfDomain {
+            axis: name,
+            value: upper,
+            minimum,
+            maximum,
+        });
     }
     Ok(())
 }
 
-fn bracket(
-    axis: &[f64],
-    value: f64,
-    name: &'static str,
-) -> Result<(usize, usize, f64), MapError> {
+fn validate_axis(axis: &[f64], name: &'static str) -> Result<(), MapError> {
+    if axis.len() < 2 {
+        return Err(MapError::InvalidMap(if name == "torque" {
+            "torque axis must contain at least two points"
+        } else {
+            "speed axis must contain at least two points"
+        }));
+    }
+    if axis.iter().any(|value| !value.is_finite()) {
+        return Err(MapError::InvalidMap(if name == "torque" {
+            "torque axis must contain only finite values"
+        } else {
+            "speed axis must contain only finite values"
+        }));
+    }
+    if axis.windows(2).any(|pair| pair[1] <= pair[0]) {
+        return Err(MapError::InvalidMap(if name == "torque" {
+            "torque axis must be strictly increasing"
+        } else {
+            "speed axis must be strictly increasing"
+        }));
+    }
+    if axis.windows(2).any(|pair| !(pair[1] - pair[0]).is_finite()) {
+        return Err(MapError::InvalidMap(if name == "torque" {
+            "torque axis intervals must be finite"
+        } else {
+            "speed axis intervals must be finite"
+        }));
+    }
+    Ok(())
+}
+
+fn bracket(axis: &[f64], value: f64, name: &'static str) -> Result<(usize, usize, f64), MapError> {
     let minimum = axis[0];
     let maximum = axis[axis.len() - 1];
     if value < minimum || value > maximum {
@@ -433,19 +661,29 @@ mod tests {
             vec![1.0, 5.0, 10.0],
             vec![1_000.0, 1_500.0, 2_000.0],
             vec![
-                MapNode { efficiency: 0.9, absolute_uncertainty_bound: 0.0 };
+                MapNode {
+                    efficiency: 0.9,
+                    absolute_uncertainty_bound: 0.0
+                };
                 9
             ],
             0.0,
         )
         .unwrap();
-        for (torque, speed) in [(1.0, 1_000.0), (2.5, 1_250.0), (7.0, 1_900.0), (10.0, 2_000.0)] {
-            let result = map.lookup(MapQuery {
-                configuration_digest: "config",
-                context_digest: "context",
-                motor_torque_nm: torque,
-                motor_speed_rpm: speed,
-            }).unwrap();
+        for (torque, speed) in [
+            (1.0, 1_000.0),
+            (2.5, 1_250.0),
+            (7.0, 1_900.0),
+            (10.0, 2_000.0),
+        ] {
+            let result = map
+                .lookup(MapQuery {
+                    configuration_digest: "config",
+                    context_digest: "context",
+                    motor_torque_nm: torque,
+                    motor_speed_rpm: speed,
+                })
+                .unwrap();
             assert!((result.efficiency - 0.9).abs() < 1.0e-12);
         }
     }
@@ -533,7 +771,10 @@ mod tests {
     #[test]
     fn malformed_axes_and_nodes_fail_closed() {
         let base_nodes = vec![
-            MapNode { efficiency: 0.9, absolute_uncertainty_bound: 0.01 };
+            MapNode {
+                efficiency: 0.9,
+                absolute_uncertainty_bound: 0.01
+            };
             4
         ];
         let invalid = [
@@ -646,12 +887,30 @@ mod tests {
     #[test]
     fn invalid_efficiency_and_uncertainty_nodes_are_rejected() {
         for node in [
-            MapNode { efficiency: 0.0, absolute_uncertainty_bound: 0.0 },
-            MapNode { efficiency: 1.01, absolute_uncertainty_bound: 0.0 },
-            MapNode { efficiency: f64::NAN, absolute_uncertainty_bound: 0.0 },
-            MapNode { efficiency: 0.9, absolute_uncertainty_bound: -0.01 },
-            MapNode { efficiency: 0.9, absolute_uncertainty_bound: f64::INFINITY },
-            MapNode { efficiency: 0.9, absolute_uncertainty_bound: 1.01 },
+            MapNode {
+                efficiency: 0.0,
+                absolute_uncertainty_bound: 0.0,
+            },
+            MapNode {
+                efficiency: 1.01,
+                absolute_uncertainty_bound: 0.0,
+            },
+            MapNode {
+                efficiency: f64::NAN,
+                absolute_uncertainty_bound: 0.0,
+            },
+            MapNode {
+                efficiency: 0.9,
+                absolute_uncertainty_bound: -0.01,
+            },
+            MapNode {
+                efficiency: 0.9,
+                absolute_uncertainty_bound: f64::INFINITY,
+            },
+            MapNode {
+                efficiency: 0.9,
+                absolute_uncertainty_bound: 1.01,
+            },
         ] {
             assert!(
                 EfficiencyMap2D::new(
@@ -673,7 +932,10 @@ mod tests {
     #[test]
     fn blank_identity_and_invalid_systematic_uncertainty_are_rejected() {
         let nodes = vec![
-            MapNode { efficiency: 0.9, absolute_uncertainty_bound: 0.01 };
+            MapNode {
+                efficiency: 0.9,
+                absolute_uncertainty_bound: 0.01
+            };
             4
         ];
         for (map_id, config, context) in [
@@ -781,5 +1043,146 @@ mod tests {
         let map = fixture();
         let input = query(3.25, 1_500.0);
         assert_eq!(map.lookup(input), map.lookup(input));
+    }
+
+    #[test]
+    fn coordinate_bounds_inside_one_cell_match_independent_corner_extrema() {
+        let map = fixture();
+        let envelope = map
+            .lookup_coordinate_bounds(MapCoordinateBounds {
+                configuration_digest: "config-sha-001",
+                context_digest: "context-sha-001",
+                nominal_motor_torque_nm: 3.25,
+                absolute_torque_bound_nm: 1.25,
+                nominal_motor_speed_rpm: 1_500.0,
+                absolute_speed_bound_rpm: 200.0,
+            })
+            .unwrap();
+
+        assert_eq!(
+            (envelope.torque_lower_nm, envelope.torque_upper_nm),
+            (2.0, 4.5)
+        );
+        assert_eq!(
+            (envelope.speed_lower_rpm, envelope.speed_upper_rpm),
+            (1_300.0, 1_700.0)
+        );
+        assert_eq!(envelope.intersected_cells.len(), 1);
+        assert!((envelope.efficiency_lower_bound - 0.7473333333333333).abs() < 1.0e-12);
+        assert!((envelope.efficiency_upper_bound - 0.8981666666666667).abs() < 1.0e-12);
+        assert_eq!(envelope.lower_witness.motor_torque_nm, 2.0);
+        assert_eq!(envelope.lower_witness.motor_speed_rpm, 1_300.0);
+        assert_eq!(envelope.upper_witness.motor_torque_nm, 4.5);
+        assert_eq!(envelope.upper_witness.motor_speed_rpm, 1_700.0);
+    }
+
+    #[test]
+    fn point_degenerate_coordinate_bounds_match_point_lookup() {
+        let map = fixture();
+        let point = query(3.25, 1_500.0);
+        let lookup = map.lookup(point).unwrap();
+        let envelope = map
+            .lookup_coordinate_bounds(MapCoordinateBounds {
+                configuration_digest: point.configuration_digest,
+                context_digest: point.context_digest,
+                nominal_motor_torque_nm: point.motor_torque_nm,
+                absolute_torque_bound_nm: 0.0,
+                nominal_motor_speed_rpm: point.motor_speed_rpm,
+                absolute_speed_bound_rpm: 0.0,
+            })
+            .unwrap();
+
+        assert_eq!(envelope.nominal_lookup, lookup);
+        assert_eq!(
+            envelope.efficiency_lower_bound,
+            lookup.efficiency_lower_bound
+        );
+        assert_eq!(
+            envelope.efficiency_upper_bound,
+            lookup.efficiency_upper_bound
+        );
+    }
+
+    #[test]
+    fn coordinate_rectangle_crossing_grid_lines_enumerates_all_closed_cells() {
+        let map = EfficiencyMap2D::new(
+            "grid-map",
+            "grid-digest",
+            "config",
+            "context",
+            "evidence",
+            vec![1.0, 5.0, 10.0],
+            vec![1_000.0, 1_500.0, 2_000.0],
+            vec![
+                MapNode {
+                    efficiency: 0.85,
+                    absolute_uncertainty_bound: 0.01,
+                };
+                9
+            ],
+            0.005,
+        )
+        .unwrap();
+
+        let envelope = map
+            .lookup_coordinate_bounds(MapCoordinateBounds {
+                configuration_digest: "config",
+                context_digest: "context",
+                nominal_motor_torque_nm: 5.0,
+                absolute_torque_bound_nm: 1.0,
+                nominal_motor_speed_rpm: 1_500.0,
+                absolute_speed_bound_rpm: 100.0,
+            })
+            .unwrap();
+
+        assert_eq!(envelope.intersected_cells.len(), 4);
+        assert_eq!(envelope.efficiency_lower_bound, 0.835);
+        assert!((envelope.efficiency_upper_bound - 0.865).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn coordinate_bounds_reject_partial_out_of_domain_rectangles() {
+        let map = fixture();
+        let result = map.lookup_coordinate_bounds(MapCoordinateBounds {
+            configuration_digest: "config-sha-001",
+            context_digest: "context-sha-001",
+            nominal_motor_torque_nm: 1.1,
+            absolute_torque_bound_nm: 0.2,
+            nominal_motor_speed_rpm: 1_500.0,
+            absolute_speed_bound_rpm: 0.0,
+        });
+        assert!(matches!(
+            result,
+            Err(MapError::OutOfDomain { axis: "torque", .. })
+        ));
+    }
+
+    #[test]
+    fn coordinate_bounds_reject_invalid_uncertainties_and_identity_mismatches() {
+        let map = fixture();
+        let mut bounds = MapCoordinateBounds {
+            configuration_digest: "config-sha-001",
+            context_digest: "context-sha-001",
+            nominal_motor_torque_nm: 3.25,
+            absolute_torque_bound_nm: -0.1,
+            nominal_motor_speed_rpm: 1_500.0,
+            absolute_speed_bound_rpm: 0.0,
+        };
+        assert!(matches!(
+            map.lookup_coordinate_bounds(bounds),
+            Err(MapError::InvalidQuery(_))
+        ));
+        bounds.absolute_torque_bound_nm = 0.1;
+        bounds.configuration_digest = "wrong";
+        assert_eq!(
+            map.lookup_coordinate_bounds(bounds),
+            Err(MapError::ConfigurationMismatch)
+        );
+        bounds.configuration_digest = "config-sha-001";
+        bounds.context_digest = "wrong";
+        assert_eq!(
+            map.lookup_coordinate_bounds(bounds),
+            Err(MapError::ContextMismatch)
+        );
     }
 }

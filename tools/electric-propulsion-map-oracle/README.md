@@ -46,3 +46,15 @@ A passing synthetic test establishes only map data validation and interpolation 
 The map-content digest is distinct from the source evidence-manifest digest. The same raw observations and calibration evidence can yield different map artifacts after changes to filtering, fitting, grid selection or map-generation code. The map digest must identify the exact serialized axes, nodes, uncertainty values and map metadata. The source evidence-manifest digest must identify the underlying observations and transformations. The lookup result preserves both; the consumer must not substitute one for the other.
 
 This crate requires the caller to supply both exact digests. It does not calculate a canonical serialization or cryptographic hash internally.
+
+## Coordinate-bounded lookup (v0.3 draft)
+
+The additive `lookup_coordinate_bounds` API accepts a nominal motor torque/RPM point and non-negative absolute bounds for both coordinates. It constructs the closed rectangular input set, rejects the entire request if any part extends outside the map's characterized support, enumerates every closed map cell intersecting the rectangle, and evaluates the four corners of each clipped cell patch. It returns the original point lookup, the global lower/upper efficiency bounds, the intersected cell rectangles, and coordinate/cell witnesses for both extrema.
+
+The corner-extremum rule follows from the bilinear form within each cell: for a bilinear surface on a rectangle, extrema occur at rectangle corners. The weighted nodal absolute-uncertainty surface is bilinear too, so the same argument applies to efficiency minus/plus the interpolated node bound. This statement is specific to this bilinear representation; it must not be reused for splines, Gaussian processes or other future map families without a separate argument.
+
+The coordinate rectangle is a set of absolute bounds, **not** a joint probability distribution. It does not infer torque/speed correlation or covariance. A rectangle touching a shared grid line is evaluated on every closed cell it intersects. A rectangle extending even partially beyond the support is rejected; it is never clipped or extrapolated.
+
+The present implementation reuses the map oracle's existing `f64` interpolation arithmetic. Its analytical extrema property is exact for the represented bilinear patches, but the implementation is not yet a formally directed-rounded interval-arithmetic proof. Do not interpret the returned numbers as a certified floating-point enclosure or physical confidence interval. A later hardening increment should add a validated outward-rounding strategy and independent arithmetic reference before using this API for physical promotion.
+
+A point-degenerate rectangle (both coordinate bounds zero) is required to reproduce the existing point lookup exactly. The new API adds no measured data and does not authorize physical testing.
