@@ -45,6 +45,12 @@ pub struct EvidenceRecord {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum BlockAxis {
+    Lot,
+    Line,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum HoldoutAxis {
     Lot,
     Line,
@@ -106,6 +112,7 @@ pub struct CellObservation {
 pub struct Campaign {
     pub campaign_id: String,
     pub mission_id: String,
+    pub blocking_axis: BlockAxis,
     pub holdout_axis: HoldoutAxis,
     pub maximum_feature_cutoff_cycle: u32,
 }
@@ -127,6 +134,7 @@ pub struct AuditReport {
     pub cell_count: usize,
     pub lot_count: usize,
     pub line_count: usize,
+    pub block_count: usize,
     pub holdout_group_count: usize,
     pub observed_eol_count: usize,
     pub right_censored_count: usize,
@@ -527,6 +535,7 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
     let mut line_digests = BTreeMap::new();
     let mut split_by_group = BTreeMap::<HoldoutGroup, DataSplit>::new();
     let mut used_holdout_groups = BTreeSet::<HoldoutGroup>::new();
+    let mut arms_by_block = BTreeMap::<String, BTreeSet<String>>::new();
     let mut observed_eol_count = 0;
     let mut right_censored_count = 0;
     let mut competing_failure_count = 0;
@@ -593,6 +602,15 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         }
         used_holdout_groups.insert(group);
 
+        let block_id = match campaign.blocking_axis {
+            BlockAxis::Lot => cell.lot_id.clone(),
+            BlockAxis::Line => cell.line_id.clone(),
+        };
+        arms_by_block
+            .entry(block_id)
+            .or_default()
+            .insert(cell.arm_id.clone());
+
         match lot_digests.insert(cell.lot_id.as_str(), cell.lot_lineage_digest.as_str()) {
             Some(previous) if previous != cell.lot_lineage_digest.as_str() => {
                 return Err(AuditError(format!(
@@ -632,6 +650,19 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         }
     }
 
+    let expected_arm_ids: BTreeSet<String> = manifest
+        .arms
+        .iter()
+        .map(|arm| arm.arm_id.clone())
+        .collect();
+    for (block_id, block_arm_ids) in &arms_by_block {
+        if block_arm_ids != &expected_arm_ids {
+            return Err(AuditError(format!(
+                "block {block_id} does not contain the full protocol-arm set"
+            )));
+        }
+    }
+
     // Reverse-map digests to stable group identities to reject aliases.
     let mut lot_ids_by_digest = BTreeMap::<&str, &str>::new();
     for (lot_id, digest) in &lot_digests {
@@ -668,6 +699,7 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         cell_count: manifest.cells.len(),
         lot_count: lot_digests.len(),
         line_count: line_digests.len(),
+        block_count: arms_by_block.len(),
         holdout_group_count: used_holdout_groups.len(),
         observed_eol_count,
         right_censored_count,
@@ -791,6 +823,7 @@ mod tests {
             campaign: Campaign {
                 campaign_id: "FORMATION-CHARGE-CO-DESIGN-001".into(),
                 mission_id: "EV-CITY-DELIVERY-DUTY-01".into(),
+                blocking_axis: BlockAxis::Lot,
                 holdout_axis: HoldoutAxis::Lot,
                 maximum_feature_cutoff_cycle: 50,
             },
@@ -812,10 +845,37 @@ mod tests {
         assert_eq!(report.cell_count, 12);
         assert_eq!(report.lot_count, 3);
         assert_eq!(report.line_count, 1);
+        assert_eq!(report.block_count, 3);
         assert_eq!(report.observed_eol_count, 0);
         assert_eq!(report.synthetic_outcome_count, 12);
         assert_eq!(report.physical_lifetime_outcome_count, 0);
         assert_eq!(report.reference_arm_id, "reference");
+    }
+
+    #[test]
+    fn matched_block_must_contain_every_protocol_arm() {
+        let mut value = fixture();
+        value
+            .cells
+            .retain(|cell| !(cell.lot_id == "LOT-A" && cell.arm_id == "joint"));
+        assert!(audit_campaign(&value).is_err());
+    }
+
+    #[test]
+    fn line_blocking_requires_every_arm_on_each_line() {
+        let mut value = fixture();
+        value.campaign.blocking_axis = BlockAxis::Line;
+        value.cells.push({
+            let mut cell = value.cells[0].clone();
+            cell.cell_id = "CELL-EXTRA".into();
+            cell.lot_id = "LOT-D".into();
+            cell.lot_lineage_digest = digest('8');
+            cell.line_id = "LINE-2".into();
+            cell.line_identity_digest = digest('9');
+            cell.arm_id = "reference".into();
+            cell
+        });
+        assert!(audit_campaign(&value).is_err());
     }
 
     #[test]
