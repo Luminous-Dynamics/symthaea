@@ -1,0 +1,296 @@
+{
+  "schema_version": "0.1.0",
+  "programme": "HTS-FUSION-MAGNET-001",
+  "generated_date": "2026-11-12",
+  "claim_ceiling": "SOURCE_REGISTER_ONLY_NO_LUMINOUS_REPRODUCTION_OR_MAGNET_QUALIFICATION",
+  "evidence_classes": [
+    "PUBLISHED_PHYSICAL_DEMONSTRATION",
+    "PUBLISHED_NUMERICAL_STUDY",
+    "PUBLISHED_REVIEW_SYNTHESIS"
+  ],
+  "rules": {
+    "self_field_current_is_high_field_current": false,
+    "scaled_projection_is_measurement": false,
+    "model_prediction_is_physical_observation": false,
+    "quench_detection_title_is_protection_qualification": false,
+    "missing_latency_is_zero_latency": false,
+    "different_quench_events_are_matched": false,
+    "current_rating_without_temperature_field_orientation_and_geometry_is_comparable": false
+  },
+  "cases": [
+    {
+      "case_id": "REBCO-LASSO-TEMPERATURE-DETECTION-2026",
+      "lane": "QUENCH_DETECTION",
+      "evidence_class": "PUBLISHED_PHYSICAL_DEMONSTRATION",
+      "source": {
+        "authors": "Bykovskiy et al.",
+        "title": "Demonstration of temperature-based quench detection on high-current insulated ReBCO coils made of LASSO cables",
+        "publisher": "Superconductor Science and Technology",
+        "publication_date": "2026-09-04",
+        "doi": "10.1088/1361-6668/aea2da",
+        "url": "https://doi.org/10.1088/1361-6668/aea2da",
+        "primary_repository": "https://infoscience.epfl.ch/entities/publication/3b2eb43f-1977-479e-9137-5a6e04177eb4",
+        "source_license": "CC-BY"
+      },
+      "configurations": [
+        {
+          "configuration_id": "SULTAN-RACETRACK",
+          "test_facility": "SULTAN",
+          "conductor_architecture": "LASSO",
+          "conductor_length_m": 20,
+          "tape_count": 12,
+          "coil_type": "single racetrack",
+          "measurement_numeric_latency_ms": null
+        },
+        {
+          "configuration_id": "JORDI-DOUBLE-PANCAKE",
+          "test_facility": "JORDI",
+          "conductor_architecture": "LASSO",
+          "conductor_length_m": 50,
+          "tape_count": 15,
+          "coil_type": "double pancake",
+          "measurement_numeric_latency_ms": null
+        }
+      ],
+      "sensing_methods": [
+        "twisted-pair superconducting quench detector (SQD)",
+        "shielded thermocouple chain (TCC)",
+        "fibre-optic sensing (FOS)"
+      ],
+      "source_conclusion": "The study examines thermal coupling and electrical insulation of temperature-based detection methods on LASSO conductor samples of increasing size and stored energy.",
+      "comparison_status": "SOURCE_CASES_IDENTIFIED_DETAILED_METRICS_EXTRACTION_REQUIRED",
+      "blockers": [
+        "Abstract/source metadata does not supply per-event latency distributions or false-positive/negative rates.",
+        "Extract raw time series, calibration, sensor placement, exact event definitions and uncertainty before quantitative detector ranking.",
+        "Do not infer high-energy coil or fusion magnet protection qualification from the demonstrated sample cases."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "REBCO-MICROWAVE-SENSOR-FREE-QUENCH-2026",
+      "lane": "QUENCH_DETECTION",
+      "evidence_class": "PUBLISHED_PHYSICAL_DEMONSTRATION",
+      "source": {
+        "authors": "Rong et al.",
+        "title": "Microwave-based, sensor-free rapid quench detection for REBCO-based magnets and power transmission lines",
+        "publisher": "Superconductor Science and Technology",
+        "publication_date": "2026-06-29",
+        "doi": "10.1088/1361-6668/ae77b2",
+        "url": "https://doi.org/10.1088/1361-6668/ae77b2",
+        "publisher_article": "https://iopscience.iop.org/article/10.1088/1361-6668/ae77b2"
+      },
+      "sensing_method": "microwave-based sensor-free quench detection",
+      "quantitative_observations": [],
+      "comparison_status": "NEW_COMPARATOR_METHOD_EXTRACTION_REQUIRED",
+      "blockers": [
+        "The paper must be inspected for exact experimental versus simulated scope, operating conditions and measured observables.",
+        "No quantitative latency, false-alarm, missed-event, or detection-margin value is admitted from title/abstract alone.",
+        "Do not infer field-ready protection qualification."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "REBCO-SQD-THEA-PROTECTION-2026",
+      "lane": "QUENCH_PROTECTION_MODEL",
+      "evidence_class": "PUBLISHED_NUMERICAL_STUDY",
+      "source": {
+        "authors": "Zgour et al.",
+        "title": "Quench Protection in Insulated REBCO Conductors: Design Optimization and Fast Detection via REBCO SQD",
+        "publisher": "IEEE Transactions on Applied Superconductivity",
+        "publication_date": "2026-02-02",
+        "doi": "10.1109/TASC.2026.3659105",
+        "url": "https://doi.org/10.1109/TASC.2026.3659105"
+      },
+      "model": "THEA one-dimensional electrothermal model",
+      "compared_architectures": [
+        "copper stabilizer cross-section optimization",
+        "co-wound REBCO superconducting quench detector, electrically isolated and thermally coupled"
+      ],
+      "source_conclusion": "The article reports a numerical proof of concept that stabilizer selection can keep hotspot temperature within a safe limit for its modelled events, and that an intentionally modified/deoxygenated REBCO SQD can transition at lower temperature for earlier detection.",
+      "comparison_status": "MODEL_REPRODUCTION_REQUIRED",
+      "blockers": [
+        "Model assumptions, exact configurations, parameter values, uncertainty and source output traces must be extracted.",
+        "A modelled proof of concept is not a physical quench demonstration or magnet protection authorization."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "REBCO-CICC-80KA-10P85T-2025",
+      "lane": "HIGH_CURRENT_CONDUCTOR",
+      "evidence_class": "PUBLISHED_PHYSICAL_DEMONSTRATION",
+      "source": {
+        "authors": "Jin et al.",
+        "title": "Performance of the First 80 kA HTS CICC for High-Field Application in Future Fusion Reactors",
+        "publisher": "Engineering",
+        "publication_date": "2025",
+        "doi": "10.1016/j.eng.2025.05.015",
+        "url": "https://doi.org/10.1016/j.eng.2025.05.015"
+      },
+      "configuration": {
+        "conductor_type": "REBCO cable-in-conduit conductor",
+        "tape_count": 288,
+        "measured_transport_current_kA": 80,
+        "measured_magnetic_field_T": 10.85,
+        "measured_temperature_K": 4.5,
+        "cyclic_lorentz_load_kN_per_m": 830,
+        "source_reported_current_sharing_temperature_K_at_80kA_10p85T": 20,
+        "scaled_design_point": {
+          "current_kA": 46.5,
+          "field_T": 20,
+          "temperature_margin_K": "over 10 relative to 4.5 K"
+        }
+      },
+      "comparison_status": "MEASURED_POINT_AND_SCALED_DESIGN_POINT_MUST_REMAIN_SEPARATE",
+      "blockers": [
+        "80 kA at 10.85 T and 4.5 K is the source-reported operating point; 46.5 kA at 20 T is a scaled/design projection, not the same measured test point.",
+        "Extract raw current/field/temperature and cyclic load curves, uncertainty, degradation and exact coil/test configuration before matched comparison.",
+        "This is a conductor prototype result, not a full magnet or fusion plant qualification."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "REBCO-HFRC-CICC-21P59KA-77K-2025",
+      "lane": "HIGH_CURRENT_CONDUCTOR",
+      "evidence_class": "PUBLISHED_PHYSICAL_DEMONSTRATION",
+      "source": {
+        "title": "Manufacturing and performance test of a 21.59 kA @77 K, self-field full-size REBCO-HFRC cable-in-conduit conductor",
+        "publisher": "Fusion Engineering and Design",
+        "publication_date": "2025-02",
+        "doi": "10.1016/j.fusengdes.2024.114775",
+        "url": "https://doi.org/10.1016/j.fusengdes.2024.114775"
+      },
+      "configuration": {
+        "cable_architecture": "six-around-one HFRC CICC",
+        "conductor_length_m": 1.284,
+        "measured_critical_current_kA": 21.59,
+        "temperature_K": 77,
+        "field_condition": "self-field",
+        "measured_total_resistance_nOhm": 36.7,
+        "measured_joint_terminal_resistances_nOhm": {
+          "upper": 20.07,
+          "lower": 16.63
+        }
+      },
+      "comparison_status": "SOURCE_SPECIFIC_77K_SELF_FIELD_CASE",
+      "blockers": [
+        "77 K self-field performance is not directly comparable to 4.5 K high-field fusion operating points.",
+        "The source describes a design target for high-field operation; do not promote the self-field test to 20 T qualification.",
+        "Preserve conductor length, cable architecture, current definition and joint boundaries."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "REBCO-ENGINEERING-TRANSLATION-REVIEW-2026",
+      "lane": "MATERIAL_TO_ENGINEERING_TRANSLATION",
+      "evidence_class": "PUBLISHED_REVIEW_SYNTHESIS",
+      "source": {
+        "title": "From critical temperature to engineering reality: A quantitative framework for assessing the translation gap in superconducting materials",
+        "publisher": "Next Materials",
+        "publication_date": "2026-10",
+        "doi": "10.1016/j.nxmate.2026.103138",
+        "url": "https://doi.org/10.1016/j.nxmate.2026.103138"
+      },
+      "source_synthesized_observations": [
+        {
+          "metric": "REBCO_routine_piece_length",
+          "lower": 0.3,
+          "upper": 2,
+          "unit": "km"
+        },
+        {
+          "metric": "REBCO_estimated_manufacturing_yield",
+          "lower": 80,
+          "upper": 90,
+          "unit": "percent"
+        },
+        {
+          "metric": "REBCO_production_readiness",
+          "value": 7,
+          "qualifier": "review's application/maturity framework, not independent certification",
+          "unit": "TRL"
+        },
+        {
+          "metric": "REBCO_high_field_translation_score_at_20K",
+          "value": 64,
+          "qualifier": "review-defined score, must reproduce scale and assumptions",
+          "unit": "score_0_to_100"
+        },
+        {
+          "metric": "maximum_material_score_across_reviewed_application_classes",
+          "value": 76,
+          "qualifier": "review-defined score, not a universal materials ceiling",
+          "unit": "score_0_to_100"
+        }
+      ],
+      "comparison_status": "REVIEW_SYNTHESIS_NOT_VENDOR_GUARANTEE",
+      "blockers": [
+        "Manufacturing piece length and yield are review-synthesized estimates, not guaranteed values for every manufacturer or product generation.",
+        "Reproduce the score construction, application class and weighting before using the numeric score for design ranking.",
+        "Do not equate a review-assigned TRL with product certification or production capacity."
+      ],
+      "luminous_reproduction": false
+    }
+  ],
+  "negative_controls": [
+    {
+      "control_id": "HTS-NC-001",
+      "condition": "Promote 77 K self-field 21.59 kA to a 20 T / 4.5 K rating.",
+      "expected_disposition": "REJECT_FIELD_TEMPERATURE_BASIS_MISMATCH"
+    },
+    {
+      "control_id": "HTS-NC-002",
+      "condition": "Promote scaled 46.5 kA / 20 T design point to an 80 kA measured observation.",
+      "expected_disposition": "REJECT_MEASURED_VS_PROJECTED_MISMATCH"
+    },
+    {
+      "control_id": "HTS-NC-003",
+      "condition": "Compare critical current without tape count, cable architecture, temperature and field angle.",
+      "expected_disposition": "NOT_COMPARABLE_CONFIGURATION_INCOMPLETE"
+    },
+    {
+      "control_id": "HTS-NC-004",
+      "condition": "Rank materials by critical temperature alone.",
+      "expected_disposition": "REJECT_APPLICATION_TRANSLATION_INCOMPLETE"
+    },
+    {
+      "control_id": "HTS-NC-005",
+      "condition": "Compare quench latency from non-identical event definitions or clocks.",
+      "expected_disposition": "NOT_COMPARABLE_EVENT_MISMATCH"
+    },
+    {
+      "control_id": "HTS-NC-006",
+      "condition": "Treat a simulated THEA hotspot as measured temperature.",
+      "expected_disposition": "REJECT_EVIDENCE_CLASS_MISMATCH"
+    },
+    {
+      "control_id": "HTS-NC-007",
+      "condition": "Treat microwave sensor-free detection publication title as demonstrated low false-alarm protection.",
+      "expected_disposition": "REJECT_INSUFFICIENT_SOURCE_DETAIL"
+    },
+    {
+      "control_id": "HTS-NC-008",
+      "condition": "Count a sensor failure as no quench or zero detection latency.",
+      "expected_disposition": "REJECT_MISSING_OBSERVATION"
+    },
+    {
+      "control_id": "HTS-NC-009",
+      "condition": "Omit AC losses, joint heating or refrigeration input from the system objective.",
+      "expected_disposition": "REJECT_INCOMPLETE_SYSTEM_BOUNDARY"
+    },
+    {
+      "control_id": "HTS-NC-010",
+      "condition": "Use self-field Ic as high-field Ic or extrapolate outside field-angle envelope.",
+      "expected_disposition": "REJECT_MODEL_OUT_OF_DOMAIN"
+    },
+    {
+      "control_id": "HTS-NC-011",
+      "condition": "Treat a conductor prototype qualification as full magnet or fusion plant qualification.",
+      "expected_disposition": "REJECT_CLAIM_CEILING_VIOLATION"
+    },
+    {
+      "control_id": "HTS-NC-012",
+      "condition": "Use review-synthesized TRL/yield/length as a vendor-guaranteed manufacturing specification.",
+      "expected_disposition": "REJECT_EVIDENCE_CLASS_MISMATCH"
+    }
+  ]
+}
