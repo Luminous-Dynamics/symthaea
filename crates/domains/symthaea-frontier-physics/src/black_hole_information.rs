@@ -4428,14 +4428,14 @@ mod symmetry_resolved_page_tests {
     }
 
     #[test]
-    fn fixed_charge_page_reference_matches_charge_block_dirichlet_decomposition() {
-        // N=4, K=2, A=2 has charge-block dimensions (1,4,1) and
-        // exact Haar-average entropy 19/20 nats from the Dirichlet/Page sum.
-        let expected = 19.0 / 20.0;
-        let actual = symmetry_resolved_page_average_entropy_nats(4, 2, 2).unwrap();
+    fn fixed_charge_page_reference_matches_unequal_block_dirichlet_sum() {
+        // N=4, K=1, A=1 has block dimensions 3 and 1:
+        // H_4 - (3/4)H_3 - (1/4)H_1 = 11/24 nats.
+        let expected = 11.0 / 24.0;
+        let actual = symmetry_resolved_page_average_entropy_nats(4, 1, 1).unwrap();
+        let complement = symmetry_resolved_page_average_entropy_nats(4, 1, 3).unwrap();
         assert!((actual - expected).abs() < 1e-13);
-        let complement = symmetry_resolved_page_average_entropy_nats(4, 2, 2).unwrap();
-        assert!((actual - complement).abs() < 1e-14);
+        assert!((complement - expected).abs() < 1e-13);
     }
 
     #[test]
