@@ -61,7 +61,7 @@ Compare, on the same design space, duty-cycle distribution, physical groups and 
 
 Use exact outer holdouts by physical cell, lot, production line/equipment, formation/charge protocol pair and design family where the source supports them. The split axis must be declared; a group must never straddle train/validation/test/prospective partitions on that axis. All scaling, feature selection, calibration, hyperparameter tuning and adaptation stay inside the training partition.
 
-For early-window predictions, every feature has an availability cycle/time. Post-cutoff capacity, impedance, endpoint, failure and lifetime information is forbidden. Start with cutoffs 1, 5, 10, 20 and 50 only where the source contains the necessary observations.
+For early-window predictions, every feature has its own availability cycle and admitted evidence reference, and that cycle must be no later than the cell's declared cutoff. Post-cutoff capacity, impedance, endpoint, failure and lifetime information is forbidden. Start with cutoffs 1, 5, 10, 20 and 50 only where the source contains the necessary observations.
 
 ## Required physical outcomes
 
