@@ -29,9 +29,9 @@ jobs:
       - name: Run Rust unit tests
         run: cargo test --locked --manifest-path tools/ieee754-enclosure-qualifier/Cargo.toml
       - name: Run Clippy
-        run: cargo clippy --locked --manifest-path tools/ieee754-enclosure-qualifier/Cargo.toml --all-targets -- -D warnings
+        run: >-\n          cargo clippy --locked --manifest-path\n          tools/ieee754-enclosure-qualifier/Cargo.toml --all-targets -- -D warnings
       - name: Emit raw-bit qualification vectors
-        run: cargo run --locked --release --manifest-path tools/ieee754-enclosure-qualifier/Cargo.toml --bin emit-vectors > /tmp/ieee754-vectors.txt
+        run: >-\n          cargo run --locked --release --manifest-path\n          tools/ieee754-enclosure-qualifier/Cargo.toml --bin emit-vectors\n          > /tmp/ieee754-vectors.txt
       - name: Verify against independent exact rationals
         run: python3 tools/ieee754-enclosure-qualifier/verify.py /tmp/ieee754-vectors.txt
       - name: Report Rust toolchain and target
