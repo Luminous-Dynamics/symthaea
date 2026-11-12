@@ -79,6 +79,20 @@ Primary product/method references:
 - Loomio proposals and polls: https://www.loomio.com/docs/en/user_manual/polls/intro_to_decisions
 - Stanford Online Deliberation Platform: https://deliberation.stanford.edu/tools-resources/online-deliberation-platform
 
+### Direct benchmark and methodological comparators
+
+| Comparator | What it measures | How Symthaea / CivOS should compare |
+|---|---|---|
+| [PHANTOM-Bench (6 Nov 2026)](https://arxiv.org/abs/2611.08971) | Private judgments, ambiguous public signals, estimated peer-private beliefs, transparency recovery, and neutral / explicit-vote controls. | Exact methodological reproduction first. Then extend with missingness, abstention, authentic roster provenance, communication topology, pluralistic tasks and independently replayable receipts. |
+| [Beyond Correctness (ICML 2026)](https://proceedings.mlr.press/v306/ha26a.html) | Direction and magnitude of solution revision during multi-agent debate, including regression from correct answers under social pressure. | Add revision-distance and warranted-update outcomes by composing #11320 and #11340. Do not treat peer-belief accuracy as a substitute for reasoning correctness. |
+| [Free-MAD (Findings ACL 2026)](https://aclanthology.org/2026.findings-acl.1600/) | Consensus-free debate, whole-trajectory scoring and anti-conformity; reports results across eight reasoning datasets and reduced communication cost. | Include as a decision-method baseline on matched verifiable tasks, tracking token/latency cost and full-trajectory evidence. It does not by itself measure actual private peer beliefs or human legitimacy. |
+| [Demystifying Multi-Agent Debate (Findings ACL 2026)](https://aclanthology.org/2026.findings-acl.1694/) | Initial perspective diversity and confidence-modulated debate updates across reasoning QA benchmarks. | Compare diversity and confidence-aware interventions, while keeping individual confidence (#11367) distinct from estimates about peers' private choices (#11682). |
+| [Misalignment Contagion (COLM 2026)](https://proceedings.colm.cc/paper_files/paper/2026/hash/871ed095b734818cfba48db6aeb25a62-Abstract-Conference.html) | Persistent stance shifts, public/private re-elicitation and communication-topology effects. | Compose through #11320; preserve evidence-supported revision as a positive outcome and test topology without transferring authority semantics. |
+| [DeliberationBank / DeliberationJudge (COLM 2026)](https://arxiv.org/abs/2510.05154) | Participant-conditioned opinion-summary judgments on representativeness, informativeness, neutrality and policy approval. | Use for the Mycelix #6011 summary track, with independent rights/consent and checkpoint-integrity gates. It is not a group-intervention benchmark. |
+| [Real-Time Group Dynamics with LLM Facilitation (FAccT 2026)](https://deepmind.google/research/publications/224297/) | Two human-group experiments (N=879) on facilitation preference, allocation influence, consensus and participation equity. | Human-reference comparator for Mycelix; keep perceived satisfaction, trust, real allocation outcomes and participation equality separate. |
+
+These are complementary evidence types, not interchangeable leaderboard rows. PHANTOM-Bench is the closest same-task reference; Free-MAD and confidence/diversity-aware debate are candidate decision algorithms; Beyond Correctness and Misalignment Contagion inform trajectory metrics; DeliberationBank informs participant-conditioned voice fidelity; FAccT informs human-group causal outcomes.
+
 ## What "better than SOTA" should mean here
 
 Do not claim superiority from synthetic fixtures or a lower aggregate agreement error. The confirmatory comparison should include:
