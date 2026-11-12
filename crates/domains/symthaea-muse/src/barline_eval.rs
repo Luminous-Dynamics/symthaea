@@ -156,6 +156,7 @@ pub enum EvaluationError {
     NoMeasures,
     NonPositiveDenominator { den: i64 },
     NegativeCoordinate { num: i64 },
+    NonReducedRational,
     EmptyOrReversedMeasure { index: usize },
     NonContiguousMeasures { left_index: usize },
     ArithmeticOverflow,
@@ -221,9 +222,7 @@ pub fn evaluate_measure_maps(
     prediction: &MeasureMap,
     tolerance: RationalBeat,
 ) -> Result<EvaluationOutcome, EvaluationError> {
-    if tolerance.num < 0 || tolerance.den <= 0 {
-        return Err(EvaluationError::InvalidTolerance);
-    }
+    validate_rational(tolerance)?;
 
     let unavailable = match (&gold.status, &prediction.status) {
         (MeasureMapStatus::Unknown { reason }, _) => {
@@ -292,6 +291,8 @@ fn validate_map(map: &MeasureMap) -> Result<(), EvaluationError> {
         return Err(EvaluationError::NoMeasures);
     }
     for (index, measure) in map.measures.iter().enumerate() {
+        validate_rational(measure.start)?;
+        validate_rational(measure.end)?;
         if measure.start.cmp_exact(measure.end) != Ordering::Less {
             return Err(EvaluationError::EmptyOrReversedMeasure { index });
         }
@@ -303,6 +304,19 @@ fn validate_map(map: &MeasureMap) -> Result<(), EvaluationError> {
                 });
             }
         }
+    }
+    Ok(())
+}
+
+fn validate_rational(value: RationalBeat) -> Result<(), EvaluationError> {
+    if value.den <= 0 {
+        return Err(EvaluationError::NonPositiveDenominator { den: value.den });
+    }
+    if value.num < 0 {
+        return Err(EvaluationError::NegativeCoordinate { num: value.num });
+    }
+    if gcd(value.num, value.den) != 1 {
+        return Err(EvaluationError::NonReducedRational);
     }
     Ok(())
 }
