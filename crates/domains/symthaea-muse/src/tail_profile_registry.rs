@@ -157,6 +157,9 @@ pub enum TailProfileError {
     EmptyObservationSet(&'static str),
     TooManyLineages,
     DuplicateEventReceipt,
+    DuplicateSourceEventObservation,
+    IncompleteSourceEventCoverage,
+    SourceScoreEventCountMismatch,
     CalibrationQualificationOverlap,
     TopologyMismatch,
     InsufficientCalibrationLineages,
@@ -327,6 +330,8 @@ fn topology_digest(topology: &TailProfileTopology) -> Result<String, TailProfile
 pub struct TailEventObservation {
     pub source_lineage_sha256: String,
     pub source_score_sha256: String,
+    pub source_score_event_count: usize,
+    pub source_event_index: usize,
     pub source_event_id: String,
     pub event_final_note_off_frame: u64,
     pub raw_measured_end_frame: Option<u64>,
@@ -360,6 +365,17 @@ impl VerifiedTailEventObservation {
 
 /// Replay EVAL-017 v0.2, bind the performed note-off frame, and require an
 /// independently verified complete topology proof.
+fn parse_score_event_index(value: &str) -> Option<usize> {
+    let suffix = value.strip_prefix("score_event_index:")?;
+    if suffix.is_empty()
+        || (suffix.len() > 1 && suffix.starts_with('0'))
+        || !suffix.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    suffix.parse().ok()
+}
+
 pub fn verify_tail_event_observation(
     report: &CounterfactualInfluenceSegmentedReport,
     input: &CounterfactualInfluenceInput<'_, '_>,
@@ -408,6 +424,12 @@ pub fn verify_tail_event_observation(
     {
         return Err(TailProfileError::RendererContextMismatch);
     }
+    if input.expected_score_event_count == 0 {
+        return Err(TailProfileError::InvalidEvidence("zero_score_event_count"));
+    }
+    let source_event_index = parse_score_event_index(input.source_event_id)
+        .filter(|index| *index < input.expected_score_event_count)
+        .ok_or(TailProfileError::InvalidEvidence("noncanonical_source_event_id"))?;
     let matches: Vec<_> = input.baseline_renderer_evidence.performed_event_lineage()
         .iter()
         .filter(|event| event.source_event_id == input.source_event_id)
@@ -429,6 +451,8 @@ pub fn verify_tail_event_observation(
     let mut observation = TailEventObservation {
         source_lineage_sha256: source_lineage.lineage_root_sha256.clone(),
         source_score_sha256: source_lineage.observed_source_score_sha256.clone(),
+        source_score_event_count: input.expected_score_event_count,
+        source_event_index,
         source_event_id: input.source_event_id.to_owned(),
         event_final_note_off_frame: note_off,
         raw_measured_end_frame: raw_end,
@@ -534,16 +558,24 @@ fn cluster_maxima(
     if observations.len() > MAX_LINEAGES * 64 { return Err(TailProfileError::TooManyLineages); }
     let mut event_receipts = BTreeSet::new();
     let mut lineage_maxima = BTreeMap::<String, u64>::new();
+    let mut score_coverage = BTreeMap::<(String, String), (usize, BTreeSet<usize>)>::new();
     let mut receipts = Vec::with_capacity(observations.len());
     for verified in observations {
         let o = &verified.observation;
         if verified.topology != *expected_topology { return Err(TailProfileError::TopologyMismatch); }
         validate_sha256("source_lineage_sha256", &o.source_lineage_sha256)?;
+        validate_sha256("source_score_sha256", &o.source_score_sha256)?;
         validate_sha256("observation_sha256", &o.observation_sha256)?;
         validate_sha256("segmented_influence_report_sha256", &o.segmented_influence_report_sha256)?;
         validate_sha256("baseline_renderer_receipt_sha256", &o.baseline_renderer_receipt_sha256)?;
         validate_sha256("counterfactual_renderer_receipt_sha256", &o.counterfactual_renderer_receipt_sha256)?;
         validate_sha256("repeatability_calibration_sha256", &o.repeatability_calibration_sha256)?;
+        if o.source_score_event_count == 0
+            || o.source_event_index >= o.source_score_event_count
+            || parse_score_event_index(&o.source_event_id) != Some(o.source_event_index)
+        {
+            return Err(TailProfileError::InvalidEvidence("source_event_index"));
+        }
         if o.observation_sha256 != observation_digest(o)? {
             return Err(TailProfileError::InvalidEvidence("event_observation_digest"));
         }
@@ -553,9 +585,26 @@ fn cluster_maxima(
         if !event_receipts.insert(o.observation_sha256.clone()) {
             return Err(TailProfileError::DuplicateEventReceipt);
         }
+        let score_key = (o.source_lineage_sha256.clone(), o.source_score_sha256.clone());
+        let coverage = score_coverage.entry(score_key).or_insert_with(|| {
+            (o.source_score_event_count, BTreeSet::new())
+        });
+        if coverage.0 != o.source_score_event_count {
+            return Err(TailProfileError::SourceScoreEventCountMismatch);
+        }
+        if !coverage.1.insert(o.source_event_index) {
+            return Err(TailProfileError::DuplicateSourceEventObservation);
+        }
         let current = lineage_maxima.entry(o.source_lineage_sha256.clone()).or_insert(0);
         *current = (*current).max(o.measured_tail_frames);
         receipts.push(o.observation_sha256.clone());
+    }
+    for (expected_count, observed_indices) in score_coverage.values() {
+        if observed_indices.len() != *expected_count
+            || (0..*expected_count).any(|index| !observed_indices.contains(&index))
+        {
+            return Err(TailProfileError::IncompleteSourceEventCoverage);
+        }
     }
     if lineage_maxima.len() > MAX_LINEAGES { return Err(TailProfileError::TooManyLineages); }
     let lineages: Vec<String> = lineage_maxima.keys().cloned().collect();
@@ -987,6 +1036,8 @@ mod tests {
         let mut o = TailEventObservation {
             source_lineage_sha256: digest(lineage),
             source_score_sha256: digest("source-score"),
+            source_score_event_count: 2,
+            source_event_index: parse_score_event_index(event).unwrap(),
             source_event_id: event.to_owned(),
             event_final_note_off_frame: 1_000,
             raw_measured_end_frame: Some(1_000 + tail),
@@ -1017,6 +1068,7 @@ mod tests {
             cal.push(test_observation(&format!("cal-{i}"), "score_event_index:0", (i % 7) as u64, topology));
             cal.push(test_observation(&format!("cal-{i}"), "score_event_index:1", (i % 7 + 2) as u64, topology));
             qual.push(test_observation(&format!("qual-{i}"), "score_event_index:0", qualification_max, topology));
+            qual.push(test_observation(&format!("qual-{i}"), "score_event_index:1", qualification_max, topology));
         }
         (cal, qual)
     }
@@ -1086,6 +1138,25 @@ mod tests {
         assert_eq!(profile.calibration_lineage_sha256s.len(), 59);
         assert_eq!(profile.calibration_cluster_tail_frames.len(), 59);
         assert!(profile.guard_frames >= 8 + 32);
+    }
+
+
+    #[test]
+    fn each_composition_score_requires_complete_unique_event_coverage() {
+        let topology = verify_tail_topology_evidence(&topology(true), &TestSignatureVerifier).unwrap();
+        let (cal, qual) = splits(&topology, 20);
+        let mut missing = cal.clone();
+        missing.remove(0);
+        assert_eq!(
+            build_tail_profile(&missing, &qual, &config()).unwrap_err(),
+            TailProfileError::IncompleteSourceEventCoverage
+        );
+        let mut duplicate = cal.clone();
+        duplicate.push(cal[0].clone());
+        assert_eq!(
+            build_tail_profile(&duplicate, &qual, &config()).unwrap_err(),
+            TailProfileError::DuplicateSourceEventObservation
+        );
     }
 
     #[test]
