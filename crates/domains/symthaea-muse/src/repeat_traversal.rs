@@ -214,6 +214,18 @@ fn validate_config(config: &RepeatTraversalConfigV1) -> Result<(), RepeatTravers
 }
 
 fn validate_graph(graph: &MusicXmlPartNotationGraphV1) -> Result<(), RepeatTraversalError> {
+    if graph.measure_locators.len() != graph.map.measures.len() {
+        return Err(RepeatTraversalError::InvalidRepeatBoundary {
+            boundary: graph.measure_locators.len().min(graph.map.measures.len()),
+        });
+    }
+    for (index, locator) in graph.measure_locators.iter().enumerate() {
+        if locator.measure_index != index {
+            return Err(RepeatTraversalError::InvalidRepeatBoundary {
+                boundary: locator.measure_index,
+            });
+        }
+    }
     let zero = crate::barline_eval::RationalBeat::new(0, 1)
         .map_err(|_| RepeatTraversalError::ArithmeticOverflow)?;
     for (index, measure) in graph.map.measures.iter().enumerate() {
@@ -408,11 +420,9 @@ fn source_measure_number(
     measure_index: usize,
 ) -> Option<String> {
     graph
-        .barline_events
-        .iter()
-        .find(|event| event.measure_index == measure_index)
-        .map(|event| event.source_measure_number.clone())
-        .filter(|number| !number.is_empty())
+        .measure_locators
+        .get(measure_index)
+        .and_then(|locator| locator.number.clone())
 }
 
 fn expand_visits(
@@ -576,6 +586,12 @@ mod tests {
         );
         assert_eq!(graph.map.measures.len(), original_measure_count);
         assert!(report.repeat_regions.is_empty());
+        assert_eq!(
+            report.visits.iter()
+                .map(|visit| visit.source_measure_number.as_deref())
+                .collect::<Vec<_>>(),
+            vec![Some("1"), Some("2"), Some("3")]
+        );
     }
 
     #[test]
@@ -765,6 +781,40 @@ mod tests {
             derive_playback_traversal(&graph, &RepeatTraversalConfigV1::default()).unwrap(),
             PlaybackTraversalOutcomeV1::Unsupported { .. }
         ));
+    }
+
+
+    #[test]
+    fn repeated_visits_preserve_non_numeric_source_measure_locators() {
+        let xml = r#"<score-partwise><part id="P1">
+            <measure number="Pickup" implicit="yes">
+                <attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><rest/><duration>1</duration></note>
+            </measure>
+            <measure number="Verse-A" id="m-a">
+                <note><rest/><duration>4</duration></note>
+                <barline location="right"><repeat direction="backward" times="2"/></barline>
+            </measure>
+        </part></score-partwise>"#;
+        let graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "sha256:non-numeric-measures", "score-clock"
+        ).unwrap().remove(0);
+        let report = supported(
+            derive_playback_traversal(&graph, &RepeatTraversalConfigV1::default()).unwrap()
+        );
+        assert_eq!(
+            report.visits.iter()
+                .map(|visit| visit.source_measure_number.as_deref())
+                .collect::<Vec<_>>(),
+            vec![
+                Some("Pickup"),
+                Some("Verse-A"),
+                Some("Pickup"),
+                Some("Verse-A"),
+            ]
+        );
+        assert_eq!(report.visits[3].source_measure_index, 1);
+        assert_eq!(report.visits[3].repeat_pass, Some(2));
     }
 
 }
