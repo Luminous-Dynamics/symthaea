@@ -2,7 +2,7 @@
   "schema_version": "0.1.0",
   "corpus_id": "APPAREL-TWIN-SEMANTIC-CASES-001",
   "fixture_class": "synthetic",
-  "purpose": "Cross-field semantic negative and positive controls for the apparel engineering digital thread. These are expected outcomes for a future semantic validator; the current JSON Schema validates structure only.",
+  "purpose": "Cross-field semantic negative and positive controls for the apparel engineering digital thread. The Draft 2020-12 schema and selected high-risk mutations are executable in the Rust harness; remaining cases are explicitly tracked as not yet executed.",
   "cases": [
     {
       "case_id": "SEM-001-PATTERN-REVISION-STALE-PROJECTION",
@@ -310,5 +310,42 @@
     }
   ],
   "claim_ceiling": "Synthetic semantic test intentions only. No validator implementation, physical testing, dataset evaluation or product qualification is implied.",
-  "revision": "2026-11-12-r2"
+  "revision": "2026-11-12-r2",
+  "execution_coverage": {
+    "executable_case_ids": [
+      "SEM-001-PATTERN-REVISION-STALE-PROJECTION",
+      "SEM-002-BOM-UNKNOWN-MATERIAL",
+      "SEM-003-DUPLICATE-PATTERN-PIECE",
+      "SEM-004-MEASURED-TEST-WITHOUT-RESULT-EVIDENCE",
+      "SEM-005-MODEL-DRAPE-PROMOTED-TO-PHYSICAL",
+      "SEM-006-PROTOTYPE-PROMOTED-TO-PRODUCTION-CAPABILITY",
+      "SEM-014-SYNTHETIC-EVIDENCE-AS-PHYSICAL",
+      "SEM-018-PREDICTED-PROPERTY-AS-MEASURED"
+    ],
+    "not_yet_executed_case_ids": [
+      "SEM-007-MATERIAL-LOT-SUBSTITUTION-STALE-TEST",
+      "SEM-008-UNKNOWN-COMPOSITION-AS-CERTAIN",
+      "SEM-009-VISUAL-GARMENT-CATEGORY-AS-FIBRE-COMPOSITION",
+      "SEM-010-RECOVERY-CLAIM-WITHOUT-PHYSICAL-OUTPUT-LOT",
+      "SEM-011-EXPIRED-NIR-CALIBRATION",
+      "SEM-012-LOT-OVERALLOCATION",
+      "SEM-013-UNIT-CONVERSION-WITHOUT-BASIS",
+      "SEM-015-RESTRICTED-SUPPLIER-DATA-IN-PUBLIC-PROJECTION",
+      "SEM-016-REPAIR-WITHOUT-REQUALIFICATION",
+      "POS-001-SINGLE-ARTICLE-TRACEABLE",
+      "POS-002-UNKNOWN-SENSOR-ABSTENTION",
+      "SEM-017-INVERSE-DESIGN-OUT-OF-DOMAIN",
+      "SEM-019-CANDIDATE-MANUFACTURABILITY-UNKNOWN",
+      "SEM-020-UNCERTAINTY-HIDDEN-BY-SCALAR-SCORE",
+      "SEM-021-HELDOUT-SPECIMEN-LEAKAGE",
+      "SEM-022-VISUAL-CATEGORY-AS-COMPOSITION",
+      "SEM-023-SORTABILITY-RULE-PROFILE-MISMATCH",
+      "SEM-024-HIDDEN-MATERIAL-OMITTED",
+      "SEM-025-DISASSEMBLY-DAMAGE-IGNORED",
+      "SEM-026-RECYCLABILITY-WITHOUT-PLANT-ACCEPTANCE",
+      "POS-003-OUT-OF-DOMAIN-EXPERIMENT",
+      "POS-004-ROUTE-SPECIFIC-DESIGN-FOR-SORTING"
+    ],
+    "note": "Coverage records whether a corresponding mutation is executed by the current Rust harness. It does not imply that every semantic rule in the case corpus is implemented or physically validated."
+  }
 }
