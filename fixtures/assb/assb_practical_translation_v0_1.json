@@ -7,7 +7,8 @@
       "evidence_class": "synthetic",
       "admission": "admitted_for_evaluation",
       "claim_scope": "synthetic high-pressure observation",
-      "metrology_ref": null
+      "metrology_ref": null,
+      "rights_ref": "SYNTHETIC-ONLY-NO-PRODUCTION-DATA"
     },
     {
       "evidence_id": "E-LOW",
@@ -15,7 +16,8 @@
       "evidence_class": "synthetic",
       "admission": "admitted_for_evaluation",
       "claim_scope": "synthetic low-pressure observation",
-      "metrology_ref": null
+      "metrology_ref": null,
+      "rights_ref": "SYNTHETIC-ONLY-NO-PRODUCTION-DATA"
     },
     {
       "evidence_id": "E-SYM",
@@ -23,14 +25,15 @@
       "evidence_class": "synthetic",
       "admission": "admitted_for_evaluation",
       "claim_scope": "synthetic symmetric-cell observation",
-      "metrology_ref": null
+      "metrology_ref": null,
+      "rights_ref": "SYNTHETIC-ONLY-NO-PRODUCTION-DATA"
     }
   ],
   "observations": [
     {
       "observation_id": "HIGH-P",
       "design": {
-        "design_id": "ASSB-SULFIDE-HIGH-P",
+        "design_id": "ASSB-SULFIDE-DESIGN-A",
         "revision": "r1",
         "technology_lane": "sulfide_lithium_metal",
         "chemistry_family": "Li-metal|NMC811",
@@ -55,27 +58,35 @@
         "uncertainty_mpa": 0.05
       },
       "mass_inventory": {
-        "cathode_active_mg": 120,
-        "anode_active_mg": 12,
+        "cathode_active_mg": 100,
+        "anode_active_mg": 10,
         "electrolyte_mg": 35,
         "separator_or_support_mg": 8,
         "current_collectors_and_tabs_mg": 18,
         "casing_and_seals_mg": 27,
         "declared_full_cell_mass_mg": 220,
         "closure_tolerance_mg": 0.1,
-        "boundary_digest": "9999999999999999999999999999999999999999999999999999999999999999"
+        "boundary_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+        "cathode_inactive_mg": 20,
+        "anode_inactive_mg": 2,
+        "declared_full_cell_volume_cm3": 1.2,
+        "volume_boundary_digest": "8888888888888888888888888888888888888888888888888888888888888888"
       },
       "cycles_observed": 100,
       "outcome_status": "synthetic_outcome",
       "event_cycle": 90,
       "capacity_retention_permille": 950,
       "impedance_growth_permille": 120,
-      "evidence_id": "E-HIGH"
+      "evidence_id": "E-HIGH",
+      "cell_id": "CELL-HIGH-P",
+      "batch_id": "BATCH-001",
+      "manufacturing_line": "PILOT-LINE-01",
+      "process_revision": "PROCESS-R1"
     },
     {
       "observation_id": "LOW-P",
       "design": {
-        "design_id": "ASSB-SULFIDE-LOW-P",
+        "design_id": "ASSB-SULFIDE-DESIGN-A",
         "revision": "r1",
         "technology_lane": "sulfide_lithium_metal",
         "chemistry_family": "Li-metal|NMC811",
@@ -100,22 +111,30 @@
         "uncertainty_mpa": 0.05
       },
       "mass_inventory": {
-        "cathode_active_mg": 120,
-        "anode_active_mg": 12,
+        "cathode_active_mg": 100,
+        "anode_active_mg": 10,
         "electrolyte_mg": 35,
         "separator_or_support_mg": 8,
         "current_collectors_and_tabs_mg": 18,
         "casing_and_seals_mg": 27,
         "declared_full_cell_mass_mg": 220,
         "closure_tolerance_mg": 0.1,
-        "boundary_digest": "9999999999999999999999999999999999999999999999999999999999999999"
+        "boundary_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+        "cathode_inactive_mg": 20,
+        "anode_inactive_mg": 2,
+        "declared_full_cell_volume_cm3": 1.2,
+        "volume_boundary_digest": "8888888888888888888888888888888888888888888888888888888888888888"
       },
       "cycles_observed": 100,
       "outcome_status": "synthetic_outcome",
       "event_cycle": 90,
       "capacity_retention_permille": 950,
       "impedance_growth_permille": 120,
-      "evidence_id": "E-LOW"
+      "evidence_id": "E-LOW",
+      "cell_id": "CELL-LOW-P",
+      "batch_id": "BATCH-001",
+      "manufacturing_line": "PILOT-LINE-01",
+      "process_revision": "PROCESS-R1"
     },
     {
       "observation_id": "SYM",
@@ -150,7 +169,11 @@
       "event_cycle": 90,
       "capacity_retention_permille": 950,
       "impedance_growth_permille": 120,
-      "evidence_id": "E-SYM"
+      "evidence_id": "E-SYM",
+      "cell_id": "CELL-SYM",
+      "batch_id": "BATCH-001",
+      "manufacturing_line": "PILOT-LINE-01",
+      "process_revision": "PROCESS-R1"
     }
   ],
   "comparisons": [
