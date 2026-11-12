@@ -1003,6 +1003,15 @@ mod tests {
     }
 
     #[test]
+    fn fusion_fuel_partition_source_case_requires_explicit_particle_origin() {
+        let mut case = minimal_dec_source_case(None, Some(false));
+        case["lane"] = Value::String("FUSION_FUEL_ENERGY_PARTITION".to_owned());
+        let source = minimal_source_manifest_with_case(case);
+        let error = audit_source_value(&source, "fuel-origin.json").unwrap_err();
+        assert!(error.to_string().contains("particle_energy_origin"));
+    }
+
+    #[test]
     fn dec_source_case_requires_explicit_particle_energy_origin() {
         let source = minimal_source_manifest_with_case(minimal_dec_source_case(None, Some(false)));
         let error = audit_source_value(&source, "dec-origin.json").unwrap_err();
@@ -1212,25 +1221,28 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             .with_context(|| format!("{display_name}: case {case_id} has no valid HTTP(S) source URL with a non-empty authority"))?;
         ensure!(!source_url.trim().is_empty(), "{display_name}: case {case_id} has empty source URL");
 
-        if case.get("lane").and_then(Value::as_str) == Some("FUSION_DIRECT_ENERGY_CONVERSION") {
+        let lane = case.get("lane").and_then(Value::as_str);
+        if lane == Some("FUSION_DIRECT_ENERGY_CONVERSION")
+            || lane == Some("FUSION_FUEL_ENERGY_PARTITION")
+        {
             let particle_origin = case
                 .get("particle_energy_origin")
                 .and_then(Value::as_str)
                 .filter(|value| !value.trim().is_empty())
                 .with_context(|| {
-                    format!("{display_name}: DEC case {case_id} has no explicit particle_energy_origin")
+                    format!("{display_name}: fusion DEC/fuel-partition case {case_id} has no explicit particle_energy_origin")
                 })?;
             ensure!(
                 !particle_origin.trim().is_empty(),
-                "{display_name}: DEC case {case_id} has an empty particle_energy_origin"
+                "{display_name}: fusion DEC/fuel-partition case {case_id} has an empty particle_energy_origin"
             );
             ensure!(
                 case.get("fusion_born_output_demonstrated").and_then(Value::as_bool) == Some(false),
-                "{display_name}: DEC case {case_id} must explicitly preserve fusion_born_output_demonstrated=false until a source-matched fusion-born output is admitted"
+                "{display_name}: fusion DEC/fuel-partition case {case_id} must explicitly preserve fusion_born_output_demonstrated=false until source-matched conversion output is admitted"
             );
             ensure!(
                 case.get("comparison_status").and_then(Value::as_str).is_some(),
-                "{display_name}: DEC case {case_id} has no comparison_status"
+                "{display_name}: fusion DEC/fuel-partition case {case_id} has no comparison_status"
             );
         }
     }
