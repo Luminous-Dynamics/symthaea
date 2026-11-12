@@ -40,7 +40,9 @@ pub enum InteractionError {
     NonFiniteDerivedValue(&'static str),
     InvalidAngularFrequency,
     SingularFrequencyResponse,
+    /// A conductance interval is non-finite, non-positive, subnormal or inverted.
     InvalidConductanceInterval,
+    /// The critical-conductance threshold or its guarded representation is unrepresentable.
     UnrepresentableCriticalConductance,
 }
 
@@ -128,6 +130,7 @@ pub struct RobustStabilityReport {
     /// Dimensionless strict separation margin for a robust disposition.
     /// Zero for a boundary/mixed/not-established result.
     pub normalized_margin: f64,
+    /// Strict robust disposition for every point in the admitted rectangular set.
     pub disposition: RobustStabilityDisposition,
 }
 
@@ -147,6 +150,12 @@ pub fn classify_symmetric_hard_bounds(
     feeder_conductance: ConductanceIntervalSiemens,
     negative_incremental_conductance: ConductanceIntervalSiemens,
 ) -> Result<RobustStabilityReport, InteractionError> {
+    // Revalidate here as well as in the constructor because the interval
+    // fields are public and can be created with a struct literal.
+    validate_conductance_interval(source_conductance)?;
+    validate_conductance_interval(feeder_conductance)?;
+    validate_conductance_interval(negative_incremental_conductance)?;
+
     let threshold_lower = common_mode_critical_conductance(
         source_conductance.lower_siemens,
         feeder_conductance.lower_siemens,
@@ -205,6 +214,22 @@ pub fn classify_symmetric_hard_bounds(
         normalized_margin,
         disposition,
     })
+}
+
+fn validate_conductance_interval(
+    interval: ConductanceIntervalSiemens,
+) -> Result<(), InteractionError> {
+    if !interval.lower_siemens.is_finite()
+        || !interval.upper_siemens.is_finite()
+        || !interval.lower_siemens.is_normal()
+        || !interval.upper_siemens.is_normal()
+        || interval.lower_siemens <= 0.0
+        || interval.upper_siemens <= 0.0
+        || interval.lower_siemens > interval.upper_siemens
+    {
+        return Err(InteractionError::InvalidConductanceInterval);
+    }
+    Ok(())
 }
 
 /// Evaluate Gs*G/(Gs+2G) without forming the potentially overflowing product.
@@ -749,6 +774,21 @@ mod tests {
         );
         assert_eq!(
             ConductanceIntervalSiemens::new(0.1, f64::INFINITY),
+            Err(InteractionError::InvalidConductanceInterval)
+        );
+
+        // Public fields permit deserialization/struct literals; the classifier
+        // must revalidate instead of trusting the constructor.
+        let bypassed_constructor = ConductanceIntervalSiemens {
+            lower_siemens: -0.1,
+            upper_siemens: 1.0,
+        };
+        assert_eq!(
+            classify_symmetric_hard_bounds(
+                ConductanceIntervalSiemens::new(1.0, 1.0).unwrap(),
+                ConductanceIntervalSiemens::new(1.0, 1.0).unwrap(),
+                bypassed_constructor,
+            ),
             Err(InteractionError::InvalidConductanceInterval)
         );
     }
