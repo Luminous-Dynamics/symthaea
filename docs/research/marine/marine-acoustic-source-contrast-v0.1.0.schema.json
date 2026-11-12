@@ -192,11 +192,15 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "equivalence_tolerance",
+        "evidence_sha256",
+        "expanded_uncertainty",
+        "measured_value",
+        "observable_id",
+        "observable_kind",
         "source",
         "state",
-        "observable_kind",
-        "observable_id",
-        "evidence_sha256"
+        "unit"
       ],
       "properties": {
         "source": {
@@ -216,6 +220,21 @@
         },
         "evidence_sha256": {
           "$ref": "#/$defs/digest"
+        },
+        "measured_value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expanded_uncertainty": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "equivalence_tolerance": {
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       }
     },
