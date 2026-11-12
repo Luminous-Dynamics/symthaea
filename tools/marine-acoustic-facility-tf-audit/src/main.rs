@@ -606,7 +606,7 @@ fn main() {
     println!("{}", serde_json::to_string_pretty(&report).expect("report serializes"));
     match report.disposition {
         "REPEATABLE_POSITION_TF" => {}
-        "INVALID" | "SPATIALLY_VARIABLE" => process::exit(2),
+        "INVALID" | "SPATIALLY_VARIABLE" | "REPEATABILITY_FAILED" => process::exit(2),
         _ => process::exit(3),
     }
 }
@@ -691,6 +691,35 @@ mod tests {
                 sample("sample-2", "r2", 0.0, 0.0, 1000.0, 150.0, 121.0),
             ],
         }
+    }
+
+    #[test]
+    fn committed_schema_and_synthetic_fixture_deserialize_with_claim_ceiling() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/marine-acoustic-facility-tf-v0.1.0.schema.json"
+        )).expect("schema JSON parses");
+        assert_eq!(schema["$schema"], "https://json-schema.org/draft/2020-12/schema");
+        for required in ["facility", "projector", "receiver", "samples"] {
+            assert!(schema["required"].as_array().unwrap().iter().any(|value| value == required));
+        }
+        let fixture: Case = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/fixtures/synthetic-marine-acoustic-facility-tf-v0.1.0.json"
+        )).expect("synthetic fixture deserializes");
+        let report = audit(&fixture);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(report.position_band_results.len(), 1);
+        assert_eq!(report.position_band_results[0].mean_transfer_function_db, Some(-29.5));
+        assert!(!report.facility_wide_representative_factor_established);
+    }
+
+    #[test]
+    fn source_and_receiver_trace_lineage_is_preserved_per_sample() {
+        let report = audit(&case());
+        let samples = &report.position_band_results[0].samples;
+        assert_eq!(samples.len(), 2);
+        assert_ne!(samples[0].source_trace_sha256, samples[1].source_trace_sha256);
+        assert_ne!(samples[0].received_trace_sha256, samples[1].received_trace_sha256);
+        assert!(samples.iter().all(|sample| sample.transfer_function_db.is_some()));
     }
 
     #[test]
