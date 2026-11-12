@@ -250,5 +250,43 @@
     "Exact synthetic analytic reference only.",
     "No generalized-Nyquist or validated contour result is claimed.",
     "No measured impedance, converter, aircraft, PHIL/HIL or airworthiness claim is made."
+  ],
+  "destabilization_witnesses": [
+    {
+      "id": "mixed-set-explicit-witness",
+      "uncertainty_set_id": "mixed",
+      "gamma": {
+        "numerator": "1",
+        "denominator": "4"
+      },
+      "expected": "DESTABILIZATION_WITNESS"
+    },
+    {
+      "id": "robust-unstable-set-explicit-witness",
+      "uncertainty_set_id": "unstable",
+      "gamma": {
+        "numerator": "3",
+        "denominator": "16"
+      },
+      "expected": "DESTABILIZATION_WITNESS"
+    },
+    {
+      "id": "boundary-is-marginal-not-strict-witness",
+      "uncertainty_set_id": "boundary",
+      "gamma": {
+        "numerator": "1",
+        "denominator": "8"
+      },
+      "expected": "MARGINAL_NOT_STRICTLY_UNSTABLE"
+    },
+    {
+      "id": "stable-set-no-witness",
+      "uncertainty_set_id": "stable",
+      "gamma": {
+        "numerator": "1",
+        "denominator": "16"
+      },
+      "expected": "NO_DESTABILIZATION_WITNESS"
+    }
   ]
 }
