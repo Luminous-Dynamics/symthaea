@@ -351,5 +351,6 @@
   "cavitation_instrument_id": "synthetic-high-speed-camera-C1",
   "cavitation_observation_method_id": "synthetic-synchronized-blade-phase-annotation-v1",
   "cavitation_calibration_or_validation_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
-  "maximum_sync_alignment_uncertainty_s": 0.01
+  "maximum_sync_alignment_uncertainty_s": 0.01,
+  "reference_run_id": "synthetic-run-1"
 }
