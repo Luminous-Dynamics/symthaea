@@ -382,3 +382,66 @@ Using `M(H2) = 2.01588 g/mol`, the reaction produces approximately `0.00604764 k
 The paper's reported 25 kWh/kg H2 net-microwave-energy point is therefore about 5.92 times this reaction-enthalpy reference.
 
 **This ratio is not an efficiency.** It is a derived thermodynamic sanity check, not a complete process balance. The process may also heat the feed/products, transfer energy imperfectly, incur wall and coupling losses, require gas handling and purification, and consume auxiliary power. A proper system efficiency needs a frozen wall-plug boundary and product quality. The calculation and its inputs are stored as `NH3-STOICHIOMETRIC-REACTION-ENTHALPY-001` in the machine-readable reference corpus.
+
+
+## 9.8 Direct energy conversion from charged plasma and fusion products
+
+A new research direction is now tracked as [FUS-DEC-001 #11755](https://github.com/Luminous-Dynamics/symthaea/issues/11755). Direct energy conversion (DEC) is an energy-conversion path for charged-particle kinetic energy; it is not a new energy source.
+
+### ENN electrostatic fundamental-unit experiment (2026)
+
+Kong et al., *Experimental study on electrostatic direct conversion of kinetic energy of charged energetic particles to electric energy*, Plasma Science and Technology 28(5), 054001, published 11 May 2026.
+
+- DOI: https://doi.org/10.1088/2058-6272/ae445a
+- Article: https://pst.hfcas.ac.cn/en/article/doi/10.1088/2058-6272/ae445a
+- The paper reports low-parameter experiments using a fundamental electrostatic DEC unit structure and energy-conversion efficiency exceeding 80%.
+- The abstract explicitly says that these tests preceded observation of fusion alpha particles in the experiments.
+
+This is a published physical experiment on a fundamental charged-particle DEC structure. It is **not** a demonstration of fusion-born alpha-particle conversion, net electricity or a fusion plant. The denominator, incident species/distribution, exact voltage/current values, source power, grid/interception losses and uncertainty must be extracted from the full paper before reproduction.
+
+### Realta / WHAM electrostatic DEC prototype (2026)
+
+Realta announced its WHAM direct-energy-conversion prototype on 30 June 2026. The unit uses a single-stage three-grid electrostatic arrangement (grounded grid, electron-repulsion grid and ion collector) at a magnetic-mirror end ring.
+
+- Company announcement: https://realtafusion.com/insight/a-fusion-first-realta-demos-direct-energy-conversion/
+- Independent trade coverage: American Nuclear Society Nuclear Newswire, 6 July 2026: https://www.ans.org/news/article-8179/realta-fusion-makes-electricity-but-not-through-heat-conversion/
+
+The company reports multiple amperes at around 100 V and output in the hundreds of watts. The ANS article confirms the three-grid demonstration and makes the important claim boundary explicit: most recovered energy in this D-only WHAM prototype came from externally supplied plasma heating/sustainment, not fusion-born energy. Both the company and ANS state that the demonstration was not net electricity or large-scale conversion of fusion-born power.
+
+Keep this case separate from the ENN fundamental-unit experiment and separate from a D-T fusion plant result. Future multi-stage scale-up and >90% target figures are not prototype measurements.
+
+### D-T energy origin partition
+
+For the D-T reaction, approximately 17.6 MeV is divided between a charged alpha particle (about 3.5 MeV) and a neutron (about 14.1 MeV).
+
+- National Academies: https://nap.nationalacademies.org/read/13438/chapter/6
+- JET D-T energy partition discussion: https://doi.org/10.1088/1741-4326/ad5c81
+
+The alpha component is about 19.89% of the primary reaction energy; the neutron component is about 80.11%. This is a nuclear reaction partition, not a DEC capture fraction. Alpha energy may first heat the plasma; only the fraction reaching a qualified converter can be recovered electrically. Neutron energy is a separate neutral-particle blanket/thermal path.
+
+**Critical accounting rule:** energy recovered from externally supplied neutral-beam, RF, microwave, ohmic or other plasma-heating/current-drive inputs is not fusion-born energy. Do not count it as fusion gain. Preserve particle origin through the source, expander, converter, collector, power conditioning and plant boundaries.
+
+## 9.9 Stronger industrial thermal-storage incumbent: refractory RTES
+
+Saini, Lidor & Hammond, *Refractory-based thermal energy storage for industrial process heat: one-dimensional modeling, control, and optimization*, Applied Thermal Engineering 303 (August 2026), Article 132078.
+
+- DOI: https://doi.org/10.1016/j.applthermaleng.2026.132078
+- Institutional record: https://research-hub.nlr.gov/en/publications/refractory-based-thermal-energy-storage-for-industrial-process-he/
+
+The peer-reviewed study models electrically heated dense ceramic refractory storage over 950–1,800 °C, storage capacities below 50 MWh and discharge powers of 5–30 MW. It includes transient gas-solid heat transfer, fan-assisted discharge, bypass control, reheating, fan power, insulation losses and genetic-algorithm optimization of brick-channel geometry and insulation. It reports indicative modelled cost maps of USD 1.6–2.0/kWh; the precise cost basis must be extracted before comparison.
+
+This is a **numerical study of a resistance/Joule-heated incumbent**, not a measured plant and not a plasma demonstration. It strengthens the first thermal-store benchmark: plasma must compete against a well-designed, controlled refractory store at matched temperature, discharge service, hold time and meter boundary—not against a simplistic heater-only baseline.
+
+The source case is in the machine-readable corpus as HTTES-REFRACTORY-950-1800C-MODELLING-2026.
+
+## 9.10 Current machine-readable portfolio
+
+The plasma energy corpus now contains 16 source cases and 16 negative controls, including:
+- ENN electrostatic DEC fundamental-unit experiment;
+- Realta WHAM DEC prototype with origin and net-power caveats;
+- a D-T alpha/neutron energy-partition derived check;
+- a 950–1,800 °C refractory thermal-storage model as a strong resistive incumbent.
+
+The corresponding benchmark programmes are [PLASMA-ENERGY-001 #11718](https://github.com/Luminous-Dynamics/symthaea/issues/11718), [THERMAL-STORE-INDUSTRIAL-001 #11734](https://github.com/Luminous-Dynamics/symthaea/issues/11734), [PLASMA-MHD-BENCH-001 #11733](https://github.com/Luminous-Dynamics/symthaea/issues/11733), and [FUS-DEC-001 #11755](https://github.com/Luminous-Dynamics/symthaea/issues/11755).
+
+All remain source-register and research-design evidence. No Luminous reproduction, physical measurement or whole-plant superiority is claimed.
