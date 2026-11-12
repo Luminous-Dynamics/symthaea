@@ -234,7 +234,10 @@ pub fn audit_corpus(bytes: &[u8]) -> Result<OpticalAuditReport> {
             invalid = true;
             findings.push(optical_finding(
                 "OBSERVER_BAND_INVALID",
-                "observer wavelength bounds and integration time must be finite and physically ordered",
+                concat!(
+                    "observer wavelength bounds and integration time must be finite ",
+                    "and physically ordered"
+                ),
             ));
         }
 
@@ -372,7 +375,10 @@ pub fn audit_corpus(bytes: &[u8]) -> Result<OpticalAuditReport> {
                 findings.push(optical_finding(
                     "OBSERVER_RADIANCE_EXCEEDS_BUDGET",
                     format!(
-                        "declared observer-band radiance {:.9} W/(m^2 sr) exceeds synthetic budget {:.9}",
+                        concat!(
+                            "declared observer-band radiance {:.9} W/(m^2 sr) ",
+                            "exceeds synthetic budget {:.9}"
+                        ),
                         measured, limit
                     ),
                 ));
@@ -386,7 +392,10 @@ pub fn audit_corpus(bytes: &[u8]) -> Result<OpticalAuditReport> {
                 invalid = true;
                 findings.push(optical_finding(
                     "OBSERVER_RADIANCE_INVALID",
-                    "observer-band radiance must be finite/non-negative and its limit finite/positive",
+                    concat!(
+                        "observer-band radiance must be finite/non-negative ",
+                        "and its limit finite/non-negative"
+                    ),
                 ));
             }
             (None, _) | (_, None) => {
