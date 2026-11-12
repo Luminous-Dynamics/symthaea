@@ -135,6 +135,29 @@ pub fn derive_playback_traversal(
     }
     validate_graph(graph)?;
 
+    const UNSUPPORTED_NAVIGATION_ATTRIBUTES: [&str; 8] = [
+        "dacapo",
+        "dalsegno",
+        "segno",
+        "coda",
+        "tocoda",
+        "forward-repeat",
+        "fine",
+        "time-only",
+    ];
+    if let Some(control) = graph.playback_controls.iter().find(|control| {
+        control.attributes.iter().any(|(name, _)| {
+            UNSUPPORTED_NAVIGATION_ATTRIBUTES.contains(&name.as_str())
+        })
+    }) {
+        return Ok(PlaybackTraversalOutcomeV1::Unsupported {
+            reason: format!(
+                "MusicXML playback control {} contains navigation or time-only semantics not interpreted by traversal V1",
+                control.element
+            ),
+        });
+    }
+
     let regions = match discover_repeat_regions(graph, config)? {
         RepeatDiscovery::Supported(regions) => regions,
         RepeatDiscovery::Unsupported(reason) => {
@@ -241,6 +264,24 @@ fn discover_repeat_regions(
         let Some(repeat) = &event.repeat else {
             continue;
         };
+        if !repeat.unrecognized_attributes.is_empty() {
+            return Ok(RepeatDiscovery::Unsupported(
+                "an unrecognized repeat attribute may affect playback order".into(),
+            ));
+        }
+        match repeat.after_jump.as_deref() {
+            None | Some("no") => {}
+            Some("yes") => {
+                return Ok(RepeatDiscovery::Unsupported(
+                    "repeat after-jump semantics require D.C./D.S. navigation, which is not implemented by V1".into(),
+                ));
+            }
+            Some(value) => {
+                return Ok(RepeatDiscovery::Unsupported(format!(
+                    "unrecognized repeat after-jump value: {value}"
+                )));
+            }
+        }
         let Some(direction) = repeat.direction.as_deref() else {
             return Ok(RepeatDiscovery::Unsupported(
                 "repeat event has no direction".into(),
@@ -698,4 +739,32 @@ mod tests {
         changed_graph.barline_events[1].repeat.as_mut().unwrap().times = Some("3".into());
         assert!(!validate_playback_traversal_replay(&changed_graph, &config, &report).unwrap());
     }
+
+    #[test]
+    fn after_jump_and_sound_navigation_controls_are_explicitly_unsupported() {
+        let after_jump = graph_with_repeats(&[
+            ("0", "left", r#"<repeat direction="forward"/>"#),
+            ("1", "right", r#"<repeat direction="backward" times="2" after-jump="yes"/>"#),
+        ]);
+        assert!(matches!(
+            derive_playback_traversal(&after_jump, &RepeatTraversalConfigV1::default()).unwrap(),
+            PlaybackTraversalOutcomeV1::Unsupported { .. }
+        ));
+
+        let xml = r#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <direction><sound dacapo="yes"/></direction>
+                <note><rest/><duration>4</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "sha256:dacapo", "score-clock"
+        ).unwrap().remove(0);
+        assert!(matches!(
+            derive_playback_traversal(&graph, &RepeatTraversalConfigV1::default()).unwrap(),
+            PlaybackTraversalOutcomeV1::Unsupported { .. }
+        ));
+    }
+
 }
