@@ -154,6 +154,9 @@ struct GateReceipt {
 struct AuditReport {
     schema_version: &'static str,
     case_id: String,
+    source_register_id: String,
+    source_register_sha256: String,
+    source_register_citation: String,
     disposition: &'static str,
     cargo_work_unit: String,
     candidate_reports: Vec<CandidateReport>,
@@ -167,13 +170,37 @@ struct AuditReport {
 struct CandidateReport {
     candidate_id: String,
     dataset_id: String,
+    raw_data_sha256: String,
+    evidence_kind: &'static str,
+    rights_status: &'static str,
+    independently_reviewed: bool,
+    service_fingerprint_sha256: String,
+    environment_fingerprint_sha256: String,
+    operating_point_receipt_sha256: String,
     vessel_revision: String,
     propeller_revision: String,
+    objective_intervals: Vec<MetricIntervalReport>,
     disposition: &'static str,
     cargo_work_difference_lower: Option<f64>,
     cargo_work_difference_upper: Option<f64>,
     gate_results: Vec<GateResult>,
     reasons: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct MetricIntervalReport {
+    metric_id: String,
+    value: f64,
+    lower: f64,
+    upper: f64,
+    expanded_uncertainty: f64,
+    confidence_level: f64,
+    unit: String,
+    method_id: String,
+    raw_data_sha256: String,
+    calibration_or_validation_sha256: String,
+    timebase_receipt_sha256: String,
+    operating_point_receipt_sha256: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -566,16 +593,45 @@ fn evaluate_candidate(case: &Case, candidate: &Candidate) -> EvaluatedCandidate 
         "ELIGIBLE_FOR_ROBUST_PARETO"
     };
 
-    let mut sorted_metrics: Vec<MetricObservation> = metrics.values().cloned().collect();
-    sorted_metrics.sort_by(|left, right| left.metric_id.cmp(&right.metric_id));
-    let _ = sorted_metrics;
+    let objective_intervals = case.objectives.iter()
+        .filter_map(|objective| metrics.get(&objective.metric_id))
+        .map(|metric| MetricIntervalReport {
+            metric_id: metric.metric_id.clone(),
+            value: metric.value,
+            lower: metric.value - metric.expanded_uncertainty,
+            upper: metric.value + metric.expanded_uncertainty,
+            expanded_uncertainty: metric.expanded_uncertainty,
+            confidence_level: metric.confidence_level,
+            unit: metric.unit.clone(),
+            method_id: metric.method_id.clone(),
+            raw_data_sha256: metric.raw_data_sha256.clone(),
+            calibration_or_validation_sha256: metric.calibration_or_validation_sha256.clone(),
+            timebase_receipt_sha256: metric.timebase_receipt_sha256.clone(),
+            operating_point_receipt_sha256: metric.operating_point_receipt_sha256.clone(),
+        })
+        .collect();
 
     EvaluatedCandidate {
         report: CandidateReport {
             candidate_id: candidate.candidate_id.clone(),
             dataset_id: candidate.dataset_id.clone(),
+            raw_data_sha256: candidate.raw_data_sha256.clone(),
+            evidence_kind: match candidate.evidence_kind {
+                EvidenceKind::Synthetic => "synthetic",
+                EvidenceKind::Measured => "measured",
+            },
+            rights_status: match candidate.rights_status {
+                RightsStatus::PublicOrPermitted => "public_or_permitted",
+                RightsStatus::Unknown => "unknown",
+                RightsStatus::Restricted => "restricted",
+            },
+            independently_reviewed: candidate.independently_reviewed,
+            service_fingerprint_sha256: candidate.service_fingerprint_sha256.clone(),
+            environment_fingerprint_sha256: candidate.environment_fingerprint_sha256.clone(),
+            operating_point_receipt_sha256: candidate.operating_point_receipt_sha256.clone(),
             vessel_revision: candidate.vessel_revision.clone(),
             propeller_revision: candidate.propeller_revision.clone(),
+            objective_intervals,
             disposition,
             cargo_work_difference_lower: Some(cargo_lower),
             cargo_work_difference_upper: Some(cargo_upper),
@@ -749,6 +805,9 @@ fn audit(case: &Case) -> AuditReport {
     AuditReport {
         schema_version: SCHEMA_VERSION,
         case_id: case.case_id.clone(),
+        source_register_id: case.source_register.register_id.clone(),
+        source_register_sha256: case.source_register.register_sha256.clone(),
+        source_register_citation: case.source_register.citation.clone(),
         disposition,
         cargo_work_unit: case.service.cargo_work_unit.clone(),
         candidate_reports: evaluated.into_iter().map(|candidate| candidate.report).collect(),
