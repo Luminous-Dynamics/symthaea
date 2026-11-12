@@ -818,7 +818,9 @@
       "citation": "Quimb tensor-network and MPS circuit simulator documentation, current development documentation accessed 12 November 2026",
       "url": "https://quimb.readthedocs.io/en/latest/autoapi/quimb/tensor/circuit/mps/index.html",
       "role": "external MPS/TEBD implementation comparator with explicit bond dimension and truncation cutoffs"
-    }
+    },
+    "https://doi.org/10.1103/PhysRevResearch.7.023032",
+    "https://doi.org/10.3390/quantum8030090"
   ],
   "provenance": {
     "code_refs": [
@@ -954,6 +956,28 @@
     "claim_ceiling": "The one-step Petz recovery map is a mathematically explicit finite-dimensional channel A=E tensor R -> Mhat. A theorem-backed commutator test now evaluates whether it is entanglement-fidelity optimal for the maximally-mixed toy channel. Neither result establishes an efficient quantum circuit, larger-scale black-hole recovery, fault tolerance, or QES/island physics."
   },
   "benchmark_policy": {
-    "claim_boundary": "Petz recovery fidelity, Haar/Page equilibrium, finite-depth scrambling, U(1) transport and gravitational QES/island calculations are distinct model classes. A successful recovery toy model is not an evaporation result."
-  }
+    "claim_boundary": "Petz recovery fidelity, Haar/Page equilibrium, finite-depth scrambling, U(1) transport and gravitational QES/island calculations are distinct model classes. A successful recovery toy model is not an evaporation result.",
+    "separate_entropy_from_reconstruction_support": true,
+    "hardware_comparison_requires_matched_circuit_noise_and_measurement": true,
+    "no_decoder_cost_claim_from_Petz_channel_fidelity": true,
+    "current_dense_simulation_scale_ceiling": "Use each backend's explicit resource ceiling; current dense domain-wall and reduced-density paths are not a matched N=20 stabilizer benchmark."
+  },
+  "competitive_reference_map": [
+    {
+      "system": "Hayden-Preskill recovery and OTOC measurements on 20-qubit trapped-ion quantum processors (Phys. Rev. Research 7, 023032, 10 April 2025)",
+      "reference": "https://doi.org/10.1103/PhysRevResearch.7.023032",
+      "strength": "Experimental implementation of a Hayden-Preskill recovery protocol and interferometric OTOC measurement on a 20-qubit trapped-ion processor using a geometrically local kicked-Ising circuit.",
+      "matched_comparison": "Use the same circuit family, message/reference placement, accessible radiation, OTOC operator convention and noise assumptions before comparing recovery signal, OTOC decay/front, circuit depth and shot cost.",
+      "symthaea_position": "Our current Petz result is a four-qubit classical channel simulation, not a hardware result. The 20-qubit experiment is a hardware-facing scale target; do not compare raw qubit count without matching dynamics, noise, readout and observable definitions.",
+      "status": "published experimental reference; matched replication not implemented"
+    },
+    {
+      "system": "Reconstruction Support and Island Dominance in Black-Hole Information Recovery (Quantum Reports 8(3), 90, published 6 September 2026)",
+      "reference": "https://doi.org/10.3390/quantum8030090",
+      "strength": "Separates QES/Page-entropy saddle dominance from operational reconstruction support and decoder implementation cost; reports a random-Clifford evaporation study at N=12,16,20 with 256 seeded realizations per size/ensemble.",
+      "matched_comparison": "Compare entropy Page-transition location, reference-qubit correlations, stricter decoupling, multipartite correlation diagnostics and actual decoder support/fidelity as distinct measurements. Keep QES/entropy saddle claims separate from operational reconstruction.",
+      "symthaea_position": "Our current dense state-vector and Petz baselines are smaller and use different ensembles. Add a stabilizer/tensor-network path before claiming a matched N=12,16,20 replication or scaling advantage.",
+      "status": "published 2026 reference; matched replication not implemented"
+    }
+  ]
 }
