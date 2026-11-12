@@ -1,0 +1,279 @@
+{
+  "schema": "luminous.airroad.pdcm_robust_stability.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_reference",
+  "model": {
+    "name": "symmetric_two_converter_shared_source_rc_cpl",
+    "critical_conductance_formula": "Gs*G/(Gs+2*G)",
+    "derivatives": {
+      "with_respect_to_source_conductance": "2*G^2/(Gs+2*G)^2",
+      "with_respect_to_feeder_conductance": "Gs^2/(Gs+2*G)^2"
+    },
+    "classification_rules": {
+      "robust_stable": "h_upper < threshold_min",
+      "robust_unstable": "h_lower > threshold_max",
+      "otherwise": "boundary_or_overlap_not_established"
+    }
+  },
+  "cases": [
+    {
+      "id": "robust-stable-hard-set",
+      "source_conductance": {
+        "lower": {
+          "n": "9",
+          "d": "10"
+        },
+        "upper": {
+          "n": "11",
+          "d": "10"
+        },
+        "unit": "S"
+      },
+      "feeder_conductance": {
+        "lower": {
+          "n": "9",
+          "d": "10"
+        },
+        "upper": {
+          "n": "11",
+          "d": "10"
+        },
+        "unit": "S"
+      },
+      "negative_incremental_conductance": {
+        "lower": {
+          "n": "1",
+          "d": "20"
+        },
+        "upper": {
+          "n": "1",
+          "d": "10"
+        },
+        "unit": "S"
+      },
+      "threshold_lower": {
+        "n": "3",
+        "d": "10"
+      },
+      "threshold_upper": {
+        "n": "11",
+        "d": "30"
+      },
+      "disposition": "robustly_hurwitz_stable",
+      "normalized_margin": {
+        "n": "2",
+        "d": "3"
+      }
+    },
+    {
+      "id": "robust-unstable-hard-set",
+      "source_conductance": {
+        "lower": {
+          "n": "9",
+          "d": "10"
+        },
+        "upper": {
+          "n": "11",
+          "d": "10"
+        },
+        "unit": "S"
+      },
+      "feeder_conductance": {
+        "lower": {
+          "n": "9",
+          "d": "10"
+        },
+        "upper": {
+          "n": "11",
+          "d": "10"
+        },
+        "unit": "S"
+      },
+      "negative_incremental_conductance": {
+        "lower": {
+          "n": "1",
+          "d": "2"
+        },
+        "upper": {
+          "n": "3",
+          "d": "5"
+        },
+        "unit": "S"
+      },
+      "threshold_lower": {
+        "n": "3",
+        "d": "10"
+      },
+      "threshold_upper": {
+        "n": "11",
+        "d": "30"
+      },
+      "disposition": "robustly_unstable_positive_real_pole",
+      "normalized_margin": {
+        "n": "4",
+        "d": "11"
+      }
+    },
+    {
+      "id": "mixed-overlapping-hard-set",
+      "source_conductance": {
+        "lower": {
+          "n": "4",
+          "d": "5"
+        },
+        "upper": {
+          "n": "6",
+          "d": "5"
+        },
+        "unit": "S"
+      },
+      "feeder_conductance": {
+        "lower": {
+          "n": "9",
+          "d": "10"
+        },
+        "upper": {
+          "n": "11",
+          "d": "10"
+        },
+        "unit": "S"
+      },
+      "negative_incremental_conductance": {
+        "lower": {
+          "n": "3",
+          "d": "10"
+        },
+        "upper": {
+          "n": "7",
+          "d": "20"
+        },
+        "unit": "S"
+      },
+      "threshold_lower": {
+        "n": "18",
+        "d": "65"
+      },
+      "threshold_upper": {
+        "n": "33",
+        "d": "85"
+      },
+      "disposition": "not_established_boundary_or_overlap",
+      "normalized_margin": {
+        "n": "0",
+        "d": "1"
+      }
+    },
+    {
+      "id": "exact-boundary-touch",
+      "source_conductance": {
+        "lower": {
+          "n": "1",
+          "d": "1"
+        },
+        "upper": {
+          "n": "1",
+          "d": "1"
+        },
+        "unit": "S"
+      },
+      "feeder_conductance": {
+        "lower": {
+          "n": "1",
+          "d": "1"
+        },
+        "upper": {
+          "n": "1",
+          "d": "1"
+        },
+        "unit": "S"
+      },
+      "negative_incremental_conductance": {
+        "lower": {
+          "n": "1",
+          "d": "3"
+        },
+        "upper": {
+          "n": "1",
+          "d": "3"
+        },
+        "unit": "S"
+      },
+      "threshold_lower": {
+        "n": "1",
+        "d": "3"
+      },
+      "threshold_upper": {
+        "n": "1",
+        "d": "3"
+      },
+      "disposition": "not_established_boundary_or_overlap",
+      "normalized_margin": {
+        "n": "0",
+        "d": "1"
+      }
+    },
+    {
+      "id": "widened-stable-set",
+      "source_conductance": {
+        "lower": {
+          "n": "9",
+          "d": "10"
+        },
+        "upper": {
+          "n": "11",
+          "d": "10"
+        },
+        "unit": "S"
+      },
+      "feeder_conductance": {
+        "lower": {
+          "n": "9",
+          "d": "10"
+        },
+        "upper": {
+          "n": "11",
+          "d": "10"
+        },
+        "unit": "S"
+      },
+      "negative_incremental_conductance": {
+        "lower": {
+          "n": "1",
+          "d": "20"
+        },
+        "upper": {
+          "n": "31",
+          "d": "100"
+        },
+        "unit": "S"
+      },
+      "threshold_lower": {
+        "n": "3",
+        "d": "10"
+      },
+      "threshold_upper": {
+        "n": "11",
+        "d": "30"
+      },
+      "disposition": "not_established_boundary_or_overlap",
+      "normalized_margin": {
+        "n": "0",
+        "d": "1"
+      }
+    }
+  ],
+  "metamorphic": {
+    "common_scaling_factor": {
+      "n": "1000000",
+      "d": "1"
+    },
+    "expected_property": "common scaling of Gs, G and h preserves threshold ratios, disposition, and normalized margin",
+    "capacitance_property": "positive C0 and C multiply pole rates but do not change the symmetric model stability sign boundary"
+  },
+  "limitations": [
+    "Only the symmetric two-identical-branch RC/CPL model is covered.",
+    "Independent rectangular hard intervals are assumed; correlations are not encoded in this v0.1 contract.",
+    "The binary64 guard is conservative screening, not a formally directed-rounded enclosure.",
+    "No line inductance, converter control-loop states, switching, measured port impedance, protection, battery, thermal, PHIL or aircraft validation."
+  ]
+}

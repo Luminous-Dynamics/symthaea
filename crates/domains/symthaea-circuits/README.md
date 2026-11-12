@@ -60,3 +60,16 @@ This is a synthetic RC/CPL reference, not a converter-control model, measured im
 ### Numerical-stability disposition
 
 The cubic Routh-Hurwitz test normalizes its coefficients by a characteristic pole-rate before applying the floating-point guard. The reported `normalized_routh_hurwitz_delta` is dimensionless and is invariant to uniform rescaling of all capacitances (a uniform time-scale change). It remains a numerical screening result for the declared model, not a robust uncertainty bound or physical stability guarantee.
+
+
+### Symmetric robust hard-bound stability
+
+The symmetric two-converter RC/CPL interaction model also exposes a closed-form hard-interval classifier. For source conductance Gs, identical feeder conductance G, and CPL negative incremental conductance h, the common-mode boundary is:
+
+```
+h_crit = Gs*G/(Gs+2*G)
+```
+
+The threshold is monotone in both Gs and G, so independent rectangular hard bounds can be classified using exact endpoint extrema. The API returns robustly Hurwitz stable, robustly unstable with a positive real common-mode pole, or not established at/touching/overlapping the boundary. It validates intervals at the classification boundary as well as at construction.
+
+The binary64 threshold guard is conservative screening, not a formally directed-rounded enclosure. This theorem applies only to the symmetric two-identical-branch RC/CPL model; it is not a general MIMO or frequency-dependent robust-stability certificate. See `docs/research/AIRROAD_PDCM_ROBUST_STABILITY_001_V0_1.md` and the exact-rational fixture/verifier.
