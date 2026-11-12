@@ -46,11 +46,15 @@ jobs:
       - name: Verify exact-rational reference fixture
         run: python3 tools/airroad-dc-stability-qualifier/verify_fixture.py
 
-      - name: Check crate formatting
-        run: cargo fmt --package symthaea-circuits -- --check
+      - name: Check crate formatting without workspace resolution
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-circuits/src/lib.rs
 
-      - name: Run crate tests
-        run: cargo test --locked --package symthaea-circuits
+      - name: Compile and run zero-dependency crate tests
+        run: |
+          rustc --test --edition=2024 crates/domains/symthaea-circuits/src/lib.rs -o /tmp/symthaea-circuits-tests
+          /tmp/symthaea-circuits-tests
 
-      - name: Run crate Clippy
-        run: cargo clippy --locked --package symthaea-circuits --all-targets -- -D warnings
+      - name: Run Clippy directly without workspace resolution
+        run: |
+          clippy-driver --edition=2024 --crate-name symthaea_circuits --crate-type lib crates/domains/symthaea-circuits/src/lib.rs -D warnings --emit=metadata -o /tmp/symthaea-circuits.rmeta
+          clippy-driver --edition=2024 --crate-name symthaea_circuits --test crates/domains/symthaea-circuits/src/lib.rs -D warnings --emit=metadata -o /tmp/symthaea-circuits-tests.rmeta
