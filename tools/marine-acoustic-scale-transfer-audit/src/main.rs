@@ -828,14 +828,14 @@ mod tests {
         {
             pairs.push(ScalePair {
                 pair_id: format!("pair-{}", index + 1),
-                shared_timebase_receipt_sha256: digest.to_string(),
-                scale_transfer_u95_db: 0.4,
                 model: ModelRun {
                     run_id: format!("model-{}", index + 1),
+                    timebase_receipt_sha256: digest.to_string(),
                     operating_point_receipt_sha256: digest.to_string(),
                     raw_trace_sha256: digest.to_string(),
                     diameter_m: 0.25,
                     rpm_hz: model_rpm,
+                    rpm_u95_hz: 0.01,
                     cavitation_number_n_d: 1.0,
                     source_reference_distance_m: 1.0,
                     bands: vec![ModelBand {
@@ -843,6 +843,7 @@ mod tests {
                         center_frequency_hz: model_frequency,
                         frequency_regime: FrequencyRegime::LowFrequency,
                         frequency_regime_basis: "Synthetic known-answer selection".to_string(),
+                        scale_transfer_u95_db: 0.4,
                         total_spl_db: total,
                         background_spl_db: background,
                         facility_transfer_function_db: 20.0,
@@ -853,6 +854,7 @@ mod tests {
                 },
                 full_scale: FullScaleRun {
                     run_id: format!("full-{}", index + 1),
+                    timebase_receipt_sha256: digest.to_string(),
                     operating_point_receipt_sha256: digest.to_string(),
                     raw_trace_sha256: digest.to_string(),
                     diameter_m: 5.0,
@@ -907,8 +909,12 @@ mod tests {
         assert_eq!(report.source_dataset_id, "synthetic-fixture");
         assert_eq!(report.pair_reports.len(), 2);
         assert_eq!(
-            report.pair_reports[0].shared_timebase_receipt_sha256,
-            case.pairs[0].shared_timebase_receipt_sha256
+            report.pair_reports[0].model_timebase_receipt_sha256,
+            case.pairs[0].model.timebase_receipt_sha256
+        );
+        assert_eq!(
+            report.pair_reports[0].full_scale_timebase_receipt_sha256,
+            case.pairs[0].full_scale.timebase_receipt_sha256
         );
         assert_eq!(
             report.pair_reports[0].band_reports[0].frequency_regime_basis,
@@ -930,6 +936,43 @@ mod tests {
         assert_eq!(
             schema["$defs"]["modelBand"]["additionalProperties"],
             false
+        );
+    }
+
+    #[test]
+    fn model_rotation_rates_must_be_separated_beyond_measurement_uncertainty() {
+        let mut case = fixture_case();
+        case.pairs[0].model.rpm_hz = 20.0;
+        case.pairs[0].model.rpm_u95_hz = 0.5;
+        case.pairs[1].model.rpm_hz = 20.5;
+        case.pairs[1].model.rpm_u95_hz = 0.5;
+        let report = audit(&case);
+        assert_eq!(report.unique_model_rotation_rates, 1);
+        assert!(report.reasons.iter().any(|r| r.contains("two distinct")));
+    }
+
+    #[test]
+    fn proportional_bandwidth_rejects_density_but_constant_bandwidth_allows_it() {
+        let mut case = fixture_case();
+        case.scaling.representation = SpectrumRepresentation::PowerSpectralDensity;
+        assert_eq!(audit(&case).disposition, "invalid");
+
+        case.scaling.bandwidth = Bandwidth::Constant;
+        assert_eq!(audit(&case).disposition, "incomplete");
+    }
+
+    #[test]
+    fn model_and_full_scale_timebases_are_separate_receipts() {
+        let mut case = fixture_case();
+        case.pairs[0].model.timebase_receipt_sha256 =
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string();
+        case.pairs[0].full_scale.timebase_receipt_sha256 =
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_string();
+        let report = audit(&case);
+        assert_eq!(report.disposition, "incomplete");
+        assert_ne!(
+            report.pair_reports[0].model_timebase_receipt_sha256,
+            report.pair_reports[0].full_scale_timebase_receipt_sha256
         );
     }
 
