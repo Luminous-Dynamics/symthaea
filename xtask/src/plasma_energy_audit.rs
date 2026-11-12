@@ -90,6 +90,7 @@ struct ThermalScenario {
 struct ServiceBoundary {
     service_contract_id: String,
     service_type: String,
+    #[serde(rename = "outlet_temperature_mK")]
     outlet_temperature_mk: Option<u64>,
     outlet_pressure_pa: Option<u64>,
     mass_flow_mg_s: Option<u64>,
