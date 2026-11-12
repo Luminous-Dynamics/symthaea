@@ -9,7 +9,7 @@ const CROSS_PSD_UNIT: &str = "pa_m_per_s2_per_hz";
 const PRESSURE_REFERENCE_PA: f64 = 1.0e-6;
 const PSD_MATRIX_RELATIVE_TOLERANCE: f64 = 1.0e-12;
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 enum EvidenceKind {
     Synthetic,
@@ -24,7 +24,7 @@ enum RightsStatus {
     Restricted,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 enum WelchWindow {
     Hann,
@@ -164,7 +164,7 @@ struct AuditReport {
     reasons: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 struct BandReport {
     band_id: String,
     frequency_hz: f64,
