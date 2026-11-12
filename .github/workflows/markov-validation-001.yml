@@ -1,0 +1,40 @@
+name: Markov Probability Verification 001
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-markov/src/chain.rs"
+      - "crates/domains/symthaea-markov/src/distribution.rs"
+      - "research/markov-validation-001/**"
+      - ".github/workflows/markov-validation-001.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: markov-validation-001-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-source-probability-verification:
+    name: Exact-source probability tests and strict Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust quality tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format isolated harness and included production modules
+        run: cargo fmt --manifest-path research/markov-validation-001/Cargo.toml -- --check
+
+      - name: Run probability and Markov tests
+        run: cargo test --locked --manifest-path research/markov-validation-001/Cargo.toml
+
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path research/markov-validation-001/Cargo.toml --all-targets -- -D warnings
