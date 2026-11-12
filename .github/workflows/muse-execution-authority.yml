@@ -45,11 +45,22 @@ jobs:
           test "$actual" = "$expected"
           printf 'exact_head=%s\\n' "$actual"
 
-      - name: Check formatting
-        run: cargo fmt --manifest-path tools/muse-execution-authority/Cargo.toml -- --check
+      - name: Format source for bootstrap review
+        run: cargo fmt --manifest-path tools/muse-execution-authority/Cargo.toml
+
+      - name: Preserve formatted source for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: muse-runtime-rustfmt-bootstrap
+          path: tools/muse-execution-authority/src/lib.rs
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Run state-transition tests
         run: cargo test --locked --manifest-path tools/muse-execution-authority/Cargo.toml
 
       - name: Run Clippy
         run: cargo clippy --locked --manifest-path tools/muse-execution-authority/Cargo.toml --all-targets -- -D warnings
+
+      - name: Require formatting diff to be committed before qualification
+        run: git diff --exit-code -- tools/muse-execution-authority/src/lib.rs
