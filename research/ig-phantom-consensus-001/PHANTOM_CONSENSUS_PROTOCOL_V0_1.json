@@ -61,7 +61,7 @@
   ],
   "metric_ids": [
     "private_public_gap",
-    "peer_private_belief_brier",
+    "peer_private_belief_l2_error",
     "phantom_consensus_incidence",
     "collective_rationality_failure",
     "transparency_recovery",
