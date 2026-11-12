@@ -60,3 +60,10 @@ This is a synthetic RC/CPL reference, not a converter-control model, measured im
 ### Numerical-stability disposition
 
 The cubic Routh-Hurwitz test normalizes its coefficients by a characteristic pole-rate before applying the floating-point guard. The reported `normalized_routh_hurwitz_delta` is dimensionless and is invariant to uniform rescaling of all capacitances (a uniform time-scale change). It remains a numerical screening result for the declared model, not a robust uncertainty bound or physical stability guarantee.
+
+
+## Two-port MIMO hidden-dynamics reference
+
+The `dc_bus_mimo_reference` module provides a narrow exact 2×2 cross-port return-ratio example. It retains both off-diagonal terms, computes `det(I + L(jω))`, carries active open-loop right-half-plane channel-pole metadata, and derives the cleared characteristic polynomial when both cross channels are present.
+
+It demonstrates that diagonal-only SISO projections can omit a coupled unstable mode, and that determinant cancellation must not erase an active realization pole. This is a synthetic benchmark/reference, not a generalized-Nyquist solver or physical converter/aircraft model. See `docs/research/AIRROAD_PDCM_MIMO_001_V0_1.md`.
