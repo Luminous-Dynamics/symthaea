@@ -813,8 +813,10 @@ mod tests {
         let windows = &mut input.runs[0].windows;
         windows[0].cavitation_present = Some(true);
         windows[1].cavitation_present = Some(false);
-        windows[2].start_time_s = 4.0;
-        windows[2].end_time_s = 5.0;
+        for window in windows.iter_mut().skip(2) {
+            window.start_time_s += 1.0;
+            window.end_time_s += 1.0;
+        }
         windows[2].cavitation_present = Some(true);
         let report = audit(&input);
         let run = &report.run_reports[0];
