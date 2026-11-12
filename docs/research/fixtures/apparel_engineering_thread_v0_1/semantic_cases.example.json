@@ -187,7 +187,128 @@
       "expected_disposition": "supported_within_scope",
       "expected_reason_codes": [],
       "invariant": "Correct abstention is a valid outcome and is preferable to an unsupported composition assertion."
+    },
+    {
+      "case_id": "SEM-017-INVERSE-DESIGN-OUT-OF-DOMAIN",
+      "case_type": "negative",
+      "mutation": "A candidate fabric architecture lies outside the calibrated construction/material domain, but the surrogate emits a supported property claim without uncertainty or abstention.",
+      "expected_disposition": "unknown",
+      "expected_reason_codes": [
+        "MODEL_DOMAIN_EXCEEDED",
+        "UNCERTAINTY_UNQUALIFIED"
+      ],
+      "invariant": "An inverse-design model must abstain or request a new physical experiment outside its validated domain."
+    },
+    {
+      "case_id": "SEM-018-PREDICTED-PROPERTY-AS-MEASURED",
+      "case_type": "negative",
+      "mutation": "A surrogate-predicted tensile/drape/thermal value is recorded as an independent physical measurement.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "MODEL_EVIDENCE_NOT_PHYSICAL_TEST"
+      ],
+      "invariant": "Predictions can rank candidates; they cannot become measured properties."
+    },
+    {
+      "case_id": "SEM-019-CANDIDATE-MANUFACTURABILITY-UNKNOWN",
+      "case_type": "negative",
+      "mutation": "An inverse-designed weave/yarn structure is released for production although the target loom/knitting/finishing capability and process envelope are unknown.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "MANUFACTURABILITY_NOT_ESTABLISHED"
+      ],
+      "invariant": "A property-optimal material candidate is not releasable unless a declared manufacturing route can produce it within its process limits."
+    },
+    {
+      "case_id": "SEM-020-UNCERTAINTY-HIDDEN-BY-SCALAR-SCORE",
+      "case_type": "negative",
+      "mutation": "An optimization pipeline picks one candidate using predicted mean only and hides uncertainty, hard-constraint risk and Pareto trade-offs.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "UNCERTAINTY_SUPPRESSED",
+        "HARD_CONSTRAINT_COMPENSATION"
+      ],
+      "invariant": "A scalar weighted objective cannot compensate for unresolved hard gates or conceal a candidate's uncertainty."
+    },
+    {
+      "case_id": "SEM-021-HELDOUT-SPECIMEN-LEAKAGE",
+      "case_type": "negative",
+      "mutation": "Spectra, pixels, physical replicates or frames from the same physical specimen/garment are split across training and held-out evaluation.",
+      "expected_disposition": "invalid",
+      "expected_reason_codes": [
+        "SPECIMEN_SPLIT_LEAKAGE"
+      ],
+      "invariant": "Splits must be grouped by physical specimen/garment and, where possible, source lot/material family."
+    },
+    {
+      "case_id": "SEM-022-VISUAL-CATEGORY-AS-COMPOSITION",
+      "case_type": "negative",
+      "mutation": "A visual category such as jacket/shirt or silhouette is used to support a fibre composition claim.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "SENSOR_TASK_SEMANTIC_MISMATCH"
+      ],
+      "invariant": "Visual garment-family evidence and spectral/material-composition evidence are separate claim types."
+    },
+    {
+      "case_id": "SEM-023-SORTABILITY-RULE-PROFILE-MISMATCH",
+      "case_type": "negative",
+      "mutation": "A design is labelled suitable for a recycling route using a sorting-rule profile for a different sensor, plant or process route.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "SORTING_PROFILE_SCOPE_MISMATCH"
+      ],
+      "invariant": "Sortability is route-, sensor-, calibration- and plant-specific, not a universal product property."
+    },
+    {
+      "case_id": "SEM-024-HIDDEN-MATERIAL-OMITTED",
+      "case_type": "negative",
+      "mutation": "The BOM omits a membrane, coating, lining, adhesive or low-share component present in the physical garment while the product is marked composition-complete.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "BOM_PHYSICAL_COMPONENT_MISMATCH",
+        "COMPOSITION_INCOMPLETE"
+      ],
+      "invariant": "Surface appearance or a main-shell label cannot stand in for complete component-level material identity."
+    },
+    {
+      "case_id": "SEM-025-DISASSEMBLY-DAMAGE-IGNORED",
+      "case_type": "negative",
+      "mutation": "A product passes design-for-disassembly although the declared separation operation damages the recovered textile or makes it fail its secondary functional profile.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "RECOVERY_DAMAGE_UNASSESSED",
+        "SECONDARY_FUNCTION_NOT_ACCEPTED"
+      ],
+      "invariant": "A separable component is not a successful recovery output unless damage and downstream function are assessed."
+    },
+    {
+      "case_id": "SEM-026-RECYCLABILITY-WITHOUT-PLANT-ACCEPTANCE",
+      "case_type": "negative",
+      "mutation": "A generic composition rule declares a garment recyclable even though no named downstream plant/process accepts its actual material blend, finish and component mix.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "DOWNSTREAM_ROUTE_UNRESOLVED"
+      ],
+      "invariant": "A rule-level compatibility result must bind to a declared downstream process route and its actual acceptance envelope."
+    },
+    {
+      "case_id": "POS-003-OUT-OF-DOMAIN-EXPERIMENT",
+      "case_type": "positive",
+      "mutation": "An inverse-design surrogate detects an out-of-domain candidate, marks the property unresolved and selects a physical coupon test that can reduce the relevant uncertainty.",
+      "expected_disposition": "supported_within_scope",
+      "expected_reason_codes": [],
+      "invariant": "Abstention plus informative physical experiment selection is a successful model outcome."
+    },
+    {
+      "case_id": "POS-004-ROUTE-SPECIFIC-DESIGN-FOR-SORTING",
+      "case_type": "positive",
+      "mutation": "A garment design satisfies a versioned, sensor- and plant-specific sorting/disassembly profile, with all components, detection limits, join methods and downstream output acceptance explicitly bound.",
+      "expected_disposition": "supported_within_scope",
+      "expected_reason_codes": [],
+      "invariant": "A route-scoped compatibility assessment may pass without asserting universal recyclability or environmental benefit."
     }
   ],
-  "claim_ceiling": "Synthetic semantic test intentions only. No validator implementation, physical testing, dataset evaluation or product qualification is implied."
+  "claim_ceiling": "Synthetic semantic test intentions only. No validator implementation, physical testing, dataset evaluation or product qualification is implied.",
+  "revision": "2026-11-12-r2"
 }
