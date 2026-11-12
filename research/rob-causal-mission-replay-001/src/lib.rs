@@ -858,7 +858,6 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         }
     }
 
-    let mut applications_linked = 0_usize;
     let mut linked_command_ids: BTreeSet<String> = BTreeSet::new();
     let mut physically_closed_command_ids: BTreeSet<String> = BTreeSet::new();
     let mut application_by_command: BTreeMap<&str, &ActuatorApplication> = BTreeMap::new();
@@ -1111,12 +1110,11 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             && decision.regret_upper_units <= decision.epsilon_task_loss_units
             && decision.calibration_disposition == CalibrationDisposition::Qualified
         {
-            applications_linked += 1;
             linked_command_ids.insert(application.command_id.clone());
         }
     }
 
-    applications_linked = linked_command_ids.len();
+    let applications_linked = linked_command_ids.len();
     let mut transitions = trace.physical_transitions.iter().collect::<Vec<_>>();
     transitions.sort_by_key(|record| record.stamp.sequence);
     let mut expected_predecessor = trace.scope.initial_reserve_state_digest.as_str();
