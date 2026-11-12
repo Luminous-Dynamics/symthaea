@@ -1461,7 +1461,7 @@ mod tests {
     fn repeat_ending_and_playback_signposts_are_not_silently_dropped() {
         let semantic_barline_fragments = [
             r#"<barline location="left"><bar-style>heavy-light</bar-style><repeat direction="forward"/></barline>"#,
-            r#"<barline location="right"><bar-style>light-heavy</bar-style><repeat direction="backward" times="2"/><future-marker code="opaque">future payload</future-marker></barline>"#,
+            r#"<barline location="right"><bar-style>light-heavy</bar-style><repeat direction="backward" times="2"/></barline>"#,
             r#"<barline location="right"><ending number="1" type="start">1.</ending></barline>"#,
             r#"<barline location="right"><ending number="1" type="stop"/></barline>"#,
             r#"<barline location="left"><segno/></barline>"#,
@@ -1495,7 +1495,7 @@ mod tests {
                 <note><rest/><duration>8</duration></note>
                 <barline location="middle" id="mid-1"><bar-style>dashed</bar-style></barline>
                 <note><rest/><duration>8</duration></note>
-                <barline location="right" id="end-1" divisions="4" custom="x"><bar-style>light-heavy</bar-style><footnote>closing note</footnote><level>1</level><wavy-line type="start" number="2" placement="above"/><segno id="S1"/><coda id="C1"/><fermata type="upright">normal</fermata><ending number="1" type="start">1.</ending><repeat direction="backward" times="2"/></barline>
+                <barline location="right" id="end-1" divisions="4" custom="x"><bar-style>light-heavy</bar-style><footnote>closing note</footnote><level>1</level><wavy-line type="start" number="2" placement="above"/><segno id="S1"/><coda id="C1"/><fermata type="upright">normal</fermata><ending number="1" type="start">1.</ending><repeat direction="backward" times="2"/><future-marker code="opaque">future payload</future-marker></barline>
             </measure>
             <measure number="2" implicit="yes">
                 <note><rest/><duration>4</duration></note>
