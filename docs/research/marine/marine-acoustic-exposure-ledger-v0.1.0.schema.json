@@ -298,30 +298,31 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "contribution_id",
-        "event_id",
-        "receiver_id",
         "band_id",
-        "start_time_s",
-        "end_time_s",
+        "bathymetry_sha256",
+        "center_frequency_hz",
+        "contribution_id",
         "duration_s",
-        "source_latitude_deg",
-        "source_longitude_deg",
-        "source_depth_m",
-        "range_m",
-        "range_tolerance_m",
-        "transmission_loss_db",
-        "transmission_loss_expanded_uncertainty_db",
-        "transmission_loss_uncertainty_confidence_level",
-        "source_to_propagation_sync_receipt_sha256",
+        "end_time_s",
+        "environment_fingerprint_sha256",
+        "event_id",
         "propagation_model_id",
         "propagation_model_version",
         "propagation_validation_sha256",
-        "bathymetry_sha256",
-        "sound_speed_profile_sha256",
+        "range_m",
+        "range_tolerance_m",
+        "receiver_id",
         "seabed_model_sha256",
-        "environment_fingerprint_sha256",
-        "timebase_receipt_sha256"
+        "sound_speed_profile_sha256",
+        "source_depth_m",
+        "source_latitude_deg",
+        "source_longitude_deg",
+        "source_to_propagation_sync_receipt_sha256",
+        "start_time_s",
+        "timebase_receipt_sha256",
+        "transmission_loss_db",
+        "transmission_loss_expanded_uncertainty_db",
+        "transmission_loss_uncertainty_confidence_level"
       ],
       "properties": {
         "contribution_id": {
@@ -412,6 +413,10 @@
         },
         "timebase_receipt_sha256": {
           "$ref": "#/$defs/digest"
+        },
+        "center_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       }
     },
@@ -419,23 +424,26 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "observation_id",
-        "evidence_kind",
-        "rights_status",
-        "independently_reviewed",
-        "receiver_id",
-        "band_id",
-        "start_time_s",
-        "end_time_s",
-        "duration_s",
+        "ambient_only_basis",
         "ambient_spl_db",
-        "expanded_uncertainty_db",
-        "measurement_method_id",
-        "instrument_id",
+        "band_id",
         "calibration_certificate_sha256",
+        "center_frequency_hz",
+        "duration_s",
+        "end_time_s",
+        "evidence_kind",
+        "expanded_uncertainty_db",
+        "independently_reviewed",
+        "instrument_id",
+        "measurement_method_id",
+        "observation_id",
+        "quantity_id",
         "raw_trace_sha256",
+        "receiver_id",
+        "rights_status",
+        "start_time_s",
         "timebase_receipt_sha256",
-        "ambient_only_basis"
+        "uncertainty_confidence_level"
       ],
       "properties": {
         "observation_id": {
@@ -502,6 +510,18 @@
         },
         "ambient_only_basis": {
           "const": "independently_measured_ambient_reference"
+        },
+        "quantity_id": {
+          "const": "received_spl_db_re_1upa"
+        },
+        "center_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "uncertainty_confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
         }
       }
     },
@@ -509,11 +529,12 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "limit_id",
-        "receiver_id",
         "band_id",
-        "upper_sel_threshold_db",
-        "requirement_reference"
+        "limit_id",
+        "quantity_id",
+        "receiver_id",
+        "requirement_reference",
+        "upper_sel_threshold_db"
       ],
       "properties": {
         "limit_id": {
@@ -534,6 +555,9 @@
         "requirement_reference": {
           "type": "string",
           "minLength": 1
+        },
+        "quantity_id": {
+          "const": "sound_exposure_level_db_re_1upa2_s"
         }
       }
     }
