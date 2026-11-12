@@ -202,19 +202,36 @@ impl std::fmt::Display for PairwiseInteractionError {
             Self::ZeroChannels => write!(f, "channel count must be non-zero"),
             Self::EmptyAudio => write!(f, "audio must contain at least one frame"),
             Self::InterleavedLengthNotDivisibleByChannels => {
-                write!(f, "interleaved sample count is not divisible by channel count")
+                write!(
+                    f,
+                    "interleaved sample count is not divisible by channel count"
+                )
             }
             Self::NonFiniteSample => write!(f, "audio contains NaN or infinite samples"),
             Self::FormatMismatch => write!(f, "coalition audio formats differ"),
             Self::LengthMismatch => write!(f, "coalition audio frame counts differ"),
-            Self::MissingRepeatQuartet => write!(f, "at least one independent repeat quartet is required"),
-            Self::InvalidEventSet => write!(f, "coalition event set does not match the exact factorial intervention"),
-            Self::InvalidEventId => write!(f, "source event ID is empty, too long or contains controls"),
+            Self::MissingRepeatQuartet => {
+                write!(f, "at least one independent repeat quartet is required")
+            }
+            Self::InvalidEventSet => write!(
+                f,
+                "coalition event set does not match the exact factorial intervention"
+            ),
+            Self::InvalidEventId => {
+                write!(f, "source event ID is empty, too long or contains controls")
+            }
             Self::SameEventTwice => write!(f, "pairwise event IDs must be distinct"),
-            Self::EventNotInSource => write!(f, "intervened event is absent from the source event set"),
+            Self::EventNotInSource => {
+                write!(f, "intervened event is absent from the source event set")
+            }
             Self::InvalidSha256(field) => write!(f, "invalid SHA-256 field: {field}"),
-            Self::DuplicateRendererReceipt => write!(f, "renderer receipt digest is reused across executions"),
-            Self::RepeatScheduleMismatch => write!(f, "repeat quartet does not reuse the exact four coalition schedules"),
+            Self::DuplicateRendererReceipt => {
+                write!(f, "renderer receipt digest is reused across executions")
+            }
+            Self::RepeatScheduleMismatch => write!(
+                f,
+                "repeat quartet does not reuse the exact four coalition schedules"
+            ),
             Self::InvalidConfig(reason) => write!(f, "invalid interaction config: {reason}"),
             Self::SerializationFailure => write!(f, "could not serialize interaction report"),
         }
@@ -248,9 +265,7 @@ pub fn measure_pairwise_event_interaction(
     if event_a_id == event_b_id {
         return Err(PairwiseInteractionError::SameEventTwice);
     }
-    if !all_ids.iter().any(|id| id == event_a_id)
-        || !all_ids.iter().any(|id| id == event_b_id)
-    {
+    if !all_ids.iter().any(|id| id == event_a_id) || !all_ids.iter().any(|id| id == event_b_id) {
         return Err(PairwiseInteractionError::EventNotInSource);
     }
     validate_sha256("source_score_sha256", source_score_sha256)?;
@@ -272,13 +287,7 @@ pub fn measure_pairwise_event_interaction(
     }
     let mut repeat_commitments = Vec::with_capacity(repeats.len());
     for repeat in repeats {
-        validate_quartet(
-            repeat,
-            &all_ids,
-            event_a_id,
-            event_b_id,
-            Some(primary),
-        )?;
+        validate_quartet(repeat, &all_ids, event_a_id, event_b_id, Some(primary))?;
         for coalition in quartet_coalitions(repeat) {
             all_receipts.push(coalition.renderer_receipt_sha256);
         }
@@ -294,7 +303,8 @@ pub fn measure_pairwise_event_interaction(
     let starts = analysis_starts(total_frames, config.frame_size, config.hop_size);
     let fft = FftPlanner::<f32>::new().plan_fft_forward(config.frame_size);
     let window = hann_window(config.frame_size);
-    let mut measurements = Vec::with_capacity(starts.len().saturating_mul(reference_audio.channels));
+    let mut measurements =
+        Vec::with_capacity(starts.len().saturating_mul(reference_audio.channels));
     let mut support = Vec::new();
     let mut pcm_detected_channel_windows = 0usize;
     let mut magnitude_detected_channel_windows = 0usize;
@@ -307,7 +317,10 @@ pub fn measure_pairwise_event_interaction(
         for channel in 0..reference_audio.channels {
             let base_window = coalition_windows(primary, start_frame, config.frame_size, channel);
             let primary_pcm = pcm_interaction(&base_window);
-            let base_pcm: Vec<f64> = base_window[0].iter().map(|sample| f64::from(*sample)).collect();
+            let base_pcm: Vec<f64> = base_window[0]
+                .iter()
+                .map(|sample| f64::from(*sample))
+                .collect();
             let base_rms = stable_rms(&base_pcm).max(EPSILON_RMS);
             let pcm_interaction_rms = stable_rms(&primary_pcm) / base_rms;
             let pcm_interaction_peak = max_abs(&primary_pcm) / max_abs(&base_pcm).max(EPSILON_RMS);
@@ -315,21 +328,23 @@ pub fn measure_pairwise_event_interaction(
             let mut pcm_repeat_noise_floor = 0.0f64;
             let mut magnitude_repeat_noise_floor = 0.0f64;
             for repeat in repeats {
-                let repeat_window = coalition_windows(repeat, start_frame, config.frame_size, channel);
+                let repeat_window =
+                    coalition_windows(repeat, start_frame, config.frame_size, channel);
                 let repeat_pcm = pcm_interaction(&repeat_window);
                 let difference: Vec<f64> = repeat_pcm
                     .iter()
                     .zip(&primary_pcm)
                     .map(|(x, y)| x - y)
                     .collect();
-                pcm_repeat_noise_floor = pcm_repeat_noise_floor
-                    .max(stable_rms(&difference) / base_rms);
+                pcm_repeat_noise_floor =
+                    pcm_repeat_noise_floor.max(stable_rms(&difference) / base_rms);
             }
 
             let (magnitude_feature_interaction, primary_magnitude_residual) =
                 magnitude_interaction(&base_window, &window, fft.as_ref());
             for repeat in repeats {
-                let repeat_window = coalition_windows(repeat, start_frame, config.frame_size, channel);
+                let repeat_window =
+                    coalition_windows(repeat, start_frame, config.frame_size, channel);
                 let (_, repeat_magnitude_residual) =
                     magnitude_interaction(&repeat_window, &window, fft.as_ref());
                 let difference: f64 = repeat_magnitude_residual
@@ -337,22 +352,20 @@ pub fn measure_pairwise_event_interaction(
                     .zip(&primary_magnitude_residual)
                     .map(|(x, y)| (x - y).abs())
                     .sum();
-                magnitude_repeat_noise_floor =
-                    magnitude_repeat_noise_floor.max(difference);
+                magnitude_repeat_noise_floor = magnitude_repeat_noise_floor.max(difference);
             }
 
             let pcm_detection_threshold = (pcm_repeat_noise_floor
                 * f64::from(config.noise_multiplier))
-                .max(f64::from(config.minimum_pcm_interaction));
+            .max(f64::from(config.minimum_pcm_interaction));
             let magnitude_detection_threshold = (magnitude_repeat_noise_floor
                 * f64::from(config.noise_multiplier))
-                .max(f64::from(config.minimum_magnitude_interaction));
+            .max(f64::from(config.minimum_magnitude_interaction));
             let pcm_detected = pcm_interaction_rms > pcm_detection_threshold;
             let magnitude_feature_detected =
                 magnitude_feature_interaction > magnitude_detection_threshold;
 
-            worst_pcm_interaction_rms =
-                worst_pcm_interaction_rms.max(pcm_interaction_rms as f32);
+            worst_pcm_interaction_rms = worst_pcm_interaction_rms.max(pcm_interaction_rms as f32);
             worst_pcm_interaction_peak =
                 worst_pcm_interaction_peak.max(pcm_interaction_peak as f32);
             worst_magnitude_feature_interaction =
@@ -391,7 +404,9 @@ pub fn measure_pairwise_event_interaction(
 
     let mut reasons = Vec::new();
     let verdict = if config.calibration_id.is_none() {
-        reasons.push("no calibration ID supplied; the interaction classification is exploratory".to_owned());
+        reasons.push(
+            "no calibration ID supplied; the interaction classification is exploratory".to_owned(),
+        );
         PairwiseInteractionVerdict::Abstain
     } else if starts.len() < config.minimum_covered_windows {
         reasons.push(format!(
@@ -455,8 +470,7 @@ pub fn verify_pairwise_event_interaction_report(
     primary: &PairwiseRenderQuartet<'_>,
     repeats: &[PairwiseRenderQuartet<'_>],
 ) -> Result<bool, PairwiseInteractionError> {
-    if report.receipt_sha256.is_empty()
-        || compute_receipt_sha256(report)? != report.receipt_sha256
+    if report.receipt_sha256.is_empty() || compute_receipt_sha256(report)? != report.receipt_sha256
     {
         return Ok(false);
     }
@@ -487,8 +501,16 @@ fn validate_quartet(
     primary: Option<&PairwiseRenderQuartet<'_>>,
 ) -> Result<(), PairwiseInteractionError> {
     let expected_y00 = all_ids.to_vec();
-    let expected_y10: Vec<String> = all_ids.iter().filter(|id| id.as_str() != event_a).cloned().collect();
-    let expected_y01: Vec<String> = all_ids.iter().filter(|id| id.as_str() != event_b).cloned().collect();
+    let expected_y10: Vec<String> = all_ids
+        .iter()
+        .filter(|id| id.as_str() != event_a)
+        .cloned()
+        .collect();
+    let expected_y01: Vec<String> = all_ids
+        .iter()
+        .filter(|id| id.as_str() != event_b)
+        .cloned()
+        .collect();
     let expected_y11: Vec<String> = all_ids
         .iter()
         .filter(|id| id.as_str() != event_a && id.as_str() != event_b)
@@ -504,7 +526,11 @@ fn validate_quartet(
             coalition.performed_event_map_sha256,
         )?;
         validate_sha256("renderer_receipt_sha256", coalition.renderer_receipt_sha256)?;
-        let actual: Vec<String> = coalition.active_event_ids.iter().map(|id| (*id).to_owned()).collect();
+        let actual: Vec<String> = coalition
+            .active_event_ids
+            .iter()
+            .map(|id| (*id).to_owned())
+            .collect();
         if actual.as_slice() != expected_ids.as_slice() {
             return Err(PairwiseInteractionError::InvalidEventSet);
         }
@@ -527,7 +553,12 @@ fn validate_quartet(
         schedule_01.schedule_sha256,
         schedule_11.schedule_sha256,
     ];
-    if schedules.into_iter().collect::<std::collections::BTreeSet<_>>().len() != 4 {
+    if schedules
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>()
+        .len()
+        != 4
+    {
         return Err(PairwiseInteractionError::InvalidEventSet);
     }
     if let Some(primary) = primary {
@@ -580,7 +611,9 @@ fn validate_event_id(id: &str) -> Result<(), PairwiseInteractionError> {
 
 fn validate_sha256(field: &'static str, value: &str) -> Result<(), PairwiseInteractionError> {
     if value.len() != 64
-        || !value.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
     {
         return Err(PairwiseInteractionError::InvalidSha256(field));
     }
@@ -600,7 +633,11 @@ fn validate_view(view: AudioView<'_>) -> Result<(), PairwiseInteractionError> {
     if view.interleaved_samples.len() % view.channels != 0 {
         return Err(PairwiseInteractionError::InterleavedLengthNotDivisibleByChannels);
     }
-    if view.interleaved_samples.iter().any(|sample| !sample.is_finite()) {
+    if view
+        .interleaved_samples
+        .iter()
+        .any(|sample| !sample.is_finite())
+    {
         return Err(PairwiseInteractionError::NonFiniteSample);
     }
     Ok(())
@@ -608,36 +645,56 @@ fn validate_view(view: AudioView<'_>) -> Result<(), PairwiseInteractionError> {
 
 fn validate_config(config: &PairwiseInteractionConfig) -> Result<(), PairwiseInteractionError> {
     if config.frame_size < 16 {
-        return Err(PairwiseInteractionError::InvalidConfig("frame_size must be at least 16"));
+        return Err(PairwiseInteractionError::InvalidConfig(
+            "frame_size must be at least 16",
+        ));
     }
     if config.frame_size > MAX_FRAME_SIZE {
-        return Err(PairwiseInteractionError::InvalidConfig("frame_size exceeds maximum allocation"));
+        return Err(PairwiseInteractionError::InvalidConfig(
+            "frame_size exceeds maximum allocation",
+        ));
     }
     if config.hop_size == 0 || config.hop_size > config.frame_size {
-        return Err(PairwiseInteractionError::InvalidConfig("hop_size must be in 1..=frame_size"));
+        return Err(PairwiseInteractionError::InvalidConfig(
+            "hop_size must be in 1..=frame_size",
+        ));
     }
     if !config.noise_multiplier.is_finite()
         || config.noise_multiplier < 1.0
         || config.noise_multiplier > 100.0
     {
-        return Err(PairwiseInteractionError::InvalidConfig("noise multiplier must be finite and in 1..=100"));
+        return Err(PairwiseInteractionError::InvalidConfig(
+            "noise multiplier must be finite and in 1..=100",
+        ));
     }
     if !config.minimum_pcm_interaction.is_finite()
         || config.minimum_pcm_interaction < 0.0
         || config.minimum_pcm_interaction > 10.0
     {
-        return Err(PairwiseInteractionError::InvalidConfig("PCM interaction floor must be finite and in 0..=10"));
+        return Err(PairwiseInteractionError::InvalidConfig(
+            "PCM interaction floor must be finite and in 0..=10",
+        ));
     }
     if !config.minimum_magnitude_interaction.is_finite()
         || !(0.0..=1.0).contains(&config.minimum_magnitude_interaction)
     {
-        return Err(PairwiseInteractionError::InvalidConfig("magnitude interaction floor must be finite and in 0..=1"));
+        return Err(PairwiseInteractionError::InvalidConfig(
+            "magnitude interaction floor must be finite and in 0..=1",
+        ));
     }
     if config.minimum_covered_windows == 0 {
-        return Err(PairwiseInteractionError::InvalidConfig("minimum_covered_windows must be non-zero"));
+        return Err(PairwiseInteractionError::InvalidConfig(
+            "minimum_covered_windows must be non-zero",
+        ));
     }
-    if config.calibration_id.as_ref().is_some_and(|id| id.trim().is_empty()) {
-        return Err(PairwiseInteractionError::InvalidConfig("calibration ID must be non-empty when present"));
+    if config
+        .calibration_id
+        .as_ref()
+        .is_some_and(|id| id.trim().is_empty())
+    {
+        return Err(PairwiseInteractionError::InvalidConfig(
+            "calibration ID must be non-empty when present",
+        ));
     }
     Ok(())
 }
@@ -692,9 +749,8 @@ fn coalition_windows(
     frames: usize,
     channel: usize,
 ) -> [Vec<f32>; 4] {
-    quartet_coalitions(quartet).map(|coalition| {
-        channel_window(coalition.audio, start, frames, channel)
-    })
+    quartet_coalitions(quartet)
+        .map(|coalition| channel_window(coalition.audio, start, frames, channel))
 }
 
 fn channel_window(view: AudioView<'_>, start: usize, frames: usize, channel: usize) -> Vec<f32> {
@@ -722,8 +778,8 @@ fn stable_rms(samples: &[f64]) -> f64 {
     if scale <= f64::MIN_POSITIVE {
         return 0.0;
     }
-    let mean_square = samples.iter().map(|x| (x / scale).powi(2)).sum::<f64>()
-        / samples.len() as f64;
+    let mean_square =
+        samples.iter().map(|x| (x / scale).powi(2)).sum::<f64>() / samples.len() as f64;
     scale * mean_square.sqrt()
 }
 
@@ -733,10 +789,7 @@ fn max_abs(samples: &[f64]) -> f64 {
 
 fn hann_window(size: usize) -> Vec<f32> {
     (0..size)
-        .map(|index| {
-            0.5 - 0.5
-                * (std::f32::consts::TAU * index as f32 / (size - 1) as f32).cos()
-        })
+        .map(|index| 0.5 - 0.5 * (std::f32::consts::TAU * index as f32 / (size - 1) as f32).cos())
         .collect()
 }
 
@@ -773,8 +826,8 @@ fn magnitude_interaction(
         let scale = magnitudes.iter().map(|row| row[index]).sum::<f64>();
         denominator += scale;
         residual.push(
-            magnitudes[0][index] - magnitudes[1][index]
-                - magnitudes[2][index] + magnitudes[3][index],
+            magnitudes[0][index] - magnitudes[1][index] - magnitudes[2][index]
+                + magnitudes[3][index],
         );
     }
     let score = if denominator <= f64::EPSILON {
@@ -836,9 +889,7 @@ mod tests {
 
     fn sine(frames: usize, frequency: f32) -> Vec<f32> {
         (0..frames)
-            .map(|index| {
-                (std::f32::consts::TAU * frequency * index as f32 / 16_000.0).sin() * 0.25
-            })
+            .map(|index| (std::f32::consts::TAU * frequency * index as f32 / 16_000.0).sin() * 0.25)
             .collect()
     }
 
@@ -948,13 +999,10 @@ mod tests {
         let report = measure(&primary, &repeat, &calibrated_config()).unwrap();
 
         assert!(report.pcm_detected_channel_windows > 0);
-        assert!(
-            matches!(
-                report.verdict,
-                PairwiseInteractionVerdict::DetectedPcm
-                    | PairwiseInteractionVerdict::DetectedBoth
-            )
-        );
+        assert!(matches!(
+            report.verdict,
+            PairwiseInteractionVerdict::DetectedPcm | PairwiseInteractionVerdict::DetectedBoth
+        ));
     }
 
     #[test]
@@ -972,7 +1020,10 @@ mod tests {
         assert_eq!(report.pcm_detected_channel_windows, 0);
         // A magnitude transform is nonlinear even when PCM summation is additive.
         assert!(report.magnitude_detected_channel_windows > 0);
-        assert_eq!(report.verdict, PairwiseInteractionVerdict::DetectedMagnitudeOnly);
+        assert_eq!(
+            report.verdict,
+            PairwiseInteractionVerdict::DetectedMagnitudeOnly
+        );
     }
 
     #[test]
@@ -993,7 +1044,12 @@ mod tests {
         config.noise_multiplier = 10.0;
         let report = measure(&primary, &repeat, &config).unwrap();
 
-        assert!(report.measurements.iter().any(|m| m.pcm_repeat_noise_floor > 0.0));
+        assert!(
+            report
+                .measurements
+                .iter()
+                .any(|m| m.pcm_repeat_noise_floor > 0.0)
+        );
         assert_eq!(report.pcm_detected_channel_windows, 0);
     }
 
