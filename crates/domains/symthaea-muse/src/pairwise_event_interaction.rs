@@ -29,6 +29,8 @@ pub struct CoalitionRender<'a> {
     pub active_event_ids: &'a [&'a str],
     /// Digest of the exact performed schedule delivered to the renderer.
     pub schedule_sha256: &'a str,
+    /// Independently replay-verifiable performed-event-map receipt digest.
+    pub performed_event_map_sha256: &'a str,
     /// Independently replay-verifiable renderer receipt digest.
     pub renderer_receipt_sha256: &'a str,
     pub audio: AudioView<'a>,
@@ -82,6 +84,7 @@ impl Default for PairwiseInteractionConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CoalitionCommitment {
     pub schedule_sha256: String,
+    pub performed_event_map_sha256: String,
     pub renderer_receipt_sha256: String,
     pub audio_sha256: String,
 }
@@ -496,6 +499,10 @@ fn validate_quartet(
     for (coalition, expected_ids) in coalitions.into_iter().zip(expected) {
         validate_view(coalition.audio)?;
         validate_sha256("schedule_sha256", coalition.schedule_sha256)?;
+        validate_sha256(
+            "performed_event_map_sha256",
+            coalition.performed_event_map_sha256,
+        )?;
         validate_sha256("renderer_receipt_sha256", coalition.renderer_receipt_sha256)?;
         let actual: Vec<String> = coalition.active_event_ids.iter().map(|id| (*id).to_owned()).collect();
         if actual.as_slice() != expected_ids.as_slice() {
@@ -528,8 +535,18 @@ fn validate_quartet(
             .into_iter()
             .zip(quartet_coalitions(primary))
         {
-            if repeat.schedule_sha256 != first.schedule_sha256 {
+            if repeat.schedule_sha256 != first.schedule_sha256
+                || repeat.performed_event_map_sha256 != first.performed_event_map_sha256
+            {
                 return Err(PairwiseInteractionError::RepeatScheduleMismatch);
+            }
+            if repeat.audio.sample_rate_hz != first.audio.sample_rate_hz
+                || repeat.audio.channels != first.audio.channels
+            {
+                return Err(PairwiseInteractionError::FormatMismatch);
+            }
+            if repeat.audio.interleaved_samples.len() != first.audio.interleaved_samples.len() {
+                return Err(PairwiseInteractionError::LengthMismatch);
             }
         }
     }
@@ -632,6 +649,7 @@ fn quartet_coalitions(quartet: &PairwiseRenderQuartet<'_>) -> [CoalitionRender<'
 fn coalition_commitment(coalition: CoalitionRender<'_>) -> CoalitionCommitment {
     CoalitionCommitment {
         schedule_sha256: coalition.schedule_sha256.to_owned(),
+        performed_event_map_sha256: coalition.performed_event_map_sha256.to_owned(),
         renderer_receipt_sha256: coalition.renderer_receipt_sha256.to_owned(),
         audio_sha256: audio_digest(coalition.audio),
     }
@@ -868,6 +886,7 @@ mod tests {
         let make = |ids: &'a [&'a str], samples: &'a [f32], index: usize| CoalitionRender {
             active_event_ids: ids,
             schedule_sha256: schedule(index),
+            performed_event_map_sha256: schedule(index),
             renderer_receipt_sha256: receipt(index),
             audio: view(samples),
         };
