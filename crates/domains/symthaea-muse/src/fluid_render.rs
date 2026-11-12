@@ -805,4 +805,187 @@ mod tests {
         assert!(master_wav(&silent).is_none());
         std::fs::remove_file(&silent).ok();
     }
+
+    #[cfg(unix)]
+    mod invocation_observation_tests {
+        use super::*;
+        use std::os::unix::fs::PermissionsExt;
+
+        fn unique_path(extension: &str) -> PathBuf {
+            let nonce = FLUID_OUTPUT_NONCE.fetch_add(1, Ordering::Relaxed);
+            std::env::temp_dir().join(format!(
+                "muse-fluid-observation-{}-{nonce}.{extension}",
+                std::process::id()
+            ))
+        }
+
+        fn write_test_wav(path: &Path) {
+            let spec = hound::WavSpec {
+                channels: 2,
+                sample_rate: 48_000,
+                bits_per_sample: 16,
+                sample_format: hound::SampleFormat::Int,
+            };
+            let mut writer = hound::WavWriter::create(path, spec).unwrap();
+            for frame in 0..4_800 {
+                let sample = ((frame as f32 * 0.071).sin() * 0.12 * i16::MAX as f32) as i16;
+                writer.write_sample(sample).unwrap();
+                writer.write_sample(sample).unwrap();
+            }
+            writer.finalize().unwrap();
+        }
+
+        fn shell_quote(path: &Path) -> String {
+            let value = path.to_string_lossy();
+            format!("'{}'", value.replace('\'', "'\"'\"'"))
+        }
+
+        fn write_fake_executable(body: &str) -> PathBuf {
+            let path = unique_path("sh");
+            std::fs::write(&path, format!("#!/bin/sh\nset -eu\n{body}\n")).unwrap();
+            let mut permissions = std::fs::metadata(&path).unwrap().permissions();
+            permissions.set_mode(0o755);
+            std::fs::set_permissions(&path, permissions).unwrap();
+            path
+        }
+
+        fn fake_inputs() -> (PathBuf, PathBuf, PathBuf, PathBuf) {
+            let midi = unique_path("mid");
+            let soundfont = unique_path("sf2");
+            let output_fixture = unique_path("wav");
+            std::fs::write(&midi, b"MThd-fixture-midi").unwrap();
+            std::fs::write(&soundfont, b"fake-soundfont-bytes").unwrap();
+            write_test_wav(&output_fixture);
+            let script = write_fake_executable("");
+            (midi, soundfont, output_fixture, script)
+        }
+
+        fn cleanup(paths: &[&Path]) {
+            for path in paths {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+
+        #[test]
+        fn successful_process_records_arguments_environment_and_both_streams() {
+            let (midi, soundfont, fixture_wav, _) = fake_inputs();
+            let body = format!(
+                "output=''\nprevious=''\nfor arg in \"$@\"; do\n  if [ \"$previous\" = '-F' ]; then output=\"$arg\"; fi\n  previous=\"$arg\"\ndone\nprintf 'fake renderer stdout\\\\n'\nprintf 'fake renderer stderr\\\\n' >&2\n/bin/cp {} \"$output\"",
+                shell_quote(&fixture_wav)
+            );
+            let script = write_fake_executable(&body);
+            let attempt = render_midi_to_wav_with_paths(
+                &midi,
+                48_000,
+                None,
+                &script,
+                &soundfont,
+            );
+            let observation = &attempt.observation;
+            assert!(attempt.wav_bytes.is_some());
+            assert_eq!(observation.disposition, FluidSynthInvocationDispositionV1::Rendered);
+            assert!(observation.process_spawned);
+            assert!(observation.process_success);
+            assert_eq!(observation.process_exit_code, Some(0));
+            assert!(observation.stdout_preview.contains("fake renderer stdout"));
+            assert!(observation.stderr_preview.contains("fake renderer stderr"));
+            assert!(!observation.arguments.is_empty());
+            assert_eq!(
+                observation.executable_sha256_before,
+                observation.executable_sha256_after
+            );
+            assert_eq!(
+                observation.soundfont_sha256_before,
+                observation.soundfont_sha256_after
+            );
+            assert_eq!(
+                observation.midi_sha256_before,
+                observation.midi_sha256_after
+            );
+            assert!(!observation.environment.is_empty());
+            assert!(
+                observation
+                    .environment
+                    .iter()
+                    .all(|item| item.name != "OPENAI_API_KEY" && item.name != "DEEPSEEK_API_KEY")
+            );
+            cleanup(&[&midi, &soundfont, &fixture_wav, &script]);
+        }
+
+        #[test]
+        fn nonzero_exit_preserves_failure_diagnostics() {
+            let (midi, soundfont, fixture_wav, _) = fake_inputs();
+            let script = write_fake_executable(
+                "printf 'expected failure\\\\n' >&2\nexit 23",
+            );
+            let attempt = render_midi_to_wav_with_paths(
+                &midi,
+                48_000,
+                None,
+                &script,
+                &soundfont,
+            );
+            assert!(attempt.wav_bytes.is_none());
+            assert_eq!(
+                attempt.observation.disposition,
+                FluidSynthInvocationDispositionV1::ProcessFailed
+            );
+            assert_eq!(attempt.observation.process_exit_code, Some(23));
+            assert!(attempt.observation.stderr_preview.contains("expected failure"));
+            assert!(attempt.observation.process_spawned);
+            assert!(!attempt.observation.process_success);
+            cleanup(&[&midi, &soundfont, &fixture_wav, &script]);
+        }
+
+        #[test]
+        fn midi_substitution_during_child_execution_fails_closed() {
+            let (midi, soundfont, fixture_wav, _) = fake_inputs();
+            let script = write_fake_executable(
+                "last=''\nfor arg in \"$@\"; do last=\"$arg\"; done\nprintf 'substituted-midi' > \"$last\"\nexit 0",
+            );
+            let attempt = render_midi_to_wav_with_paths(
+                &midi,
+                48_000,
+                None,
+                &script,
+                &soundfont,
+            );
+            assert!(attempt.wav_bytes.is_none());
+            assert_eq!(
+                attempt.observation.disposition,
+                FluidSynthInvocationDispositionV1::MidiChangedDuringRender
+            );
+            assert_ne!(
+                attempt.observation.midi_sha256_before,
+                attempt.observation.midi_sha256_after
+            );
+            cleanup(&[&midi, &soundfont, &fixture_wav, &script]);
+        }
+
+        #[test]
+        fn stderr_is_drained_beyond_preview_limit_without_deadlock() {
+            let (midi, soundfont, fixture_wav, _) = fake_inputs();
+            let body = format!(
+                "output=''\nprevious=''\nfor arg in \"$@\"; do\n  if [ \"$previous\" = '-F' ]; then output=\"$arg\"; fi\n  previous=\"$arg\"\ndone\ni=0\nwhile [ $i -lt 2000 ]; do printf 'x1234567890\\\\n' >&2; i=$((i+1)); done\n/bin/cp {} \"$output\"",
+                shell_quote(&fixture_wav)
+            );
+            let script = write_fake_executable(&body);
+            let attempt = render_midi_to_wav_with_paths(
+                &midi,
+                48_000,
+                None,
+                &script,
+                &soundfont,
+            );
+            assert_eq!(
+                attempt.observation.disposition,
+                FluidSynthInvocationDispositionV1::Rendered
+            );
+            assert!(attempt.observation.stderr_preview_truncated);
+            assert!(attempt.observation.stderr_total_bytes > DIAGNOSTIC_PREVIEW_LIMIT as u64);
+            assert!(attempt.observation.stderr_sha256.is_some());
+            cleanup(&[&midi, &soundfont, &fixture_wav, &script]);
+        }
+    }
+
 }
