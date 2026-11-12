@@ -48,6 +48,8 @@ pub mod factorial_ground_truth;
 pub mod interaction_probe_plan;
 #[cfg(feature = "theory")]
 pub mod edit_contract;
+#[cfg(feature = "theory")]
+pub mod locality_repair_planner;
 pub mod performed_event_map;
 pub mod renderer_execution_receipt;
 #[cfg(feature = "theory")]
