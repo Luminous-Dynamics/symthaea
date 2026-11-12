@@ -8,6 +8,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod joint_metrology_adapter;
+
 /// Bounded timestamp on the mission's declared monotonic clock.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TimestampInterval {
