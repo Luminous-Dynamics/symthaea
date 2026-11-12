@@ -34,7 +34,7 @@ fn check_schema_header(schema: &Value) -> Vec<String> {
     }
     let required: Vec<&str> = [
         "intake_id","version","status","captured_at","upstream","reported_protocol",
-        "seed_audit","scorer_audit","validation_audit","dataset_audit","custody","disposition"
+        "seed_audit","scorer_audit","validation_audit","dataset_audit","custody","disposition","scenario_audit"
     ].into_iter().collect();
     for key in required {
         if !schema["required"].as_array().is_some_and(|a| a.iter().any(|x| x.as_str()==Some(key))) {
@@ -69,6 +69,39 @@ fn validate(manifest: &Value) -> Result<(), Vec<String>> {
         || manifest["reported_protocol"]["assigned_private_dissenters"].as_u64()!=Some(16)
         || manifest["reported_protocol"]["assigned_private_supporters"].as_u64()!=Some(4) {
         fail(&mut errors,"80/20 assigned private-stance condition must be recorded exactly");
+    }
+    let scenario = &manifest["scenario_audit"];
+    if str_at(scenario,&["corpus_blob_sha"]) != Some("20431c55914da2062b772ceb238a167d75bb8ad5")
+        || scenario["record_count"].as_u64()!=Some(100)
+        || scenario["unique_id_count"].as_u64()!=Some(100)
+        || scenario["missing_required_field_count"].as_u64()!=Some(0)
+        || scenario["domain_count"].as_u64()!=Some(10) {
+        fail(&mut errors,"scenario corpus identity, size, uniqueness or required-field audit mismatch");
+    }
+    let required_fields = [
+        "id","domain","authority_level","topic","policy","authority",
+        "private_oppose_belief","private_support_belief","false_consensus","discussion_context"
+    ];
+    let got_fields: Vec<&str> = scenario["required_fields"].as_array()
+        .into_iter().flatten().filter_map(Value::as_str).collect();
+    for field in required_fields {
+        if !got_fields.contains(&field) { fail(&mut errors,format!("scenario required field missing: {field}")); }
+    }
+    let domains = scenario["domain_counts"].as_object();
+    if domains.is_none_or(|d| d.len()!=10 || d.values().any(|v|v.as_u64()!=Some(10))) {
+        fail(&mut errors,"each of the ten scenario domains must contain exactly ten records");
+    }
+    let levels = scenario["authority_level_counts"].as_object();
+    if levels.is_none_or(|d| d.len()!=5 || (1..=5).any(|n|d.get(&n.to_string()).and_then(Value::as_u64)!=Some(20))) {
+        fail(&mut errors,"each of five authority levels must contain exactly twenty records");
+    }
+    if scenario["domain_authority_cell_count"].as_u64()!=Some(50)
+        || scenario["expected_records_per_domain_authority_cell"].as_u64()!=Some(2)
+        || scenario["unbalanced_domain_authority_cell_count"].as_u64()!=Some(0)
+        || scenario["exact_duplicate_scenario_bundle_count"].as_u64()!=Some(0)
+        || scenario["duplicate_policy_text_count"].as_u64()!=Some(0)
+        || str_at(scenario,&["status"])!=Some("static_structure_pass") {
+        fail(&mut errors,"scenario domain-by-authority balance or duplicate audit mismatch");
     }
     if !manifest["reported_protocol"]["private_state_semantics"].as_str().unwrap_or("").contains("not privileged access") {
         fail(&mut errors,"assigned private stance must not be promoted to a latent-belief claim");
@@ -221,6 +254,29 @@ mod tests {
     #[test]
     fn synthetic_80_20_assignment_is_not_a_human_population_prior() {
         assert!(manifest()["reported_protocol"]["private_state_semantics"].as_str().unwrap().contains("not a human population prior"));
+    }
+    #[test]
+    fn scenario_matrix_has_one_hundred_unique_records_and_balanced_strata() {
+        let m=manifest();
+        let s=&m["scenario_audit"];
+        assert_eq!(s["record_count"],100);
+        assert_eq!(s["unique_id_count"],100);
+        assert_eq!(s["domain_count"],10);
+        assert_eq!(s["domain_authority_cell_count"],50);
+        assert_eq!(s["unbalanced_domain_authority_cell_count"],0);
+        assert!(validate(&m).is_ok());
+    }
+    #[test]
+    fn scenario_audit_rejects_unbalanced_authority_level() {
+        let mut m=manifest();
+        m["scenario_audit"]["authority_level_counts"]["3"]=Value::from(19);
+        assert!(validate(&m).is_err());
+    }
+    #[test]
+    fn scenario_audit_rejects_missing_required_fields() {
+        let mut m=manifest();
+        m["scenario_audit"]["missing_required_field_count"]=Value::from(1);
+        assert!(validate(&m).is_err());
     }
     #[test]
     fn repo_license_claim_is_not_equal_to_detected_repo_license() {
