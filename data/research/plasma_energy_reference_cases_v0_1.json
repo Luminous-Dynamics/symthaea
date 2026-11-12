@@ -493,7 +493,7 @@
       ],
       "luminous_reproduction": false,
       "particle_energy_origin": "LOW_PARAMETER_LABORATORY_CHARGED_PARTICLE_SOURCE",
-      "fusion_born_output_observed": false
+      "fusion_born_output_demonstrated": false
     },
     {
       "case_id": "FUSION-DEC-REALTA-WHAM-2026",
@@ -558,7 +558,7 @@
       ],
       "luminous_reproduction": false,
       "particle_energy_origin": "EXTERNALLY_HEATED_DEUTERIUM_PLASMA",
-      "fusion_born_output_observed": false
+      "fusion_born_output_demonstrated": false
     },
     {
       "case_id": "HTTES-REFRACTORY-950-1800C-MODELLING-2026",
@@ -675,7 +675,7 @@
       ],
       "luminous_reproduction": false,
       "particle_energy_origin": "LABORATORY_HYDROGEN_PLASMA_SOURCE",
-      "fusion_born_output_observed": false
+      "fusion_born_output_demonstrated": false
     },
     {
       "case_id": "FUSION-DEC-LLNL-TMX-1983",
@@ -751,7 +751,7 @@
       ],
       "luminous_reproduction": false,
       "particle_energy_origin": "TMX_EXPERIMENTAL_END_LOSS_PLASMA",
-      "fusion_born_output_observed": false
+      "fusion_born_output_demonstrated": false
     },
     {
       "case_id": "FUSION-DEC-HELION-INDUCTIVE-RECOVERY-2026",
@@ -794,7 +794,7 @@
       ],
       "luminous_reproduction": false,
       "particle_energy_origin": "MANUFACTURER_ARCHITECTURE_CLAIM_NO_PUBLIC_ORIGIN_RESOLVED_OUTPUT",
-      "fusion_born_output_observed": false
+      "fusion_born_output_demonstrated": false
     }
   ],
   "negative_controls": [
