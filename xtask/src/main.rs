@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
+mod plasma_energy_audit;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -66,6 +67,19 @@ enum Commands {
         #[arg(long, default_value = ".")]
         root: PathBuf,
     },
+    /// Offline, source-bound audit of plasma energy corpora and thermal-store accounting fixtures.
+    #[command(name = "plasma-energy-audit")]
+    PlasmaEnergyAudit {
+        #[arg(long, default_value = "data/research/plasma_energy_reference_cases_v0_1.json")]
+        plasma_sources: PathBuf,
+        #[arg(long, default_value = "data/research/hts_fusion_magnet_reference_cases_v0_1.json")]
+        hts_sources: PathBuf,
+        #[arg(long, default_value = "data/research/thermal_store_accounting_fixtures_v0_1.json")]
+        thermal_fixtures: PathBuf,
+        /// Emit stable structured JSON instead of the human-readable summary.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -113,6 +127,19 @@ fn main() -> anyhow::Result<()> {
                 "Manifest generated at {}",
                 root.join("manifest.json").display()
             );
+        }
+        Commands::PlasmaEnergyAudit {
+            plasma_sources,
+            hts_sources,
+            thermal_fixtures,
+            json,
+        } => {
+            let report = plasma_energy_audit::run_audit(
+                &plasma_sources,
+                &hts_sources,
+                &thermal_fixtures,
+            )?;
+            plasma_energy_audit::print_report(&report, json)?;
         }
         Commands::DuplicateScan { registry } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
