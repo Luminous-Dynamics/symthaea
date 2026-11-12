@@ -39,6 +39,8 @@ jobs:
       - name: Formatting
         run: cargo fmt --all -- --check
       - name: Unit tests
-        run: cargo test
+        run: cargo test --locked
+      - name: Independent exact-rational oracle
+        run: python3 tests/exact_rational_oracle.py
       - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
+        run: cargo clippy --all-targets --locked -- -D warnings
