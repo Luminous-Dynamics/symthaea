@@ -66,6 +66,7 @@ pub enum MergeOutcome {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum ReasonCode {
     ExactIdempotentReplay,
+    ReplayEvidenceNotVerified,
     CommitAcknowledgementUncertain,
     StaleBaseOrBranchHead,
     MissingAuthority,
@@ -153,6 +154,9 @@ pub struct MergeContext {
     /// This permits constructing a candidate, not committing it.
     pub revalidation_available: bool,
     pub commit_state: CommitState,
+    /// True only after a durable lookup matched the idempotency key AND the
+    /// exact prepared-operation fingerprint to the committed record.
+    pub idempotency_replay_verified: bool,
 }
 
 /// Pairwise operation rules explicitly qualified by a separate proof/test suite.
@@ -237,6 +241,14 @@ pub fn analyze_merge(
     registry: &CommutativityRegistry,
 ) -> MergeDecision {
     if context.commit_state == CommitState::AlreadyCommittedSameKey {
+        if !context.idempotency_replay_verified {
+            return MergeDecision::new(
+                MergeOutcome::Unknown,
+                vec![ReasonCode::ReplayEvidenceNotVerified],
+                false,
+                false,
+            );
+        }
         return MergeDecision::new(
             MergeOutcome::SafeAutomaticMerge,
             vec![ReasonCode::ExactIdempotentReplay],
@@ -487,6 +499,7 @@ mod tests {
             base_and_branch_heads_match: true,
             revalidation_available: false,
             commit_state: CommitState::Prepared,
+            idempotency_replay_verified: false,
         }
     }
 
@@ -497,7 +510,13 @@ mod tests {
         reads: &[&str],
         writes: &[&str],
     ) -> PatchFootprint {
-        PatchFootprint::direct(id, op, targets, reads, writes)
+        PatchFootprint::direct(
+            id,
+            op,
+            targets.iter().copied(),
+            reads.iter().copied(),
+            writes.iter().copied(),
+        )
     }
 
     fn assert_outcome(
@@ -592,10 +611,25 @@ mod tests {
     fn m10_exact_retry_reuses_the_existing_commit() {
         let left = patch("A", "set_velocity", &["event:E9"], &["event:E9.velocity"], &["event:E9.velocity"]);
         let right = patch("B", "set_articulation", &["event:E10"], &["event:E10.articulation"], &["event:E10.articulation"]);
-        let ctx = MergeContext { commit_state: CommitState::AlreadyCommittedSameKey, ..context() };
+        let ctx = MergeContext {
+            commit_state: CommitState::AlreadyCommittedSameKey,
+            idempotency_replay_verified: true,
+            ..context()
+        };
         let decision = assert_outcome(MergeOutcome::SafeAutomaticMerge, ctx, &left, &right);
         assert!(decision.idempotent_replay);
         assert!(!decision.candidate_may_be_built);
+    }
+
+    #[test]
+    fn unverified_idempotency_replay_claim_is_unknown() {
+        let left = patch("A", "set_pitch", &["event:E1"], &["event:E1.pitch"], &["event:E1.pitch"]);
+        let right = patch("B", "set_velocity", &["event:E2"], &["event:E2.velocity"], &["event:E2.velocity"]);
+        let ctx = MergeContext {
+            commit_state: CommitState::AlreadyCommittedSameKey,
+            ..context()
+        };
+        assert_outcome(MergeOutcome::Unknown, ctx, &left, &right);
     }
 
     #[test]
