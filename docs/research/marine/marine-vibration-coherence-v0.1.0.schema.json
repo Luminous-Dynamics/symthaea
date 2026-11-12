@@ -1,0 +1,351 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-vibration-coherence-v0.1.0.schema.json",
+  "title": "Marine hydrophone–accelerometer coherence audit v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "evidence_kind",
+    "source",
+    "vessel_id",
+    "propeller_revision",
+    "operating_condition_id",
+    "operating_point_receipt_sha256",
+    "service_fingerprint_sha256",
+    "environment_fingerprint_sha256",
+    "timebase_binding_receipt_sha256",
+    "synchronization_receipt_sha256",
+    "alignment_offset_applied_in_estimator",
+    "residual_alignment_uncertainty_s",
+    "maximum_phase_uncertainty_rad",
+    "predeclared_coherence_interpretation_threshold",
+    "cross_spectrum_convention",
+    "pressure_channel",
+    "vibration_channel",
+    "estimator",
+    "bands"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_kind": {
+      "enum": [
+        "synthetic",
+        "measured"
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "vessel_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "propeller_revision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operating_condition_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operating_point_receipt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "service_fingerprint_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "environment_fingerprint_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "timebase_binding_receipt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "synchronization_receipt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "alignment_offset_applied_in_estimator": {
+      "const": true
+    },
+    "residual_alignment_uncertainty_s": {
+      "type": "number",
+      "minimum": 0
+    },
+    "maximum_phase_uncertainty_rad": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 3.141592653589793
+    },
+    "predeclared_coherence_interpretation_threshold": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "cross_spectrum_convention": {
+      "const": "pressure_times_conjugate_acceleration"
+    },
+    "pressure_channel": {
+      "$ref": "#/$defs/channel"
+    },
+    "vibration_channel": {
+      "$ref": "#/$defs/channel"
+    },
+    "estimator": {
+      "$ref": "#/$defs/estimator"
+    },
+    "bands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/band"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "citation",
+        "raw_data_sha256",
+        "rights_status",
+        "independently_reviewed"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "rights_status": {
+          "enum": [
+            "public_or_permitted",
+            "unknown",
+            "restricted"
+          ]
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instrument_id",
+        "channel_id",
+        "physical_location",
+        "orientation",
+        "calibration_certificate_sha256",
+        "raw_trace_sha256",
+        "timebase_id",
+        "sample_rate_hz",
+        "sample_count",
+        "window_start_s",
+        "window_end_s"
+      ],
+      "properties": {
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "channel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "physical_location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "orientation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "raw_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "timebase_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_rate_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "sample_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "window_start_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "window_end_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "estimator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "estimator_id",
+        "estimator_version",
+        "window",
+        "segment_length_samples",
+        "overlap_fraction",
+        "number_of_averages",
+        "frequency_resolution_hz",
+        "output_scaling",
+        "sidedness",
+        "averaging_method"
+      ],
+      "properties": {
+        "estimator_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "estimator_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "window": {
+          "enum": [
+            "hann",
+            "hamming",
+            "blackman"
+          ]
+        },
+        "segment_length_samples": {
+          "type": "integer",
+          "minimum": 8
+        },
+        "overlap_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "number_of_averages": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "frequency_resolution_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "output_scaling": {
+          "const": "density"
+        },
+        "sidedness": {
+          "const": "one_sided"
+        },
+        "averaging_method": {
+          "const": "arithmetic_mean_of_modified_periodograms"
+        }
+      }
+    },
+    "band": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "band_id",
+        "frequency_hz",
+        "pressure_psd",
+        "pressure_psd_expanded_uncertainty",
+        "pressure_psd_unit",
+        "acceleration_psd",
+        "acceleration_psd_expanded_uncertainty",
+        "acceleration_psd_unit",
+        "cross_psd_real",
+        "cross_psd_real_expanded_uncertainty",
+        "cross_psd_imag",
+        "cross_psd_imag_expanded_uncertainty",
+        "cross_psd_unit",
+        "uncertainty_coverage_level",
+        "cross_spectrum_phase_expanded_uncertainty_rad"
+      ],
+      "properties": {
+        "band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "pressure_psd": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "pressure_psd_expanded_uncertainty": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "pressure_psd_unit": {
+          "const": "pa2_per_hz"
+        },
+        "acceleration_psd": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "acceleration_psd_expanded_uncertainty": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "acceleration_psd_unit": {
+          "const": "m2_per_s4_per_hz"
+        },
+        "cross_psd_real": {
+          "type": "number"
+        },
+        "cross_psd_real_expanded_uncertainty": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cross_psd_imag": {
+          "type": "number"
+        },
+        "cross_psd_imag_expanded_uncertainty": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cross_psd_unit": {
+          "const": "pa_m_per_s2_per_hz"
+        },
+        "uncertainty_coverage_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "cross_spectrum_phase_expanded_uncertainty_rad": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 3.141592653589793
+        }
+      }
+    }
+  }
+}
