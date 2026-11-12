@@ -298,7 +298,6 @@ jobs:
 
     manual = """on:
   pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 jobs:
   manual:
