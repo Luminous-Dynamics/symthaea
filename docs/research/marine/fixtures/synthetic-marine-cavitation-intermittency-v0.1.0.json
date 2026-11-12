@@ -1,0 +1,237 @@
+{
+  "schema_version": "0.1.0",
+  "case_id": "synthetic-intermittency-known-answer-001",
+  "evidence_kind": "synthetic",
+  "source": {
+    "dataset_id": "synthetic-cavitation-intermittency",
+    "citation": "Synthetic known-answer fixture only; not measured data",
+    "raw_data_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "rights_status": "unknown",
+    "independently_reviewed": false
+  },
+  "operating_condition_id": "synthetic-J0.8-sigma-nD1",
+  "operating_condition_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "environment_fingerprint_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "hydrophone_instrument_id": "synthetic-hydrophone-H1",
+  "calibration_certificate_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "band": {
+    "band_id": "one-third-octave-1000Hz",
+    "quantity_id": "received_spl_db_re_1upa",
+    "center_frequency_hz": 1000
+  },
+  "window_duration_s": 1,
+  "minimum_usable_windows_per_run": 4,
+  "minimum_runs": 2,
+  "runs": [
+    {
+      "run_id": "synthetic-run-1",
+      "timebase_receipt_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "service_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "background_method": "bare_hub",
+      "background_trace_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+      "windows": [
+        {
+          "window_id": "window-1",
+          "start_time_s": 0,
+          "end_time_s": 1,
+          "acoustic_trace_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cavitation_observation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "cavitation_present": false,
+          "total_spl_db": 101,
+          "background_spl_db": 90,
+          "total_expanded_uncertainty_db": 0.2,
+          "background_expanded_uncertainty_db": 0.2
+        },
+        {
+          "window_id": "window-2",
+          "start_time_s": 1,
+          "end_time_s": 2,
+          "acoustic_trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cavitation_observation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "cavitation_present": true,
+          "total_spl_db": 111,
+          "background_spl_db": 90,
+          "total_expanded_uncertainty_db": 0.2,
+          "background_expanded_uncertainty_db": 0.2
+        },
+        {
+          "window_id": "window-3",
+          "start_time_s": 2,
+          "end_time_s": 3,
+          "acoustic_trace_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cavitation_observation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "cavitation_present": false,
+          "total_spl_db": 101,
+          "background_spl_db": 90,
+          "total_expanded_uncertainty_db": 0.2,
+          "background_expanded_uncertainty_db": 0.2
+        },
+        {
+          "window_id": "window-4",
+          "start_time_s": 3,
+          "end_time_s": 4,
+          "acoustic_trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cavitation_observation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "cavitation_present": true,
+          "total_spl_db": 111,
+          "background_spl_db": 90,
+          "total_expanded_uncertainty_db": 0.2,
+          "background_expanded_uncertainty_db": 0.2
+        },
+        {
+          "window_id": "window-5",
+          "start_time_s": 4,
+          "end_time_s": 5,
+          "acoustic_trace_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cavitation_observation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "cavitation_present": false,
+          "total_spl_db": 101,
+          "background_spl_db": 90,
+          "total_expanded_uncertainty_db": 0.2,
+          "background_expanded_uncertainty_db": 0.2
+        },
+        {
+          "window_id": "window-6",
+          "start_time_s": 5,
+          "end_time_s": 6,
+          "acoustic_trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cavitation_observation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "cavitation_present": true,
+          "total_spl_db": 111,
+          "background_spl_db": 90,
+          "total_expanded_uncertainty_db": 0.2,
+          "background_expanded_uncertainty_db": 0.2
+        },
+        {
+          "window_id": "window-7",
+          "start_time_s": 6,
+          "end_time_s": 7,
+          "acoustic_trace_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "cavitation_observation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "cavitation_present": false,
+          "total_spl_db": 101,
+          "background_spl_db": 90,
+          "total_expanded_uncertainty_db": 0.2,
+          "background_expanded_uncertainty_db": 0.2
+        },
+        {
+          "window_id": "window-8",
+          "start_time_s": 7,
+          "end_time_s": 8,
+          "acoustic_trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cavitation_observation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "cavitation_present": true,
+          "total_spl_db": 111,
+          "background_spl_db": 90,
+          "total_expanded_uncertainty_db": 0.2,
+          "background_expanded_uncertainty_db": 0.2
+        }
+      ]
+    },
+    {
+      "run_id": "synthetic-run-2",
+      "timebase_receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "service_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "background_method": "bare_hub",
+      "background_trace_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "windows": [
+        {
+          "window_id": "window-1",
+          "start_time_s": 0,
+          "end_time_s": 1,
+          "acoustic_trace_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "cavitation_observation_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "cavitation_present": false,
+          "total_spl_db": 101,
+          "background_spl_db": 90,
+          "total_expanded_uncertainty_db": 0.2,
+          "background_expanded_uncertainty_db": 0.2
+        },
+        {
+          "window_id": "window-2",
+          "start_time_s": 1,
+          "end_time_s": 2,
+          "acoustic_trace_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "cavitation_observation_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "cavitation_present": true,
+          "total_spl_db": 111,
+          "background_spl_db": 90,
+          "total_expanded_uncertainty_db": 0.2,
+          "background_expanded_uncertainty_db": 0.2
+        },
+        {
+          "window_id": "window-3",
+          "start_time_s": 2,
+          "end_time_s": 3,
+          "acoustic_trace_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "cavitation_observation_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "cavitation_present": false,
+          "total_spl_db": 101,
+          "background_spl_db": 90,
+          "total_expanded_uncertainty_db": 0.2,
+          "background_expanded_uncertainty_db": 0.2
+        },
+        {
+          "window_id": "window-4",
+          "start_time_s": 3,
+          "end_time_s": 4,
+          "acoustic_trace_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "cavitation_observation_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "cavitation_present": true,
+          "total_spl_db": 111,
+          "background_spl_db": 90,
+          "total_expanded_uncertainty_db": 0.2,
+          "background_expanded_uncertainty_db": 0.2
+        },
+        {
+          "window_id": "window-5",
+          "start_time_s": 4,
+          "end_time_s": 5,
+          "acoustic_trace_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "cavitation_observation_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "cavitation_present": false,
+          "total_spl_db": 101,
+          "background_spl_db": 90,
+          "total_expanded_uncertainty_db": 0.2,
+          "background_expanded_uncertainty_db": 0.2
+        },
+        {
+          "window_id": "window-6",
+          "start_time_s": 5,
+          "end_time_s": 6,
+          "acoustic_trace_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "cavitation_observation_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "cavitation_present": true,
+          "total_spl_db": 111,
+          "background_spl_db": 90,
+          "total_expanded_uncertainty_db": 0.2,
+          "background_expanded_uncertainty_db": 0.2
+        },
+        {
+          "window_id": "window-7",
+          "start_time_s": 6,
+          "end_time_s": 7,
+          "acoustic_trace_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "cavitation_observation_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "cavitation_present": false,
+          "total_spl_db": 101,
+          "background_spl_db": 90,
+          "total_expanded_uncertainty_db": 0.2,
+          "background_expanded_uncertainty_db": 0.2
+        },
+        {
+          "window_id": "window-8",
+          "start_time_s": 7,
+          "end_time_s": 8,
+          "acoustic_trace_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "cavitation_observation_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "cavitation_present": true,
+          "total_spl_db": 111,
+          "background_spl_db": 90,
+          "total_expanded_uncertainty_db": 0.2,
+          "background_expanded_uncertainty_db": 0.2
+        }
+      ]
+    }
+  ]
+}
