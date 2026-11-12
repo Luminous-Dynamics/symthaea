@@ -6,6 +6,7 @@
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use serde::Serialize;
+use sha2::Digest;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
