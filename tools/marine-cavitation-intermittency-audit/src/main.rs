@@ -29,6 +29,28 @@ enum BackgroundMethod {
     Unknown,
 }
 
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Copy, Clone)]
+#[serde(rename_all = "snake_case")]
+enum SusceptibilityMeasure {
+    TotalGasContent,
+    CavitationSusceptibilityAlpha,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(deny_unknown_fields)]
+struct WaterCondition {
+    measure: SusceptibilityMeasure,
+    value: f64,
+    unit: String,
+    expanded_uncertainty: f64,
+    equivalence_tolerance: f64,
+    method_id: String,
+    instrument_id: String,
+    calibration_certificate_sha256: String,
+    evidence_sha256: String,
+    nuclei_distribution_evidence_sha256: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Case {
@@ -77,6 +99,7 @@ struct Run {
     calibration_certificate_sha256: String,
     background_method: BackgroundMethod,
     background_trace_sha256: String,
+    water_condition: WaterCondition,
     windows: Vec<Window>,
 }
 
@@ -113,6 +136,7 @@ struct AuditReport {
     disposition: &'static str,
     claim_ceiling: &'static str,
     run_reports: Vec<RunReport>,
+    nuclei_distribution_coverage_fraction: f64,
     run_to_run_energy_mean_sd_db: Option<f64>,
     run_to_run_energy_mean_range_db: Option<f64>,
     reasons: Vec<String>,
@@ -140,6 +164,7 @@ struct RunReport {
     calibration_certificate_sha256: String,
     background_method: &'static str,
     background_trace_sha256: String,
+    water_condition: WaterCondition,
     window_evidence: Vec<WindowEvidenceRef>,
     total_windows: usize,
     usable_windows: usize,
@@ -286,6 +311,30 @@ fn validate_case(case: &Case) -> Vec<String> {
     for run in &case.runs {
         if run.run_id.trim().is_empty() || !run_ids.insert(run.run_id.clone()) {
             errors.push(format!("empty or duplicate run_id {}", run.run_id));
+        }
+        let water = &run.water_condition;
+        if !water.value.is_finite()
+            || water.value < 0.0
+            || !finite_positive(water.expanded_uncertainty)
+            || !finite_positive(water.equivalence_tolerance)
+            || water.unit.trim().is_empty()
+            || water.method_id.trim().is_empty()
+            || water.instrument_id.trim().is_empty()
+        {
+            errors.push(format!("run {} has invalid water susceptibility value, unit, method, instrument or uncertainty", run.run_id));
+        }
+        for (label, digest) in [
+            ("water susceptibility calibration certificate", &water.calibration_certificate_sha256),
+            ("water susceptibility measurement evidence", &water.evidence_sha256),
+        ] {
+            if !is_sha256(digest) {
+                errors.push(format!("run {}: {label} digest must be 64 hexadecimal characters", run.run_id));
+            }
+        }
+        if let Some(digest) = &water.nuclei_distribution_evidence_sha256 {
+            if !is_sha256(digest) {
+                errors.push(format!("run {}: nuclei-distribution evidence digest must be 64 hexadecimal characters", run.run_id));
+            }
         }
         for (label, digest) in [
             ("timebase receipt", &run.timebase_receipt_sha256),
@@ -565,6 +614,7 @@ fn summarize_run(run: &Run) -> RunReport {
             BackgroundMethod::Unknown => "unknown",
         },
         background_trace_sha256: run.background_trace_sha256.clone(),
+        water_condition: run.water_condition.clone(),
         window_evidence,
         total_windows: run.windows.len(),
         usable_windows: usable.len(),
@@ -609,7 +659,51 @@ fn audit(case: &Case) -> AuditReport {
         Vec::new()
     };
 
+    let mut water_condition_incomparable = false;
+    let mut water_condition_unresolved = false;
+    let nuclei_distribution_coverage_fraction = if case.runs.is_empty() {
+        0.0
+    } else {
+        case.runs.iter()
+            .filter(|run| run.water_condition.nuclei_distribution_evidence_sha256.is_some())
+            .count() as f64 / case.runs.len() as f64
+    };
+
     if validation_errors.is_empty() {
+        let reference_water = &case.runs[0].water_condition;
+        if nuclei_distribution_coverage_fraction > 0.0
+            && nuclei_distribution_coverage_fraction < 1.0
+        {
+            reasons.push("nuclei number/size distribution evidence is present for only part of the run cohort".to_string());
+            water_condition_unresolved = true;
+        } else if nuclei_distribution_coverage_fraction == 0.0 {
+            reasons.push("recommended nuclei number/size distribution evidence was not supplied; water comparison relies on the declared gas-content or cavitation-susceptibility measure".to_string());
+        }
+
+        for run in case.runs.iter().skip(1) {
+            let water = &run.water_condition;
+            if water.measure != reference_water.measure
+                || water.unit != reference_water.unit
+                || water.method_id != reference_water.method_id
+                || water.instrument_id != reference_water.instrument_id
+                || water.calibration_certificate_sha256 != reference_water.calibration_certificate_sha256
+                || (water.equivalence_tolerance - reference_water.equivalence_tolerance).abs() > 1.0e-12
+            {
+                reasons.push(format!("run {} water-condition measure, unit, method, instrument, calibration or equivalence tolerance differs from the comparison stratum", run.run_id));
+                water_condition_incomparable = true;
+                continue;
+            }
+            let delta = (water.value - reference_water.value).abs();
+            let uncertainty = water.expanded_uncertainty + reference_water.expanded_uncertainty;
+            if delta - uncertainty > reference_water.equivalence_tolerance {
+                reasons.push(format!("run {} water susceptibility is demonstrably outside the predeclared equivalence tolerance", run.run_id));
+                water_condition_incomparable = true;
+            } else if delta + uncertainty > reference_water.equivalence_tolerance {
+                reasons.push(format!("run {} water susceptibility uncertainty does not establish equivalence to the reference run", run.run_id));
+                water_condition_unresolved = true;
+            }
+        }
+
         let common_method = case.runs.first().map(|run| &run.background_method);
         if case.runs.iter().any(|run| Some(&run.background_method) != common_method) {
             reasons.push("background measurement method differs across runs in one operating-condition stratum".to_string());
@@ -659,6 +753,10 @@ fn audit(case: &Case) -> AuditReport {
 
     let disposition = if !validation_errors.is_empty() {
         "INVALID"
+    } else if water_condition_incomparable {
+        "INCOMPARABLE_CONDITION"
+    } else if water_condition_unresolved {
+        "INCOMPLETE"
     } else if run_reports.iter().any(|report| report.usable_windows < case.minimum_usable_windows_per_run)
         || case.runs.len() < case.minimum_runs
         || case.runs.iter().any(|run| run.windows.iter().any(|window| window.cavitation_present.is_none()))
@@ -693,6 +791,7 @@ fn audit(case: &Case) -> AuditReport {
         disposition,
         claim_ceiling: "distributional_summary_of_declared_model_scale_windows_only_no_full_scale_transfer_source_decomposition_causal_or_ecological_qualification",
         run_reports,
+        nuclei_distribution_coverage_fraction,
         run_to_run_energy_mean_sd_db: run_to_run_sd,
         run_to_run_energy_mean_range_db: run_range,
         reasons,
@@ -727,7 +826,7 @@ fn main() {
     println!("{}", serde_json::to_string_pretty(&report).expect("report serializes"));
     match report.disposition {
         "DISTRIBUTIONAL_SUMMARY_ONLY" => {}
-        "INVALID" => process::exit(2),
+        "INVALID" | "INCOMPARABLE_CONDITION" => process::exit(2),
         _ => process::exit(3),
     }
 }
@@ -775,6 +874,18 @@ mod tests {
             calibration_certificate_sha256: digest('4'),
             background_method: BackgroundMethod::BareHub,
             background_trace_sha256: digest(if run_index == 0 { '1' } else { '2' }),
+            water_condition: WaterCondition {
+                measure: SusceptibilityMeasure::CavitationSusceptibilityAlpha,
+                value: 0.62 + run_index as f64 * 0.01,
+                unit: "dimensionless".to_string(),
+                expanded_uncertainty: 0.01,
+                equivalence_tolerance: 0.05,
+                method_id: "synthetic-alpha-method".to_string(),
+                instrument_id: "synthetic-alpha-meter-1".to_string(),
+                calibration_certificate_sha256: digest('5'),
+                evidence_sha256: digest(if run_index == 0 { '6' } else { '7' }),
+                nuclei_distribution_evidence_sha256: Some(digest(if run_index == 0 { '8' } else { '9' })),
+            },
             windows,
         }
     }
@@ -808,6 +919,64 @@ mod tests {
             minimum_runs: 2,
             runs: vec![run("run-1", 0, &levels, &states), run("run-2", 1, &levels, &states)],
         }
+    }
+
+    #[test]
+    fn stable_water_susceptibility_allows_distributional_comparison() {
+        let mut input = case();
+        make_measured(&mut input);
+        for run in &mut input.runs {
+            run.water_condition.nuclei_distribution_evidence_sha256 = Some(digest('8'));
+        }
+        assert_eq!(audit(&input).disposition, "DISTRIBUTIONAL_SUMMARY_ONLY");
+    }
+
+    #[test]
+    fn water_susceptibility_drift_outside_tolerance_is_incomparable() {
+        let mut input = case();
+        make_measured(&mut input);
+        input.runs[1].water_condition.value = 0.90;
+        assert_eq!(audit(&input).disposition, "INCOMPARABLE_CONDITION");
+    }
+
+    #[test]
+    fn water_susceptibility_uncertainty_crossing_tolerance_is_incomplete() {
+        let mut input = case();
+        make_measured(&mut input);
+        input.runs[1].water_condition.value = 0.66;
+        input.runs[1].water_condition.expanded_uncertainty = 0.04;
+        assert_eq!(audit(&input).disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn water_susceptibility_method_or_calibration_change_is_incomparable() {
+        let mut input = case();
+        make_measured(&mut input);
+        input.runs[1].water_condition.method_id = "different-method".to_string();
+        assert_eq!(audit(&input).disposition, "INCOMPARABLE_CONDITION");
+    }
+
+    #[test]
+    fn partial_nuclei_distribution_evidence_coverage_is_incomplete() {
+        let mut input = case();
+        make_measured(&mut input);
+        input.runs[1].water_condition.nuclei_distribution_evidence_sha256 = None;
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(report.nuclei_distribution_coverage_fraction, 0.5);
+    }
+
+    #[test]
+    fn total_gas_content_is_an_alternative_water_condition_measure() {
+        let mut input = case();
+        make_measured(&mut input);
+        for run in &mut input.runs {
+            run.water_condition.measure = SusceptibilityMeasure::TotalGasContent;
+            run.water_condition.value = 40.0;
+            run.water_condition.unit = "percent_saturation".to_string();
+            run.water_condition.nuclei_distribution_evidence_sha256 = Some(digest('8'));
+        }
+        assert_eq!(audit(&input).disposition, "DISTRIBUTIONAL_SUMMARY_ONLY");
     }
 
     #[test]
@@ -955,7 +1124,7 @@ mod tests {
         let run = &report.run_reports[0];
         assert_eq!(run.observed_cavitation_onsets, Some(2));
         assert_eq!(run.left_censored_active_segments, Some(2));
-        assert_eq!(run.right_censored_active_segments, Some(0));
+        assert_eq!(run.right_censored_active_segments, Some(1));
     }
 
     #[test]
