@@ -14,8 +14,7 @@ use crate::mimo_impedance_passport::{
 };
 
 /// Version of the conservative complex quotient enclosure algorithm.
-pub const ENCLOSURE_ALGORITHM_VERSION: &str =
-    "mimo-complex-disc-rectangular-quotient-v0.1";
+pub const ENCLOSURE_ALGORITHM_VERSION: &str = "mimo-complex-disc-rectangular-quotient-v0.1";
 
 /// Whether supplied phasor error radii are deterministic hard bounds.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -229,8 +228,7 @@ pub fn enclose_mimo_impedance_sweep(
         sweep_digest: sweep.sweep_digest.clone(),
         evidence_class,
         hard_bound_method_reference: method_reference,
-        dependence_assumption:
-            UncertaintyDependenceAssumption::IndependentDiscsOuterEnclosure,
+        dependence_assumption: UncertaintyDependenceAssumption::IndependentDiscsOuterEnclosure,
         algorithm_version: ENCLOSURE_ALGORITHM_VERSION.to_string(),
         frequency_matrices,
     })
@@ -404,9 +402,7 @@ fn denominator_squared_interval(
 
     let real = NumericInterval::point(current.real)?;
     let imag = NumericInterval::point(current.imag)?;
-    let norm_squared = real
-        .multiply(real)?
-        .add(imag.multiply(imag)?)?;
+    let norm_squared = real.multiply(real)?.add(imag.multiply(imag)?)?;
     let norm_lower = outward_down(norm_squared.lower.max(0.0).sqrt())?.max(0.0);
     let norm_upper = outward_up(norm_squared.upper.max(0.0).sqrt())?;
 
@@ -742,8 +738,14 @@ mod tests {
         let enclosure =
             enclose_mimo_impedance_matrix_at_exact_frequency(&sweep, 0.0, &semantics()).unwrap();
         let element = &enclosure.impedance_ohm[0][0];
-        let v0 = ComplexValue { real: 4.0, imag: 2.0 };
-        let i0 = ComplexValue { real: 2.0, imag: 0.0 };
+        let v0 = ComplexValue {
+            real: 4.0,
+            imag: 2.0,
+        };
+        let i0 = ComplexValue {
+            real: 2.0,
+            imag: 0.0,
+        };
         let rv = 0.5_f64;
         let ri = 0.25_f64;
 
