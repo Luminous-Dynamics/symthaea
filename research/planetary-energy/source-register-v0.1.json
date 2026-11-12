@@ -418,6 +418,41 @@
         "a specific universal efficiency or cost target",
         "independently measured factory yield for every technology"
       ]
+    },
+    {
+      "source_id": "MOONGLASS-PEROVSKITE-ISRU-2025",
+      "title": "Moon photovoltaics utilizing lunar regolith and halide perovskites",
+      "publisher": "Device",
+      "published_or_updated": "2025-07-18",
+      "source_url": "https://doi.org/10.1016/j.device.2025.100747",
+      "evidence_class": "peer_reviewed_experimental_and_modelled_research",
+      "technology_scope": [
+        "anorthositic_regolith_simulant_to_moonglass",
+        "moonglass_substrate_and_encapsulation",
+        "halide_perovskite_photovoltaics",
+        "proton_irradiation_testing",
+        "lunar_PV_launch_mass_model"
+      ],
+      "reported_facts": [
+        "The study fabricated glass from anorthositic lunar regolith simulant and demonstrated perovskite solar cells on the resulting moonglass.",
+        "It reports AM0 cell efficiencies of approximately 8.5–8.6% for a superstrate configuration and up to 12.1% for a substrate configuration using an IZO transparent contact.",
+        "Moonglass/perovskite devices retained 99.6% of initial efficiency after exposure to 2 × 10^12 68-MeV protons per cm².",
+        "The paper predicts approximately 21.5–22.7% efficiency for a thinner 0.1-mm moonglass with improved interfaces; these values are simulated/projection results, not demonstrated cells.",
+        "The paper estimates 99% material transport-weight reduction and a 22–50 W/g power-per-launched-mass ratio under its proposed lunar manufacturing scenario."
+      ],
+      "comparison_use": [
+        "local_glass_substrate_and_encapsulation_route",
+        "imported_thin_absorber_vs_local_silicon_extraction_comparison",
+        "AM0_perovskite_device_and_proton_test_reference"
+      ],
+      "not_established": [
+        "commercial module-scale manufacturing yield",
+        "long-duration operational stability",
+        "large-area field or lunar performance",
+        "full factory process energy and equipment closure",
+        "complete-system landed mass including manufacturing plant, optics, deposition/contact equipment, installation and spares",
+        "all lunar regolith compositions produce optically suitable glass"
+      ]
     }
   ]
 }
