@@ -554,7 +554,13 @@ fn audit(case: &Case) -> AuditReport {
     let band_reports: Vec<BandReport> = computed.iter().map(|item| item.report.clone()).collect();
     let uncertainty_unresolved = computed.iter().any(|item| item.uncertainty_unresolved);
     let has_invalid_spectral_matrix = !validation_errors.is_empty()
-        || reasons.iter().any(|reason| reason.contains("positive-semidefinite constraint") || reason.contains("exceeds pressure PSD"));
+        || computed.len() != case.bands.len()
+        || reasons.iter().any(|reason| {
+            reason.contains("positive-semidefinite constraint")
+                || reason.contains("exceeds pressure PSD")
+                || reason.contains("non-finite spectral matrix entries")
+                || reason.contains("uncertainty arithmetic overflowed")
+        });
     let phase_unresolved = band_reports.iter().any(|band| band.phase_status == "phase_unresolved");
 
     let disposition = if !validation_errors.is_empty() || has_invalid_spectral_matrix {
@@ -796,6 +802,42 @@ mod tests {
         let mut input = case();
         input.estimator.sidedness = "two_sided".to_string();
         assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn committed_schema_and_fixture_preserve_the_declared_contract() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/marine-vibration-coherence-v0.1.0.schema.json"
+        )).expect("schema JSON parses");
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/fixtures/synthetic-marine-vibration-coherence-v0.1.0.json"
+        )).expect("fixture JSON parses");
+        assert_eq!(schema["$schema"], "https://json-schema.org/draft/2020-12/schema");
+        for required in [
+            "cross_spectrum_convention",
+            "timebase_binding_receipt_sha256",
+            "synchronization_receipt_sha256",
+            "pressure_channel",
+            "vibration_channel",
+            "estimator",
+            "bands",
+        ] {
+            assert!(schema["required"].as_array().unwrap().iter().any(|value| value == required));
+        }
+        assert_eq!(fixture["cross_spectrum_convention"], "pressure_times_conjugate_acceleration");
+        assert_eq!(fixture["pressure_channel"]["timebase_id"], fixture["vibration_channel"]["timebase_id"]);
+        assert_eq!(fixture["evidence_kind"], "synthetic");
+    }
+
+    #[test]
+    fn a_failed_band_calculation_cannot_be_hidden_by_another_valid_band() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        input.bands[0].cross_psd_real = 7.0;
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INVALID");
+        assert_eq!(report.band_reports.len(), 1);
+        assert!(report.reasons.iter().any(|reason| reason.contains("positive-semidefinite constraint")));
     }
 
     #[test]
