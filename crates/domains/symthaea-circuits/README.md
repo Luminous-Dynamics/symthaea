@@ -55,3 +55,8 @@ one finite-impedance Thevenin source, a common DC-link capacitor, two resistive 
 - frequency-domain branch admittances, source impedance and a common-mode return ratio.
 
 This is a synthetic RC/CPL reference, not a converter-control model, measured impedance fit, switching simulation, aircraft stability proof, or flight-safety authority. The companion exact-rational case and independent verifier are under `docs/research/AIRROAD_PDCM_IMPEDANCE_001_V0_1.md` and `tools/airroad-pdcm-impedance-qualifier/`.
+
+
+### Numerical-stability disposition
+
+The cubic Routh-Hurwitz test normalizes its coefficients by a characteristic pole-rate before applying the floating-point guard. The reported `normalized_routh_hurwitz_delta` is dimensionless and is invariant to uniform rescaling of all capacitances (a uniform time-scale change). It remains a numerical screening result for the declared model, not a robust uncertainty bound or physical stability guarantee.
