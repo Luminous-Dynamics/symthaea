@@ -73,7 +73,8 @@
     "symmetry_resolved_page_reference": "For a U(1)-conserving fixed-total-excitation model compare only with the exact Haar average inside that same charge sector; the unconstrained Page formula is an invalid equilibrium comparator unless symmetry breaking is explicitly part of the model.",
     "symmetry_sector_reference": "A fixed-charge pure-state ensemble has a symmetry-resolved Page average; do not substitute the unconstrained Haar Page formula.",
     "domain_wall_transport": "Measure site occupations and oriented bond currents at every nearest-neighbour brickwork layer. Enforce delta n_i = j_(i-1->i) - j_(i->i+1) and independently verify that integrated central-cut current equals the loss of charge from the left half. Entropy growth alone is not a transport diagnostic.",
-    "recoverability": "Separate reference-black-hole decoupling, information availability in accessible radiation, existence of a recovery map, and an efficient operational decoder. A small I(Q:B') is only a decoupling diagnostic; it does not by itself demonstrate a decoder or its cost."
+    "recoverability": "Separate reference-black-hole decoupling, information availability in accessible radiation, existence of a recovery map, and an efficient operational decoder. A small I(Q:B') is only a decoupling diagnostic; it does not by itself demonstrate a decoder or its cost.",
+    "decoder_evidence": "Any operational recovery claim requires the decoder's access set, channel convention, fidelity/error metric, success probability and resource cost. Decoupling is a necessary diagnostic in relevant models, not an implemented decoder."
   },
   "benchmark_ladder": [
     {
@@ -350,29 +351,48 @@
       "id": "QI-4",
       "name": "Hayden-Preskill decoupling and reference recovery",
       "status": "planned",
-      "model": "message register Q injected into a black-hole register entangled with an explicit reference",
+      "model": "Reference Q is initially maximally entangled with injected message M; black-hole register B is initially entangled with explicit early radiation R; a declared scrambler acts on M tensor B; emitted factors E are made accessible while remaining B' is inaccessible to the decoder.",
       "observables": [
-        "mutual_information_QR",
-        "mutual_information_QB",
-        "decoupling_error",
-        "recovery_fidelity",
-        "success_probability",
+        "mutual_information_Q_Bprime",
+        "decoupling_trace_distance_Q_Bprime",
+        "accessible_reference_radiation_mutual_information",
+        "entanglement_fidelity_after_recovery",
+        "average_message_state_fidelity",
+        "worst_case_recovery_error_or_declared_bound",
+        "decoder_success_probability",
         "decoder_gate_count",
         "decoder_depth",
-        "classical_runtime",
-        "memory_bytes"
+        "decoder_runtime",
+        "decoder_peak_memory",
+        "charge_sector_leakage",
+        "noise_sensitivity"
       ],
       "decoder_baselines": [
-        "exact_small_dimension_optimal_reference",
+        "exact_small_dimension_optimal_recovery_via_SDP_or_channel_optimization",
         "Petz_recovery",
+        "rotated_Petz_recovery",
+        "charge_sector_resolved_Petz_recovery",
         "declared_approximate_decoder"
       ],
       "acceptance": {
         "information_recovery_claim_requires_measured_fidelity_and_cost": true,
         "existence_of_recovery_map_is_not_called_efficient_decoder": true,
-        "null_controls_required": true
+        "decoder_access_set": "R tensor emitted E only; never B' or its simulator memory",
+        "exact_baseline": "For small fixtures, compare with exact optimal recovery or a certified upper/lower bound",
+        "small_fixture_target": "Variational decoder entanglement fidelity within 1e-3 absolute of the exact optimum on preregistered small cases",
+        "finite_size": "Sweep message size, black-hole size, radiation fraction, seeds and conserved-charge sectors",
+        "symmetry": "For U(1) channels, decoder must declare whether it preserves charge and report sector leakage",
+        "generalization": "Train on separate scrambler seeds from held-out evaluation seeds; no decoder may receive hidden random seed/state amplitudes as side information",
+        "noise": "Report fidelity versus a declared local gate/noise model",
+        "null_controls": [
+          "decoder given access to B'",
+          "decoder given full global state or hidden simulator amplitudes",
+          "unrestricted recovery compared as if it preserved U(1)",
+          "recovery claim made using mutual information only",
+          "fidelity reported without gate count/depth/runtime"
+        ]
       },
-      "implementation_status": "not_implemented"
+      "implementation_status": "not_implemented; QI-4A decoupling-only diagnostic now provides an exact small one-step setup but no recovery channel"
     },
     {
       "id": "QI-5",
@@ -475,7 +495,10 @@
     "compare 1D domain-wall transport against all-to-all gates as though both had the same spatial metric",
     "declare message recovery from a low reference-black-hole mutual information without constructing a decoder",
     "report mutual-information complementarity as entanglement recovery fidelity",
-    "allow recovery decoder to inspect the remaining black-hole register"
+    "allow recovery decoder to inspect the remaining black-hole register",
+    "declare efficient recovery from the existence of a Petz map without evaluating its implementation cost",
+    "evaluate a decoder on the same scrambler seeds used for training without held-out evaluation",
+    "claim a charge-preserving recovery while silently allowing sector leakage"
   ],
   "competitive_baselines": [
     {
