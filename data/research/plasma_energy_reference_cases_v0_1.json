@@ -795,6 +795,164 @@
       "luminous_reproduction": false,
       "particle_energy_origin": "MANUFACTURER_ARCHITECTURE_CLAIM_NO_PUBLIC_ORIGIN_RESOLVED_OUTPUT",
       "fusion_born_output_demonstrated": false
+    },
+    {
+      "case_id": "HTTES-ELECTRIFIED-TES-REVIEW-2026",
+      "lane": "HIGH_TEMPERATURE_THERMAL_STORAGE",
+      "evidence_class": "PUBLISHED_REVIEW_OR_DATA_SYNTHESIS",
+      "source": {
+        "title": "Electrified thermal energy storage",
+        "publisher": "Nature Reviews Clean Technology",
+        "publication_date": "2026-01-09",
+        "volume": "2",
+        "pages": "89-106",
+        "doi": "10.1038/s44359-025-00131-4",
+        "url": "https://doi.org/10.1038/s44359-025-00131-4"
+      },
+      "observations": [
+        {
+          "metric": "resistive_ETES_reported_cost",
+          "value": 50,
+          "qualifier": "review reports costs around this figure; exact technology/cost scope and normalization must be extracted before use",
+          "unit": "USD_per_kW"
+        },
+        {
+          "metric": "non_contact_ETES_heating_temperature",
+          "value": 3000,
+          "qualifier": "review states emerging microwave or inductive heating methods can reach temperatures up to this level; this is not plasma-specific and is not a thermal-store operating point",
+          "unit": "degC",
+          "relation": "up_to"
+        }
+      ],
+      "source_conclusion": "The review identifies resistive heating coupled to sensible/latent storage as commercially viable but often limited to short-duration service by thermal losses and low energy density. It discusses non-contact/volumetric microwave and inductive heating as faster alternatives and thermochemical storage as a longer-duration but lower-TRL direction.",
+      "comparison_status": "CROSS_TECHNOLOGY_REVIEW_BOUNDARIES_AND_COST_BASIS_EXTRACTION_REQUIRED",
+      "blockers": [
+        "The reported USD/kW figure is not normalized to a specific duration, energy capacity, installation scope or delivered-heat contract in the abstract.",
+        "The cited up-to-3000°C capability is for non-contact heating examples such as microwave/induction, not a plasma-specific advantage.",
+        "Review synthesis is not a matched performance test or physical Luminous result."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "PLASMA-SCALEUP-ROADMAP-2026",
+      "lane": "PLASMA_INDUSTRIAL_HEATING_AND_SCALEUP",
+      "evidence_class": "PUBLISHED_REVIEW_OR_DATA_SYNTHESIS",
+      "source": {
+        "title": "Large-Scale Applications of Plasma Technologies: Progresses and Challenges",
+        "publisher": "High Voltage",
+        "publication_date": "2026-09-30",
+        "volume": "11",
+        "issue": "5",
+        "pages": "1524-1582",
+        "doi": "10.1049/hve2.70241",
+        "url": "https://doi.org/10.1049/hve2.70241"
+      },
+      "observations": [],
+      "source_conclusion": "The review argues that large-scale plasma deployment is constrained by controllability of plasma parameters/discharge modes during scale-up, grid-to-outcome system energy efficiency, long-term reliability and maintainability, and outcome-relevant diagnostics/harmonized benchmarking. It notes that high plasma-to-chemistry or plasma-to-heat efficiency does not guarantee grid-to-outcome performance once power conversion, coupling, cooling, feed, separation and auxiliaries are included.",
+      "comparison_status": "REVIEW_FRAMEWORK_NOT_NUMERIC_PERFORMANCE_BENCHMARK",
+      "blockers": [
+        "This is a review/roadmap rather than a source-matched plasma-heater experiment.",
+        "Application-specific metrics and full-system boundaries must be extracted before quantitative use.",
+        "Do not interpret broad plasma-source classes as a single transferable efficiency value."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "PLASMA-MW-MGO-REFRACTORY-PILOT-2025",
+      "lane": "PLASMA_HIGH_TEMPERATURE_MATERIAL_PROCESSING",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Thermal treatment of MgO refractories in a pilot furnace heated with microwave plasma burner",
+        "publisher": "Journal of the European Ceramic Society",
+        "publication_date": "2025-05",
+        "article_number": "117146",
+        "doi": "10.1016/j.jeurceramsoc.2024.117146",
+        "url": "https://doi.org/10.1016/j.jeurceramsoc.2024.117146"
+      },
+      "configuration": {
+        "heating_method": "microwave plasma burner heats air as process gas, which is blown into a pilot furnace",
+        "comparator": "conventional electric resistance furnace",
+        "material": "MgO refractory specimens"
+      },
+      "observations": [
+        {
+          "metric": "material_density_or_microstructure_adverse_change",
+          "value": false,
+          "qualifier": "paper reports no adverse effect of microwave-plasma treatment compared with the electric reference",
+          "unit": "boolean"
+        },
+        {
+          "metric": "phase_composition_change_observed",
+          "value": false,
+          "qualifier": "paper reports no phase-composition changes",
+          "unit": "boolean"
+        }
+      ],
+      "source_conclusion": "Pilot-furnace microwave-plasma burner treatment was compared with an electric resistance furnace and combinations of the methods. The paper reports no adverse effects on density, microstructure or flexural strength of the MgO specimens and no change in phase composition.",
+      "comparison_status": "PILOT_MATERIAL_PROCESS_DEMONSTRATION_NOT_COMPLETE_ENERGY_BALANCE",
+      "blockers": [
+        "The paper's material-property outcomes do not establish wall-plug-to-useful-heat efficiency or storage round-trip performance.",
+        "Extract electrical meter boundaries, burner/gas flow, cooling, air enthalpy, furnace losses, cycle duration and material temperature history before energy comparison.",
+        "A pilot furnace/material-treatment demonstration is not a thermal battery or industrial plant qualification."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "PLASMA-MW-CERAMIC-FIRING-2026",
+      "lane": "PLASMA_HIGH_TEMPERATURE_MATERIAL_PROCESSING",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Comparative effects of microwave-induced plasma and conventional firing on the properties of silicate ceramics: A statistical and validated study",
+        "publisher": "Ceramics International",
+        "publication_date": "2026-07-30",
+        "doi": "10.1016/j.ceramint.2026.07.435",
+        "url": "https://doi.org/10.1016/j.ceramint.2026.07.435"
+      },
+      "configuration": {
+        "plasma_source": "2.45 GHz microwave-induced plasma burner",
+        "reported_burner_power_kW": 6,
+        "target_firing_temperature_C": 1000,
+        "comparators": [
+          "electric resistance firing",
+          "natural gas firing",
+          "reference firing"
+        ],
+        "test_design": "two-factorial design: firing method x specimen condition (dried or pre-fired)"
+      },
+      "observations": [
+        {
+          "metric": "dried_specimen_water_absorption",
+          "value": 21.21,
+          "qualifier": "MWP firing; source also reports 21.25% for electric resistance",
+          "unit": "percent"
+        },
+        {
+          "metric": "dried_specimen_young_modulus",
+          "value": 20.05,
+          "qualifier": "MWP firing; source also reports 21.34 GPa for electric resistance",
+          "unit": "GPa"
+        },
+        {
+          "metric": "dried_specimen_biaxial_strength",
+          "value": 30.38,
+          "qualifier": "MWP firing; source also reports 32.94 MPa for electric resistance",
+          "unit": "MPa"
+        },
+        {
+          "metric": "pre_fired_specimen_biaxial_strength",
+          "value": 36.73,
+          "qualifier": "MWP group; source reports the highest strength among the pre-fired groups",
+          "unit": "MPa"
+        }
+      ],
+      "source_conclusion": "For dried specimens, microwave-induced plasma firing produced water absorption, Young's modulus and biaxial strength comparable to electric resistance under the tested firing curve, while gas/reference firing yielded higher strength and modulus. For pre-fired specimens, MWP achieved the highest reported strength and modulus. The paper discusses atmosphere and thermal-history effects rather than establishing an energy-efficiency advantage.",
+      "comparison_status": "MATCHED_MATERIAL_QUALITY_EXPERIMENT_ENERGY_BOUNDARY_NOT_REPORTED",
+      "blockers": [
+        "The source does not establish full wall-plug-to-product energy efficiency or thermal-storage performance.",
+        "Dried and pre-fired specimen states must be separate matched strata.",
+        "Gas, resistance and plasma have different atmospheres and thermal histories; property differences are not a direct energy-efficiency ranking."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -897,6 +1055,21 @@
       "control_id": "NC-DEC-007",
       "condition": "Treat electrostatic mirror loss-cone conversion and pulsed FRC inductive recapture as the same converter architecture.",
       "expected_disposition": "NOT_COMPARABLE_PHYSICS_AND_BOUNDARY_MISMATCH"
+    },
+    {
+      "control_id": "NC-HTTES-003",
+      "condition": "Treat the Nature ETES review's up-to-3000°C microwave/induction examples as plasma-specific performance evidence.",
+      "expected_disposition": "REJECT_TECHNOLOGY_CLASS_MISMATCH"
+    },
+    {
+      "control_id": "NC-HTTES-004",
+      "condition": "Infer thermal-store wall-plug efficiency from the MgO or silicate-ceramic material-property outcomes without complete energy metering.",
+      "expected_disposition": "REJECT_INCOMPLETE_ENERGY_BOUNDARY"
+    },
+    {
+      "control_id": "NC-HTTES-005",
+      "condition": "Pool dried and pre-fired MWP ceramic specimens into one averaged outcome without stratifying specimen history.",
+      "expected_disposition": "REJECT_EXPERIMENTAL_DESIGN_MISMATCH"
     }
   ],
   "derived_reference_checks": [
