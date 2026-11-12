@@ -462,7 +462,7 @@ The service evaluator checks complete time coverage, interval identity, electric
 - `BLOCKED_UNKNOWN`: required capability or time coverage is missing;
 - `INVALID`: malformed identity, time, value or evidence classification.
 
-It checks declared upstream capability receipts; it does not validate the upstream generation/storage/thermal models or derive their values. This is a join/eligibility checker, not an energy dispatch or thermal solver.
+It checks that an upstream capability-receipt identifier is present and compares the declared values; it does not resolve, authenticate or verify the receipt, validate the upstream generation/storage/thermal models, or derive their values. Every interval must state its thermal-service list explicitly (an empty list means no thermal service is required). This is a synthetic join/eligibility checker, not an energy dispatch or thermal solver.
 
 ### Tests and claim ceiling
 
@@ -474,4 +474,4 @@ cargo test -p xtask
 
 The orbit and service commands use the existing `serde`, `serde_json`, `sha2` and `anyhow` dependencies. A corpus-level PASS means its expected synthetic/reference dispositions were reproduced; it does not mean all included candidates are feasible. Neither command validates a solar array, power system, battery, radiator, site, material process or ISRU plant.
 
-The service receipt values in the synthetic fixture are deliberately synthetic. Production use must first bind exact source model, configuration, timebase, evidence class, units, uncertainty and capability receipt identity from the upstream owner. A reference to a capability receipt is not proof that the receipt itself is qualified.
+The service receipt values in the synthetic fixture are deliberately synthetic. Production use must first bind exact source model, configuration, timebase, evidence class, units, uncertainty and capability receipt identity from the upstream owner. A non-empty capability-receipt identifier is only a reference string; it is not proof that the receipt exists, is authentic, is current, or is qualified.
