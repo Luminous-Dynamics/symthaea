@@ -31,49 +31,77 @@
         "state": "non_cavitating",
         "observable_kind": "cavitation_video",
         "observable_id": "cavitation-baseline",
-        "evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        "evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+        "unit": "cavitation_state_index",
+        "measured_value": 0,
+        "expanded_uncertainty": 0.05,
+        "equivalence_tolerance": 0.1
       },
       {
         "source": "propeller_hydrodynamic",
         "state": "matched",
         "observable_kind": "wake_probe",
         "observable_id": "wake-station",
-        "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unit": "wake_metric_index",
+        "measured_value": 1,
+        "expanded_uncertainty": 0.01,
+        "equivalence_tolerance": 0.05
       },
       {
         "source": "prime_mover",
         "state": "running",
         "observable_kind": "engine_state_bus",
         "observable_id": "engine-controller",
-        "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "unit": "operating_state_index",
+        "measured_value": 1,
+        "expanded_uncertainty": 0.01,
+        "equivalence_tolerance": 0.05
       },
       {
         "source": "shaft_gearbox",
         "state": "matched",
         "observable_kind": "shaft_torsion_meter",
         "observable_id": "shaft-meter",
-        "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "unit": "vibration_metric_index",
+        "measured_value": 1,
+        "expanded_uncertainty": 0.01,
+        "equivalence_tolerance": 0.05
       },
       {
         "source": "auxiliary_machinery",
         "state": "matched",
         "observable_kind": "auxiliary_state_bus",
         "observable_id": "aux-bus",
-        "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "unit": "load_fraction",
+        "measured_value": 0.5,
+        "expanded_uncertainty": 0.01,
+        "equivalence_tolerance": 0.05
       },
       {
         "source": "hull_appendage_flow",
         "state": "matched",
         "observable_kind": "flow_observation",
         "observable_id": "flow-camera",
-        "evidence_sha256": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+        "evidence_sha256": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+        "unit": "flow_metric_index",
+        "measured_value": 1,
+        "expanded_uncertainty": 0.01,
+        "equivalence_tolerance": 0.05
       },
       {
         "source": "ambient_background",
         "state": "matched",
         "observable_kind": "ambient_hydrophone",
         "observable_id": "ambient-reference",
-        "evidence_sha256": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh"
+        "evidence_sha256": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
+        "unit": "received_spl_db_re_1upa",
+        "measured_value": 90,
+        "expanded_uncertainty": 0.5,
+        "equivalence_tolerance": 1.5
       }
     ],
     "bands": [
@@ -101,49 +129,77 @@
         "state": "cavitating",
         "observable_kind": "cavitation_video",
         "observable_id": "cavitation-baseline",
-        "evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+        "evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "unit": "cavitation_state_index",
+        "measured_value": 1,
+        "expanded_uncertainty": 0.05,
+        "equivalence_tolerance": 0.1
       },
       {
         "source": "propeller_hydrodynamic",
         "state": "matched",
         "observable_kind": "wake_probe",
         "observable_id": "wake-station",
-        "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "unit": "wake_metric_index",
+        "measured_value": 1,
+        "expanded_uncertainty": 0.01,
+        "equivalence_tolerance": 0.05
       },
       {
         "source": "prime_mover",
         "state": "running",
         "observable_kind": "engine_state_bus",
         "observable_id": "engine-controller",
-        "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        "evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "unit": "operating_state_index",
+        "measured_value": 1,
+        "expanded_uncertainty": 0.01,
+        "equivalence_tolerance": 0.05
       },
       {
         "source": "shaft_gearbox",
         "state": "matched",
         "observable_kind": "shaft_torsion_meter",
         "observable_id": "shaft-meter",
-        "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        "evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "unit": "vibration_metric_index",
+        "measured_value": 1,
+        "expanded_uncertainty": 0.01,
+        "equivalence_tolerance": 0.05
       },
       {
         "source": "auxiliary_machinery",
         "state": "matched",
         "observable_kind": "auxiliary_state_bus",
         "observable_id": "aux-bus",
-        "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        "evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "unit": "load_fraction",
+        "measured_value": 0.5,
+        "expanded_uncertainty": 0.01,
+        "equivalence_tolerance": 0.05
       },
       {
         "source": "hull_appendage_flow",
         "state": "matched",
         "observable_kind": "flow_observation",
         "observable_id": "flow-camera",
-        "evidence_sha256": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+        "evidence_sha256": "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+        "unit": "flow_metric_index",
+        "measured_value": 1,
+        "expanded_uncertainty": 0.01,
+        "equivalence_tolerance": 0.05
       },
       {
         "source": "ambient_background",
         "state": "matched",
         "observable_kind": "ambient_hydrophone",
         "observable_id": "ambient-reference",
-        "evidence_sha256": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh"
+        "evidence_sha256": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh",
+        "unit": "received_spl_db_re_1upa",
+        "measured_value": 90,
+        "expanded_uncertainty": 0.5,
+        "equivalence_tolerance": 1.5
       }
     ],
     "bands": [
