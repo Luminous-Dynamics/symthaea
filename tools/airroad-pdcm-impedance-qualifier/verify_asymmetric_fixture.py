@@ -7,7 +7,7 @@ import json
 from fractions import Fraction
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "docs/research/fixtures/airroad-pdcm-asymmetric-two-converter-v0.1.json"
 
 
