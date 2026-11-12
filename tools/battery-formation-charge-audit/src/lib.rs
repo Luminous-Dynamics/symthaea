@@ -650,11 +650,8 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         }
     }
 
-    let expected_arm_ids: BTreeSet<String> = manifest
-        .arms
-        .iter()
-        .map(|arm| arm.arm_id.clone())
-        .collect();
+    let expected_arm_ids: BTreeSet<String> =
+        manifest.arms.iter().map(|arm| arm.arm_id.clone()).collect();
     for (block_id, block_arm_ids) in &arms_by_block {
         if block_arm_ids != &expected_arm_ids {
             return Err(AuditError(format!(
