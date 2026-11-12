@@ -268,8 +268,9 @@ fn band_map(observation: &Observation) -> BTreeMap<&str, &BandMeasurement> {
 }
 
 fn audit(case: &Case) -> AuditReport {
-    let errors = validate_case(case);
-    let mut reasons = errors;
+    let validation_errors = validate_case(case);
+    let invalid_input = !validation_errors.is_empty();
+    let mut reasons = validation_errors;
     let mut band_deltas = Vec::new();
     let mut identifiability = "INCOMPLETE";
 
@@ -386,8 +387,8 @@ fn audit(case: &Case) -> AuditReport {
     let evidence_eligible = case.evidence_kind == EvidenceKind::Measured
         && case.source.rights_status == RightsStatus::PublicOrPermitted
         && case.source.independently_reviewed;
-    let disposition = if !reasons.is_empty() && identifiability == "INCOMPLETE" {
-        "INCOMPLETE"
+    let disposition = if invalid_input {
+        "INVALID"
     } else if identifiability == "INCOMPARABLE" {
         "INCOMPARABLE"
     } else if identifiability == "UNRESOLVED_MIXTURE" {
@@ -398,8 +399,6 @@ fn audit(case: &Case) -> AuditReport {
         "INCOMPLETE"
     } else if identifiability == "IDENTIFIABLE_FOR_DECLARED_CONTRAST" {
         "CONTRAST_ELIGIBLE"
-    } else if !errors.is_empty() {
-        "INVALID"
     } else {
         "INCOMPLETE"
     };
@@ -485,7 +484,7 @@ mod tests {
             state: state.to_string(),
             observable_kind: "independent_sensor_or_state_record".to_string(),
             observable_id: format!("obs-{}", source.name()),
-            evidence_sha256: digest(if source == SourceKind::PropellerCavitation { target_digest } else { 'b' }),
+            evidence_sha256: digest(target_digest),
         })
         .collect()
     }
