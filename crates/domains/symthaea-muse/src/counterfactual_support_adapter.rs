@@ -1,7 +1,7 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Replay-verified EVAL-017 → EVAL-019 support adapter.
+//! Replay-verified EVAL-017 â EVAL-019 support adapter.
 //!
 //! This adapter turns one independently replay-verified counterfactual
 //! influence report per source event into planner-ready EVAL-019 support.
@@ -17,10 +17,9 @@
 //! EVAL-019 must therefore expand incomplete routing to global pair scope.
 
 use crate::counterfactual_influence::{
-    CounterfactualInfluenceError, CounterfactualInfluenceInput,
-    CounterfactualInfluenceReport, EventIntervention, InfluenceDisposition,
-    VerifiedRendererAudioBinding, VerifiedRepeatabilityCalibration,
-    verify_counterfactual_influence,
+    CounterfactualInfluenceError, CounterfactualInfluenceInput, CounterfactualInfluenceReport,
+    EventIntervention, InfluenceDisposition, VerifiedRendererAudioBinding,
+    VerifiedRepeatabilityCalibration, verify_counterfactual_influence,
 };
 use crate::fluid_render::{
     FluidSynthEffectsGroupAssignment, build_effects_group_assignment,
@@ -39,8 +38,7 @@ const ADAPTER_REPORT_DOMAIN: &[u8] =
     b"luminous-dynamics-mel-mr-eval-025-support-adapter-report-v2\0";
 const MAX_ADAPTER_EVENTS: usize = 100_000;
 const MAX_SUPPORT_INTERVALS_PER_EVENT: usize = 100_000;
-const ROUTING_INCOMPLETE_REASON: &str =
-    "effects-group assignment is known, but complete FluidSynth downstream/master/plugin routing is not independently evidenced";
+const ROUTING_INCOMPLETE_REASON: &str = "effects-group assignment is known, but complete FluidSynth downstream/master/plugin routing is not independently evidenced";
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CounterfactualEventSupportEvidence {
@@ -129,8 +127,7 @@ impl CounterfactualSupportAdapterReport {
                     && event_evidence_sha256(event)
                         .is_ok_and(|digest| digest == event.evidence_sha256)
             })
-            && adapter_report_sha256(self)
-                .is_ok_and(|digest| self.receipt_sha256 == digest)
+            && adapter_report_sha256(self).is_ok_and(|digest| self.receipt_sha256 == digest)
     }
 
     /// Alias for the structural planner-readiness check. Only the opaque
@@ -298,11 +295,8 @@ fn build_event_support(
 
     let mut domains = BTreeSet::new();
     for channel in baseline_channels {
-        let group = effects_group_for_midi_channel(
-            channel,
-            assignment.effects_group_count,
-        )
-        .ok_or(CounterfactualSupportAdapterError::InvalidEffectsGroupAssignment)?;
+        let group = effects_group_for_midi_channel(channel, assignment.effects_group_count)
+            .ok_or(CounterfactualSupportAdapterError::InvalidEffectsGroupAssignment)?;
         domains.insert(format!("fluidsynth:effects-group:{group}"));
     }
 
@@ -321,7 +315,10 @@ fn build_event_support(
         if start_frame >= end_frame || end_frame > report.total_frames as u64 {
             return Err(CounterfactualSupportAdapterError::InvalidSupportIntervals);
         }
-        acoustic_support.push(AcousticSupportInterval { start_frame, end_frame });
+        acoustic_support.push(AcousticSupportInterval {
+            start_frame,
+            end_frame,
+        });
     }
     acoustic_support.sort_unstable();
     let mut merged: Vec<AcousticSupportInterval> = Vec::with_capacity(acoustic_support.len());
@@ -347,7 +344,9 @@ fn build_event_support(
         baseline_event_map_receipt_sha256: report.performed_event_map_receipt_sha256.clone(),
         baseline_schedule_sha256: report.baseline_schedule_sha256.clone(),
         baseline_renderer_receipt_sha256: report.baseline_renderer_receipt_sha256.clone(),
-        counterfactual_renderer_receipt_sha256: report.counterfactual_renderer_receipt_sha256.clone(),
+        counterfactual_renderer_receipt_sha256: report
+            .counterfactual_renderer_receipt_sha256
+            .clone(),
         baseline_audio_sha256: report.baseline_audio_sha256.clone(),
         counterfactual_audio_sha256: report.counterfactual_audio_sha256.clone(),
         repeatability_calibration_sha256: report.repeatability_calibration_sha256.clone(),
@@ -438,13 +437,10 @@ fn assemble_from_verified_events(
             return Err(CounterfactualSupportAdapterError::DuplicateOrMissingEvent);
         }
         if event.source_score_sha256 != first.source_score_sha256
-            || event.baseline_event_map_artifact_sha256
-                != first.baseline_event_map_artifact_sha256
-            || event.baseline_event_map_receipt_sha256
-                != first.baseline_event_map_receipt_sha256
+            || event.baseline_event_map_artifact_sha256 != first.baseline_event_map_artifact_sha256
+            || event.baseline_event_map_receipt_sha256 != first.baseline_event_map_receipt_sha256
             || event.baseline_schedule_sha256 != first.baseline_schedule_sha256
-            || event.baseline_renderer_receipt_sha256
-                != first.baseline_renderer_receipt_sha256
+            || event.baseline_renderer_receipt_sha256 != first.baseline_renderer_receipt_sha256
             || event.baseline_audio_sha256 != first.baseline_audio_sha256
             || event.renderer_identity_sha256 != first.renderer_identity_sha256
             || event.renderer_config_sha256 != first.renderer_config_sha256
@@ -525,7 +521,10 @@ mod tests {
         format!("{:x}", Sha256::digest(label.as_bytes()))
     }
 
-    fn event(index: usize, intervals: Vec<AcousticSupportInterval>) -> VerifiedCounterfactualEventSupport {
+    fn event(
+        index: usize,
+        intervals: Vec<AcousticSupportInterval>,
+    ) -> VerifiedCounterfactualEventSupport {
         let assignment = build_effects_group_assignment(4).unwrap();
         let mut evidence = CounterfactualEventSupportEvidence {
             version: COUNTERFACTUAL_SUPPORT_ADAPTER_VERSION.to_owned(),
@@ -539,7 +538,9 @@ mod tests {
             baseline_event_map_receipt_sha256: digest("baseline-map-receipt"),
             baseline_schedule_sha256: digest("baseline-schedule"),
             baseline_renderer_receipt_sha256: digest("baseline-render"),
-            counterfactual_renderer_receipt_sha256: digest(&format!("counterfactual-render-{index}")),
+            counterfactual_renderer_receipt_sha256: digest(&format!(
+                "counterfactual-render-{index}"
+            )),
             baseline_audio_sha256: digest("baseline-audio"),
             counterfactual_audio_sha256: digest(&format!("counterfactual-audio-{index}")),
             repeatability_calibration_sha256: digest("repeatability"),
@@ -586,7 +587,13 @@ mod tests {
 
     #[test]
     fn event_evidence_digest_rejects_interval_tampering() {
-        let verified = event(0, vec![AcousticSupportInterval { start_frame: 60, end_frame: 67 }]);
+        let verified = event(
+            0,
+            vec![AcousticSupportInterval {
+                start_frame: 60,
+                end_frame: 67,
+            }],
+        );
         let mut altered = verified.evidence.clone();
         altered.support.acoustic_support[0].end_frame = 68;
         assert_ne!(
@@ -595,7 +602,11 @@ mod tests {
         );
     }
 
-    fn lineage(source_index: usize, channel: u8, midi_note: u8) -> crate::performed_event_map::PerformedEventLineage {
+    fn lineage(
+        source_index: usize,
+        channel: u8,
+        midi_note: u8,
+    ) -> crate::performed_event_map::PerformedEventLineage {
         lineage_descendant(source_index, 0, channel, midi_note)
     }
 
@@ -770,7 +781,13 @@ mod tests {
     fn aggregate_requires_every_event_once_and_keeps_routing_incomplete() {
         let events = vec![
             event(1, Vec::new()),
-            event(0, vec![AcousticSupportInterval { start_frame: 60, end_frame: 67 }]),
+            event(
+                0,
+                vec![AcousticSupportInterval {
+                    start_frame: 60,
+                    end_frame: 67,
+                }],
+            ),
         ];
         let report = assemble_counterfactual_support_adapter_report(&events).unwrap();
         assert!(report.report().receipt_is_intact());
@@ -780,9 +797,16 @@ mod tests {
         assert_eq!(report.planner_event_supports().len(), 2);
         assert_eq!(report.planner_event_supports()[0].source_event_index, 0);
         assert_eq!(report.planner_event_supports()[1].source_event_index, 1);
-        assert!(report.planner_event_supports()[1].acoustic_support.is_empty());
+        assert!(
+            report.planner_event_supports()[1]
+                .acoustic_support
+                .is_empty()
+        );
         assert!(report.planner_event_supports().iter().all(|support| {
-            support.support_evidence_sha256.as_ref().is_some_and(|digest| is_sha256(digest))
+            support
+                .support_evidence_sha256
+                .as_ref()
+                .is_some_and(|digest| is_sha256(digest))
                 && !support.routing_complete
         }));
     }
@@ -794,7 +818,10 @@ mod tests {
             Err(CounterfactualSupportAdapterError::EventCountMismatch)
         ));
         assert!(matches!(
-            assemble_counterfactual_support_adapter_report(&[event(0, Vec::new()), event(0, Vec::new())]),
+            assemble_counterfactual_support_adapter_report(&[
+                event(0, Vec::new()),
+                event(0, Vec::new())
+            ]),
             Err(CounterfactualSupportAdapterError::DuplicateOrMissingEvent)
         ));
     }
