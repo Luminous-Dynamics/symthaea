@@ -473,3 +473,30 @@ The benchmark source manifest is now at revision `2026-11-12-r2` with 12 distinc
 Each source record distinguishes paper-reported results, publicly downloadable scope, licensing/redistribution status, domain limitations and intended use. The manifest does not claim any dataset has been downloaded or reproduced.
 
 The source split rules are strict: repeated pixels/spectra/frames from the same physical specimen remain in one split; garment identities and material families are held out where possible; simulation outputs never become physical labels; and source-domain transfer is evaluated explicitly.
+
+
+## 19. Multi-stage factory scheduling and source-load coordination
+
+Symtropy's existing textile scheduler is intentionally a one-stage parallel-machine benchmark. Keep that baseline frozen and extend it through a separate workstream: [Symtropy #4875 — TEXTILE-MULTISTAGE-FACTORY-001](https://github.com/Luminous-Dynamics/symtropy/issues/4875).
+
+The research landscape includes concrete comparators:
+- [Dual-resource flexible job-shop scheduling in garment manufacturing (2026)](https://doi.org/10.1080/00207543.2026.2711058): machine/operator assignment, sequence-dependent setup and skills; the reported LCS heuristic is compared with MIP/CP and an analytical upper bound. The reported >200-operation / <23%-upper-bound-gap figures are specific to that study's industrial instances and must be reproduced.
+- [Steam-aware multi-objective textile scheduling (August 2026)](https://doi.org/10.1016/j.swevo.2026.102498): Q-learning-driven multi-objective evolutionary search for flexible job-shop scheduling with steam use.
+- [Graph RL source-load scheduling for textile production (2025)](https://www.sciencedirect.com/science/article/pii/S2950550X25000275): the authors report 10.1% lower carbon emissions, 2.9% lower energy cost and 1.1% higher makespan in a Shanghai enterprise case; data are reported available on request.
+- [Multi-line garment scheduling (2026)](https://doi.org/10.1016/j.procs.2026.02.164): flow-shop, lot-streaming and heterogeneous-workforce assignment, with MILP and a genetic algorithm.
+- [Apparel scheduling systematic review (2026)](https://doi.org/10.1108/RJTA-09-2025-0213): 82 studies across 2005–2025.
+- [Human-centered garment scheduling (2025)](https://doi.org/10.1007/s11740-025-01349-8): integrates skills and ergonomic considerations into flexible garment manufacturing scheduling.
+
+The next benchmark progression should be:
+1. Preserve the existing single-stage exact/dispatch-rule comparison as M0.
+2. Add multi-stage route and precedence constraints (cut, sew/assembly, finish, inspect).
+3. Add dual-resource constraints (machines plus operator skills/availability), sequence-dependent setup and workload/ergonomic bounds.
+4. Couple time-dependent electricity and steam/thermal capacity, freshwater and wastewater constraints to the production plan.
+5. Add dynamic order, material, worker, machine and utility disruptions with replayable robust rescheduling.
+6. Connect a read-only observed-state interface before considering any operator-approved actuation or plant connection.
+
+Compare exact MILP/constraint programming where tractable, EDD/setup-aware heuristics, the published dual-resource heuristic, genetic and multi-objective evolutionary algorithms, and RL/graph-RL only after the deterministic baselines are frozen. Measure optimality gaps, Pareto hypervolume, service and quality, worker workload/fairness, energy/steam/water peaks, WIP, plan churn, recovery latency and compute budget.
+
+A lower carbon or energy objective cannot compensate for unsafe workload, unqualified process windows, a missed hard delivery commitment, off-spec output or missing environmental evidence. Published case-study savings must not be stitched across different papers into a single SOTA number.
+
+The machine-readable benchmark register has been extended to 18 sources at revision `2026-11-12-r3`; it records scheduling literature separately from cloth physics, material sensing, inverse design and robotic sewing.
