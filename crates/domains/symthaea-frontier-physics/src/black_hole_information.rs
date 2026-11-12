@@ -26,27 +26,72 @@ pub const MAX_PAGE_REFERENCE_TOTAL_DIMENSION: usize = 1 << MAX_DENSE_STATE_QUBIT
 pub enum QuantumInformationError {
     InvalidDimension(usize),
     DimensionOverflow,
-    DimensionMismatch { expected: usize, actual: usize },
-    DenseDimensionLimit { requested: usize, maximum: usize },
-    DenseStateQubitLimit { requested: usize, maximum: usize },
-    PageReferenceDimensionLimit { requested: usize, maximum: usize },
+    DimensionMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    DenseDimensionLimit {
+        requested: usize,
+        maximum: usize,
+    },
+    DenseStateQubitLimit {
+        requested: usize,
+        maximum: usize,
+    },
+    PageReferenceDimensionLimit {
+        requested: usize,
+        maximum: usize,
+    },
     InvalidPageEntropy(f64),
     InvalidEnsembleSampleCount(usize),
     InvalidCircuitTopology,
-    InvalidSubsystemSize { requested: usize, maximum: usize },
-    InvalidExcitationSector { excitations: usize, number_of_qubits: usize },
-    EvaporationRegisterLimit { requested: usize, maximum: usize },
+    InvalidSubsystemSize {
+        requested: usize,
+        maximum: usize,
+    },
+    InvalidExcitationSector {
+        excitations: usize,
+        number_of_qubits: usize,
+    },
+    EvaporationRegisterLimit {
+        requested: usize,
+        maximum: usize,
+    },
     UnitaryConstructionFailure,
     InvalidTolerance(f64),
-    NonFiniteState { index: usize },
-    NonFiniteMatrix { row: usize, column: usize },
-    InvalidQubit { qubit: usize, register_size: usize },
+    NonFiniteState {
+        index: usize,
+    },
+    NonFiniteMatrix {
+        row: usize,
+        column: usize,
+    },
+    InvalidQubit {
+        qubit: usize,
+        register_size: usize,
+    },
     DuplicateQubit(usize),
-    NormalizationError { norm_squared: f64, tolerance: f64 },
-    NonHermitian { residual: f64, tolerance: f64 },
-    TraceError { real: f64, imaginary: f64, tolerance: f64 },
-    NonPositive { minimum_eigenvalue: f64, tolerance: f64 },
-    EigensolverNonconvergence { sweeps: usize, residual: f64 },
+    NormalizationError {
+        norm_squared: f64,
+        tolerance: f64,
+    },
+    NonHermitian {
+        residual: f64,
+        tolerance: f64,
+    },
+    TraceError {
+        real: f64,
+        imaginary: f64,
+        tolerance: f64,
+    },
+    NonPositive {
+        minimum_eigenvalue: f64,
+        tolerance: f64,
+    },
+    EigensolverNonconvergence {
+        sweeps: usize,
+        residual: f64,
+    },
 }
 
 impl fmt::Display for QuantumInformationError {
@@ -54,27 +99,93 @@ impl fmt::Display for QuantumInformationError {
         match self {
             Self::InvalidDimension(d) => write!(f, "invalid Hilbert-space dimension {d}"),
             Self::DimensionOverflow => write!(f, "Hilbert-space dimension overflow"),
-            Self::DimensionMismatch { expected, actual } => write!(f, "dimension mismatch: expected {expected}, got {actual}"),
-            Self::DenseDimensionLimit { requested, maximum } => write!(f, "dense dimension {requested} exceeds limit {maximum}"),
-            Self::DenseStateQubitLimit { requested, maximum } => write!(f, "dense state with {requested} qubits exceeds limit {maximum}"),
-            Self::PageReferenceDimensionLimit { requested, maximum } => write!(f, "Page reference dimension product {requested} exceeds limit {maximum}"),
-            Self::InvalidPageEntropy(value) => write!(f, "Page reference entropy is invalid: {value}"),
-            Self::InvalidEnsembleSampleCount(count) => write!(f, "Haar ensemble needs at least two samples, got {count}"),
-            Self::InvalidCircuitTopology => write!(f, "circuit topology requires at least two qubits"),
-            Self::InvalidSubsystemSize { requested, maximum } => write!(f, "subsystem size {requested} exceeds total register size {maximum}"),
-            Self::InvalidExcitationSector { excitations, number_of_qubits } => write!(f, "excitation sector {excitations} is invalid for {number_of_qubits} qubits"),
-            Self::EvaporationRegisterLimit { requested, maximum } => write!(f, "sequential evaporation register has {requested} qubits; dense complementary diagnostics support at most {maximum}"),
-            Self::UnitaryConstructionFailure => write!(f, "failed to construct a numerically independent Haar unitary basis"),
+            Self::DimensionMismatch { expected, actual } => {
+                write!(f, "dimension mismatch: expected {expected}, got {actual}")
+            }
+            Self::DenseDimensionLimit { requested, maximum } => {
+                write!(f, "dense dimension {requested} exceeds limit {maximum}")
+            }
+            Self::DenseStateQubitLimit { requested, maximum } => write!(
+                f,
+                "dense state with {requested} qubits exceeds limit {maximum}"
+            ),
+            Self::PageReferenceDimensionLimit { requested, maximum } => write!(
+                f,
+                "Page reference dimension product {requested} exceeds limit {maximum}"
+            ),
+            Self::InvalidPageEntropy(value) => {
+                write!(f, "Page reference entropy is invalid: {value}")
+            }
+            Self::InvalidEnsembleSampleCount(count) => {
+                write!(f, "Haar ensemble needs at least two samples, got {count}")
+            }
+            Self::InvalidCircuitTopology => {
+                write!(f, "circuit topology requires at least two qubits")
+            }
+            Self::InvalidSubsystemSize { requested, maximum } => write!(
+                f,
+                "subsystem size {requested} exceeds total register size {maximum}"
+            ),
+            Self::InvalidExcitationSector {
+                excitations,
+                number_of_qubits,
+            } => write!(
+                f,
+                "excitation sector {excitations} is invalid for {number_of_qubits} qubits"
+            ),
+            Self::EvaporationRegisterLimit { requested, maximum } => write!(
+                f,
+                "sequential evaporation register has {requested} qubits; dense complementary diagnostics support at most {maximum}"
+            ),
+            Self::UnitaryConstructionFailure => write!(
+                f,
+                "failed to construct a numerically independent Haar unitary basis"
+            ),
             Self::InvalidTolerance(t) => write!(f, "invalid tolerance {t}"),
-            Self::NonFiniteState { index } => write!(f, "non-finite state amplitude at index {index}"),
-            Self::NonFiniteMatrix { row, column } => write!(f, "non-finite matrix entry ({row}, {column})"),
-            Self::InvalidQubit { qubit, register_size } => write!(f, "qubit {qubit} is outside a {register_size}-qubit register"),
+            Self::NonFiniteState { index } => {
+                write!(f, "non-finite state amplitude at index {index}")
+            }
+            Self::NonFiniteMatrix { row, column } => {
+                write!(f, "non-finite matrix entry ({row}, {column})")
+            }
+            Self::InvalidQubit {
+                qubit,
+                register_size,
+            } => write!(
+                f,
+                "qubit {qubit} is outside a {register_size}-qubit register"
+            ),
             Self::DuplicateQubit(q) => write!(f, "qubit {q} appears more than once"),
-            Self::NormalizationError { norm_squared, tolerance } => write!(f, "state norm squared {norm_squared} differs from one beyond {tolerance}"),
-            Self::NonHermitian { residual, tolerance } => write!(f, "Hermiticity residual {residual} exceeds {tolerance}"),
-            Self::TraceError { real, imaginary, tolerance } => write!(f, "trace ({real}, {imaginary}) differs from one beyond {tolerance}"),
-            Self::NonPositive { minimum_eigenvalue, tolerance } => write!(f, "minimum eigenvalue {minimum_eigenvalue} is below -{tolerance}"),
-            Self::EigensolverNonconvergence { sweeps, residual } => write!(f, "Jacobi eigensolver did not converge after {sweeps} sweeps (residual {residual})"),
+            Self::NormalizationError {
+                norm_squared,
+                tolerance,
+            } => write!(
+                f,
+                "state norm squared {norm_squared} differs from one beyond {tolerance}"
+            ),
+            Self::NonHermitian {
+                residual,
+                tolerance,
+            } => write!(f, "Hermiticity residual {residual} exceeds {tolerance}"),
+            Self::TraceError {
+                real,
+                imaginary,
+                tolerance,
+            } => write!(
+                f,
+                "trace ({real}, {imaginary}) differs from one beyond {tolerance}"
+            ),
+            Self::NonPositive {
+                minimum_eigenvalue,
+                tolerance,
+            } => write!(
+                f,
+                "minimum eigenvalue {minimum_eigenvalue} is below -{tolerance}"
+            ),
+            Self::EigensolverNonconvergence { sweeps, residual } => write!(
+                f,
+                "Jacobi eigensolver did not converge after {sweeps} sweeps (residual {residual})"
+            ),
         }
     }
 }
@@ -98,14 +209,27 @@ pub struct DensityDiagnostics {
 impl DensityMatrix {
     /// Construct row-major storage. Physical invariants are checked by
     /// diagnostics and entropy methods; they are never silently repaired.
-    pub fn from_entries(dimension: usize, entries: Vec<Complex64>) -> Result<Self, QuantumInformationError> {
-        if dimension == 0 { return Err(QuantumInformationError::InvalidDimension(dimension)); }
-        if dimension > MAX_DENSE_REDUCED_DIMENSION {
-            return Err(QuantumInformationError::DenseDimensionLimit { requested: dimension, maximum: MAX_DENSE_REDUCED_DIMENSION });
+    pub fn from_entries(
+        dimension: usize,
+        entries: Vec<Complex64>,
+    ) -> Result<Self, QuantumInformationError> {
+        if dimension == 0 {
+            return Err(QuantumInformationError::InvalidDimension(dimension));
         }
-        let expected = dimension.checked_mul(dimension).ok_or(QuantumInformationError::DimensionOverflow)?;
+        if dimension > MAX_DENSE_REDUCED_DIMENSION {
+            return Err(QuantumInformationError::DenseDimensionLimit {
+                requested: dimension,
+                maximum: MAX_DENSE_REDUCED_DIMENSION,
+            });
+        }
+        let expected = dimension
+            .checked_mul(dimension)
+            .ok_or(QuantumInformationError::DimensionOverflow)?;
         if entries.len() != expected {
-            return Err(QuantumInformationError::DimensionMismatch { expected, actual: entries.len() });
+            return Err(QuantumInformationError::DimensionMismatch {
+                expected,
+                actual: entries.len(),
+            });
         }
         for row in 0..dimension {
             for column in 0..dimension {
@@ -118,13 +242,19 @@ impl DensityMatrix {
         Ok(Self { dimension, entries })
     }
 
-    pub const fn dimension(&self) -> usize { self.dimension }
-    pub fn entries(&self) -> &[Complex64] { &self.entries }
+    pub const fn dimension(&self) -> usize {
+        self.dimension
+    }
+    pub fn entries(&self) -> &[Complex64] {
+        &self.entries
+    }
 
     pub fn get(&self, row: usize, column: usize) -> Option<Complex64> {
         if row < self.dimension && column < self.dimension {
             Some(self.entries[row * self.dimension + column])
-        } else { None }
+        } else {
+            None
+        }
     }
 
     /// Partial trace of a normalized pure state onto retained qubits.
@@ -143,41 +273,68 @@ impl DensityMatrix {
                 maximum: MAX_DENSE_STATE_QUBITS,
             });
         }
-        if number_of_qubits >= usize::BITS as usize { return Err(QuantumInformationError::DimensionOverflow); }
+        if number_of_qubits >= usize::BITS as usize {
+            return Err(QuantumInformationError::DimensionOverflow);
+        }
         let full_dimension = 1usize << number_of_qubits;
         if amplitudes.len() != full_dimension {
-            return Err(QuantumInformationError::DimensionMismatch { expected: full_dimension, actual: amplitudes.len() });
+            return Err(QuantumInformationError::DimensionMismatch {
+                expected: full_dimension,
+                actual: amplitudes.len(),
+            });
         }
         let mut norm_squared = 0.0;
         for (index, a) in amplitudes.iter().enumerate() {
-            if !a.re.is_finite() || !a.im.is_finite() { return Err(QuantumInformationError::NonFiniteState { index }); }
+            if !a.re.is_finite() || !a.im.is_finite() {
+                return Err(QuantumInformationError::NonFiniteState { index });
+            }
             norm_squared += a.norm_sqr();
         }
-        if !norm_squared.is_finite() { return Err(QuantumInformationError::NonFiniteState { index: amplitudes.len() }); }
+        if !norm_squared.is_finite() {
+            return Err(QuantumInformationError::NonFiniteState {
+                index: amplitudes.len(),
+            });
+        }
         if (norm_squared - 1.0).abs() > normalization_tolerance {
-            return Err(QuantumInformationError::NormalizationError { norm_squared, tolerance: normalization_tolerance });
+            return Err(QuantumInformationError::NormalizationError {
+                norm_squared,
+                tolerance: normalization_tolerance,
+            });
         }
 
         let mut retained = vec![false; number_of_qubits];
         for &qubit in retained_qubits {
             if qubit >= number_of_qubits {
-                return Err(QuantumInformationError::InvalidQubit { qubit, register_size: number_of_qubits });
+                return Err(QuantumInformationError::InvalidQubit {
+                    qubit,
+                    register_size: number_of_qubits,
+                });
             }
-            if retained[qubit] { return Err(QuantumInformationError::DuplicateQubit(qubit)); }
+            if retained[qubit] {
+                return Err(QuantumInformationError::DuplicateQubit(qubit));
+            }
             retained[qubit] = true;
         }
-        if retained_qubits.len() >= usize::BITS as usize { return Err(QuantumInformationError::DimensionOverflow); }
+        if retained_qubits.len() >= usize::BITS as usize {
+            return Err(QuantumInformationError::DimensionOverflow);
+        }
         let reduced_dimension = 1usize << retained_qubits.len();
         if reduced_dimension > MAX_DENSE_REDUCED_DIMENSION {
-            return Err(QuantumInformationError::DenseDimensionLimit { requested: reduced_dimension, maximum: MAX_DENSE_REDUCED_DIMENSION });
+            return Err(QuantumInformationError::DenseDimensionLimit {
+                requested: reduced_dimension,
+                maximum: MAX_DENSE_REDUCED_DIMENSION,
+            });
         }
         let environment_qubits = number_of_qubits - retained_qubits.len();
-        if environment_qubits >= usize::BITS as usize { return Err(QuantumInformationError::DimensionOverflow); }
+        if environment_qubits >= usize::BITS as usize {
+            return Err(QuantumInformationError::DimensionOverflow);
+        }
         let environment_dimension = 1usize << environment_qubits;
 
         // Regroup amplitudes as psi[environment, retained], then form
         // rho_A = sum_e |psi_e><psi_e|.
-        let mut blocks = vec![vec![Complex64::new(0.0, 0.0); reduced_dimension]; environment_dimension];
+        let mut blocks =
+            vec![vec![Complex64::new(0.0, 0.0); reduced_dimension]; environment_dimension];
         for (basis_index, amplitude) in amplitudes.iter().copied().enumerate() {
             let mut a_index = 0usize;
             for &qubit in retained_qubits {
@@ -197,7 +354,9 @@ impl DensityMatrix {
         for row in 0..reduced_dimension {
             for column in 0..reduced_dimension {
                 let mut value = Complex64::new(0.0, 0.0);
-                for block in &blocks { value += block[row] * block[column].conj(); }
+                for block in &blocks {
+                    value += block[row] * block[column].conj();
+                }
                 entries[row * reduced_dimension + column] = value;
             }
         }
@@ -206,7 +365,9 @@ impl DensityMatrix {
 
     pub fn trace(&self) -> Complex64 {
         let mut result = Complex64::new(0.0, 0.0);
-        for i in 0..self.dimension { result += self.entries[i * self.dimension + i]; }
+        for i in 0..self.dimension {
+            result += self.entries[i * self.dimension + i];
+        }
         result
     }
 
@@ -214,7 +375,11 @@ impl DensityMatrix {
         let mut residual: f64 = 0.0;
         for i in 0..self.dimension {
             for j in 0..self.dimension {
-                residual = residual.max((self.entries[i * self.dimension + j] - self.entries[j * self.dimension + i].conj()).norm());
+                residual = residual.max(
+                    (self.entries[i * self.dimension + j]
+                        - self.entries[j * self.dimension + i].conj())
+                    .norm(),
+                );
             }
         }
         residual
@@ -224,21 +389,32 @@ impl DensityMatrix {
         Ok(self.checked_diagnostics(tolerance)?.eigenvalues)
     }
 
-    pub fn diagnostics(&self, tolerance: f64) -> Result<DensityDiagnostics, QuantumInformationError> {
+    pub fn diagnostics(
+        &self,
+        tolerance: f64,
+    ) -> Result<DensityDiagnostics, QuantumInformationError> {
         self.checked_diagnostics(tolerance)
     }
 
     /// Von Neumann entropy in nats. Eigenvalues in the permitted roundoff
     /// interval [-tolerance, 0] contribute zero; larger negative values reject.
     pub fn von_neumann_entropy(&self, tolerance: f64) -> Result<f64, QuantumInformationError> {
-        Ok(self.spectrum(tolerance)?.into_iter().filter(|p| *p > 0.0).map(|p| -p * p.ln()).sum())
+        Ok(self
+            .spectrum(tolerance)?
+            .into_iter()
+            .filter(|p| *p > 0.0)
+            .map(|p| -p * p.ln())
+            .sum())
     }
 
     /// Second Renyi entropy in nats.
     pub fn renyi_2_entropy(&self, tolerance: f64) -> Result<f64, QuantumInformationError> {
         let d = self.checked_diagnostics(tolerance)?;
         if d.purity <= 0.0 || !d.purity.is_finite() {
-            return Err(QuantumInformationError::NonPositive { minimum_eigenvalue: d.minimum_eigenvalue, tolerance });
+            return Err(QuantumInformationError::NonPositive {
+                minimum_eigenvalue: d.minimum_eigenvalue,
+                tolerance,
+            });
         }
         Ok(-d.purity.ln())
     }
@@ -250,37 +426,70 @@ impl DensityMatrix {
         let mut square = vec![Complex64::new(0.0, 0.0); n * n];
         for i in 0..n {
             for j in 0..n {
-                for k in 0..n { square[i * n + j] += self.entries[i * n + k] * self.entries[k * n + j]; }
+                for k in 0..n {
+                    square[i * n + j] += self.entries[i * n + k] * self.entries[k * n + j];
+                }
             }
         }
         let mut trace_cube = Complex64::new(0.0, 0.0);
         for i in 0..n {
-            for j in 0..n { trace_cube += square[i * n + j] * self.entries[j * n + i]; }
+            for j in 0..n {
+                trace_cube += square[i * n + j] * self.entries[j * n + i];
+            }
         }
-        if !trace_cube.re.is_finite() || !trace_cube.im.is_finite() || trace_cube.re <= 0.0 || trace_cube.im.abs() > tolerance {
-            return Err(QuantumInformationError::TraceError { real: trace_cube.re, imaginary: trace_cube.im, tolerance });
+        if !trace_cube.re.is_finite()
+            || !trace_cube.im.is_finite()
+            || trace_cube.re <= 0.0
+            || trace_cube.im.abs() > tolerance
+        {
+            return Err(QuantumInformationError::TraceError {
+                real: trace_cube.re,
+                imaginary: trace_cube.im,
+                tolerance,
+            });
         }
         Ok(-0.5 * trace_cube.re.ln())
     }
 
-    fn checked_diagnostics(&self, tolerance: f64) -> Result<DensityDiagnostics, QuantumInformationError> {
+    fn checked_diagnostics(
+        &self,
+        tolerance: f64,
+    ) -> Result<DensityDiagnostics, QuantumInformationError> {
         validate_tolerance(tolerance)?;
         let trace = self.trace();
         if (trace.re - 1.0).abs() > tolerance || trace.im.abs() > tolerance {
-            return Err(QuantumInformationError::TraceError { real: trace.re, imaginary: trace.im, tolerance });
+            return Err(QuantumInformationError::TraceError {
+                real: trace.re,
+                imaginary: trace.im,
+                tolerance,
+            });
         }
         let hermiticity_residual = self.hermiticity_residual();
         if hermiticity_residual > tolerance {
-            return Err(QuantumInformationError::NonHermitian { residual: hermiticity_residual, tolerance });
+            return Err(QuantumInformationError::NonHermitian {
+                residual: hermiticity_residual,
+                tolerance,
+            });
         }
         let eigenvalues = hermitian_eigenvalues(self, (tolerance * 0.1).max(1e-14))?;
         let minimum_eigenvalue = eigenvalues.iter().copied().fold(f64::INFINITY, f64::min);
         if minimum_eigenvalue < -tolerance {
-            return Err(QuantumInformationError::NonPositive { minimum_eigenvalue, tolerance });
+            return Err(QuantumInformationError::NonPositive {
+                minimum_eigenvalue,
+                tolerance,
+            });
         }
         let purity: f64 = self.entries.iter().map(|x| x.norm_sqr()).sum();
-        if !purity.is_finite() { return Err(QuantumInformationError::NonFiniteMatrix { row: 0, column: 0 }); }
-        Ok(DensityDiagnostics { trace, hermiticity_residual, purity, eigenvalues, minimum_eigenvalue })
+        if !purity.is_finite() {
+            return Err(QuantumInformationError::NonFiniteMatrix { row: 0, column: 0 });
+        }
+        Ok(DensityDiagnostics {
+            trace,
+            hermiticity_residual,
+            purity,
+            eigenvalues,
+            minimum_eigenvalue,
+        })
     }
 }
 
@@ -382,10 +591,7 @@ pub fn symmetry_resolved_page_average_entropy_nats(
 
     for a_charge in minimum_a_charge..=maximum_a_charge {
         let dimension_a = binomial_dimension(subsystem_a_qubits, a_charge)?;
-        let dimension_b = binomial_dimension(
-            subsystem_b_qubits,
-            total_excitations - a_charge,
-        )?;
+        let dimension_b = binomial_dimension(subsystem_b_qubits, total_excitations - a_charge)?;
         let block_dimension = dimension_a
             .checked_mul(dimension_b)
             .ok_or(QuantumInformationError::DimensionOverflow)?;
@@ -394,8 +600,7 @@ pub fn symmetry_resolved_page_average_entropy_nats(
             .ok_or(QuantumInformationError::DimensionOverflow)?;
         let weight = block_dimension as f64 / total_dimension as f64;
         weighted_block_harmonic += weight * harmonic_number(block_dimension);
-        weighted_page_entropy += weight
-            * page_average_entropy_nats(dimension_a, dimension_b)?;
+        weighted_page_entropy += weight * page_average_entropy_nats(dimension_a, dimension_b)?;
     }
 
     if block_dimension_sum != total_dimension {
@@ -405,9 +610,8 @@ pub fn symmetry_resolved_page_average_entropy_nats(
         });
     }
 
-    let entropy = harmonic_number(total_dimension)
-        - weighted_block_harmonic
-        + weighted_page_entropy;
+    let entropy =
+        harmonic_number(total_dimension) - weighted_block_harmonic + weighted_page_entropy;
     if entropy.is_finite() && entropy >= 0.0 {
         Ok(entropy)
     } else {
@@ -471,9 +675,7 @@ pub struct RandomCircuitEntropySummary {
 
 /// Generate a Haar-distributed 4x4 complex unitary by Gram-Schmidt
 /// orthonormalization of iid complex Gaussian columns (Ginibre construction).
-fn haar_unitary_4(
-    rng: &mut ChaCha20Rng,
-) -> Result<[[Complex64; 4]; 4], QuantumInformationError> {
+fn haar_unitary_4(rng: &mut ChaCha20Rng) -> Result<[[Complex64; 4]; 4], QuantumInformationError> {
     let mut columns = [[Complex64::new(0.0, 0.0); 4]; 4];
     for column in 0..4 {
         let mut accepted = false;
@@ -527,7 +729,8 @@ fn apply_two_qubit_unitary(
     second_qubit: usize,
     unitary: &[[Complex64; 4]; 4],
 ) -> Result<(), QuantumInformationError> {
-    if first_qubit >= number_of_qubits || second_qubit >= number_of_qubits
+    if first_qubit >= number_of_qubits
+        || second_qubit >= number_of_qubits
         || first_qubit == second_qubit
     {
         return Err(QuantumInformationError::InvalidQubit {
@@ -535,7 +738,8 @@ fn apply_two_qubit_unitary(
             register_size: number_of_qubits,
         });
     }
-    let expected = 1usize.checked_shl(number_of_qubits as u32)
+    let expected = 1usize
+        .checked_shl(number_of_qubits as u32)
         .ok_or(QuantumInformationError::DimensionOverflow)?;
     if amplitudes.len() != expected {
         return Err(QuantumInformationError::DimensionMismatch {
@@ -612,25 +816,23 @@ pub fn simulate_random_circuit_entropy(
             RandomCircuitTopology::AllToAllMatching => {
                 let mut qubits = (0..number_of_qubits).collect::<Vec<_>>();
                 qubits.shuffle(&mut rng);
-                qubits.chunks_exact(2)
+                qubits
+                    .chunks_exact(2)
                     .map(|pair| (pair[0], pair[1]))
                     .collect::<Vec<_>>()
             }
         };
         for (first, second) in pairs {
             let unitary = haar_unitary_4(&mut rng)?;
-            apply_two_qubit_unitary(
-                &mut amplitudes,
-                number_of_qubits,
-                first,
-                second,
-                &unitary,
-            )?;
+            apply_two_qubit_unitary(&mut amplitudes, number_of_qubits, first, second, &unitary)?;
             gate_count += 1;
         }
     }
 
-    let norm_squared: f64 = amplitudes.iter().map(|amplitude| amplitude.norm_sqr()).sum();
+    let norm_squared: f64 = amplitudes
+        .iter()
+        .map(|amplitude| amplitude.norm_sqr())
+        .sum();
     if !norm_squared.is_finite() {
         return Err(QuantumInformationError::NonFiniteState { index: dimension });
     }
@@ -640,12 +842,8 @@ pub fn simulate_random_circuit_entropy(
             tolerance,
         });
     }
-    let reduced = DensityMatrix::from_pure_state(
-        &amplitudes,
-        number_of_qubits,
-        retained_qubits,
-        tolerance,
-    )?;
+    let reduced =
+        DensityMatrix::from_pure_state(&amplitudes, number_of_qubits, retained_qubits, tolerance)?;
     let entropy = reduced.von_neumann_entropy(tolerance)?;
     let purity = reduced.diagnostics(tolerance)?.purity;
     Ok(RandomCircuitEntropySample {
@@ -672,14 +870,21 @@ pub fn sample_random_circuit_entropy_ensemble(
     tolerance: f64,
 ) -> Result<RandomCircuitEntropySummary, QuantumInformationError> {
     if sample_count < 2 {
-        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(
+            sample_count,
+        ));
     }
     let mut mean = 0.0;
     let mut sum_squared_deviations = 0.0;
     for sample_index in 0..sample_count {
         let seed = first_seed.wrapping_add(sample_index as u64);
         let sample = simulate_random_circuit_entropy(
-            number_of_qubits, depth, topology, retained_qubits, seed, tolerance,
+            number_of_qubits,
+            depth,
+            topology,
+            retained_qubits,
+            seed,
+            tolerance,
         )?;
         let delta = sample.subsystem_entropy_nats - mean;
         mean += delta / (sample_index + 1) as f64;
@@ -805,19 +1010,15 @@ pub fn simulate_u1_conserving_random_circuit_entropy(
         };
         for (first, second) in pairs {
             let unitary = u1_conserving_unitary_4(&mut rng)?;
-            apply_two_qubit_unitary(
-                &mut amplitudes,
-                number_of_qubits,
-                first,
-                second,
-                &unitary,
-            )?;
+            apply_two_qubit_unitary(&mut amplitudes, number_of_qubits, first, second, &unitary)?;
             gate_count += 1;
         }
     }
 
-    let norm_squared: f64 =
-        amplitudes.iter().map(|amplitude| amplitude.norm_sqr()).sum();
+    let norm_squared: f64 = amplitudes
+        .iter()
+        .map(|amplitude| amplitude.norm_sqr())
+        .sum();
     if !norm_squared.is_finite() {
         return Err(QuantumInformationError::NonFiniteState {
             index: state_dimension,
@@ -829,8 +1030,7 @@ pub fn simulate_u1_conserving_random_circuit_entropy(
             tolerance,
         });
     }
-    let (charge_expectation, charge_variance) =
-        total_excitation_moments(&amplitudes);
+    let (charge_expectation, charge_variance) = total_excitation_moments(&amplitudes);
     if (charge_expectation - total_excitations as f64).abs() > tolerance
         || charge_variance > tolerance
     {
@@ -840,12 +1040,8 @@ pub fn simulate_u1_conserving_random_circuit_entropy(
         });
     }
 
-    let reduced = DensityMatrix::from_pure_state(
-        &amplitudes,
-        number_of_qubits,
-        retained_qubits,
-        tolerance,
-    )?;
+    let reduced =
+        DensityMatrix::from_pure_state(&amplitudes, number_of_qubits, retained_qubits, tolerance)?;
     let entropy = reduced.von_neumann_entropy(tolerance)?;
     let purity = reduced.diagnostics(tolerance)?.purity;
     let page_mean = symmetry_resolved_page_average_entropy_nats(
@@ -883,7 +1079,9 @@ pub fn sample_u1_conserving_random_circuit_entropy_ensemble(
     tolerance: f64,
 ) -> Result<U1RandomCircuitEntropySummary, QuantumInformationError> {
     if sample_count < 2 {
-        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(
+            sample_count,
+        ));
     }
     let mut mean = 0.0;
     let mut sum_squared_deviations = 0.0;
@@ -931,9 +1129,15 @@ mod u1_random_circuit_tests {
     #[test]
     fn depth_zero_product_state_has_zero_entropy_and_declared_charge() {
         let sample = simulate_u1_conserving_random_circuit_entropy(
-            8, 4, 0, RandomCircuitTopology::Brickwork1D, &[0, 1, 2, 3],
-            0xD3F7, TOLERANCE,
-        ).unwrap();
+            8,
+            4,
+            0,
+            RandomCircuitTopology::Brickwork1D,
+            &[0, 1, 2, 3],
+            0xD3F7,
+            TOLERANCE,
+        )
+        .unwrap();
         assert_eq!(sample.two_qubit_gate_count, 0);
         assert!(sample.subsystem_entropy_nats.abs() < TOLERANCE);
         assert!((sample.total_excitation_expectation - 4.0).abs() < TOLERANCE);
@@ -948,58 +1152,95 @@ mod u1_random_circuit_tests {
             RandomCircuitTopology::AllToAllMatching,
         ] {
             let sample = simulate_u1_conserving_random_circuit_entropy(
-                8, 4, 12, topology, &[0, 1, 2, 3], 0xB1A5 + topology as u64,
+                8,
+                4,
+                12,
+                topology,
+                &[0, 1, 2, 3],
+                0xB1A5 + topology as u64,
                 TOLERANCE,
-            ).unwrap();
+            )
+            .unwrap();
             assert!((sample.state_norm_squared - 1.0).abs() < TOLERANCE);
             assert!((sample.total_excitation_expectation - 4.0).abs() < TOLERANCE);
             assert!(sample.total_excitation_variance < TOLERANCE);
             assert!(sample.subsystem_entropy_nats >= -TOLERANCE);
-            let maximal_bipartite_entropy =
-                ((1usize << 4).min(1usize << 4) as f64).ln();
-            assert!(sample.subsystem_entropy_nats
-                <= maximal_bipartite_entropy + 1e-9);
+            let maximal_bipartite_entropy = ((1usize << 4).min(1usize << 4) as f64).ln();
+            assert!(sample.subsystem_entropy_nats <= maximal_bipartite_entropy + 1e-9);
         }
     }
 
     #[test]
     fn fixed_charge_circuit_sample_is_reproducible() {
         let first = simulate_u1_conserving_random_circuit_entropy(
-            8, 4, 8, RandomCircuitTopology::AllToAllMatching,
-            &[0, 1, 2, 3], 0xA110, TOLERANCE,
-        ).unwrap();
+            8,
+            4,
+            8,
+            RandomCircuitTopology::AllToAllMatching,
+            &[0, 1, 2, 3],
+            0xA110,
+            TOLERANCE,
+        )
+        .unwrap();
         let repeated = simulate_u1_conserving_random_circuit_entropy(
-            8, 4, 8, RandomCircuitTopology::AllToAllMatching,
-            &[0, 1, 2, 3], 0xA110, TOLERANCE,
-        ).unwrap();
+            8,
+            4,
+            8,
+            RandomCircuitTopology::AllToAllMatching,
+            &[0, 1, 2, 3],
+            0xA110,
+            TOLERANCE,
+        )
+        .unwrap();
         assert_eq!(first, repeated);
     }
 
     #[test]
     fn fixed_charge_circuit_ensemble_reports_uncertainty_and_correct_equilibrium() {
         let summary = sample_u1_conserving_random_circuit_entropy_ensemble(
-            8, 4, 8, RandomCircuitTopology::Brickwork1D, &[0, 1, 2, 3],
-            12, 0xC1AC, TOLERANCE,
-        ).unwrap();
+            8,
+            4,
+            8,
+            RandomCircuitTopology::Brickwork1D,
+            &[0, 1, 2, 3],
+            12,
+            0xC1AC,
+            TOLERANCE,
+        )
+        .unwrap();
         assert_eq!(summary.sample_count, 12);
         assert!(summary.sample_variance_nats_squared >= 0.0);
         assert!(summary.standard_error_nats >= 0.0);
-        assert!((summary.mean_entropy_gap_to_equilibrium_nats
-            - (summary.symmetry_resolved_page_mean_nats - summary.mean_entropy_nats)).abs()
-            < TOLERANCE);
+        assert!(
+            (summary.mean_entropy_gap_to_equilibrium_nats
+                - (summary.symmetry_resolved_page_mean_nats - summary.mean_entropy_nats))
+                .abs()
+                < TOLERANCE
+        );
     }
 
     #[test]
     fn fixed_charge_circuit_rejects_invalid_sector_and_empty_subsystem_overflow() {
         assert!(matches!(
             simulate_u1_conserving_random_circuit_entropy(
-                8, 9, 2, RandomCircuitTopology::Brickwork1D, &[0, 1], 1, TOLERANCE,
+                8,
+                9,
+                2,
+                RandomCircuitTopology::Brickwork1D,
+                &[0, 1],
+                1,
+                TOLERANCE,
             ),
             Err(QuantumInformationError::InvalidExcitationSector { .. })
         ));
         assert!(matches!(
             simulate_u1_conserving_random_circuit_entropy(
-                8, 4, 2, RandomCircuitTopology::Brickwork1D, &[0, 1, 2, 3, 4, 5, 6], 1,
+                8,
+                4,
+                2,
+                RandomCircuitTopology::Brickwork1D,
+                &[0, 1, 2, 3, 4, 5, 6],
+                1,
                 TOLERANCE,
             ),
             Err(QuantumInformationError::DenseDimensionLimit { .. })
@@ -1044,7 +1285,9 @@ pub fn sample_haar_page_entropy_ensemble(
 ) -> Result<HaarPageEnsembleSummary, QuantumInformationError> {
     validate_tolerance(tolerance)?;
     if sample_count < 2 {
-        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(
+            sample_count,
+        ));
     }
     let total_qubits = subsystem_a_qubits
         .checked_add(subsystem_b_qubits)
@@ -1055,9 +1298,7 @@ pub fn sample_haar_page_entropy_ensemble(
             maximum: MAX_DENSE_STATE_QUBITS,
         });
     }
-    if subsystem_a_qubits >= usize::BITS as usize
-        || subsystem_b_qubits >= usize::BITS as usize
-    {
+    if subsystem_a_qubits >= usize::BITS as usize || subsystem_b_qubits >= usize::BITS as usize {
         return Err(QuantumInformationError::DimensionOverflow);
     }
     let dimension_a = 1usize << subsystem_a_qubits;
@@ -1088,21 +1329,22 @@ pub fn sample_haar_page_entropy_ensemble(
 
         // Normalization is part of Haar-state construction, not a repair of a
         // user-supplied state or an evolved numerical trajectory.
-        let norm_squared: f64 = amplitudes.iter().map(|amplitude| amplitude.norm_sqr()).sum();
+        let norm_squared: f64 = amplitudes
+            .iter()
+            .map(|amplitude| amplitude.norm_sqr())
+            .sum();
         if !norm_squared.is_finite() || norm_squared <= 0.0 {
-            return Err(QuantumInformationError::NonFiniteState { index: sample_index });
+            return Err(QuantumInformationError::NonFiniteState {
+                index: sample_index,
+            });
         }
         let inverse_norm = norm_squared.sqrt().recip();
         for amplitude in &mut amplitudes {
             *amplitude *= inverse_norm;
         }
 
-        let reduced = DensityMatrix::from_pure_state(
-            &amplitudes,
-            total_qubits,
-            &retained_qubits,
-            tolerance,
-        )?;
+        let reduced =
+            DensityMatrix::from_pure_state(&amplitudes, total_qubits, &retained_qubits, tolerance)?;
         let entropy = reduced.von_neumann_entropy(tolerance)?;
         let delta = entropy - mean;
         mean += delta / (sample_index + 1) as f64;
@@ -1127,10 +1369,7 @@ pub fn sample_haar_page_entropy_ensemble(
         mean_von_neumann_entropy_nats: mean,
         sample_variance_nats_squared: sample_variance,
         standard_error_nats: standard_error,
-        confidence_95_approx_nats: [
-            mean - 1.96 * standard_error,
-            mean + 1.96 * standard_error,
-        ],
+        confidence_95_approx_nats: [mean - 1.96 * standard_error, mean + 1.96 * standard_error],
         page_theorem_mean_nats: page_mean,
         normalized_mean_deviation: normalized_deviation,
     })
@@ -1167,7 +1406,9 @@ pub fn sample_symmetry_resolved_page_entropy_ensemble(
 ) -> Result<SymmetryResolvedPageEnsembleSummary, QuantumInformationError> {
     validate_tolerance(tolerance)?;
     if sample_count < 2 {
-        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(
+            sample_count,
+        ));
     }
     if number_of_qubits > MAX_DENSE_STATE_QUBITS {
         return Err(QuantumInformationError::DenseStateQubitLimit {
@@ -1222,10 +1463,14 @@ pub fn sample_symmetry_resolved_page_entropy_ensemble(
         for &basis in &sector_basis {
             amplitudes[basis] = complex_standard_normal(&mut rng);
         }
-        let norm_squared: f64 =
-            amplitudes.iter().map(|amplitude| amplitude.norm_sqr()).sum();
+        let norm_squared: f64 = amplitudes
+            .iter()
+            .map(|amplitude| amplitude.norm_sqr())
+            .sum();
         if !norm_squared.is_finite() || norm_squared <= 0.0 {
-            return Err(QuantumInformationError::NonFiniteState { index: sample_index });
+            return Err(QuantumInformationError::NonFiniteState {
+                index: sample_index,
+            });
         }
         let inverse_norm = norm_squared.sqrt().recip();
         for amplitude in &mut amplitudes {
@@ -1262,10 +1507,7 @@ pub fn sample_symmetry_resolved_page_entropy_ensemble(
         mean_von_neumann_entropy_nats: mean,
         sample_variance_nats_squared: sample_variance,
         standard_error_nats: standard_error,
-        confidence_95_approx_nats: [
-            mean - 1.96 * standard_error,
-            mean + 1.96 * standard_error,
-        ],
+        confidence_95_approx_nats: [mean - 1.96 * standard_error, mean + 1.96 * standard_error],
         symmetry_resolved_page_mean_nats: exact_page_mean,
         normalized_mean_deviation: normalized_deviation,
     })
@@ -1279,28 +1521,35 @@ mod symmetry_resolved_page_sampler_tests {
 
     #[test]
     fn fixed_charge_haar_sampler_is_seeded_and_uses_matching_sector_oracle() {
-        let first = sample_symmetry_resolved_page_entropy_ensemble(
-            8, 4, 4, 256, 0xC4A26E, TOLERANCE,
-        ).unwrap();
-        let repeated = sample_symmetry_resolved_page_entropy_ensemble(
-            8, 4, 4, 256, 0xC4A26E, TOLERANCE,
-        ).unwrap();
+        let first =
+            sample_symmetry_resolved_page_entropy_ensemble(8, 4, 4, 256, 0xC4A26E, TOLERANCE)
+                .unwrap();
+        let repeated =
+            sample_symmetry_resolved_page_entropy_ensemble(8, 4, 4, 256, 0xC4A26E, TOLERANCE)
+                .unwrap();
         assert_eq!(first, repeated);
         assert_eq!(first.total_excitations, 4);
         assert!(first.sample_variance_nats_squared > 0.0);
         assert!(first.standard_error_nats > 0.0);
         assert!(first.normalized_mean_deviation.abs() < 6.0);
-        assert!((first.mean_von_neumann_entropy_nats
-            - first.symmetry_resolved_page_mean_nats).abs() < 0.10);
+        assert!(
+            (first.mean_von_neumann_entropy_nats - first.symmetry_resolved_page_mean_nats).abs()
+                < 0.10
+        );
     }
 
     #[test]
     fn fixed_charge_haar_sampler_has_zero_entropy_in_extremal_sectors() {
         for total_excitations in [0, 4] {
             let sample = sample_symmetry_resolved_page_entropy_ensemble(
-                4, total_excitations, 2, 16, 0xE100 + total_excitations as u64,
+                4,
+                total_excitations,
+                2,
+                16,
+                0xE100 + total_excitations as u64,
                 TOLERANCE,
-            ).unwrap();
+            )
+            .unwrap();
             assert!(sample.mean_von_neumann_entropy_nats.abs() < TOLERANCE);
             assert!(sample.symmetry_resolved_page_mean_nats.abs() < TOLERANCE);
             assert!(sample.sample_variance_nats_squared.abs() < 1e-24);
@@ -1338,15 +1587,22 @@ fn harmonic_number(n: usize) -> f64 {
 }
 
 fn validate_tolerance(t: f64) -> Result<(), QuantumInformationError> {
-    if !t.is_finite() || t <= 0.0 { return Err(QuantumInformationError::InvalidTolerance(t)); }
+    if !t.is_finite() || t <= 0.0 {
+        return Err(QuantumInformationError::InvalidTolerance(t));
+    }
     Ok(())
 }
 
 /// Real symmetric embedding of a Hermitian matrix; duplicate eigenvalues are
 /// paired after sorting to recover the physical spectrum.
-fn hermitian_eigenvalues(matrix: &DensityMatrix, tolerance: f64) -> Result<Vec<f64>, QuantumInformationError> {
+fn hermitian_eigenvalues(
+    matrix: &DensityMatrix,
+    tolerance: f64,
+) -> Result<Vec<f64>, QuantumInformationError> {
     let n = matrix.dimension;
-    let m = n.checked_mul(2).ok_or(QuantumInformationError::DimensionOverflow)?;
+    let m = n
+        .checked_mul(2)
+        .ok_or(QuantumInformationError::DimensionOverflow)?;
     let mut real = vec![0.0; m * m];
     for i in 0..n {
         for j in 0..n {
@@ -1359,12 +1615,19 @@ fn hermitian_eigenvalues(matrix: &DensityMatrix, tolerance: f64) -> Result<Vec<f
     }
     let mut values = jacobi_eigenvalues(&mut real, m, tolerance)?;
     values.sort_by(f64::total_cmp);
-    Ok(values.chunks_exact(2).map(|p| 0.5 * (p[0] + p[1])).collect())
+    Ok(values
+        .chunks_exact(2)
+        .map(|p| 0.5 * (p[0] + p[1]))
+        .collect())
 }
 
 /// Cyclic Jacobi sweeps have O(n^3) work per sweep, avoiding a full O(n^2)
 /// maximum-pivot search before each individual rotation.
-fn jacobi_eigenvalues(a: &mut [f64], n: usize, tol: f64) -> Result<Vec<f64>, QuantumInformationError> {
+fn jacobi_eigenvalues(
+    a: &mut [f64],
+    n: usize,
+    tol: f64,
+) -> Result<Vec<f64>, QuantumInformationError> {
     const MAX_SWEEPS: usize = 80;
     let mut residual: f64;
     for _ in 0..MAX_SWEEPS {
@@ -1372,7 +1635,9 @@ fn jacobi_eigenvalues(a: &mut [f64], n: usize, tol: f64) -> Result<Vec<f64>, Qua
         residual = 0.0;
         for i in 0..n {
             scale = scale.max(a[i * n + i].abs());
-            for j in (i + 1)..n { residual = residual.max(a[i * n + j].abs()); }
+            for j in (i + 1)..n {
+                residual = residual.max(a[i * n + j].abs());
+            }
         }
         if residual <= tol * scale {
             let mut values = (0..n).map(|i| a[i * n + i]).collect::<Vec<_>>();
@@ -1382,7 +1647,9 @@ fn jacobi_eigenvalues(a: &mut [f64], n: usize, tol: f64) -> Result<Vec<f64>, Qua
         for p in 0..n {
             for q in (p + 1)..n {
                 let apq = a[p * n + q];
-                if apq.abs() <= tol * scale / n as f64 { continue; }
+                if apq.abs() <= tol * scale / n as f64 {
+                    continue;
+                }
                 let app = a[p * n + p];
                 let aqq = a[q * n + q];
                 let tau = (aqq - app) / (2.0 * apq);
@@ -1391,21 +1658,29 @@ fn jacobi_eigenvalues(a: &mut [f64], n: usize, tol: f64) -> Result<Vec<f64>, Qua
                 let c = 1.0 / (1.0 + t * t).sqrt();
                 let s = t * c;
                 for k in 0..n {
-                    if k == p || k == q { continue; }
+                    if k == p || k == q {
+                        continue;
+                    }
                     let akp = a[k * n + p];
                     let akq = a[k * n + q];
                     let np = c * akp - s * akq;
                     let nq = s * akp + c * akq;
-                    a[k * n + p] = np; a[p * n + k] = np;
-                    a[k * n + q] = nq; a[q * n + k] = nq;
+                    a[k * n + p] = np;
+                    a[p * n + k] = np;
+                    a[k * n + q] = nq;
+                    a[q * n + k] = nq;
                 }
                 a[p * n + p] = app - t * apq;
                 a[q * n + q] = aqq + t * apq;
-                a[p * n + q] = 0.0; a[q * n + p] = 0.0;
+                a[p * n + q] = 0.0;
+                a[q * n + p] = 0.0;
             }
         }
     }
-    Err(QuantumInformationError::EigensolverNonconvergence { sweeps: MAX_SWEEPS, residual })
+    Err(QuantumInformationError::EigensolverNonconvergence {
+        sweeps: MAX_SWEEPS,
+        residual,
+    })
 }
 
 #[cfg(test)]
@@ -1426,7 +1701,8 @@ mod tests {
     fn bell_pair_has_one_bit_of_entanglement() {
         let a = 1.0 / 2.0_f64.sqrt();
         let mut state = vec![Complex64::new(0.0, 0.0); 4];
-        state[0] = Complex64::new(a, 0.0); state[3] = Complex64::new(a, 0.0);
+        state[0] = Complex64::new(a, 0.0);
+        state[3] = Complex64::new(a, 0.0);
         let rho = DensityMatrix::from_pure_state(&state, 2, &[0], TOL).unwrap();
         assert!((rho.von_neumann_entropy(TOL).unwrap() - 2.0_f64.ln()).abs() < 1e-10);
         assert!((rho.renyi_2_entropy(TOL).unwrap() - 2.0_f64.ln()).abs() < 1e-10);
@@ -1438,7 +1714,8 @@ mod tests {
     fn complex_phase_does_not_change_bell_pair_entropy() {
         let a = 1.0 / 2.0_f64.sqrt();
         let mut state = vec![Complex64::new(0.0, 0.0); 4];
-        state[0] = Complex64::new(a, 0.0); state[3] = Complex64::new(0.0, a);
+        state[0] = Complex64::new(a, 0.0);
+        state[3] = Complex64::new(0.0, a);
         let rho = DensityMatrix::from_pure_state(&state, 2, &[1], TOL).unwrap();
         assert!((rho.von_neumann_entropy(TOL).unwrap() - 2.0_f64.ln()).abs() < 1e-10);
         assert!(rho.hermiticity_residual() < 1e-14);
@@ -1448,7 +1725,8 @@ mod tests {
     fn ghz_reduction_has_two_equal_nonzero_eigenvalues() {
         let a = 1.0 / 2.0_f64.sqrt();
         let mut state = vec![Complex64::new(0.0, 0.0); 8];
-        state[0] = Complex64::new(a, 0.0); state[7] = Complex64::new(a, 0.0);
+        state[0] = Complex64::new(a, 0.0);
+        state[7] = Complex64::new(a, 0.0);
         let rho = DensityMatrix::from_pure_state(&state, 3, &[0, 1], TOL).unwrap();
         let e = rho.spectrum(TOL).unwrap();
         assert!(e[0].abs() < 1e-10 && e[1].abs() < 1e-10);
@@ -1464,22 +1742,29 @@ mod tests {
         state[7] = Complex64::new(a, 0.0);
         let left = DensityMatrix::from_pure_state(&state, 3, &[0], TOL).unwrap();
         let right = DensityMatrix::from_pure_state(&state, 3, &[1, 2], TOL).unwrap();
-        assert!((left.von_neumann_entropy(TOL).unwrap()
-            - right.von_neumann_entropy(TOL).unwrap()).abs() < 1e-10);
+        assert!(
+            (left.von_neumann_entropy(TOL).unwrap() - right.von_neumann_entropy(TOL).unwrap())
+                .abs()
+                < 1e-10
+        );
     }
 
     #[test]
     fn non_normalized_state_is_rejected_without_repair() {
         let state = vec![Complex64::new(2.0, 0.0), Complex64::new(0.0, 0.0)];
-        assert!(matches!(DensityMatrix::from_pure_state(&state, 1, &[0], TOL),
-            Err(QuantumInformationError::NormalizationError { .. })));
+        assert!(matches!(
+            DensityMatrix::from_pure_state(&state, 1, &[0], TOL),
+            Err(QuantumInformationError::NormalizationError { .. })
+        ));
     }
 
     #[test]
     fn duplicate_qubits_are_rejected() {
         let state = vec![Complex64::new(0.5, 0.0); 4];
-        assert!(matches!(DensityMatrix::from_pure_state(&state, 2, &[0, 0], TOL),
-            Err(QuantumInformationError::DuplicateQubit(0))));
+        assert!(matches!(
+            DensityMatrix::from_pure_state(&state, 2, &[0, 0], TOL),
+            Err(QuantumInformationError::DuplicateQubit(0))
+        ));
     }
 
     #[test]
@@ -1527,9 +1812,8 @@ mod tests {
             RandomCircuitTopology::Brickwork1D,
             RandomCircuitTopology::AllToAllMatching,
         ] {
-            let sample = simulate_random_circuit_entropy(
-                6, 0, topology, &[0, 1, 2], 42, TOL,
-            ).unwrap();
+            let sample =
+                simulate_random_circuit_entropy(6, 0, topology, &[0, 1, 2], 42, TOL).unwrap();
             assert_eq!(sample.two_qubit_gate_count, 0);
             assert!((sample.state_norm_squared - 1.0).abs() < 1e-14);
             assert!(sample.subsystem_entropy_nats.abs() < 1e-12);
@@ -1540,11 +1824,23 @@ mod tests {
     #[test]
     fn random_brickwork_circuit_is_seed_reproducible_and_norm_preserving() {
         let first = simulate_random_circuit_entropy(
-            6, 6, RandomCircuitTopology::Brickwork1D, &[0, 1, 2], 0xB12C, TOL,
-        ).unwrap();
+            6,
+            6,
+            RandomCircuitTopology::Brickwork1D,
+            &[0, 1, 2],
+            0xB12C,
+            TOL,
+        )
+        .unwrap();
         let repeated = simulate_random_circuit_entropy(
-            6, 6, RandomCircuitTopology::Brickwork1D, &[0, 1, 2], 0xB12C, TOL,
-        ).unwrap();
+            6,
+            6,
+            RandomCircuitTopology::Brickwork1D,
+            &[0, 1, 2],
+            0xB12C,
+            TOL,
+        )
+        .unwrap();
         assert_eq!(first, repeated);
         assert!((first.state_norm_squared - 1.0).abs() < 1e-12);
         assert!(first.subsystem_entropy_nats >= 0.0);
@@ -1555,11 +1851,25 @@ mod tests {
     #[test]
     fn local_and_all_to_all_circuit_ensembles_report_seeded_statistics() {
         let local = sample_random_circuit_entropy_ensemble(
-            6, 4, RandomCircuitTopology::Brickwork1D, &[0, 1, 2], 16, 100, TOL,
-        ).unwrap();
+            6,
+            4,
+            RandomCircuitTopology::Brickwork1D,
+            &[0, 1, 2],
+            16,
+            100,
+            TOL,
+        )
+        .unwrap();
         let global = sample_random_circuit_entropy_ensemble(
-            6, 4, RandomCircuitTopology::AllToAllMatching, &[0, 1, 2], 16, 100, TOL,
-        ).unwrap();
+            6,
+            4,
+            RandomCircuitTopology::AllToAllMatching,
+            &[0, 1, 2],
+            16,
+            100,
+            TOL,
+        )
+        .unwrap();
         assert_eq!(local.sample_count, 16);
         assert_eq!(global.sample_count, 16);
         assert!(local.sample_variance_nats_squared >= 0.0);
@@ -1631,14 +1941,22 @@ mod tests {
 
     #[test]
     fn negative_spectrum_is_rejected_instead_of_projected() {
-        let rho = DensityMatrix::from_entries(2, vec![
-            Complex64::new(1.1, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(-0.1, 0.0),
-        ]).unwrap();
-        assert!(matches!(rho.spectrum(TOL), Err(QuantumInformationError::NonPositive { .. })));
+        let rho = DensityMatrix::from_entries(
+            2,
+            vec![
+                Complex64::new(1.1, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(-0.1, 0.0),
+            ],
+        )
+        .unwrap();
+        assert!(matches!(
+            rho.spectrum(TOL),
+            Err(QuantumInformationError::NonPositive { .. })
+        ));
     }
 }
-
 
 /// One checkpoint in a closed, charge-conserving sequential-emission toy model.
 /// The global state remains pure; emitted tensor factors are never acted on
@@ -1774,8 +2092,7 @@ pub fn simulate_u1_conserving_sequential_evaporation(
             newly_emitted_qubit = Some(emitted);
         }
 
-        let state_norm_squared: f64 =
-            amplitudes.iter().map(|value| value.norm_sqr()).sum();
+        let state_norm_squared: f64 = amplitudes.iter().map(|value| value.norm_sqr()).sum();
         if !state_norm_squared.is_finite() {
             return Err(QuantumInformationError::NonFiniteState { index: dimension });
         }
@@ -1786,8 +2103,7 @@ pub fn simulate_u1_conserving_sequential_evaporation(
             });
         }
 
-        let (radiation_entropy_nats, black_hole_entropy_nats,
-            radiation_purity, black_hole_purity) =
+        let (radiation_entropy_nats, black_hole_entropy_nats, radiation_purity, black_hole_purity) =
             if radiation_qubits.is_empty() || black_hole_qubits.is_empty() {
                 // The unpartitioned global state is pure at the two endpoints.
                 (0.0, 0.0, 1.0, 1.0)
@@ -1819,10 +2135,11 @@ pub fn simulate_u1_conserving_sequential_evaporation(
         let black_hole_excitation_expectation =
             subsystem_excitation_expectation(&amplitudes, number_of_qubits, &black_hole_qubits);
         let energy_partition_residual = (total_excitation_expectation
-            - radiation_excitation_expectation - black_hole_excitation_expectation).abs();
-        let newly_emitted_excitation_expectation = newly_emitted_qubit.map(|qubit| {
-            subsystem_excitation_expectation(&amplitudes, number_of_qubits, &[qubit])
-        });
+            - radiation_excitation_expectation
+            - black_hole_excitation_expectation)
+            .abs();
+        let newly_emitted_excitation_expectation = newly_emitted_qubit
+            .map(|qubit| subsystem_excitation_expectation(&amplitudes, number_of_qubits, &[qubit]));
         samples.push(SequentialEvaporationSample {
             emission_count,
             newly_emitted_qubit,
@@ -1830,8 +2147,9 @@ pub fn simulate_u1_conserving_sequential_evaporation(
             radiation_qubits: radiation_qubits.clone(),
             radiation_entropy_nats,
             black_hole_entropy_nats,
-            entropy_complementarity_residual_nats:
-                (radiation_entropy_nats - black_hole_entropy_nats).abs(),
+            entropy_complementarity_residual_nats: (radiation_entropy_nats
+                - black_hole_entropy_nats)
+                .abs(),
             radiation_purity,
             black_hole_purity,
             state_norm_squared,
@@ -1874,13 +2192,9 @@ fn u1_conserving_unitary_4(
     for column in 0..2 {
         let mut accepted = false;
         for _attempt in 0..8 {
-            let mut vector = [
-                complex_standard_normal(rng),
-                complex_standard_normal(rng),
-            ];
+            let mut vector = [complex_standard_normal(rng), complex_standard_normal(rng)];
             if column == 1 {
-                let overlap = columns[0][0].conj() * vector[0]
-                    + columns[0][1].conj() * vector[1];
+                let overlap = columns[0][0].conj() * vector[0] + columns[0][1].conj() * vector[1];
                 vector[0] -= columns[0][0] * overlap;
                 vector[1] -= columns[0][1] * overlap;
             }
@@ -1917,19 +2231,23 @@ fn u1_conserving_unitary_4(
     Ok(unitary)
 }
 
-
 /// Expected number of excitations in a selected tensor-factor subsystem.
 fn subsystem_excitation_expectation(
     amplitudes: &[Complex64],
     number_of_qubits: usize,
     subsystem_qubits: &[usize],
 ) -> f64 {
-    let masks = subsystem_qubits.iter()
+    let masks = subsystem_qubits
+        .iter()
         .map(|qubit| 1usize << (number_of_qubits - 1 - qubit))
         .collect::<Vec<_>>();
-    amplitudes.iter().enumerate().map(|(basis, amplitude)| {
-        amplitude.norm_sqr() * masks.iter().filter(|mask| basis & **mask != 0).count() as f64
-    }).sum()
+    amplitudes
+        .iter()
+        .enumerate()
+        .map(|(basis, amplitude)| {
+            amplitude.norm_sqr() * masks.iter().filter(|mask| basis & **mask != 0).count() as f64
+        })
+        .sum()
 }
 
 /// Expected excitation number and variance of the computational-basis
@@ -1980,9 +2298,8 @@ mod sequential_evaporation_tests {
 
     #[test]
     fn sequential_emission_preserves_charge_norm_and_complementary_entropy() {
-        let result = simulate_u1_conserving_sequential_evaporation(
-            8, 4, 0xE_AA0, TOLERANCE,
-        ).unwrap();
+        let result =
+            simulate_u1_conserving_sequential_evaporation(8, 4, 0xE_AA0, TOLERANCE).unwrap();
         assert_eq!(result.samples.len(), 9);
         assert_eq!(result.total_two_qubit_gates, 7);
         for (step, sample) in result.samples.iter().enumerate() {
@@ -1994,8 +2311,13 @@ mod sequential_evaporation_tests {
             assert!((sample.state_norm_squared - 1.0).abs() < TOLERANCE);
             assert!((sample.total_excitation_expectation - 4.0).abs() < TOLERANCE);
             assert!(sample.total_excitation_variance < TOLERANCE);
-            assert!((sample.radiation_excitation_expectation
-                + sample.black_hole_excitation_expectation - 4.0).abs() < TOLERANCE);
+            assert!(
+                (sample.radiation_excitation_expectation
+                    + sample.black_hole_excitation_expectation
+                    - 4.0)
+                    .abs()
+                    < TOLERANCE
+            );
             assert!(sample.energy_partition_residual < TOLERANCE);
             assert_eq!(
                 sample.newly_emitted_excitation_expectation.is_some(),
@@ -2012,19 +2334,24 @@ mod sequential_evaporation_tests {
 
     #[test]
     fn emitted_qubits_are_a_monotonic_disjoint_prefix_and_gate_budget_is_exact() {
-        let result = simulate_u1_conserving_sequential_evaporation(
-            7, 3, 0x51A7E, TOLERANCE,
-        ).unwrap();
+        let result =
+            simulate_u1_conserving_sequential_evaporation(7, 3, 0x51A7E, TOLERANCE).unwrap();
         for (step, sample) in result.samples.iter().enumerate() {
             assert_eq!(sample.radiation_qubits.len(), step);
             assert_eq!(sample.black_hole_qubits.len(), 7 - step);
             let mut partition = vec![false; 7];
             for &qubit in &sample.radiation_qubits {
-                assert!(!partition[qubit], "radiation contains a duplicate qubit {qubit}");
+                assert!(
+                    !partition[qubit],
+                    "radiation contains a duplicate qubit {qubit}"
+                );
                 partition[qubit] = true;
             }
             for &qubit in &sample.black_hole_qubits {
-                assert!(!partition[qubit], "an emitted qubit re-entered the active register");
+                assert!(
+                    !partition[qubit],
+                    "an emitted qubit re-entered the active register"
+                );
                 partition[qubit] = true;
             }
             assert!(partition.into_iter().all(|present| present));
@@ -2043,8 +2370,12 @@ mod sequential_evaporation_tests {
     fn vacuum_and_fully_filled_sectors_remain_unentangled() {
         for excitations in [0, 6] {
             let result = simulate_u1_conserving_sequential_evaporation(
-                6, excitations, 0xF00D + excitations as u64, TOLERANCE,
-            ).unwrap();
+                6,
+                excitations,
+                0xF00D + excitations as u64,
+                TOLERANCE,
+            )
+            .unwrap();
             for sample in result.samples {
                 assert!(sample.radiation_entropy_nats.abs() < TOLERANCE);
                 assert!(sample.black_hole_entropy_nats.abs() < TOLERANCE);
@@ -2068,12 +2399,10 @@ mod sequential_evaporation_tests {
 
     #[test]
     fn sequential_model_is_reproducible_for_a_frozen_seed() {
-        let first = simulate_u1_conserving_sequential_evaporation(
-            8, 3, 0xDEC0DE, TOLERANCE,
-        ).unwrap();
-        let repeated = simulate_u1_conserving_sequential_evaporation(
-            8, 3, 0xDEC0DE, TOLERANCE,
-        ).unwrap();
+        let first =
+            simulate_u1_conserving_sequential_evaporation(8, 3, 0xDEC0DE, TOLERANCE).unwrap();
+        let repeated =
+            simulate_u1_conserving_sequential_evaporation(8, 3, 0xDEC0DE, TOLERANCE).unwrap();
         assert_eq!(first, repeated);
     }
 }
@@ -2084,37 +2413,54 @@ mod symmetry_resolved_page_tests {
 
     #[test]
     fn fixed_charge_page_reference_has_exact_small_sector_answers() {
-        assert!((symmetry_resolved_page_average_entropy_nats(2, 1, 1).unwrap()
-            - 0.5).abs() < 1e-14);
-        assert!((symmetry_resolved_page_average_entropy_nats(4, 1, 2).unwrap()
-            - 7.0 / 12.0).abs() < 1e-14);
-        assert!((symmetry_resolved_page_average_entropy_nats(4, 2, 2).unwrap()
-            - 0.95).abs() < 1e-13);
+        assert!(
+            (symmetry_resolved_page_average_entropy_nats(2, 1, 1).unwrap() - 0.5).abs() < 1e-14
+        );
+        assert!(
+            (symmetry_resolved_page_average_entropy_nats(4, 1, 2).unwrap() - 7.0 / 12.0).abs()
+                < 1e-14
+        );
+        assert!(
+            (symmetry_resolved_page_average_entropy_nats(4, 2, 2).unwrap() - 0.95).abs() < 1e-13
+        );
     }
 
     #[test]
     fn fixed_charge_page_reference_is_complement_symmetric() {
-        for (number_of_qubits, total_excitations, subsystem) in [
-            (8, 4, 1), (8, 4, 3), (10, 5, 4), (12, 6, 5),
-        ] {
+        for (number_of_qubits, total_excitations, subsystem) in
+            [(8, 4, 1), (8, 4, 3), (10, 5, 4), (12, 6, 5)]
+        {
             let left = symmetry_resolved_page_average_entropy_nats(
-                number_of_qubits, total_excitations, subsystem,
-            ).unwrap();
+                number_of_qubits,
+                total_excitations,
+                subsystem,
+            )
+            .unwrap();
             let right = symmetry_resolved_page_average_entropy_nats(
-                number_of_qubits, total_excitations, number_of_qubits - subsystem,
-            ).unwrap();
+                number_of_qubits,
+                total_excitations,
+                number_of_qubits - subsystem,
+            )
+            .unwrap();
             assert!((left - right).abs() < 1e-12);
         }
     }
 
     #[test]
     fn fixed_charge_page_reference_vanishes_for_trivial_sectors_and_cuts() {
-        for (number_of_qubits, total_excitations, subsystem) in [
-            (8, 0, 4), (8, 8, 4), (8, 4, 0), (8, 4, 8),
-        ] {
-            assert!(symmetry_resolved_page_average_entropy_nats(
-                number_of_qubits, total_excitations, subsystem,
-            ).unwrap().abs() < 1e-13);
+        for (number_of_qubits, total_excitations, subsystem) in
+            [(8, 0, 4), (8, 8, 4), (8, 4, 0), (8, 4, 8)]
+        {
+            assert!(
+                symmetry_resolved_page_average_entropy_nats(
+                    number_of_qubits,
+                    total_excitations,
+                    subsystem,
+                )
+                .unwrap()
+                .abs()
+                    < 1e-13
+            );
         }
     }
 
@@ -2130,4 +2476,3 @@ mod symmetry_resolved_page_tests {
         ));
     }
 }
-
