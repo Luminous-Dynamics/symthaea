@@ -1,0 +1,541 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-acoustic-exposure-ledger-v0.1.0.schema.json",
+  "title": "Marine acoustic exposure ledger v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "period",
+    "source_events",
+    "receivers",
+    "contributions",
+    "ambient_observations",
+    "exposure_limits"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "period": {
+      "$ref": "#/$defs/period"
+    },
+    "source_events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/sourceEvent"
+      }
+    },
+    "receivers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/receiver"
+      }
+    },
+    "contributions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/contribution"
+      }
+    },
+    "ambient_observations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ambientObservation"
+      }
+    },
+    "exposure_limits": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/exposureLimit"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "period": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "period_id",
+        "mission_id",
+        "route_id",
+        "source_energy_sum_basis",
+        "start_time_s",
+        "end_time_s",
+        "service_fingerprint_sha256",
+        "environment_fingerprint_sha256"
+      ],
+      "properties": {
+        "period_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mission_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "route_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_energy_sum_basis": {
+          "enum": [
+            "incoherent_or_phase_averaged",
+            "unknown"
+          ]
+        },
+        "start_time_s": {
+          "type": "number"
+        },
+        "end_time_s": {
+          "type": "number"
+        },
+        "service_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "sourceEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "evidence_kind",
+        "dataset_id",
+        "citation",
+        "rights_status",
+        "independently_reviewed",
+        "vessel_id",
+        "vessel_revision",
+        "propeller_revision",
+        "source_state_id",
+        "mission_id",
+        "route_id",
+        "service_fingerprint_sha256",
+        "environment_fingerprint_sha256",
+        "source_track_sha256",
+        "source_level_method_id",
+        "source_level_calibration_sha256",
+        "source_level_raw_trace_sha256",
+        "source_level_timebase_receipt_sha256",
+        "operating_point_receipt_sha256",
+        "source_levels"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_kind": {
+          "enum": [
+            "synthetic",
+            "measured"
+          ]
+        },
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rights_status": {
+          "enum": [
+            "public_or_permitted",
+            "unknown",
+            "restricted"
+          ]
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        },
+        "vessel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vessel_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propeller_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_state_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mission_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "route_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "service_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_track_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_level_method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_level_calibration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_level_raw_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_level_timebase_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "operating_point_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_levels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sourceLevelBand"
+          }
+        }
+      }
+    },
+    "sourceLevelBand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "band_id",
+        "quantity_id",
+        "center_frequency_hz",
+        "source_level_db",
+        "expanded_uncertainty_db",
+        "uncertainty_confidence_level"
+      ],
+      "properties": {
+        "band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quantity_id": {
+          "const": "source_level_db_re_1upa_at_1m"
+        },
+        "center_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "source_level_db": {
+          "type": "number"
+        },
+        "expanded_uncertainty_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "uncertainty_confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        }
+      }
+    },
+    "receiver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "receiver_id",
+        "latitude_deg",
+        "longitude_deg",
+        "depth_m",
+        "location_evidence_sha256"
+      ],
+      "properties": {
+        "receiver_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "latitude_deg": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "longitude_deg": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "depth_m": {
+          "type": "number",
+          "minimum": 0
+        },
+        "location_evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "contribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contribution_id",
+        "event_id",
+        "receiver_id",
+        "band_id",
+        "start_time_s",
+        "end_time_s",
+        "duration_s",
+        "source_latitude_deg",
+        "source_longitude_deg",
+        "source_depth_m",
+        "range_m",
+        "range_tolerance_m",
+        "transmission_loss_db",
+        "transmission_loss_expanded_uncertainty_db",
+        "transmission_loss_uncertainty_confidence_level",
+        "source_to_propagation_sync_receipt_sha256",
+        "propagation_model_id",
+        "propagation_model_version",
+        "propagation_validation_sha256",
+        "bathymetry_sha256",
+        "sound_speed_profile_sha256",
+        "seabed_model_sha256",
+        "environment_fingerprint_sha256",
+        "timebase_receipt_sha256"
+      ],
+      "properties": {
+        "contribution_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receiver_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_time_s": {
+          "type": "number"
+        },
+        "end_time_s": {
+          "type": "number"
+        },
+        "duration_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "source_latitude_deg": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "source_longitude_deg": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        },
+        "source_depth_m": {
+          "type": "number",
+          "minimum": 0
+        },
+        "range_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "range_tolerance_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "transmission_loss_db": {
+          "type": "number"
+        },
+        "transmission_loss_expanded_uncertainty_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "transmission_loss_uncertainty_confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "source_to_propagation_sync_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "propagation_model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propagation_model_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propagation_validation_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "bathymetry_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "sound_speed_profile_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "seabed_model_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "timebase_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "ambientObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "evidence_kind",
+        "rights_status",
+        "independently_reviewed",
+        "receiver_id",
+        "band_id",
+        "start_time_s",
+        "end_time_s",
+        "duration_s",
+        "ambient_spl_db",
+        "expanded_uncertainty_db",
+        "measurement_method_id",
+        "instrument_id",
+        "calibration_certificate_sha256",
+        "raw_trace_sha256",
+        "timebase_receipt_sha256",
+        "ambient_only_basis"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_kind": {
+          "enum": [
+            "synthetic",
+            "measured"
+          ]
+        },
+        "rights_status": {
+          "enum": [
+            "public_or_permitted",
+            "unknown",
+            "restricted"
+          ]
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        },
+        "receiver_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_time_s": {
+          "type": "number"
+        },
+        "end_time_s": {
+          "type": "number"
+        },
+        "duration_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "ambient_spl_db": {
+          "type": "number"
+        },
+        "expanded_uncertainty_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "measurement_method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "raw_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "timebase_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "ambient_only_basis": {
+          "const": "independently_measured_ambient_reference"
+        }
+      }
+    },
+    "exposureLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "limit_id",
+        "receiver_id",
+        "band_id",
+        "upper_sel_threshold_db",
+        "requirement_reference"
+      ],
+      "properties": {
+        "limit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receiver_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "upper_sel_threshold_db": {
+          "type": "number"
+        },
+        "requirement_reference": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
