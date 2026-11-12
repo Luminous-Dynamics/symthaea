@@ -94,6 +94,9 @@ pub struct ParsedMidiTranscriptionV1 {
     pub ticks_per_quarter: u16,
     pub tempo_point_count: u32,
     pub tempo_points: Vec<MidiTempoPointV1>,
+    /// Explicit MIDI time-signature metadata. An empty vector means unknown;
+    /// the parser never invents a 4/4 signature.
+    pub time_signature_points: Vec<MidiTimeSignaturePointV1>,
     pub unclosed_note_count: u32,
     pub orphan_note_off_count: u32,
     pub overlapping_same_pitch_note_on_count: u32,
@@ -150,6 +153,17 @@ pub struct MidiTranscriptionPartSeparationSummaryV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MidiTranscriptionMeterMetadataSummaryV1 {
+    pub reference_numerator: u8,
+    pub reference_denominator: u8,
+    pub prediction_meter_point_count: u32,
+    pub prediction_initial_numerator: Option<u8>,
+    pub prediction_initial_denominator: Option<u16>,
+    /// None means no explicit tick-zero meter was supplied by the prediction.
+    pub prediction_initial_matches_reference: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MidiTranscriptionEvaluationReportV1 {
     pub schema: String,
     pub algorithm: String,
@@ -163,6 +177,8 @@ pub struct MidiTranscriptionEvaluationReportV1 {
     pub prediction_unclosed_note_count: u32,
     pub prediction_orphan_note_off_count: u32,
     pub prediction_tempo_point_count: u32,
+    /// Exact metadata comparison, not a barline or rhythm-accuracy claim.
+    pub meter_metadata: MidiTranscriptionMeterMetadataSummaryV1,
     pub prediction_overlapping_same_pitch_note_on_count: u32,
     /// mir_eval-style onset-only metric; deliberately ignores pitch.
     pub onset_only_metrics: MidiTranscriptionMetricV1,
@@ -206,6 +222,8 @@ pub enum MidiTranscriptionEvaluationIssueV1 {
     UnsupportedMidiFormat,
     UnsupportedSmpteTiming,
     InvalidTempo,
+    InvalidTimeSignature,
+    ConflictingTimeSignature { tick: u64 },
     ConflictingProgramChange { tick: u64, channel: u8 },
     MidiTickOverflow,
     TooManyPredictedNotes { count: usize, maximum: usize },
@@ -221,6 +239,17 @@ pub struct MidiTempoPointV1 {
     pub start_tick: u64,
     pub start_seconds: f64,
     pub microseconds_per_quarter: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MidiTimeSignaturePointV1 {
+    pub start_tick: u64,
+    pub source_track_index: u16,
+    pub numerator: u8,
+    pub denominator_power: u8,
+    pub denominator: u16,
+    pub clocks_per_click: u8,
+    pub thirtyseconds_per_quarter: u8,
 }
 
 #[derive(Debug, Clone)]
@@ -247,6 +276,7 @@ struct ReportCommitmentV1<'a> {
     prediction_unclosed_note_count: u32,
     prediction_orphan_note_off_count: u32,
     prediction_tempo_point_count: u32,
+    meter_metadata: &'a MidiTranscriptionMeterMetadataSummaryV1,
     prediction_overlapping_same_pitch_note_on_count: u32,
     onset_only_metrics: &'a MidiTranscriptionMetricV1,
     offset_only_metrics: &'a MidiTranscriptionMetricV1,
@@ -375,6 +405,63 @@ fn tempo_points_from_events(
     Ok(points)
 }
 
+fn time_signature_points_from_events(
+    events: &[(u64, usize, usize, u8, u8, u8, u8)],
+) -> Result<Vec<MidiTimeSignaturePointV1>, MidiTranscriptionEvaluationIssueV1> {
+    // A single track has a defined order for same-tick events; its last
+    // same-tick time-signature event wins. Across Type-1 tracks, distinct
+    // simultaneous signatures are ambiguous and fail closed.
+    let mut by_tick: BTreeMap<u64, BTreeMap<usize, (usize, (u8, u8, u8, u8))>> =
+        BTreeMap::new();
+    for (tick, track_index, event_index, numerator, denominator_power, clocks, thirtyseconds)
+        in events
+    {
+        by_tick.entry(*tick).or_default().insert(
+            *track_index,
+            (
+                *event_index,
+                (*numerator, *denominator_power, *clocks, *thirtyseconds),
+            ),
+        );
+    }
+
+    let mut points = Vec::with_capacity(by_tick.len());
+    for (tick, track_events) in by_tick {
+        let mut values = track_events.values().map(|(_, value)| *value);
+        let Some(first_value) = values.next() else {
+            continue;
+        };
+        if values.any(|value| value != first_value) {
+            return Err(MidiTranscriptionEvaluationIssueV1::ConflictingTimeSignature {
+                tick,
+            });
+        }
+        let (&source_track_index, _) = track_events
+            .first_key_value()
+            .ok_or(MidiTranscriptionEvaluationIssueV1::InvalidTimeSignature)?;
+        let (numerator, denominator_power, clocks_per_click, thirtyseconds_per_quarter) =
+            first_value;
+        if numerator == 0 || denominator_power > 15 {
+            return Err(MidiTranscriptionEvaluationIssueV1::InvalidTimeSignature);
+        }
+        let denominator = 1u16
+            .checked_shl(u32::from(denominator_power))
+            .filter(|value| *value > 0)
+            .ok_or(MidiTranscriptionEvaluationIssueV1::InvalidTimeSignature)?;
+        points.push(MidiTimeSignaturePointV1 {
+            start_tick: tick,
+            source_track_index: u16::try_from(source_track_index)
+                .map_err(|_| MidiTranscriptionEvaluationIssueV1::InvalidTimeSignature)?,
+            numerator,
+            denominator_power,
+            denominator,
+            clocks_per_click,
+            thirtyseconds_per_quarter,
+        });
+    }
+    Ok(points)
+}
+
 fn tick_to_seconds(tick: u64, tempo_points: &[MidiTempoPointV1], ticks_per_quarter: u16) -> Option<f64> {
     let index = tempo_points.partition_point(|point| point.start_tick <= tick);
     let point = tempo_points.get(index.checked_sub(1)?)?;
@@ -416,6 +503,7 @@ pub fn parse_transcribed_midi_v1(
     }
 
     let mut tempo_events = Vec::new();
+    let mut time_signature_events = Vec::new();
     let mut absolute_events = Vec::new();
     let mut midi_event_count = 0usize;
     let mut program_at_tick: BTreeMap<(u64, u8), (usize, u8)> = BTreeMap::new();
@@ -438,6 +526,23 @@ pub fn parse_transcribed_midi_v1(
                 .ok_or(MidiTranscriptionEvaluationIssueV1::MidiTickOverflow)?;
             if let TrackEventKind::Meta(MetaMessage::Tempo(tempo)) = event.kind {
                 tempo_events.push((tick, track_index, event_index, tempo.as_int()));
+            }
+            if let TrackEventKind::Meta(MetaMessage::TimeSignature(
+                numerator,
+                denominator_power,
+                clocks_per_click,
+                thirtyseconds_per_quarter,
+            )) = event.kind
+            {
+                time_signature_events.push((
+                    tick,
+                    track_index,
+                    event_index,
+                    numerator,
+                    denominator_power,
+                    clocks_per_click,
+                    thirtyseconds_per_quarter,
+                ));
             }
             if let TrackEventKind::Midi {
                 channel,
@@ -463,6 +568,7 @@ pub fn parse_transcribed_midi_v1(
     }
 
     let tempo_points = tempo_points_from_events(&tempo_events, ticks_per_quarter)?;
+    let time_signature_points = time_signature_points_from_events(&time_signature_events)?;
     // Preserve each track's event order at equal ticks. Cross-track tie
     // order is deterministic (track index, then event index); MIDI Type 1
     // does not define a stronger total order for simultaneous events on a
@@ -609,6 +715,7 @@ pub fn parse_transcribed_midi_v1(
         ticks_per_quarter,
         tempo_point_count: u32::try_from(tempo_points.len()).unwrap_or(u32::MAX),
         tempo_points,
+        time_signature_points,
         unclosed_note_count: u32::try_from(unclosed_note_count).unwrap_or(u32::MAX),
         orphan_note_off_count: u32::try_from(orphan_note_off_count).unwrap_or(u32::MAX),
         overlapping_same_pitch_note_on_count:
@@ -1545,6 +1652,31 @@ fn part_separation_summary_v1(
     })
 }
 
+fn meter_metadata_summary_v1(
+    reference: &MidiPerformanceArtifactV1,
+    parsed: &ParsedMidiTranscriptionV1,
+) -> MidiTranscriptionMeterMetadataSummaryV1 {
+    let initial = parsed
+        .time_signature_points
+        .iter()
+        .find(|point| point.start_tick == 0);
+    let prediction_initial_numerator = initial.map(|point| point.numerator);
+    let prediction_initial_denominator = initial.map(|point| point.denominator);
+    let prediction_initial_matches_reference = initial.map(|point| {
+        point.numerator == reference.manifest.meter_numerator
+            && point.denominator == u16::from(reference.manifest.meter_denominator)
+    });
+    MidiTranscriptionMeterMetadataSummaryV1 {
+        reference_numerator: reference.manifest.meter_numerator,
+        reference_denominator: reference.manifest.meter_denominator,
+        prediction_meter_point_count: u32::try_from(parsed.time_signature_points.len())
+            .unwrap_or(u32::MAX),
+        prediction_initial_numerator,
+        prediction_initial_denominator,
+        prediction_initial_matches_reference,
+    }
+}
+
 fn value_error_summary(values: &[f64]) -> MidiTranscriptionValueErrorSummaryV1 {
     if values.is_empty() {
         return MidiTranscriptionValueErrorSummaryV1 {
@@ -1631,6 +1763,7 @@ pub fn midi_transcription_evaluation_commitment_v1(
         prediction_unclosed_note_count: report.prediction_unclosed_note_count,
         prediction_orphan_note_off_count: report.prediction_orphan_note_off_count,
         prediction_tempo_point_count: report.prediction_tempo_point_count,
+        meter_metadata: &report.meter_metadata,
         prediction_overlapping_same_pitch_note_on_count:
             report.prediction_overlapping_same_pitch_note_on_count,
         onset_only_metrics: &report.onset_only_metrics,
@@ -1826,6 +1959,7 @@ pub fn evaluate_midi_transcription_v1(
         prediction_unclosed_note_count: parsed.unclosed_note_count,
         prediction_orphan_note_off_count: parsed.orphan_note_off_count,
         prediction_tempo_point_count: parsed.tempo_point_count,
+        meter_metadata: meter_metadata_summary_v1(reference, &parsed),
         prediction_overlapping_same_pitch_note_on_count:
             parsed.overlapping_same_pitch_note_on_count,
         onset_only_metrics: metric_from_matching(
@@ -1919,7 +2053,7 @@ mod tests {
         program: u8,
         tempo_events: &[(u64, u32)],
     ) -> Vec<u8> {
-        build_midi_layout(notes, program, tempo_events, 100, false)
+        build_midi_layout(notes, program, tempo_events, 100, false, Some((4, 4)))
     }
 
     fn build_midi_with_velocity(
@@ -1928,14 +2062,22 @@ mod tests {
         tempo_events: &[(u64, u32)],
         velocity: u8,
     ) -> Vec<u8> {
-        build_midi_layout(notes, program, tempo_events, velocity, false)
+        build_midi_layout(notes, program, tempo_events, velocity, false, Some((4, 4)))
+    }
+
+    fn build_midi_with_meter(
+        notes: &[(u8, u64, u64)],
+        program: u8,
+        meter: Option<(u8, u8)>,
+    ) -> Vec<u8> {
+        build_midi_layout(notes, program, &[(0, 500_000)], 100, false, meter)
     }
 
     fn build_midi_with_program_in_conductor_track(
         notes: &[(u8, u64, u64)],
         program: u8,
     ) -> Vec<u8> {
-        build_midi_layout(notes, program, &[(0, 500_000)], 100, true)
+        build_midi_layout(notes, program, &[(0, 500_000)], 100, true, Some((4, 4)))
     }
 
     fn build_midi_layout(
@@ -1944,6 +2086,7 @@ mod tests {
         tempo_events: &[(u64, u32)],
         velocity: u8,
         program_in_conductor_track: bool,
+        meter: Option<(u8, u8)>,
     ) -> Vec<u8> {
         let mut note_events: Vec<(u64, u8, Vec<u8>)> =
             if program_in_conductor_track {
@@ -1987,7 +2130,18 @@ mod tests {
                 0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20,
             ]);
         }
-        tempo_track.extend_from_slice(&[0x00, 0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08]);
+        if let Some((numerator, denominator)) = meter {
+            tempo_track.extend_from_slice(&[
+                0x00,
+                0xff,
+                0x58,
+                0x04,
+                numerator,
+                denominator.trailing_zeros() as u8,
+                0x18,
+                0x08,
+            ]);
+        }
         tempo_track.extend_from_slice(&[0x00, 0xff, 0x2f, 0x00]);
 
         let mut bytes = Vec::new();
@@ -2318,6 +2472,80 @@ mod tests {
         report.part_separation = Some(summary);
         let tampered = midi_transcription_evaluation_commitment_v1(&report).unwrap();
         assert_ne!(original, tampered);
+    }
+
+    #[test]
+    fn parses_explicit_three_four_time_signature_without_inference() {
+        let midi = build_midi_with_meter(&[(60, 0, 480)], 40, Some((3, 4)));
+        let parsed = parse_transcribed_midi_v1(&midi).unwrap();
+        assert_eq!(parsed.time_signature_points.len(), 1);
+        assert_eq!(parsed.time_signature_points[0].start_tick, 0);
+        assert_eq!(parsed.time_signature_points[0].numerator, 3);
+        assert_eq!(parsed.time_signature_points[0].denominator, 4);
+    }
+
+    #[test]
+    fn missing_time_signature_metadata_remains_unknown() {
+        let midi = build_midi_with_meter(&[(60, 0, 480)], 40, None);
+        let parsed = parse_transcribed_midi_v1(&midi).unwrap();
+        assert!(parsed.time_signature_points.is_empty());
+    }
+
+    #[test]
+    fn meter_report_does_not_invent_prediction_when_time_signature_is_absent() {
+        let reference = reference_artifact(&[(60, 0, 480)], 40);
+        let prediction = build_midi_with_meter(&[(60, 0, 480)], 40, None);
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.meter_metadata.reference_numerator, 4);
+        assert_eq!(report.meter_metadata.reference_denominator, 4);
+        assert_eq!(report.meter_metadata.prediction_meter_point_count, 0);
+        assert!(report.meter_metadata.prediction_initial_matches_reference.is_none());
+    }
+
+    #[test]
+    fn meter_report_marks_exact_tick_zero_match() {
+        let reference = reference_artifact(&[(60, 0, 480)], 40);
+        let prediction = build_midi_with_meter(&[(60, 0, 480)], 40, Some((4, 4)));
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.meter_metadata.prediction_initial_matches_reference, Some(true));
+    }
+
+    #[test]
+    fn conflicting_type_one_time_signatures_at_same_tick_are_rejected() {
+        let conductor = vec![
+            0x00, 0xff, 0x58, 0x04, 0x03, 0x02, 0x18, 0x08,
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let other = vec![
+            0x00, 0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08,
+            0x00, 0xff, 0x2f, 0x00,
+        ];
+        let tracks = vec![conductor, other];
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"MThd");
+        bytes.extend_from_slice(&6u32.to_be_bytes());
+        bytes.extend_from_slice(&1u16.to_be_bytes());
+        bytes.extend_from_slice(&2u16.to_be_bytes());
+        bytes.extend_from_slice(&MIDI_TRANSCRIPTION_TEST_PPQ.to_be_bytes());
+        for track in tracks {
+            bytes.extend_from_slice(b"MTrk");
+            bytes.extend_from_slice(&(track.len() as u32).to_be_bytes());
+            bytes.extend_from_slice(&track);
+        }
+        assert_eq!(
+            parse_transcribed_midi_v1(&bytes).unwrap_err(),
+            MidiTranscriptionEvaluationIssueV1::ConflictingTimeSignature { tick: 0 }
+        );
     }
 
     #[test]
