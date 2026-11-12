@@ -46,7 +46,10 @@
       "two_distinct_positive_roots": "higher_voltage_root_locally_asymptotically_stable_lower_voltage_root_unstable",
       "repeated_root": "non_hyperbolic_fold_semistable_from_above_repelling_from_below",
       "negative_discriminant": "no_real_equilibrium_non_pass"
-    }
+    },
+    "normalized_static_fold_margin": "mu = Delta/(Vs^2) = 1 - P/P_critical",
+    "critical_power": "P_critical = Vs^2/(4*Rs)",
+    "phase_line": "dV_dt = -((V - V_minus)*(V - V_plus))/(Rs*C*V)"
   },
   "cases": [
     {
@@ -93,7 +96,20 @@
           "classification": "unstable"
         }
       ],
-      "disposition": "two_equilibria"
+      "disposition": "two_equilibria",
+      "power_loading_fraction": {
+        "numerator": "3",
+        "denominator": "4"
+      },
+      "normalized_static_fold_margin": {
+        "numerator": "1",
+        "denominator": "4"
+      },
+      "initial_voltage_basin": {
+        "high_voltage_equilibrium": "V0 > 25 V",
+        "unstable_equilibrium": "V0 = 25 V",
+        "outside_high_voltage_basin": "0 < V0 < 25 V leads toward the zero-voltage domain boundary"
+      }
     },
     {
       "id": "near-fold-two-roots",
@@ -139,7 +155,20 @@
           "classification": "unstable"
         }
       ],
-      "disposition": "two_equilibria"
+      "disposition": "two_equilibria",
+      "power_loading_fraction": {
+        "numerator": "2499",
+        "denominator": "2500"
+      },
+      "normalized_static_fold_margin": {
+        "numerator": "1",
+        "denominator": "2500"
+      },
+      "initial_voltage_basin": {
+        "high_voltage_equilibrium": "V0 > 49 V",
+        "unstable_equilibrium": "V0 = 49 V",
+        "outside_high_voltage_basin": "0 < V0 < 49 V leads toward the zero-voltage domain boundary"
+      }
     },
     {
       "id": "critical-fold",
@@ -173,7 +202,20 @@
           "classification": "non_hyperbolic_semistable_from_above_repelling_from_below"
         }
       ],
-      "disposition": "critical_fold_non_pass"
+      "disposition": "critical_fold_non_pass",
+      "power_loading_fraction": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "normalized_static_fold_margin": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "initial_voltage_behavior": {
+        "V0 > 50 V": "approaches the fold equilibrium from above",
+        "V0 = 50 V": "remains at the exact equilibrium",
+        "0 < V0 < 50 V": "moves away from the fold toward the zero-voltage domain boundary"
+      }
     },
     {
       "id": "no-equilibrium",
@@ -194,7 +236,16 @@
         }
       },
       "roots": [],
-      "disposition": "no_equilibrium_non_pass"
+      "disposition": "no_equilibrium_non_pass",
+      "power_loading_fraction": {
+        "numerator": "2501",
+        "denominator": "2500"
+      },
+      "normalized_static_fold_margin": {
+        "numerator": "-1",
+        "denominator": "2500"
+      },
+      "initial_voltage_behavior": "No positive equilibrium exists; no equilibrium basin is reported."
     }
   ],
   "limitations": [
