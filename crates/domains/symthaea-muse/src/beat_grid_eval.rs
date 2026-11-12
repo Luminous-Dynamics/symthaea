@@ -1,0 +1,951 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//! Model-agnostic beat/downbeat evaluation for Melothaea.
+//!
+//! The evaluator consumes timestamp sequences from any beat tracker and one
+//! or more independently annotated reference sequences. It does not perform
+//! beat tracking, audio decoding, or annotation consensus. Multiple reference
+//! tracks remain separately visible so disagreement is not erased by choosing
+//! one annotator as unquestioned truth.
+//!
+//! Strict beat F1 uses the mir_eval default 70 ms event tolerance. Cemgil
+//! scoring and the five conventional metrical-level variants are additional
+//! diagnostics; the best metrical-level score must never replace strict F1.
+
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+
+pub const BEAT_GRID_EVALUATION_SCHEMA_V1: &str = "muse-beat-grid-evaluation-v1";
+pub const BEAT_GRID_EVALUATION_ALGORITHM_V1: &str =
+    "sorted-one-to-one-event-match-cemgil-metric-level-v1";
+pub const BEAT_GRID_DEFAULT_TOLERANCE_MS_V1: u32 = 70;
+pub const BEAT_GRID_DEFAULT_DOWNBEAT_TOLERANCE_MS_V1: u32 = 70;
+pub const BEAT_GRID_DEFAULT_CEMGIL_SIGMA_MS_V1: u32 = 40;
+pub const BEAT_GRID_MAX_REFERENCES_V1: usize = 64;
+pub const BEAT_GRID_MAX_EVENTS_PER_SEQUENCE_V1: usize = 2_000_000;
+pub const BEAT_GRID_MAX_TOTAL_EVENTS_V1: usize = 8_000_000;
+pub const BEAT_GRID_MAX_DURATION_SECONDS_V1: f64 = 30_000.0;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BeatGridReferenceV1 {
+    pub reference_id: String,
+    /// One coherent beat interpretation from one annotator or annotation source.
+    pub beat_times_seconds: Vec<f64>,
+    /// Empty means downbeat ground truth is unavailable, not that no downbeats exist.
+    pub downbeat_times_seconds: Vec<f64>,
+    pub annotation_source: String,
+    pub annotation_group: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BeatGridPredictionV1 {
+    pub model_id: String,
+    pub model_revision: String,
+    pub beat_times_seconds: Vec<f64>,
+    pub downbeat_times_seconds: Vec<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BeatGridEvaluationConfigV1 {
+    pub beat_tolerance_ms: u32,
+    pub downbeat_tolerance_ms: u32,
+    pub cemgil_sigma_ms: u32,
+    /// Optional explicit trim applied equally to reference and prediction.
+    /// None is the default: retain the complete annotated clip.
+    pub minimum_evaluation_time_ms: Option<u32>,
+    pub metric_level_variants_enabled: bool,
+}
+
+impl Default for BeatGridEvaluationConfigV1 {
+    fn default() -> Self {
+        Self {
+            beat_tolerance_ms: BEAT_GRID_DEFAULT_TOLERANCE_MS_V1,
+            downbeat_tolerance_ms: BEAT_GRID_DEFAULT_DOWNBEAT_TOLERANCE_MS_V1,
+            cemgil_sigma_ms: BEAT_GRID_DEFAULT_CEMGIL_SIGMA_MS_V1,
+            minimum_evaluation_time_ms: None,
+            metric_level_variants_enabled: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BeatGridEventMetricV1 {
+    pub true_positives: u32,
+    pub false_positives: u32,
+    pub false_negatives: u32,
+    pub precision: f64,
+    pub recall: f64,
+    pub f1: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BeatGridTimingErrorSummaryV1 {
+    pub matched_event_count: u32,
+    /// Signed prediction-minus-reference bias in milliseconds.
+    pub mean_signed_error_ms: Option<f64>,
+    pub mean_absolute_error_ms: Option<f64>,
+    pub median_absolute_error_ms: Option<f64>,
+    pub p95_absolute_error_ms: Option<f64>,
+    pub p99_absolute_error_ms: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BeatGridReferenceScoreV1 {
+    pub reference_id: String,
+    pub annotation_source: String,
+    pub annotation_group: Option<String>,
+    pub reference_beat_count: u32,
+    pub predicted_beat_count: u32,
+    /// Strict beat event F1 at the configured tolerance (70 ms by default).
+    pub beat_f_measure: BeatGridEventMetricV1,
+    /// Direct-reference Cemgil score at the configured sigma.
+    pub cemgil_score: Option<f64>,
+    /// Maximum Cemgil score over reference, offbeat, double, and half-time variants.
+    /// This is a diagnostic for metrical-level ambiguity, not strict beat accuracy.
+    pub cemgil_best_metric_level: Option<f64>,
+    pub downbeat_metric: Option<BeatGridEventMetricV1>,
+    pub beat_timing_error: BeatGridTimingErrorSummaryV1,
+    pub downbeat_timing_error: Option<BeatGridTimingErrorSummaryV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BeatGridEvaluationReportV1 {
+    pub schema: String,
+    pub algorithm: String,
+    pub config: BeatGridEvaluationConfigV1,
+    pub prediction_sha256: String,
+    pub reference_bundle_sha256: String,
+    pub prediction_model_id: String,
+    pub prediction_model_revision: String,
+    pub reference_count: u32,
+    pub reference_scores: Vec<BeatGridReferenceScoreV1>,
+    /// Median strict beat F1 across reference interpretations.
+    pub median_beat_f1_across_references: f64,
+    /// Worst strict beat F1 across reference interpretations.
+    pub minimum_beat_f1_across_references: f64,
+    /// Median downbeat F1 over references that actually provide downbeat labels.
+    pub median_downbeat_f1_across_references: Option<f64>,
+    /// Pairwise beat F1 between reference tracks; measures annotation disagreement.
+    pub median_pairwise_reference_agreement: Option<f64>,
+    pub minimum_pairwise_reference_agreement: Option<f64>,
+    pub report_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BeatGridEvaluationIssueV1 {
+    InvalidConfig { field: String },
+    NoReferences,
+    TooManyReferences { count: usize, maximum: usize },
+    InvalidReferenceId { index: usize },
+    InvalidAnnotationSource { index: usize },
+    InvalidTimestampSequence { field: String, index: usize },
+    TooManyEvents { count: usize, maximum: usize },
+    TotalEventBudgetExceeded { count: usize, maximum: usize },
+    InvalidModelIdentity,
+    SerializationFailed,
+    ReportInputMismatch,
+}
+
+#[derive(Serialize)]
+struct EvaluationCommitmentV1<'a> {
+    schema: &'a str,
+    algorithm: &'a str,
+    config: &'a BeatGridEvaluationConfigV1,
+    prediction_sha256: &'a str,
+    reference_bundle_sha256: &'a str,
+    prediction_model_id: &'a str,
+    prediction_model_revision: &'a str,
+    reference_count: u32,
+    reference_scores: &'a [BeatGridReferenceScoreV1],
+    median_beat_f1_across_references: f64,
+    minimum_beat_f1_across_references: f64,
+    median_downbeat_f1_across_references: Option<f64>,
+    median_pairwise_reference_agreement: Option<f64>,
+    minimum_pairwise_reference_agreement: Option<f64>,
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn domain_separated_sha256(schema: &str, bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(schema.as_bytes());
+    hasher.update([0]);
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
+}
+
+fn validate_config(
+    config: &BeatGridEvaluationConfigV1,
+) -> Result<(), BeatGridEvaluationIssueV1> {
+    if config.beat_tolerance_ms == 0 || config.beat_tolerance_ms > 5_000 {
+        return Err(BeatGridEvaluationIssueV1::InvalidConfig {
+            field: "beat_tolerance_ms".into(),
+        });
+    }
+    if config.downbeat_tolerance_ms == 0 || config.downbeat_tolerance_ms > 5_000 {
+        return Err(BeatGridEvaluationIssueV1::InvalidConfig {
+            field: "downbeat_tolerance_ms".into(),
+        });
+    }
+    if config.cemgil_sigma_ms == 0 || config.cemgil_sigma_ms > 1_000 {
+        return Err(BeatGridEvaluationIssueV1::InvalidConfig {
+            field: "cemgil_sigma_ms".into(),
+        });
+    }
+    if config.minimum_evaluation_time_ms.is_some_and(|value| value > 30_000_000) {
+        return Err(BeatGridEvaluationIssueV1::InvalidConfig {
+            field: "minimum_evaluation_time_ms".into(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_times(
+    values: &[f64],
+    field: &str,
+    allow_empty: bool,
+) -> Result<(), BeatGridEvaluationIssueV1> {
+    if (!allow_empty && values.is_empty()) || values.len() > BEAT_GRID_MAX_EVENTS_PER_SEQUENCE_V1 {
+        return Err(BeatGridEvaluationIssueV1::TooManyEvents {
+            count: values.len(),
+            maximum: BEAT_GRID_MAX_EVENTS_PER_SEQUENCE_V1,
+        });
+    }
+    let mut previous = None;
+    for (index, value) in values.iter().enumerate() {
+        if !value.is_finite()
+            || *value < 0.0
+            || *value > BEAT_GRID_MAX_DURATION_SECONDS_V1
+            || previous.is_some_and(|prior| *value <= prior)
+        {
+            return Err(BeatGridEvaluationIssueV1::InvalidTimestampSequence {
+                field: field.into(),
+                index,
+            });
+        }
+        previous = Some(*value);
+    }
+    Ok(())
+}
+
+fn validate_inputs(
+    prediction: &BeatGridPredictionV1,
+    references: &[BeatGridReferenceV1],
+    config: &BeatGridEvaluationConfigV1,
+) -> Result<(), BeatGridEvaluationIssueV1> {
+    validate_config(config)?;
+    if references.is_empty() {
+        return Err(BeatGridEvaluationIssueV1::NoReferences);
+    }
+    if references.len() > BEAT_GRID_MAX_REFERENCES_V1 {
+        return Err(BeatGridEvaluationIssueV1::TooManyReferences {
+            count: references.len(),
+            maximum: BEAT_GRID_MAX_REFERENCES_V1,
+        });
+    }
+    if prediction.model_id.trim().is_empty()
+        || prediction.model_id.len() > 256
+        || prediction.model_revision.trim().is_empty()
+        || prediction.model_revision.len() > 256
+    {
+        return Err(BeatGridEvaluationIssueV1::InvalidModelIdentity);
+    }
+    validate_times(
+        &prediction.beat_times_seconds,
+        "prediction.beat_times_seconds",
+        true,
+    )?;
+    validate_times(
+        &prediction.downbeat_times_seconds,
+        "prediction.downbeat_times_seconds",
+        true,
+    )?;
+
+    let mut total_events = prediction.beat_times_seconds.len()
+        + prediction.downbeat_times_seconds.len();
+    for (index, reference) in references.iter().enumerate() {
+        if reference.reference_id.trim().is_empty()
+            || reference.reference_id.len() > 256
+            || references[..index].iter().any(|prior| prior.reference_id == reference.reference_id)
+        {
+            return Err(BeatGridEvaluationIssueV1::InvalidReferenceId { index });
+        }
+        if reference.annotation_source.trim().is_empty()
+            || reference.annotation_source.len() > 256
+        {
+            return Err(BeatGridEvaluationIssueV1::InvalidAnnotationSource { index });
+        }
+        if reference.annotation_group.as_ref().is_some_and(|value| {
+            value.trim().is_empty() || value.len() > 256
+        }) {
+            return Err(BeatGridEvaluationIssueV1::InvalidAnnotationSource { index });
+        }
+        validate_times(
+            &reference.beat_times_seconds,
+            "reference.beat_times_seconds",
+            false,
+        )?;
+        validate_times(
+            &reference.downbeat_times_seconds,
+            "reference.downbeat_times_seconds",
+            true,
+        )?;
+        total_events = total_events
+            .saturating_add(reference.beat_times_seconds.len())
+            .saturating_add(reference.downbeat_times_seconds.len());
+    }
+    if total_events > BEAT_GRID_MAX_TOTAL_EVENTS_V1 {
+        return Err(BeatGridEvaluationIssueV1::TotalEventBudgetExceeded {
+            count: total_events,
+            maximum: BEAT_GRID_MAX_TOTAL_EVENTS_V1,
+        });
+    }
+    Ok(())
+}
+
+fn trimmed(values: &[f64], minimum_seconds: Option<f64>) -> Vec<f64> {
+    match minimum_seconds {
+        Some(minimum) => {
+            let start = values.partition_point(|value| *value < minimum);
+            values[start..].to_vec()
+        }
+        None => values.to_vec(),
+    }
+}
+
+/// Sorted greedy matching is maximum-cardinality for one-dimensional points
+/// under a fixed symmetric tolerance. It also guarantees one-to-one matches.
+fn match_events(
+    reference: &[f64],
+    estimated: &[f64],
+    tolerance_seconds: f64,
+) -> Vec<(usize, usize)> {
+    let mut matching = Vec::new();
+    let mut reference_index = 0usize;
+    let mut estimated_index = 0usize;
+
+    while reference_index < reference.len() && estimated_index < estimated.len() {
+        let error = estimated[estimated_index] - reference[reference_index];
+        if error.abs() <= tolerance_seconds + 0.000005 {
+            matching.push((reference_index, estimated_index));
+            reference_index += 1;
+            estimated_index += 1;
+        } else if error < -tolerance_seconds {
+            estimated_index += 1;
+        } else {
+            reference_index += 1;
+        }
+    }
+    matching
+}
+
+fn event_metric(
+    reference_count: usize,
+    estimated_count: usize,
+    true_positives: usize,
+) -> BeatGridEventMetricV1 {
+    let false_positives = estimated_count.saturating_sub(true_positives);
+    let false_negatives = reference_count.saturating_sub(true_positives);
+    let precision = if estimated_count == 0 {
+        0.0
+    } else {
+        true_positives as f64 / estimated_count as f64
+    };
+    let recall = if reference_count == 0 {
+        0.0
+    } else {
+        true_positives as f64 / reference_count as f64
+    };
+    let f1 = if precision + recall == 0.0 {
+        0.0
+    } else {
+        2.0 * precision * recall / (precision + recall)
+    };
+    BeatGridEventMetricV1 {
+        true_positives: u32::try_from(true_positives).unwrap_or(u32::MAX),
+        false_positives: u32::try_from(false_positives).unwrap_or(u32::MAX),
+        false_negatives: u32::try_from(false_negatives).unwrap_or(u32::MAX),
+        precision,
+        recall,
+        f1,
+    }
+}
+
+fn median(values: &mut [f64]) -> Option<f64> {
+    if values.is_empty() {
+        return None;
+    }
+    values.sort_by(f64::total_cmp);
+    Some(if values.len().is_multiple_of(2) {
+        (values[values.len() / 2 - 1] + values[values.len() / 2]) * 0.5
+    } else {
+        values[values.len() / 2]
+    })
+}
+
+fn percentile(sorted: &[f64], fraction: f64) -> Option<f64> {
+    if sorted.is_empty() {
+        return None;
+    }
+    let index = ((sorted.len() as f64 * fraction).ceil() as usize)
+        .saturating_sub(1)
+        .min(sorted.len() - 1);
+    Some(sorted[index])
+}
+
+fn timing_error_summary(
+    reference: &[f64],
+    estimated: &[f64],
+    matching: &[(usize, usize)],
+) -> BeatGridTimingErrorSummaryV1 {
+    let errors_ms: Vec<f64> = matching
+        .iter()
+        .map(|(reference_index, estimated_index)| {
+            (estimated[*estimated_index] - reference[*reference_index]) * 1_000.0
+        })
+        .collect();
+    let mut absolute: Vec<f64> = errors_ms.iter().map(|value| value.abs()).collect();
+    let mean_signed = if errors_ms.is_empty() {
+        None
+    } else {
+        Some(errors_ms.iter().sum::<f64>() / errors_ms.len() as f64)
+    };
+    let mean_absolute = if absolute.is_empty() {
+        None
+    } else {
+        Some(absolute.iter().sum::<f64>() / absolute.len() as f64)
+    };
+    let median_absolute = median(&mut absolute);
+    BeatGridTimingErrorSummaryV1 {
+        matched_event_count: u32::try_from(errors_ms.len()).unwrap_or(u32::MAX),
+        mean_signed_error_ms: mean_signed,
+        mean_absolute_error_ms: mean_absolute,
+        median_absolute_error_ms: median_absolute,
+        p95_absolute_error_ms: percentile(&absolute, 0.95),
+        p99_absolute_error_ms: percentile(&absolute, 0.99),
+    }
+}
+
+fn cemgil_score(
+    reference: &[f64],
+    estimated: &[f64],
+    sigma_seconds: f64,
+) -> Option<f64> {
+    if reference.is_empty() || estimated.is_empty() {
+        return Some(0.0);
+    }
+    let gaussian_sum = reference
+        .iter()
+        .map(|reference_time| {
+            let nearest_error = estimated
+                .iter()
+                .map(|estimated_time| (reference_time - estimated_time).abs())
+                .fold(f64::INFINITY, f64::min);
+            (-nearest_error.powi(2) / (2.0 * sigma_seconds.powi(2))).exp()
+        })
+        .sum::<f64>();
+    Some(gaussian_sum / (0.5 * (estimated.len() + reference.len()) as f64))
+}
+
+fn metric_level_variants(reference: &[f64]) -> [Vec<f64>; 5] {
+    if reference.len() < 2 {
+        return [
+            reference.to_vec(),
+            Vec::new(),
+            reference.to_vec(),
+            reference.to_vec(),
+            reference.to_vec(),
+        ];
+    }
+    let mut offbeat = Vec::with_capacity(reference.len() - 1);
+    let mut doubled = Vec::with_capacity(reference.len() * 2 - 1);
+    for pair in reference.windows(2) {
+        doubled.push(pair[0]);
+        let midpoint = (pair[0] + pair[1]) * 0.5;
+        offbeat.push(midpoint);
+        doubled.push(midpoint);
+    }
+    doubled.push(*reference.last().unwrap_or(&reference[0]));
+    [
+        reference.to_vec(),
+        offbeat,
+        doubled,
+        reference.iter().step_by(2).copied().collect(),
+        reference.iter().skip(1).step_by(2).copied().collect(),
+    ]
+}
+
+fn score_one_reference(
+    reference: &BeatGridReferenceV1,
+    prediction: &BeatGridPredictionV1,
+    config: &BeatGridEvaluationConfigV1,
+) -> BeatGridReferenceScoreV1 {
+    let minimum_seconds = config.minimum_evaluation_time_ms.map(|value| {
+        f64::from(value) / 1_000.0
+    });
+    let reference_beats = trimmed(&reference.beat_times_seconds, minimum_seconds);
+    let estimated_beats = trimmed(&prediction.beat_times_seconds, minimum_seconds);
+    let beat_matches = match_events(
+        &reference_beats,
+        &estimated_beats,
+        f64::from(config.beat_tolerance_ms) / 1_000.0,
+    );
+    let beat_f_measure = event_metric(
+        reference_beats.len(),
+        estimated_beats.len(),
+        beat_matches.len(),
+    );
+    let beat_timing_error =
+        timing_error_summary(&reference_beats, &estimated_beats, &beat_matches);
+
+    let cemgil = cemgil_score(
+        &reference_beats,
+        &estimated_beats,
+        f64::from(config.cemgil_sigma_ms) / 1_000.0,
+    );
+    let cemgil_best = if config.metric_level_variants_enabled {
+        metric_level_variants(&reference_beats)
+            .iter()
+            .filter_map(|variant| {
+                cemgil_score(
+                    variant,
+                    &estimated_beats,
+                    f64::from(config.cemgil_sigma_ms) / 1_000.0,
+                )
+            })
+            .max_by(f64::total_cmp)
+    } else {
+        None
+    };
+
+    let reference_downbeats = trimmed(&reference.downbeat_times_seconds, minimum_seconds);
+    let estimated_downbeats = trimmed(&prediction.downbeat_times_seconds, minimum_seconds);
+    let (downbeat_metric, downbeat_timing_error) = if reference_downbeats.is_empty() {
+        (None, None)
+    } else {
+        let matches = match_events(
+            &reference_downbeats,
+            &estimated_downbeats,
+            f64::from(config.downbeat_tolerance_ms) / 1_000.0,
+        );
+        (
+            Some(event_metric(
+                reference_downbeats.len(),
+                estimated_downbeats.len(),
+                matches.len(),
+            )),
+            Some(timing_error_summary(
+                &reference_downbeats,
+                &estimated_downbeats,
+                &matches,
+            )),
+        )
+    };
+
+    BeatGridReferenceScoreV1 {
+        reference_id: reference.reference_id.clone(),
+        annotation_source: reference.annotation_source.clone(),
+        annotation_group: reference.annotation_group.clone(),
+        reference_beat_count: u32::try_from(reference_beats.len()).unwrap_or(u32::MAX),
+        predicted_beat_count: u32::try_from(estimated_beats.len()).unwrap_or(u32::MAX),
+        beat_f_measure,
+        cemgil_score: cemgil,
+        cemgil_best_metric_level: cemgil_best,
+        downbeat_metric,
+        beat_timing_error,
+        downbeat_timing_error,
+    }
+}
+
+fn median_of(mut values: Vec<f64>) -> Option<f64> {
+    median(&mut values)
+}
+
+fn aggregate_scores(
+    scores: &[BeatGridReferenceScoreV1],
+    references: &[BeatGridReferenceV1],
+) -> (f64, f64, Option<f64>, Option<f64>, Option<f64>) {
+    let beat_scores: Vec<f64> = scores
+        .iter()
+        .map(|score| score.beat_f_measure.f1)
+        .collect();
+    let median_beat = median_of(beat_scores.clone()).unwrap_or(0.0);
+    let minimum_beat = beat_scores.iter().copied().fold(f64::INFINITY, f64::min);
+
+    let downbeat_scores: Vec<f64> = scores
+        .iter()
+        .filter_map(|score| score.downbeat_metric.as_ref().map(|metric| metric.f1))
+        .collect();
+    let median_downbeat = median_of(downbeat_scores);
+
+    let mut pairwise = Vec::new();
+    for left_index in 0..references.len() {
+        for right_index in left_index + 1..references.len() {
+            if references[left_index].annotation_group
+                != references[right_index].annotation_group
+            {
+                continue;
+            }
+            let matches = match_events(
+                &references[left_index].beat_times_seconds,
+                &references[right_index].beat_times_seconds,
+                f64::from(BEAT_GRID_DEFAULT_TOLERANCE_MS_V1) / 1_000.0,
+            );
+            pairwise.push(event_metric(
+                references[left_index].beat_times_seconds.len(),
+                references[right_index].beat_times_seconds.len(),
+                matches.len(),
+            ).f1);
+        }
+    }
+    (
+        median_beat,
+        minimum_beat,
+        median_downbeat,
+        median_of(pairwise.clone()),
+        pairwise.into_iter().min_by(f64::total_cmp),
+    )
+}
+
+/// Evaluate a beat/downbeat tracker against one or more independent reference
+/// interpretations. Reference tracks are scored separately; aggregation uses
+/// the median and minimum so annotator disagreement is not hidden.
+pub fn evaluate_beat_grid_v1(
+    prediction: &BeatGridPredictionV1,
+    references: &[BeatGridReferenceV1],
+    config: BeatGridEvaluationConfigV1,
+) -> Result<BeatGridEvaluationReportV1, BeatGridEvaluationIssueV1> {
+    validate_inputs(prediction, references, &config)?;
+    let reference_bundle_bytes = serde_json::to_vec(references)
+        .map_err(|_| BeatGridEvaluationIssueV1::SerializationFailed)?;
+    let prediction_bytes = serde_json::to_vec(prediction)
+        .map_err(|_| BeatGridEvaluationIssueV1::SerializationFailed)?;
+    let reference_bundle_sha256 = domain_separated_sha256(
+        "muse-beat-grid-reference-bundle-v1",
+        &reference_bundle_bytes,
+    );
+    let prediction_sha256 = domain_separated_sha256(
+        "muse-beat-grid-prediction-v1",
+        &prediction_bytes,
+    );
+    let reference_scores: Vec<_> = references
+        .iter()
+        .map(|reference| score_one_reference(reference, prediction, &config))
+        .collect();
+    let (
+        median_beat_f1_across_references,
+        minimum_beat_f1_across_references,
+        median_downbeat_f1_across_references,
+        median_pairwise_reference_agreement,
+        minimum_pairwise_reference_agreement,
+    ) = aggregate_scores(&reference_scores, references);
+
+    let mut report = BeatGridEvaluationReportV1 {
+        schema: BEAT_GRID_EVALUATION_SCHEMA_V1.into(),
+        algorithm: BEAT_GRID_EVALUATION_ALGORITHM_V1.into(),
+        config,
+        prediction_sha256,
+        reference_bundle_sha256,
+        prediction_model_id: prediction.model_id.clone(),
+        prediction_model_revision: prediction.model_revision.clone(),
+        reference_count: u32::try_from(references.len()).unwrap_or(u32::MAX),
+        reference_scores,
+        median_beat_f1_across_references,
+        minimum_beat_f1_across_references,
+        median_downbeat_f1_across_references,
+        median_pairwise_reference_agreement,
+        minimum_pairwise_reference_agreement,
+        report_sha256: String::new(),
+    };
+    report.report_sha256 = beat_grid_evaluation_commitment_v1(&report)
+        .map_err(|_| BeatGridEvaluationIssueV1::SerializationFailed)?;
+    Ok(report)
+}
+
+pub fn beat_grid_evaluation_commitment_v1(
+    report: &BeatGridEvaluationReportV1,
+) -> Result<String, serde_json::Error> {
+    let commitment = EvaluationCommitmentV1 {
+        schema: &report.schema,
+        algorithm: &report.algorithm,
+        config: &report.config,
+        prediction_sha256: &report.prediction_sha256,
+        reference_bundle_sha256: &report.reference_bundle_sha256,
+        prediction_model_id: &report.prediction_model_id,
+        prediction_model_revision: &report.prediction_model_revision,
+        reference_count: report.reference_count,
+        reference_scores: &report.reference_scores,
+        median_beat_f1_across_references: report.median_beat_f1_across_references,
+        minimum_beat_f1_across_references: report.minimum_beat_f1_across_references,
+        median_downbeat_f1_across_references: report.median_downbeat_f1_across_references,
+        median_pairwise_reference_agreement: report.median_pairwise_reference_agreement,
+        minimum_pairwise_reference_agreement: report.minimum_pairwise_reference_agreement,
+    };
+    Ok(domain_separated_sha256(
+        BEAT_GRID_EVALUATION_SCHEMA_V1,
+        &serde_json::to_vec(&commitment)?,
+    ))
+}
+
+pub fn validate_beat_grid_evaluation_report_v1(
+    report: &BeatGridEvaluationReportV1,
+    prediction: &BeatGridPredictionV1,
+    references: &[BeatGridReferenceV1],
+) -> Result<(), BeatGridEvaluationIssueV1> {
+    let replay = evaluate_beat_grid_v1(prediction, references, report.config.clone())?;
+    if replay != *report {
+        return Err(BeatGridEvaluationIssueV1::ReportInputMismatch);
+    }
+    let digest = beat_grid_evaluation_commitment_v1(report)
+        .map_err(|_| BeatGridEvaluationIssueV1::SerializationFailed)?;
+    if digest != report.report_sha256 {
+        return Err(BeatGridEvaluationIssueV1::ReportInputMismatch);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn reference(
+        id: &str,
+        group: Option<&str>,
+        beats: &[f64],
+        downbeats: &[f64],
+    ) -> BeatGridReferenceV1 {
+        BeatGridReferenceV1 {
+            reference_id: id.into(),
+            beat_times_seconds: beats.to_vec(),
+            downbeat_times_seconds: downbeats.to_vec(),
+            annotation_source: "test-annotator".into(),
+            annotation_group: group.map(str::to_owned),
+        }
+    }
+
+    fn prediction(beats: &[f64], downbeats: &[f64]) -> BeatGridPredictionV1 {
+        BeatGridPredictionV1 {
+            model_id: "fixture-tracker".into(),
+            model_revision: "fixture-v1".into(),
+            beat_times_seconds: beats.to_vec(),
+            downbeat_times_seconds: downbeats.to_vec(),
+        }
+    }
+
+    #[test]
+    fn exact_beat_and_downbeat_sequences_are_perfect() {
+        let beats = [0.0, 0.5, 1.0, 1.5, 2.0];
+        let downbeats = [0.0, 2.0];
+        let prediction = prediction(&beats, &downbeats);
+        let references = [reference("a", Some("clip-a"), &beats, &downbeats)];
+        let report = evaluate_beat_grid_v1(
+            &prediction,
+            &references,
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        assert_eq!(report.reference_scores[0].beat_f_measure.f1, 1.0);
+        assert_eq!(report.reference_scores[0].downbeat_metric.as_ref().unwrap().f1, 1.0);
+        assert_eq!(report.median_beat_f1_across_references, 1.0);
+        assert_eq!(report.median_downbeat_f1_across_references, Some(1.0));
+    }
+
+    #[test]
+    fn default_seventy_millisecond_beat_tolerance_is_inclusive() {
+        let reference = [0.0, 0.5, 1.0, 1.5];
+        let predicted = [0.07, 0.57, 1.07, 1.57];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&predicted, &[]),
+            &[reference("a", None, &reference, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        assert_eq!(report.reference_scores[0].beat_f_measure.true_positives, 4);
+        assert_eq!(report.reference_scores[0].beat_f_measure.f1, 1.0);
+    }
+
+    #[test]
+    fn duplicated_estimated_beats_are_false_positives_not_double_matches() {
+        let reference = [0.0, 0.5, 1.0];
+        let predicted = [0.0, 0.01, 0.5, 1.0];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&predicted, &[]),
+            &[reference("a", None, &reference, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        assert_eq!(report.reference_scores[0].beat_f_measure.true_positives, 3);
+        assert_eq!(report.reference_scores[0].beat_f_measure.false_positives, 1);
+        assert!(report.reference_scores[0].beat_f_measure.f1 < 1.0);
+    }
+
+    #[test]
+    fn missing_beats_reduce_recall() {
+        let reference = [0.0, 0.5, 1.0, 1.5];
+        let predicted = [0.0, 1.0];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&predicted, &[]),
+            &[reference("a", None, &reference, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        assert_eq!(report.reference_scores[0].beat_f_measure.recall, 0.5);
+        assert_eq!(report.reference_scores[0].beat_f_measure.precision, 1.0);
+    }
+
+    #[test]
+    fn half_time_interpretation_is_visible_as_strict_error_and_best_metric_level() {
+        let reference = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
+        let predicted = [0.0, 1.0, 2.0, 3.0];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&predicted, &[]),
+            &[reference("a", None, &reference, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        let score = &report.reference_scores[0];
+        assert!(score.beat_f_measure.f1 < 1.0);
+        assert!(score.cemgil_best_metric_level.unwrap() >= score.cemgil_score.unwrap());
+    }
+
+    #[test]
+    fn downbeats_are_scored_separately_from_beats() {
+        let reference_beats = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5];
+        let reference_downbeats = [0.0, 2.0];
+        let predicted_beats = reference_beats;
+        let predicted_downbeats = [1.0, 3.0];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&predicted_beats, &predicted_downbeats),
+            &[reference("a", None, &reference_beats, &reference_downbeats)],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        assert_eq!(report.reference_scores[0].beat_f_measure.f1, 1.0);
+        assert_eq!(report.reference_scores[0].downbeat_metric.as_ref().unwrap().f1, 0.0);
+    }
+
+    #[test]
+    fn missing_downbeat_annotation_is_unknown_not_zero() {
+        let beats = [0.0, 0.5, 1.0];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&beats, &[]),
+            &[reference("a", None, &beats, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        assert!(report.reference_scores[0].downbeat_metric.is_none());
+        assert!(report.median_downbeat_f1_across_references.is_none());
+    }
+
+    #[test]
+    fn multiple_reference_interpretations_remain_separate_and_report_agreement() {
+        let ref_a = [0.0, 0.5, 1.0, 1.5, 2.0];
+        let ref_b = [0.0, 0.5, 1.02, 1.5, 2.0];
+        let predicted = [0.0, 0.5, 1.0, 1.5, 2.0];
+        let references = [
+            reference("a", Some("same-clip"), &ref_a, &[]),
+            reference("b", Some("same-clip"), &ref_b, &[]),
+        ];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&predicted, &[]),
+            &references,
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        assert_eq!(report.reference_scores.len(), 2);
+        assert_eq!(report.median_pairwise_reference_agreement, Some(1.0));
+        assert!(report.reference_scores.iter().all(|score| score.beat_f_measure.f1 == 1.0));
+    }
+
+    #[test]
+    fn reference_disagreement_is_not_computed_across_different_clips() {
+        let ref_a = [0.0, 0.5, 1.0];
+        let ref_b = [0.1, 0.6, 1.1];
+        let references = [
+            reference("a", Some("clip-a"), &ref_a, &[]),
+            reference("b", Some("clip-b"), &ref_b, &[]),
+        ];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&ref_a, &[]),
+            &references,
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        assert!(report.median_pairwise_reference_agreement.is_none());
+    }
+
+    #[test]
+    fn explicit_five_second_trim_is_applied_to_both_sequences() {
+        let reference = [0.0, 0.5, 1.0, 5.0, 5.5, 6.0];
+        let prediction = [0.1, 0.6, 5.0, 5.5, 6.0];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&prediction, &[]),
+            &[reference("a", None, &reference, &[])],
+            BeatGridEvaluationConfigV1 {
+                minimum_evaluation_time_ms: Some(5_000),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(report.reference_scores[0].beat_f_measure.f1, 1.0);
+        assert_eq!(report.reference_scores[0].reference_beat_count, 3);
+    }
+
+    #[test]
+    fn malformed_non_monotonic_timestamp_sequences_are_rejected() {
+        let prediction = prediction(&[0.0, 0.5, 0.4], &[]);
+        let references = [reference("a", None, &[0.0, 0.5, 1.0], &[])];
+        assert!(matches!(
+            evaluate_beat_grid_v1(
+                &prediction,
+                &references,
+                BeatGridEvaluationConfigV1::default()
+            ),
+            Err(BeatGridEvaluationIssueV1::InvalidTimestampSequence { .. })
+        ));
+    }
+
+    #[test]
+    fn report_replay_rejects_changed_prediction_or_reference_input() {
+        let beats = [0.0, 0.5, 1.0];
+        let prediction = prediction(&beats, &[]);
+        let references = [reference("a", None, &beats, &[])];
+        let report = evaluate_beat_grid_v1(
+            &prediction,
+            &references,
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        assert!(validate_beat_grid_evaluation_report_v1(
+            &report,
+            &prediction,
+            &references
+        )
+        .is_ok());
+        let changed_prediction = prediction(&[0.0, 0.51, 1.0], &[]);
+        assert_eq!(
+            validate_beat_grid_evaluation_report_v1(
+                &report,
+                &changed_prediction,
+                &references
+            )
+            .unwrap_err(),
+            BeatGridEvaluationIssueV1::ReportInputMismatch
+        );
+    }
+
+    #[test]
+    fn empty_prediction_is_a_valid_zero_score_not_a_parser_error() {
+        let reference = [0.0, 0.5, 1.0];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&[], &[]),
+            &[reference("a", None, &reference, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        assert_eq!(report.reference_scores[0].beat_f_measure.f1, 0.0);
+        assert_eq!(report.reference_scores[0].beat_f_measure.false_negatives, 3);
+    }
+}
