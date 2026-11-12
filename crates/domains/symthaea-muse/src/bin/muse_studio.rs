@@ -5622,3 +5622,63 @@ mod compose_bars_contract_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod notation_summary_tests {
+    use super::summarize_imported_notation_structure;
+    use symthaea_muse::symbolic_import::ImportedNotationStructureV1;
+    use symthaea_muse_protocol::ImportedNotationStructureSummary;
+
+    #[test]
+    fn musicxml_graph_summary_commits_the_persisted_sidecar() {
+        let xml = br#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+                <note><rest/><duration>16</duration></note>
+                <barline location="right" id="bar-1"><repeat direction="backward" times="2"/></barline>
+            </measure>
+        </part></score-partwise>"#;
+        let source_sha256 = symthaea_muse::evidence_digest::sha256_hex(xml);
+        let graphs = symthaea_muse::musicxml_barline_adapter::parse_musicxml_part_notation_graph(
+            xml,
+            &format!("sha256:{source_sha256}"),
+            "test-score-clock",
+        ).unwrap();
+        let (summary, sidecar) = summarize_imported_notation_structure(
+            &source_sha256,
+            ImportedNotationStructureV1::MusicXmlPartGraphs(graphs),
+        ).unwrap();
+        assert_eq!(summary.status, "supported");
+        assert_eq!(summary.part_count, 1);
+        assert_eq!(summary.supported_part_count, 1);
+        assert_eq!(summary.unknown_part_count, 0);
+        assert_eq!(summary.measure_count, 1);
+        assert_eq!(summary.barline_event_count, 1);
+        assert_eq!(summary.source_sha256, source_sha256);
+        let sidecar = sidecar.expect("MusicXML graph must be persisted");
+        let decoded: Vec<symthaea_muse::musicxml_barline_adapter::MusicXmlPartNotationGraphV1> =
+            serde_json::from_slice(&sidecar).unwrap();
+        let digest = symthaea_muse::evidence_digest::canonical_json_sha256(&decoded).unwrap();
+        assert_eq!(summary.graph_sha256.as_deref(), Some(digest.as_str()));
+    }
+
+    #[test]
+    fn unknown_structure_has_a_summary_but_no_graph_sidecar() {
+        let source_sha256 = "a".repeat(64);
+        let (summary, sidecar): (
+            ImportedNotationStructureSummary,
+            Option<Vec<u8>>,
+        ) = summarize_imported_notation_structure(
+            &source_sha256,
+            ImportedNotationStructureV1::Unknown {
+                reason: "MIDI requires an explicit barline sidecar".into(),
+            },
+        ).unwrap();
+        assert_eq!(summary.status, "unknown");
+        assert_eq!(summary.source_sha256, source_sha256);
+        assert!(summary.graph_sha256.is_none());
+        assert!(sidecar.is_none());
+        assert!(summary.explanation.unwrap().contains("barline sidecar"));
+    }
+}
+
