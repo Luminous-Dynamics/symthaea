@@ -347,7 +347,10 @@ fn validate_lifetime_status(
                     cell.cell_id
                 )));
             }
-            if cell.event_cycle.is_some_and(|cycle| cycle == 0 || cycle > cell.cycles_observed) {
+            if cell
+                .event_cycle
+                .is_some_and(|cycle| cycle == 0 || cycle > cell.cycles_observed)
+            {
                 return Err(AuditError(format!(
                     "synthetic event for cell {} is outside observed cycles",
                     cell.cell_id
@@ -378,7 +381,9 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         ));
     }
     if manifest.arms.is_empty() || manifest.cells.is_empty() {
-        return Err(AuditError("campaign requires protocol arms and cell observations".into()));
+        return Err(AuditError(
+            "campaign requires protocol arms and cell observations".into(),
+        ));
     }
 
     let registry = evidence_registry(&manifest.evidence)?;
@@ -397,14 +402,8 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         BTreeMap::new();
     let mut design_charge_policies: BTreeMap<(String, String), BTreeSet<(String, String)>> =
         BTreeMap::new();
-    let mut design_combinations: BTreeSet<(
-        String,
-        String,
-        String,
-        String,
-        String,
-        String,
-    )> = BTreeSet::new();
+    let mut design_combinations: BTreeSet<(String, String, String, String, String, String)> =
+        BTreeSet::new();
     let mut formation_profiles = BTreeSet::new();
     let mut charge_policies = BTreeSet::new();
 
@@ -415,7 +414,10 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
             (arm.formation_profile_id.as_str(), "formation profile ID"),
             (arm.formation_revision.as_str(), "formation revision"),
             (arm.charge_policy_id.as_str(), "charge policy ID"),
-            (arm.charge_policy_revision.as_str(), "charge policy revision"),
+            (
+                arm.charge_policy_revision.as_str(),
+                "charge policy revision",
+            ),
         ] {
             require_nonempty(value, label)?;
         }
@@ -542,12 +544,15 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         maximum_observed_feature_cutoff_cycle =
             maximum_observed_feature_cutoff_cycle.max(cell.feature_cutoff_cycle);
 
-        let arm = arms_by_id.get(cell.arm_id.as_str()).copied().ok_or_else(|| {
-            AuditError(format!(
-                "cell {} references unknown protocol arm {}",
-                cell.cell_id, cell.arm_id
-            ))
-        })?;
+        let arm = arms_by_id
+            .get(cell.arm_id.as_str())
+            .copied()
+            .ok_or_else(|| {
+                AuditError(format!(
+                    "cell {} references unknown protocol arm {}",
+                    cell.cell_id, cell.arm_id
+                ))
+            })?;
         if cell.design_id != arm.design_id || cell.design_revision != arm.design_revision {
             return Err(AuditError(format!(
                 "cell {} design identity differs from its protocol arm",
