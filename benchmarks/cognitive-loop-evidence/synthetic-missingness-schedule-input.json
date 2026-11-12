@@ -1,0 +1,534 @@
+{
+  "schema_version": 1,
+  "run_id": "synthetic-mnar-heavy-tail-not-measured",
+  "dataset_id": "synthetic-outcome-delay-fixture-not-measured",
+  "scenario_id": "mnar-high-loss-heavy-tail-explicit-notice",
+  "seed": 481516,
+  "evaluation_horizon_tick": 80,
+  "config": {
+    "mechanism": "mnar_high_loss",
+    "base_missing_probability": 0.05,
+    "missing_probability_slope": 0.9,
+    "declaration_mode": "explicit",
+    "declaration_delay_ticks": 2,
+    "delay": {
+      "kind": "heavy_tailed_capped",
+      "scale_ticks": 2,
+      "cap_ticks": 40
+    }
+  },
+  "events": [
+    {
+      "event_id": "event-000",
+      "decision_tick": 0,
+      "hidden_loss": 0,
+      "observed_covariate": 0,
+      "prediction_error_signal": 0,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-001",
+      "decision_tick": 1,
+      "hidden_loss": 0.1,
+      "observed_covariate": 0.583,
+      "prediction_error_signal": 0.313,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-002",
+      "decision_tick": 2,
+      "hidden_loss": 0.2,
+      "observed_covariate": 0.083,
+      "prediction_error_signal": 0.625,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-003",
+      "decision_tick": 3,
+      "hidden_loss": 0.3,
+      "observed_covariate": 0.667,
+      "prediction_error_signal": 0.938,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-004",
+      "decision_tick": 4,
+      "hidden_loss": 0.4,
+      "observed_covariate": 0.167,
+      "prediction_error_signal": 0.188,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-005",
+      "decision_tick": 5,
+      "hidden_loss": 0.5,
+      "observed_covariate": 0.75,
+      "prediction_error_signal": 0.5,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-006",
+      "decision_tick": 6,
+      "hidden_loss": 0.6,
+      "observed_covariate": 0.25,
+      "prediction_error_signal": 0.813,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-007",
+      "decision_tick": 7,
+      "hidden_loss": 0.7,
+      "observed_covariate": 0.833,
+      "prediction_error_signal": 0.063,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-008",
+      "decision_tick": 8,
+      "hidden_loss": 0.8,
+      "observed_covariate": 0.333,
+      "prediction_error_signal": 0.375,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-009",
+      "decision_tick": 9,
+      "hidden_loss": 0.9,
+      "observed_covariate": 0.917,
+      "prediction_error_signal": 0.688,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-010",
+      "decision_tick": 10,
+      "hidden_loss": 1,
+      "observed_covariate": 0.417,
+      "prediction_error_signal": 1,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-011",
+      "decision_tick": 11,
+      "hidden_loss": 0,
+      "observed_covariate": 1,
+      "prediction_error_signal": 0.25,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-012",
+      "decision_tick": 12,
+      "hidden_loss": 0.1,
+      "observed_covariate": 0.5,
+      "prediction_error_signal": 0.563,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-013",
+      "decision_tick": 13,
+      "hidden_loss": 0.2,
+      "observed_covariate": 0,
+      "prediction_error_signal": 0.875,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-014",
+      "decision_tick": 14,
+      "hidden_loss": 0.3,
+      "observed_covariate": 0.583,
+      "prediction_error_signal": 0.125,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-015",
+      "decision_tick": 15,
+      "hidden_loss": 0.4,
+      "observed_covariate": 0.083,
+      "prediction_error_signal": 0.438,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-016",
+      "decision_tick": 16,
+      "hidden_loss": 0.5,
+      "observed_covariate": 0.667,
+      "prediction_error_signal": 0.75,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-017",
+      "decision_tick": 17,
+      "hidden_loss": 0.6,
+      "observed_covariate": 0.167,
+      "prediction_error_signal": 0,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-018",
+      "decision_tick": 18,
+      "hidden_loss": 0.7,
+      "observed_covariate": 0.75,
+      "prediction_error_signal": 0.313,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-019",
+      "decision_tick": 19,
+      "hidden_loss": 0.8,
+      "observed_covariate": 0.25,
+      "prediction_error_signal": 0.625,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-020",
+      "decision_tick": 20,
+      "hidden_loss": 0.9,
+      "observed_covariate": 0.833,
+      "prediction_error_signal": 0.938,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-021",
+      "decision_tick": 21,
+      "hidden_loss": 1,
+      "observed_covariate": 0.333,
+      "prediction_error_signal": 0.188,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-022",
+      "decision_tick": 22,
+      "hidden_loss": 0,
+      "observed_covariate": 0.917,
+      "prediction_error_signal": 0.5,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-023",
+      "decision_tick": 23,
+      "hidden_loss": 0.1,
+      "observed_covariate": 0.417,
+      "prediction_error_signal": 0.813,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-024",
+      "decision_tick": 24,
+      "hidden_loss": 0.2,
+      "observed_covariate": 1,
+      "prediction_error_signal": 0.063,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-025",
+      "decision_tick": 25,
+      "hidden_loss": 0.3,
+      "observed_covariate": 0.5,
+      "prediction_error_signal": 0.375,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-026",
+      "decision_tick": 26,
+      "hidden_loss": 0.4,
+      "observed_covariate": 0,
+      "prediction_error_signal": 0.688,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-027",
+      "decision_tick": 27,
+      "hidden_loss": 0.5,
+      "observed_covariate": 0.583,
+      "prediction_error_signal": 1,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-028",
+      "decision_tick": 28,
+      "hidden_loss": 0.6,
+      "observed_covariate": 0.083,
+      "prediction_error_signal": 0.25,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-029",
+      "decision_tick": 29,
+      "hidden_loss": 0.7,
+      "observed_covariate": 0.667,
+      "prediction_error_signal": 0.563,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-030",
+      "decision_tick": 30,
+      "hidden_loss": 0.8,
+      "observed_covariate": 0.167,
+      "prediction_error_signal": 0.875,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-031",
+      "decision_tick": 31,
+      "hidden_loss": 0.9,
+      "observed_covariate": 0.75,
+      "prediction_error_signal": 0.125,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-032",
+      "decision_tick": 32,
+      "hidden_loss": 1,
+      "observed_covariate": 0.25,
+      "prediction_error_signal": 0.438,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-033",
+      "decision_tick": 33,
+      "hidden_loss": 0,
+      "observed_covariate": 0.833,
+      "prediction_error_signal": 0.75,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-034",
+      "decision_tick": 34,
+      "hidden_loss": 0.1,
+      "observed_covariate": 0.333,
+      "prediction_error_signal": 0,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-035",
+      "decision_tick": 35,
+      "hidden_loss": 0.2,
+      "observed_covariate": 0.917,
+      "prediction_error_signal": 0.313,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-036",
+      "decision_tick": 36,
+      "hidden_loss": 0.3,
+      "observed_covariate": 0.417,
+      "prediction_error_signal": 0.625,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-037",
+      "decision_tick": 37,
+      "hidden_loss": 0.4,
+      "observed_covariate": 1,
+      "prediction_error_signal": 0.938,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-038",
+      "decision_tick": 38,
+      "hidden_loss": 0.5,
+      "observed_covariate": 0.5,
+      "prediction_error_signal": 0.188,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-039",
+      "decision_tick": 39,
+      "hidden_loss": 0.6,
+      "observed_covariate": 0,
+      "prediction_error_signal": 0.5,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-040",
+      "decision_tick": 40,
+      "hidden_loss": 0.7,
+      "observed_covariate": 0.583,
+      "prediction_error_signal": 0.813,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-041",
+      "decision_tick": 41,
+      "hidden_loss": 0.8,
+      "observed_covariate": 0.083,
+      "prediction_error_signal": 0.063,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-042",
+      "decision_tick": 42,
+      "hidden_loss": 0.9,
+      "observed_covariate": 0.667,
+      "prediction_error_signal": 0.375,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-043",
+      "decision_tick": 43,
+      "hidden_loss": 1,
+      "observed_covariate": 0.167,
+      "prediction_error_signal": 0.688,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-044",
+      "decision_tick": 44,
+      "hidden_loss": 0,
+      "observed_covariate": 0.75,
+      "prediction_error_signal": 1,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-045",
+      "decision_tick": 45,
+      "hidden_loss": 0.1,
+      "observed_covariate": 0.25,
+      "prediction_error_signal": 0.25,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-046",
+      "decision_tick": 46,
+      "hidden_loss": 0.2,
+      "observed_covariate": 0.833,
+      "prediction_error_signal": 0.563,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-047",
+      "decision_tick": 47,
+      "hidden_loss": 0.3,
+      "observed_covariate": 0.333,
+      "prediction_error_signal": 0.875,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-048",
+      "decision_tick": 48,
+      "hidden_loss": 0.4,
+      "observed_covariate": 0.917,
+      "prediction_error_signal": 0.125,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-049",
+      "decision_tick": 49,
+      "hidden_loss": 0.5,
+      "observed_covariate": 0.417,
+      "prediction_error_signal": 0.438,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-050",
+      "decision_tick": 50,
+      "hidden_loss": 0.6,
+      "observed_covariate": 1,
+      "prediction_error_signal": 0.75,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-051",
+      "decision_tick": 51,
+      "hidden_loss": 0.7,
+      "observed_covariate": 0.5,
+      "prediction_error_signal": 0,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-052",
+      "decision_tick": 52,
+      "hidden_loss": 0.8,
+      "observed_covariate": 0,
+      "prediction_error_signal": 0.313,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-053",
+      "decision_tick": 53,
+      "hidden_loss": 0.9,
+      "observed_covariate": 0.583,
+      "prediction_error_signal": 0.625,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-054",
+      "decision_tick": 54,
+      "hidden_loss": 1,
+      "observed_covariate": 0.083,
+      "prediction_error_signal": 0.938,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-055",
+      "decision_tick": 55,
+      "hidden_loss": 0,
+      "observed_covariate": 0.667,
+      "prediction_error_signal": 0.188,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-056",
+      "decision_tick": 56,
+      "hidden_loss": 0.1,
+      "observed_covariate": 0.167,
+      "prediction_error_signal": 0.5,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-057",
+      "decision_tick": 57,
+      "hidden_loss": 0.2,
+      "observed_covariate": 0.75,
+      "prediction_error_signal": 0.813,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-058",
+      "decision_tick": 58,
+      "hidden_loss": 0.3,
+      "observed_covariate": 0.25,
+      "prediction_error_signal": 0.063,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-059",
+      "decision_tick": 59,
+      "hidden_loss": 0.4,
+      "observed_covariate": 0.833,
+      "prediction_error_signal": 0.375,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-060",
+      "decision_tick": 60,
+      "hidden_loss": 0.5,
+      "observed_covariate": 0.333,
+      "prediction_error_signal": 0.688,
+      "action_taken": true
+    },
+    {
+      "event_id": "event-061",
+      "decision_tick": 61,
+      "hidden_loss": 0.6,
+      "observed_covariate": 0.917,
+      "prediction_error_signal": 1,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-062",
+      "decision_tick": 62,
+      "hidden_loss": 0.7,
+      "observed_covariate": 0.417,
+      "prediction_error_signal": 0.25,
+      "action_taken": false
+    },
+    {
+      "event_id": "event-063",
+      "decision_tick": 63,
+      "hidden_loss": 0.8,
+      "observed_covariate": 1,
+      "prediction_error_signal": 0.563,
+      "action_taken": true
+    }
+  ]
+}
