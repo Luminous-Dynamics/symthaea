@@ -284,6 +284,10 @@ pub struct ComparisonReport {
     pub candidate_critical_safety_violations: u64,
     /// Number of clusters with a critical safety regression.
     pub critical_safety_regression_clusters: u16,
+    /// Lower median of qualified independent-cluster safe-success deltas in PPM.
+    pub median_delta_lower_ppm: Option<i64>,
+    /// Upper median of qualified independent-cluster safe-success deltas in PPM.
+    pub median_delta_upper_ppm: Option<i64>,
     /// Exact sign-test result over independent cluster differences.
     pub sign_test: ExactSignTest,
     /// Per-cluster descriptive results in canonical cluster-ID order.
@@ -459,6 +463,7 @@ pub fn compare_paired_clusters(
     let mut negative = 0_u16;
     let mut ties = 0_u16;
     let mut qualified_independent = 0_u16;
+    let mut qualified_deltas = Vec::new();
     let mut unknown_independence = false;
     let mut rejected_independence = false;
     let mut unknown_outcomes = false;
@@ -499,7 +504,10 @@ pub fn compare_paired_clusters(
         }
 
         match cluster.independence_disposition {
-            EvidenceDisposition::Qualified => qualified_independent += 1,
+            EvidenceDisposition::Qualified => {
+                qualified_independent += 1;
+                qualified_deltas.push(delta);
+            }
             EvidenceDisposition::Unknown => unknown_independence = true,
             EvidenceDisposition::Rejected => rejected_independence = true,
         }
@@ -579,6 +587,17 @@ pub fn compare_paired_clusters(
     }
 
     results.sort_by(|left, right| left.cluster_id.cmp(&right.cluster_id));
+    qualified_deltas.sort_unstable();
+    let median_delta_lower_ppm = if qualified_deltas.is_empty() {
+        None
+    } else {
+        Some(qualified_deltas[(qualified_deltas.len() - 1) / 2])
+    };
+    let median_delta_upper_ppm = if qualified_deltas.is_empty() {
+        None
+    } else {
+        Some(qualified_deltas[qualified_deltas.len() / 2])
+    };
     let sign_test = exact_sign_test(positive, negative, ties, adjusted_alpha_ppm)?;
     let disposition = if rejected_independence {
         ComparisonDisposition::Rejected
@@ -614,6 +633,8 @@ pub fn compare_paired_clusters(
         baseline_critical_safety_violations: baseline_critical_violations,
         candidate_critical_safety_violations: candidate_critical_violations,
         critical_safety_regression_clusters: safety_regressions,
+        median_delta_lower_ppm,
+        median_delta_upper_ppm,
         sign_test,
         clusters: results,
         actuation_authorized: false,
@@ -718,6 +739,8 @@ mod tests {
         assert_eq!(report.total_paired_episodes, 80);
         assert_eq!(report.total_control_ticks, 160_000);
         assert!(report.sign_test.significant);
+        assert_eq!(report.median_delta_lower_ppm, Some(300_000));
+        assert_eq!(report.median_delta_upper_ppm, Some(300_000));
         assert!(!report.actuation_authorized);
     }
 
