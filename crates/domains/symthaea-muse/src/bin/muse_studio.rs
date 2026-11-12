@@ -106,6 +106,7 @@ const COMPOSE_BARS_RANGE: std::ops::RangeInclusive<usize> = 2..=36;
 const NOVELTY_FLOOR: f64 = 0.5;
 const IMPORT_ROOT: &str = "data/music/imports";
 const MAX_SYMBOLIC_IMPORT_BYTES: usize = 12 * 1024 * 1024;
+const MAX_SYMBOLIC_MEASURE_SIDECAR_BYTES: usize = 2 * 1024 * 1024;
 
 /// A per-process, monotonically increasing nonce for temp file/dir names
 /// that must not collide across concurrently-running `spawn_blocking`
@@ -984,7 +985,9 @@ async fn main() {
         .route("/api/compose", post(compose))
         .route(
             "/api/music/import",
-            post(import_music).layer(DefaultBodyLimit::max(MAX_SYMBOLIC_IMPORT_BYTES + 64 * 1024)),
+            post(import_music).layer(DefaultBodyLimit::max(
+                MAX_SYMBOLIC_IMPORT_BYTES + MAX_SYMBOLIC_MEASURE_SIDECAR_BYTES + 64 * 1024,
+            )),
         )
         .route("/api/music/imports", get(imported_works))
         .route("/api/music/import/{id}", get(imported_work))
@@ -2413,14 +2416,20 @@ async fn import_music(
             }
             upload = Some((filename, bytes.to_vec()));
         } else if name == "measure_sidecar" {
+            if measure_sidecar.is_some() {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "only one measure_sidecar field is allowed".to_owned(),
+                ));
+            }
             let bytes = field
                 .bytes()
                 .await
                 .map_err(|error| (StatusCode::BAD_REQUEST, error.to_string()))?;
-            if bytes.len() > MAX_SYMBOLIC_IMPORT_BYTES {
+            if bytes.len() > MAX_SYMBOLIC_MEASURE_SIDECAR_BYTES {
                 return Err((
                     StatusCode::PAYLOAD_TOO_LARGE,
-                    "MIDI measure sidecar exceeds 12 MiB".to_owned(),
+                    "MIDI measure sidecar exceeds 2 MiB".to_owned(),
                 ));
             }
             measure_sidecar = Some(bytes.to_vec());
@@ -2919,8 +2928,14 @@ async fn imported_work_midi_measure_maps(
     let actual_digest =
         symthaea_muse::midi_measure_sidecar::midi_measure_sidecar_commitment(&receipt)
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let raw_sidecar = std::fs::read(
+        Path::new(IMPORT_ROOT).join(&id).join("midi-measure-sidecar.json"),
+    )
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let raw_sidecar_sha256 = sha256_hex(&raw_sidecar);
     if actual_digest.as_str() != expected_digest
         || receipt.midi_sha256 != summary.manifest.source_sha256
+        || receipt.sidecar_sha256 != raw_sidecar_sha256
     {
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
