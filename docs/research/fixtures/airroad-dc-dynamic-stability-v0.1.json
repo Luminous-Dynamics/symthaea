@@ -1,0 +1,207 @@
+{
+  "schema": "luminous.airroad.dc_dynamic_stability.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_analytical_reference",
+  "model": {
+    "name": "thevenin_source_constant_power_load_dc_link",
+    "equation": "C*dV_dt = (Vs - V)/Rs - P/V",
+    "parameters": {
+      "Vs": {
+        "value": "100",
+        "unit": "V",
+        "exact_rational": {
+          "numerator": "100",
+          "denominator": "1"
+        }
+      },
+      "Rs": {
+        "value": "1",
+        "unit": "ohm",
+        "exact_rational": {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      },
+      "C": {
+        "value": "0.01",
+        "unit": "F",
+        "exact_rational": {
+          "numerator": "1",
+          "denominator": "100"
+        }
+      }
+    },
+    "load_law": "ideal_constant_power",
+    "voltage_domain": {
+      "lower_bound": "0",
+      "lower_bound_exclusive": true,
+      "unit": "V"
+    }
+  },
+  "equations": {
+    "equilibrium_polynomial": "V^2 - Vs*V + Rs*P = 0",
+    "discriminant": "Vs^2 - 4*Rs*P",
+    "eigenvalue": "(1/C)*(-1/Rs + P/(V_star^2))",
+    "classification": {
+      "two_distinct_positive_roots": "higher_voltage_root_locally_asymptotically_stable_lower_voltage_root_unstable",
+      "repeated_root": "non_hyperbolic_fold_semistable_from_above_repelling_from_below",
+      "negative_discriminant": "no_real_equilibrium_non_pass"
+    }
+  },
+  "cases": [
+    {
+      "id": "stable-and-unstable-roots",
+      "P": {
+        "value": "1875",
+        "unit": "W",
+        "exact_rational": {
+          "numerator": "1875",
+          "denominator": "1"
+        }
+      },
+      "delta": {
+        "value": "2500",
+        "unit": "V^2",
+        "exact_rational": {
+          "numerator": "2500",
+          "denominator": "1"
+        }
+      },
+      "roots": [
+        {
+          "voltage": "75",
+          "unit": "V",
+          "current": "25",
+          "current_unit": "A",
+          "eigenvalue": {
+            "numerator": "-200",
+            "denominator": "3",
+            "unit": "s^-1"
+          },
+          "classification": "locally_asymptotically_stable"
+        },
+        {
+          "voltage": "25",
+          "unit": "V",
+          "current": "75",
+          "current_unit": "A",
+          "eigenvalue": {
+            "numerator": "200",
+            "denominator": "1",
+            "unit": "s^-1"
+          },
+          "classification": "unstable"
+        }
+      ],
+      "disposition": "two_equilibria"
+    },
+    {
+      "id": "near-fold-two-roots",
+      "P": {
+        "value": "2499",
+        "unit": "W",
+        "exact_rational": {
+          "numerator": "2499",
+          "denominator": "1"
+        }
+      },
+      "delta": {
+        "value": "4",
+        "unit": "V^2",
+        "exact_rational": {
+          "numerator": "4",
+          "denominator": "1"
+        }
+      },
+      "roots": [
+        {
+          "voltage": "51",
+          "unit": "V",
+          "current": "49",
+          "current_unit": "A",
+          "eigenvalue": {
+            "numerator": "-200",
+            "denominator": "51",
+            "unit": "s^-1"
+          },
+          "classification": "locally_asymptotically_stable"
+        },
+        {
+          "voltage": "49",
+          "unit": "V",
+          "current": "51",
+          "current_unit": "A",
+          "eigenvalue": {
+            "numerator": "200",
+            "denominator": "49",
+            "unit": "s^-1"
+          },
+          "classification": "unstable"
+        }
+      ],
+      "disposition": "two_equilibria"
+    },
+    {
+      "id": "critical-fold",
+      "P": {
+        "value": "2500",
+        "unit": "W",
+        "exact_rational": {
+          "numerator": "2500",
+          "denominator": "1"
+        }
+      },
+      "delta": {
+        "value": "0",
+        "unit": "V^2",
+        "exact_rational": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "roots": [
+        {
+          "voltage": "50",
+          "unit": "V",
+          "current": "50",
+          "current_unit": "A",
+          "eigenvalue": {
+            "numerator": "0",
+            "denominator": "1",
+            "unit": "s^-1"
+          },
+          "classification": "non_hyperbolic_semistable_from_above_repelling_from_below"
+        }
+      ],
+      "disposition": "critical_fold_non_pass"
+    },
+    {
+      "id": "no-equilibrium",
+      "P": {
+        "value": "2501",
+        "unit": "W",
+        "exact_rational": {
+          "numerator": "2501",
+          "denominator": "1"
+        }
+      },
+      "delta": {
+        "value": "-4",
+        "unit": "V^2",
+        "exact_rational": {
+          "numerator": "-4",
+          "denominator": "1"
+        }
+      },
+      "roots": [],
+      "disposition": "no_equilibrium_non_pass"
+    }
+  ],
+  "limitations": [
+    "No source inductance or distributed feeder model.",
+    "No converter control-loop or switching model.",
+    "No battery electrochemistry or temperature dependence.",
+    "No protection, contactor, fault-current or isolation dynamics.",
+    "No physical or flight validation."
+  ]
+}
