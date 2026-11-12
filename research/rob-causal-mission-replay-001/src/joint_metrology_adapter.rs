@@ -948,7 +948,6 @@ mod tests {
         assert_eq!(report.disposition, QualificationDisposition::Unknown);
     }
 
-
     #[test]
     fn sensor_policy_and_hardware_configuration_receipts_must_bind_exactly() {
         let mut sensor = valid_evidence();
