@@ -1837,6 +1837,43 @@
       },
       "interpretation": "This derives charged-product energy share from the source's simplified fuel-mixture model. It is not a direct-conversion efficiency, particle collection fraction, fusion gain or net plant electricity. The model's higher D-He3 temperature/density, side reactions and omitted stability/ignition physics remain separate constraints.",
       "luminous_measurement": false
+    },
+    {
+      "check_id": "GAPS-DISCHARGE-ONLY-EEO-RECONSTRUCTION-2026",
+      "source_case_id": "PLASMA-AIR-DBD-GAPS-2026",
+      "evidence_class": "DERIVED_ARITHMETIC_FROM_PUBLISHED_AIR_DBD_OPERATING_POINT",
+      "inputs": {
+        "average_discharge_power_W": 0.65,
+        "compressed_air_flow_L_per_min": 12.5,
+        "airflow_m3_per_hour": 0.75,
+        "reported_log10_reduction": 4.5,
+        "power_basis": "DISCHARGE_TERMINAL_ONLY"
+      },
+      "derivation": {
+        "discharge_input_kW": 0.00065,
+        "airflow_m3_per_hour": 0.75,
+        "calculated_EEO_kWh_per_m3_per_order": 0.0001925925925925926,
+        "reported_EEO_kWh_per_m3_per_order": 0.0002,
+        "relative_difference_from_rounded_report_percent": 3.703703703703697
+      },
+      "interpretation": "This independent arithmetic reproduces the paper's rounded 2×10^-4 kWh m^-3 order^-1 value from the stated 0.65 W discharge power, 12.5 L/min airflow and 4.5-log result. It is not wall-plug EEO: the paper's calculation excludes power-supply losses, and the comparison still needs the energy/pressure penalty of downstream ozone abatement. The calculation also uses an up-to single-pass log-reduction result, not a guaranteed operating average.",
+      "luminous_measurement": false
+    },
+    {
+      "check_id": "PLASMA-WATER-REVIEW-MEDIAN-EEO-RATIOS-2026",
+      "source_case_id": "PLASMA-WATER-AOP-EEO-CROSSSTUDY-REVIEW-2026",
+      "evidence_class": "DERIVED_ARITHMETIC_FROM_REVIEW_LEVEL_CROSS_STUDY_MEDIANS",
+      "inputs": {
+        "plasma_median_EEO_kWh_per_m3_per_order": 3.3,
+        "ozonation_median_EEO_kWh_per_m3_per_order": 0.15,
+        "UV_H2O2_median_EEO_kWh_per_m3_per_order": 0.7
+      },
+      "derivation": {
+        "plasma_to_ozonation_median_ratio": 22,
+        "plasma_to_UV_H2O2_median_ratio": 4.714285714285714
+      },
+      "interpretation": "Ratios are derived from the review's cross-study medians only. They are a screening warning, not a matched comparison: compounds, matrices, reactor boundaries, treatment goals and auxiliary-energy accounting may differ. No device superiority conclusion is admitted from these ratios.",
+      "luminous_measurement": false
     }
   ]
 }
