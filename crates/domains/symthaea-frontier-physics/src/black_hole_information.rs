@@ -2497,7 +2497,8 @@ pub fn analyze_u1_hydrodynamic_scrambling(
 ) -> Result<U1HydrodynamicScramblingAnalysis, QuantumInformationError> {
     let number_of_qubits = domain_wall.number_of_qubits;
     let total_excitations = domain_wall.initial_left_excitations;
-    let source_qubit = operator_depths.first()
+    let source_qubit = operator_depths
+        .first()
         .map(|sample| sample.source_qubit)
         .ok_or(QuantumInformationError::InvalidHydrodynamicFit {
             observable: "operator_depths",
@@ -2547,7 +2548,8 @@ pub fn analyze_u1_hydrodynamic_scrambling(
                 actual: profile.len(),
             });
         }
-        let gradient_weights = profile.windows(2)
+        let gradient_weights = profile
+            .windows(2)
             .map(|pair| (pair[1] - pair[0]).abs())
             .collect::<Vec<_>>();
         let total_weight: f64 = gradient_weights.iter().sum();
@@ -2556,12 +2558,18 @@ pub fn analyze_u1_hydrodynamic_scrambling(
                 observable: "density_gradient_variance",
             });
         }
-        let centroid = gradient_weights.iter().enumerate()
+        let centroid = gradient_weights
+            .iter()
+            .enumerate()
             .map(|(bond, weight)| (bond as f64 + 0.5) * weight)
-            .sum::<f64>() / total_weight;
-        let variance = gradient_weights.iter().enumerate()
+            .sum::<f64>()
+            / total_weight;
+        let variance = gradient_weights
+            .iter()
+            .enumerate()
             .map(|(bond, weight)| weight * ((bond as f64 + 0.5) - centroid).powi(2))
-            .sum::<f64>() / total_weight;
+            .sum::<f64>()
+            / total_weight;
         widths.push((layer as f64, variance));
     }
     let charge_diffusion_width_fit = fit_line(&widths, "charge_diffusion_width")?;
@@ -2617,9 +2625,10 @@ pub fn analyze_u1_hydrodynamic_scrambling(
             });
         }
         previous_depth = Some(sample.depth);
-        if operator_sample_count.replace(sample.sample_count).is_some_and(|count| {
-            count != sample.sample_count
-        }) {
+        if operator_sample_count
+            .replace(sample.sample_count)
+            .is_some_and(|count| count != sample.sample_count)
+        {
             return Err(QuantumInformationError::InvalidHydrodynamicFit {
                 observable: "operator_sample_count_consistency",
             });
@@ -2674,13 +2683,19 @@ pub fn analyze_u1_hydrodynamic_scrambling(
         left_operator_front_fit,
         right_operator_front_fit,
         operator_front_positions,
-        maximum_domain_wall_continuity_residual: domain_wall.layers.iter()
+        maximum_domain_wall_continuity_residual: domain_wall
+            .layers
+            .iter()
             .map(|layer| layer.maximum_continuity_residual)
             .fold(0.0_f64, f64::max),
-        maximum_domain_wall_norm_drift: domain_wall.layers.iter()
+        maximum_domain_wall_norm_drift: domain_wall
+            .layers
+            .iter()
             .map(|layer| layer.maximum_norm_drift)
             .fold(0.0_f64, f64::max),
-        maximum_domain_wall_charge_drift: domain_wall.layers.iter()
+        maximum_domain_wall_charge_drift: domain_wall
+            .layers
+            .iter()
             .map(|layer| layer.maximum_charge_drift)
             .fold(0.0_f64, f64::max),
         maximum_operator_norm_drift,
@@ -2691,27 +2706,33 @@ fn fit_line(
     points: &[(f64, f64)],
     observable: &'static str,
 ) -> Result<U1LinearFit, QuantumInformationError> {
-    if points.len() < 2
-        || points.iter().any(|(x, y)| !x.is_finite() || !y.is_finite())
-    {
+    if points.len() < 2 || points.iter().any(|(x, y)| !x.is_finite() || !y.is_finite()) {
         return Err(QuantumInformationError::InvalidHydrodynamicFit { observable });
     }
     let count = points.len() as f64;
     let mean_x = points.iter().map(|point| point.0).sum::<f64>() / count;
     let mean_y = points.iter().map(|point| point.1).sum::<f64>() / count;
-    let covariance = points.iter()
+    let covariance = points
+        .iter()
         .map(|(x, y)| (x - mean_x) * (y - mean_y))
         .sum::<f64>();
-    let variance_x = points.iter().map(|(x, _)| (x - mean_x).powi(2)).sum::<f64>();
+    let variance_x = points
+        .iter()
+        .map(|(x, _)| (x - mean_x).powi(2))
+        .sum::<f64>();
     if variance_x <= 0.0 {
         return Err(QuantumInformationError::InvalidHydrodynamicFit { observable });
     }
     let slope = covariance / variance_x;
     let intercept = mean_y - slope * mean_x;
-    let residual_sum = points.iter()
+    let residual_sum = points
+        .iter()
         .map(|(x, y)| (y - (intercept + slope * x)).powi(2))
         .sum::<f64>();
-    let total_sum = points.iter().map(|(_, y)| (y - mean_y).powi(2)).sum::<f64>();
+    let total_sum = points
+        .iter()
+        .map(|(_, y)| (y - mean_y).powi(2))
+        .sum::<f64>();
     let r_squared = if total_sum <= 1e-24 {
         if residual_sum <= 1e-24 { 1.0 } else { 0.0 }
     } else {
