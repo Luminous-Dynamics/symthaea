@@ -33,6 +33,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         max_frame_bytes: 640 * 360 * 3,
         initial_dt_us: 33_333,
         maximum_frame_gap_us: 66_666,
+        maximum_observation_delivery_age_us: 5_000,
         maximum_sensor_clock_skew_us: 1_000,
         visual_weight_ppm: 500_000,
         vehicle_encoder_seed_phrase: "public-nonsecret-fresh-process-driving-fixture-seed-v0-1"
