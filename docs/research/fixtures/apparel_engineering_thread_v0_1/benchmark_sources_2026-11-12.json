@@ -35,10 +35,40 @@
       "known_limitations": [
         "two released garments have non-manifold meshes and are excluded from paper published baselines",
         "small real garment evaluation set",
-        "not a robotic sewing benchmark"
+        "not a robotic sewing benchmark",
+        "A separate RGBench garment-asset research subset is available in RGBench/garment_assets; its project-specific non-commercial research license is distinct from the CC-BY-4.0 capture dataset."
       ],
       "intended_use": "reproduce published bidirectional point-cloud simulation-to-reality metrics, then extend with task-weighted physical fidelity",
-      "redistribution_action": "verify exact file license and attribution; CC-BY-4.0 is stated on the current dataset card"
+      "redistribution_action": "verify exact file license and attribution; CC-BY-4.0 is stated on the current dataset card",
+      "companion_asset_dataset": {
+        "source_id": "RGBENCH-GARMENT-ASSETS-RESEARCH-SUBSET",
+        "dataset_url": "https://huggingface.co/datasets/RGBench/garment_assets",
+        "public_scope": {
+          "rows": 2794,
+          "classes": 504,
+          "approx_total_size_gb": 25.5,
+          "formats": [
+            "OBJ",
+            "Style3D"
+          ]
+        },
+        "license_status": "rgbeng_project_specific_non_commercial_research_license",
+        "measured_parameters_in_style3d": [
+          "stretch_stiffness",
+          "bending_stiffness",
+          "area_density",
+          "thickness"
+        ],
+        "limitations": [
+          "row count is not a verified count of unique garment designs",
+          "full 4000_plus industrial garment asset library remains restricted/contact-only",
+          "mesh and physical-parameter parsing/post-processing scripts are described as forthcoming",
+          "does not include the real RGBench evaluation captures",
+          "do not assume the capture dataset CC-BY-4.0 license applies to these assets"
+        ],
+        "intended_use": "non-commercial research subset for garment geometry/material parameter intake after license review",
+        "redistribution_action": "do not use commercially, redistribute or publish derivatives without reviewing and satisfying the project-specific license"
+      }
     },
     {
       "source_id": "NIST-NIR-SORT",
@@ -210,6 +240,44 @@
       ],
       "intended_use": "matched seam tracking and physical construction comparator",
       "redistribution_action": "cite the paper; do not assume supplementary experiment data is openly redistributable"
+    },
+    {
+      "source_id": "RGBENCH-GARMENT-ASSETS-RESEARCH-SUBSET",
+      "name": "RGBench Garment Assets — Research Subset",
+      "source_kind": "3d_garment_asset_research_dataset",
+      "dataset_url": "https://huggingface.co/datasets/RGBench/garment_assets",
+      "project_url": "https://github.com/hwk0809/RGBench",
+      "paper_url": "https://arxiv.org/abs/2511.06434",
+      "publication_date": "2026-11-12 repository/dataset page inspected",
+      "license_status": "rgbeng_project_specific_non_commercial_research_license",
+      "public_scope": {
+        "rows": 2794,
+        "classes": 504,
+        "approx_total_size_gb": 25.5,
+        "formats": [
+          "OBJ",
+          "Style3D"
+        ]
+      },
+      "measured_parameters_in_style3d": [
+        "stretch_stiffness",
+        "bending_stiffness",
+        "area_density",
+        "thickness"
+      ],
+      "related_capture_dataset": "RGBench/RGBench-Cloth-Sim2Real-v1",
+      "full_asset_library": {
+        "described_size": "4000+ models",
+        "access": "contact the authors for access/research collaboration and data licensing"
+      },
+      "known_limitations": [
+        "2,794 rows do not establish 2,794 unique garments",
+        "Style3D is required to inspect physical parameters carried inside native files",
+        "scripts for mesh/physical-parameter parsing and simulator post-processing are described as forthcoming",
+        "project-specific non-commercial research license is distinct from the capture dataset's CC-BY-4.0 license"
+      ],
+      "intended_use": "non-commercial parameter/geometry research subset; supplement, not replacement for the nine-garment real capture benchmark",
+      "redistribution_action": "no commercial use or redistribution without explicit license review/permission"
     }
   ],
   "split_policy": [
@@ -220,5 +288,5 @@
     "report source, instrument, material, garment and task strata rather than only one pooled mean"
   ],
   "cross_dataset_rule": "TexSortML visual garment-family labels are not fibre-composition labels. NIR-SORT composition observations are not garment-category labels. Fusion is permitted only with matched item identity, independent measurement provenance and explicit missing/unknown states.",
-  "claim_ceiling": "This source register is a research intake manifest. It does not prove that any dataset has been downloaded, parsed, reproduced, licensed for redistribution, or evaluated by Luminous Dynamics."
+  "claim_ceiling": "This source register is a research intake manifest. It does not prove that any dataset has been downloaded, parsed, reproduced, licensed for redistribution, or evaluated by Luminous Dynamics. The companion RGBench garment asset subset is separately licensed for non-commercial research; do not treat its rights as inherited from the CC-BY-4.0 capture set."
 }
