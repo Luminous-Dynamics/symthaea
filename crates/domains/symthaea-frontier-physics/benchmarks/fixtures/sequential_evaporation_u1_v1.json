@@ -1,6 +1,6 @@
 {
   "schema": "luminous.black_hole_information.sequential_evaporation_u1.v1",
-  "status": "authored_contract_not_executed",
+  "status": "product_state_initialization_and_32_seed_numpy_comparator_added; Rust source authored and Rust execution pending",
   "model": "finite-dimensional closed pure-state qubit chain with sequential tensor-factor emission",
   "claim_ceiling": "This is a U(1)-conserving quantum-circuit toy model. It is not Hawking radiation, a gravitational evaporation calculation, a Page-island derivation, or evidence for a four-dimensional black-hole information solution.",
   "conventions": {
@@ -14,11 +14,12 @@
     "entropy_units": "nats",
     "equal_gap_hamiltonian": "H = hbar*omega*sum_i |1><1|_i",
     "total_charge": "N = sum_i |1><1|_i",
-    "initial_state": "Haar-random pure state restricted to the exact Hamming-weight-k (fixed-N) subspace"
+    "initial_state": "seeded low-entanglement computational-basis product state in the exact Hamming-weight-K sector",
+    "initial_pattern": "For 0<K<N, qubit 0 is occupied, qubit 1 is empty, and K-1 occupied sites are seeded from qubits 2..N-1. K=0 and K=N are explicit trivial-sector controls."
   },
   "evolution": {
     "each_emission_step": [
-      "Apply a seeded Haar element of U(1) x U(2) x U(1) to the first two active black-hole qubits.",
+      "Apply a seeded Haar element of U(1) x U(2) x U(1) to the first two active black-hole factors.",
       "Move the first active tensor factor into the collected radiation register.",
       "Never apply any later gate to an emitted tensor factor."
     ],
@@ -35,7 +36,11 @@
     "radiation_and_remaining_register_purity",
     "emitted_qubit_identity_and_immutability",
     "two_qubit_gate_count",
-    "seed_reproducibility"
+    "seed_reproducibility",
+    "initial_excited_qubit_labels",
+    "initial_product_state_entropy",
+    "first_emission_entropy_growth",
+    "final_complete_radiation_purification"
   ],
   "reference_controls": [
     {
@@ -74,7 +79,81 @@
     "initial_excitations": 4,
     "seed_hex": "0xE_AA0",
     "status": "source_authored_rust_execution_pending",
-    "purpose": "finite-size sequential boundary-emission trajectory with charge conservation and independent B/R entropy comparison"
+    "purpose": "finite-size sequential boundary-emission trajectory with charge conservation and independent B/R entropy comparison",
+    "independent_numpy_comparator": {
+      "generator": "32 independent NumPy PRNG seeds; seeded random product-state occupancy and independent complex-Gaussian Gram-Schmidt U(2) gate construction. Not ChaCha20 bitwise Rust fixture.",
+      "sample_count": 32,
+      "first_seed_hex": "0xE_AA0",
+      "seed_schedule": "0xEAA0 + sample_index, sample_index 0..31",
+      "results": [
+        {
+          "emission_count": 0,
+          "mean_radiation_entropy_nats": 0,
+          "standard_error_nats": 0,
+          "min_nats": 0,
+          "max_nats": 0
+        },
+        {
+          "emission_count": 1,
+          "mean_radiation_entropy_nats": 0.5323730323354667,
+          "standard_error_nats": 0.032540734143632545,
+          "min_nats": 0.005359530433036107,
+          "max_nats": 0.6922755308452949
+        },
+        {
+          "emission_count": 2,
+          "mean_radiation_entropy_nats": 0.44032774490803495,
+          "standard_error_nats": 0.03636620874200684,
+          "min_nats": 0.010915474217097517,
+          "max_nats": 0.6929024379450199
+        },
+        {
+          "emission_count": 3,
+          "mean_radiation_entropy_nats": 0.4032874840495291,
+          "standard_error_nats": 0.0384667124204956,
+          "min_nats": 0.03491368026528051,
+          "max_nats": 0.6931471305897383
+        },
+        {
+          "emission_count": 4,
+          "mean_radiation_entropy_nats": 0.43529271436806877,
+          "standard_error_nats": 0.03802787118369539,
+          "min_nats": 0.0008504918338138173,
+          "max_nats": 0.691546586704639
+        },
+        {
+          "emission_count": 5,
+          "mean_radiation_entropy_nats": 0.4420827531818077,
+          "standard_error_nats": 0.03731158611264512,
+          "min_nats": 0.015523603832564204,
+          "max_nats": 0.6913340737792115
+        },
+        {
+          "emission_count": 6,
+          "mean_radiation_entropy_nats": 0.3953588180794906,
+          "standard_error_nats": 0.03658144280952179,
+          "min_nats": 0.014610086934874485,
+          "max_nats": 0.6929284422072931
+        },
+        {
+          "emission_count": 7,
+          "mean_radiation_entropy_nats": 0.4322606679272916,
+          "standard_error_nats": 0.04005585131002241,
+          "min_nats": 0.022122032272452706,
+          "max_nats": 0.6929719907574248
+        },
+        {
+          "emission_count": 8,
+          "mean_radiation_entropy_nats": 0,
+          "standard_error_nats": 0,
+          "min_nats": 0,
+          "max_nats": 0
+        }
+      ],
+      "max_observed_norm_drift": 4.440892098500626e-16,
+      "max_observed_charge_expectation_drift": 1.7763568394002505e-15,
+      "interpretation": "The low-entropy initial condition produces nonzero first-emission entanglement and full-register purification at the final cut. The one-boundary-gate-per-step conveyor has modest entropy in this N=8,K=4 sample; it is not a Haar-equilibrated scrambler. A deeper per-emission scrambler should be a separately declared model."
+    }
   },
   "resource_limits": {
     "maximum_total_qubits": 12,
@@ -86,7 +165,8 @@
     "apply a gate to a previously emitted radiation qubit",
     "prepare a state with support outside the declared excitation sector",
     "renormalize an evolved state after a deliberately non-unitary perturbation",
-    "report a Page-island or Hawking result from this circuit"
+    "report a Page-island or Hawking result from this circuit",
+    "seed_initial_state_in_Haar_fixed_charge_ensemble_when_claiming_low_entropy_initial_evaporation"
   ],
   "required_receipt": {
     "fields": [
@@ -104,7 +184,11 @@
       "S_B_by_step",
       "complementarity_residual_by_step",
       "runtime",
-      "peak_memory"
+      "peak_memory",
+      "initial_excited_qubit_labels",
+      "initial_radiation_entropy",
+      "first_emission_entropy",
+      "late_complete_radiation_entropy"
     ],
     "ci_policy": "queued, missing, or skipped checks are not passes"
   }
