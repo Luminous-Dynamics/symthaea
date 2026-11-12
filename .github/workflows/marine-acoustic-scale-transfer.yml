@@ -1,0 +1,40 @@
+name: Marine Acoustic Scale Transfer Audit
+
+on:
+  pull_request:
+    paths:
+      - "tools/marine-acoustic-scale-transfer-audit/**"
+      - "docs/research/marine/marine-acoustic-scale-transfer-v0.1.0.schema.json"
+      - "docs/research/marine/fixtures/synthetic-marine-acoustic-scale-transfer-v0.1.0.json"
+      - ".github/workflows/marine-acoustic-scale-transfer.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/marine-acoustic-scale-transfer-audit/**"
+      - "docs/research/marine/marine-acoustic-scale-transfer-v0.1.0.schema.json"
+      - "docs/research/marine/fixtures/synthetic-marine-acoustic-scale-transfer-v0.1.0.json"
+      - ".github/workflows/marine-acoustic-scale-transfer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Format, lint and known-answer tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/marine-acoustic-scale-transfer-audit/Cargo.toml -- --check
+      - name: Clippy
+        run: cargo clippy --manifest-path tools/marine-acoustic-scale-transfer-audit/Cargo.toml --all-targets -- -D warnings
+      - name: Run unit tests
+        run: cargo test --manifest-path tools/marine-acoustic-scale-transfer-audit/Cargo.toml
+      - name: Validate fixture JSON and schema JSON syntax
+        run: |
+          python3 -c "import json; json.load(open('docs/research/marine/marine-acoustic-scale-transfer-v0.1.0.schema.json')); json.load(open('docs/research/marine/fixtures/synthetic-marine-acoustic-scale-transfer-v0.1.0.json'))"
