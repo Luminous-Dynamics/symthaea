@@ -459,7 +459,8 @@
           "expanded_uncertainty": 0.003
         }
       }
-    ]
+    ],
+    "operating_point_receipt_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
   },
   "realized": {
     "field_id": "realized",
@@ -886,6 +887,7 @@
           "expanded_uncertainty": 0.003
         }
       }
-    ]
+    ],
+    "operating_point_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
   }
 }
