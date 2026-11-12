@@ -153,8 +153,7 @@ pub fn analyze(
     let a1 = -trace;
     let a2 = principal_minors;
     let a3 = -determinant;
-    let routh_delta = a1 * a2 - a3;
-    let derived = [a1, a2, a3, routh_delta, j00, j01, j02, j10, j11, j20, j22];
+    let derived = [a1, a2, a3, j00, j01, j02, j10, j11, j20, j22];
     if derived.iter().any(|value| !value.is_finite()) {
         return Err(InteractionError::NonFiniteDerivedValue("linearization"));
     }
