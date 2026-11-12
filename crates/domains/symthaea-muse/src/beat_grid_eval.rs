@@ -1270,6 +1270,108 @@ mod tests {
     }
 
     #[test]
+    fn pinned_mir_eval_0_8_2_reference_fixtures_match_beat_metric_semantics() {
+        // Expected values were generated with the installed mir_eval 0.8.2
+        // package using direct beat metric functions (not evaluate(), whose
+        // default five-second trim would remove these short synthetic cases).
+        let exact = [0.0, 0.5, 1.0, 1.5, 2.0];
+        let exact_report = evaluate_beat_grid_v1(
+            &prediction(&exact, &[]),
+            &[reference("exact", None, &exact, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        let exact_score = &exact_report.reference_scores[0];
+        assert!((exact_score.beat_f_measure.f1 - 1.0).abs() < 1e-12);
+        assert!((exact_score.cemgil_score.unwrap() - 1.0).abs() < 1e-12);
+        assert!((exact_score.cemgil_best_metric_level.unwrap() - 1.0).abs() < 1e-12);
+        let exact_cml = exact_score.continuity_metrics.as_ref().unwrap();
+        assert!((exact_cml.correct_metric_level_continuous - 1.0).abs() < 1e-12);
+        assert!((exact_cml.correct_metric_level_total - 1.0).abs() < 1e-12);
+        assert!((exact_cml.any_metric_level_continuous - 1.0).abs() < 1e-12);
+        assert!((exact_cml.any_metric_level_total - 1.0).abs() < 1e-12);
+
+        let offbeat_ref = [0.0, 0.5, 1.0, 1.5, 2.0];
+        let offbeat_est = [0.25, 0.75, 1.25, 1.75];
+        let offbeat_report = evaluate_beat_grid_v1(
+            &prediction(&offbeat_est, &[]),
+            &[reference("offbeat", None, &offbeat_ref, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        let offbeat = &offbeat_report.reference_scores[0];
+        assert_eq!(offbeat.beat_f_measure.f1, 0.0);
+        assert!((offbeat.cemgil_score.unwrap() - 3.66e-9).abs() < 1e-9);
+        assert!((offbeat.cemgil_best_metric_level.unwrap() - 1.0).abs() < 1e-12);
+        let offbeat_cml = offbeat.continuity_metrics.as_ref().unwrap();
+        assert_eq!(offbeat_cml.correct_metric_level_total, 0.0);
+        assert_eq!(offbeat_cml.correct_metric_level_continuous, 0.0);
+        assert!((offbeat_cml.any_metric_level_total - 1.0).abs() < 1e-12);
+        assert!((offbeat_cml.any_metric_level_continuous - 1.0).abs() < 1e-12);
+
+        let half_ref = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
+        let half_est = [0.0, 1.0, 2.0, 3.0];
+        let half_report = evaluate_beat_grid_v1(
+            &prediction(&half_est, &[]),
+            &[reference("half", None, &half_ref, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        let half = &half_report.reference_scores[0];
+        assert!((half.beat_f_measure.f1 - 0.7272727272727273).abs() < 1e-12);
+        assert!((half.cemgil_score.unwrap() - 0.7272727272727273).abs() < 1e-12);
+        assert!((half.cemgil_best_metric_level.unwrap() - 1.0).abs() < 1e-12);
+        let half_cml = half.continuity_metrics.as_ref().unwrap();
+        assert_eq!(half_cml.correct_metric_level_continuous, 0.0);
+        assert_eq!(half_cml.correct_metric_level_total, 0.0);
+        assert!((half_cml.any_metric_level_continuous - 1.0).abs() < 1e-12);
+        assert!((half_cml.any_metric_level_total - 1.0).abs() < 1e-12);
+
+        let double_ref = [0.0, 1.0, 2.0, 3.0];
+        let double_est = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
+        let double_report = evaluate_beat_grid_v1(
+            &prediction(&double_est, &[]),
+            &[reference("double", None, &double_ref, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        let double = &double_report.reference_scores[0];
+        assert!((double.beat_f_measure.f1 - 0.7272727272727273).abs() < 1e-12);
+        assert!((double.cemgil_score.unwrap() - 0.7272727272727273).abs() < 1e-12);
+        assert!((double.cemgil_best_metric_level.unwrap() - 1.0).abs() < 1e-12);
+
+        let broken_ref = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5];
+        let broken_est = [0.0, 0.5, 1.0, 1.85, 2.35, 2.85];
+        let broken_report = evaluate_beat_grid_v1(
+            &prediction(&broken_est, &[]),
+            &[reference("broken", None, &broken_ref, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        let broken = &broken_report.reference_scores[0];
+        assert!((broken.beat_f_measure.f1 - 0.5).abs() < 1e-12);
+        assert!((broken.cemgil_score.unwrap() - 0.500294608769).abs() < 1e-9);
+        let broken_cml = broken.continuity_metrics.as_ref().unwrap();
+        assert!((broken_cml.correct_metric_level_continuous - 0.5).abs() < 1e-12);
+        assert!((broken_cml.correct_metric_level_total - 0.5).abs() < 1e-12);
+
+        let outside_ref = [0.0, 1.0, 2.0];
+        let outside_est = [0.070001, 1.070001, 2.070001];
+        let outside_report = evaluate_beat_grid_v1(
+            &prediction(&outside_est, &[]),
+            &[reference("outside", None, &outside_ref, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        let outside = &outside_report.reference_scores[0];
+        assert_eq!(outside.beat_f_measure.f1, 0.0);
+        let outside_cml = outside.continuity_metrics.as_ref().unwrap();
+        // mir_eval's continuity criterion is phase/period based, not 70 ms.
+        assert!((outside_cml.correct_metric_level_total - 1.0).abs() < 1e-12);
+        assert!((outside_cml.any_metric_level_total - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
     fn malformed_non_monotonic_timestamp_sequences_are_rejected() {
         let prediction = prediction(&[0.0, 0.5, 0.4], &[]);
         let references = [reference("a", None, &[0.0, 0.5, 1.0], &[])];
