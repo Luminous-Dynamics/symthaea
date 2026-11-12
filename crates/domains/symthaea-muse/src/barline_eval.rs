@@ -146,6 +146,10 @@ pub enum MeasureKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MeasureMap {
     pub source_id: String,
+    /// Shared notated-score coordinate frame established by the adapter.
+    pub score_clock_id: String,
+    /// Adapter/canonicalization contract used to express quarter-note beats.
+    pub canonicalization_version: String,
     pub status: MeasureMapStatus,
     pub measures: Vec<MeasureSpan>,
 }
@@ -153,6 +157,10 @@ pub struct MeasureMap {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EvaluationError {
     EmptySourceId,
+    EmptyScoreClockId,
+    EmptyCanonicalizationVersion,
+    ScoreClockMismatch,
+    CanonicalizationMismatch,
     NoMeasures,
     NonPositiveDenominator { den: i64 },
     NegativeCoordinate { num: i64 },
@@ -184,6 +192,8 @@ pub struct BarlineEvaluationReport {
     pub evaluator_version: String,
     pub gold_source_id: String,
     pub prediction_source_id: String,
+    pub score_clock_id: String,
+    pub canonicalization_version: String,
     pub tolerance: RationalBeat,
     pub gold_internal_barline_count: usize,
     pub predicted_internal_barline_count: usize,
@@ -253,6 +263,12 @@ pub fn evaluate_measure_maps(
 
     validate_map(gold)?;
     validate_map(prediction)?;
+    if gold.score_clock_id != prediction.score_clock_id {
+        return Err(EvaluationError::ScoreClockMismatch);
+    }
+    if gold.canonicalization_version != prediction.canonicalization_version {
+        return Err(EvaluationError::CanonicalizationMismatch);
+    }
 
     let gold_boundaries = internal_boundaries(gold);
     let predicted_boundaries = internal_boundaries(prediction);
@@ -268,6 +284,8 @@ pub fn evaluate_measure_maps(
         evaluator_version: BARLINE_EVALUATOR_VERSION.to_string(),
         gold_source_id: gold.source_id.clone(),
         prediction_source_id: prediction.source_id.clone(),
+        score_clock_id: gold.score_clock_id.clone(),
+        canonicalization_version: gold.canonicalization_version.clone(),
         tolerance,
         gold_internal_barline_count: gold_boundaries.len(),
         predicted_internal_barline_count: predicted_boundaries.len(),
@@ -286,6 +304,12 @@ pub fn evaluate_measure_maps(
 fn validate_map(map: &MeasureMap) -> Result<(), EvaluationError> {
     if map.source_id.trim().is_empty() {
         return Err(EvaluationError::EmptySourceId);
+    }
+    if map.score_clock_id.trim().is_empty() {
+        return Err(EvaluationError::EmptyScoreClockId);
+    }
+    if map.canonicalization_version.trim().is_empty() {
+        return Err(EvaluationError::EmptyCanonicalizationVersion);
     }
     if map.measures.is_empty() {
         return Err(EvaluationError::NoMeasures);
@@ -446,6 +470,8 @@ mod tests {
     fn map(source_id: &str, measures: Vec<MeasureSpan>) -> MeasureMap {
         MeasureMap {
             source_id: source_id.into(),
+            score_clock_id: "shared-score-clock-v1".into(),
+            canonicalization_version: "quarter-beat-rational-v1".into(),
             status: MeasureMapStatus::Supported,
             measures,
         }
@@ -554,6 +580,8 @@ mod tests {
         );
         let prediction = MeasureMap {
             source_id: "midi-without-barline-sidecar".into(),
+            score_clock_id: "shared-score-clock-v1".into(),
+            canonicalization_version: "quarter-beat-rational-v1".into(),
             status: MeasureMapStatus::Unsupported {
                 reason: "MIDI time-signature events do not encode the annotated bar sequence".into(),
             },
@@ -597,6 +625,34 @@ mod tests {
         assert_eq!(result.barline_metrics.recall, None);
         assert_eq!(result.barline_metrics.f1, None);
         assert_eq!(result.measure_metrics.f1, Some(1.0));
+    }
+
+    #[test]
+    fn incompatible_score_clock_is_rejected() {
+        let gold = map(
+            "gold",
+            vec![span((0, 1), (4, 1), MeasureKind::Regular)],
+        );
+        let mut prediction = gold.clone();
+        prediction.score_clock_id = "different-score-frame".into();
+        assert_eq!(
+            evaluate_measure_maps(&gold, &prediction, beat(1, 8)),
+            Err(EvaluationError::ScoreClockMismatch)
+        );
+    }
+
+    #[test]
+    fn incompatible_canonicalization_is_rejected() {
+        let gold = map(
+            "gold",
+            vec![span((0, 1), (4, 1), MeasureKind::Regular)],
+        );
+        let mut prediction = gold.clone();
+        prediction.canonicalization_version = "different-contract".into();
+        assert_eq!(
+            evaluate_measure_maps(&gold, &prediction, beat(1, 8)),
+            Err(EvaluationError::CanonicalizationMismatch)
+        );
     }
 
     #[test]
