@@ -34,7 +34,6 @@ pub enum ComparisonDisposition {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct Fixture {
     schema_version: String,
     fixture_id: String,
@@ -552,7 +551,7 @@ mod tests {
         .expect("synthetic bondability fixture parses")
     }
 
-    fn result_for(report: &AuditReport, arm_id: &str) -> &ArmResult {
+    fn result_for<'a>(report: &'a AuditReport, arm_id: &str) -> &'a ArmResult {
         report
             .arm_results
             .iter()
