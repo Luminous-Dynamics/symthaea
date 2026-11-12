@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/rea-proof-obligation-acquisition-agent-view-v0.schema.json",
+  "title": "REA proof-obligation acquisition agent-view fixture v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "status",
+    "source_policy",
+    "use",
+    "not_human_adjudicated",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "dataset_id": {
+      "const": "rea-proof-obligation-acquisition"
+    },
+    "status": {
+      "const": "design_fixture_only"
+    },
+    "source_policy": {
+      "const": "original_synthetic_text_only"
+    },
+    "use": {
+      "const": "agent_visible_development_input_only"
+    },
+    "not_human_adjudicated": {
+      "const": true
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 18,
+      "maxItems": 18,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "obligationStatus": {
+      "enum": [
+        "satisfied",
+        "unsatisfied",
+        "conflicted",
+        "unknown",
+        "incomplete",
+        "contradicted"
+      ]
+    },
+    "obligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "obligation_id",
+        "kind",
+        "required",
+        "status",
+        "admissible_evidence_classes",
+        "notes"
+      ],
+      "properties": {
+        "obligation_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{1,63}$"
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 2
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "status": {
+          "$ref": "#/$defs/obligationStatus"
+        },
+        "admissible_evidence_classes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 2
+          },
+          "uniqueItems": true
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 8
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "experiment_id",
+        "authorization",
+        "reversible",
+        "destructive",
+        "target_impact",
+        "cost_units",
+        "description",
+        "outcomes"
+      ],
+      "properties": {
+        "experiment_id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "authorization": {
+          "enum": [
+            "authorized",
+            "denied",
+            "unknown"
+          ]
+        },
+        "reversible": {
+          "type": "boolean"
+        },
+        "destructive": {
+          "type": "boolean"
+        },
+        "target_impact": {
+          "enum": [
+            "read_only",
+            "temporary_configuration",
+            "service_restart",
+            "data_mutation",
+            "physical_actuation",
+            "isolated_test"
+          ]
+        },
+        "cost_units": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "domain",
+        "fault_family",
+        "claim_text",
+        "obligations",
+        "candidates"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^REA-POA-[0-9]{3}$"
+        },
+        "domain": {
+          "type": "string",
+          "minLength": 2
+        },
+        "fault_family": {
+          "type": "string",
+          "minLength": 2
+        },
+        "claim_text": {
+          "type": "string",
+          "minLength": 20
+        },
+        "obligations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/obligation"
+          },
+          "contains": {
+            "type": "object",
+            "required": [
+              "required"
+            ],
+            "properties": {
+              "required": {
+                "const": true
+              }
+            }
+          },
+          "minContains": 1
+        },
+        "candidates": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/candidate"
+          }
+        }
+      }
+    }
+  }
+}

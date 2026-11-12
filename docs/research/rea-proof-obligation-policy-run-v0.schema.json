@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/rea-proof-obligation-policy-run-v0.schema.json",
+  "title": "REA proof-obligation policy submission v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "policy_id",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "dataset_id": {
+      "const": "rea-proof-obligation-acquisition"
+    },
+    "policy_id": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 128
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 18,
+      "maxItems": 18,
+      "items": {
+        "$ref": "#/$defs/decision"
+      }
+    }
+  },
+  "$defs": {
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "selected_experiment_id",
+        "claimed_ready_before_action"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^REA-POA-[0-9]{3}$"
+        },
+        "selected_experiment_id": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 128
+        },
+        "claimed_ready_before_action": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
