@@ -142,11 +142,14 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "run_id",
-        "timebase_receipt_sha256",
-        "service_fingerprint_sha256",
         "background_method",
         "background_trace_sha256",
+        "calibration_certificate_sha256",
+        "environment_fingerprint_sha256",
+        "hydrophone_instrument_id",
+        "run_id",
+        "service_fingerprint_sha256",
+        "timebase_receipt_sha256",
         "windows"
       ],
       "properties": {
@@ -176,6 +179,16 @@
           "items": {
             "$ref": "#/$defs/window"
           }
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "hydrophone_instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
         }
       }
     },
