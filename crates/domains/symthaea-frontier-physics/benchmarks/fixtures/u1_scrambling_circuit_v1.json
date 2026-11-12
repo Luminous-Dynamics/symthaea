@@ -1,0 +1,195 @@
+{
+  "schema": "luminous.black_hole_information.u1_scrambling_circuit.v1",
+  "status": "independent_numpy_comparator; Rust source authored and Rust execution pending",
+  "claim_ceiling": "Finite-depth U(1)-conserving random quantum circuits on a finite qubit chain. This does not model Hawking radiation, black-hole evaporation, gravitational backreaction, QES/islands, or an efficient recovery decoder.",
+  "model": {
+    "number_of_qubits": 8,
+    "total_excitations": 4,
+    "initial_state": "computational-basis product state |11110000> (MSB-first)",
+    "subsystem_A_qubits": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "subsystem_B_qubits": [
+      4,
+      5,
+      6,
+      7
+    ],
+    "entropy_units": "nats",
+    "pair_gate": "Haar U(1) x U(2) x U(1): independent U(1) phases on |00>,|11> and Haar U(2) on span{|01>,|10}>",
+    "topologies": {
+      "brickwork_1d": "alternating even/odd nearest-neighbour matchings",
+      "all_to_all": "fresh random disjoint qubit matching at each layer"
+    },
+    "page_equilibrium": {
+      "exact_symmetry_resolved_mean_nats": 2.206170090971405,
+      "warning": "This is the Haar ensemble mean in the N=8,K=4 charge sector. It is not a strict upper bound on individual circuit realizations."
+    }
+  },
+  "independent_numpy_comparator": {
+    "generator": "NumPy PRNG per seed, independent QR Haar U(2) construction, direct state-vector gate application and reduced density matrix eigenspectrum",
+    "sample_count_per_depth_and_topology": 32,
+    "first_seed_hex": "0xC1AC",
+    "seed_schedule": "seed = 0xC1AC + sample_index, sample_index 0..31",
+    "caveat": "Independent PRNG and QR implementation; these are not bitwise expected values for the Rust ChaCha20 stream.",
+    "results": [
+      {
+        "depth": 0,
+        "brickwork": {
+          "mean": 0,
+          "standard_error": 0,
+          "max": 0,
+          "gate_count": 0
+        },
+        "all_to_all": {
+          "mean": 0,
+          "standard_error": 0,
+          "max": 0,
+          "gate_count": 0
+        }
+      },
+      {
+        "depth": 1,
+        "brickwork": {
+          "mean": 0,
+          "standard_error": 0,
+          "max": 0,
+          "gate_count": 4
+        },
+        "all_to_all": {
+          "mean": 1.0008915512415877,
+          "standard_error": 0.1051629493523272,
+          "max": 2.3840899711202446,
+          "gate_count": 4
+        }
+      },
+      {
+        "depth": 2,
+        "brickwork": {
+          "mean": 0.4027737574059831,
+          "standard_error": 0.03732957931482079,
+          "max": 0.6922415034486187,
+          "gate_count": 7
+        },
+        "all_to_all": {
+          "mean": 1.2646291282186972,
+          "standard_error": 0.07998507536867427,
+          "max": 2.384089971120244,
+          "gate_count": 8
+        }
+      },
+      {
+        "depth": 4,
+        "brickwork": {
+          "mean": 0.7385853249644525,
+          "standard_error": 0.04622467240774703,
+          "max": 1.2100544356956335,
+          "gate_count": 14
+        },
+        "all_to_all": {
+          "mean": 1.6745644272674016,
+          "standard_error": 0.05469092405554366,
+          "max": 2.2108070552164456,
+          "gate_count": 16
+        }
+      },
+      {
+        "depth": 8,
+        "brickwork": {
+          "mean": 1.209615575687681,
+          "standard_error": 0.0369882814133799,
+          "max": 1.8922955385762017,
+          "gate_count": 28
+        },
+        "all_to_all": {
+          "mean": 2.063179360324358,
+          "standard_error": 0.024815386576047444,
+          "max": 2.2711226625420284,
+          "gate_count": 32
+        }
+      },
+      {
+        "depth": 12,
+        "brickwork": {
+          "mean": 1.5534964302056935,
+          "standard_error": 0.04335393283612798,
+          "max": 2.134811586155094,
+          "gate_count": 42
+        },
+        "all_to_all": {
+          "mean": 2.1840587539382734,
+          "standard_error": 0.016071195454361985,
+          "max": 2.357378559515886,
+          "gate_count": 48
+        }
+      },
+      {
+        "depth": 16,
+        "brickwork": {
+          "mean": 1.7940999939879374,
+          "standard_error": 0.03388712111826175,
+          "max": 2.073643050218804,
+          "gate_count": 56
+        },
+        "all_to_all": {
+          "mean": 2.191845678687715,
+          "standard_error": 0.014068641760995284,
+          "max": 2.3378275039428162,
+          "gate_count": 64
+        }
+      },
+      {
+        "depth": 24,
+        "brickwork": {
+          "mean": 2.078808225004331,
+          "standard_error": 0.020705758572971102,
+          "max": 2.266201592259424,
+          "gate_count": 84
+        },
+        "all_to_all": {
+          "mean": 2.2024911277189694,
+          "standard_error": 0.014671130527757764,
+          "max": 2.376768211889695,
+          "gate_count": 96
+        }
+      }
+    ]
+  },
+  "interpretation": [
+    "In this N=8,K=4,A=4 comparator, all-to-all matching reaches entropy close to the symmetry-sector Page mean at fewer layers than the local brickwork chain.",
+    "The brickwork first layer has zero entropy growth for this particular product cut because its first even-bond matching acts within the two four-qubit halves; the next odd layer introduces cross-cut interactions.",
+    "At depth 24 the mean entropy gap is about 0.1274 nats for brickwork and 0.00368 nats for all-to-all, but the small finite sample and one initial state do not establish a universal topology ranking or a rigorous mixing time.",
+    "Individual samples can exceed the Page ensemble mean; only the ensemble statistics should be compared with its uncertainty."
+  ],
+  "required_receipt_fields": [
+    "source_sha",
+    "N",
+    "K",
+    "subsystem_A",
+    "topology",
+    "depth",
+    "sample_count",
+    "seed_schedule",
+    "gate_count",
+    "mean_entropy",
+    "sample_variance",
+    "standard_error",
+    "state_norm_drift",
+    "charge_expectation_drift",
+    "charge_variance",
+    "symmetry_resolved_Page_mean",
+    "mean_entropy_gap",
+    "runtime",
+    "peak_memory"
+  ],
+  "negative_controls": [
+    "use unrestricted Haar U(4) gates in place of charge-preserving gates",
+    "use an already-Haar-random fixed-charge initial state when measuring entropy growth from a product state",
+    "claim each individual entropy must be below the Page ensemble mean",
+    "compare a fixed-charge circuit to unconstrained Page equilibrium",
+    "claim gravitational black-hole evaporation or a Page island from these circuits"
+  ]
+}
