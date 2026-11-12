@@ -453,6 +453,158 @@
         "complete-system landed mass including manufacturing plant, optics, deposition/contact equipment, installation and spares",
         "all lunar regolith compositions produce optically suitable glass"
       ]
+    },
+    {
+      "source_id": "NASA-GSFC-STD-1000H-STRAY-LIGHT",
+      "title": "GSFC-STD-1000H Rules for Design, Development, Verification and Operation of Flight Systems, §5.15",
+      "publisher": "NASA Goddard Space Flight Center",
+      "published_or_updated": "2023-03-15",
+      "source_url": "https://standards.nasa.gov/sites/default/files/standards/GSFC/H/0/GSFC-STD-1000RevH_Approved.pdf",
+      "evidence_class": "government_engineering_standard",
+      "technology_scope": [
+        "system_level_stray_light_analysis",
+        "optical_instrument_baffling",
+        "BRDF_and_surface_scatter",
+        "thermal_self_emission",
+        "as_built_optical_configuration"
+      ],
+      "reported_facts": [
+        "Section 5.15 requires an end-to-end stray-light model and test campaign at system level for optical systems.",
+        "The rationale explicitly includes scattering from optical and hardware surfaces, thermal self-emission, unintended optical paths, hardware glints and vignetting.",
+        "The standard requires model/configuration updates over the lifecycle so the analysis reflects as-built flight hardware."
+      ],
+      "comparison_use": [
+        "stray_light_budget_and_test_baseline",
+        "observer_and_detector_impact_contract",
+        "as_built_coating_and_surface_configuration_provenance"
+      ],
+      "not_established": [
+        "a universal glare threshold for all planetary energy installations",
+        "performance of any proposed Luminous coating or array",
+        "requirements applicability outside the governing project/contract"
+      ]
+    },
+    {
+      "source_id": "IAU-CPS-CONSOLIDATED-REFLECTED-LIGHT-RECOMMENDATIONS",
+      "title": "IAU Centre for the Protection of the Dark and Quiet Sky — Consolidated CPS Recommendations",
+      "publisher": "International Astronomical Union",
+      "published_or_updated": "2025",
+      "source_url": "https://cps.iau.org/documents/44/Consolidated-CPS-Recommendations.pdf",
+      "evidence_class": "astronomy_environmental_recommendations",
+      "technology_scope": [
+        "reflected_sunlight_brightness",
+        "satellite_glint_and_flare",
+        "BRDF_characterization",
+        "radiometric_visibility_prediction",
+        "astronomy_impact"
+      ],
+      "reported_facts": [
+        "The recommendations define a reflected-sunlight brightness criterion in Johnson V band at 550 nm of fainter than magnitude 7.0 for relevant orbital altitudes up to 550 km, with an altitude-dependent expression above 550 km.",
+        "The document recommends minimizing high-amplitude glints and brightness variation under small changes in Sun/viewing angle.",
+        "It calls for public radiometric visibility models based on material reflectivity and wavelength-dependent BRDF, with model validation using ground observations."
+      ],
+      "comparison_use": [
+        "astronomy_compatibility_reference_for_orbital_assets",
+        "BRDF_measurement_and_glint_benchmark",
+        "public_radiometric_prediction_requirements"
+      ],
+      "not_established": [
+        "a lunar surface brightness threshold",
+        "a universal safety threshold for all detectors or biological environments",
+        "performance of any proposed low-glare surface"
+      ]
+    },
+    {
+      "source_id": "NASA-SMALLSAT-THERMAL-CONTROL-2026",
+      "title": "NASA SmallSat State of the Art — Thermal Control",
+      "publisher": "NASA SmallSat Institute",
+      "published_or_updated": null,
+      "retrieved_on": "2026-11-12",
+      "source_url": "https://www.nasa.gov/smallsat-institute/sst-soa/thermal-control/",
+      "evidence_class": "government_technical_guidance",
+      "technology_scope": [
+        "solar_absorptivity",
+        "infrared_emissivity",
+        "radiator_coatings",
+        "thermal_control_surfaces",
+        "end_of_life_optical_property_degradation"
+      ],
+      "reported_facts": [
+        "NASA distinguishes solar absorptivity from infrared emissivity as separate surface optical properties.",
+        "The guide describes radiator surfaces as needing high infrared emissivity and low solar absorptivity.",
+        "The guide notes that optical surface properties change during missions and that end-of-life values must be considered."
+      ],
+      "comparison_use": [
+        "separate_visible_solar_and_thermal_IR_property_ledgers",
+        "radiator_and_solar_collection_surface_trade_studies",
+        "coating_aging_and_end_of_life_test_requirements"
+      ],
+      "not_established": [
+        "low visible brightness as equivalent to low thermal emission",
+        "universal spectral behavior for all coatings",
+        "qualification of a new Luminous radiator coating"
+      ]
+    },
+    {
+      "source_id": "WVO2-SMART-OPTICAL-SOLAR-REFLECTOR-2026",
+      "title": "Smart and Flexible Optical Solar Reflectors for Passive Radiative Cooling Regulation in Space Using a W:VO2 Metasurface",
+      "publisher": "Nanophotonics",
+      "published_or_updated": "2026-01-28",
+      "source_url": "https://doi.org/10.1002/nap2.70011",
+      "evidence_class": "peer_reviewed_materials_experiment_and_environmental_test",
+      "technology_scope": [
+        "smart_optical_solar_reflector",
+        "temperature_adaptive_emissivity",
+        "flexible_metasurface",
+        "spacecraft_thermal_control"
+      ],
+      "reported_facts": [
+        "The work reports solar absorptance alpha = 0.22, hot-state infrared emissivity approximately 0.80, and emissivity contrast Delta epsilon approximately 0.33.",
+        "A 10 × 10 cm2 flexible demonstrator was fabricated on space-grade polyimide using nanoimprint lithography and a low-temperature W:VO2 process.",
+        "The authors report adhesion, bending, thermal-cycle, proton/electron irradiation and humidity testing with negligible property degradation under the tested conditions."
+      ],
+      "comparison_use": [
+        "adaptive_OSR_material_reference",
+        "coating_mass_flexibility_and_emissivity_trade_study",
+        "environmental_test_matrix_comparator"
+      ],
+      "not_established": [
+        "lunar flight qualification",
+        "large-area industrial manufacturing yield",
+        "lunar dust and micrometeoroid lifetime",
+        "universal optical performance across every incidence/view angle"
+      ]
+    },
+    {
+      "source_id": "VO2-METASURFACE-INTELLIGENT-RADIATOR-2026",
+      "title": "2D-Network VO2 Metasurface-Integrated Adaptive Radiative Thermal Device With Ultra-Low Solar Absorptance for Spacecraft Thermal Control",
+      "publisher": "Laser & Photonics Reviews",
+      "published_or_updated": "2026-07-21",
+      "source_url": "https://doi.org/10.1002/lpor.71614",
+      "evidence_class": "peer_reviewed_materials_experiment_and_model",
+      "technology_scope": [
+        "adaptive_spacecraft_radiator",
+        "spectrally_selective_emission",
+        "VO2_metasurface",
+        "solar_absorptance_control",
+        "infrared_emissivity_switching"
+      ],
+      "reported_facts": [
+        "The study reports solar absorptance alpha_s = 0.26.",
+        "The device reports adaptive thermal emittance switching from 0.28 to 0.92, with Delta epsilon = 0.64.",
+        "The paper reports transient orbital thermodynamic modelling of a one-unit CubeSat in 600 km low Earth orbit and terrestrial outdoor experiments."
+      ],
+      "comparison_use": [
+        "adaptive_radiator_material_frontier",
+        "solar_absorptance_vs_IR_emittance_cooptimization",
+        "material_model_and_environmental_test_comparator"
+      ],
+      "not_established": [
+        "lunar deployment or lunar-qualified lifetime",
+        "large-area production yield",
+        "measured full-spacecraft thermal performance",
+        "visible-band glare or detector-impact compliance"
+      ]
     }
   ]
 }
