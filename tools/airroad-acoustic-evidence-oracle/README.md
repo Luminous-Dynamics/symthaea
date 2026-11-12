@@ -12,9 +12,9 @@ A run binds:
 - exact analysis time window and reference clock;
 - calibrated raw channels with immutable SHA-256 digests;
 - microphone and array coordinates, boresight and position uncertainty;
-- rotor phase and RPM channel references;
+- rotor phase, RPM, thrust and torque channel references for each exact rotor;
 - per-rotor thrust, torque, RPM, pitch and tilt observations;
-- environmental conditions and declared test mode.
+- environmental conditions with a separate evidence digest and declared test mode.
 
 The validator checks that microphones resolve to calibrated raw channels in the declared coordinate frame, each array has at least two positioned microphones, rotor declarations resolve to phase and speed channels for the same rotor identity, and all channels cover the analysis window within declared clock/skew budgets.
 
