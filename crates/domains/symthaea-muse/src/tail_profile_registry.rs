@@ -72,6 +72,77 @@ pub trait TailEvidenceSignatureVerifier {
     fn verify(&self, key_id: &str, message: &[u8], signature: &[u8]) -> bool;
 }
 
+const SOURCE_LINEAGE_DOMAIN: &[u8] =
+    b"luminous-dynamics-mel-mr-eval-035-source-lineage-v1\\0";
+
+/// Signed proof that one exact source Score belongs to a declared root
+/// composition lineage. Different edits/exports/versions from the same root
+/// reuse lineage_root_sha256 and therefore cannot inflate the independent N.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TailSourceLineageEvidence {
+    pub version: String,
+    pub publisher_key_id: String,
+    pub lineage_root_sha256: String,
+    pub observed_source_score_sha256: String,
+    pub provenance_chain_sha256: String,
+    pub evidence_sha256: String,
+    pub signature: Vec<u8>,
+}
+
+fn source_lineage_evidence_digest(
+    evidence: &TailSourceLineageEvidence,
+) -> Result<String, TailProfileError> {
+    let mut unsigned = evidence.clone();
+    unsigned.evidence_sha256.clear();
+    unsigned.signature.clear();
+    let bytes = serde_json::to_vec(&unsigned)
+        .map_err(|_| TailProfileError::SerializationFailure)?;
+    Ok(hash_domain(SOURCE_LINEAGE_DOMAIN, &bytes))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerifiedTailSourceLineageEvidence {
+    lineage_root_sha256: String,
+    observed_source_score_sha256: String,
+}
+
+impl VerifiedTailSourceLineageEvidence {
+    pub fn lineage_root_sha256(&self) -> &str { &self.lineage_root_sha256 }
+    pub fn observed_source_score_sha256(&self) -> &str { &self.observed_source_score_sha256 }
+}
+
+pub fn verify_tail_source_lineage_evidence(
+    evidence: &TailSourceLineageEvidence,
+    verifier: &dyn TailEvidenceSignatureVerifier,
+) -> Result<VerifiedTailSourceLineageEvidence, TailProfileError> {
+    if evidence.version != TAIL_PROFILE_REGISTRY_VERSION
+        || evidence.publisher_key_id.trim().is_empty()
+        || evidence.publisher_key_id.len() > 256
+    {
+        return Err(TailProfileError::InvalidEvidence("source_lineage_identity"));
+    }
+    validate_sha256("lineage_root_sha256", &evidence.lineage_root_sha256)?;
+    validate_sha256("observed_source_score_sha256", &evidence.observed_source_score_sha256)?;
+    validate_sha256("provenance_chain_sha256", &evidence.provenance_chain_sha256)?;
+    if evidence.signature.is_empty() || evidence.signature.len() > MAX_SIGNATURE_BYTES {
+        return Err(TailProfileError::InvalidSignature);
+    }
+    let expected = source_lineage_evidence_digest(evidence)?;
+    if expected != evidence.evidence_sha256 {
+        return Err(TailProfileError::InvalidEvidence("source_lineage_digest"));
+    }
+    let mut message = Vec::with_capacity(SOURCE_LINEAGE_DOMAIN.len() + expected.len());
+    message.extend_from_slice(SOURCE_LINEAGE_DOMAIN);
+    message.extend_from_slice(expected.as_bytes());
+    if !verifier.verify(&evidence.publisher_key_id, &message, &evidence.signature) {
+        return Err(TailProfileError::InvalidSignature);
+    }
+    Ok(VerifiedTailSourceLineageEvidence {
+        lineage_root_sha256: evidence.lineage_root_sha256.clone(),
+        observed_source_score_sha256: evidence.observed_source_score_sha256.clone(),
+    })
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TailProfileError {
     InvalidDigest(&'static str),
@@ -207,6 +278,7 @@ pub fn verify_tail_topology_evidence(
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TailProfileTopology {
+    pub topology_publisher_key_id: String,
     pub renderer_identity_sha256: String,
     pub renderer_config_sha256: String,
     pub soundfont_sha256: String,
@@ -226,6 +298,7 @@ pub struct TailProfileTopology {
 
 fn topology_from_evidence(e: &TailTopologyEvidence) -> TailProfileTopology {
     TailProfileTopology {
+        topology_publisher_key_id: e.publisher_key_id.clone(),
         renderer_identity_sha256: e.renderer_identity_sha256.clone(),
         renderer_config_sha256: e.renderer_config_sha256.clone(),
         soundfont_sha256: e.soundfont_sha256.clone(),
@@ -254,6 +327,7 @@ fn topology_digest(topology: &TailProfileTopology) -> Result<String, TailProfile
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TailEventObservation {
     pub source_lineage_sha256: String,
+    pub source_score_sha256: String,
     pub source_event_id: String,
     pub event_final_note_off_frame: u64,
     pub raw_measured_end_frame: Option<u64>,
@@ -292,9 +366,8 @@ pub fn verify_tail_event_observation(
     input: &CounterfactualInfluenceInput<'_, '_>,
     calibration: &VerifiedRepeatabilityCalibration,
     topology: &VerifiedTailTopologyEvidence,
-    source_lineage_sha256: &str,
+    source_lineage: &VerifiedTailSourceLineageEvidence,
 ) -> Result<VerifiedTailEventObservation, TailProfileError> {
-    validate_sha256("source_lineage_sha256", source_lineage_sha256)?;
     verify_counterfactual_influence_segmented(report, input, calibration)
         .map_err(|_| TailProfileError::InfluenceReplayFailed)?;
     let evidence = topology.evidence();
@@ -310,6 +383,9 @@ pub fn verify_tail_event_observation(
         return Err(TailProfileError::UnsupportedOperation);
     }
     if report.base_report.source_event_id != input.source_event_id
+        || report.base_report.source_score_sha256 != source_lineage.observed_source_score_sha256
+        || input.baseline_renderer_evidence.source_score_sha256()
+            != source_lineage.observed_source_score_sha256
         || input.baseline_renderer_evidence.renderer_identity_sha256()
             != evidence.renderer_identity_sha256
         || input.baseline_renderer_evidence.renderer_config_sha256()
@@ -340,7 +416,8 @@ pub fn verify_tail_event_observation(
         return Err(TailProfileError::InvalidEvidence("frame_horizon"));
     }
     let mut observation = TailEventObservation {
-        source_lineage_sha256: source_lineage_sha256.to_owned(),
+        source_lineage_sha256: source_lineage.lineage_root_sha256.clone(),
+        source_score_sha256: source_lineage.observed_source_score_sha256.clone(),
         source_event_id: input.source_event_id.to_owned(),
         event_final_note_off_frame: note_off,
         raw_measured_end_frame: raw_end,
@@ -763,7 +840,10 @@ pub fn resolve_verified_tail_profile(
     {
         return Err(TailProfileError::ProfileNotQualified);
     }
-    if profile.topology != *expected_topology || !profile.topology.routing_complete {
+    if profile.topology != *expected_topology
+        || !profile.topology.routing_complete
+        || topology_digest(&profile.topology)? != profile.topology_sha256
+    {
         return Err(TailProfileError::ProfileTopologyMismatch);
     }
     if signed.publisher_key_id.trim().is_empty()
@@ -849,6 +929,28 @@ mod tests {
         e
     }
 
+
+    fn signed_source_lineage(
+        lineage_root: &str,
+        source_score: &str,
+    ) -> TailSourceLineageEvidence {
+        let mut evidence = TailSourceLineageEvidence {
+            version: TAIL_PROFILE_REGISTRY_VERSION.to_owned(),
+            publisher_key_id: "test-key".to_owned(),
+            lineage_root_sha256: digest(lineage_root),
+            observed_source_score_sha256: digest(source_score),
+            provenance_chain_sha256: digest("provenance-chain"),
+            evidence_sha256: String::new(),
+            signature: Vec::new(),
+        };
+        evidence.evidence_sha256 = source_lineage_evidence_digest(&evidence).unwrap();
+        let mut message = Vec::new();
+        message.extend_from_slice(SOURCE_LINEAGE_DOMAIN);
+        message.extend_from_slice(evidence.evidence_sha256.as_bytes());
+        evidence.signature = Sha256::digest(message).to_vec();
+        evidence
+    }
+
     fn test_observation(
         lineage: &str,
         event: &str,
@@ -857,6 +959,7 @@ mod tests {
     ) -> VerifiedTailEventObservation {
         let mut o = TailEventObservation {
             source_lineage_sha256: digest(lineage),
+            source_score_sha256: digest("source-score"),
             source_event_id: event.to_owned(),
             event_final_note_off_frame: 1_000,
             raw_measured_end_frame: Some(1_000 + tail),
@@ -901,6 +1004,27 @@ mod tests {
             minimum_qualification_lineages: 59,
             maximum_qualification_miss_rate_ppm: 50_000,
         }
+    }
+
+
+    #[test]
+    fn source_lineage_requires_a_signature_and_binds_the_observed_score() {
+        let verifier = TestSignatureVerifier;
+        let evidence = signed_source_lineage("composition-root", "source-score");
+        let verified = verify_tail_source_lineage_evidence(&evidence, &verifier).unwrap();
+        assert_eq!(verified.lineage_root_sha256(), evidence.lineage_root_sha256);
+        assert_eq!(verified.observed_source_score_sha256(), evidence.observed_source_score_sha256);
+
+        let mut tampered = evidence.clone();
+        tampered.lineage_root_sha256 = digest("another-composition");
+        assert!(verify_tail_source_lineage_evidence(&tampered, &verifier).is_err());
+
+        let mut bad_signature = evidence;
+        bad_signature.signature[0] ^= 0x01;
+        assert_eq!(
+            verify_tail_source_lineage_evidence(&bad_signature, &verifier).unwrap_err(),
+            TailProfileError::InvalidSignature
+        );
     }
 
     #[test]
