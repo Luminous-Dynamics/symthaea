@@ -22,7 +22,7 @@
 //!   candidate's exact post-render preservation contract.
 
 use crate::counterfactual_influence::{
-    CounterfactualInfluenceInput, CounterfactualInfluenceReport,
+    CounterfactualInfluenceInput, CounterfactualInfluenceReport, InfluenceDisposition,
     VerifiedRepeatabilityCalibration, verify_counterfactual_influence,
 };
 use crate::counterfactual_interaction::{
@@ -31,7 +31,7 @@ use crate::counterfactual_interaction::{
 use crate::edit_contract::{EditAttribute, ObligationScope, SupportedEditOperation, FrozenEditContract};
 use crate::interaction_probe_plan::{
     EventInteractionSupport, InteractionProbeConfig, InteractionProbePlan,
-    InteractionProbePlanError, verify_interaction_probe_plan,
+    verify_interaction_probe_plan,
 };
 use crate::symbolic_audio_binding::{
     AudioPreservationProfile, RendererManifest, audio_preservation_profile_sha256,
@@ -302,6 +302,7 @@ pub struct VerifiedEventInfluence {
     report_receipt_sha256: String,
     support_frames: u64,
     support_interval_count: usize,
+    disposition: InfluenceDisposition,
 }
 
 /// Create an influence summary only after EVAL-017 has replayed the full report
@@ -322,7 +323,7 @@ pub fn verify_event_influence(
         .measured_influence_intervals
         .iter()
         .map(|interval| interval.end_frame.saturating_sub(interval.start_frame) as u64)
-        .sum();
+        .fold(0u64, u64::saturating_add);
     Ok(VerifiedEventInfluence {
         event_index,
         source_score_sha256: report.source_score_sha256.clone(),
@@ -331,6 +332,7 @@ pub fn verify_event_influence(
         report_receipt_sha256: report.receipt_sha256.clone(),
         support_frames,
         support_interval_count: report.measured_influence_intervals.len(),
+        disposition: report.disposition,
     })
 }
 
@@ -469,6 +471,7 @@ pub enum RepairProposalState {
     ReadyForCandidateRender,
     NeedsAdditionalProbes,
     MissingEventInfluence,
+    NoDetectableTargetInfluence,
     OverRenderBudget,
 }
 
@@ -503,6 +506,10 @@ pub struct RepairCandidateProposal {
     pub measured_influence_receipts: Vec<String>,
     pub measured_interaction_receipts: Vec<String>,
     pub missing_influence_event_indices: Vec<usize>,
+    /// Changed events whose calibrated removal effect did not exceed the
+    /// renderer-specific repeatability noise floor. This is not proof of
+    /// inaudibility or zero contribution.
+    pub no_detectable_target_influence_event_indices: Vec<usize>,
     pub unmeasured_protected_pairs: Vec<(usize, usize)>,
     /// Pairs selected by EVAL-019 but still awaiting an EVAL-018 render/report.
     pub selected_but_unmeasured_protected_pairs: Vec<(usize, usize)>,
@@ -693,6 +700,7 @@ pub fn build_locality_repair_plan(
         }
 
         let mut missing_influence_event_indices = Vec::new();
+        let mut no_detectable_target_influence_event_indices = Vec::new();
         let mut measured_influence_support_frames = 0u64;
         let mut measured_influence_interval_count = 0usize;
         let mut measured_influence_receipts = Vec::new();
@@ -702,12 +710,16 @@ pub fn build_locality_repair_plan(
                     measured_influence_support_frames.saturating_add(evidence.support_frames);
                 measured_influence_interval_count = measured_influence_interval_count
                     .saturating_add(evidence.support_interval_count);
+                if evidence.disposition == InfluenceDisposition::NoEffectAboveNoiseFloor {
+                    no_detectable_target_influence_event_indices.push(*event_index);
+                }
                 measured_influence_receipts.push(evidence.report_receipt_sha256.clone());
             } else {
                 missing_influence_event_indices.push(*event_index);
             }
         }
         missing_influence_event_indices.sort_unstable();
+        no_detectable_target_influence_event_indices.sort_unstable();
         measured_influence_receipts.sort();
 
         let mut relevant_pairs = std::collections::BTreeSet::new();
@@ -751,6 +763,12 @@ pub fn build_locality_repair_plan(
         } else if !missing_influence_event_indices.is_empty() {
             reasons.push("one or more changed source events lack replay-verified EVAL-017 evidence".to_owned());
             RepairProposalState::MissingEventInfluence
+        } else if !no_detectable_target_influence_event_indices.is_empty() {
+            reasons.push(
+                "one or more changed events have no influence detected above the calibrated repeatability floor; their target audibility is unresolved"
+                    .to_owned(),
+            );
+            RepairProposalState::NoDetectableTargetInfluence
         } else if (request.require_complete_protected_pair_evidence
             && !unmeasured_protected_pairs.is_empty())
             || unmeasured_protected_pairs.len() > config.maximum_unmeasured_protected_pairs
@@ -783,6 +801,7 @@ pub fn build_locality_repair_plan(
             measured_influence_receipts,
             measured_interaction_receipts,
             missing_influence_event_indices,
+            no_detectable_target_influence_event_indices,
             unmeasured_protected_pairs,
             selected_but_unmeasured_protected_pairs,
             unselected_protected_pairs,
@@ -923,6 +942,7 @@ mod tests {
             report_receipt_sha256: digest(&format!("influence-{event_index}")),
             support_frames,
             support_interval_count: 1,
+            disposition: InfluenceDisposition::EffectDetected,
         }
     }
 
@@ -985,6 +1005,31 @@ mod tests {
         assert_eq!(result.proposals[0].state, RepairProposalState::MissingEventInfluence);
         assert_eq!(result.proposals[0].objectives.measured_influence_support_frames, 0);
         assert_eq!(result.proposals[0].missing_influence_event_indices, vec![0]);
+        assert!(result.preferred_candidate_id.is_none());
+    }
+
+    #[test]
+    fn no_effect_above_noise_floor_is_not_treated_as_zero_target_risk() {
+        let candidates = [symbolic_candidate("c1", &[0], 2)];
+        let mut no_effect = influence(0, 0);
+        no_effect.disposition = InfluenceDisposition::NoEffectAboveNoiseFloor;
+        let result = build_locality_repair_plan(
+            request(),
+            RepairPlannerConfig::default(),
+            &candidates,
+            &[no_effect],
+            &[],
+            &probe_plan(),
+        )
+        .unwrap();
+        assert_eq!(
+            result.proposals[0].state,
+            RepairProposalState::NoDetectableTargetInfluence
+        );
+        assert_eq!(
+            result.proposals[0].no_detectable_target_influence_event_indices,
+            vec![0]
+        );
         assert!(result.preferred_candidate_id.is_none());
     }
 
