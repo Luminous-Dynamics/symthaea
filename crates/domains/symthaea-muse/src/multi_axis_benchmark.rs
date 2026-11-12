@@ -55,9 +55,10 @@ pub enum MetricUnitV1 {
     Scalar,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GroupingUnitV1 {
+    Work,
     Composer,
     Artist,
     Performer,
@@ -231,6 +232,10 @@ pub enum BenchmarkValidationError {
     ReportDigestMismatch,
     IncompatibleProtocol,
     MissingComparableMetric { metric_id: String },
+    MissingMetricCoverage { metric_id: String },
+    MissingGroupSlice { group_id: String },
+    MissingGroupMetricCoverage { group_id: String, metric_id: String },
+    DuplicateGroupSlice { group_id: String },
     IncompatibleMetricCoverage { metric_id: String },
     SerializationFailed,
 }
@@ -327,8 +332,15 @@ pub fn validate_benchmark_protocol(
     }
     match protocol.split.claim {
         GeneralizationClaimV1::InDistribution => {
-            if protocol.split.grouping_unit != GroupingUnitV1::RandomExcerpt
-                || !protocol.split.held_out_group_ids.is_empty()
+            // In-distribution runs may still hold out works or recording
+            // sessions, provided the broader composer/performer distribution
+            // is not being claimed as unseen. The grouping unit is explicit.
+            if !matches!(
+                protocol.split.grouping_unit,
+                GroupingUnitV1::RandomExcerpt
+                    | GroupingUnitV1::Work
+                    | GroupingUnitV1::RecordingSession
+            ) || !protocol.split.held_out_group_ids.is_empty()
             {
                 return Err(BenchmarkValidationError::InvalidSplitPolicy);
             }
@@ -500,6 +512,8 @@ pub fn validate_benchmark_run_report(
         .map(|definition| (definition.metric_id.as_str(), definition))
         .collect();
     let mut overall_count = 0usize;
+    let mut overall_metric_ids = BTreeSet::new();
+    let mut group_slice_keys = BTreeSet::new();
     let mut slice_ids = BTreeSet::new();
     for slice in &report.slices {
         if slice.slice_id.trim().is_empty() || slice.sample_count == 0 {
@@ -525,6 +539,16 @@ pub fn validate_benchmark_run_report(
             return Err(BenchmarkValidationError::InvalidSlice {
                 slice_id: slice.slice_id.clone(),
             });
+        } else {
+            let key = (
+                slice.grouping_unit.unwrap(),
+                slice.grouping_value.as_deref().unwrap(),
+            );
+            if !group_slice_keys.insert(key) {
+                return Err(BenchmarkValidationError::DuplicateGroupSlice {
+                    group_id: key.1.to_string(),
+                });
+            }
         }
         let mut metric_ids = BTreeSet::new();
         for metric in &slice.metrics {
@@ -538,6 +562,9 @@ pub fn validate_benchmark_run_report(
                     slice_id: slice.slice_id.clone(),
                     metric_id: metric.metric_id.clone(),
                 });
+            }
+            if slice.is_overall {
+                overall_metric_ids.insert(metric.metric_id.as_str());
             }
             validate_digest(
                 "metric.evaluated_sample_manifest_sha256",
@@ -591,6 +618,43 @@ pub fn validate_benchmark_run_report(
         0 => return Err(BenchmarkValidationError::MissingOverallSlice),
         1 => {}
         _ => return Err(BenchmarkValidationError::DuplicateOverallSlice),
+    }
+    let expected_metric_ids: BTreeSet<_> = definitions.keys().copied().collect();
+    if overall_metric_ids != expected_metric_ids {
+        if let Some(metric_id) = expected_metric_ids.difference(&overall_metric_ids).next() {
+            return Err(BenchmarkValidationError::MissingMetricCoverage {
+                metric_id: (*metric_id).to_string(),
+            });
+        }
+        return Err(BenchmarkValidationError::InvalidSlice {
+            slice_id: "overall".into(),
+        });
+    }
+    if report.protocol.split.claim == GeneralizationClaimV1::OutOfDistribution {
+        for group_id in &report.protocol.split.held_out_group_ids {
+            let Some(group_slice) = report.slices.iter().find(|slice| {
+                !slice.is_overall
+                    && slice.grouping_unit == Some(report.protocol.split.grouping_unit)
+                    && slice.grouping_value.as_deref() == Some(group_id.as_str())
+            }) else {
+                return Err(BenchmarkValidationError::MissingGroupSlice {
+                    group_id: group_id.clone(),
+                });
+            };
+            let group_metric_ids: BTreeSet<_> = group_slice
+                .metrics
+                .iter()
+                .map(|metric| metric.metric_id.as_str())
+                .collect();
+            for metric_id in &expected_metric_ids {
+                if !group_metric_ids.contains(metric_id) {
+                    return Err(BenchmarkValidationError::MissingGroupMetricCoverage {
+                        group_id: group_id.clone(),
+                        metric_id: (*metric_id).to_string(),
+                    });
+                }
+            }
+        }
     }
     for (field, value) in [
         ("inference_milliseconds", report.resources.inference_milliseconds),
@@ -815,6 +879,29 @@ mod tests {
                     ],
                 },
                 BenchmarkSliceV1 {
+                    slice_id: "composer-brahms".into(),
+                    is_overall: false,
+                    grouping_unit: Some(GroupingUnitV1::Composer),
+                    grouping_value: Some("Brahms".into()),
+                    sample_count: 100,
+                    metrics: vec![
+                        MetricValueV1 {
+                            metric_id: "mv2h".into(),
+                            value: mv2h,
+                            sample_count: 100,
+                            evaluated_sample_manifest_sha256: digest('8'),
+                            confidence_interval: None,
+                        },
+                        MetricValueV1 {
+                            metric_id: "clews".into(),
+                            value: 0.65,
+                            sample_count: 100,
+                            evaluated_sample_manifest_sha256: digest('8'),
+                            confidence_interval: None,
+                        },
+                    ],
+                },
+                BenchmarkSliceV1 {
                     slice_id: "composer-schubert".into(),
                     is_overall: false,
                     grouping_unit: Some(GroupingUnitV1::Composer),
@@ -824,6 +911,13 @@ mod tests {
                         MetricValueV1 {
                             metric_id: "mv2h".into(),
                             value: mv2h,
+                            sample_count: 100,
+                            evaluated_sample_manifest_sha256: digest('8'),
+                            confidence_interval: None,
+                        },
+                        MetricValueV1 {
+                            metric_id: "clews".into(),
+                            value: 0.65,
                             sample_count: 100,
                             evaluated_sample_manifest_sha256: digest('8'),
                             confidence_interval: None,
@@ -967,14 +1061,53 @@ mod tests {
     }
 
     #[test]
-    fn in_distribution_claim_requires_random_excerpt_split() {
+    fn in_distribution_claim_allows_work_or_session_holdouts_without_composer_leakage_claims() {
         let mut protocol = protocol(EvaluationTrackV1::Blind);
         protocol.split.claim = GeneralizationClaimV1::InDistribution;
-        protocol.split.grouping_unit = GroupingUnitV1::Composer;
+        protocol.split.grouping_unit = GroupingUnitV1::Work;
+        protocol.split.training_group_ids = vec!["work-a".into(), "work-b".into()];
+        protocol.split.evaluation_group_ids = vec!["work-c".into()];
         protocol.split.held_out_group_ids.clear();
+        assert_eq!(validate_benchmark_protocol(&protocol), Ok(()));
+
+        protocol.split.grouping_unit = GroupingUnitV1::RecordingSession;
+        assert_eq!(validate_benchmark_protocol(&protocol), Ok(()));
+    }
+
+    #[test]
+    fn ood_report_requires_every_held_out_group_and_metric_slice() {
+        let mut report = report("system-a", 0.61, EvaluationTrackV1::Blind);
+        report.slices.pop();
+        report.report_sha256 = benchmark_run_report_commitment(&report).unwrap();
         assert_eq!(
-            validate_benchmark_protocol(&protocol),
-            Err(BenchmarkValidationError::InvalidSplitPolicy)
+            validate_benchmark_run_report(&report),
+            Err(BenchmarkValidationError::MissingGroupSlice {
+                group_id: "Brahms".into()
+            })
+        );
+
+        let mut report = report("system-a", 0.61, EvaluationTrackV1::Blind);
+        report.slices[2].metrics.pop();
+        report.report_sha256 = benchmark_run_report_commitment(&report).unwrap();
+        assert_eq!(
+            validate_benchmark_run_report(&report),
+            Err(BenchmarkValidationError::MissingGroupMetricCoverage {
+                group_id: "Brahms".into(),
+                metric_id: "mv2h".into()
+            })
+        );
+    }
+
+    #[test]
+    fn overall_slice_must_report_every_declared_metric() {
+        let mut report = report("system-a", 0.61, EvaluationTrackV1::Blind);
+        report.slices[0].metrics.pop();
+        report.report_sha256 = benchmark_run_report_commitment(&report).unwrap();
+        assert_eq!(
+            validate_benchmark_run_report(&report),
+            Err(BenchmarkValidationError::MissingMetricCoverage {
+                metric_id: "clews".into()
+            })
         );
     }
 
