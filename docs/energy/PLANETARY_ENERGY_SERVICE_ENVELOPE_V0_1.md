@@ -331,3 +331,88 @@ Runner-independent work should begin with P1 fixtures and P2 pure accounting/sch
 - Nature Reviews Clean Technology (2026), perovskite PV commercialization perspective: <https://www.nature.com/articles/s44359-026-00173-2>
 
 Source URLs are discovery pointers. Each future admitted case must pin the exact publication/product version, date, system boundary, evidence class, applicability, data rights and source bytes/digest. Links alone are not qualification evidence.
+
+
+## 13. Industry comparison snapshot — 12 November 2026
+
+These references establish what an external comparator can currently support. They are not one interchangeable leaderboard.
+
+### Space-array specific power
+
+NASA's 2026 SmallSat Institute survey describes empirical spacecraft solar-array specific power as strongly clustered around approximately 30 W/kg, with the cited mission dataset bounded by an observed maximum around 200 W/kg. This is a spacecraft-array reference distribution, not a lunar surface plant target: surface foundations, dust mitigation, deployment, cabling, storage, radiators, power conversion and maintenance can dominate a surface installation.
+
+Benchmark requirement: report W/kg at cell, module, deployed-array, complete generation subsystem and complete maintained-plant boundaries. Compare the same environmental distance, mission, output voltage, deployment state and included mass.
+
+Source: https://www.nasa.gov/smallsat-institute/sst-soa/power-subsystems/
+
+### Terrestrial lifetime performance
+
+The NLR PV Fleet Performance Data Initiative reports a median fleet performance loss of 0.75%/year across 4,915 observations, with a P90 loss around 1.9%/year in the current published snapshot. A 2025 meta-analysis of 80 studies and 610 field degradation observations reports a 0.94%/year median module degradation rate. These figures are not contradictory: fleet-level performance loss and module degradation use different system boundaries and populations; soiling, inverter/plant faults, cohort selection and methodology matter.
+
+Benchmark requirement: preserve raw energy yield, plane-of-array irradiance, meteorology, sensor calibration, availability, soiling/cleaning events and module/inverter identities. Report degradation and recoverable loss separately. A high initial efficiency does not win a lifetime-service competition by itself.
+
+Sources:
+- https://nrel.sitefinity.cloud/pv/fleet-performance-data-initiative
+- https://doi.org/10.1016/j.rser.2025.115697
+- https://doi.org/10.2172/3020423
+
+### Lunar power and ISRU
+
+NASA's September 2026 NextSTEP-3 lunar enabling infrastructure call explicitly includes vertical solar arrays with generation, management, distribution and storage; radioisotope Stirling power; regolith oxygen production; advanced manufacturing and nanomaterial production. These are strong indicators that mission architecture must integrate energy with manufacturing and local resource conversion.
+
+NASA's February 2026 CaRD update reports integrated prototype tests using concentrated solar energy and simulated lunar regolith that confirmed carbon-monoxide production. This is a meaningful process-integration milestone, but it is not proof of an operational lunar plant, sustained oxygen production, or locally manufactured photovoltaic modules.
+
+NASA's 40-kWe-class Fission Surface Power programme is a continuous-power reference architecture targeting a lunar demonstration in the early 2030s. Compare it as a firm-power alternative under identical service requirements, not as a solar-cell competitor.
+
+Sources:
+- https://www.nasa.gov/news-release/nasa-calls-for-proposals-to-accelerate-lunar-surface-technologies/
+- https://www.nasa.gov/centers-and-facilities/johnson/sunlight-extracts-oxygen-from-regolith-using-solar-chemistry/
+- https://www.nasa.gov/exploration-systems-development-mission-directorate/fission-surface-power/
+
+### Lunar thermal and long-duration storage
+
+NASA's 2026 Thermal & Fluids Analysis Workshop proceedings include a concept for a radiant heat-pump system with a radiation-only condenser/radiator and preliminary analysis of roughly 15 kW peak habitat heat load. The work is described as concept/model development with future representative testing; it is not a demonstrated lunar product.
+
+A 2026 review of lunar chemical storage notes that regenerative fuel-cell concepts still require long-duration stability work in lunar conditions and that water-ice extraction/beneficiation/electrolysis are key dependencies for an ISRU-supplied loop.
+
+Benchmark requirement: compare storage by delivered service, full round-trip chain, lifetime, reserve, replacement, heat rejection, process dependencies and local consumables. Include a declared firm-power competitor and the long-duration darkness scenario.
+
+Sources:
+- https://tfaws.nasa.gov/tfaws-2026-2/paper-proceedings/
+- https://www.nature.com/articles/s44453-026-00053-w
+
+### Competitive positioning
+
+The most defensible path beyond the current field is not to claim a universal panel-efficiency record. It is to demonstrate, on common frozen missions and independently checkable boundaries:
+
+1. lower worst-case unserved critical energy at equal installed mass and lifecycle assumptions;
+2. lower lifetime burden per delivered electrical and temperature-graded thermal service;
+3. more reliable service under dust, degradation, thermal extremes, long darkness and component faults;
+4. a higher verified local-production capability with fewer critical imported dependencies;
+5. fewer physical experiments to reach a decision of equal or better quality, with all validation costs counted.
+
+A candidate is competitive only when it beats strong baselines on held-out scenarios and retains the hard physical/evidence constraints. A synthetic fixture or a source audit cannot establish these outcomes.
+
+## 14. Runner-independent audit command
+
+The first executable slice audits the inverse-square orbit-reference corpus only:
+
+```bash
+cargo run -p xtask -- planetary-energy-audit
+```
+
+To select another input or write the machine-readable report:
+
+```bash
+cargo run -p xtask -- planetary-energy-audit \
+  --input benchmarks/planetary-energy-service/v0.1/orbit-reference-cases.json \
+  --out reports/planetary-energy/orbit-reference-audit.json
+```
+
+Focused tests are authored under `xtask/src/planetary_energy.rs` and can be run with:
+
+```bash
+cargo test -p xtask
+```
+
+The command uses the existing `serde`, `serde_json`, `sha2` and `anyhow` dependencies. It refuses malformed schemas, unknown fields, invalid distances/units, duplicate identities, evidence-class promotion and values outside the declared rounding tolerance. PASS means only that the source corpus is internally consistent with the stated analytic relation. It is not a power-system, solar-array, thermal, storage, site or ISRU validation.
