@@ -83,7 +83,7 @@ struct Receiver {
     acquisition_chain_evidence_sha256: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 struct Position {
     position_id: String,
@@ -93,7 +93,7 @@ struct Position {
     expanded_position_uncertainty_m: f64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(deny_unknown_fields)]
 struct Sample {
     sample_id: String,
