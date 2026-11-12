@@ -432,6 +432,21 @@ fn validate_case(case: &Case) -> Vec<String> {
                 errors.push(format!("candidate {} is missing required metric {}", candidate.candidate_id, expected));
             }
         }
+        for objective in &case.objectives {
+            if let Some(observation) = candidate.metrics.iter().find(|metric| metric.metric_id == objective.metric_id)
+                && observation.unit != objective.unit
+            {
+                errors.push(format!("candidate {} objective {} unit differs from its declared objective unit", candidate.candidate_id, objective.metric_id));
+            }
+        }
+        for gate in &case.hard_gates {
+            if let Some(metric_id) = &gate.metric_id
+                && let Some(observation) = candidate.metrics.iter().find(|metric| &metric.metric_id == metric_id)
+                && gate.unit.as_deref() != Some(observation.unit.as_str())
+            {
+                errors.push(format!("candidate {} metric gate {} unit differs from its declared gate unit", candidate.candidate_id, gate.gate_id));
+            }
+        }
         for observed in &metric_ids {
             if !required_metric_ids.contains(observed) {
                 errors.push(format!("candidate {} supplies undeclared metric {}", candidate.candidate_id, observed));
@@ -998,11 +1013,9 @@ mod tests {
     fn hard_biosecurity_failure_excludes_candidate_despite_energy_advantage() {
         let mut input = case();
         input.candidates[0].metrics.iter_mut()
-            .find(|metric| metric.metric_id == "bio_release_count")
-            .unwrap().value = 1.0;
-        input.candidates[0].metrics.iter_mut()
             .find(|metric| metric.metric_id == "energy_per_cargo_work")
             .unwrap().value = 20.0;
+        input.candidates[0].gate_receipts[0].status = GateStatus::Failed;
         let report = audit(&input);
         assert_eq!(report.candidate_reports[0].disposition, "EXCLUDED_HARD_GATE");
         assert!(report.robust_frontier.iter().all(|entry| entry.candidate_id != "A"));
@@ -1046,6 +1059,7 @@ mod tests {
         for candidate in &mut input.candidates {
             let mut obs = metric("availability", 0.98, "fraction");
             obs.expanded_uncertainty = 0.01;
+            obs.operating_point_receipt_sha256 = candidate.operating_point_receipt_sha256.clone();
             candidate.metrics.push(obs);
         }
         assert_eq!(audit(&input).candidate_reports[0].disposition, "ELIGIBLE_FOR_ROBUST_PARETO");
@@ -1053,44 +1067,27 @@ mod tests {
 
     #[test]
     fn external_biosecurity_audit_receipt_is_required_and_consumed() {
-        let mut input = case();
-        let gate = &mut input.hard_gates[1];
-        gate.evaluation = GateEvaluation::ExternalAuditReceipt;
-        gate.metric_id = None;
-        gate.threshold = None;
-        gate.unit = None;
-        gate.required_audit_contract_id = Some("marine-biofouling-evidence-audit-v0.1".to_string());
-        for candidate in &mut input.candidates {
-            candidate.gate_receipts.push(GateReceipt {
-                gate_id: "biosecurity-release".to_string(),
-                status: GateStatus::Satisfied,
-                audit_contract_id: "marine-biofouling-evidence-audit-v0.1".to_string(),
-                audit_receipt_sha256: digest('8'),
-                requirement_reference: "permit:zero-uncontained-organism-release".to_string(),
-            });
-        }
-        assert_eq!(audit(&input).candidate_reports[0].disposition, "ELIGIBLE_FOR_ROBUST_PARETO");
+        let report = audit(&case());
+        assert_eq!(report.candidate_reports[0].disposition, "ELIGIBLE_FOR_ROBUST_PARETO");
+        let receipt = report.candidate_reports[0].gate_results.iter()
+            .find(|gate| gate.gate_id == "biosecurity-release").unwrap();
+        assert_eq!(receipt.status, "pass");
+        assert_eq!(receipt.audit_contract_id.as_deref(), Some("marine-biofouling-evidence-audit-v0.1"));
+        assert!(receipt.audit_receipt_sha256.is_some());
     }
 
     #[test]
-    fn external_gate_receipt_failure_excludes_candidate() {
+    fn external_gate_unresolved_receipt_holds_candidate() {
         let mut input = case();
-        let gate = &mut input.hard_gates[1];
-        gate.evaluation = GateEvaluation::ExternalAuditReceipt;
-        gate.metric_id = None;
-        gate.threshold = None;
-        gate.unit = None;
-        gate.required_audit_contract_id = Some("marine-biofouling-evidence-audit-v0.1".to_string());
-        for candidate in &mut input.candidates {
-            candidate.gate_receipts.push(GateReceipt {
-                gate_id: "biosecurity-release".to_string(),
-                status: if candidate.candidate_id == "A" { GateStatus::Failed } else { GateStatus::Satisfied },
-                audit_contract_id: "marine-biofouling-evidence-audit-v0.1".to_string(),
-                audit_receipt_sha256: digest('8'),
-                requirement_reference: "permit:zero-uncontained-organism-release".to_string(),
-            });
-        }
-        assert_eq!(audit(&input).candidate_reports[0].disposition, "EXCLUDED_HARD_GATE");
+        input.candidates[0].gate_receipts[0].status = GateStatus::Unresolved;
+        assert_eq!(audit(&input).candidate_reports[0].disposition, "HOLD_UNRESOLVED");
+    }
+
+    #[test]
+    fn missing_external_gate_receipt_is_incomplete() {
+        let mut input = case();
+        input.candidates[0].gate_receipts.clear();
+        assert_eq!(audit(&input).disposition, "INCOMPLETE");
     }
 
     #[test]
@@ -1140,9 +1137,10 @@ mod tests {
         let mut input = case();
         for candidate in &mut input.candidates {
             for metric in &mut candidate.metrics {
-                metric.expanded_uncertainty = if metric.metric_id == "bio_release_count" {0.01} else {10.0};
+                metric.expanded_uncertainty = 10.0;
             }
         }
+        input.hard_gates[0].threshold = Some(200.0);
         let report = audit(&input);
         assert_eq!(report.pairwise_relations[0].relation_from_a, "unresolved_interval_order");
         assert!(report.robust_frontier.iter().all(|entry| entry.certainty == "provisional_unresolved_pairs"));
