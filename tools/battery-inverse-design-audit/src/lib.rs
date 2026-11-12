@@ -54,7 +54,7 @@ pub enum EvidenceAdmission {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct EvidenceRecord {
     pub evidence_id: String,
-    pub source_sha256: String,
+    pub source_digest: String,
     pub claim_scope: String,
     pub validity_domain: String,
     pub admission: EvidenceAdmission,
@@ -184,7 +184,7 @@ fn validate_evidence_registry(
 
     let mut records = BTreeMap::new();
     for record in evidence {
-        validate_sha256(&record.source_sha256, "evidence source digest")?;
+        validate_sha256(&record.source_digest, "evidence source digest")?;
         if record.claim_scope.trim().is_empty() || record.validity_domain.trim().is_empty() {
             return Err(AuditError(format!(
                 "evidence {} has an empty claim scope or validity domain",
@@ -769,7 +769,7 @@ mod tests {
             EvidenceRecord {
                 evidence_id: "SYNTH-EVIDENCE".into(),
                 evidence_class: EvidenceClass::SyntheticFixture,
-                source_sha256: "1".repeat(64),
+                source_digest: "1".repeat(64),
                 claim_scope: "synthetic objective values".into(),
                 validity_domain: "test fixtures only".into(),
                 admission: EvidenceAdmission::AdmittedForEvaluation,
@@ -777,7 +777,7 @@ mod tests {
             EvidenceRecord {
                 evidence_id: "SYNTH-GATE".into(),
                 evidence_class: EvidenceClass::SyntheticFixture,
-                source_sha256: "2".repeat(64),
+                source_digest: "2".repeat(64),
                 claim_scope: "synthetic hard-gate fixture".into(),
                 validity_domain: "test fixtures only".into(),
                 admission: EvidenceAdmission::AdmittedForEvaluation,
@@ -785,7 +785,7 @@ mod tests {
             EvidenceRecord {
                 evidence_id: "SYNTH-VOI".into(),
                 evidence_class: EvidenceClass::SyntheticFixture,
-                source_sha256: "3".repeat(64),
+                source_digest: "3".repeat(64),
                 claim_scope: "synthetic experiment estimate".into(),
                 validity_domain: "test fixtures only".into(),
                 admission: EvidenceAdmission::AdmittedForEvaluation,
@@ -898,6 +898,7 @@ mod tests {
         let result = audit_design_portfolio(
             &scenarios(),
             &objectives(),
+            &evidence(),
             &[candidate(
                 "a",
                 [300.0, 1800.0, 100.0],
@@ -967,7 +968,7 @@ mod tests {
         let mut item = candidate("a", [300.0, 1800.0, 100.0], GateDisposition::Unknown);
         item.scenario_metrics.remove("hot");
 
-        let error = audit_design_portfolio(&scenarios(), &objectives(), &[item])
+        let error = audit_design_portfolio(&scenarios(), &objectives(), &evidence(), &[item])
             .expect_err("missing scenario must fail closed");
 
         assert!(error.0.contains("missing or unexpected scenario metrics"));
@@ -1040,7 +1041,7 @@ mod tests {
             allow_no_experiment: true,
         };
 
-        let selection = select_experiment(&options, &budget).expect("no-op is admissible");
+        let selection = select_experiment(&options, &evidence(), &budget).expect("no-op is admissible");
         assert_eq!(selection.experiment_id, None);
     }
 
@@ -1086,7 +1087,7 @@ mod tests {
     #[test]
     fn evidence_digest_must_be_well_formed_sha256() {
         let mut records = evidence();
-        records[0].source_sha256 = "not-a-digest".into();
+        records[0].source_digest = "not-a-digest".into();
         let item = candidate("a", [300.0, 1800.0, 100.0], GateDisposition::Unknown);
 
         let error = audit_design_portfolio(
