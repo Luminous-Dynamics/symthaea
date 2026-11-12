@@ -445,3 +445,50 @@ The plasma energy corpus now contains 16 source cases and 16 negative controls, 
 The corresponding benchmark programmes are [PLASMA-ENERGY-001 #11718](https://github.com/Luminous-Dynamics/symthaea/issues/11718), [THERMAL-STORE-INDUSTRIAL-001 #11734](https://github.com/Luminous-Dynamics/symthaea/issues/11734), [PLASMA-MHD-BENCH-001 #11733](https://github.com/Luminous-Dynamics/symthaea/issues/11733), and [FUS-DEC-001 #11755](https://github.com/Luminous-Dynamics/symthaea/issues/11755).
 
 All remain source-register and research-design evidence. No Luminous reproduction, physical measurement or whole-plant superiority is claimed.
+
+
+### Historical SOTA: LLNL electrostatic direct-converter experiments
+
+The new evidence register now includes two highly relevant historical physical benchmarks:
+
+**Barr, Moir & Kinney (1977)**, *Experimental and computational results on direct energy conversion for mirror fusion reactors*, Nuclear Fusion 17, DOI https://doi.org/10.1088/0029-5515/17/5/012.
+
+- A 22-stage electrostatic periodic-focusing converter with magnetic expander and hydrogen plasma source.
+- Reported low-beam-density measured average efficiency: 86.5 ± 1.5%; corresponding model prediction 88.6 ± 1.5%.
+- Efficiency fell as beam density and space-charge effects increased.
+- The paper's scaling/economic discussion suggested a mean ion energy above 500 keV for the studied recovery system to be likely economical.
+
+This is a strong historical electrostatic converter reference, not a plant result. Match the beam distribution, ion energy, density, stage geometry and meter denominator before comparing it with modern prototypes.
+
+**Barr & Moir (1983)**, *Test Results on Plasma Direct Converters*, Fusion Science and Technology 3(1), DOI https://doi.org/10.13182/FST83-A20820.
+
+- Single-stage and two-stage Venetian-blind bench units were tested up to 100 kV and 6 kW for approximately 80 hours, with power density up to 70 W/cm².
+- A separate single-stage unit mounted at the Tandem Mirror Experiment (TMX) end wall intercepted 138 W of end-loss plasma; gross recovered power was 79 W and suppressor-grid consumption was 12 W.
+- The paper reports 48% net efficiency. Direct arithmetic on the rounded source values gives 79 − 12 = 67 W net, or 48.55% of 138 W, consistent with a rounded 48% report.
+
+The 6 kW bench test and the 138 W TMX test are distinct test configurations. Preserve them separately. The TMX case is not a D-T fusion-born alpha-particle or whole-plant electricity result.
+
+**Scale-up lessons:** the 1983 paper reports background-gas ionization and secondary-electron emission becoming important as power density increased, and identifies high-voltage breakdown as a concern for large converters. The 1977 work shows space charge and ion-energy distribution can materially alter efficiency. These phenomena must become explicit benchmark axes.
+
+### Alternate industry architecture: Helion pulsed inductive energy recovery
+
+Helion describes a different architecture: high-beta field-reversed-configuration (FRC) plasmas expand against the machine magnetic field, inducing current through Faraday's law that is recaptured by the pulsed electrical system.
+
+- Technology: https://www.helionenergy.com/technology
+- Polaris prototype: https://www.helionenergy.com/polaris
+- FAQ / net-electricity boundary: https://www.helionenergy.com/faq
+
+Helion identifies inductive energy recovery as a core design feature and reports measured high-efficiency magnetic energy recovery, but its public material does not provide a source-matched numerical efficiency dataset suitable for independent ranking. Its FAQ clarifies that the company now prioritizes demonstrating electricity from fusion because its earlier use of the term “net electricity” was insufficiently defined.
+
+Keep pulsed inductive FRC recovery separate from electrostatic mirror loss-cone conversion. Compare only after the input/output boundary, pulse energy, magnetic field/current trajectories, storage/conditioning, auxiliary power and fusion-origin contribution are specified.
+
+### Revised direct-conversion benchmark ladder
+
+The machine-readable corpus now spans:
+1. 1977 multi-stage electrostatic converter and its space-charge scaling evidence;
+2. 1983 single-/two-stage bench and TMX end-loss tests with explicit parasitic suppressor power;
+3. ENN's 2026 low-parameter electrostatic fundamental-unit experiment;
+4. Realta/WHAM's 2026 three-grid D-only prototype;
+5. Helion's 2026 manufacturer-described pulsed-inductive recovery architecture.
+
+The source corpus separately includes a derived TMX net-power check (67 W, approximately 48.55% of the rounded 138 W incident figure). This validates arithmetic against the source values only; it does not turn the paper into a modern plant benchmark or independent reproduction.
