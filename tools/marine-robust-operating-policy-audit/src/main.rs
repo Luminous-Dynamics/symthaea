@@ -132,6 +132,18 @@ struct AuditReport {
     schema_version: &'static str,
     case_id: String,
     dataset_id: String,
+    source_data_sha256: String,
+    rights_decision_reference: String,
+    evidence_kind: &'static str,
+    rights_status: &'static str,
+    independently_reviewed: bool,
+    vessel_id: String,
+    vessel_configuration_sha256: String,
+    propeller_design_id: String,
+    propeller_revision: String,
+    route_id: String,
+    environment_fingerprint_sha256: String,
+    hull_state_sha256: String,
     service_fingerprint_sha256: String,
     scenario_fingerprint_sha256: String,
     disposition: &'static str,
@@ -145,11 +157,29 @@ struct AuditReport {
 }
 
 #[derive(Debug, Serialize)]
+struct SourceLevelEvidenceReceipt {
+    band_id: String,
+    quantity_id: String,
+    source_level_db: f64,
+    expanded_uncertainty_db: f64,
+    method_id: String,
+    evidence_sha256: String,
+}
+
+#[derive(Debug, Serialize)]
 struct CandidateReport {
     candidate_id: String,
     policy_label: String,
     operating_point_id: String,
+    scenario_fingerprint_sha256: String,
+    method_id: String,
+    evidence_review_receipt_sha256: String,
+    operating_point_receipt_sha256: String,
+    raw_measurement_or_validation_sha256: String,
+    propeller_rpm: f64,
+    vessel_speed_knots: f64,
     evidence_kind: &'static str,
+    source_level_evidence: Vec<SourceLevelEvidenceReceipt>,
     disposition: &'static str,
     constraint_decisions: Vec<ConstraintDecision>,
     robust_objectives: Vec<ObjectiveValue>,
@@ -554,7 +584,22 @@ fn evaluate_candidate(case: &Case, candidate: &Candidate) -> CandidateReport {
         candidate_id: candidate.candidate_id.clone(),
         policy_label: candidate.policy_label.clone(),
         operating_point_id: candidate.operating_point_id.clone(),
+        scenario_fingerprint_sha256: candidate.scenario_fingerprint_sha256.clone(),
+        method_id: candidate.method_id.clone(),
+        evidence_review_receipt_sha256: candidate.evidence_review_receipt_sha256.clone(),
+        operating_point_receipt_sha256: candidate.operating_point_receipt_sha256.clone(),
+        raw_measurement_or_validation_sha256: candidate.raw_measurement_or_validation_sha256.clone(),
+        propeller_rpm: candidate.propeller_rpm,
+        vessel_speed_knots: candidate.vessel_speed_knots,
         evidence_kind: evidence_name(&candidate.evidence_kind),
+        source_level_evidence: candidate.metrics.source_levels.iter().map(|source| SourceLevelEvidenceReceipt {
+            band_id: source.band_id.clone(),
+            quantity_id: source.quantity_id.clone(),
+            source_level_db: source.source_level_db,
+            expanded_uncertainty_db: source.expanded_uncertainty_db,
+            method_id: source.method_id.clone(),
+            evidence_sha256: source.evidence_sha256.clone(),
+        }).collect(),
         disposition,
         constraint_decisions,
         robust_objectives: robust_objectives(candidate),
@@ -626,6 +671,22 @@ fn audit(case: &Case) -> AuditReport {
         schema_version: SCHEMA_VERSION,
         case_id: case.case_id.clone(),
         dataset_id: case.source.dataset_id.clone(),
+        source_data_sha256: case.source.raw_data_sha256.clone(),
+        rights_decision_reference: case.source.rights_decision_reference.clone(),
+        evidence_kind: evidence_name(&case.evidence_kind),
+        rights_status: match case.rights_status {
+            RightsStatus::PublicOrPermitted => "public_or_permitted",
+            RightsStatus::Unknown => "unknown",
+            RightsStatus::Restricted => "restricted",
+        },
+        independently_reviewed: case.independently_reviewed,
+        vessel_id: case.scenario.vessel_id.clone(),
+        vessel_configuration_sha256: case.scenario.vessel_configuration_sha256.clone(),
+        propeller_design_id: case.scenario.propeller_design_id.clone(),
+        propeller_revision: case.scenario.propeller_revision.clone(),
+        route_id: case.scenario.route_id.clone(),
+        environment_fingerprint_sha256: case.scenario.environment_fingerprint_sha256.clone(),
+        hull_state_sha256: case.scenario.hull_state_sha256.clone(),
         service_fingerprint_sha256: case.scenario.service_fingerprint_sha256.clone(),
         scenario_fingerprint_sha256: case.scenario.scenario_fingerprint_sha256.clone(),
         disposition,
@@ -795,6 +856,21 @@ mod tests {
                 }),
             ],
         }
+    }
+
+    #[test]
+    fn operating_policy_receipt_preserves_scenario_and_band_evidence_lineage() {
+        let input = case();
+        let report = audit(&input);
+        assert_eq!(report.source_data_sha256, input.source.raw_data_sha256);
+        assert_eq!(report.vessel_id, input.scenario.vessel_id);
+        assert_eq!(report.propeller_revision, input.scenario.propeller_revision);
+        assert_eq!(report.scenario_fingerprint_sha256, input.scenario.scenario_fingerprint_sha256);
+        let candidate = report.candidate_reports.iter().find(|x| x.candidate_id == "A").unwrap();
+        assert_eq!(candidate.operating_point_receipt_sha256, input.candidates[0].operating_point_receipt_sha256);
+        assert_eq!(candidate.raw_measurement_or_validation_sha256, input.candidates[0].raw_measurement_or_validation_sha256);
+        assert_eq!(candidate.source_level_evidence.len(), 2);
+        assert_eq!(candidate.source_level_evidence[0].evidence_sha256, input.candidates[0].metrics.source_levels[0].evidence_sha256);
     }
 
     #[test]
