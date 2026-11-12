@@ -1045,6 +1045,37 @@ mod tests {
     }
 
     #[test]
+    fn registry_admitted_physical_evidence_can_satisfy_physical_gate() {
+        let mut records = evidence();
+        records.push(EvidenceRecord {
+            evidence_id: "PHYSICAL-SAFETY-REPORT".into(),
+            evidence_class: EvidenceClass::PhysicalMeasurement,
+            source_digest: "4".repeat(64),
+            claim_scope: "cell safety evidence for exact specimen".into(),
+            validity_domain: "declared laboratory protocol".into(),
+            admission: EvidenceAdmission::AdmittedForEvaluation,
+        });
+
+        let mut item = candidate("a", [300.0, 1800.0, 100.0], GateDisposition::Pass);
+        item.hard_gates
+            .iter_mut()
+            .find(|gate| gate.gate_id == "physical_safety")
+            .expect("physical safety gate")
+            .evidence_id = "PHYSICAL-SAFETY-REPORT".into();
+
+        let result = audit_design_portfolio(
+            &scenarios(),
+            &objectives(),
+            &records,
+            &[item],
+        )
+        .expect("physical evidence registry is well formed");
+
+        assert_eq!(result.eligible_candidate_ids, vec!["a".to_string()]);
+        assert_eq!(result.pareto_front_ids, vec!["a".to_string()]);
+    }
+
+    #[test]
     fn candidate_evidence_must_resolve_through_shared_registry() {
         let mut item = candidate("a", [300.0, 1800.0, 100.0], GateDisposition::Unknown);
         item.scenario_metrics
