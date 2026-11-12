@@ -1139,6 +1139,58 @@ mod tests {
     }
 
     #[test]
+    fn preflight_delivery_age_rejection_does_not_poison_next_valid_observation() {
+        let mut config = config();
+        config.maximum_observation_delivery_age_us = 1_000;
+        config.expected_camera_calibration_sha256 = Some("d".repeat(64));
+        let mut bridge = CameraDrivingBridge::try_new(config, VisionConfig::default()).unwrap();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+
+        let mut over_age = observation(&pixels, 1, 10_000, &state);
+        over_age.upstream.delivered_timestamp_us =
+            over_age.upstream.capture_timestamp_us + 1_001;
+        over_age.upstream.receipt_sha256 =
+            over_age.upstream.calculated_receipt_sha256();
+        assert_eq!(
+            bridge.observe(over_age).err(),
+            Some(BridgeError::UpstreamDeliveryAgeExceeded)
+        );
+        assert_eq!(bridge.frames_processed(), 0);
+
+        let accepted = bridge
+            .observe(observation(&pixels, 1, 10_000, &state))
+            .unwrap();
+        assert_eq!(accepted.receipt.capture_sequence, 1);
+        assert_eq!(bridge.frames_processed(), 1);
+    }
+
+    #[test]
+    fn preflight_calibration_rejection_does_not_poison_next_valid_observation() {
+        let mut config = config();
+        config.expected_camera_calibration_sha256 = Some("d".repeat(64));
+        let mut bridge = CameraDrivingBridge::try_new(config, VisionConfig::default()).unwrap();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+
+        let mut wrong_calibration = observation(&pixels, 1, 10_000, &state);
+        wrong_calibration.upstream.camera_calibration_sha256 = "f".repeat(64);
+        wrong_calibration.upstream.receipt_sha256 =
+            wrong_calibration.upstream.calculated_receipt_sha256();
+        assert_eq!(
+            bridge.observe(wrong_calibration).err(),
+            Some(BridgeError::UpstreamCalibrationMismatch)
+        );
+        assert_eq!(bridge.frames_processed(), 0);
+
+        let accepted = bridge
+            .observe(observation(&pixels, 1, 10_000, &state))
+            .unwrap();
+        assert_eq!(accepted.receipt.capture_sequence, 1);
+        assert_eq!(bridge.frames_processed(), 1);
+    }
+
+    #[test]
     fn rejects_zero_delivery_age_budget_as_invalid_bridge_config() {
         let mut config = config();
         config.maximum_observation_delivery_age_us = 0;
