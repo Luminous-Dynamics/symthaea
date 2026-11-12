@@ -1,0 +1,397 @@
+{
+  "schema": "luminous.airroad.mimo_impedance_passport.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_reference",
+  "sweep_identity": {
+    "configuration_digest": "sha256:aircraft-config",
+    "operating_point_digest": "sha256:op-42",
+    "sweep_digest": "sha256:sweep-7",
+    "origin": {
+      "kind": "analytical_reference",
+      "derivation_digest": "sha256:analytical-matrix-derivation"
+    }
+  },
+  "ports": [
+    {
+      "port_id": "bus-a",
+      "voltage_positive_reference": "bus-a-to-return",
+      "current_positive_direction": "injected-into-bus-a"
+    },
+    {
+      "port_id": "bus-b",
+      "voltage_positive_reference": "bus-b-to-return",
+      "current_positive_direction": "injected-into-bus-b"
+    }
+  ],
+  "matrix_definition": "Z_ij(jw) = V_i(jw) / I_j(jw)",
+  "frequency_slices": [
+    {
+      "angular_frequency_rad_s": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "columns": [
+        {
+          "driven_port_id": "bus-a",
+          "injected_current_a": {
+            "real": {
+              "numerator": "2",
+              "denominator": "1"
+            },
+            "imag": {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          },
+          "absolute_error_bound_a": {
+            "numerator": "1",
+            "denominator": "200"
+          },
+          "excitation_digest": "sha256:excitation-a-dc",
+          "column_payload_digest": "sha256:column-a-dc",
+          "voltage_observations": [
+            {
+              "observed_port_id": "bus-a",
+              "response_voltage_v": {
+                "real": {
+                  "numerator": "4",
+                  "denominator": "1"
+                },
+                "imag": {
+                  "numerator": "2",
+                  "denominator": "1"
+                }
+              },
+              "absolute_error_bound_v": {
+                "numerator": "1",
+                "denominator": "100"
+              }
+            },
+            {
+              "observed_port_id": "bus-b",
+              "response_voltage_v": {
+                "real": {
+                  "numerator": "1",
+                  "denominator": "1"
+                },
+                "imag": {
+                  "numerator": "-2",
+                  "denominator": "1"
+                }
+              },
+              "absolute_error_bound_v": {
+                "numerator": "1",
+                "denominator": "100"
+              }
+            }
+          ]
+        },
+        {
+          "driven_port_id": "bus-b",
+          "injected_current_a": {
+            "real": {
+              "numerator": "4",
+              "denominator": "1"
+            },
+            "imag": {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          },
+          "absolute_error_bound_a": {
+            "numerator": "1",
+            "denominator": "200"
+          },
+          "excitation_digest": "sha256:excitation-b-dc",
+          "column_payload_digest": "sha256:column-b-dc",
+          "voltage_observations": [
+            {
+              "observed_port_id": "bus-a",
+              "response_voltage_v": {
+                "real": {
+                  "numerator": "4",
+                  "denominator": "1"
+                },
+                "imag": {
+                  "numerator": "8",
+                  "denominator": "1"
+                }
+              },
+              "absolute_error_bound_v": {
+                "numerator": "1",
+                "denominator": "100"
+              }
+            },
+            {
+              "observed_port_id": "bus-b",
+              "response_voltage_v": {
+                "real": {
+                  "numerator": "12",
+                  "denominator": "1"
+                },
+                "imag": {
+                  "numerator": "-4",
+                  "denominator": "1"
+                }
+              },
+              "absolute_error_bound_v": {
+                "numerator": "1",
+                "denominator": "100"
+              }
+            }
+          ]
+        }
+      ],
+      "expected_impedance_matrix_ohm": [
+        [
+          {
+            "real": {
+              "numerator": "2",
+              "denominator": "1"
+            },
+            "imag": {
+              "numerator": "1",
+              "denominator": "1"
+            }
+          },
+          {
+            "real": {
+              "numerator": "1",
+              "denominator": "1"
+            },
+            "imag": {
+              "numerator": "2",
+              "denominator": "1"
+            }
+          }
+        ],
+        [
+          {
+            "real": {
+              "numerator": "1",
+              "denominator": "2"
+            },
+            "imag": {
+              "numerator": "-1",
+              "denominator": "1"
+            }
+          },
+          {
+            "real": {
+              "numerator": "3",
+              "denominator": "1"
+            },
+            "imag": {
+              "numerator": "-1",
+              "denominator": "1"
+            }
+          }
+        ]
+      ]
+    },
+    {
+      "angular_frequency_rad_s": {
+        "numerator": "10",
+        "denominator": "1"
+      },
+      "columns": [
+        {
+          "driven_port_id": "bus-a",
+          "injected_current_a": {
+            "real": {
+              "numerator": "2",
+              "denominator": "1"
+            },
+            "imag": {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          },
+          "absolute_error_bound_a": {
+            "numerator": "1",
+            "denominator": "200"
+          },
+          "excitation_digest": "sha256:excitation-a-10",
+          "column_payload_digest": "sha256:column-a-10",
+          "voltage_observations": [
+            {
+              "observed_port_id": "bus-a",
+              "response_voltage_v": {
+                "real": {
+                  "numerator": "4",
+                  "denominator": "1"
+                },
+                "imag": {
+                  "numerator": "2",
+                  "denominator": "1"
+                }
+              },
+              "absolute_error_bound_v": {
+                "numerator": "1",
+                "denominator": "100"
+              }
+            },
+            {
+              "observed_port_id": "bus-b",
+              "response_voltage_v": {
+                "real": {
+                  "numerator": "1",
+                  "denominator": "1"
+                },
+                "imag": {
+                  "numerator": "-2",
+                  "denominator": "1"
+                }
+              },
+              "absolute_error_bound_v": {
+                "numerator": "1",
+                "denominator": "100"
+              }
+            }
+          ]
+        },
+        {
+          "driven_port_id": "bus-b",
+          "injected_current_a": {
+            "real": {
+              "numerator": "4",
+              "denominator": "1"
+            },
+            "imag": {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          },
+          "absolute_error_bound_a": {
+            "numerator": "1",
+            "denominator": "200"
+          },
+          "excitation_digest": "sha256:excitation-b-10",
+          "column_payload_digest": "sha256:column-b-10",
+          "voltage_observations": [
+            {
+              "observed_port_id": "bus-a",
+              "response_voltage_v": {
+                "real": {
+                  "numerator": "4",
+                  "denominator": "1"
+                },
+                "imag": {
+                  "numerator": "8",
+                  "denominator": "1"
+                }
+              },
+              "absolute_error_bound_v": {
+                "numerator": "1",
+                "denominator": "100"
+              }
+            },
+            {
+              "observed_port_id": "bus-b",
+              "response_voltage_v": {
+                "real": {
+                  "numerator": "12",
+                  "denominator": "1"
+                },
+                "imag": {
+                  "numerator": "-4",
+                  "denominator": "1"
+                }
+              },
+              "absolute_error_bound_v": {
+                "numerator": "1",
+                "denominator": "100"
+              }
+            }
+          ]
+        }
+      ],
+      "expected_impedance_matrix_ohm": [
+        [
+          {
+            "real": {
+              "numerator": "2",
+              "denominator": "1"
+            },
+            "imag": {
+              "numerator": "1",
+              "denominator": "1"
+            }
+          },
+          {
+            "real": {
+              "numerator": "1",
+              "denominator": "1"
+            },
+            "imag": {
+              "numerator": "2",
+              "denominator": "1"
+            }
+          }
+        ],
+        [
+          {
+            "real": {
+              "numerator": "1",
+              "denominator": "2"
+            },
+            "imag": {
+              "numerator": "-1",
+              "denominator": "1"
+            }
+          },
+          {
+            "real": {
+              "numerator": "3",
+              "denominator": "1"
+            },
+            "imag": {
+              "numerator": "-1",
+              "denominator": "1"
+            }
+          }
+        ]
+      ]
+    }
+  ],
+  "negative_controls": [
+    {
+      "id": "missing-cross-port-observation",
+      "mutate": "remove bus-b voltage observation from bus-a excitation",
+      "expected": "not_evaluable_missing_matrix_element"
+    },
+    {
+      "id": "duplicate-driven-port",
+      "mutate": "replace bus-b excitation column with a second bus-a column",
+      "expected": "not_evaluable_duplicate_input_column"
+    },
+    {
+      "id": "measured-without-calibration",
+      "mutate": "set origin kind measured and omit calibration certificate digest",
+      "expected": "not_evaluable_missing_calibration"
+    },
+    {
+      "id": "off-knot-query",
+      "query_angular_frequency_rad_s": {
+        "numerator": "5",
+        "denominator": "1"
+      },
+      "expected": "not_evaluable_unsupported_frequency"
+    },
+    {
+      "id": "zero-excitation",
+      "mutate": "set injected current to zero",
+      "expected": "not_evaluable_invalid_excitation"
+    },
+    {
+      "id": "current-uncertainty-includes-zero",
+      "mutate": "set injected-current absolute error bound to at least the injected-current magnitude",
+      "expected": "not_evaluable_excitation_uncertainty_covers_zero"
+    }
+  ],
+  "claim_ceiling": [
+    "Synthetic analytical matrix only.",
+    "The uncertainty bounds are retained but not propagated into an impedance enclosure.",
+    "No measured, simulated, aircraft, PHIL/HIL or certification evidence is claimed."
+  ]
+}
