@@ -130,15 +130,9 @@ pub struct Analysis {
 /// The discriminant ambiguity band intentionally withholds a positive
 /// disposition near collapse. This is a research reference, not a formally
 /// qualified interval-arithmetic kernel.
-pub fn analyze(
-    parameters: Parameters,
-    initial_voltage_v: f64,
-) -> Result<Analysis, AnalysisError> {
+pub fn analyze(parameters: Parameters, initial_voltage_v: f64) -> Result<Analysis, AnalysisError> {
     validate_positive("source_voltage_v", parameters.source_voltage_v)?;
-    validate_positive(
-        "source_resistance_ohm",
-        parameters.source_resistance_ohm,
-    )?;
+    validate_positive("source_resistance_ohm", parameters.source_resistance_ohm)?;
     validate_positive("bus_capacitance_f", parameters.bus_capacitance_f)?;
     validate_positive("load_power_w", parameters.load_power_w)?;
 
@@ -150,8 +144,7 @@ pub fn analyze(
     }
 
     let source_square = parameters.source_voltage_v * parameters.source_voltage_v;
-    let resistance_power =
-        parameters.source_resistance_ohm * parameters.load_power_w;
+    let resistance_power = parameters.source_resistance_ohm * parameters.load_power_w;
     let load_term = 4.0 * resistance_power;
 
     if !source_square.is_finite()
@@ -171,8 +164,9 @@ pub fn analyze(
 
     // FMA rounds the source-square subtraction once. The load term has already
     // been rounded by its two multiplications, so retain an ambiguity guard.
-    let discriminant_v2 =
-        parameters.source_voltage_v.mul_add(parameters.source_voltage_v, -load_term);
+    let discriminant_v2 = parameters
+        .source_voltage_v
+        .mul_add(parameters.source_voltage_v, -load_term);
     if !discriminant_v2.is_finite() {
         return Err(AnalysisError::UnrepresentableIntermediate);
     }
@@ -208,8 +202,7 @@ pub fn analyze(
     }
 
     let root_discriminant = discriminant_v2.sqrt();
-    let upper_voltage_v =
-        (parameters.source_voltage_v * 0.5) + (root_discriminant * 0.5);
+    let upper_voltage_v = (parameters.source_voltage_v * 0.5) + (root_discriminant * 0.5);
 
     // Use the product of roots (Rs * P) to avoid cancellation in Vs - sqrt(Delta).
     let lower_voltage_v = resistance_power / upper_voltage_v;
@@ -348,10 +341,7 @@ mod tests {
         assert!((lower.eigenvalue_per_s - 200.0).abs() < 1e-10);
         assert!((upper.eigenvalue_per_s + (200.0 / 3.0)).abs() < 1e-10);
         assert_eq!(lower.stability, LocalStability::Unstable);
-        assert_eq!(
-            upper.stability,
-            LocalStability::LocallyAsymptoticallyStable
-        );
+        assert_eq!(upper.stability, LocalStability::LocallyAsymptoticallyStable);
         assert_eq!(
             analysis.initial_voltage_basin,
             Some(InitialVoltageBasin::BetweenEquilibriaTowardStableRoot)
@@ -375,10 +365,7 @@ mod tests {
     fn exact_fold_is_withheld_as_numerically_indeterminate() {
         let analysis = analyze(parameters(2_500.0), 60.0).expect("valid fixture");
         assert_eq!(analysis.discriminant_v2, 0.0);
-        assert_eq!(
-            analysis.result,
-            EquilibriumResult::NumericallyIndeterminate
-        );
+        assert_eq!(analysis.result, EquilibriumResult::NumericallyIndeterminate);
         assert_eq!(analysis.initial_voltage_basin, None);
         assert_eq!(analysis.normalized_fold_margin, 0.0);
     }
@@ -423,14 +410,14 @@ mod tests {
 
     #[test]
     fn near_basin_boundaries_are_not_silently_classified() {
-        let near_lower = analyze(parameters(1_875.0), 25.0 + f64::EPSILON * 128.0)
-            .expect("valid fixture");
+        let near_lower =
+            analyze(parameters(1_875.0), 25.0 + f64::EPSILON * 128.0).expect("valid fixture");
         assert_eq!(
             near_lower.initial_voltage_basin,
             Some(InitialVoltageBasin::NearUnstableEquilibriumBoundary)
         );
-        let near_upper = analyze(parameters(1_875.0), 75.0 - f64::EPSILON * 256.0)
-            .expect("valid fixture");
+        let near_upper =
+            analyze(parameters(1_875.0), 75.0 - f64::EPSILON * 256.0).expect("valid fixture");
         assert_eq!(
             near_upper.initial_voltage_basin,
             Some(InitialVoltageBasin::NearStableEquilibrium)
