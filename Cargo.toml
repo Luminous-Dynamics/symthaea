@@ -18,6 +18,9 @@ exclude = [
     # This glob-matched path is a source/examples directory, not a Cargo package.
     # Excluding it keeps cargo metadata/format/test commands scoped to real members.
     "crates/core/symthaea",
+    # This is a source-only attestation prototype, not a Cargo package yet.
+    # Keep it outside the broad core glob until its crate ownership is resolved.
+    "crates/core/symthaea-observation-attestation",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
