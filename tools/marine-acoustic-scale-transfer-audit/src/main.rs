@@ -209,8 +209,11 @@ struct BandReport {
     frequency_regime: &'static str,
     frequency_regime_basis: String,
     spl_scale_delta_db: f64,
+    scale_transfer_u95_db: f64,
     model_source_level_db: f64,
     predicted_full_scale_source_level_db: f64,
+    signed_error_db: Option<f64>,
+    absolute_error_db: Option<f64>,
     predicted_interval_lower_db: Option<f64>,
     predicted_interval_upper_db: Option<f64>,
     mapped_frequency_hz: f64,
@@ -586,8 +589,11 @@ fn audit(case: &Case) -> AuditReport {
                     frequency_regime: frequency_regime_name(&model_band.frequency_regime),
                     frequency_regime_basis: model_band.frequency_regime_basis.clone(),
                     spl_scale_delta_db: delta_db,
+                    scale_transfer_u95_db: model_band.scale_transfer_u95_db,
                     model_source_level_db: model_source_level,
                     predicted_full_scale_source_level_db: predicted_full_scale,
+                    signed_error_db: None,
+                    absolute_error_db: None,
                     predicted_interval_lower_db: None,
                     predicted_interval_upper_db: None,
                     mapped_frequency_hz: mapped_frequency,
@@ -610,8 +616,11 @@ fn audit(case: &Case) -> AuditReport {
                     frequency_regime: frequency_regime_name(&model_band.frequency_regime),
                     frequency_regime_basis: model_band.frequency_regime_basis.clone(),
                     spl_scale_delta_db: delta_db,
+                    scale_transfer_u95_db: model_band.scale_transfer_u95_db,
                     model_source_level_db: model_source_level,
                     predicted_full_scale_source_level_db: predicted_full_scale,
+                    signed_error_db: Some(predicted_full_scale - full_band.source_level_db),
+                    absolute_error_db: Some((predicted_full_scale - full_band.source_level_db).abs()),
                     predicted_interval_lower_db: None,
                     predicted_interval_upper_db: None,
                     mapped_frequency_hz: mapped_frequency,
@@ -641,8 +650,11 @@ fn audit(case: &Case) -> AuditReport {
                     frequency_regime: frequency_regime_name(&model_band.frequency_regime),
                     frequency_regime_basis: model_band.frequency_regime_basis.clone(),
                     spl_scale_delta_db: delta_db,
+                    scale_transfer_u95_db: model_band.scale_transfer_u95_db,
                     model_source_level_db: model_source_level,
                     predicted_full_scale_source_level_db: predicted_full_scale,
+                    signed_error_db: Some(predicted_full_scale - full_band.source_level_db),
+                    absolute_error_db: Some((predicted_full_scale - full_band.source_level_db).abs()),
                     predicted_interval_lower_db: None,
                     predicted_interval_upper_db: None,
                     mapped_frequency_hz: mapped_frequency,
@@ -677,8 +689,11 @@ fn audit(case: &Case) -> AuditReport {
                 frequency_regime: frequency_regime_name(&model_band.frequency_regime),
                 frequency_regime_basis: model_band.frequency_regime_basis.clone(),
                 spl_scale_delta_db: delta_db,
+                scale_transfer_u95_db: model_band.scale_transfer_u95_db,
                 model_source_level_db: model_source_level,
                 predicted_full_scale_source_level_db: predicted_full_scale,
+                signed_error_db: Some(predicted_full_scale - full_band.source_level_db),
+                absolute_error_db: Some((predicted_full_scale - full_band.source_level_db).abs()),
                 predicted_interval_lower_db: Some(predicted_lower),
                 predicted_interval_upper_db: Some(predicted_upper),
                 mapped_frequency_hz: mapped_frequency,
@@ -1084,11 +1099,23 @@ mod tests {
     #[test]
     fn disjoint_prediction_and_observation_intervals_are_reported() {
         let mut case = fixture_case();
+        case.evidence_kind = EvidenceKind::Measured;
+        case.source.rights_status = RightsStatus::PublicOrPermitted;
+        case.source.independently_reviewed = true;
         case.pairs[0].full_scale.bands[0].source_level_db = 150.0;
         let report = audit(&case);
         assert_eq!(report.comparison_outcome, "at_least_one_band_disjoint");
         assert_eq!(report.disposition, "comparison_outside_declared_uncertainty");
         assert_eq!(report.pair_reports[0].band_reports[0].comparison, "intervals_disjoint");
+        assert!(report.pair_reports[0].band_reports[0].signed_error_db.unwrap() < 0.0);
+        assert_eq!(
+            report.pair_reports[0].band_reports[0].absolute_error_db.unwrap(),
+            report.pair_reports[0].band_reports[0].signed_error_db.unwrap().abs()
+        );
+        assert_eq!(
+            report.pair_reports[0].band_reports[0].scale_transfer_u95_db,
+            case.pairs[0].model.bands[0].scale_transfer_u95_db
+        );
     }
 
     #[test]
