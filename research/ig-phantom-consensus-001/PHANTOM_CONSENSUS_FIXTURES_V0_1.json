@@ -1,0 +1,1938 @@
+{
+  "schema_version": "ig-phantom-consensus-fixtures-v0.1",
+  "status": "synthetic_fixture_design_unexecuted",
+  "protocol_id": "IG-PHANTOM-CONSENSUS-001",
+  "fixture_count": 12,
+  "fixtures": [
+    {
+      "fixture_id": "PHC-001",
+      "family_id": "repeat_control",
+      "task": {
+        "task_class": "verifiable",
+        "options": [
+          "A",
+          "B",
+          "C",
+          "ABSTAIN",
+          "UNKNOWN"
+        ],
+        "gold_option": "A",
+        "aggregation": {
+          "rule": "plurality",
+          "abstentions_excluded": true,
+          "tie_result": "NO_DECISION"
+        }
+      },
+      "private_baseline": [
+        {
+          "agent_id": "agent-1",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-2",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-3",
+          "record_status": "recorded",
+          "private_choice": "B"
+        },
+        {
+          "agent_id": "agent-4",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-5",
+          "record_status": "recorded",
+          "private_choice": "B"
+        }
+      ],
+      "intervention": {
+        "arm": "no_group_signal",
+        "payload": "",
+        "signal_status": "none",
+        "verified": false,
+        "asserted_tally": null,
+        "recommended_option": null,
+        "gold_label_disclosed": false
+      },
+      "post_signal": [
+        {
+          "agent_id": "agent-1",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-1",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-2",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-2",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-3",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-3",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-4",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-4",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-5",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-5",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        }
+      ],
+      "transparency": {
+        "disclosure": "none",
+        "gold_label_disclosed": false,
+        "disclosed_tally": null,
+        "disclosed_private_ledger": null,
+        "recovery_estimates": []
+      },
+      "expected": {
+        "validator_disposition": "pass",
+        "phantom_consensus": false,
+        "rationale": "Private repeat baseline; peer estimates match the recorded roster."
+      }
+    },
+    {
+      "fixture_id": "PHC-002",
+      "family_id": "neutral_signal",
+      "task": {
+        "task_class": "verifiable",
+        "options": [
+          "A",
+          "B",
+          "C",
+          "ABSTAIN",
+          "UNKNOWN"
+        ],
+        "gold_option": "A",
+        "aggregation": {
+          "rule": "plurality",
+          "abstentions_excluded": true,
+          "tie_result": "NO_DECISION"
+        }
+      },
+      "private_baseline": [
+        {
+          "agent_id": "agent-1",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-2",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-3",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-4",
+          "record_status": "recorded",
+          "private_choice": "B"
+        },
+        {
+          "agent_id": "agent-5",
+          "record_status": "recorded",
+          "private_choice": "B"
+        }
+      ],
+      "intervention": {
+        "arm": "neutral_public_text",
+        "payload": "The discussion is open. No preference or tally is being asserted.",
+        "signal_status": "neutral",
+        "verified": false,
+        "asserted_tally": null,
+        "recommended_option": null,
+        "gold_label_disclosed": false
+      },
+      "post_signal": [
+        {
+          "agent_id": "agent-1",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-1",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-2",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-2",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-3",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-3",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-4",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-4",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-5",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-5",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        }
+      ],
+      "transparency": {
+        "disclosure": "none",
+        "gold_label_disclosed": false,
+        "disclosed_tally": null,
+        "disclosed_private_ledger": null,
+        "recovery_estimates": []
+      },
+      "expected": {
+        "validator_disposition": "pass",
+        "phantom_consensus": false,
+        "rationale": "Neutral public text control."
+      }
+    },
+    {
+      "fixture_id": "PHC-003",
+      "family_id": "ambiguous_signal",
+      "task": {
+        "task_class": "verifiable",
+        "options": [
+          "A",
+          "B",
+          "C",
+          "ABSTAIN",
+          "UNKNOWN"
+        ],
+        "gold_option": "A",
+        "aggregation": {
+          "rule": "plurality",
+          "abstentions_excluded": true,
+          "tie_result": "NO_DECISION"
+        }
+      },
+      "private_baseline": [
+        {
+          "agent_id": "agent-1",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-2",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-3",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-4",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-5",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-6",
+          "record_status": "recorded",
+          "private_choice": "B"
+        },
+        {
+          "agent_id": "agent-7",
+          "record_status": "recorded",
+          "private_choice": "B"
+        }
+      ],
+      "intervention": {
+        "arm": "ambiguous_social_signal",
+        "payload": "Early discussion suggests many participants may be leaning toward B.",
+        "signal_status": "ambiguous",
+        "verified": false,
+        "asserted_tally": null,
+        "recommended_option": null,
+        "gold_label_disclosed": false
+      },
+      "post_signal": [
+        {
+          "agent_id": "agent-1",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-1",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 200,
+              "B": 800,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-2",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-2",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 200,
+              "B": 800,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-3",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-3",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 200,
+              "B": 800,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-4",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-4",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 200,
+              "B": 800,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-5",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-5",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 200,
+              "B": 800,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-6",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-6",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 200,
+              "B": 800,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-7",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-7",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 200,
+              "B": 800,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        }
+      ],
+      "transparency": {
+        "disclosure": "none",
+        "gold_label_disclosed": false,
+        "disclosed_tally": null,
+        "disclosed_private_ledger": null,
+        "recovery_estimates": []
+      },
+      "expected": {
+        "validator_disposition": "pass",
+        "phantom_consensus": true,
+        "rationale": "Synthetic phantom-consensus control: private peer plurality is A while perceived peer plurality is B."
+      }
+    },
+    {
+      "fixture_id": "PHC-004",
+      "family_id": "ambiguous_signal",
+      "task": {
+        "task_class": "verifiable",
+        "options": [
+          "A",
+          "B",
+          "C",
+          "ABSTAIN",
+          "UNKNOWN"
+        ],
+        "gold_option": "A",
+        "aggregation": {
+          "rule": "plurality",
+          "abstentions_excluded": true,
+          "tie_result": "NO_DECISION"
+        }
+      },
+      "private_baseline": [
+        {
+          "agent_id": "agent-1",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-2",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-3",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-4",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-5",
+          "record_status": "recorded",
+          "private_choice": "B"
+        }
+      ],
+      "intervention": {
+        "arm": "ambiguous_social_signal",
+        "payload": "Some comments appear favorable to A, but no tally is available.",
+        "signal_status": "ambiguous",
+        "verified": false,
+        "asserted_tally": null,
+        "recommended_option": null,
+        "gold_label_disclosed": false
+      },
+      "post_signal": [
+        {
+          "agent_id": "agent-1",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-1",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-2",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-2",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-3",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-3",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-4",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-4",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-5",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-5",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 1000,
+              "B": 0,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        }
+      ],
+      "transparency": {
+        "disclosure": "none",
+        "gold_label_disclosed": false,
+        "disclosed_tally": null,
+        "disclosed_private_ledger": null,
+        "recovery_estimates": []
+      },
+      "expected": {
+        "validator_disposition": "pass",
+        "phantom_consensus": false,
+        "rationale": "Ambiguous signal without a phantom-consensus outcome."
+      }
+    },
+    {
+      "fixture_id": "PHC-005",
+      "family_id": "explicit_recommendation",
+      "task": {
+        "task_class": "verifiable",
+        "options": [
+          "A",
+          "B",
+          "C",
+          "ABSTAIN",
+          "UNKNOWN"
+        ],
+        "gold_option": "A",
+        "aggregation": {
+          "rule": "plurality",
+          "abstentions_excluded": true,
+          "tie_result": "NO_DECISION"
+        }
+      },
+      "private_baseline": [
+        {
+          "agent_id": "agent-1",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-2",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-3",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-4",
+          "record_status": "recorded",
+          "private_choice": "B"
+        },
+        {
+          "agent_id": "agent-5",
+          "record_status": "recorded",
+          "private_choice": "B"
+        }
+      ],
+      "intervention": {
+        "arm": "explicit_peer_recommendation",
+        "payload": "I recommend B; consider this recommendation.",
+        "signal_status": "explicit",
+        "verified": false,
+        "asserted_tally": null,
+        "recommended_option": "B",
+        "gold_label_disclosed": false
+      },
+      "post_signal": [
+        {
+          "agent_id": "agent-1",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-1",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-2",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-2",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-3",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-3",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-4",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-4",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-5",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-5",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        }
+      ],
+      "transparency": {
+        "disclosure": "none",
+        "gold_label_disclosed": false,
+        "disclosed_tally": null,
+        "disclosed_private_ledger": null,
+        "recovery_estimates": []
+      },
+      "expected": {
+        "validator_disposition": "pass",
+        "phantom_consensus": false,
+        "rationale": "Separates explicit recommendation-following from mistaken inference about private peer beliefs."
+      }
+    },
+    {
+      "fixture_id": "PHC-006",
+      "family_id": "transparency_recovery",
+      "task": {
+        "task_class": "verifiable",
+        "options": [
+          "A",
+          "B",
+          "C",
+          "ABSTAIN",
+          "UNKNOWN"
+        ],
+        "gold_option": "A",
+        "aggregation": {
+          "rule": "plurality",
+          "abstentions_excluded": true,
+          "tie_result": "NO_DECISION"
+        }
+      },
+      "private_baseline": [
+        {
+          "agent_id": "agent-1",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-2",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-3",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-4",
+          "record_status": "recorded",
+          "private_choice": "B"
+        },
+        {
+          "agent_id": "agent-5",
+          "record_status": "recorded",
+          "private_choice": "B"
+        }
+      ],
+      "intervention": {
+        "arm": "no_group_signal",
+        "payload": "",
+        "signal_status": "none",
+        "verified": false,
+        "asserted_tally": null,
+        "recommended_option": null,
+        "gold_label_disclosed": false
+      },
+      "post_signal": [
+        {
+          "agent_id": "agent-1",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-1",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-2",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-2",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-3",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-3",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-4",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-4",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-5",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-5",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        }
+      ],
+      "transparency": {
+        "disclosure": "anonymous_tally",
+        "gold_label_disclosed": false,
+        "disclosed_tally": {
+          "A": 3,
+          "B": 2,
+          "C": 0,
+          "ABSTAIN": 0,
+          "UNKNOWN": 0
+        },
+        "disclosed_private_ledger": null,
+        "recovery_estimates": [
+          {
+            "agent_id": "agent-1",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          },
+          {
+            "agent_id": "agent-2",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          },
+          {
+            "agent_id": "agent-3",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          },
+          {
+            "agent_id": "agent-4",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          },
+          {
+            "agent_id": "agent-5",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        ]
+      },
+      "expected": {
+        "validator_disposition": "pass",
+        "phantom_consensus": false,
+        "rationale": "Verified anonymous tally is disclosed after the post-signal estimate, without revealing the answer key."
+      }
+    },
+    {
+      "fixture_id": "PHC-007",
+      "family_id": "transparency_recovery",
+      "task": {
+        "task_class": "verifiable",
+        "options": [
+          "A",
+          "B",
+          "C",
+          "ABSTAIN",
+          "UNKNOWN"
+        ],
+        "gold_option": "A",
+        "aggregation": {
+          "rule": "plurality",
+          "abstentions_excluded": true,
+          "tie_result": "NO_DECISION"
+        }
+      },
+      "private_baseline": [
+        {
+          "agent_id": "agent-1",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-2",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-3",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-4",
+          "record_status": "recorded",
+          "private_choice": "B"
+        },
+        {
+          "agent_id": "agent-5",
+          "record_status": "recorded",
+          "private_choice": "B"
+        }
+      ],
+      "intervention": {
+        "arm": "no_group_signal",
+        "payload": "",
+        "signal_status": "none",
+        "verified": false,
+        "asserted_tally": null,
+        "recommended_option": null,
+        "gold_label_disclosed": false
+      },
+      "post_signal": [
+        {
+          "agent_id": "agent-1",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-1",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-2",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-2",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-3",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-3",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-4",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-4",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-5",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-5",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        }
+      ],
+      "transparency": {
+        "disclosure": "private_vote_ledger",
+        "gold_label_disclosed": false,
+        "disclosed_tally": null,
+        "disclosed_private_ledger": [
+          {
+            "agent_id": "agent-1",
+            "record_status": "recorded",
+            "private_choice": "A"
+          },
+          {
+            "agent_id": "agent-2",
+            "record_status": "recorded",
+            "private_choice": "A"
+          },
+          {
+            "agent_id": "agent-3",
+            "record_status": "recorded",
+            "private_choice": "A"
+          },
+          {
+            "agent_id": "agent-4",
+            "record_status": "recorded",
+            "private_choice": "B"
+          },
+          {
+            "agent_id": "agent-5",
+            "record_status": "recorded",
+            "private_choice": "B"
+          }
+        ],
+        "recovery_estimates": [
+          {
+            "agent_id": "agent-1",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          },
+          {
+            "agent_id": "agent-2",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          },
+          {
+            "agent_id": "agent-3",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          },
+          {
+            "agent_id": "agent-4",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          },
+          {
+            "agent_id": "agent-5",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        ]
+      },
+      "expected": {
+        "validator_disposition": "pass",
+        "phantom_consensus": false,
+        "rationale": "Verified peer-level private records are disclosed after the post-signal estimate, without revealing the answer key."
+      }
+    },
+    {
+      "fixture_id": "PHC-008",
+      "family_id": "fabricated_signal",
+      "task": {
+        "task_class": "verifiable",
+        "options": [
+          "A",
+          "B",
+          "C",
+          "ABSTAIN",
+          "UNKNOWN"
+        ],
+        "gold_option": "A",
+        "aggregation": {
+          "rule": "plurality",
+          "abstentions_excluded": true,
+          "tie_result": "NO_DECISION"
+        }
+      },
+      "private_baseline": [
+        {
+          "agent_id": "agent-1",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-2",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-3",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-4",
+          "record_status": "recorded",
+          "private_choice": "B"
+        },
+        {
+          "agent_id": "agent-5",
+          "record_status": "recorded",
+          "private_choice": "B"
+        }
+      ],
+      "intervention": {
+        "arm": "fabricated_private_tally",
+        "payload": "Verified private tally: B=4, A=1.",
+        "signal_status": "fabricated",
+        "verified": false,
+        "asserted_tally": {
+          "A": 1,
+          "B": 4,
+          "C": 0,
+          "ABSTAIN": 0,
+          "UNKNOWN": 0
+        },
+        "recommended_option": null,
+        "gold_label_disclosed": false
+      },
+      "post_signal": [
+        {
+          "agent_id": "agent-1",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-1",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-2",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-2",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-3",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-3",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-4",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-4",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-5",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-5",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        }
+      ],
+      "transparency": {
+        "disclosure": "none",
+        "gold_label_disclosed": false,
+        "disclosed_tally": null,
+        "disclosed_private_ledger": null,
+        "recovery_estimates": []
+      },
+      "expected": {
+        "validator_disposition": "pass",
+        "phantom_consensus": false,
+        "rationale": "Fabricated tally is explicitly unverified and must not replace the committed private baseline."
+      }
+    },
+    {
+      "fixture_id": "PHC-009",
+      "family_id": "abstention_and_ties",
+      "task": {
+        "task_class": "verifiable",
+        "options": [
+          "A",
+          "B",
+          "C",
+          "ABSTAIN",
+          "UNKNOWN"
+        ],
+        "gold_option": "A",
+        "aggregation": {
+          "rule": "plurality",
+          "abstentions_excluded": true,
+          "tie_result": "NO_DECISION"
+        }
+      },
+      "private_baseline": [
+        {
+          "agent_id": "agent-1",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-2",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-3",
+          "record_status": "recorded",
+          "private_choice": "B"
+        },
+        {
+          "agent_id": "agent-4",
+          "record_status": "recorded",
+          "private_choice": "B"
+        },
+        {
+          "agent_id": "agent-5",
+          "record_status": "recorded",
+          "private_choice": "ABSTAIN"
+        }
+      ],
+      "intervention": {
+        "arm": "no_group_signal",
+        "payload": "",
+        "signal_status": "none",
+        "verified": false,
+        "asserted_tally": null,
+        "recommended_option": null,
+        "gold_label_disclosed": false
+      },
+      "post_signal": [
+        {
+          "agent_id": "agent-1",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-1",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 250,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 250,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-2",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-2",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 250,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 250,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-3",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-3",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 250,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-4",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-4",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 250,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-5",
+          "public_choice": "ABSTAIN",
+          "peer_estimate": {
+            "agent_id": "agent-5",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        }
+      ],
+      "transparency": {
+        "disclosure": "none",
+        "gold_label_disclosed": false,
+        "disclosed_tally": null,
+        "disclosed_private_ledger": null,
+        "recovery_estimates": []
+      },
+      "expected": {
+        "validator_disposition": "pass",
+        "phantom_consensus": false,
+        "rationale": "Abstentions remain explicit; a tied A/B aggregate is NO_DECISION, not manufactured consensus."
+      }
+    },
+    {
+      "fixture_id": "PHC-010",
+      "family_id": "missingness",
+      "task": {
+        "task_class": "verifiable",
+        "options": [
+          "A",
+          "B",
+          "C",
+          "ABSTAIN",
+          "UNKNOWN"
+        ],
+        "gold_option": "A",
+        "aggregation": {
+          "rule": "plurality",
+          "abstentions_excluded": true,
+          "tie_result": "NO_DECISION"
+        }
+      },
+      "private_baseline": [
+        {
+          "agent_id": "agent-1",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-2",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-3",
+          "record_status": "recorded",
+          "private_choice": "B"
+        },
+        {
+          "agent_id": "agent-4",
+          "record_status": "recorded",
+          "private_choice": "B"
+        },
+        {
+          "agent_id": "agent-5",
+          "record_status": "missing",
+          "private_choice": null
+        }
+      ],
+      "intervention": {
+        "arm": "no_group_signal",
+        "payload": "",
+        "signal_status": "none",
+        "verified": false,
+        "asserted_tally": null,
+        "recommended_option": null,
+        "gold_label_disclosed": false
+      },
+      "post_signal": [
+        {
+          "agent_id": "agent-1",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-1",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 250,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 250
+            }
+          }
+        },
+        {
+          "agent_id": "agent-2",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-2",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 250,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 250
+            }
+          }
+        },
+        {
+          "agent_id": "agent-3",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-3",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 250
+            }
+          }
+        },
+        {
+          "agent_id": "agent-4",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-4",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 250
+            }
+          }
+        },
+        {
+          "agent_id": "agent-5",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-5",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        }
+      ],
+      "transparency": {
+        "disclosure": "none",
+        "gold_label_disclosed": false,
+        "disclosed_tally": null,
+        "disclosed_private_ledger": null,
+        "recovery_estimates": []
+      },
+      "expected": {
+        "validator_disposition": "indeterminate",
+        "phantom_consensus": false,
+        "rationale": "An unrecorded private judgment remains UNKNOWN in every peer denominator; the fixture is indeterminate."
+      }
+    },
+    {
+      "fixture_id": "PHC-011",
+      "family_id": "identity_integrity",
+      "task": {
+        "task_class": "verifiable",
+        "options": [
+          "A",
+          "B",
+          "C",
+          "ABSTAIN",
+          "UNKNOWN"
+        ],
+        "gold_option": "A",
+        "aggregation": {
+          "rule": "plurality",
+          "abstentions_excluded": true,
+          "tie_result": "NO_DECISION"
+        }
+      },
+      "private_baseline": [
+        {
+          "agent_id": "agent-1",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-1",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-3",
+          "record_status": "recorded",
+          "private_choice": "B"
+        },
+        {
+          "agent_id": "agent-4",
+          "record_status": "recorded",
+          "private_choice": "B"
+        },
+        {
+          "agent_id": "agent-5",
+          "record_status": "recorded",
+          "private_choice": "A"
+        }
+      ],
+      "intervention": {
+        "arm": "no_group_signal",
+        "payload": "",
+        "signal_status": "none",
+        "verified": false,
+        "asserted_tally": null,
+        "recommended_option": null,
+        "gold_label_disclosed": false
+      },
+      "post_signal": [
+        {
+          "agent_id": "agent-1",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-1",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-1",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-1",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-3",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-3",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-4",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-4",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 750,
+              "B": 250,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-5",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-5",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        }
+      ],
+      "transparency": {
+        "disclosure": "none",
+        "gold_label_disclosed": false,
+        "disclosed_tally": null,
+        "disclosed_private_ledger": null,
+        "recovery_estimates": []
+      },
+      "expected": {
+        "validator_disposition": "reject",
+        "phantom_consensus": false,
+        "rationale": "Duplicate AgentInstanceId is a deliberate negative control and must be rejected."
+      }
+    },
+    {
+      "fixture_id": "PHC-012",
+      "family_id": "normative_pluralism",
+      "task": {
+        "task_class": "normative_pluralism",
+        "options": [
+          "A",
+          "B",
+          "C",
+          "ABSTAIN",
+          "UNKNOWN"
+        ],
+        "gold_option": null,
+        "aggregation": {
+          "rule": "plurality",
+          "abstentions_excluded": true,
+          "tie_result": "NO_DECISION"
+        }
+      },
+      "private_baseline": [
+        {
+          "agent_id": "agent-1",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-2",
+          "record_status": "recorded",
+          "private_choice": "A"
+        },
+        {
+          "agent_id": "agent-3",
+          "record_status": "recorded",
+          "private_choice": "B"
+        },
+        {
+          "agent_id": "agent-4",
+          "record_status": "recorded",
+          "private_choice": "B"
+        },
+        {
+          "agent_id": "agent-5",
+          "record_status": "recorded",
+          "private_choice": "C"
+        }
+      ],
+      "intervention": {
+        "arm": "no_group_signal",
+        "payload": "",
+        "signal_status": "none",
+        "verified": false,
+        "asserted_tally": null,
+        "recommended_option": null,
+        "gold_label_disclosed": false
+      },
+      "post_signal": [
+        {
+          "agent_id": "agent-1",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-1",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 250,
+              "B": 500,
+              "C": 250,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-2",
+          "public_choice": "A",
+          "peer_estimate": {
+            "agent_id": "agent-2",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 250,
+              "B": 500,
+              "C": 250,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-3",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-3",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 250,
+              "C": 250,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-4",
+          "public_choice": "B",
+          "peer_estimate": {
+            "agent_id": "agent-4",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 250,
+              "C": 250,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        },
+        {
+          "agent_id": "agent-5",
+          "public_choice": "C",
+          "peer_estimate": {
+            "agent_id": "agent-5",
+            "estimate_status": "reported",
+            "probabilities_permille": {
+              "A": 500,
+              "B": 500,
+              "C": 0,
+              "ABSTAIN": 0,
+              "UNKNOWN": 0
+            }
+          }
+        }
+      ],
+      "transparency": {
+        "disclosure": "none",
+        "gold_label_disclosed": false,
+        "disclosed_tally": null,
+        "disclosed_private_ledger": null,
+        "recovery_estimates": []
+      },
+      "expected": {
+        "validator_disposition": "pass",
+        "phantom_consensus": false,
+        "rationale": "Multiple legitimate fictional priorities; the recorded distribution is measurable but no gold policy choice exists."
+      }
+    }
+  ]
+}

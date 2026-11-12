@@ -1,0 +1,334 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ig-phantom-consensus-fixtures-v0.1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "protocol_id",
+    "fixture_count",
+    "fixtures"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ig-phantom-consensus-fixtures-v0.1"
+    },
+    "status": {
+      "const": "synthetic_fixture_design_unexecuted"
+    },
+    "protocol_id": {
+      "const": "IG-PHANTOM-CONSENSUS-001"
+    },
+    "fixture_count": {
+      "type": "integer",
+      "const": 12
+    },
+    "fixtures": {
+      "type": "array",
+      "minItems": 12,
+      "maxItems": 12,
+      "items": {
+        "$ref": "#/$defs/fixture"
+      }
+    }
+  },
+  "$defs": {
+    "baseline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agent_id",
+        "record_status",
+        "private_choice"
+      ],
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "record_status": {
+          "enum": [
+            "recorded",
+            "missing"
+          ]
+        },
+        "private_choice": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "estimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agent_id",
+        "estimate_status",
+        "probabilities_permille"
+      ],
+      "properties": {
+        "agent_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "estimate_status": {
+          "enum": [
+            "reported",
+            "missing"
+          ]
+        },
+        "probabilities_permille": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          }
+        }
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fixture_id",
+        "family_id",
+        "task",
+        "private_baseline",
+        "intervention",
+        "post_signal",
+        "transparency",
+        "expected"
+      ],
+      "properties": {
+        "fixture_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "task_class",
+            "options",
+            "gold_option",
+            "aggregation"
+          ],
+          "properties": {
+            "task_class": {
+              "enum": [
+                "verifiable",
+                "normative_pluralism"
+              ]
+            },
+            "options": {
+              "type": "array",
+              "minItems": 4,
+              "uniqueItems": true,
+              "items": {
+                "type": "string"
+              }
+            },
+            "gold_option": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "aggregation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "rule",
+                "abstentions_excluded",
+                "tie_result"
+              ],
+              "properties": {
+                "rule": {
+                  "const": "plurality"
+                },
+                "abstentions_excluded": {
+                  "type": "boolean"
+                },
+                "tie_result": {
+                  "const": "NO_DECISION"
+                }
+              }
+            }
+          }
+        },
+        "private_baseline": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "$ref": "#/$defs/baseline"
+          }
+        },
+        "intervention": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "arm",
+            "payload",
+            "signal_status",
+            "verified",
+            "asserted_tally",
+            "recommended_option",
+            "gold_label_disclosed"
+          ],
+          "properties": {
+            "arm": {
+              "enum": [
+                "no_group_signal",
+                "neutral_public_text",
+                "ambiguous_social_signal",
+                "explicit_peer_recommendation",
+                "fabricated_private_tally"
+              ]
+            },
+            "payload": {
+              "type": "string"
+            },
+            "signal_status": {
+              "enum": [
+                "none",
+                "neutral",
+                "ambiguous",
+                "explicit",
+                "fabricated"
+              ]
+            },
+            "verified": {
+              "type": "boolean"
+            },
+            "asserted_tally": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "recommended_option": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "gold_label_disclosed": {
+              "const": false
+            }
+          }
+        },
+        "post_signal": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "agent_id",
+              "public_choice",
+              "peer_estimate"
+            ],
+            "properties": {
+              "agent_id": {
+                "type": "string"
+              },
+              "public_choice": {
+                "type": "string"
+              },
+              "peer_estimate": {
+                "$ref": "#/$defs/estimate"
+              }
+            }
+          }
+        },
+        "transparency": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "disclosure",
+            "gold_label_disclosed",
+            "disclosed_tally",
+            "disclosed_private_ledger",
+            "recovery_estimates"
+          ],
+          "properties": {
+            "disclosure": {
+              "enum": [
+                "none",
+                "anonymous_tally",
+                "private_vote_ledger"
+              ]
+            },
+            "gold_label_disclosed": {
+              "const": false
+            },
+            "disclosed_tally": {
+              "type": [
+                "object",
+                "null"
+              ],
+              "additionalProperties": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "disclosed_private_ledger": {
+              "type": [
+                "array",
+                "null"
+              ],
+              "items": {
+                "$ref": "#/$defs/baseline"
+              }
+            },
+            "recovery_estimates": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/estimate"
+              }
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "validator_disposition",
+            "phantom_consensus",
+            "rationale"
+          ],
+          "properties": {
+            "validator_disposition": {
+              "enum": [
+                "pass",
+                "indeterminate",
+                "reject"
+              ]
+            },
+            "phantom_consensus": {
+              "type": "boolean"
+            },
+            "rationale": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

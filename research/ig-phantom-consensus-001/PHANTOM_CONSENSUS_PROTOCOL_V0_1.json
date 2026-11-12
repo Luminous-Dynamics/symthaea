@@ -1,0 +1,93 @@
+{
+  "protocol_id": "IG-PHANTOM-CONSENSUS-001",
+  "version": "0.1.0",
+  "status": "research-proposal",
+  "title": "Perceived private consensus under ambiguous public signals",
+  "source": {
+    "title": "Phantom Consensus: Measuring Social Reasoning in Multi-Agent LLM Decision-Making",
+    "arxiv_id": "2611.08971",
+    "url": "https://arxiv.org/abs/2611.08971",
+    "first_submitted": "2026-11-06",
+    "audit_status": "preprint-methodology-reference-not-reproduced",
+    "note": "Reported results are specific to the source paper's tested models, tasks, prompts and interventions."
+  },
+  "composition": {
+    "contagion_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11320",
+    "contagion_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/11323",
+    "communication_topology_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11337",
+    "revision_ledger_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11340",
+    "confidence_calibration_pr": "https://github.com/Luminous-Dynamics/symthaea/pull/11367",
+    "delibbench_issue": "https://github.com/Luminous-Dynamics/mycelix/issues/5999",
+    "summary_issue": "https://github.com/Luminous-Dynamics/mycelix/issues/6011",
+    "opinion_shift_issue": "https://github.com/Luminous-Dynamics/mycelix/issues/6023"
+  },
+  "stages": [
+    {
+      "id": "private_baseline",
+      "visibility": "private",
+      "purpose": "Record each agent's elicited private judgment before group exposure."
+    },
+    {
+      "id": "group_context_intervention",
+      "visibility": "declared",
+      "purpose": "Expose agents to one randomized, provenance-bound group-context signal."
+    },
+    {
+      "id": "post_signal_private_elicitation",
+      "visibility": "private",
+      "purpose": "Record public-stage choice and estimate of other agents' recorded baseline judgments."
+    },
+    {
+      "id": "transparency_recovery",
+      "visibility": "private",
+      "purpose": "Measure recovery after authentic private records are disclosed without the task answer."
+    }
+  ],
+  "intervention_arms": [
+    "no_group_signal",
+    "neutral_public_text",
+    "ambiguous_social_signal",
+    "explicit_peer_recommendation",
+    "fabricated_private_tally"
+  ],
+  "transparency_arms": [
+    "none",
+    "anonymous_tally",
+    "private_vote_ledger"
+  ],
+  "task_classes": [
+    "verifiable",
+    "normative_pluralism"
+  ],
+  "metric_ids": [
+    "private_public_gap",
+    "peer_private_belief_brier",
+    "phantom_consensus_incidence",
+    "collective_rationality_failure",
+    "transparency_recovery",
+    "signal_susceptibility",
+    "pluralism_preservation",
+    "run_validity"
+  ],
+  "qualification_gates": [
+    "all_synthetic_oracles_reproduced",
+    "private_baseline_not_exposed_before_transparency_arm",
+    "verified_tallies_equal_committed_private_baseline",
+    "fabricated_tallies_never_promoted_to_verified",
+    "agent_rosters_are_unique_and_complete",
+    "abstentions_and_missingness_remain_explicit",
+    "answer_key_not_disclosed_in_transparency_arms",
+    "normative_tasks_have_no_gold_preference",
+    "unknown_or_incomplete_outcomes_are_not_pass"
+  ],
+  "claim_ceiling": {
+    "synthetic": "Qualifies only structural invariants and deterministic synthetic oracle fixtures.",
+    "agent_execution": "Applies only to pinned models, prompts, tasks, signals, seeds and analysis.",
+    "excluded": [
+      "human pluralistic-ignorance claims",
+      "democratic legitimacy claims",
+      "public-opinion simulation claims",
+      "production deployment readiness"
+    ]
+  }
+}

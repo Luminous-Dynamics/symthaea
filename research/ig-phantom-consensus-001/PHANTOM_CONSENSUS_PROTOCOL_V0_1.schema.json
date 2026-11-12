@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ig-phantom-consensus-protocol-v0.1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_id",
+    "version",
+    "status",
+    "title",
+    "source",
+    "composition",
+    "stages",
+    "intervention_arms",
+    "transparency_arms",
+    "task_classes",
+    "metric_ids",
+    "qualification_gates",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "protocol_id": {
+      "const": "IG-PHANTOM-CONSENSUS-001"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "const": "research-proposal"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "arxiv_id",
+        "url",
+        "first_submitted",
+        "audit_status",
+        "note"
+      ],
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "arxiv_id": {
+          "type": "string",
+          "pattern": "^\\d{4}\\.\\d{5}$"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "first_submitted": {
+          "type": "string",
+          "format": "date"
+        },
+        "audit_status": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      }
+    },
+    "composition": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "format": "uri"
+      },
+      "minProperties": 8
+    },
+    "stages": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "visibility",
+          "purpose"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "visibility": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "intervention_arms": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "transparency_arms": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "task_classes": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "metric_ids": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "qualification_gates": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_ceiling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "synthetic",
+        "agent_execution",
+        "excluded"
+      ],
+      "properties": {
+        "synthetic": {
+          "type": "string"
+        },
+        "agent_execution": {
+          "type": "string"
+        },
+        "excluded": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
