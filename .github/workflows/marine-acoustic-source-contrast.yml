@@ -32,7 +32,7 @@ jobs:
         with:
           components: rustfmt, clippy
       - name: Format Rust source
-        run: cargo fmt --manifest-path tools/marine-acoustic-source-contrast-audit/Cargo.toml
+        run: rustfmt --edition 2024 --check tools/marine-acoustic-source-contrast-audit/src/main.rs
       - name: Generate isolated Cargo lockfile
         run: cargo generate-lockfile --manifest-path tools/marine-acoustic-source-contrast-audit/Cargo.toml
       - name: Preserve formatted source and lockfile
@@ -43,8 +43,6 @@ jobs:
             tools/marine-acoustic-source-contrast-audit/src/main.rs
             tools/marine-acoustic-source-contrast-audit/Cargo.lock
           if-no-files-found: error
-      - name: Verify formatting
-        run: cargo fmt --manifest-path tools/marine-acoustic-source-contrast-audit/Cargo.toml -- --check
       - name: Clippy
         run: cargo clippy --locked --manifest-path tools/marine-acoustic-source-contrast-audit/Cargo.toml --all-targets -- -D warnings
       - name: Run unit tests
