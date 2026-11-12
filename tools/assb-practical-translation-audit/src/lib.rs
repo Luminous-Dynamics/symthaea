@@ -87,7 +87,9 @@ impl MatchedAxis {
 #[derive(Clone, Debug, PartialEq)]
 pub struct MassInventory {
     pub cathode_active_mg: f64,
+    pub cathode_inactive_mg: f64,
     pub anode_active_mg: f64,
+    pub anode_inactive_mg: f64,
     pub electrolyte_mg: f64,
     pub separator_or_support_mg: f64,
     pub current_collectors_and_tabs_mg: f64,
@@ -95,12 +97,16 @@ pub struct MassInventory {
     pub declared_full_cell_mass_mg: f64,
     pub closure_tolerance_mg: f64,
     pub boundary_digest: String,
+    pub declared_full_cell_volume_cm3: f64,
+    pub volume_boundary_digest: String,
 }
 
 impl MassInventory {
     pub fn component_sum_mg(&self) -> f64 {
         self.cathode_active_mg
+            + self.cathode_inactive_mg
             + self.anode_active_mg
+            + self.anode_inactive_mg
             + self.electrolyte_mg
             + self.separator_or_support_mg
             + self.current_collectors_and_tabs_mg
@@ -150,6 +156,10 @@ pub struct EvidenceRecord {
 #[derive(Clone, Debug, PartialEq)]
 pub struct CellObservation {
     pub observation_id: String,
+    pub cell_id: String,
+    pub batch_id: String,
+    pub manufacturing_line: String,
+    pub process_revision: String,
     pub design: DesignDescriptor,
     pub pressure: PressureEvidence,
     pub mass_inventory: Option<MassInventory>,
@@ -183,6 +193,10 @@ pub struct ComparisonReport {
     pub baseline_observation_id: String,
     pub candidate_observation_id: String,
     pub matched_axis_count: usize,
+    pub pressure_measurement_method: String,
+    pub baseline_fabrication_pressure_milli_mpa: u64,
+    pub candidate_fabrication_pressure_milli_mpa: u64,
+    pub fabrication_pressure_delta_milli_mpa: i64,
     pub baseline_operating_pressure_milli_mpa: u64,
     pub candidate_operating_pressure_milli_mpa: u64,
     pub pressure_delta_milli_mpa: i64,
@@ -347,7 +361,9 @@ fn validate_pressure(p: &PressureEvidence) -> Result<(), AuditError> {
 fn validate_mass(m: &MassInventory) -> Result<(), AuditError> {
     for (v, n) in [
         (m.cathode_active_mg, "cathode active mass"),
+        (m.cathode_inactive_mg, "cathode inactive composite mass"),
         (m.anode_active_mg, "anode active mass"),
+        (m.anode_inactive_mg, "anode inactive mass"),
         (m.electrolyte_mg, "electrolyte mass"),
         (m.separator_or_support_mg, "separator/support mass"),
         (m.current_collectors_and_tabs_mg, "current collector/tab mass"),
@@ -358,6 +374,11 @@ fn validate_mass(m: &MassInventory) -> Result<(), AuditError> {
     finite_positive(m.declared_full_cell_mass_mg, "declared full-cell mass")?;
     finite_nonnegative(m.closure_tolerance_mg, "mass closure tolerance")?;
     validate_digest(&m.boundary_digest, "complete-cell boundary digest")?;
+    finite_positive(
+        m.declared_full_cell_volume_cm3,
+        "declared full-cell external volume",
+    )?;
+    validate_digest(&m.volume_boundary_digest, "complete-cell volume boundary digest")?;
     let delta = (m.component_sum_mg() - m.declared_full_cell_mass_mg).abs();
     if delta > m.closure_tolerance_mg {
         return Err(AuditError(format!(
@@ -483,6 +504,10 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
 
     for o in &manifest.observations {
         require_nonempty(&o.observation_id, "observation ID")?;
+        require_nonempty(&o.cell_id, "cell ID")?;
+        require_nonempty(&o.batch_id, "manufacturing batch ID")?;
+        require_nonempty(&o.manufacturing_line, "manufacturing line ID")?;
+        require_nonempty(&o.process_revision, "manufacturing process revision")?;
         validate_design(&o.design)?;
         validate_pressure(&o.pressure)?;
         let evidence = admitted_evidence(
@@ -554,6 +579,41 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
                 comparison.comparison_id
             )));
         }
+        if baseline.design.design_id != candidate.design.design_id
+            || baseline.design.revision != candidate.design.revision
+        {
+            return Err(AuditError(format!(
+                "comparison {} changes design identity/revision; only operating pressure may vary",
+                comparison.comparison_id
+            )));
+        }
+        if baseline.batch_id != candidate.batch_id
+            || baseline.manufacturing_line != candidate.manufacturing_line
+            || baseline.process_revision != candidate.process_revision
+        {
+            return Err(AuditError(format!(
+                "comparison {} changes batch, manufacturing line or process revision; stratify the process effect separately",
+                comparison.comparison_id
+            )));
+        }
+        if baseline.pressure.measurement_method != candidate.pressure.measurement_method {
+            return Err(AuditError(format!(
+                "comparison {} uses incompatible pressure measurement methods",
+                comparison.comparison_id
+            )));
+        }
+        let fabrication_pressure_delta =
+            (candidate.pressure.fabrication_pressure_mpa - baseline.pressure.fabrication_pressure_mpa).abs();
+        let fabrication_pressure_tolerance =
+            baseline.pressure.uncertainty_mpa + candidate.pressure.uncertainty_mpa;
+        if fabrication_pressure_delta > fabrication_pressure_tolerance {
+            return Err(AuditError(format!(
+                "comparison {} confounds operating pressure with fabrication pressure (delta={} MPa exceeds combined uncertainty={} MPa)",
+                comparison.comparison_id,
+                fabrication_pressure_delta,
+                fabrication_pressure_tolerance
+            )));
+        }
         if baseline.pressure.operating_pressure_mpa.to_bits() == candidate.pressure.operating_pressure_mpa.to_bits() {
             return Err(AuditError(format!(
                 "comparison {} must vary operating pressure to qualify a pressure comparison",
@@ -611,6 +671,17 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
             baseline_observation_id: baseline.observation_id.clone(),
             candidate_observation_id: candidate.observation_id.clone(),
             matched_axis_count: comparison.matched_axes.len(),
+            pressure_measurement_method: baseline.pressure.measurement_method.clone(),
+            baseline_fabrication_pressure_milli_mpa: pressure_milli_mpa(
+                baseline.pressure.fabrication_pressure_mpa,
+            ),
+            candidate_fabrication_pressure_milli_mpa: pressure_milli_mpa(
+                candidate.pressure.fabrication_pressure_mpa,
+            ),
+            fabrication_pressure_delta_milli_mpa: ((candidate.pressure.fabrication_pressure_mpa
+                - baseline.pressure.fabrication_pressure_mpa)
+                * 1000.0)
+                .round() as i64,
             baseline_operating_pressure_milli_mpa: pressure_milli_mpa(baseline.pressure.operating_pressure_mpa),
             candidate_operating_pressure_milli_mpa: pressure_milli_mpa(candidate.pressure.operating_pressure_mpa),
             pressure_delta_milli_mpa: delta.round() as i64,
@@ -661,16 +732,20 @@ mod tests {
 
     fn mass()->MassInventory{
         MassInventory{
-            cathode_active_mg:120.0,anode_active_mg:12.0,electrolyte_mg:35.0,
+            cathode_active_mg:100.0,cathode_inactive_mg:20.0,
+            anode_active_mg:10.0,anode_inactive_mg:2.0,electrolyte_mg:35.0,
             separator_or_support_mg:8.0,current_collectors_and_tabs_mg:18.0,casing_and_seals_mg:27.0,
-            declared_full_cell_mass_mg:220.0,closure_tolerance_mg:0.1,boundary_digest:digest('9')
+            declared_full_cell_mass_mg:220.0,closure_tolerance_mg:0.1,boundary_digest:digest('9'),
+            declared_full_cell_volume_cm3:1.2,volume_boundary_digest:digest('8')
         }
     }
 
     fn observation(id:&str,d:DesignDescriptor,op:f64,eid:&str)->CellObservation{
         let full=d.test_level==TestLevel::FullCell;
         CellObservation{
-            observation_id:id.into(),design:d,pressure:PressureEvidence{
+            observation_id:id.into(),cell_id:format!("CELL-{id}"),batch_id:"BATCH-001".into(),
+            manufacturing_line:"PILOT-LINE-01".into(),process_revision:"PROCESS-R1".into(),
+            design:d,pressure:PressureEvidence{
                 fabrication_pressure_mpa:100.0,operating_pressure_mpa:op,
                 measurement_method:"calibrated load-cell fixture".into(),instrument_ref:"PRESSURE-MET-01".into(),uncertainty_mpa:0.05
             },
@@ -687,8 +762,8 @@ mod tests {
             campaign_id:"ASSB-LOW-PRESSURE-001".into(),
             evidence:vec![evidence("E-HIGH",'a'),evidence("E-LOW",'b'),evidence("E-SYM",'c')],
             observations:vec![
-                observation("HIGH-P",design("ASSB-SULFIDE-HIGH-P",TestLevel::FullCell),5.0,"E-HIGH"),
-                observation("LOW-P",design("ASSB-SULFIDE-LOW-P",TestLevel::FullCell),0.3,"E-LOW"),
+                observation("HIGH-P",design("ASSB-SULFIDE-DESIGN-A",TestLevel::FullCell),5.0,"E-HIGH"),
+                observation("LOW-P",design("ASSB-SULFIDE-DESIGN-A",TestLevel::FullCell),0.3,"E-LOW"),
                 observation("SYM",design("ASSB-SULFIDE-SYM",TestLevel::SymmetricCell),5.0,"E-SYM")
             ],
             comparisons:vec![PressureComparison{
@@ -751,6 +826,60 @@ mod tests {
         assert!(audit_manifest(&m).is_ok());
         // Zero fabrication pressure is allowed; it is a real declared measurement,
         // not a missing value. Operating pressure remains independently required.
+    }
+
+    #[test]
+    fn fabrication_pressure_must_be_controlled_within_measurement_uncertainty() {
+        let mut m = fixture();
+        m.observations[1].pressure.fabrication_pressure_mpa = 101.0;
+        assert!(audit_manifest(&m).is_err());
+    }
+
+    #[test]
+    fn fabrication_pressure_within_combined_uncertainty_is_comparable() {
+        let mut m = fixture();
+        m.observations[1].pressure.fabrication_pressure_mpa = 100.08;
+        assert!(audit_manifest(&m).is_ok());
+    }
+
+    #[test]
+    fn different_pressure_measurement_methods_are_rejected() {
+        let mut m = fixture();
+        m.observations[1].pressure.measurement_method = "different fixture method".into();
+        assert!(audit_manifest(&m).is_err());
+    }
+
+    #[test]
+    fn process_batch_line_and_design_revision_must_match() {
+        let mut m = fixture();
+        m.observations[1].batch_id = "BATCH-002".into();
+        assert!(audit_manifest(&m).is_err());
+        let mut m = fixture();
+        m.observations[1].process_revision = "PROCESS-R2".into();
+        assert!(audit_manifest(&m).is_err());
+        let mut m = fixture();
+        m.observations[1].design.revision = "r2".into();
+        assert!(audit_manifest(&m).is_err());
+    }
+
+    #[test]
+    fn complete_cell_volume_must_be_positive_and_bound() {
+        let mut m = fixture();
+        m.observations[0].mass_inventory.as_mut().unwrap().declared_full_cell_volume_cm3 = 0.0;
+        assert!(audit_manifest(&m).is_err());
+        let mut m = fixture();
+        m.observations[0].mass_inventory.as_mut().unwrap().volume_boundary_digest = "bad".into();
+        assert!(audit_manifest(&m).is_err());
+    }
+
+    #[test]
+    fn missing_cell_or_process_identity_is_rejected() {
+        let mut m = fixture();
+        m.observations[0].cell_id.clear();
+        assert!(audit_manifest(&m).is_err());
+        let mut m = fixture();
+        m.observations[0].batch_id.clear();
+        assert!(audit_manifest(&m).is_err());
     }
 
     #[test]
