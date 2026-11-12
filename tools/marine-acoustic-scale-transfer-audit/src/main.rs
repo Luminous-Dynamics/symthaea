@@ -572,6 +572,8 @@ fn audit(case: &Case) -> AuditReport {
                 any_frequency_mismatch = true;
                 band_reports.push(BandReport {
                     band_id: model_band.band_id.clone(),
+                    frequency_regime: frequency_regime_name(&model_band.frequency_regime),
+                    frequency_regime_basis: model_band.frequency_regime_basis.clone(),
                     spl_scale_delta_db: delta_db,
                     model_source_level_db: model_source_level,
                     predicted_full_scale_source_level_db: predicted_full_scale,
@@ -601,6 +603,8 @@ fn audit(case: &Case) -> AuditReport {
                 any_unresolved_band = true;
                 band_reports.push(BandReport {
                     band_id: model_band.band_id.clone(),
+                    frequency_regime: frequency_regime_name(&model_band.frequency_regime),
+                    frequency_regime_basis: model_band.frequency_regime_basis.clone(),
                     spl_scale_delta_db: delta_db,
                     model_source_level_db: model_source_level,
                     predicted_full_scale_source_level_db: predicted_full_scale,
@@ -635,6 +639,8 @@ fn audit(case: &Case) -> AuditReport {
             }
             band_reports.push(BandReport {
                 band_id: model_band.band_id.clone(),
+                frequency_regime: frequency_regime_name(&model_band.frequency_regime),
+                frequency_regime_basis: model_band.frequency_regime_basis.clone(),
                 spl_scale_delta_db: delta_db,
                 model_source_level_db: model_source_level,
                 predicted_full_scale_source_level_db: predicted_full_scale,
