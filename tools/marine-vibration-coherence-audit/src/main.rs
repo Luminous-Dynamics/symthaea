@@ -51,6 +51,7 @@ struct Case {
     residual_alignment_uncertainty_s: f64,
     maximum_phase_uncertainty_rad: f64,
     predeclared_coherence_interpretation_threshold: f64,
+    cross_spectrum_convention: String,
     pressure_channel: ChannelEvidence,
     vibration_channel: ChannelEvidence,
     estimator: WelchEstimator,
@@ -94,6 +95,8 @@ struct WelchEstimator {
     number_of_averages: u32,
     frequency_resolution_hz: f64,
     output_scaling: String,
+    sidedness: String,
+    averaging_method: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -141,7 +144,11 @@ struct AuditReport {
     vibration_calibration_certificate_sha256: String,
     estimator_id: String,
     estimator_version: String,
+    cross_spectrum_convention: String,
     welch_window: &'static str,
+    output_scaling: String,
+    sidedness: String,
+    averaging_method: String,
     number_of_averages: u32,
     overlap_fraction: f64,
     frequency_resolution_hz: f64,
@@ -304,6 +311,9 @@ fn validate_case(case: &Case) -> Vec<String> {
     if !case.alignment_offset_applied_in_estimator {
         errors.push("declared sensor alignment offset has not been applied in the cross-spectral estimator".to_string());
     }
+    if case.cross_spectrum_convention != "pressure_times_conjugate_acceleration" {
+        errors.push("cross_spectrum_convention must be pressure_times_conjugate_acceleration".to_string());
+    }
     if !finite_nonnegative(case.residual_alignment_uncertainty_s)
         || !finite_positive(case.maximum_phase_uncertainty_rad)
         || case.maximum_phase_uncertainty_rad > std::f64::consts::PI
@@ -321,8 +331,10 @@ fn validate_case(case: &Case) -> Vec<String> {
     if estimator.estimator_id.trim().is_empty()
         || estimator.estimator_version.trim().is_empty()
         || estimator.output_scaling != "density"
+        || estimator.sidedness != "one_sided"
+        || estimator.averaging_method != "arithmetic_mean_of_modified_periodograms"
     {
-        errors.push("estimator ID/version are required and output_scaling must be density".to_string());
+        errors.push("estimator ID/version, density scaling, one-sided spectra and arithmetic mean of modified periodograms are required".to_string());
     }
     if estimator.segment_length_samples < 8
         || estimator.segment_length_samples > case.pressure_channel.sample_count
@@ -583,6 +595,7 @@ fn audit(case: &Case) -> AuditReport {
         vibration_calibration_certificate_sha256: case.vibration_channel.calibration_certificate_sha256.clone(),
         estimator_id: case.estimator.estimator_id.clone(),
         estimator_version: case.estimator.estimator_version.clone(),
+        cross_spectrum_convention: case.cross_spectrum_convention.clone(),
         welch_window: match case.estimator.window {
             WelchWindow::Hann => "hann",
             WelchWindow::Hamming => "hamming",
@@ -590,6 +603,9 @@ fn audit(case: &Case) -> AuditReport {
         },
         number_of_averages: case.estimator.number_of_averages,
         overlap_fraction: case.estimator.overlap_fraction,
+        output_scaling: case.estimator.output_scaling.clone(),
+        sidedness: case.estimator.sidedness.clone(),
+        averaging_method: case.estimator.averaging_method.clone(),
         frequency_resolution_hz: case.estimator.frequency_resolution_hz,
         predeclared_coherence_interpretation_threshold: case.predeclared_coherence_interpretation_threshold,
         disposition,
@@ -691,6 +707,7 @@ mod tests {
             residual_alignment_uncertainty_s: 1.0e-6,
             maximum_phase_uncertainty_rad: 0.5,
             predeclared_coherence_interpretation_threshold: 0.7,
+            cross_spectrum_convention: "pressure_times_conjugate_acceleration".to_string(),
             pressure_channel: ChannelEvidence {
                 instrument_id: "hydrophone-H1".to_string(),
                 channel_id: "pressure-channel-1".to_string(),
@@ -726,12 +743,32 @@ mod tests {
                 number_of_averages: 19,
                 frequency_resolution_hz: 10.0,
                 output_scaling: "density".to_string(),
+                sidedness: "one_sided".to_string(),
+                averaging_method: "arithmetic_mean_of_modified_periodograms".to_string(),
             },
             bands: vec![
                 band("band-100", 100.0, 4.0, 9.0, 3.0, 0.0),
                 band("band-200", 200.0, 4.0, 9.0, 0.0, 3.0),
             ],
         }
+    }
+
+    #[test]
+    fn cross_spectrum_sign_convention_is_explicit_and_enforced() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        input.cross_spectrum_convention = "acceleration_times_conjugate_pressure".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn welch_psd_scaling_and_sidedness_are_explicit() {
+        let mut input = case();
+        input.estimator.output_scaling = "spectrum".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
+        let mut input = case();
+        input.estimator.sidedness = "two_sided".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
     }
 
     #[test]
