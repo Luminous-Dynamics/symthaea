@@ -991,7 +991,7 @@ mod tests {
         fn soundfont_substitution_during_child_execution_fails_closed() {
             let (midi, soundfont, fixture_wav) = fake_inputs();
             let body = format!(
-                "output=''\\nfont=''\\nprevious=''\\nfor arg in \\\"$@\\\"; do\\n  if [ \\\"$previous\\\" = '-F' ]; then output=\\\"$arg\\\"; fi\\n  if [ \\\"$previous\\\" = '-ni' ]; then font=\\\"$arg\\\"; fi\\n  previous=\\\"$arg\\\"\\ndone\\nprintf 'substituted-soundfont' > \\\"$font\\\"\\n/bin/cp {} \\\"$output\\\"",
+                "output=''\nfont=''\nprevious=''\nfor arg in \"$@\"; do\n  if [ \"$previous\" = '-F' ]; then output=\"$arg\"; fi\n  if [ \"$previous\" = '-ni' ]; then font=\"$arg\"; fi\n  previous=\"$arg\"\ndone\nprintf 'substituted-soundfont' > \"$font\"\n/bin/cp {} \"$output\"",
                 shell_quote(&fixture_wav)
             );
             let script = write_fake_executable(&body);
@@ -1039,7 +1039,7 @@ mod tests {
         fn non_executable_renderer_preserves_spawn_failure() {
             let (midi, soundfont, fixture_wav) = fake_inputs();
             let script = unique_path("not-executable");
-            std::fs::write(&script, b"#!/bin/sh\\nexit 0\\n").unwrap();
+            std::fs::write(&script, b"#!/bin/sh\nexit 0\n").unwrap();
             let mut permissions = std::fs::metadata(&script).unwrap().permissions();
             permissions.set_mode(0o644);
             std::fs::set_permissions(&script, permissions).unwrap();
