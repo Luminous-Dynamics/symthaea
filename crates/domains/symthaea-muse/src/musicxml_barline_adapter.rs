@@ -327,6 +327,12 @@ pub enum MusicXmlBarlineLocationV1 {
     Right,
 }
 
+/// Segno/coda marker presence plus an optional source identifier.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MusicXmlSignpostV1 {
+    pub identifier: Option<String>,
+}
+
 /// Explicit repeat semantics retained from a MusicXML barline.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlRepeatV1 {
@@ -361,8 +367,8 @@ pub struct MusicXmlPartBarlineEventV1 {
     pub divisions_override: Option<String>,
     pub repeat: Option<MusicXmlRepeatV1>,
     pub ending: Option<MusicXmlEndingV1>,
-    pub segno: Option<String>,
-    pub coda: Option<String>,
+    pub segno: Option<MusicXmlSignpostV1>,
+    pub coda: Option<MusicXmlSignpostV1>,
     pub fermatas: Vec<MusicXmlFermataV1>,
     pub wavy_lines: Vec<MusicXmlWavyLineV1>,
     pub annotations: Vec<MusicXmlBarlineAnnotationV1>,
@@ -659,16 +665,25 @@ fn parse_barline_events_for_part(
                     text: node.text().map(|value| value.trim().to_string())
                         .filter(|value| !value.is_empty()),
                 });
-                let child_text = |name: &str| {
-                    element.children()
-                        .find(|node| node.has_tag_name(name))
-                        .map(|node| node.attribute("id").map(str::to_string)
-                            .or_else(|| node.text().map(|value| value.trim().to_string()))
-                            .filter(|value| !value.is_empty()))
-                        .flatten()
+                let parse_signpost = |name: &str| {
+                    let attribute_value = element.attribute(name);
+                    let child = element.children().find(|node| node.has_tag_name(name));
+                    if attribute_value.is_none() && child.is_none() {
+                        None
+                    } else {
+                        let identifier = attribute_value.map(str::to_string).or_else(|| {
+                            child.and_then(|node| {
+                                node.attribute("id")
+                                    .map(str::to_string)
+                                    .or_else(|| node.text().map(|value| value.trim().to_string()))
+                                    .filter(|value| !value.is_empty())
+                            })
+                        });
+                        Some(MusicXmlSignpostV1 { identifier })
+                    }
                 };
-                let segno = element.attribute("segno").map(str::to_string).or_else(|| child_text("segno"));
-                let coda = element.attribute("coda").map(str::to_string).or_else(|| child_text("coda"));
+                let segno = parse_signpost("segno");
+                let coda = parse_signpost("coda");
                 let bar_style = element.children()
                     .find(|node| node.has_tag_name("bar-style"))
                     .and_then(|node| node.text())
@@ -1538,8 +1553,14 @@ mod tests {
         assert_eq!(right.repeat.as_ref().and_then(|value| value.direction.as_deref()), Some("backward"));
         assert_eq!(right.repeat.as_ref().and_then(|value| value.times.as_deref()), Some("2"));
         assert_eq!(right.divisions_override.as_deref(), Some("4"));
-        assert_eq!(right.segno.as_deref(), Some("S1"));
-        assert_eq!(right.coda.as_deref(), Some("C1"));
+        assert_eq!(
+            right.segno.as_ref().and_then(|value| value.identifier.as_deref()),
+            Some("S1")
+        );
+        assert_eq!(
+            right.coda.as_ref().and_then(|value| value.identifier.as_deref()),
+            Some("C1")
+        );
         assert_eq!(right.fermatas.len(), 1);
         assert_eq!(right.fermatas[0].fermata_type.as_deref(), Some("upright"));
         assert_eq!(right.fermatas[0].content.as_deref(), Some("normal"));
@@ -1643,6 +1664,24 @@ mod tests {
         assert_eq!(graph[0].map.status, MeasureMapStatus::Supported);
         assert_eq!(graph[0].barline_events[0].unrecognized_attributes.len(), 1);
         assert_eq!(graph[0].barline_events[0].unrecognized_children.len(), 1);
+    }
+
+
+    #[test]
+    fn signpost_presence_is_preserved_even_without_an_identifier() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+            <note><rest/><duration>16</duration></note>
+            <barline location="right"><segno/><coda/></barline>
+        </measure></part></score-partwise>"#;
+        let graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "sha256:anonymous-signposts", "score-clock"
+        ).unwrap();
+        let event = &graph[0].barline_events[0];
+        assert!(event.segno.is_some());
+        assert!(event.coda.is_some());
+        assert_eq!(event.segno.as_ref().unwrap().identifier, None);
+        assert_eq!(event.coda.as_ref().unwrap().identifier, None);
     }
 
 }
