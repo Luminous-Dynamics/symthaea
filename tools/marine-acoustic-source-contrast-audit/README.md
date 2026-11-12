@@ -18,8 +18,9 @@ The synthetic fixture intentionally returns INCOMPLETE as physical evidence, eve
 
 ## V0 eligibility rules
 
-- The intervention is predeclared and randomized or counterbalanced.
-- The target source state changes and every other declared source state remains unchanged.
+- The intervention is predeclared; its protocol and experimental-design/randomization evidence are bound by separate digests.
+- Randomized or counterbalanced design is required for contrast eligibility. A single baseline/candidate contrast is only an eligibility record; it is not, by itself, a powered causal experiment or causal effect estimate.
+- The target source state changes and every other declared source state remains unchanged, including the identity of each source-state observable.
 - The full source inventory is present on both sides: propeller cavitation, propeller hydrodynamics, prime mover, shaft/gearbox, auxiliary machinery, hull/appendage flow and ambient background.
 - No unobserved source contributors are declared.
 - Baseline and candidate share exact service and environment fingerprints, hydrophone identity, calibration-certificate digest and timebase receipt.
@@ -30,6 +31,6 @@ A same-state passive spectrum is UNRESOLVED_MIXTURE. A changed non-target source
 
 ## Interpretation boundary
 
-The audit reports the observed candidate-minus-baseline change in **total received sound pressure level** with a conservative uncertainty interval using the sum of expanded uncertainties. It does not estimate additive propeller/machinery source contributions, source level, propagation loss, ecological exposure, biological response, quiet-ship compliance or causal effect beyond the declared contrast design.
+The audit reports the observed candidate-minus-baseline change in **total received sound pressure level** with a conservative uncertainty interval using the sum of expanded uncertainties. It checks eligibility of the declared controlled contrast; one pair does not establish statistical power, a causal effect estimate or transportability. It does not estimate additive propeller/machinery source contributions, source level, propagation loss, ecological exposure, biological response or quiet-ship compliance.
 
 The SHA-256 values are identifiers, not authentication. V0 requires the same hydrophone/calibration/timebase across both observations; it does not perform sensor authentication, clock-transfer correction, multi-hydrophone beamforming, blind source separation or spectral deconvolution.
