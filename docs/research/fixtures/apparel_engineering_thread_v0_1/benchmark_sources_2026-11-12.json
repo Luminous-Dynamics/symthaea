@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "manifest_id": "APPAREL-TEXTILE-BENCHMARK-SOURCES-2026-11-12",
-  "purpose": "Versioned source register for research baselines in cloth simulation, robotic garment manipulation, textile sorting and sewing. This manifest does not declare any dataset ingested or authorize redistribution. This revision adds OpenTextile-NIR, two inverse-design research comparators, a design-sorting mismatch study and a 2026 critical fabric-design review. Reported percentages/metrics are source-specific and must not be treated as universal or reproduced Luminous results. This revision adds apparel scheduling comparators spanning dual-resource MIP/CP/heuristics, textile steam-aware multi-objective RL, source-load coordination, multi-line flow shops and human-centered scheduling. Published case results are scope-specific and are not a common leaderboard. This revision adds ASTM D6673-10 pattern interchange, the Knitout v0.6 machine-independent knitting instruction format and an open parametric sweater reference generator. These formats cover different layers and must not be conflated as a complete garment digital thread. This revision adds human-AI sustainable fashion co-design, sketch-to-parametric garment generation, spatially varying ease/pattern extraction, controllable fashion diffusion and multimodal sketch/text-to-pattern sources. These are distinct levels of the workflow; image generation, editable pattern generation, 3D fit evaluation and physical product qualification must not be conflated. This revision adds textile-reinforced concrete and digital construction sources: process classification, hybrid textile/SHCC placement, robotic rebar insertion/grouting, in-process mesh placement, robotic steel reinforcement/welding and textile-waste cementitious composites. These are structural-material benchmarks, distinct from apparel qualification.",
+  "purpose": "Versioned source register for research baselines in cloth simulation, robotic garment manipulation, textile sorting and sewing. This manifest does not declare any dataset ingested or authorize redistribution. This revision adds OpenTextile-NIR, two inverse-design research comparators, a design-sorting mismatch study and a 2026 critical fabric-design review. Reported percentages/metrics are source-specific and must not be treated as universal or reproduced Luminous results. This revision adds apparel scheduling comparators spanning dual-resource MIP/CP/heuristics, textile steam-aware multi-objective RL, source-load coordination, multi-line flow shops and human-centered scheduling. Published case results are scope-specific and are not a common leaderboard. This revision adds ASTM D6673-10 pattern interchange, the Knitout v0.6 machine-independent knitting instruction format and an open parametric sweater reference generator. These formats cover different layers and must not be conflated as a complete garment digital thread. This revision adds human-AI sustainable fashion co-design, sketch-to-parametric garment generation, spatially varying ease/pattern extraction, controllable fashion diffusion and multimodal sketch/text-to-pattern sources. These are distinct levels of the workflow; image generation, editable pattern generation, 3D fit evaluation and physical product qualification must not be conflated. This revision adds textile-reinforced concrete and digital construction sources: process classification, hybrid textile/SHCC placement, robotic rebar insertion/grouting, in-process mesh placement, robotic steel reinforcement/welding and textile-waste cementitious composites. These are structural-material benchmarks, distinct from apparel qualification. Revision r7 adds the textile pre-processing review, NIR contamination and elastane challenges, and industrial/reuse-flow evidence for polyester-cotton and stretch-textile recovery. Identification, physical separation, material output and downstream acceptance remain separate evaluation stages.",
   "sources": [
     {
       "source_id": "RGBENCH-REAL-GARMENT-EVAL-V1",
@@ -999,6 +999,180 @@
       ],
       "intended_use": "circular textile-to-construction materials research and material qualification taxonomy",
       "redistribution_action": "review article license and individual cited dataset rights before any material data reuse"
+    },
+    {
+      "source_id": "TEXTILE-PREPROCESSING-REVIEW-2026",
+      "name": "Intelligent and Automated Technologies for Textile Recycling Pre-Processing: A Systematic Literature Review",
+      "source_kind": "systematic_review_sorting_and_contaminant_automation",
+      "paper_url": "https://www.mdpi.com/2227-7080/14/4/200",
+      "publication_date": "2026",
+      "license_status": "open_access_article; verify_article_specific_license",
+      "reported_scope": {
+        "primary_studies": 21,
+        "literature_window": "2020-2025",
+        "task_counts": {
+          "identification": 19,
+          "explicit_physical_sorting": 4,
+          "contaminant_detection_or_removal": 3
+        }
+      },
+      "known_limitations": [
+        "review counts describe selected published studies, not the industrial market or all deployed systems",
+        "identification, routing and physical separation definitions differ across studies",
+        "not a performance dataset or leaderboard"
+      ],
+      "intended_use": "benchmark-gap justification for separating identification, physical sorting and contaminant removal",
+      "redistribution_action": "cite the article; do not infer industrial deployment prevalence from study counts"
+    },
+    {
+      "source_id": "NIR-SURFACE-CONTAMINATION-2026",
+      "name": "Effects of surface contamination on automated textile sorting using NIR-spectroscopy",
+      "source_kind": "sensor_robustness_and_contamination_research",
+      "paper_url": "https://doi.org/10.1016/j.wasman.2025.115227",
+      "publication_date": "2026-01-15",
+      "license_status": "open_access_article; verify_data_and_code_terms",
+      "reported_scope": {
+        "modality": "NIR spectroscopy",
+        "perturbations": [
+          "moisture",
+          "heavy surface contamination",
+          "textile fraction"
+        ],
+        "reported_findings": [
+          "moisture and heavy surface contamination increase misclassification risk",
+          "tailoring classifiers to textile fractions can improve sorting accuracy"
+        ]
+      },
+      "known_limitations": [
+        "classification results do not alone demonstrate physical bin purity or downstream recycler acceptance",
+        "the exact contamination levels and device profiles must be taken from the paper/supplement before replication"
+      ],
+      "intended_use": "contamination/missingness subgroup and route-abstention benchmark",
+      "redistribution_action": "check data/supplement rights and specimen-level metadata before reuse"
+    },
+    {
+      "source_id": "NIR-HSI-ELASTANE-2026",
+      "name": "Challenges and spectra interpretability in textile sorting: NIR hyperspectral images and chemometrics",
+      "source_kind": "hyperspectral_minor_component_detection_research",
+      "paper_url": "https://doi.org/10.1016/j.saa.2025.126665",
+      "publication_date": "2026-01-05",
+      "license_status": "open_access_article_cc_license_reported; verify exact terms",
+      "reported_scope": {
+        "modality": "NIR hyperspectral imaging and chemometrics",
+        "focus": [
+          "different textile chemical compositions",
+          "minor elastane detection in cotton blends"
+        ]
+      },
+      "known_limitations": [
+        "specific material mixtures and instrument configuration; do not generalize to arbitrary blends without transfer tests",
+        "chemical classification is not physical sorting or output-grade qualification"
+      ],
+      "intended_use": "low-share elastane/blend detection and spectral interpretability baseline",
+      "redistribution_action": "inspect supplement and reuse terms before data/code ingestion"
+    },
+    {
+      "source_id": "MECHANICAL-RECOVERY-STRETCH-WASTE-2026",
+      "name": "Mechanical recycling and industrial reintegration of post-industrial stretch textile waste",
+      "source_kind": "industrial_recycling_process_and_output_quality_case",
+      "paper_url": "https://doi.org/10.1016/j.jclepro.2026.149662",
+      "publication_date": "2026-10-22",
+      "license_status": "open_access_article_cc_license_reported; verify exact license",
+      "reported_scope": {
+        "feedstock_composition_wt_percent": {
+          "polyester": 68,
+          "viscose": 29,
+          "elastane": 3
+        },
+        "process": "mechanical recycling of post-industrial stretch textile waste",
+        "focus": [
+          "fibre entanglement and residual elastomeric filaments",
+          "screening mechanical recycling routes",
+          "industrial reintegration of selected fibre fraction"
+        ]
+      },
+      "known_limitations": [
+        "one specific post-industrial waste stream; not representative of consumer post-use garments generally",
+        "must inspect the full paper for output yield, fibre length/quality, process energy and product acceptance before benchmarking"
+      ],
+      "intended_use": "mechanical-recycling route and secondary-grade qualification comparator",
+      "redistribution_action": "verify article/supplement rights; do not reuse any performance values without full denominator/method audit"
+    },
+    {
+      "source_id": "DUTCH-CLOTHING-WASTE-MFA-2026",
+      "name": "Untangling textile waste flows: A detailed product and material flow analysis of Dutch clothing waste",
+      "source_kind": "regional_product_material_flow_analysis",
+      "paper_url": "https://doi.org/10.1016/j.resconrec.2026.109030",
+      "publication_date": "2026-08-30",
+      "license_status": "open_access_article_cc_license_reported; verify_data_terms",
+      "reported_scope": {
+        "geography": "Netherlands",
+        "study": "clothing purchase-to-end-of-life product and material flow analysis",
+        "reported_scenario_if_all_waste_sorted_prioritizing_mechanical_fibre_to_fibre": {
+          "overall_reuse_and_recycling_percent": 40,
+          "reuse_percent": {
+            "central": 22,
+            "uncertainty": 9
+          },
+          "closed_loop_recycling_percent": {
+            "central": 5,
+            "uncertainty": 2
+          },
+          "open_loop_recycling_percent": {
+            "central": 13,
+            "uncertainty": 5
+          }
+        }
+      },
+      "known_limitations": [
+        "scenario/model-based flow estimate, not measured national achieved rate",
+        "geography, collection mix and sorting/recycling assumptions are specific to Dutch waste flows"
+      ],
+      "intended_use": "material flow model and denominator discipline for route/yield analysis",
+      "redistribution_action": "reproduce flows and uncertainty assumptions before reuse; do not present scenario estimates as observed rates"
+    },
+    {
+      "source_id": "PESCO-RECOVERY-EODESIGN-2026",
+      "name": "Advancing secondary raw material flows through cleaner production: integrating mechanical recycling and eco-design of post-industrial textile waste",
+      "source_kind": "integrated_recycling_and_ecodesign_case",
+      "paper_url": "https://doi.org/10.1016/j.jclepro.2026.148400",
+      "publication_date": "2026-05-14",
+      "license_status": "publisher_access_and_reuse_terms_to_be_verified",
+      "reported_scope": {
+        "feedstock": "post-industrial polyester-cotton cutting waste",
+        "integration": [
+          "mechanical recycling route",
+          "eco-design strategy",
+          "product durability and fibre recovery"
+        ]
+      },
+      "known_limitations": [
+        "post-industrial cutting waste differs from mixed post-consumer garments",
+        "verify experimental output properties and functional test methods before comparative claims"
+      ],
+      "intended_use": "coupled design/recovery benchmark comparator for known production waste",
+      "redistribution_action": "confirm paper and data licenses before data extraction or reuse"
+    },
+    {
+      "source_id": "PES-CO-RECYCLING-REVIEW-2026",
+      "name": "Recent Advances in Recycling Polyester–Cotton Blended Textiles: Review",
+      "source_kind": "polyester_cotton_recycling_review",
+      "paper_url": "https://doi.org/10.3390/textiles6030092",
+      "publication_date": "2026-07-31",
+      "license_status": "open_access_article; verify CC license",
+      "reported_scope": {
+        "focus": [
+          "separation chemistries",
+          "recovered-fraction quality",
+          "industrial maturity of polyester-cotton recycling"
+        ]
+      },
+      "known_limitations": [
+        "review-level evidence, not a directly executable process dataset",
+        "reported route maturity and performance must be checked against underlying primary studies"
+      ],
+      "intended_use": "PES/CO blend recycling route taxonomy and output-quality comparison",
+      "redistribution_action": "cite review; trace quantitative claims to primary studies before reuse"
     }
   ],
   "split_policy": [
@@ -1010,5 +1184,5 @@
   ],
   "cross_dataset_rule": "TexSortML visual garment-family labels are not fibre-composition labels. NIR-SORT composition observations are not garment-category labels. Fusion is permitted only with matched item identity, independent measurement provenance and explicit missing/unknown states.",
   "claim_ceiling": "This source register is a research intake manifest. It does not prove that any dataset has been downloaded, parsed, reproduced, licensed for redistribution, or evaluated by Luminous Dynamics. The companion RGBench garment asset subset is separately licensed for non-commercial research; do not treat its rights as inherited from the CC-BY-4.0 capture set.",
-  "revision": "2026-11-12-r6"
+  "revision": "2026-11-12-r7"
 }
