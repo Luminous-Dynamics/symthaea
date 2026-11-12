@@ -381,7 +381,7 @@ fn match_events(
 
     while reference_index < reference.len() && estimated_index < estimated.len() {
         let error = estimated[estimated_index] - reference[reference_index];
-        if error.abs() <= tolerance_seconds + 0.000005 {
+        if error.abs() <= tolerance_seconds {
             matching.push((reference_index, estimated_index));
             reference_index += 1;
             estimated_index += 1;
@@ -1208,6 +1208,65 @@ mod tests {
         let continuity = report.reference_scores[0].continuity_metrics.as_ref().unwrap();
         assert_eq!(continuity.correct_metric_level_continuous, 0.0);
         assert_eq!(continuity.correct_metric_level_total, 0.0);
+    }
+
+    #[test]
+    fn exact_and_offbeat_cemgil_values_match_mir_eval_metric_level_semantics() {
+        let reference_times = [0.0, 0.5, 1.0, 1.5, 2.0];
+        let exact_report = evaluate_beat_grid_v1(
+            &prediction(&reference_times, &[]),
+            &[reference("exact", None, &reference_times, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        let exact = &exact_report.reference_scores[0];
+        assert_eq!(exact.beat_f_measure.f1, 1.0);
+        assert!((exact.cemgil_score.unwrap() - 1.0).abs() < 1e-12);
+        assert!((exact.cemgil_best_metric_level.unwrap() - 1.0).abs() < 1e-12);
+        let offbeat_times = [0.25, 0.75, 1.25, 1.75];
+        let offbeat_report = evaluate_beat_grid_v1(
+            &prediction(&offbeat_times, &[]),
+            &[reference("offbeat", None, &reference_times, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        let offbeat = &offbeat_report.reference_scores[0];
+        assert_eq!(offbeat.beat_f_measure.f1, 0.0);
+        assert!(offbeat.cemgil_score.unwrap() < 1e-6);
+        assert!((offbeat.cemgil_best_metric_level.unwrap() - 1.0).abs() < 1e-12);
+        let continuity = offbeat.continuity_metrics.as_ref().unwrap();
+        assert_eq!(continuity.correct_metric_level_total, 0.0);
+        assert!((continuity.any_metric_level_total - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn doubled_pulse_is_strictly_scored_but_metric_level_tolerance_is_separate() {
+        let reference_times = [0.0, 1.0, 2.0, 3.0];
+        let doubled_times = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&doubled_times, &[]),
+            &[reference("double", None, &reference_times, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        let score = &report.reference_scores[0];
+        assert!(score.beat_f_measure.f1 < 1.0);
+        assert!(score.cemgil_best_metric_level.unwrap() > score.cemgil_score.unwrap());
+        let continuity = score.continuity_metrics.as_ref().unwrap();
+        assert!(continuity.any_metric_level_total >= continuity.correct_metric_level_total);
+    }
+
+    #[test]
+    fn strict_beat_threshold_has_no_extra_epsilon() {
+        let reference_times = [0.0, 1.0, 2.0];
+        let just_outside = [0.070_001, 1.070_001, 2.070_001];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&just_outside, &[]),
+            &[reference("edge", None, &reference_times, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        assert_eq!(report.reference_scores[0].beat_f_measure.true_positives, 0);
     }
 
     #[test]
