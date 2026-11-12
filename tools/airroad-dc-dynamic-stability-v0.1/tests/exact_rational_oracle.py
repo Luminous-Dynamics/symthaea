@@ -9,7 +9,7 @@ from math import isqrt
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[4]
+ROOT = Path(__file__).resolve().parents[3]
 FIXTURE = ROOT / "docs/research/fixtures/airroad-dc-dynamic-stability-v0.1.json"
 
 
