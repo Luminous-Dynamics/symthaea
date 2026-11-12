@@ -144,7 +144,7 @@
     {
       "id": "QI-3",
       "name": "sequential unitary evaporation toy model",
-      "status": "planned",
+      "status": "partial_source_authored_not_executed",
       "model": "apply a declared scrambler only to remaining B, then move one output factor into R and never act on it again",
       "ensembles": [
         "all_to_all_random_two_qubit_circuits",
@@ -158,7 +158,11 @@
         "radiation_purity",
         "mutual_information",
         "circuit_depth",
-        "two_qubit_gate_count"
+        "two_qubit_gate_count",
+        "subsystem_von_neumann_entropy_by_depth",
+        "subsystem_purity_by_depth",
+        "seed_reproducibility",
+        "state_norm_drift"
       ],
       "acceptance": {
         "global_unitarity_and_state_norm_drift_reported_per_step": true,
@@ -166,7 +170,9 @@
         "late_complete_radiation_state_is_pure_for_closed_unitary_model": true,
         "finite_size_variance_reported": true
       },
-      "implementation_status": "not_implemented"
+      "implementation_status": "single-register finite-depth brickwork_1d and all_to_all_matching Haar-U4 scrambling simulators authored; sequential evaporation register transfer not implemented",
+      "source_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/random_circuit_scrambling_v1.json",
+      "claim_ceiling": "Finite-depth random-unitary entanglement dynamics only; not an evaporating black-hole model or gravitational Page curve."
     },
     {
       "id": "QI-4",
@@ -396,6 +402,12 @@
         "standard_error_nats": 0.001095290614359053,
         "normalized_mean_deviation": -0.8560990029439228,
         "rust_sampler_executed": false
+      },
+      "random_circuit_comparator": {
+        "status": "python_numpy_reference_only",
+        "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/random_circuit_scrambling_v1.json",
+        "interpretation": "six-qubit 3+3 finite-depth test: 1D brickwork mean 0.89935 nats, all-to-all matching 1.40608 nats, Haar/Page mean 1.58853 nats; one small sample/seed ensemble only, no universal topology ranking",
+        "rust_source_executed": false
       }
     }
   },
@@ -411,11 +423,12 @@
       "QI-0_renyi_2_and_3": "authored_not_executed",
       "QI-1_complementary_subsystem_identity_controls": "authored_not_executed",
       "QI-2_page_haar_average_reference_formula": "authored_not_executed",
-      "QI-2_seeded_haar_random_state_sampler_and_ensemble_statistics": "authored_not_executed"
+      "QI-2_seeded_haar_random_state_sampler_and_ensemble_statistics": "authored_not_executed",
+      "QI-3_seeded_local_and_all_to_all_random_two_qubit_scramblers": "partial_source_authored_not_executed"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
-      "finite_depth_random_circuit_ensembles": "not_implemented",
+      "finite_depth_random_circuit_ensembles": "seeded_Haar_U4_brickwork_and_all_to_all_matching_source_authored_not_executed; sequential_evaporation_and_energy_conserving_variants_not_implemented",
       "sequential_unitary_evaporation_model": "not_implemented",
       "hayden_preskill_recovery_decoders": "not_implemented",
       "mps_entropy_from_validated_schmidt_spectrum": "not_qualified",
