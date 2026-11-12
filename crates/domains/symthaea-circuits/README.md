@@ -42,3 +42,16 @@ aircraft dynamics or certification.
 
 The frozen contract and machine-readable known-answer vectors are tracked in
 [AIRROAD-DC-DYNAMIC-STABILITY-001 #11712](https://github.com/Luminous-Dynamics/symthaea/pull/11712).
+
+
+## Distributed-electric propulsion DC-bus interaction reference
+
+The `dc_bus_interaction` module contains a reduced-order two-branch model:
+one finite-impedance Thevenin source, a common DC-link capacitor, two resistive feeders, one input capacitor per branch, and two constant-power loads. It provides:
+
+- a KCL-checked operating-point witness;
+- the three-state small-signal Jacobian and cubic characteristic coefficients;
+- isolated branch poles and a conservative Routh-Hurwitz disposition;
+- frequency-domain branch admittances, source impedance and a common-mode return ratio.
+
+This is a synthetic RC/CPL reference, not a converter-control model, measured impedance fit, switching simulation, aircraft stability proof, or flight-safety authority. The companion exact-rational case and independent verifier are under `docs/research/AIRROAD_PDCM_IMPEDANCE_001_V0_1.md` and `tools/airroad-pdcm-impedance-qualifier/`.
