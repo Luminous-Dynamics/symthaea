@@ -76,6 +76,8 @@ For each source-composition lineage, the profile builder takes the maximum measu
 
 Calibration and qualification lineage sets must be digest-disjoint. The profile contains sorted lineage IDs, event-observation receipt digests and one maximum-tail value per lineage.
 
+Before clustering, every observed source Score version must have exact coverage of its canonical event-index range: each Score event index appears exactly once, the declared event count is consistent, and duplicates or missing events reject. This prevents a profile from being built from a conveniently selected subset of low-tail events. Different Score versions may belong to the same signed root composition lineage; each version must be complete, then the maximum across all of its events/versions contributes one value for that root lineage.
+
 ### 4.2 Distribution-free upper confidence bound for the requested quantile
 
 The builder uses an exact binomial order-statistic rule.
