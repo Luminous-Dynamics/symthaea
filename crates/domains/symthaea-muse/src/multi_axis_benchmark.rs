@@ -1087,7 +1087,7 @@ mod tests {
         );
 
         let mut report = report("system-a", 0.61, EvaluationTrackV1::Blind);
-        report.slices[1].metrics.pop();
+        report.slices[1].metrics.remove(0);
         report.report_sha256 = benchmark_run_report_commitment(&report).unwrap();
         assert_eq!(
             validate_benchmark_run_report(&report),
