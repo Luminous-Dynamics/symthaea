@@ -171,9 +171,9 @@ fn validate_sha256(value: &str, label: &str) -> Result<(), AuditError> {
     Ok(())
 }
 
-fn validate_evidence_registry<'a>(
-    evidence: &'a [EvidenceRecord],
-) -> Result<BTreeMap<&'a str, &'a EvidenceRecord>, AuditError> {
+fn validate_evidence_registry(
+    evidence: &[EvidenceRecord],
+) -> Result<BTreeMap<&str, &EvidenceRecord>, AuditError> {
     if evidence.is_empty() {
         return Err(AuditError(
             "at least one evidence record is required".into(),
@@ -626,12 +626,12 @@ fn valid_nonnegative(value: f64) -> bool {
 }
 
 fn risk_is_admissible(candidate: &RiskClass, maximum: &RiskClass) -> bool {
-    match (candidate, maximum) {
-        (RiskClass::Low, _) => true,
-        (RiskClass::Moderate, RiskClass::Moderate | RiskClass::High) => true,
-        (RiskClass::High, RiskClass::High) => true,
-        _ => false,
-    }
+    matches!(
+        (candidate, maximum),
+        (RiskClass::Low, _)
+            | (RiskClass::Moderate, RiskClass::Moderate | RiskClass::High)
+            | (RiskClass::High, RiskClass::High)
+    )
 }
 
 /// Select a finite, predeclared experiment under a strict resource/risk budget.
