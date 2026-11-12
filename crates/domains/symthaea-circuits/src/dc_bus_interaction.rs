@@ -496,6 +496,52 @@ mod tests {
     }
 
     #[test]
+    fn asymmetric_branches_can_be_stable_individually_but_unstable_when_coupled() {
+        let p = NetworkParameters {
+            source_voltage_v: 17.0 / 8.0,
+            source_resistance_ohm: 1.0,
+            bus_capacitance_f: 1.0,
+            feeder_1_resistance_ohm: 1.0,
+            feeder_2_resistance_ohm: 2.0,
+            input_1_capacitance_f: 1.0,
+            input_2_capacitance_f: 2.0,
+            load_1_power_w: 0.5,
+            load_2_power_w: 5.0 / 32.0,
+        };
+        let op = OperatingPoint {
+            bus_voltage_v: 1.5,
+            input_1_voltage_v: 1.0,
+            input_2_voltage_v: 1.25,
+        };
+        let result = analyze(p, op, 1e-12).expect("asymmetric exact operating point");
+        close(result.isolated_branch_poles_per_s[0], -0.5, 1e-12);
+        close(result.isolated_branch_poles_per_s[1], -0.2, 1e-12);
+        assert_eq!(
+            result.stability,
+            StabilityDisposition::PositiveRealPoleGuaranteed
+        );
+        close(result.characteristic_coefficients[1], 16.0 / 5.0, 1e-12);
+        close(result.characteristic_coefficients[2], 29.0 / 40.0, 1e-12);
+        close(result.characteristic_coefficients[3], -1.0 / 80.0, 1e-12);
+
+        let dc = evaluate_return_ratio(p, op, 1e-12, 0.0).unwrap();
+        close(dc.branch_1_admittance_s.real, -1.0, 1e-12);
+        close(dc.branch_2_admittance_s.real, -1.0 / 8.0, 1e-12);
+        close(dc.source_impedance_ohm.real, 1.0, 1e-12);
+        close(dc.return_ratio.real, -9.0 / 8.0, 1e-12);
+
+        let omega_one = evaluate_return_ratio(p, op, 1e-12, 1.0).unwrap();
+        close(omega_one.branch_1_admittance_s.real, 3.0 / 5.0, 1e-12);
+        close(omega_one.branch_1_admittance_s.imag, 4.0 / 5.0, 1e-12);
+        close(omega_one.branch_2_admittance_s.real, 99.0 / 208.0, 1e-12);
+        close(omega_one.branch_2_admittance_s.imag, 25.0 / 208.0, 1e-12);
+        close(omega_one.source_impedance_ohm.real, 0.5, 1e-12);
+        close(omega_one.source_impedance_ohm.imag, -0.5, 1e-12);
+        close(omega_one.return_ratio.real, 519.0 / 520.0, 1e-12);
+        close(omega_one.return_ratio.imag, -81.0 / 1040.0, 1e-12);
+    }
+
+    #[test]
     fn invalid_operating_point_and_frequency_fail_closed() {
         let (p, mut op) = fixture();
         op.input_1_voltage_v = 1.2;

@@ -1,0 +1,329 @@
+{
+  "schema": "luminous.airroad.pdcm_asymmetric.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_reference",
+  "case_id": "asymmetric-two-cpl-shared-source-rc-network",
+  "model": {
+    "name": "thevenin-source-two-unequal-rc-cpl-branches",
+    "equations": [
+      "C0*dV0/dt = Gs*(Vs-V0)-G1*(V0-V1)-G2*(V0-V2)",
+      "Ci*dVi/dt = Gi*(V0-Vi)-Pi/Vi"
+    ],
+    "parameters": {
+      "Vs": {
+        "n": "17",
+        "d": "8",
+        "unit": "V"
+      },
+      "Rs": {
+        "n": "1",
+        "d": "1",
+        "unit": "ohm"
+      },
+      "C0": {
+        "n": "1",
+        "d": "1",
+        "unit": "F"
+      },
+      "R1": {
+        "n": "1",
+        "d": "1",
+        "unit": "ohm"
+      },
+      "R2": {
+        "n": "2",
+        "d": "1",
+        "unit": "ohm"
+      },
+      "C1": {
+        "n": "1",
+        "d": "1",
+        "unit": "F"
+      },
+      "C2": {
+        "n": "2",
+        "d": "1",
+        "unit": "F"
+      },
+      "P1": {
+        "n": "1",
+        "d": "2",
+        "unit": "W"
+      },
+      "P2": {
+        "n": "5",
+        "d": "32",
+        "unit": "W"
+      }
+    }
+  },
+  "equilibrium": {
+    "V0": {
+      "n": "3",
+      "d": "2",
+      "unit": "V"
+    },
+    "V1": {
+      "n": "1",
+      "d": "1",
+      "unit": "V"
+    },
+    "V2": {
+      "n": "5",
+      "d": "4",
+      "unit": "V"
+    },
+    "source_current": {
+      "n": "5",
+      "d": "8",
+      "unit": "A"
+    },
+    "branch_current_1": {
+      "n": "1",
+      "d": "2",
+      "unit": "A"
+    },
+    "branch_current_2": {
+      "n": "1",
+      "d": "8",
+      "unit": "A"
+    },
+    "source_power": {
+      "n": "85",
+      "d": "64",
+      "unit": "W"
+    },
+    "load_power": {
+      "n": "21",
+      "d": "32",
+      "unit": "W"
+    },
+    "source_resistor_loss": {
+      "n": "25",
+      "d": "64",
+      "unit": "W"
+    },
+    "feeder_1_loss": {
+      "n": "1",
+      "d": "4",
+      "unit": "W"
+    },
+    "feeder_2_loss": {
+      "n": "1",
+      "d": "32",
+      "unit": "W"
+    }
+  },
+  "isolated_branch_poles": [
+    {
+      "n": "-1",
+      "d": "2",
+      "unit": "s^-1"
+    },
+    {
+      "n": "-1",
+      "d": "5",
+      "unit": "s^-1"
+    }
+  ],
+  "coupled_linearization": {
+    "state_order": [
+      "V0",
+      "V1",
+      "V2"
+    ],
+    "jacobian": [
+      [
+        {
+          "n": "-5",
+          "d": "2"
+        },
+        {
+          "n": "1",
+          "d": "1"
+        },
+        {
+          "n": "1",
+          "d": "2"
+        }
+      ],
+      [
+        {
+          "n": "1",
+          "d": "1"
+        },
+        {
+          "n": "-1",
+          "d": "2"
+        },
+        {
+          "n": "0",
+          "d": "1"
+        }
+      ],
+      [
+        {
+          "n": "1",
+          "d": "4"
+        },
+        {
+          "n": "0",
+          "d": "1"
+        },
+        {
+          "n": "-1",
+          "d": "5"
+        }
+      ]
+    ],
+    "characteristic_polynomial_coefficients_descending": [
+      {
+        "n": "1",
+        "d": "1"
+      },
+      {
+        "n": "16",
+        "d": "5"
+      },
+      {
+        "n": "29",
+        "d": "40"
+      },
+      {
+        "n": "-1",
+        "d": "80"
+      }
+    ],
+    "stability": "positive_real_pole_guaranteed_by_negative_constant_term"
+  },
+  "frequency_domain": {
+    "current_sign_convention": "positive current drawn from the common bus",
+    "branch_1_admittance": "(s - 1/2)/(s + 1/2)",
+    "branch_2_admittance": "(s - 1/20)/(2s + 2/5)",
+    "source_impedance": "1/(s+1)",
+    "return_ratio": "L(s)=Zs(s)*(Y1(s)+Y2(s))",
+    "closed_loop_characteristic_polynomial_descending": [
+      {
+        "n": "2",
+        "d": "1"
+      },
+      {
+        "n": "32",
+        "d": "5"
+      },
+      {
+        "n": "29",
+        "d": "20"
+      },
+      {
+        "n": "-1",
+        "d": "40"
+      }
+    ],
+    "expected_points": [
+      {
+        "omega_rad_s": {
+          "n": "0",
+          "d": "1"
+        },
+        "branch_1": {
+          "re": {
+            "n": "-1",
+            "d": "1"
+          },
+          "im": {
+            "n": "0",
+            "d": "1"
+          }
+        },
+        "branch_2": {
+          "re": {
+            "n": "-1",
+            "d": "8"
+          },
+          "im": {
+            "n": "0",
+            "d": "1"
+          }
+        },
+        "source_impedance": {
+          "re": {
+            "n": "1",
+            "d": "1"
+          },
+          "im": {
+            "n": "0",
+            "d": "1"
+          }
+        },
+        "return_ratio": {
+          "re": {
+            "n": "-9",
+            "d": "8"
+          },
+          "im": {
+            "n": "0",
+            "d": "1"
+          }
+        }
+      },
+      {
+        "omega_rad_s": {
+          "n": "1",
+          "d": "1"
+        },
+        "branch_1": {
+          "re": {
+            "n": "3",
+            "d": "5"
+          },
+          "im": {
+            "n": "4",
+            "d": "5"
+          }
+        },
+        "branch_2": {
+          "re": {
+            "n": "99",
+            "d": "208"
+          },
+          "im": {
+            "n": "25",
+            "d": "208"
+          }
+        },
+        "source_impedance": {
+          "re": {
+            "n": "1",
+            "d": "2"
+          },
+          "im": {
+            "n": "-1",
+            "d": "2"
+          }
+        },
+        "return_ratio": {
+          "re": {
+            "n": "519",
+            "d": "520"
+          },
+          "im": {
+            "n": "-81",
+            "d": "1040"
+          }
+        }
+      }
+    ]
+  },
+  "conclusion": {
+    "isolated_branches": "both_locally_stable_against_stiff_bus",
+    "coupled_network": "small_signal_unstable_positive_real_pole",
+    "claim": "asymmetric RC/CPL single-common-bus SISO counterexample only",
+    "non_claims": [
+      "general MIMO stability",
+      "converter control-loop dynamics",
+      "aircraft electrical stability",
+      "HIL/PHIL or flight validation"
+    ]
+  }
+}
