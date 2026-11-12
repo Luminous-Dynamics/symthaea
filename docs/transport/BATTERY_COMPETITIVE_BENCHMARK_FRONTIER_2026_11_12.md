@@ -222,6 +222,66 @@ Near-term benchmark ladder:
 
 Draft [PR #11770](https://github.com/Luminous-Dynamics/symthaea/pull/11770) implements the first read-only audit slice on branch `research/assb-practical-translation-v0.1`. Exact head `1075e8fbdd8311c9ebda3146f63485f43bcd1671` passed Draft 2020-12 schema/fixture validation, locked metadata, Rust 1.96 formatting, 23/23 tests and strict Clippy (https://github.com/Luminous-Dynamics/symthaea/actions/runs/43274827165). It rejects fabrication-pressure, batch, line, process-revision, design-revision, method/instrument and uncertainty confounding; audits inactive electrode mass plus complete-cell volume. All evidence remains synthetic; this is not an electrochemical performance claim.
 
+## ASSB benchmark frontier: targets beyond low-pressure headlines
+
+The current low-pressure benchmark lane is **ASSB-PRACTICAL-TRANSLATION-001 #11759** / draft [PR #11770](https://github.com/Luminous-Dynamics/symthaea/pull/11770). Its exact-head focused workflow passed schema/fixture validation, locked metadata, formatting, **23/23 Rust tests** and strict Clippy:
+https://github.com/Luminous-Dynamics/symthaea/actions/runs/43274827165
+
+### Three benchmark levels must remain separate
+
+**Current low-pressure research demonstrations**
+- Lee et al. (7 November 2026) report room-temperature sulfide ASSB operation at ≤0.3 MPa stack pressure, with NMC811 at 2.4 mAh/cm² and 0.1C. This is an important near-ambient pressure demonstration, but the reported loading and rate are below the ≥5 mAh/cm² and ≥2C challenge proposed for competitive practical SSBs.
+- A separate 2026 *Nature Communications* result reports pouch-cell operation at 2.5 MPa, 350 cycles at 1C and 85% retention; its >400 Wh/kg figure is based on solid electrolyte, Li metal and positive-electrode materials, not a fully inclusive inactive-component complete-cell mass boundary. Do not compare that figure directly to complete-cell or pack Wh/kg.
+
+Sources:
+- https://www.nature.com/articles/s41467-026-79393-w
+- https://www.nature.com/articles/s41467-026-73012-4
+- https://doi.org/10.1002/batt.70514
+
+**USABC solid-electrolyte development goals (version 21 October 2025)**
+These are explicit automotive-development goals, not a current industry average or a demonstrated commercial baseline.
+
+| Level | Parameter | USABC target |
+|---|---|---:|
+| Material | Ionic conductivity | >10 mS/cm at 30°C; >1 mS/cm at 0°C |
+| Material | Electronic conductivity | <1×10⁻⁸ mS/cm (as stated in the USABC table) |
+| Material | Critical current density | >13 mA/cm² |
+| Material | Electrochemical window | 0–5 V vs Li/Li⁺ |
+| Material | Thermal stability | >250°C |
+| Material | Water stability | <10% ionic-conductivity loss after 72 h at −40°C dew point |
+| Material | Cost | <$10/kg at 75 kt/year |
+| Cell | Capacity | ≥5 Ah |
+| Cell | Pressure | <2 MPa |
+| Cell | Electrolyte thickness | <20 μm |
+| Cell | Calendar life | >15 years |
+| Cell | Cycle life | >1,000 cycles |
+| Cell | Low-temperature operation | >70% of 30°C usable energy at −20°C, unassisted |
+
+The USABC high-energy EV cell goals add a distinct EOL target set: 450 Wh/kg usable specific energy, 850 Wh/L usable energy density, 10-minute charge to 80% usable energy at 30°C, 750 dynamic-stress-test cycles with 25% fast charging, 15-year calendar life, and $60/kWh at 250,000-unit production assumptions. These goals must not be merged into the solid-electrolyte material targets or treated as pack-level numbers.
+
+Sources:
+- USABC Solid Electrolyte RFPI, Appendix A (21 October 2025): https://uscar.org/wp-content/uploads/2025/12/USABC-Electrolyte-RFPI.pdf
+- USABC High-Energy EV performance targets (6 October 2025): https://uscar.org/wp-content/uploads/2025/12/USABC-High-Energy-EV-RFPI.pdf
+- USABC goals catalogue: https://uscar.org/usabc/goals/
+
+**Research competitiveness challenge**
+A March 2026 analysis argues that competitive ASSBs should reach >5 mAh/cm² areal loading and >2C, and that many academic demonstrations remain below 2 mAh/cm² and below 1C. These are proposed practical competitiveness boundaries, not universally standardized pass criteria:
+https://doi.org/10.1002/anie.2890151
+
+The benchmark should therefore report a multi-axis vector—pressure, full-cell mass/volume, areal capacity, rate, life, electrolyte thickness, inactive fraction, batch yield and cost—rather than a single record number. The first near-ambient demonstrator should be a reproduction baseline; the USABC and ≥5 mAh/cm² / ≥2C goals are stretch targets.
+
+### Interlaboratory reproducibility is a first-class research lane
+
+A separate programme, **ASSB-ROUNDROBIN-001 #11784**, is now open with a first read-only data/audit slice in branch `research/assb-roundrobin-v0.1`. It composes the ASSB translation audit rather than duplicating it.
+
+The motivation:
+- A 2024 *Nature Energy* interlaboratory study supplied common materials to 21 groups and found large variation associated with pressing pressure, pressing duration and In-to-Li ratio. It recommended standard parameter reporting and triplicate data:
+  https://www.nature.com/articles/s41560-024-01634-3
+- A 2026 fixture study suggests <5% pressure homogeneity, <5% setpoint accuracy MAPE and <5% pressure repeatability CV as candidate engineering metrics. The authors note that quantitative fixture benchmarks were not established and that their numbers are engineering judgement:
+  https://doi.org/10.1002/ese3.70581
+
+The round-robin lane distinguishes COMMON_PROTOCOL, LAB_NATIVE and PROTOCOL_DEVIATION arms; counts unique physical cells rather than repeated readings; and reports a synthetic known-answer fixture separately from physical cross-lab candidates. A group with ≥3 labs and ≥3 distinct cells per lab can only qualify as a **candidate for cross-lab variance analysis**, not as proof of reproducibility. It does not yet calculate pooled statistics.
+
 ## Additional materials frontier: sodium-ion and zero-excess sodium-metal
 
 A new bounded materials lane has been opened in Symthaea [SODIUM-BATTERY-MISSION-001 #11694](https://github.com/Luminous-Dynamics/symthaea/issues/11694) / draft [PR #11695](https://github.com/Luminous-Dynamics/symthaea/pull/11695).
