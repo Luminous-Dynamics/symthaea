@@ -1,0 +1,243 @@
+# TEXTILE-SORT-FUSION-001 — visual + spectral textile evidence v0.1
+
+**Status:** executable Rust evidence-admission contract and 15-case synthetic corpus. No real dataset has been downloaded, no fibre classifier has been trained, and no physical sorting line has been evaluated.
+
+**Owner:** Symthaea `symthaea-materials::textile_sensing`
+
+**Research issue:** [TEXTILE-SORT-FUSION-001 #11743](https://github.com/Luminous-Dynamics/symthaea/issues/11743)
+
+**Parent programme:** [APPAREL-ENG-TWIN-001 #11731](https://github.com/Luminous-Dynamics/symthaea/issues/11731)
+
+---
+
+## 1. Problem and research thesis
+
+Textile sorting is not one classification task. A real garment may require separate answers to:
+
+1. What visual garment family and presentation state are visible?
+2. What fibre composition is supported by a calibrated material sensor?
+3. Which portions of the material remain unknown, blended, contaminated or out-of-domain?
+4. What evidence is required before a material stream may be routed to a particular physical recovery process?
+5. Did the physical sort actually produce the declared output lot and grade?
+
+The system must keep those questions independent. A shirt/jacket/dress label does not establish cotton/polyester/wool composition. NIR spectra do not establish garment category, contamination, wearability, recyclability or output grade. A classifier prediction does not prove a physical sort occurred.
+
+**Paradigm shift:** move from forced top-1 labels to an evidence-bearing sensing cascade with independent modality results, calibrated uncertainty, explicit open-set abstention and downstream physical outcome measurement.
+
+## 2. Existing ownership
+
+- Symthaea [TEXTILE-HYG-MFG-000 #5984](https://github.com/Luminous-Dynamics/symthaea/issues/5984) owns textile product-function evidence and its qualification ceiling.
+- Symthaea [symthaea-materials](https://github.com/Luminous-Dynamics/symthaea/tree/main/crates/domains/symthaea-materials) owns shared material representation, HDC-based property search and related material reasoning. This v0.1 slice is added as `textile_sensing`; it does not create a second material database.
+- Symtropy textile robotics [#4865](https://github.com/Luminous-Dynamics/symtropy/issues/4865) owns cloth handling/manipulation trials and physical action evidence.
+- Symtropy RGBench reproduction [#4870](https://github.com/Luminous-Dynamics/symtropy/issues/4870) owns cloth-model Sim2Real benchmark admission.
+- Mycelix textile recovery [PR #5057](https://github.com/Luminous-Dynamics/mycelix/pull/5057) owns recovery event/secondary-fibre evidence conformance; its combined D6S integration candidate is [PR #6095](https://github.com/Luminous-Dynamics/mycelix/pull/6095).
+- Mycelix textile product-passport projection [#6092](https://github.com/Luminous-Dynamics/mycelix/issues/6092) owns a controlled projection over admitted product/lifecycle records.
+
+The sensing module is not a recovery eligibility engine, product passport, inventory ledger, sensor calibration service or robot controller.
+
+## 3. Latest public benchmark sources
+
+### 3.1 TexSortML — visual garment category and presentation state
+
+Paper: https://doi.org/10.3390/s26196236
+Dataset DOI: https://doi.org/10.5281/zenodo.22143896
+
+The 30 September 2026 paper describes:
+- 751 post-consumer garments;
+- 11 visual categories;
+- 2,253 annotated frames;
+- 3 presentation stages for each garment;
+- garment-level five-fold validation, keeping all frames for one garment in the same fold.
+
+Reported ViT accuracy is 95.23%, 91.90% and 85.94% across the three stages (9.3 percentage-point first-to-third drop). The reported ResNet-18 and ResNet-50 drops are 16.9 and 16.6 points. These numbers are paper-reported, not independently reproduced by Luminous.
+
+Limitations:
+- small and class-imbalanced sample;
+- garments were sourced from collection containers and had already been pre-sorted at one facility;
+- its labels describe visual garment family/presentation, not fibre composition;
+- a very large ViT (about 305.6M parameters in the reported setup) is compared with substantially smaller ResNets, so parameter/compute-matched comparisons are required before claiming architecture superiority.
+
+### 3.2 NIST NIR-SORT — fibre/composition evidence
+
+Catalog: https://catalog.data.gov/dataset/near-infrared-spectra-of-origin-defined-and-real-world-textiles-nir-sort-a-spectroscopic-a
+Paper: https://doi.org/10.1038/s41597-026-07434-6
+Record DOI: https://doi.org/10.18126/61v0-rf98
+
+The catalog describes 113 physical textile specimens:
+- 70 known-provenance fabrics with known fibre content and varied dyes/finishes;
+- 20 known-provenance undyed blends;
+- 11 post-consumer textiles;
+- 12 pre-consumer textiles.
+
+Nominally seven NIR replicates per specimen are described, using:
+- a benchtop instrument covering 833–2500 nm;
+- two handheld instrument ranges covering 1550–1950 nm.
+
+The catalog lists approximately 193 MB spectroscopy data and 10.6 GB microscopy data. Start with spectroscopy; microscopy is a later opt-in lane. Verify repository and file-level rights/attribution before copying, downloading in CI or redistributing any data.
+
+### 3.3 Task separation
+
+| Benchmark | Valid question | It does not establish |
+|---|---|---|
+| TexSortML | Which visual garment category/presentation state is visible? | Fibre composition or recovery eligibility |
+| NIR-SORT | What fibre/composition evidence is supported by this instrument/specimen/method? | Garment category, contamination or recyclability |
+| Mycelix recovery evidence | Is a declared physical recovery event and output-lot claim sufficiently evidenced? | Sorting model accuracy or sensor calibration |
+
+Fusion must not collapse these three evidence planes.
+
+## 4. Executable Rust v0.1
+
+The new module is:
+
+`crates/domains/symthaea-materials/src/textile_sensing.rs`
+
+It exports through `symthaea-materials::textile_sensing`.
+
+### 4.1 NIR admission
+
+An NIR composition estimate is admitted only when:
+- observation, specimen, subject, instrument, replicate-group and evidence identities are present;
+- instrument identity matches the declared instrument profile;
+- observation, calibration and profile share the exact calibration-profile identity;
+- calibration was not revoked and was valid at acquisition time;
+- the observed wavelength interval is within the declared qualified profile;
+- signal quality is valid and the composition estimate is structurally/arithmetically coherent;
+- fibre fractions close to exactly 1,000,000 ppm, duplicate fibre identities are absent, and each uncertainty interval contains its point estimate.
+
+Expired-at-acquisition, saturated, low-signal, out-of-domain or missing-composition observations abstain as `Unknown`; explicit calibration revocation or malformed/contradictory identity/units is rejected. A declared unknown fraction is retained and yields an unknown disposition rather than a guessed fibre identity.
+
+This is an admission validator for externally produced estimates. It does not implement a NIR classifier, absorbance preprocessing or instrument calibration routine.
+
+### 4.2 Visual garment observation
+
+Visual observations have a separate type containing:
+- garment category;
+- presentation state;
+- model identity;
+- confidence;
+- garment and subject identity;
+- source image/annotation evidence reference.
+
+The type has no fibre-composition field. Confidence floors are caller-declared policy inputs; they are not treated as universal thresholds.
+
+### 4.3 Paired multimodal observations
+
+When both modalities are supplied, the pair is bound only if both refer to the same physical subject. The assessment preserves the visual and spectral results separately.
+
+No visual-to-fibre label transfer exists in this contract. If visual-only data arrive, the spectral result remains absent; if modalities identify different items, pair binding is rejected, even though each source's independent assessment is retained.
+
+### 4.4 Leakage-safe split validation
+
+`validate_grouped_splits` enforces:
+- TexSortML-style frames for one garment identity remain in one train/validation/test/fold partition.
+- NIR-SORT replicate spectra for one physical specimen remain in one partition.
+- row identities are unique within each grouping kind.
+
+This prevents multiple views/replicates of one physical item from leaking across the train/test boundary and inflating performance.
+
+## 5. Current synthetic tests
+
+The new module contains 15 Rust unit tests for:
+1. valid current-calibration composition admission;
+2. expired calibration abstention;
+3. revoked calibration rejection;
+4. instrument/profile mismatch rejection;
+5. wavelength-domain abstention;
+6. saturated-signal abstention;
+7. missing composition abstention;
+8. invalid fraction-total rejection;
+9. preserving an unknown blend fraction without forcing a label;
+10. visual-only input not producing fibre-composition evidence;
+11. visual/spectral subject mismatch;
+12. visual confidence below a declared threshold;
+13. garment-identity split leakage;
+14. physical-specimen replicate leakage;
+15. valid grouped replicate/fold assignment.
+
+A separate synthetic fixture corpus is provided at:
+- `docs/research/fixtures/textile_sort_fusion_v0_1/sensor_cases.schema.json`
+- `docs/research/fixtures/textile_sort_fusion_v0_1/sensor_cases.example.json`
+
+The JSON corpus currently expresses 15 expected outcomes for future fixture-loading/semantic tests. It is not yet consumed by the Rust tests.
+
+## 6. Benchmark programme to exceed SOTA
+
+### B0 — reproduce both public baselines independently
+
+TexSortML:
+- reproduce the published garment-level grouped five-fold split;
+- report per-class macro-F1, balanced accuracy, precision/recall, confusion and confidence calibration at each presentation stage;
+- compare matched model parameter counts, FLOPs, resolution, training data and inference budget.
+
+NIR-SORT:
+- group all replicates by physical specimen;
+- stratify by instrument (benchtop vs each handheld instrument);
+- compare raw/normalized spectra and simple classical baselines (PCA + SVM, PLS-DA where methodologically appropriate) with a version-pinned learned baseline;
+- preserve preprocessing, method, reference composition measurement and calibration identity.
+
+Do not pool the visual and spectral scores into one leaderboard.
+
+### B1 — open-set and domain shift
+
+Adversarial domains:
+- unknown blends or fibre families;
+- new dyes, finishes, coatings and laminates;
+- wet, dirty, worn and aged samples;
+- partial garment views, occlusion, overlap and extreme folds;
+- handheld-to-benchtop instrument shift;
+- low signal, saturation, wavelength truncation and calibration expiry;
+- conflicting replicate measurements and changed sensor firmware.
+
+Metrics:
+- macro-F1 and worst-class recall;
+- per-class precision/recall and blend error;
+- unknown/OOD false-accept rate;
+- coverage-risk curves and selective prediction;
+- expected calibration error/Brier score;
+- confidence/interval coverage;
+- instrument-transfer degradation;
+- time to abstain/request remeasurement.
+
+The most important metric may be **false acceptance of an unknown material** rather than the highest top-1 accuracy.
+
+### B2 — sensor fusion
+
+Compare matched models/policies:
+1. visual-only;
+2. NIR-only;
+3. late fusion with separate calibrated modality outputs;
+4. learned fusion with explicit missing-modality handling;
+5. conservative evidence cascade that requests another measurement on conflict/OOD.
+
+All arms receive the same physical specimen IDs, training splits, calibration boundaries and compute budget. The cascade must never invent fibre composition from a garment label or treat a supplier declaration as a spectral measurement.
+
+### B3 — physical sorting and recovery
+
+Only after a guarded instrumented cell exists, measure:
+- item-level correct sort / reject / abstain;
+- mass per physical output stream;
+- stream purity and contamination;
+- throughput, recirculation and operator intervention;
+- actual output lot identity and custody;
+- recovery route qualification;
+- secondary-fibre grade and functional acceptance.
+
+Classification accuracy alone cannot prove recyclability, recovery yield or environmental benefit.
+
+## 7. Proposed challenge targets (not achieved)
+
+Freeze after baseline reproduction and measurement repeatability:
+- zero admitted spectra from missing, revoked or out-of-validity calibration;
+- zero fibre-composition claims derived from visual garment labels;
+- 100% garment/specimen group integrity across all train/test splits;
+- zero silent imputation of missing/saturated/out-of-domain spectra;
+- report selective coverage and risk; choose an operating point with a frozen false-accept ceiling;
+- improve macro-F1 and worst-class recall against compute-matched baselines without increasing unknown-material false acceptance;
+- demonstrate reduced instrument-transfer degradation on held-out specimens;
+- 100% of actual physical output lots linked to sort and recovery receipts before material recovery claims.
+
+These targets are challenge goals, not predictions or results. Freeze thresholds only after the data protocol, class taxonomy, held-out split and source measurement quality are established.
+
+## 8. Claim ceiling
+
+A passing Rust contract test validates only the declared input/admission semantics. It does not establish model accuracy, calibrated fibre identification, industrial throughput, garment sorting performance, secondary-fibre grade, recycling yield, textile safety, lifecycle impact or regulatory conformity. Those require actual licensed data, independently checked references, calibrated instruments and physical recovery trials.
