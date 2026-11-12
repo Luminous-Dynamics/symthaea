@@ -6,8 +6,8 @@ pins and composes four independently owned Symthaea reference crates:
 | Role | Package | Immutable source revision |
 |---|---|---|
 | Calibrated synchronized observations | `electric-propulsion-observation-oracle` 0.3.0 | `d81f5b4f1ee050d677c3bae1c7733d5bfe73fa20` |
-| Strict coordinate-aware context-bound motor map | `electric-propulsion-map-oracle` 0.3.0 | `b99e8cb896cbeec34698cb71e5807b033fb77c07` |
-| Gearbox-aware and motor-shaft coordinate drive envelope | `electric-rotorcraft-drive-oracle` 0.6.0 | `c8441438f0e00cceeb1e951ea3c4d88a9aaf3b80` |
+| Strict coordinate-aware context-bound motor map | `electric-propulsion-map-oracle` 0.3.0 | `ccd0aead85237f824f619321dae555a6c372d788` |
+| Gearbox-aware and motor-shaft coordinate drive envelope | `electric-rotorcraft-drive-oracle` 0.6.0 | `cc91e1dcfbc064aeaefaa17f55753e3707d57a90` |
 | Electrical and thermal loss ledgers | `electric-thermal-loss-ledger-oracle` 0.2.0 | `2865e86a755e92a99bc534a5ea6dd13c272d8dc9` |
 
 Dependencies are pinned by Git commit in `Cargo.toml` and repeated in
