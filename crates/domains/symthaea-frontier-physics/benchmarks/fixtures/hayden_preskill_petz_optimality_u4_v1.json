@@ -1,6 +1,6 @@
 {
   "schema": "luminous.black_hole_information.hayden_preskill_petz_optimality_u4.v1",
-  "status": "Rust source and five tests authored; exact-head focused Rust execution pending; independent NumPy theorem-criterion comparator executed",
+  "status": "Rust source now uses support-aware Hermitian PSD square root; exact-head Rust runner validation pending independent NumPy reference",
   "claim_ceiling": "The result concerns one-qubit message/reference, one-qubit black-hole/early-radiation, and a single Haar U(4) scrambler. It establishes Petz optimality for this specific maximally-mixed finite-dimensional channel family when the commutator criterion is numerically satisfied. It is not a large-N decoder result, a gate-efficient implementation, gravitational evaporation, or a QES/island calculation.",
   "reference": {
     "paper": "Bikun Li, Zhaoyou Wang, Guo Zheng, Yat Wong, Liang Jiang, Optimality Condition for the Petz Map",
@@ -30,8 +30,25 @@
     "commutator": "C = [M_sigma, gamma tensor T]",
     "numerical_metric": "Frobenius norm ||C||_F",
     "interpretation": "For rho=sigma=I/2, a numerically vanishing commutator is the theorem's necessary-and-sufficient criterion for Petz entanglement-fidelity optimality in this channel.",
-    "inverse_square_root": "The Rust implementation computes sqrt(M)=M*M^(-1/2) using the existing unregularized complex-Hermitian Newton-Schulz inverse-square-root routine; non-convergence is a typed failure.",
-    "no_silent_repair": true
+    "inverse_square_root": "Removed from the QI-4O QEC-matrix square-root route; the QI-4P Petz recovery channel still separately needs an inverse square root of rho_A and retains its own unregularized Newton-Schulz policy.",
+    "no_silent_repair": true,
+    "optimality_matrix_square_root": {
+      "method": "8x8 real-symmetric embedding eigendecomposition with real eigenvectors mapped to complex 4-vectors and complex Gram-Schmidt",
+      "support": "Positive-semidefinite matrices including rank-deficient cases; numerical support rank reported",
+      "negative_spectrum": "Materially negative eigenvalues are rejected; only negative roundoff within the declared tolerance is treated as zero",
+      "flooring": "No positive eigenvalue floor or support regularization is applied",
+      "residual": "||S*S-M_sigma||_F/max(1,||M_sigma||_F)",
+      "authored_controls": [
+        "rank-one PSD projector square root equals itself",
+        "rank-two PSD diagonal matrix reconstructs to declared tolerance",
+        "materially negative eigenvalue returns a typed non-positive error"
+      ],
+      "status": "source_authored_not_executed"
+    },
+    "observables": [
+      "QEC_matrix_positive_square_root_residual",
+      "QEC_matrix_numerical_support_rank"
+    ]
   },
   "independent_numpy_comparator": {
     "generator": "Independent NumPy PRNG; complex Gaussian Haar U(4) via QR; direct Kraus/QEC-matrix construction; numpy.linalg.eigh for sqrt(M_sigma); explicit partial trace and commutator.",
@@ -69,7 +86,7 @@
       "ensemble reports uncertainty and maximum residual",
       "sample count one is rejected"
     ],
-    "status": "five Rust tests authored; exact-head validation pending"
+    "status": "source_authored_runner_pending"
   },
   "limitations": [
     "The theorem applies to a fixed channel and stated input/reference states; this test does not generalize to non-maximally-mixed inputs.",
