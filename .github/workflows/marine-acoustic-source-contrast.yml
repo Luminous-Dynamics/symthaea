@@ -32,6 +32,14 @@ jobs:
         with:
           components: rustfmt, clippy
       - name: Format Rust source
+        run: rustfmt --edition 2024 tools/marine-acoustic-source-contrast-audit/src/main.rs
+      - name: Preserve formatted source
+        uses: actions/upload-artifact@v4
+        with:
+          name: marine-acoustic-source-contrast-rustfmt
+          path: tools/marine-acoustic-source-contrast-audit/src/main.rs
+          if-no-files-found: error
+      - name: Verify formatting
         run: rustfmt --edition 2024 --check tools/marine-acoustic-source-contrast-audit/src/main.rs
       - name: Generate isolated Cargo lockfile
         run: cargo generate-lockfile --manifest-path tools/marine-acoustic-source-contrast-audit/Cargo.toml
