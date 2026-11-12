@@ -63,8 +63,9 @@ pub struct InteractionAnalysis {
     pub characteristic_coefficients: [f64; 4],
     /// Isolated branch poles when the bus voltage is held stiff.
     pub isolated_branch_poles_per_s: [f64; 2],
-    /// Routh-Hurwitz quantity a1*a2 - a3 for the cubic characteristic.
-    pub routh_hurwitz_delta: f64,
+    /// Dimensionless Routh-Hurwitz quantity after normalizing the pole-rate
+    /// scale. This avoids comparing coefficients with different SI dimensions.
+    pub normalized_routh_hurwitz_delta: f64,
     /// Conservative numerical disposition; not a physical safety decision.
     pub stability: StabilityDisposition,
 }
@@ -158,17 +159,39 @@ pub fn analyze(
         return Err(InteractionError::NonFiniteDerivedValue("linearization"));
     }
 
-    let scale = 1.0_f64
-        .max(a1.abs())
-        .max(a2.abs())
-        .max(a3.abs())
-        .max((a1 * a2).abs())
-        .max(routh_delta.abs());
-    let guard = 64.0 * f64::EPSILON * scale;
+    // Normalize the three dimensionful coefficients by one characteristic
+    // pole-rate. alpha_1, alpha_2 and alpha_3 are dimensionless, and the
+    // normalized Routh-Hurwitz determinant is invariant to uniform time-unit
+    // scaling of the same dynamical system.
+    let rate_scale = a1.abs().max(a2.abs().sqrt()).max(a3.abs().cbrt());
+    let (alpha_1, alpha_2, alpha_3) = if rate_scale > 0.0 && rate_scale.is_finite() {
+        (
+            a1 / rate_scale,
+            a2.signum() * (a2.abs().sqrt() / rate_scale).powi(2),
+            a3.signum() * (a3.abs().cbrt() / rate_scale).powi(3),
+        )
+    } else {
+        (0.0, 0.0, 0.0)
+    };
+    let normalized_routh_delta = alpha_1 * alpha_2 - alpha_3;
+    if !alpha_1.is_finite()
+        || !alpha_2.is_finite()
+        || !alpha_3.is_finite()
+        || !normalized_routh_delta.is_finite()
+    {
+        return Err(InteractionError::NonFiniteDerivedValue(
+            "normalized_routh_hurwitz",
+        ));
+    }
+    let guard = 64.0 * f64::EPSILON;
 
-    let stability = if a3 < -guard {
+    let stability = if alpha_3 < -guard {
         StabilityDisposition::PositiveRealPoleGuaranteed
-    } else if a1 > guard && a2 > guard && a3 > guard && routh_delta > guard {
+    } else if alpha_1 > guard
+        && alpha_2 > guard
+        && alpha_3 > guard
+        && normalized_routh_delta > guard
+    {
         StabilityDisposition::HurwitzStable
     } else {
         StabilityDisposition::NotCertifiedStable
@@ -186,7 +209,7 @@ pub fn analyze(
         jacobian,
         characteristic_coefficients: [1.0, a1, a2, a3],
         isolated_branch_poles_per_s: [isolated_1, isolated_2],
-        routh_hurwitz_delta: routh_delta,
+        normalized_routh_hurwitz_delta: normalized_routh_delta,
         stability,
     })
 }
@@ -436,6 +459,41 @@ mod tests {
         assert!(result.characteristic_coefficients[2] > 0.0);
         assert!(result.characteristic_coefficients[3] > 0.0);
         assert!(result.routh_hurwitz_delta > 0.0);
+    }
+
+    #[test]
+    fn normalized_routh_disposition_is_invariant_to_uniform_time_scaling() {
+        let (mut p, op) = fixture();
+        let baseline = analyze(p, op, 1e-12).expect("unstable baseline");
+
+        // Multiplying all capacitances by ten slows all poles by ten without
+        // changing their stability. The normalized Routh quantity is invariant.
+        p.bus_capacitance_f *= 10.0;
+        p.input_1_capacitance_f *= 10.0;
+        p.input_2_capacitance_f *= 10.0;
+        let scaled = analyze(p, op, 1e-12).expect("scaled unstable system");
+
+        assert_eq!(baseline.stability, scaled.stability);
+        close(
+            baseline.normalized_routh_hurwitz_delta,
+            scaled.normalized_routh_hurwitz_delta,
+            1e-12,
+        );
+        close(
+            scaled.characteristic_coefficients[1],
+            baseline.characteristic_coefficients[1] / 10.0,
+            1e-12,
+        );
+        close(
+            scaled.characteristic_coefficients[2],
+            baseline.characteristic_coefficients[2] / 100.0,
+            1e-12,
+        );
+        close(
+            scaled.characteristic_coefficients[3],
+            baseline.characteristic_coefficients[3] / 1000.0,
+            1e-12,
+        );
     }
 
     #[test]
