@@ -96,6 +96,32 @@ Sources:
 - NASA 2025 ISAM State of Play: https://ntrs.nasa.gov/citations/20250008988
 - TU Berlin / JPM Silicon SoMo: https://www.tu.berlin/en/raumfahrttechnik/research/current-projects/somo
 
+## 5A. Regolith-derived moonglass + imported perovskite is a direct alternative to silicon extraction
+
+A 2025 *Device* paper, **Moon photovoltaics utilizing lunar regolith and halide perovskites**, demonstrates a different ISRU split from Blue Alchemist:
+- Manufacture transparent moonglass substrate/encapsulation from anorthositic lunar-regolith simulant.
+- Deposit ultrathin halide-perovskite absorbers and contacts, retaining some imported precursor/electrode dependencies.
+- Avoid semiconductor-grade silicon extraction/purification in the first production stage.
+
+Reported experimental results include:
+- approximately 8.5–8.6% AM0 PCE for a superstrate moonglass/perovskite cell using opaque Cu electrodes;
+- 12.1% AM0 PCE for a substrate configuration using an IZO contact;
+- 99.6% initial-efficiency retention after exposure to (2\times10^{12}) 68-MeV protons/cm².
+
+The paper also models 21.5–22.7% PCE for thinner (~0.1 mm) moonglass and improved interfaces; those are projections, not measured devices. Its 99% material-transport reduction and 22–50 W/g power-per-launched-mass figures are scenario estimates with a launched-mass denominator. They are not complete installed-array W/kg and do not include every factory, deployment, replacement and maintenance dependency.
+
+**This is a strategically important comparator.** It trades deeper local semiconductor extraction for a locally manufactured bulk substrate/protective-glass route with imported thin absorbers and contacts. The feedstock mineralogy matters: the paper reports that anorthositic highland simulant produced more transparent glass than iron-richer lowland simulant. It also identifies moonglass optical absorption and contact resistance as experimental performance limitations.
+
+PESE / PV-ISRU must compare at least three distinct routes:
+1. **Blue Alchemist-style silicon route:** deeper local material conversion and conductor/oxygen coproducts, with purification, semiconductor-grade process and equipment dependencies.
+2. **Moonglass + perovskite route:** local glass substrate/cover, imported thin absorber/contact precursors, with lower purification burden but remaining imported chemical/electrode dependencies.
+3. **Imported high-performance cell route:** bring in qualified III-V / silicon / tandem cells and locally manufacture structures, glass, supports, thermal storage and cabling.
+
+Compare them on imported kg per qualified Wp, factory energy and heat, feedstock grade, product quality, batch yield, deployed mass, radiation/thermal/dust lifetime, repair and total lifetime delivered service. Do not equate locally made glass with a fully local PV module.
+
+Primary source:
+- Cuervo-Ortiz et al. (2025), *Moon photovoltaics utilizing lunar regolith and halide perovskites*: <https://doi.org/10.1016/j.device.2025.100747>
+
 ## 6. Perovskite and autonomous manufacturing frontier
 
 A 14 April 2026 Nature study integrates machine-learning materials discovery, automated fabrication, Bayesian optimization and symbolic regression in a closed loop. It reports:
