@@ -39,6 +39,7 @@ The model-scale and full-scale comparison must use source levels normalized to t
 - The ITTC 4.2–7.1 dB full-scale prediction uncertainty reported in Revision 03 is based on questionnaire estimates, not a universal per-project acceptance tolerance. This tool does not hard-code it.
 - Cavitation-pattern similarity, Reynolds effects, wake fidelity, nuclei/gas content, facility reverberation, background subtraction and transfer-function characterization require independent engineering review and experimental evidence.
 - No CFD solver, ecological impact model, vessel certification or causal improvement claim is implemented.
+- The standalone workflow generates one Cargo.lock per exact-head run, uses `--locked` for Clippy/tests/audit, and preserves the lockfile as a workflow artifact. Commit that generated lockfile before treating dependency resolution as repository-frozen.
 - Exact-head Rust tests/format/clippy and physical validation must be reported separately.
 
 ## External benchmark targets
