@@ -881,8 +881,12 @@ mod tests {
         let plasma_summary = audit_source_value(&plasma, "plasma-source-cases").unwrap();
         let hts_summary = audit_source_value(&hts, "hts-source-cases").unwrap();
 
-        assert_eq!(plasma_summary.case_count, 23);
-        assert_eq!(plasma_summary.negative_control_count, 23);
+        assert_eq!(plasma_summary.case_count, 24);
+        assert_eq!(plasma_summary.negative_control_count, 24);
+        assert!(plasma.cases.as_array().unwrap().iter().any(|case| {
+            case.get("case_id").and_then(Value::as_str)
+                == Some("FUSION-FUEL-DHE3-ARC-NEUTRON-PARTITION-2026")
+        }));
         assert_eq!(hts_summary.case_count, 6);
         assert_eq!(hts_summary.negative_control_count, 12);
     }
