@@ -1,0 +1,277 @@
+{
+  "schema_version": "planetary-energy-source-register-v0.1",
+  "status": "discovery_register_not_qualification",
+  "updated_on": "2026-11-12",
+  "created_for": [
+    "https://github.com/Luminous-Dynamics/symthaea/issues/11756",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/11771",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/11783",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/11785"
+  ],
+  "policy": {
+    "source_url_is_not_qualification": true,
+    "manufacturer_or_programme_statement_is_not_independent_verification": true,
+    "review_article_values_require_primary_source_retrieval_before_matched_comparison": true,
+    "unknown_values_must_remain_unknown": true,
+    "cell_metrics_must_not_be_promoted_to_module_array_or_plant_metrics": true,
+    "earth_orbit_array_metrics_must_not_be_promoted_to_lunar_surface_system_metrics": true
+  },
+  "records": [
+    {
+      "source_id": "NASA-VSAT-RFC-LUNAGRID-HARMONIA-2026",
+      "title": "NASA Lunar Surface Technology — Surface Power",
+      "publisher": "NASA",
+      "published_or_updated": "2026-11-12",
+      "source_url": "https://www.nasa.gov/lunar-surface-technology/",
+      "evidence_class": "government_program_summary",
+      "technology_scope": [
+        "vertical_solar_array",
+        "regenerative_fuel_cell",
+        "tethered_surface_power_distribution",
+        "radioisotope_power"
+      ],
+      "reported_facts": [
+        "NASA describes VSAT as an autonomous deployment/retraction and mobility concept for uneven terrain using vertical arrays on masts up to 20 m.",
+        "NASA describes RFC storage as chemical storage, fuel-cell discharge and electrolysis recharge.",
+        "NASA describes LunaGrid-Lite as a tethered surface power distribution demonstration between a lander and rover.",
+        "NASA describes Harmonia as a radioisotope heat/power system intended to sustain operations through the 14-day lunar night and in permanently shadowed regions."
+      ],
+      "comparison_use": [
+        "architecture_scope",
+        "technology_role",
+        "deployment_and_mobility_requirements",
+        "system_interface_discovery"
+      ],
+      "not_established": [
+        "numerical mission-level vertical-array W_per_kg",
+        "full-site power availability",
+        "long-duration lunar RFC round-trip efficiency or life",
+        "lunar grid installed-system loss",
+        "completed lunar operational deployment"
+      ]
+    },
+    {
+      "source_id": "NASA-NEXTSTEP3-LEIA-2026",
+      "title": "NASA Calls for Proposals to Accelerate Lunar Surface Technologies",
+      "publisher": "NASA",
+      "published_or_updated": "2026-09-28",
+      "source_url": "https://www.nasa.gov/news-release/nasa-calls-for-proposals-to-accelerate-lunar-surface-technologies/",
+      "evidence_class": "government_solicitation",
+      "technology_scope": [
+        "vertical_solar_arrays",
+        "power_management_distribution_storage",
+        "regolith_oxygen_isru",
+        "radioisotope_stirling",
+        "in_space_advanced_manufacturing",
+        "nanomaterials"
+      ],
+      "reported_facts": [
+        "The solicitation identifies these technology capability areas for lunar South Pole infrastructure."
+      ],
+      "comparison_use": [
+        "technology_gap_prioritization",
+        "mission_relevance",
+        "external_programme_alignment"
+      ],
+      "not_established": [
+        "technology performance",
+        "awardee product performance",
+        "flight qualification",
+        "commercial readiness"
+      ]
+    },
+    {
+      "source_id": "NASA-BLUE-ALCHEMIST",
+      "title": "NASA Lunar Surface Technology — ISRU-Based Power on the Moon",
+      "publisher": "NASA",
+      "published_or_updated": "2026-11-12",
+      "source_url": "https://www.nasa.gov/lunar-surface-technology/",
+      "evidence_class": "government_program_summary_of_industry_demonstration",
+      "technology_scope": [
+        "molten_regolith_electrolysis",
+        "regolith_to_silicon_solar_cells",
+        "aluminium_wires",
+        "oxygen",
+        "iron",
+        "slag",
+        "integrated_autonomous_process"
+      ],
+      "reported_facts": [
+        "NASA states Blue Origin's Blue Alchemist demonstrates integrated autonomous operation of eight technologies using regolith simulants in lunar environmental conditions.",
+        "NASA lists silicon solar cells, aluminium wires, oxygen, iron and slag among the process outputs."
+      ],
+      "comparison_use": [
+        "direct_regolith_to_pv_manufacturing_comparator",
+        "multi_product_process_graph",
+        "ISRU_evidence_chain"
+      ],
+      "not_established": [
+        "full commercial throughput",
+        "solar-grade silicon yield and impurity distribution from public summary alone",
+        "cell and module I_V curves",
+        "module efficiency and lifetime",
+        "kWh_per_qualified_Wp manufacturing energy",
+        "complete factory imported mass and closure",
+        "lunar surface operation"
+      ]
+    },
+    {
+      "source_id": "NASA-SMALLSAT-POWER-SOA-2026",
+      "title": "NASA Small Spacecraft State of the Art — Power Subsystems",
+      "publisher": "NASA SmallSat Institute",
+      "published_or_updated": "2026-05",
+      "source_url": "https://www.nasa.gov/smallsat-institute/sst-soa/power-subsystems/",
+      "evidence_class": "government_survey_and_product_catalog",
+      "technology_scope": [
+        "spacecraft_solar_array_products",
+        "specific_power",
+        "deployment",
+        "foldable_and_flexible_arrays"
+      ],
+      "reported_facts": [
+        "NASA describes the empirical spacecraft mission array population as clustering around approximately 30 W/kg, with an observed dataset envelope of approximately 1 to 200 W/kg.",
+        "NASA lists individual SmallSat array products with different specific-power and BOL output values, including flexible PV blankets and deployable rigid arrays."
+      ],
+      "comparison_use": [
+        "space_array_specific_power_context",
+        "product_level_reference",
+        "deployment_and_mass_trade_studies"
+      ],
+      "not_established": [
+        "lunar_surface_array_specific_power",
+        "mass boundary equivalence between products",
+        "surface foundations and site preparation",
+        "storage, cabling, radiators or maintenance mass",
+        "performance at arbitrary heliocentric distance"
+      ]
+    },
+    {
+      "source_id": "NATURE-PEROVSKITE-AUTOLOOP-2026",
+      "title": "Autonomous closed-loop framework for reproducible perovskite solar cells",
+      "publisher": "Nature",
+      "published_or_updated": "2026-04-14",
+      "source_url": "https://doi.org/10.1038/s41586-026-10482-y",
+      "evidence_class": "peer_reviewed_experimental_research",
+      "technology_scope": [
+        "machine_learning_material_discovery",
+        "automated_fabrication",
+        "bayesian_optimization",
+        "symbolic_regression",
+        "perovskite_cell",
+        "perovskite_mini_module"
+      ],
+      "reported_facts": [
+        "Certified MPPT efficiency of 27.18% for 0.05 cm2 cells.",
+        "23.49% PCE for 21.4 cm2 mini-modules.",
+        "98.7% retention of initial efficiency after 1,200 hours under ISOS-L-1I.",
+        "The paper reports nearly fivefold greater efficiency reproducibility than manual fabrication."
+      ],
+      "comparison_use": [
+        "autonomous_materials_and_process_discovery_baseline",
+        "cell_to_mini_module_scale_up_baseline",
+        "stability_and_reproducibility_protocol"
+      ],
+      "not_established": [
+        "large_area_factory yield",
+        "commercial module lifetime",
+        "space radiation qualification",
+        "lunar dust/vacuum/thermal cycling performance",
+        "regolith-derived complete module",
+        "Luminous reproduction"
+      ]
+    },
+    {
+      "source_id": "NPJ-LUNAR-ENERGY-REVIEW-2026",
+      "title": "Lunar surface energy infrastructure: from in-situ resource utilization to deep space exploration",
+      "publisher": "npj Space Exploration",
+      "published_or_updated": "2026-09-02",
+      "source_url": "https://www.nature.com/articles/s44453-026-00053-w",
+      "evidence_class": "peer_reviewed_review",
+      "technology_scope": [
+        "lunar_pv",
+        "perovskite_radiation_tolerance",
+        "vertical_and_triangular_arrays",
+        "dust_mitigation",
+        "photovoltaic_thermal",
+        "radiative_cooling",
+        "concentrated_solar_thermal",
+        "regolith_thermal_storage",
+        "regenerative_fuel_cells",
+        "microgrids"
+      ],
+      "reported_facts": [
+        "Reviews planar, tent, triangular and vertical array concepts.",
+        "Discusses piezoelectric vibration-based non-contact dust removal.",
+        "Discusses PV/T and deep-space radiative cooling concepts.",
+        "Discusses CSP trough and linear Fresnel collectors, thermal storage and power-cycle options.",
+        "Reports literature values for radiation response and storage specific energy; these are secondary synthesis and must be traced to cited primary sources.",
+        "Provides a first-order lifecycle and launched-mass architecture comparison."
+      ],
+      "comparison_use": [
+        "technology_candidate_discovery",
+        "primary_source_retrieval_queue",
+        "architecture_trade_space"
+      ],
+      "not_established": [
+        "universal PV/T energy utilization gain",
+        "lunar field qualification of review concepts",
+        "long-duration RFC operation under lunar conditions",
+        "all cited study metrics being directly comparable"
+      ]
+    },
+    {
+      "source_id": "NLR-PV-FLEET-DATA-INITIATIVE",
+      "title": "PV Fleet Performance Data Initiative",
+      "publisher": "National Laboratory of the Rockies (NLR), U.S. Department of Energy",
+      "published_or_updated": "2026-11-12",
+      "source_url": "https://nrel.sitefinity.cloud/pv/fleet-performance-data-initiative",
+      "evidence_class": "field_data_programme_description",
+      "technology_scope": [
+        "terrestrial_pv_fleet_performance",
+        "degradation",
+        "system_performance"
+      ],
+      "reported_facts": [
+        "The initiative pools large PV plant operating data for fleet-level performance and degradation analysis.",
+        "The participation description specifies systems above 250 kW, at least three years of data, at least 15-minute performance sampling, on-site plane-of-array irradiance, meteorology and system specifications."
+      ],
+      "comparison_use": [
+        "terrestrial_field_data_protocol",
+        "degradation_and_soiling_separation",
+        "external_data_partnership"
+      ],
+      "not_established": [
+        "lunar_or_mars_degradation",
+        "product-specific module failure rates",
+        "direct comparison with laboratory accelerated aging"
+      ]
+    },
+    {
+      "source_id": "NASA-CARD-CARBOTHERMAL-2026",
+      "title": "NASA Carbothermal Reduction Demonstration",
+      "publisher": "NASA",
+      "published_or_updated": "2026-02",
+      "source_url": "https://www.nasa.gov/centers-and-facilities/johnson/sunlight-extracts-oxygen-from-regolith-using-solar-chemistry/",
+      "evidence_class": "government_report_of_integrated_prototype_test",
+      "technology_scope": [
+        "concentrated_solar_process_heat",
+        "regolith_carbothermal_reduction",
+        "oxygen_isru",
+        "solar_to_industrial_process"
+      ],
+      "reported_facts": [
+        "NASA reports thermal-vacuum prototype testing of a concentrated-solar carbothermal reactor using regolith simulant and carbon monoxide production."
+      ],
+      "comparison_use": [
+        "solar_thermal_to_isru_process_reference",
+        "process_integration_and_thermal_boundary"
+      ],
+      "not_established": [
+        "operational lunar oxygen production",
+        "commercial throughput",
+        "full process energy efficiency",
+        "lunar PV manufacturing"
+      ]
+    }
+  ]
+}
