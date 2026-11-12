@@ -1954,15 +1954,7 @@ pub fn evaluate_midi_transcription_v1(
         .and_then(|point| {
             measure_phase_summary_v1(
                 &reference_notes,
-                &parsed.notes.iter().map(|note| EvaluationNoteV1 {
-                    pitch_midi: note.pitch_midi,
-                    onset_tick: note.onset_tick,
-                    part_id: 0,
-                    gm_program: note.gm_program,
-                    velocity_midi: note.velocity_midi,
-                    onset_seconds: note.onset_seconds,
-                    offset_seconds: note.offset_seconds,
-                }).collect::<Vec<_>>(),
+                &predicted_notes,
                 &onset_matching,
                 reference.manifest.ticks_per_quarter,
                 parsed.ticks_per_quarter,
