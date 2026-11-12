@@ -62,6 +62,9 @@ pub fn parse_symbolic_with_structure(
     format: SymbolicImportFormat,
     score_clock_id: &str,
 ) -> Result<StructuredSymbolicImportV1, String> {
+    if matches!(format, SymbolicImportFormat::MusicXml) && score_clock_id.trim().is_empty() {
+        return Err("MusicXML structured import requires a non-empty score_clock_id".into());
+    }
     let score = parse_symbolic(bytes, format.clone())?;
     let source_sha256 = sha256_hex(bytes);
     let source_id = format!("sha256:{source_sha256}");
@@ -74,9 +77,11 @@ pub fn parse_symbolic_with_structure(
                         reason: format!("MusicXML root <{root}> is unsupported by the V1 notation graph"),
                     }
                 }
-                Err(error) => {
-                    return Err(format!("MusicXML notation-graph import failed: {error:?}"));
-                }
+                Err(error) => ImportedNotationStructureV1::Unknown {
+                    reason: format!(
+                        "The note-centric Score parsed, but the explicit MusicXML notation graph could not be established: {error:?}"
+                    ),
+                },
             }
         }
         SymbolicImportFormat::Midi => ImportedNotationStructureV1::Unknown {
@@ -571,6 +576,47 @@ mod tests {
             imported.notation_structure,
             ImportedNotationStructureV1::Unknown { .. }
         ));
+    }
+
+
+    #[test]
+    fn invalid_graph_adapter_state_does_not_discard_a_valid_legacy_score() {
+        // The legacy parser tolerates duplicate part IDs; the structure graph
+        // must reject the ambiguous ownership while preserving the imported
+        // note-centric Score and exposing Unknown structure.
+        let xml = br#"<score-partwise>
+            <part id="P1"><measure number="1">
+                <attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure></part>
+            <part id="P1"><measure number="1">
+                <attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure></part>
+        </score-partwise>"#;
+        let imported = parse_symbolic_with_structure(
+            xml,
+            SymbolicImportFormat::MusicXml,
+            "score-clock",
+        ).unwrap();
+        assert_eq!(imported.score.notes.len(), 2);
+        assert!(matches!(
+            imported.notation_structure,
+            ImportedNotationStructureV1::Unknown { .. }
+        ));
+    }
+
+    #[test]
+    fn musicxml_structured_import_rejects_an_empty_score_clock_id() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        assert!(parse_symbolic_with_structure(
+            xml,
+            SymbolicImportFormat::MusicXml,
+            "  ",
+        ).is_err());
     }
 
 }
