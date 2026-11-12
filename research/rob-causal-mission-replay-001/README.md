@@ -51,3 +51,18 @@ The report always carries actuation_authorized = false. Closed means only that t
     cargo fmt --manifest-path research/rob-causal-mission-replay-001/Cargo.toml -- --check
     cargo test --locked --manifest-path research/rob-causal-mission-replay-001/Cargo.toml
     cargo clippy --locked --manifest-path research/rob-causal-mission-replay-001/Cargo.toml --all-targets -- -D warnings
+
+## Causal closure measurement
+
+The replay now emits a **causal-closure metric** in addition to the mission-level Closed / Unknown / Rejected disposition:
+
+- denominator: every actuator-application record supplied, including Unknown and Invalid attempts;
+- linked applications: complete observation, decision/calibration, optional request/admission/response, proposal/prefix, assurance and application lineage;
+- causally closed applications: linked applications with a corresponding physical transition, continuous predecessor-state chain, complete declared thermal-node manifest, certain timestamp order and known recovery topology;
+- `closure_ppm`: floor(causally_closed / applications_examined × 1,000,000), or `None` when no applications are supplied.
+
+Terminal safe-stop, energy closure, command response and other physical qualification domains remain separately reported. This avoids presenting a high application-lineage rate as a complete physical mission pass. The metric is a proposed Luminous benchmark, not an industry-standard leaderboard score.
+
+The event records now bind policy digest to the decision and action chunk, actuator/controller configuration digests to the application, and thermal sensor calibration to the physical transition. These are checked by the independent replay before an application can count as linked/closed.
+
+Current source-level corpus: 25 core causal-replay tests and 17 single-joint metrology-join tests. Exact-head Rust 1.96 CI remains the execution gate.
