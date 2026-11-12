@@ -1470,7 +1470,10 @@ mod tests {
     #[test]
     fn unselected_grouping_dimensions_are_not_used_as_leakage_keys() {
         let mut case = fixture_case();
-        case.validation_split.grouping_dimensions = vec![GroupingDimension::VesselId];
+        case.validation_split.grouping_dimensions = vec![
+            GroupingDimension::VesselId,
+            GroupingDimension::PropellerRevision,
+        ];
         case.validation_split.groups[1].model_facility_id =
             case.validation_split.groups[0].model_facility_id.clone();
         assert_eq!(audit(&case).disposition, "incomplete");
@@ -1866,9 +1869,11 @@ mod tests {
     #[test]
     fn one_model_rotation_rate_remains_incomplete() {
         let mut case = fixture_case();
-        case.pairs.pop();
+        case.pairs[1].model.rpm_hz = case.pairs[0].model.rpm_hz;
+        case.pairs[1].model.rpm_u95_hz = case.pairs[0].model.rpm_u95_hz;
         let report = audit(&case);
         assert_eq!(report.disposition, "incomplete");
+        assert_eq!(report.unique_model_rotation_rates, 1);
         assert!(report.reasons.iter().any(|r| r.contains("two distinct")));
     }
 
