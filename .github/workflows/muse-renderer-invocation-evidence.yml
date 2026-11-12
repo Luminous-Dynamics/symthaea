@@ -74,8 +74,22 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Check formatting of changed Muse Rust files only
-        run: rustfmt --check --edition 2024 crates/domains/symthaea-muse/src/fluid_render.rs crates/domains/symthaea-muse/src/renderer_execution_receipt.rs crates/domains/symthaea-muse/src/bin/muse_studio.rs
+      # This bootstrap pass formats only the files changed by MEL-MR-EVAL-016.
+      # The generated diff is uploaded, reviewed, committed, and then the next
+      # exact-head run switches back to rustfmt --check.
+      - name: Format changed Muse Rust files for review
+        run: rustfmt --edition 2024 crates/domains/symthaea-muse/src/fluid_render.rs crates/domains/symthaea-muse/src/renderer_execution_receipt.rs crates/domains/symthaea-muse/src/bin/muse_studio.rs
+
+      - name: Preserve rustfmt output for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: muse-rustfmt-bootstrap
+          path: |
+            crates/domains/symthaea-muse/src/fluid_render.rs
+            crates/domains/symthaea-muse/src/renderer_execution_receipt.rs
+            crates/domains/symthaea-muse/src/bin/muse_studio.rs
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Run renderer invocation and temp-path tests
         run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib fluid_render::tests
@@ -89,5 +103,5 @@ jobs:
       - name: Run Clippy for the Muse Studio binary
         run: cargo clippy --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features studio --bin muse_studio -- -D warnings
 
-      - name: Require committed Cargo.lock to match the pinned Cargo resolution
-        run: git diff --exit-code -- Cargo.lock
+      - name: Require generated resolution and formatting to be committed
+        run: git diff --exit-code -- Cargo.lock crates/domains/symthaea-muse/src/fluid_render.rs crates/domains/symthaea-muse/src/renderer_execution_receipt.rs crates/domains/symthaea-muse/src/bin/muse_studio.rs
