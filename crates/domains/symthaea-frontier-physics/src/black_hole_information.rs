@@ -1120,7 +1120,9 @@ pub fn sample_u1_conserving_random_circuit_entropy_ensemble(
     tolerance: f64,
 ) -> Result<U1RandomCircuitEntropySummary, QuantumInformationError> {
     if sample_count < 2 {
-        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(
+            sample_count,
+        ));
     }
     let U1RandomCircuitEntropyConfig {
         number_of_qubits,
