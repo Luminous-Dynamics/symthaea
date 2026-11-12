@@ -2833,7 +2833,7 @@ fn fluidsynth_candidate_wav(
             "output_format": "wav",
             "sample_rate_hz": SAMPLE_RATE,
             "non_interactive": true,
-            "environment_allowlist": invocation_observation.environment,
+            "environment_allowlist": &invocation_observation.environment,
             "color": {
                 "reverb_room": color.reverb_room,
                 "reverb_level": color.reverb_level,
