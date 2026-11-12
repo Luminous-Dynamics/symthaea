@@ -1629,7 +1629,7 @@ fn jacobi_eigenvalues(
     tol: f64,
 ) -> Result<Vec<f64>, QuantumInformationError> {
     const MAX_SWEEPS: usize = 80;
-    let mut residual: f64;
+    let mut residual = f64::INFINITY;
     for _ in 0..MAX_SWEEPS {
         let mut scale: f64 = 1.0;
         residual = 0.0;
@@ -2274,10 +2274,10 @@ mod sequential_evaporation_tests {
     fn u1_gate_is_unitary_and_has_no_cross_charge_matrix_elements() {
         let mut rng = ChaCha20Rng::seed_from_u64(0xC0A5E);
         let gate = u1_conserving_unitary_4(&mut rng).unwrap();
-        for row in 0..4 {
-            for column in 0..4 {
-                let row_charge = (row.count_ones()) as usize;
-                let column_charge = (column.count_ones()) as usize;
+        for row in 0usize..4 {
+            for column in 0usize..4 {
+                let row_charge = row.count_ones() as usize;
+                let column_charge = column.count_ones() as usize;
                 if row_charge != column_charge {
                     assert!(gate[row][column].norm() < 1e-14);
                 }
