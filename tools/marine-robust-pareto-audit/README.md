@@ -1,0 +1,41 @@
+# Marine robust Pareto audit
+
+A standalone Rust decision audit for comparing propulsion candidates on a frozen cargo-service functional unit. It applies non-compensable hard gates before interval-robust Pareto comparison. It does not produce a weighted score.
+
+## Run
+
+~~~sh
+cargo test --manifest-path tools/marine-robust-pareto-audit/Cargo.toml
+cargo run --manifest-path tools/marine-robust-pareto-audit/Cargo.toml -- \
+  docs/research/marine/fixtures/synthetic-marine-robust-pareto-v0.1.0.json
+~~~
+
+The synthetic fixture must return INCOMPLETE and must not qualify a candidate for the robust frontier.
+
+## Decision rules
+
+- Candidate service must match the frozen mission, vessel, route, measurement window, service/environment fingerprints and cargo-work unit.
+- Candidate cargo-work interval must fit the declared service equivalence tolerance.
+- Each objective metric must be present for every candidate, with matching units, measurement method and expanded-uncertainty confidence level across the comparison.
+- Every candidate metric carries method, raw data, calibration/validation, timebase and operating-point references.
+- Every hard gate is non-compensable. Metric upper-bound gates pass only if the whole interval is below the threshold, fail only if the whole interval is above, and otherwise hold as unresolved. Lower-bound gates use the symmetric interval rule. External biosecurity gates consume an exact required audit contract/requirement receipt.
+- A failed hard gate excludes a candidate regardless of energy or cost. An unresolved/missing gate holds the candidate and never contributes it to the Pareto frontier.
+- For a minimizing objective, A is certainly no worse only if A's upper interval bound is <= B's lower bound. For maximizing objectives, A's lower bound must be >= B's upper bound.
+- Dominance requires certainty on every objective and strict separation on at least one. A confirmed trade-off is retained; overlapping/touching intervals do not create a ranking.
+- The output is pairwise relations plus a robust nondominated set with uncertainty status. No single weighted score is generated.
+
+## Interpretation limits
+
+The audit tests declared comparison contracts and computes interval relations. It does not authenticate sensor certificates or raw bytes, validate physical measurements, acoustic propagation, ecology, CFD, full-scale transfer or regulatory compliance. A SHA-256 digest is a reference, not proof of authenticity.
+
+A confirmed nondominated candidate is not automatically the best engineering choice; it is only not robustly dominated within the declared objective set and evidence envelope. Held candidates and unresolved pairwise comparisons remain explicit.
+
+## Benchmark progression
+
+B0 known-answer fixtures: interval arithmetic, hard-gate truth tables, Pareto dominance/trade-off and no false rankings under overlap.
+B1 matched model-scale/bench trials with independently measured cargo work.
+B2 cross-facility and held-out vessel comparison using the same service fingerprint and declared acoustic bands.
+B3 ITTC Nawigator XXI Round Robin acoustic metric harmonization where data rights permit.
+B4 held-out full-scale service campaigns with load, route, water condition, hull condition and maintenance state.
+
+Research targets, not achievements: zero false hard-gate passes; zero robust dominance claims unless all objective intervals separate in the required directions; 100% metric/gate provenance; 100% service/unit matching; and a 10% primary-energy-per-cargo-work improvement campaign target only after every environmental and reliability gate passes.
