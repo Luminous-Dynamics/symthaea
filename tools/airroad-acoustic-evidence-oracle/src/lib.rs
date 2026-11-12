@@ -194,12 +194,13 @@ pub enum AcousticValidationError {
     MissingMicrophoneArray,
     MissingRotors,
     MicrophoneArrayTooSmall(String),
-    MissingMicrophonePosition(String),
-    UnexpectedMicrophonePosition(String),
+    MicrophonePositionWithoutChannel(String),
+    MicrophoneChannelWithoutPosition(String),
     MissingRotorOperatingPoint(String),
     UnexpectedRotorOperatingPoint(String),
     MissingRotorPhaseChannel(String),
     MissingRotorSpeedChannel(String),
+    MissingRotorLoadChannel(String),
     ChannelKindMismatch(String),
     ChannelUnitMismatch(String),
     InvalidChannelTimeWindow(String),
@@ -325,7 +326,7 @@ pub fn validate_bundle(
 
     for channel_id in &microphone_channel_ids {
         if !positioned_microphone_channels.contains(channel_id) {
-            errors.push(AcousticValidationError::UnexpectedMicrophonePosition(
+            errors.push(AcousticValidationError::MicrophoneChannelWithoutPosition(
                 (*channel_id).to_owned(),
             ));
         }
@@ -598,6 +599,31 @@ fn validate_rotors(
             )),
         }
 
+        for (channel_id, expected_kind) in [
+            (
+                rotor.thrust_channel_id.as_str(),
+                ChannelKind::RotorThrust {
+                    rotor_id: rotor.rotor_id.clone(),
+                },
+            ),
+            (
+                rotor.torque_channel_id.as_str(),
+                ChannelKind::RotorTorque {
+                    rotor_id: rotor.rotor_id.clone(),
+                },
+            ),
+        ] {
+            match channels.get(channel_id) {
+                Some(channel) if channel.kind == expected_kind => {}
+                Some(_) => errors.push(AcousticValidationError::ChannelKindMismatch(
+                    channel_id.to_owned(),
+                )),
+                None => errors.push(AcousticValidationError::MissingRotorLoadChannel(
+                    channel_id.to_owned(),
+                )),
+            }
+        }
+
         match operating_points.get(rotor.rotor_id.as_str()) {
             Some(point) => {
                 if !valid_rotor_operating_point(point) {
@@ -707,7 +733,7 @@ mod tests {
     use super::*;
 
     fn digest(character: char) -> String {
-        std::iter::repeat(character).take(64).collect()
+        character.to_string().repeat(64)
     }
 
     fn microphone_channel(channel_id: &str, microphone_id: &str) -> AcousticChannel {
@@ -967,6 +993,25 @@ mod tests {
             &AcousticValidationError::ChannelKindMismatch(
                 "rotor-phase-01".to_owned()
             )
+        ));
+    }
+
+    #[test]
+    fn rotor_thrust_and_torque_channels_must_match_declared_rotor() {
+        let mut input = bundle();
+        input.channels[4].kind = ChannelKind::RotorThrust {
+            rotor_id: "different-rotor".to_owned(),
+        };
+        input.channels[5].kind = ChannelKind::RotorTorque {
+            rotor_id: "different-rotor".to_owned(),
+        };
+
+        let errors = validate_bundle(&input).unwrap_err();
+        assert!(errors.contains(
+            &AcousticValidationError::ChannelKindMismatch("rotor-thrust-01".to_owned())
+        ));
+        assert!(errors.contains(
+            &AcousticValidationError::ChannelKindMismatch("rotor-torque-01".to_owned())
         ));
     }
 
