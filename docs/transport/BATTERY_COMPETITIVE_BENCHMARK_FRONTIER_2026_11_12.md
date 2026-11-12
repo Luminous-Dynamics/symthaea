@@ -81,6 +81,24 @@ Report:
 
 Do not claim process causality from observational correlations alone. Controlled interventions or well-supported quasi-experimental designs are required for stronger causal claims.
 
+### Track D — joint formation and lifetime charge-policy co-design
+
+Owner: Symthaea [BATTERY-FORMATION-CHARGE-CODESIGN-001 #11735](https://github.com/Luminous-Dynamics/symthaea/issues/11735) / draft [PR #11735](https://github.com/Luminous-Dynamics/symthaea/pull/11735).
+
+This is a distinct interaction benchmark, not another general charge controller or degradation model.
+
+- **Formation baseline:** Attia et al., *Joule* 8(11) (20 November 2024), evaluated 186 cells across 62 formation protocols. The paper reports an average 50% cycle-life increase for its high-first-cycle-current group and attributes the result to altered lithium inventory/electrode utilization under that cell and ageing protocol: https://doi.org/10.1016/j.joule.2024.07.024
+- **In-service charge baseline:** a 17 April 2026 *Advanced Science* study reports 20–80% SOC in 15 minutes versus 18 minutes for the manufacturer specification and 25 minutes for a commercial EV charge profile, with less than 5% capacity loss over 500 cycles on one specific commercial cylindrical-cell system. It is not a universal chemistry/format result: https://doi.org/10.1002/advs.75306
+- **Manufacturing context:** the October 2026 formation review emphasizes protocol dependence on chemistry, cell format, voltage/current distribution, temperature, pressure and endpoints; no universally optimal protocol exists: https://doi.org/10.1016/j.nxener.2026.100785
+
+The benchmark's novelty is the factorial interaction:
+`joint - formation-only - charge-only + reference`.
+Compare reference/reference, candidate/reference, reference/candidate and candidate/candidate arms on matched exact cell designs, randomized within independent lot/line blocks. Score charge time, lifetime delivered energy, fade, impedance, thermal/plating diagnostics and formation duration/energy as a Pareto vector.
+
+Reproduce each external study on its own exact cell, split, ageing conditions and metric before claiming parity. Never merge the datasets or claim their published outcomes are additive. A Luminous joint-policy advantage requires a preregistered, lot-held-out physical confirmation set, censor-aware lifetime accounting and evidence of a non-zero interaction with uncertainty. Numeric improvement thresholds are set only after baseline repeatability and power analysis.
+
+The initial Rust contract PR #11735 validates full factorial coverage, immutable protocol identities, declared group-holdout isolation, feature cutoffs, event/censoring semantics and physical evidence/metrology gates. Its synthetic software PASS is not a physical interaction or battery-performance result.
+
 ## Additional materials frontier: sodium-ion and zero-excess sodium-metal
 
 A new bounded materials lane has been opened in Symthaea [SODIUM-BATTERY-MISSION-001 #11694](https://github.com/Luminous-Dynamics/symthaea/issues/11694) / draft [PR #11695](https://github.com/Luminous-Dynamics/symthaea/pull/11695).
