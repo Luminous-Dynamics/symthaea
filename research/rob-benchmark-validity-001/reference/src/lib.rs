@@ -110,7 +110,7 @@ pub struct EpisodeTally {
     pub timed_out: u32,
     /// Episodes censored under the predeclared evaluation protocol.
     pub censored: u32,
-    /// Count of independently adjudicated critical safety violations.
+    /// Episodes with at least one independently adjudicated critical safety violation.
     pub critical_safety_violations: u32,
     /// Number of raw control ticks in these episodes; descriptive only.
     pub control_ticks: u64,
@@ -216,6 +216,8 @@ pub enum ComparisonDisposition {
     Inconclusive,
     /// Candidate has a per-cluster increase in critical safety violations.
     SafetyRegressionDetected,
+    /// At least one critical safety-violation episode was observed on the candidate.
+    CandidateCriticalSafetyViolationObserved,
     /// Supplied evidence or input contradicts the declared contract.
     Rejected,
 }
@@ -276,6 +278,10 @@ pub struct ComparisonReport {
     pub baseline_censored: u64,
     /// Candidate censored outcomes.
     pub candidate_censored: u64,
+    /// Baseline episodes with at least one critical safety violation.
+    pub baseline_critical_safety_violations: u64,
+    /// Candidate episodes with at least one critical safety violation.
+    pub candidate_critical_safety_violations: u64,
     /// Number of clusters with a critical safety regression.
     pub critical_safety_regression_clusters: u16,
     /// Exact sign-test result over independent cluster differences.
@@ -466,6 +472,8 @@ pub fn compare_paired_clusters(
     let mut candidate_unknown = 0_u64;
     let mut baseline_censored = 0_u64;
     let mut candidate_censored = 0_u64;
+    let mut baseline_critical_violations = 0_u64;
+    let mut candidate_critical_violations = 0_u64;
 
     for cluster in &comparison.clusters {
         require_nonempty("cluster_id", &cluster.cluster_id)?;
@@ -545,6 +553,10 @@ pub fn compare_paired_clusters(
         candidate_unknown += u64::from(cluster.candidate.unknown);
         baseline_censored += u64::from(cluster.baseline.censored);
         candidate_censored += u64::from(cluster.candidate.censored);
+        baseline_critical_violations +=
+            u64::from(cluster.baseline.critical_safety_violations);
+        candidate_critical_violations +=
+            u64::from(cluster.candidate.critical_safety_violations);
 
         results.push(ClusterResult {
             cluster_id: cluster.cluster_id.clone(),
@@ -572,6 +584,8 @@ pub fn compare_paired_clusters(
         ComparisonDisposition::Rejected
     } else if safety_regressions > 0 {
         ComparisonDisposition::SafetyRegressionDetected
+    } else if candidate_critical_violations > 0 {
+        ComparisonDisposition::CandidateCriticalSafetyViolationObserved
     } else if scope.split_kind != SplitKind::HiddenConfirmatory
         || unknown_independence
         || unknown_outcomes
@@ -597,6 +611,8 @@ pub fn compare_paired_clusters(
         candidate_unknown,
         baseline_censored,
         candidate_censored,
+        baseline_critical_safety_violations: baseline_critical_violations,
+        candidate_critical_safety_violations: candidate_critical_violations,
         critical_safety_regression_clusters: safety_regressions,
         sign_test,
         clusters: results,
@@ -742,6 +758,21 @@ mod tests {
         let report = compare_paired_clusters(&comparison(clusters)).unwrap();
         assert_eq!(report.disposition, ComparisonDisposition::SafetyRegressionDetected);
         assert_eq!(report.critical_safety_regression_clusters, 1);
+    }
+
+    #[test]
+    fn any_candidate_critical_violation_blocks_safe_improvement_even_if_below_baseline() {
+        let mut clusters = (0..8).map(|id| cluster(id, 5, 9)).collect::<Vec<_>>();
+        clusters[3].baseline.critical_safety_violations = 2;
+        clusters[3].candidate.critical_safety_violations = 1;
+        let report = compare_paired_clusters(&comparison(clusters)).unwrap();
+        assert_eq!(report.critical_safety_regression_clusters, 0);
+        assert_eq!(report.baseline_critical_safety_violations, 2);
+        assert_eq!(report.candidate_critical_safety_violations, 1);
+        assert_eq!(
+            report.disposition,
+            ComparisonDisposition::CandidateCriticalSafetyViolationObserved
+        );
     }
 
     #[test]
