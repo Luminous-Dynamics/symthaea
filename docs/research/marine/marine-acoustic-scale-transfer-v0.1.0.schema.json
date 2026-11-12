@@ -147,9 +147,11 @@
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "pair_id",
+          "cavitation_pattern",
+          "cavitation_pattern_comparability",
+          "full_scale",
           "model",
-          "full_scale"
+          "pair_id"
         ],
         "properties": {
           "pair_id": {
@@ -161,6 +163,24 @@
           },
           "full_scale": {
             "$ref": "#/$defs/fullScaleRun"
+          },
+          "cavitation_pattern": {
+            "enum": [
+              "sheet",
+              "cloud",
+              "bubble",
+              "tip_vortex",
+              "mixed",
+              "unknown"
+            ]
+          },
+          "cavitation_pattern_comparability": {
+            "enum": [
+              "matched",
+              "mismatch",
+              "partial",
+              "unknown"
+            ]
           }
         }
       }
@@ -178,8 +198,11 @@
         "background_measurement_method",
         "background_trace_sha256",
         "bands",
+        "calibration_certificate_sha256",
         "cavitation_number_n_d",
         "diameter_m",
+        "facility_transfer_function_sha256",
+        "hydrophone_instrument_id",
         "operating_point_receipt_sha256",
         "raw_trace_sha256",
         "rpm_hz",
@@ -237,6 +260,16 @@
           ]
         },
         "background_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "hydrophone_instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "facility_transfer_function_sha256": {
           "$ref": "#/$defs/digest"
         }
       }
@@ -307,16 +340,18 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "run_id",
-        "timebase_receipt_sha256",
+        "bands",
+        "calibration_certificate_sha256",
+        "cavitation_number_n_d",
+        "diameter_m",
+        "hydrophone_instrument_id",
         "operating_point_receipt_sha256",
         "raw_trace_sha256",
-        "diameter_m",
         "rpm_hz",
-        "cavitation_number_n_d",
-        "source_reference_distance_m",
+        "run_id",
         "source_level_method_id",
-        "bands"
+        "source_reference_distance_m",
+        "timebase_receipt_sha256"
       ],
       "properties": {
         "run_id": {
@@ -356,6 +391,13 @@
           }
         },
         "timebase_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "hydrophone_instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_certificate_sha256": {
           "$ref": "#/$defs/digest"
         }
       }
