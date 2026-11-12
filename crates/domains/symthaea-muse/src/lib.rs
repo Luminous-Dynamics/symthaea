@@ -33,6 +33,8 @@
 #![deny(unsafe_code)]
 
 #[cfg(feature = "theory")]
+pub mod barline_eval;
+#[cfg(feature = "theory")]
 pub mod adaptive_experiment;
 #[cfg(feature = "theory")]
 pub mod adaptive_prediction;
