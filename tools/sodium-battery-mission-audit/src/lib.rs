@@ -279,7 +279,10 @@ fn valid_digest(value: &str) -> bool {
 }
 
 fn validate_lifetime(outcome: &LifetimeOutcome) -> Result<(), SodiumAuditError> {
-    require_nonempty(&outcome.end_of_life_definition_ref, "end-of-life definition")?;
+    require_nonempty(
+        &outcome.end_of_life_definition_ref,
+        "end-of-life definition",
+    )?;
 
     match outcome.status {
         LifetimeStatus::EventObserved => {
@@ -373,13 +376,16 @@ pub fn audit_sodium_manifest(
         || manifest.comparison_sets.is_empty()
     {
         return Err(SodiumAuditError(
-            "lanes, specimens, conditions, measurements, evidence and comparison sets are required".into(),
+            "lanes, specimens, conditions, measurements, evidence and comparison sets are required"
+                .into(),
         ));
     }
 
     if !manifest.policy.require_matched_conditions
         || !manifest.policy.separate_frontier_groups
-        || manifest.policy.allow_active_material_to_full_cell_extrapolation
+        || manifest
+            .policy
+            .allow_active_material_to_full_cell_extrapolation
     {
         return Err(SodiumAuditError(
             "comparison policy must match conditions, separate frontier groups and forbid active-material-to-cell extrapolation".into(),
@@ -391,27 +397,45 @@ pub fn audit_sodium_manifest(
         "technology lane ID",
     )?;
     unique_ids(
-        manifest.specimens.iter().map(|item| item.specimen_id.as_str()),
+        manifest
+            .specimens
+            .iter()
+            .map(|item| item.specimen_id.as_str()),
         "specimen ID",
     )?;
     unique_ids(
-        manifest.conditions.iter().map(|item| item.condition_id.as_str()),
+        manifest
+            .conditions
+            .iter()
+            .map(|item| item.condition_id.as_str()),
         "condition ID",
     )?;
     unique_ids(
-        manifest.measurements.iter().map(|item| item.measurement_id.as_str()),
+        manifest
+            .measurements
+            .iter()
+            .map(|item| item.measurement_id.as_str()),
         "measurement ID",
     )?;
     unique_ids(
-        manifest.lifetime_outcomes.iter().map(|item| item.outcome_id.as_str()),
+        manifest
+            .lifetime_outcomes
+            .iter()
+            .map(|item| item.outcome_id.as_str()),
         "lifetime outcome ID",
     )?;
     unique_ids(
-        manifest.evidence.iter().map(|item| item.evidence_id.as_str()),
+        manifest
+            .evidence
+            .iter()
+            .map(|item| item.evidence_id.as_str()),
         "evidence ID",
     )?;
     unique_ids(
-        manifest.comparison_sets.iter().map(|item| item.comparison_set_id.as_str()),
+        manifest
+            .comparison_sets
+            .iter()
+            .map(|item| item.comparison_set_id.as_str()),
         "comparison set ID",
     )?;
 
@@ -431,7 +455,10 @@ pub fn audit_sodium_manifest(
             ("cell mass", specimen.cell_mass_g),
             ("cell volume", specimen.cell_volume_cm3),
             ("areal loading", specimen.areal_loading_mg_cm2),
-            ("electrolyte-to-capacity ratio", specimen.electrolyte_to_capacity_g_ah),
+            (
+                "electrolyte-to-capacity ratio",
+                specimen.electrolyte_to_capacity_g_ah,
+            ),
         ] {
             if !value.is_finite() || value < 0.0 {
                 return Err(SodiumAuditError(format!(
@@ -465,9 +492,7 @@ pub fn audit_sodium_manifest(
         .map(|scenario| (scenario.condition_profile_id.as_str(), scenario))
         .collect();
 
-    if profile_by_id.len() != manifest.mission.ambient_scenarios.len()
-        || profile_by_id.is_empty()
-    {
+    if profile_by_id.len() != manifest.mission.ambient_scenarios.len() || profile_by_id.is_empty() {
         return Err(SodiumAuditError(
             "mission condition profile IDs must be nonempty and unique".into(),
         ));
@@ -602,7 +627,10 @@ pub fn audit_sodium_manifest(
             )));
         }
 
-        if !specimen.mass_basis.matches_boundary(measurement.system_boundary) {
+        if !specimen
+            .mass_basis
+            .matches_boundary(measurement.system_boundary)
+        {
             return Err(SodiumAuditError(format!(
                 "measurement {} system boundary does not match specimen mass basis",
                 measurement.measurement_id
@@ -618,7 +646,10 @@ pub fn audit_sodium_manifest(
     }
 
     unique_ids(
-        manifest.lifetime_outcomes.iter().map(|item| item.specimen_id.as_str()),
+        manifest
+            .lifetime_outcomes
+            .iter()
+            .map(|item| item.specimen_id.as_str()),
         "lifetime outcome specimen ID",
     )?;
 
@@ -996,7 +1027,9 @@ mod tests {
     fn rejects_zero_excess_sodium_metal_in_commercial_frontier() {
         let mut manifest = valid_manifest();
         manifest.comparison_sets[0].lane_ids.push("ZEM".into());
-        manifest.comparison_sets[0].specimen_ids.push("ZEM-1".into());
+        manifest.comparison_sets[0]
+            .specimen_ids
+            .push("ZEM-1".into());
 
         let error = audit_sodium_manifest(&manifest).expect_err("frontier mixing rejected");
         assert!(error.0.contains("mixes technology frontier groups"));
@@ -1008,7 +1041,11 @@ mod tests {
         manifest.specimens[0].mass_basis = MassBasis::ActiveMaterial;
 
         let error = audit_sodium_manifest(&manifest).expect_err("mass boundary mismatch");
-        assert!(error.0.contains("system boundary does not match specimen mass basis"));
+        assert!(
+            error
+                .0
+                .contains("system boundary does not match specimen mass basis")
+        );
     }
 
     #[test]
@@ -1017,7 +1054,11 @@ mod tests {
         manifest.conditions[0].temperature_c = 10;
 
         let error = audit_sodium_manifest(&manifest).expect_err("condition mismatch");
-        assert!(error.0.contains("temperature does not match mission profile"));
+        assert!(
+            error
+                .0
+                .contains("temperature does not match mission profile")
+        );
     }
 
     #[test]
@@ -1062,7 +1103,11 @@ mod tests {
         manifest.measurements[0].specimen_id = "LFP-1".into();
 
         let error = audit_sodium_manifest(&manifest).expect_err("cross-specimen join rejected");
-        assert!(error.0.contains("condition belongs to a different specimen"));
+        assert!(
+            error
+                .0
+                .contains("condition belongs to a different specimen")
+        );
     }
 
     #[test]
