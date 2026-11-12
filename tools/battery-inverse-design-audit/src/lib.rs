@@ -177,8 +177,10 @@ fn validate_manifest(
         }
     }
 
-    let expected_scenarios: BTreeSet<&str> =
-        scenarios.iter().map(|scenario| scenario.id.as_str()).collect();
+    let expected_scenarios: BTreeSet<&str> = scenarios
+        .iter()
+        .map(|scenario| scenario.id.as_str())
+        .collect();
 
     for candidate in candidates {
         if candidate.revision.trim().is_empty() {
@@ -209,7 +211,10 @@ fn validate_manifest(
         }
 
         validate_unique_nonempty(
-            candidate.hard_gates.iter().map(|gate| gate.gate_id.as_str()),
+            candidate
+                .hard_gates
+                .iter()
+                .map(|gate| gate.gate_id.as_str()),
             "hard-gate ID",
         )?;
 
@@ -249,8 +254,7 @@ fn validate_manifest(
                         ))
                     })?;
 
-                if observation.unit != objective.unit
-                    || observation.boundary != objective.boundary
+                if observation.unit != objective.unit || observation.boundary != objective.boundary
                 {
                     return Err(AuditError(format!(
                         "candidate {} objective {} has mismatched unit or boundary",
@@ -357,9 +361,7 @@ fn robust_score(
         }
 
         let value = match objective.direction {
-            Direction::Maximize => scenario_values
-                .into_iter()
-                .fold(f64::INFINITY, f64::min),
+            Direction::Maximize => scenario_values.into_iter().fold(f64::INFINITY, f64::min),
             Direction::Minimize => scenario_values
                 .into_iter()
                 .fold(f64::NEG_INFINITY, f64::max),
@@ -664,11 +666,7 @@ mod tests {
         ]
     }
 
-    fn candidate(
-        id: &str,
-        values: [f64; 3],
-        gate_disposition: GateDisposition,
-    ) -> Candidate {
+    fn candidate(id: &str, values: [f64; 3], gate_disposition: GateDisposition) -> Candidate {
         let metrics = |offset: f64| {
             vec![
                 MetricObservation {
@@ -732,7 +730,12 @@ mod tests {
     }
 
     fn scenarios() -> Vec<Scenario> {
-        vec![Scenario { id: "nominal".into() }, Scenario { id: "hot".into() }]
+        vec![
+            Scenario {
+                id: "nominal".into(),
+            },
+            Scenario { id: "hot".into() },
+        ]
     }
 
     #[test]
@@ -740,19 +743,29 @@ mod tests {
         let result = audit_design_portfolio(
             &scenarios(),
             &objectives(),
-            &[candidate("a", [300.0, 1800.0, 100.0], GateDisposition::Unknown)],
+            &[candidate(
+                "a",
+                [300.0, 1800.0, 100.0],
+                GateDisposition::Unknown,
+            )],
         )
         .expect("manifest should be structurally valid");
 
         assert!(result.eligible_candidate_ids.is_empty());
         assert!(result.pareto_front_ids.is_empty());
         assert_eq!(result.rejected.len(), 1);
-        assert!(result.rejected[0]
-            .reasons
-            .contains(&RejectionReason::GateUnknown("physical_safety".into())));
-        assert!(result.rejected[0]
-            .reasons
-            .contains(&RejectionReason::GateEvidenceNotPhysical("physical_safety".into())));
+        assert!(
+            result.rejected[0]
+                .reasons
+                .contains(&RejectionReason::GateUnknown("physical_safety".into()))
+        );
+        assert!(
+            result.rejected[0]
+                .reasons
+                .contains(&RejectionReason::GateEvidenceNotPhysical(
+                    "physical_safety".into()
+                ))
+        );
     }
 
     #[test]
@@ -760,21 +773,33 @@ mod tests {
         let result = audit_design_portfolio(
             &scenarios(),
             &objectives(),
-            &[candidate("a", [300.0, 1800.0, 100.0], GateDisposition::Pass)],
+            &[candidate(
+                "a",
+                [300.0, 1800.0, 100.0],
+                GateDisposition::Pass,
+            )],
         )
         .expect("manifest should be structurally valid");
 
         assert!(result.eligible_candidate_ids.is_empty());
-        assert!(result.rejected[0]
-            .reasons
-            .contains(&RejectionReason::GateEvidenceNotPhysical("physical_safety".into())));
+        assert!(
+            result.rejected[0]
+                .reasons
+                .contains(&RejectionReason::GateEvidenceNotPhysical(
+                    "physical_safety".into()
+                ))
+        );
     }
 
     #[test]
     fn pareto_front_preserves_tradeoffs_and_discards_dominated_design() {
         let candidates = vec![
             candidate("high-energy", [320.0, 1800.0, 105.0], GateDisposition::Pass),
-            candidate("long-life-low-cost", [300.0, 2200.0, 90.0], GateDisposition::Pass),
+            candidate(
+                "long-life-low-cost",
+                [300.0, 2200.0, 90.0],
+                GateDisposition::Pass,
+            ),
             candidate("dominated", [280.0, 1500.0, 125.0], GateDisposition::Pass),
         ];
 
@@ -782,15 +807,12 @@ mod tests {
         // the mathematical Pareto oracle below.
         let mut eligible_candidates = candidates;
         for item in &mut eligible_candidates {
-            item.hard_gates.retain(|gate| gate.gate_id != "physical_safety");
+            item.hard_gates
+                .retain(|gate| gate.gate_id != "physical_safety");
         }
 
-        let result = audit_design_portfolio(
-            &scenarios(),
-            &objectives(),
-            &eligible_candidates,
-        )
-        .expect("valid finite portfolio");
+        let result = audit_design_portfolio(&scenarios(), &objectives(), &eligible_candidates)
+            .expect("valid finite portfolio");
 
         assert_eq!(
             result.pareto_front_ids,
@@ -829,7 +851,8 @@ mod tests {
     #[test]
     fn scenario_aggregation_uses_conservative_interval_bound() {
         let mut item = candidate("a", [300.0, 1800.0, 100.0], GateDisposition::Pass);
-        item.hard_gates.retain(|gate| gate.gate_id != "physical_safety");
+        item.hard_gates
+            .retain(|gate| gate.gate_id != "physical_safety");
 
         let result = audit_design_portfolio(&scenarios(), &objectives(), &[item])
             .expect("valid finite portfolio");
@@ -907,10 +930,9 @@ mod tests {
             item.hard_gates.retain(|gate| gate.gate_id != "physical_safety");
         }
 
-        let one = audit_design_portfolio(&scenarios(), &objectives(), &first)
-            .expect("first order");
-        let two = audit_design_portfolio(&scenarios(), &objectives(), &second)
-            .expect("second order");
+        let one = audit_design_portfolio(&scenarios(), &objectives(), &first).expect("first order");
+        let two =
+            audit_design_portfolio(&scenarios(), &objectives(), &second).expect("second order");
 
         assert_eq!(one.pareto_front_ids, two.pareto_front_ids);
         assert_eq!(one.scores, two.scores);
