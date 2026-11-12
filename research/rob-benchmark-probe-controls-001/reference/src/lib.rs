@@ -1203,6 +1203,32 @@ mod tests {
     }
 
     #[test]
+    fn probe_cannot_use_non_privileged_input_unavailable_to_candidate() {
+        let mut audit = input(8, InputFamily::ActionHistory);
+        assert!(matches!(
+            audit_probe_controls(&audit),
+            Err(ProbeAuditError::ProbeInputOutsideCandidate {
+                arm_id,
+                family: InputFamily::ActionHistory
+            }) if arm_id == "probe"
+        ));
+        audit.candidate_manifest.input_families.push(InputFamily::ActionHistory);
+        assert!(audit_probe_controls(&audit).is_ok());
+    }
+
+    #[test]
+    fn one_cluster_receipt_cannot_be_reused_for_another_cluster() {
+        let mut audit = input(8, InputFamily::TaskMetadata);
+        audit.candidate_clusters[1].paired_episode_manifest_digest =
+            audit.candidate_clusters[0].paired_episode_manifest_digest.clone();
+        assert!(matches!(
+            audit_probe_controls(&audit),
+            Err(ProbeAuditError::DuplicateClusterReceipt(cluster))
+                if cluster == "cluster-01"
+        ));
+    }
+
+    #[test]
     fn record_order_does_not_change_canonical_report() {
         let mut audit_a = input(8, InputFamily::TaskMetadata);
         let mut audit_b = audit_a.clone();
