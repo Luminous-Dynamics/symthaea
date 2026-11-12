@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
+mod planetary_energy;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -62,6 +63,18 @@ enum Commands {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Audit the analytic inverse-square planetary orbit reference corpus.
+    /// This is an evidence/consistency check, not a power-system simulation.
+    PlanetaryEnergyAudit {
+        #[arg(
+            long,
+            default_value = "benchmarks/planetary-energy-service/v0.1/orbit-reference-cases.json"
+        )]
+        input: PathBuf,
+        /// Optional path for the machine-readable audit report.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -105,6 +118,9 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::RhnFinalize { input, out } => {
             rhn_sweep::run_finalize(input, out)?;
+        }
+        Commands::PlanetaryEnergyAudit { input, out } => {
+            planetary_energy::run(&input, out.as_deref())?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
