@@ -49,12 +49,13 @@ The qualifier checks a bounded schema header and explicit structural invariants.
 
 ## Implemented versus planned metrics
 
-The protocol names eight outcome families, but v0.1 computes only two synthetic fixture-level quantities:
+The protocol names eight outcome families, but v0.1 computes three synthetic fixture-level quantities:
 
 - `peer_private_belief_l2_error`: squared L2 error between a fixture's estimated peer-choice probability vector and the empirical peer distribution computed from the committed private baseline.
 - `phantom_consensus_incidence`: a bounded known-answer oracle indicating whether any agent's estimated unique peer plurality differs from the unique recorded peer plurality.
+- `synthetic_transparency_recovery_l2_improvement`: a paired fixture-level check that the peer-belief error decreases after authentic tally/ledger disclosure in the two frozen recovery controls. This is not a causal effect estimate from model-agent runs.
 
-The remaining six metrics are research targets, not implemented results in this slice: private/public decision gap, collective-rationality failure, transparency-recovery effect, signal susceptibility, pluralism preservation and full run-validity reporting. The fixture validator checks selected structural invariants for those protocols but does not claim to estimate their causal effects. Future work must not report these as benchmark outputs until their scoring and analysis implementations exist.
+The remaining six metrics are research targets, not implemented results in this slice: private/public decision gap, collective-rationality failure, model-agent transparency-recovery effect, signal susceptibility, pluralism preservation and full run-validity reporting. The fixture validator checks selected structural invariants for those protocols but does not claim to estimate their causal effects. Future work must not report these as benchmark outputs until their scoring and analysis implementations exist.
 
 ## Claim ceiling
 
