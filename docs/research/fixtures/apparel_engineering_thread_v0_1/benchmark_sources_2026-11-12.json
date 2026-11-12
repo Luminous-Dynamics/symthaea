@@ -1,0 +1,224 @@
+{
+  "schema_version": "0.1.0",
+  "manifest_id": "APPAREL-TEXTILE-BENCHMARK-SOURCES-2026-11-12",
+  "purpose": "Versioned source register for research baselines in cloth simulation, robotic garment manipulation, textile sorting and sewing. This manifest does not declare any dataset ingested or authorize redistribution.",
+  "sources": [
+    {
+      "source_id": "RGBENCH-REAL-GARMENT-EVAL-V1",
+      "name": "RGBench Cloth Sim-to-Real v1",
+      "source_kind": "evaluation_dataset",
+      "publication": "AAAI-26 Real Garment Benchmark",
+      "dataset_url": "https://huggingface.co/datasets/RGBench/RGBench-Cloth-Sim2Real-v1",
+      "paper_url": "https://ojs.aaai.org/index.php/AAAI/article/download/38894/42856",
+      "license_status": "dataset_card_lists_cc-by-4.0",
+      "public_scope": {
+        "garments": 9,
+        "actions": [
+          "grasp",
+          "fold",
+          "fling"
+        ],
+        "approximate_evaluation_samples": 100,
+        "modalities": [
+          "camera_extrinsics",
+          "initial_pose",
+          "robot_joint_and_end_effector_csv",
+          "segmented_cloth_point_cloud",
+          "OBJ_mesh",
+          "USD_mesh"
+        ]
+      },
+      "not_yet_available_in_this_release": [
+        "paper_described_6000_plus_garment_asset_library",
+        "GarmentDynamics_full_simulator"
+      ],
+      "known_limitations": [
+        "two released garments have non-manifold meshes and are excluded from paper published baselines",
+        "small real garment evaluation set",
+        "not a robotic sewing benchmark"
+      ],
+      "intended_use": "reproduce published bidirectional point-cloud simulation-to-reality metrics, then extend with task-weighted physical fidelity",
+      "redistribution_action": "verify exact file license and attribution; CC-BY-4.0 is stated on the current dataset card"
+    },
+    {
+      "source_id": "NIST-NIR-SORT",
+      "name": "Near Infrared Spectra of Origin-defined and Real-world Textiles",
+      "source_kind": "spectroscopy_and_microscopy_dataset",
+      "source_url": "https://catalog.data.gov/dataset/near-infrared-spectra-of-origin-defined-and-real-world-textiles-nir-sort-a-spectroscopic-a",
+      "paper_url": "https://doi.org/10.1038/s41597-026-07434-6",
+      "publication_date": "2026-05-22",
+      "catalog_revision_date": "2026-01-28",
+      "license_status": "file_level_terms_to_be_verified",
+      "public_scope": {
+        "specimens_total": 113,
+        "groups": [
+          {
+            "name": "known_provenance_known_fibre_content_dyes_finishes",
+            "count": 70
+          },
+          {
+            "name": "known_provenance_undyed_blends",
+            "count": 20
+          },
+          {
+            "name": "post_consumer",
+            "count": 11
+          },
+          {
+            "name": "pre_consumer",
+            "count": 12
+          }
+        ],
+        "nominal_replicates_per_specimen": 7,
+        "instruments": [
+          {
+            "type": "benchtop_NIR",
+            "range_nm": [
+              833,
+              2500
+            ]
+          },
+          {
+            "type": "handheld_NIR_A",
+            "range_nm": [
+              1550,
+              1950
+            ]
+          },
+          {
+            "type": "handheld_NIR_B",
+            "range_nm": [
+              1550,
+              1950
+            ]
+          }
+        ],
+        "approximate_data_size": {
+          "spectroscopy_mb": 193,
+          "microscopy_gb": 10.6,
+          "spectroscopy_files": 4248,
+          "microscopy_files": 1044
+        }
+      },
+      "known_limitations": [
+        "specimen-level dataset, not a complete industrial incoming-stream sample",
+        "microscopy subset is large and should be an explicit opt-in download",
+        "catalog does not by itself establish permission to redistribute all files"
+      ],
+      "intended_use": "fibre/blend classification, instrument-transfer and open-set validation with specimen-grouped splits",
+      "redistribution_action": "inspect repository README and file-level terms before copying or publishing"
+    },
+    {
+      "source_id": "TEXSORTML-2026",
+      "name": "TexSortML",
+      "source_kind": "visual_garment_sorting_dataset_and_baseline",
+      "paper_url": "https://doi.org/10.3390/s26196236",
+      "publication_date": "2026-09-30",
+      "dataset_url": "https://doi.org/10.5281/zenodo.22143896",
+      "license_status": "dataset_specific_license_to_be_verified",
+      "public_scope": {
+        "garments": 751,
+        "visual_categories": 11,
+        "annotated_frames": 2253,
+        "presentation_stages": 3,
+        "split_protocol": "garment-level stratified five-fold; all three presentation frames for a garment stay in one fold"
+      },
+      "reported_baselines": {
+        "metric": "accuracy_percent",
+        "model": "directly_fine_tuned_ViT",
+        "stages": [
+          95.23,
+          91.9,
+          85.94
+        ],
+        "stage_1_to_3_drop_percentage_points": 9.3,
+        "comparator_drops": {
+          "ResNet-18": 16.9,
+          "ResNet-50": 16.6
+        }
+      },
+      "known_limitations": [
+        "751 garments came from collection containers and were already facility-pre-sorted",
+        "one facility sample, not a random sample of all incoming waste",
+        "labels cover visual garment category and deformation, not fibre composition",
+        "small and class-imbalanced dataset"
+      ],
+      "intended_use": "visual garment-family and presentation-state robustness only",
+      "redistribution_action": "verify Zenodo record license and attribution"
+    },
+    {
+      "source_id": "CLOTHDOJO-ARXIV-2611.01190",
+      "name": "ClothDojo: Learned Data Generation and Benchmarking for Bimanual Garment Flattening and Folding",
+      "source_kind": "research_preprint",
+      "paper_url": "https://arxiv.org/abs/2611.01190",
+      "publication_date": "2026-10-31",
+      "license_status": "paper_only_data_and_code_release_not_verified",
+      "reported_claims": {
+        "generated_successful_simulated_trajectories_approx": 8000,
+        "scope": "bimanual garment flattening and folding across hundreds of garments",
+        "method": "learned trajectory generation with canonical NOCS cues, then randomized appearance rendering for RGB policy training"
+      },
+      "known_limitations": [
+        "preprint, not an independent Luminous replication",
+        "unseen-garment generalization remains an open challenge",
+        "simulated rollout success is not physical task success"
+      ],
+      "intended_use": "method comparator for generated training data after independent cloth model validation",
+      "redistribution_action": "do not assume dataset or implementation is publicly licensed from the preprint alone"
+    },
+    {
+      "source_id": "ICRA-CLOTH-COMPETITION-2024",
+      "name": "ICRA 2024 Cloth Competition",
+      "source_kind": "real_robot_competition_dataset_and_paper",
+      "paper_url": "https://doi.org/10.1177/02783649251414885",
+      "dataset_url": "https://doi.org/10.5281/zenodo.14372573",
+      "publication_date": "2026-01-28",
+      "license_status": "verify_dataset_license_and_attribution",
+      "reported_scope": {
+        "teams": 11,
+        "real_world_grasp_attempts": 500,
+        "competition_evaluation_trials": 176,
+        "total_demonstrations": 679,
+        "garment_identities": 34
+      },
+      "known_limitations": [
+        "in-air unfolding grasp selection only",
+        "not sewing or full production",
+        "competition score can conceal coverage trade-offs"
+      ],
+      "intended_use": "reproduce grasp selection and report success/coverage separately",
+      "redistribution_action": "verify Zenodo data package terms"
+    },
+    {
+      "source_id": "ROBOTIC-SEWING-2026-ANATOLIAKIS",
+      "name": "A Robotic sewing system for flexible fabric manipulation using computer vision, learning-based grasping and force control",
+      "source_kind": "published_research_comparator",
+      "paper_url": "https://doi.org/10.1007/s41315-026-00590-3",
+      "publication_date": "2026-09-21",
+      "license_status": "open_access_paper; no reusable benchmark dataset identified",
+      "reported_scope": {
+        "robot": "single-arm SCARA",
+        "machine": "unmodified industrial sewing machine",
+        "reported_seam_deviation_mm": "+/-2.5",
+        "control": "vision seam tracking plus force-regulated tension"
+      },
+      "known_limitations": [
+        "limited user intervention remains",
+        "one robot setup and task family",
+        "small grasp-image evaluation described in the paper",
+        "not a general autonomous factory benchmark"
+      ],
+      "intended_use": "matched seam tracking and physical construction comparator",
+      "redistribution_action": "cite the paper; do not assume supplementary experiment data is openly redistributable"
+    }
+  ],
+  "split_policy": [
+    "never split repeated spectra or frames from the same physical specimen/garment across train and held-out evaluation",
+    "hold out complete garment identities and, where available, material families and source lots",
+    "keep calibration specimens separate from scored validation specimens",
+    "keep simulator-generated observations distinct from physical observations",
+    "report source, instrument, material, garment and task strata rather than only one pooled mean"
+  ],
+  "cross_dataset_rule": "TexSortML visual garment-family labels are not fibre-composition labels. NIR-SORT composition observations are not garment-category labels. Fusion is permitted only with matched item identity, independent measurement provenance and explicit missing/unknown states.",
+  "claim_ceiling": "This source register is a research intake manifest. It does not prove that any dataset has been downloaded, parsed, reproduced, licensed for redistribution, or evaluated by Luminous Dynamics."
+}
