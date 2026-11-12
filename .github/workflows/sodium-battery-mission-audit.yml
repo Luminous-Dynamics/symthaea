@@ -1,0 +1,33 @@
+name: Sodium battery mission audit v0.1
+
+on:
+  pull_request:
+    paths:
+      - "docs/transport/SODIUM_BATTERY_MISSION_BENCHMARK_V0_1.md"
+      - "schemas/transport/sodium_battery_mission_v0_1.schema.json"
+      - "fixtures/ev_battery/sodium_battery_mission_v0_1.json"
+      - "tools/sodium-battery-mission-audit/**"
+      - ".github/workflows/sodium-battery-mission-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: Check locked package metadata
+        run: cargo metadata --manifest-path tools/sodium-battery-mission-audit/Cargo.toml --locked --no-deps
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/sodium-battery-mission-audit/Cargo.toml -- --check
+      - name: Run frontier, mass-boundary and censoring tests
+        run: cargo test --manifest-path tools/sodium-battery-mission-audit/Cargo.toml --locked
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path tools/sodium-battery-mission-audit/Cargo.toml --all-targets --locked -- -D warnings
