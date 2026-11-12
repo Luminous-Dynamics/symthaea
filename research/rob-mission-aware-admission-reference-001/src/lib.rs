@@ -210,6 +210,12 @@ pub enum ReferenceError {
     ResourceArithmeticOverflow,
     /// KV-cache growth demand was not supplied for the request.
     UnknownKvCacheDemand(String),
+    /// Candidate robot identity was duplicated in a static-cap selection.
+    DuplicateRobotId(String),
+    /// A retained active episode was not in the candidate robot set.
+    UnknownActiveRobot(String),
+    /// Existing active episodes exceed a newly configured cap; no episode is silently preempted.
+    ActiveEpisodesExceedCap { active_count: usize, cap: usize },
 }
 
 /// One request's final disposition.
@@ -411,6 +417,86 @@ fn compare_request(
                 .then(a.request_id.cmp(&b.request_id))
         }
     }
+}
+
+
+/// Deterministic static active-episode cap baseline for shared brain/KV serving.
+///
+/// This is deliberately separate from request-level resource admission. It
+/// models the simple concurrency control used as a strong fleet-serving
+/// baseline: preserve already active episodes, then fill remaining slots in
+/// lexical robot-ID order. It never silently preempts an active episode.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StaticEpisodeCapSelection {
+    /// Active robot episodes after applying the cap.
+    pub active_robot_ids: Vec<String>,
+    /// Candidate robot episodes deferred by the cap.
+    pub deferred_robot_ids: Vec<String>,
+    /// Configured maximum number of simultaneously active episodes.
+    pub maximum_active_episodes: usize,
+    /// Explicitly false: selecting serving slots does not authorize actuation.
+    pub actuation_authorized: bool,
+}
+
+/// Select active robot episodes under a fixed concurrency cap.
+///
+/// The input candidate set must contain unique, nonempty robot IDs. Existing
+/// active episodes are retained across calls to avoid cache/context churn.
+/// If a cap is lowered beneath the number of existing active episodes, this
+/// function returns an error instead of silently evicting a live episode.
+pub fn select_static_active_episodes(
+    candidate_robot_ids: &[String],
+    currently_active_robot_ids: &[String],
+    maximum_active_episodes: usize,
+) -> Result<StaticEpisodeCapSelection, ReferenceError> {
+    let mut candidates = BTreeSet::new();
+    for robot_id in candidate_robot_ids {
+        if robot_id.trim().is_empty() {
+            return Err(ReferenceError::EmptyIdentity);
+        }
+        if !candidates.insert(robot_id.as_str()) {
+            return Err(ReferenceError::DuplicateRobotId(robot_id.clone()));
+        }
+    }
+
+    let mut active = BTreeSet::new();
+    for robot_id in currently_active_robot_ids {
+        if !candidates.contains(robot_id.as_str()) {
+            return Err(ReferenceError::UnknownActiveRobot(robot_id.clone()));
+        }
+        if !active.insert(robot_id.clone()) {
+            return Err(ReferenceError::DuplicateRobotId(robot_id.clone()));
+        }
+    }
+
+    if active.len() > maximum_active_episodes {
+        return Err(ReferenceError::ActiveEpisodesExceedCap {
+            active_count: active.len(),
+            cap: maximum_active_episodes,
+        });
+    }
+
+    for robot_id in &candidates {
+        if active.len() >= maximum_active_episodes {
+            break;
+        }
+        active.insert((*robot_id).to_owned());
+    }
+
+    let active_robot_ids: Vec<String> = active.into_iter().collect();
+    let active_set: BTreeSet<&str> = active_robot_ids.iter().map(String::as_str).collect();
+    let deferred_robot_ids = candidates
+        .into_iter()
+        .filter(|robot_id| !active_set.contains(robot_id))
+        .map(str::to_owned)
+        .collect();
+
+    Ok(StaticEpisodeCapSelection {
+        active_robot_ids,
+        deferred_robot_ids,
+        maximum_active_episodes,
+        actuation_authorized: false,
+    })
 }
 
 /// Admit a batch of optional remote inference requests under the selected policy.
@@ -625,6 +711,46 @@ mod tests {
         SchedulerCursor {
             last_robot_id: None,
         }
+    }
+
+    #[test]
+    fn static_episode_cap_preserves_existing_active_episodes() {
+        let candidates = vec!["r1".into(), "r2".into(), "r3".into(), "r4".into()];
+        let active = vec!["r3".into(), "r4".into()];
+        let selected = select_static_active_episodes(&candidates, &active, 2).unwrap();
+        assert_eq!(selected.active_robot_ids, vec!["r3", "r4"]);
+        assert_eq!(selected.deferred_robot_ids, vec!["r1", "r2"]);
+        assert!(!selected.actuation_authorized);
+    }
+
+    #[test]
+    fn static_episode_cap_fills_remaining_slots_deterministically() {
+        let candidates = vec!["r4".into(), "r2".into(), "r3".into(), "r1".into()];
+        let active = vec!["r4".into()];
+        let selected = select_static_active_episodes(&candidates, &active, 3).unwrap();
+        assert_eq!(selected.active_robot_ids, vec!["r1", "r2", "r4"]);
+        assert_eq!(selected.deferred_robot_ids, vec!["r3"]);
+    }
+
+    #[test]
+    fn static_episode_cap_does_not_preempt_when_cap_is_lowered() {
+        let candidates = vec!["r1".into(), "r2".into()];
+        let active = vec!["r1".into(), "r2".into()];
+        assert_eq!(
+            select_static_active_episodes(&candidates, &active, 1),
+            Err(ReferenceError::ActiveEpisodesExceedCap {
+                active_count: 2,
+                cap: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn static_episode_cap_accepts_zero_as_explicit_pause() {
+        let candidates = vec!["r1".into(), "r2".into()];
+        let selected = select_static_active_episodes(&candidates, &[], 0).unwrap();
+        assert!(selected.active_robot_ids.is_empty());
+        assert_eq!(selected.deferred_robot_ids, vec!["r1", "r2"]);
     }
 
     #[test]
