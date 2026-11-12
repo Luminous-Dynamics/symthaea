@@ -143,9 +143,7 @@ fn checked_i64(value: i128) -> Result<i64, QualificationErrorV1> {
 }
 
 fn state_identity<const N: usize>() -> Matrix<N> {
-    std::array::from_fn(|row| {
-        std::array::from_fn(|column| if row == column { 1 } else { 0 })
-    })
+    std::array::from_fn(|row| std::array::from_fn(|column| if row == column { 1 } else { 0 }))
 }
 
 fn matrix_product<const N: usize>(
@@ -159,7 +157,10 @@ fn matrix_product<const N: usize>(
             for inner in 0..N {
                 value = checked_add(
                     value,
-                    checked_mul(i128::from(left[row][inner]), i128::from(right[inner][column]))?,
+                    checked_mul(
+                        i128::from(left[row][inner]),
+                        i128::from(right[inner][column]),
+                    )?,
                 )?;
             }
             output[row][column] = checked_i64(value)?;
@@ -177,9 +178,8 @@ fn matrix_commutator<const N: usize>(
     let mut output = [[0_i64; N]; N];
     for row in 0..N {
         for column in 0..N {
-            output[row][column] = checked_i64(
-                i128::from(ab[row][column]) - i128::from(ba[row][column]),
-            )?;
+            output[row][column] =
+                checked_i64(i128::from(ab[row][column]) - i128::from(ba[row][column]))?;
         }
     }
     Ok(output)
@@ -196,14 +196,10 @@ fn linear_combination<const N: usize>(
     for (generator, coefficient) in generators.iter().zip(coefficients) {
         for row in 0..N {
             for column in 0..N {
-                let contribution = checked_mul(
-                    i128::from(*coefficient),
-                    i128::from(generator[row][column]),
-                )?;
-                output[row][column] = checked_i64(checked_add(
-                    i128::from(output[row][column]),
-                    contribution,
-                )?)?;
+                let contribution =
+                    checked_mul(i128::from(*coefficient), i128::from(generator[row][column]))?;
+                output[row][column] =
+                    checked_i64(checked_add(i128::from(output[row][column]), contribution)?)?;
             }
         }
     }
@@ -241,9 +237,7 @@ fn dynamic_product(
     Ok(output)
 }
 
-fn validate_group(
-    group: &FiniteGroupV1,
-) -> Result<(Vec<usize>, usize), QualificationErrorV1> {
+fn validate_group(group: &FiniteGroupV1) -> Result<(Vec<usize>, usize), QualificationErrorV1> {
     let order = group.multiplication.len();
     if order == 0 {
         return Err(QualificationErrorV1::MultiplicationTableNotSquare);
@@ -346,19 +340,20 @@ fn validate_lie_algebra<const N: usize>(
                 }
             }
         }
-        if algebra.generators[i].iter().flatten().all(|value| *value == 0) {
+        if algebra.generators[i]
+            .iter()
+            .flatten()
+            .all(|value| *value == 0)
+        {
             return Err(QualificationErrorV1::LieMatrixClosureViolation);
         }
     }
 
     for i in 0..dimension {
         for j in 0..dimension {
-            let commutator =
-                matrix_commutator(&algebra.generators[i], &algebra.generators[j])?;
-            let expected = linear_combination(
-                &algebra.generators,
-                &algebra.structure_constants[i][j],
-            )?;
+            let commutator = matrix_commutator(&algebra.generators[i], &algebra.generators[j])?;
+            let expected =
+                linear_combination(&algebra.generators, &algebra.structure_constants[i][j])?;
             closure_checks += 1;
             if commutator != expected {
                 return Err(QualificationErrorV1::LieMatrixClosureViolation);
@@ -458,22 +453,46 @@ fn validate_profile<const N: usize>(
     // O(d^5); matrix products: O(N^3) per composition/conjugation.
     let d = extension.lie_algebra.generators.len();
     let group_order = extension.component_group.multiplication.len();
-    let g2 = group_order.checked_mul(group_order).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
-    let g3 = g2.checked_mul(group_order).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
-    let d2 = d.checked_mul(d).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
-    let d3 = d2.checked_mul(d).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
-    let d4 = d3.checked_mul(d).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
-    let d5 = d4.checked_mul(d).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
-    let n2 = N.checked_mul(N).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
-    let n3 = n2.checked_mul(N).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
-    let g_d5 = group_order.checked_mul(d5).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let g2 = group_order
+        .checked_mul(group_order)
+        .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let g3 = g2
+        .checked_mul(group_order)
+        .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let d2 = d
+        .checked_mul(d)
+        .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let d3 = d2
+        .checked_mul(d)
+        .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let d4 = d3
+        .checked_mul(d)
+        .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let d5 = d4
+        .checked_mul(d)
+        .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let n2 = N
+        .checked_mul(N)
+        .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let n3 = n2
+        .checked_mul(N)
+        .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let g_d5 = group_order
+        .checked_mul(d5)
+        .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
     let g_d_n3 = group_order
         .checked_mul(d)
         .and_then(|value| value.checked_mul(n3))
         .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
-    let g2_d3 = g2.checked_mul(d3).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
-    let g2_n3 = g2.checked_mul(n3).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
-    let d2_n3 = d2.checked_mul(n3).ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let g2_d3 = g2
+        .checked_mul(d3)
+        .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let g2_n3 = g2
+        .checked_mul(n3)
+        .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
+    let d2_n3 = d2
+        .checked_mul(n3)
+        .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
     let required = g3
         .checked_add(d5)
         .and_then(|value| value.checked_add(g_d5))
@@ -505,9 +524,7 @@ pub fn verify_split_extension<const N: usize>(
         return Err(QualificationErrorV1::RepresentationCountMismatch);
     }
     for matrix in &representations.adjoint_matrices {
-        if matrix.len() != lie_dimension
-            || matrix.iter().any(|row| row.len() != lie_dimension)
-        {
+        if matrix.len() != lie_dimension || matrix.iter().any(|row| row.len() != lie_dimension) {
             return Err(QualificationErrorV1::AdjointShapeMismatch);
         }
     }
@@ -565,9 +582,7 @@ pub fn verify_split_extension<const N: usize>(
                             transformed_original,
                             checked_mul(
                                 i128::from(adjoint[output][input]),
-                                i128::from(
-                                    extension.lie_algebra.structure_constants[i][j][input],
-                                ),
+                                i128::from(extension.lie_algebra.structure_constants[i][j][input]),
                             )?,
                         )?;
                     }
@@ -690,10 +705,7 @@ mod tests {
         LieAlgebraV1 {
             algebra_id: "affine-line".to_owned(),
             generators: vec![[[1, 0], [0, 0]], [[0, 1], [0, 0]]],
-            structure_constants: vec![
-                vec![vec![0, 0], vec![0, 1]],
-                vec![vec![0, -1], vec![0, 0]],
-            ],
+            structure_constants: vec![vec![vec![0, 0], vec![0, 1]], vec![vec![0, -1], vec![0, 0]]],
         }
     }
 
@@ -706,18 +718,15 @@ mod tests {
             lie_algebra: affine_lie_algebra(),
             component_representation: ComponentRepresentationV1 {
                 state_matrices: vec![[[1, 0], [0, 1]], [[1, 0], [0, -1]]],
-                adjoint_matrices: vec![
-                    vec![vec![1, 0], vec![0, 1]],
-                    vec![vec![1, 0], vec![0, -1]],
-                ],
+                adjoint_matrices: vec![vec![vec![1, 0], vec![0, 1]], vec![vec![1, 0], vec![0, -1]]],
             },
         }
     }
 
     #[test]
     fn exact_o2_split_extension_is_qualified() {
-        let receipt = verify_split_extension(&o2_extension(), QualificationProfileV1::default())
-            .unwrap();
+        let receipt =
+            verify_split_extension(&o2_extension(), QualificationProfileV1::default()).unwrap();
         assert!(receipt.split_extension_qualified);
         assert!(receipt.exact_integer_arithmetic);
         assert_eq!(receipt.component_order, 2);
@@ -735,9 +744,11 @@ mod tests {
 
     #[test]
     fn nonabelian_affine_lie_algebra_accepts_discrete_automorphism() {
-        let receipt =
-            verify_split_extension(&affine_component_extension(), QualificationProfileV1::default())
-                .unwrap();
+        let receipt = verify_split_extension(
+            &affine_component_extension(),
+            QualificationProfileV1::default(),
+        )
+        .unwrap();
         assert_eq!(receipt.jacobi_checks, 8);
         assert_eq!(receipt.bracket_automorphism_checks, 16);
     }
@@ -767,16 +778,10 @@ mod tests {
         let mut extension = direct_product_control();
         // A shear is a valid automorphism of the two-dimensional abelian
         // algebra, but its square is not the identity required by C2.
-        extension.lie_algebra.generators = vec![
-            [[1, 0], [0, 0]],
-            [[0, 0], [0, 1]],
-        ];
-        extension.lie_algebra.structure_constants = vec![
-            vec![vec![0, 0], vec![0, 0]],
-            vec![vec![0, 0], vec![0, 0]],
-        ];
-        extension.component_representation.adjoint_matrices[1] =
-            vec![vec![1, 1], vec![0, 1]];
+        extension.lie_algebra.generators = vec![[[1, 0], [0, 0]], [[0, 0], [0, 1]]];
+        extension.lie_algebra.structure_constants =
+            vec![vec![vec![0, 0], vec![0, 0]], vec![vec![0, 0], vec![0, 0]]];
+        extension.component_representation.adjoint_matrices[1] = vec![vec![1, 1], vec![0, 1]];
         assert_eq!(
             verify_split_extension(&extension, QualificationProfileV1::default()),
             Err(QualificationErrorV1::AdjointRepresentationLawViolation)
@@ -788,8 +793,7 @@ mod tests {
         let mut extension = affine_component_extension();
         // This order-two basis map is invertible but does not preserve
         // [A1,A2] = A2.
-        extension.component_representation.adjoint_matrices[1] =
-            vec![vec![-1, 0], vec![0, 1]];
+        extension.component_representation.adjoint_matrices[1] = vec![vec![-1, 0], vec![0, 1]];
         assert_eq!(
             verify_split_extension(&extension, QualificationProfileV1::default()),
             Err(QualificationErrorV1::BracketAutomorphismViolation)
@@ -811,11 +815,8 @@ mod tests {
                 vec![5, 4, 1, 0, 2, 3],
             ],
         };
-        extension.component_representation.state_matrices = vec![
-            state_identity::<2>(); 6
-        ];
-        extension.component_representation.adjoint_matrices =
-            vec![vec![vec![1]]; 6];
+        extension.component_representation.state_matrices = vec![state_identity::<2>(); 6];
+        extension.component_representation.adjoint_matrices = vec![vec![vec![1]]; 6];
         assert_eq!(
             verify_split_extension(&extension, QualificationProfileV1::default()),
             Err(QualificationErrorV1::NonAssociativeGroup)
