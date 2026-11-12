@@ -128,7 +128,7 @@ def overflow_count(path: Path) -> int:
     count = 0
     with path.open("rb") as stream:
         for raw_line in stream:
-            fields = raw_line.decode("ascii").rstrip("\\n").split("|")
+            fields = raw_line.decode("ascii").rstrip("\n").split("|")
             if len(fields) == 7 and fields[6] == "OK":
                 lower = f64_from_bits(fields[4])
                 upper = f64_from_bits(fields[5])
