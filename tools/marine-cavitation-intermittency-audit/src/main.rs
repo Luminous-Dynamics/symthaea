@@ -1517,7 +1517,7 @@ mod tests {
             "measurement_id", "method_id", "instrument_id",
             "calibration_certificate_sha256", "evidence_sha256",
             "sample_volume_ml", "number_concentration_equivalence_tolerance_per_ml",
-            "wasserstein1_equivalence_tolerance_um", "bins"
+            "wasserstein1_equivalence_tolerance_um", "expanded_uncertainty_confidence_level", "bins"
         ] {
             assert!(schema["$defs"]["nucleiDistribution"]["required"]
                 .as_array().unwrap().iter().any(|value| value == required));
