@@ -2421,7 +2421,8 @@ mod symmetry_resolved_page_tests {
                 < 1e-14
         );
         assert!(
-            (symmetry_resolved_page_average_entropy_nats(4, 2, 2).unwrap() - 77.0 / 60.0).abs() < 1e-13
+            (symmetry_resolved_page_average_entropy_nats(4, 2, 2).unwrap() - 77.0 / 60.0).abs()
+                < 1e-13
         );
     }
 
