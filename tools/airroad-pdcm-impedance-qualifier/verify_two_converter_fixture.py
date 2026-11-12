@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / "docs/research/fixtures/airroad-pdcm-two-converter-shared-source-v0.1.json"
 
 
