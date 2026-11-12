@@ -28,9 +28,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 pub const COUNTERFACTUAL_INFLUENCE_VERSION: &str =
-    "mel-mr-eval-017-counterfactual-influence-v0.1";
+    "mel-mr-eval-017-counterfactual-influence-v0.2";
 pub const REPEATABILITY_CALIBRATION_VERSION: &str =
-    "mel-mr-eval-017-repeatability-calibration-v0.1";
+    "mel-mr-eval-017-repeatability-calibration-v0.2";
 const CALIBRATION_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-repeatability-v1\0";
 const INFLUENCE_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-influence-v1\0";
 const MINIMUM_NOOP_RENDERS: usize = 3;
@@ -51,6 +51,49 @@ pub struct InfluenceAnalysisConfig {
     /// A counterfactual change must exceed this multiple of the largest
     /// measured no-op delta for the matching window/channel.
     pub noise_floor_multiplier: f32,
+    /// Temporal support qualification. This policy is receipt-bound and
+    /// applied independently to each audio channel.
+    pub support_policy: InfluenceSupportPolicy,
+}
+
+/// Temporal qualification of per-window acoustic influence observations.
+/// Release thresholds are fixed-point fractions of the enter thresholds.
+/// Tail extension is conservative post-processing, never a measured effect.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InfluenceSupportPolicy {
+    /// Exit/release threshold as millionths of the enter threshold.
+    /// Must be in 1..999_999 so release is strictly below enter.
+    pub release_ratio_ppm: u32,
+    /// Minimum release-positive windows required to qualify an episode.
+    pub minimum_release_windows: usize,
+    /// Maximum consecutive sub-release windows bridged inside an episode.
+    pub maximum_gap_windows: usize,
+    /// Conservative extension after the last sustained measurement, clamped
+    /// to the rendered output horizon. It never creates support from empty data.
+    pub tail_extension_frames: usize,
+}
+
+impl Default for InfluenceSupportPolicy {
+    fn default() -> Self {
+        Self {
+            release_ratio_ppm: 700_000,
+            minimum_release_windows: 2,
+            maximum_gap_windows: 1,
+            tail_extension_frames: 0,
+        }
+    }
+}
+
+/// One qualified temporal support episode for one channel. The measured end
+/// preserves the last actually observed window; the output end additionally
+/// includes the explicitly configured bounded tail extension.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChannelSupportInterval {
+    pub channel: usize,
+    pub start_frame: usize,
+    pub measured_end_frame: usize,
+    pub end_frame: usize,
+    pub tail_extension_frames: usize,
 }
 
 impl Default for InfluenceAnalysisConfig {
@@ -63,6 +106,7 @@ impl Default for InfluenceAnalysisConfig {
             minimum_rms_delta: 0.0,
             minimum_spectral_distance: 0.0,
             noise_floor_multiplier: 3.0,
+            support_policy: InfluenceSupportPolicy::default(),
         }
     }
 }
@@ -86,6 +130,9 @@ pub enum InfluenceDisposition {
     /// The declared paired outputs did not exceed the calibrated thresholds.
     /// This does not prove that the intervention had no audible effect.
     NoEffectAboveNoiseFloor,
+    /// Raw threshold crossings existed, but no sustained hysteresis-qualified
+    /// episode met the minimum release-window criterion.
+    InsufficientQualifiedSupport,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -571,7 +618,15 @@ pub struct InfluenceWindowMeasurement {
     pub spectral_magnitude_distance: f32,
     pub calibrated_rms_threshold: f32,
     pub calibrated_spectral_threshold: f32,
+    /// Hysteresis exit thresholds, strictly below the corresponding enter
+    /// thresholds under the frozen support policy.
+    pub calibrated_release_rms_threshold: f32,
+    pub calibrated_release_spectral_threshold: f32,
+    /// Historical raw enter-threshold crossing; retained unchanged.
     pub effect_detected: bool,
+    pub release_detected: bool,
+    pub in_qualified_episode: bool,
+    pub bridged_gap: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -600,10 +655,20 @@ pub struct CounterfactualInfluenceReport {
     pub total_frames: usize,
     pub analysis: InfluenceAnalysisConfig,
     pub total_channel_windows: usize,
+    /// Raw enter-threshold-positive channel/window count.
     pub affected_channel_windows: usize,
-    /// Merged frame intervals where at least one channel/window exceeded its
-    /// calibrated threshold. These are measured support regions, not ownership.
+    /// Windows in qualified episodes, including bridged interior gaps.
+    pub qualified_support_channel_windows: usize,
+    pub bridged_gap_channel_windows: usize,
+    /// Total post-measurement extension applied across qualified channel episodes.
+    pub tail_extension_frames_applied: usize,
+    /// Raw enter-threshold-positive intervals; diagnostic only.
     pub measured_influence_intervals: Vec<FrameInterval>,
+    /// Union of temporal episodes that passed hysteresis/minimum-duration rules.
+    /// This is the only interval set EVAL-025 should expose to EVAL-019.
+    pub qualified_support_intervals: Vec<FrameInterval>,
+    /// Channel-specific episodes retaining measured end and post-measurement tail.
+    pub qualified_support_by_channel: Vec<ChannelSupportInterval>,
     pub disposition: InfluenceDisposition,
     pub receipt_sha256: String,
 }
@@ -805,6 +870,27 @@ fn validate_config(
     if config.noise_floor_multiplier < 1.0 {
         return Err(CounterfactualInfluenceError::InvalidConfig(
             "noise_floor_multiplier must be at least 1",
+        ));
+    }
+    let policy = &config.support_policy;
+    if !(1..1_000_000).contains(&policy.release_ratio_ppm) {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "support release_ratio_ppm must be in 1..999999",
+        ));
+    }
+    if policy.minimum_release_windows == 0 || policy.minimum_release_windows > 10_000 {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "support minimum_release_windows must be in 1..=10000",
+        ));
+    }
+    if policy.maximum_gap_windows > 10_000 {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "support maximum_gap_windows must be <= 10000",
+        ));
+    }
+    if policy.tail_extension_frames > 10_000_000 {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "support tail_extension_frames exceeds the implementation bound",
         ));
     }
     Ok(())
@@ -1343,6 +1429,137 @@ fn validate_input(
 }
 
 
+/// Run a per-channel hysteresis state machine over the ordered raw trace.
+/// Each episode starts only at an enter-threshold crossing. It remains active
+/// while release-positive windows continue, may bridge the configured number
+/// of interior sub-release windows, and qualifies only after the minimum
+/// release-positive-window count. Tail extension is applied after the final
+/// measured release-positive window and clamped to the exact output horizon.
+fn qualify_support_episodes(
+    measurements: &mut [InfluenceWindowMeasurement],
+    channels: usize,
+    total_frames: usize,
+    policy: &InfluenceSupportPolicy,
+) -> Result<(Vec<ChannelSupportInterval>, usize, usize), CounterfactualInfluenceError> {
+    if channels == 0 || measurements.is_empty() || measurements.len() % channels != 0 {
+        return Err(CounterfactualInfluenceError::WindowIndexMismatch);
+    }
+    if policy.tail_extension_frames > total_frames {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "support tail extension exceeds the rendered output horizon",
+        ));
+    }
+    let windows_per_channel = measurements.len() / channels;
+    let mut episodes = Vec::new();
+    let mut bridged_gap_windows = 0usize;
+    let mut tail_extension_frames_applied = 0usize;
+
+    for channel in 0..channels {
+        let indices: Vec<usize> = (0..windows_per_channel)
+            .map(|window_index| window_index * channels + channel)
+            .collect();
+        let mut previous_start = None;
+        for &index in &indices {
+            let measurement = &measurements[index];
+            if measurement.channel != channel
+                || measurement.start_frame >= measurement.end_frame
+                || measurement.end_frame > total_frames
+                || previous_start.is_some_and(|start| measurement.start_frame <= start)
+            {
+                return Err(CounterfactualInfluenceError::WindowIndexMismatch);
+            }
+            previous_start = Some(measurement.start_frame);
+        }
+
+        let mut cursor = 0usize;
+        while cursor < indices.len() {
+            if !measurements[indices[cursor]].effect_detected {
+                cursor += 1;
+                continue;
+            }
+
+            let episode_start_index = cursor;
+            let mut last_release_index = None;
+            let mut release_positive_windows = 0usize;
+            let mut gap_windows = 0usize;
+            let mut scan = cursor;
+            while scan < indices.len() {
+                let measurement = &measurements[indices[scan]];
+                if measurement.release_detected {
+                    release_positive_windows += 1;
+                    last_release_index = Some(scan);
+                    gap_windows = 0;
+                    scan += 1;
+                    continue;
+                }
+                if last_release_index.is_some() && gap_windows < policy.maximum_gap_windows {
+                    gap_windows += 1;
+                    scan += 1;
+                    continue;
+                }
+                break;
+            }
+
+            if let Some(last_release_index) = last_release_index
+                && release_positive_windows >= policy.minimum_release_windows
+            {
+                for local_index in episode_start_index..=last_release_index {
+                    let measurement = &mut measurements[indices[local_index]];
+                    measurement.in_qualified_episode = true;
+                    if !measurement.release_detected {
+                        measurement.bridged_gap = true;
+                        bridged_gap_windows = bridged_gap_windows.saturating_add(1);
+                    }
+                }
+
+                let first = &measurements[indices[episode_start_index]];
+                let last = &measurements[indices[last_release_index]];
+                let measured_end_frame = last.end_frame;
+                let end_frame = measured_end_frame
+                    .saturating_add(policy.tail_extension_frames)
+                    .min(total_frames);
+                let applied = end_frame.saturating_sub(measured_end_frame);
+                tail_extension_frames_applied =
+                    tail_extension_frames_applied.saturating_add(applied);
+                episodes.push(ChannelSupportInterval {
+                    channel,
+                    start_frame: first.start_frame,
+                    measured_end_frame,
+                    end_frame,
+                    tail_extension_frames: applied,
+                });
+            }
+
+            // If a new raw enter window closed the previous episode, revisit it
+            // as the beginning of a new episode. Otherwise skip the failed
+            // terminating window so it cannot create a phantom episode.
+            cursor = if scan < indices.len()
+                && measurements[indices[scan]].effect_detected
+            {
+                scan
+            } else if scan < indices.len() {
+                scan + 1
+            } else {
+                scan
+            };
+        }
+    }
+
+    episodes.sort_by_key(|episode| (episode.channel, episode.start_frame, episode.end_frame));
+    Ok((episodes, bridged_gap_windows, tail_extension_frames_applied))
+}
+
+fn union_channel_support(episodes: &[ChannelSupportInterval]) -> Vec<FrameInterval> {
+    let intervals = episodes
+        .iter()
+        .map(|episode| FrameInterval {
+            start_frame: episode.start_frame,
+            end_frame: episode.end_frame,
+        })
+        .collect();
+    merge_intervals(intervals)
+}
+
 fn seal_report(
     mut report: CounterfactualInfluenceReport,
 ) -> Result<CounterfactualInfluenceReport, CounterfactualInfluenceError> {
@@ -1364,6 +1581,11 @@ pub fn measure_counterfactual_influence(
     validate_config(&calibration.analysis)?;
     validate_input(input, calibration)?;
     let windows = frame_windows(calibration.total_frames, &calibration.analysis)?;
+    if calibration.analysis.support_policy.tail_extension_frames > calibration.total_frames {
+        return Err(CounterfactualInfluenceError::InvalidConfig(
+            "support tail extension exceeds the rendered output horizon",
+        ));
+    }
     if calibration.cells.len() != windows.len() * calibration.channels {
         return Err(CounterfactualInfluenceError::WindowIndexMismatch);
     }
@@ -1379,7 +1601,7 @@ pub fn measure_counterfactual_influence(
 
     let metrics = analyze_pair(input.baseline_audio, input.counterfactual_audio, &windows);
     let mut measurements = Vec::with_capacity(metrics.len());
-    let mut affected = Vec::new();
+    let mut raw_affected = Vec::new();
     for (index, metric) in metrics.into_iter().enumerate() {
         let cell = &calibration.cells[index];
         let rms_threshold = calibration
@@ -1393,10 +1615,16 @@ pub fn measure_counterfactual_influence(
                 cell.maximum_noop_spectral_distance
                     * calibration.analysis.noise_floor_multiplier,
             );
+        let release_ratio = calibration.analysis.support_policy.release_ratio_ppm as f32
+            / 1_000_000.0;
+        let release_rms_threshold = rms_threshold * release_ratio;
+        let release_spectral_threshold = spectral_threshold * release_ratio;
         let effect_detected = metric.rms_delta > rms_threshold
             || metric.spectral_magnitude_distance > spectral_threshold;
+        let release_detected = metric.rms_delta > release_rms_threshold
+            || metric.spectral_magnitude_distance > release_spectral_threshold;
         if effect_detected {
-            affected.push(FrameInterval {
+            raw_affected.push(FrameInterval {
                 start_frame: cell.start_frame,
                 end_frame: cell.end_frame,
             });
@@ -1410,7 +1638,12 @@ pub fn measure_counterfactual_influence(
             spectral_magnitude_distance: metric.spectral_magnitude_distance,
             calibrated_rms_threshold: rms_threshold,
             calibrated_spectral_threshold: spectral_threshold,
+            calibrated_release_rms_threshold: release_rms_threshold,
+            calibrated_release_spectral_threshold: release_spectral_threshold,
             effect_detected,
+            release_detected,
+            in_qualified_episode: false,
+            bridged_gap: false,
         });
     }
 
@@ -1418,8 +1651,22 @@ pub fn measure_counterfactual_influence(
         .iter()
         .filter(|measurement| measurement.effect_detected)
         .count();
-    let disposition = if affected_channel_windows > 0 {
+    let (qualified_support_by_channel, bridged_gap_channel_windows, tail_extension_frames_applied) =
+        qualify_support_episodes(
+            &mut measurements,
+            calibration.channels,
+            calibration.total_frames,
+            &calibration.analysis.support_policy,
+        )?;
+    let qualified_support_channel_windows = measurements
+        .iter()
+        .filter(|measurement| measurement.in_qualified_episode)
+        .count();
+    let qualified_support_intervals = union_channel_support(&qualified_support_by_channel);
+    let disposition = if qualified_support_channel_windows > 0 {
         InfluenceDisposition::EffectDetected
+    } else if affected_channel_windows > 0 {
+        InfluenceDisposition::InsufficientQualifiedSupport
     } else {
         InfluenceDisposition::NoEffectAboveNoiseFloor
     };
@@ -1457,7 +1704,12 @@ pub fn measure_counterfactual_influence(
         analysis: calibration.analysis.clone(),
         total_channel_windows: measurements.len(),
         affected_channel_windows,
-        measured_influence_intervals: merge_intervals(affected),
+        qualified_support_channel_windows,
+        bridged_gap_channel_windows,
+        tail_extension_frames_applied,
+        measured_influence_intervals: merge_intervals(raw_affected),
+        qualified_support_intervals,
+        qualified_support_by_channel,
         disposition,
         receipt_sha256: String::new(),
     })
@@ -1494,6 +1746,12 @@ mod tests {
             minimum_rms_delta: 1.0e-6,
             minimum_spectral_distance: 1.0e-4,
             noise_floor_multiplier: 2.0,
+            support_policy: InfluenceSupportPolicy {
+                release_ratio_ppm: 700_000,
+                minimum_release_windows: 1,
+                maximum_gap_windows: 0,
+                tail_extension_frames: 0,
+            },
         }
     }
 
