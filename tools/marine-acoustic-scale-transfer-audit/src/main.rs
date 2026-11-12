@@ -654,7 +654,7 @@ fn main() {
 
     match report.overall_disposition.as_str() {
         "COMPARISON_WITHIN_DECLARED_UNCERTAINTY_REQUIRES_INDEPENDENT_REVIEW" => process::exit(0),
-        "INVALID" | "INCOMPLETE" | "VALIDATION_FAILURE" => process::exit(2),
+        "INVALID" | "INCOMPLETE" | "COMPARISON_OUTSIDE_DECLARED_UNCERTAINTY" => process::exit(2),
         _ => process::exit(2),
     }
 }
@@ -787,7 +787,7 @@ mod tests {
         band.signal_to_background_margin_db = 5.0;
         band.background_correction_applied = true;
         let report = audit(&case);
-        assert_eq!(report.structural_disposition, "ELIGIBLE", "{:?}", report.incomplete_reasons);
+        assert_eq!(report.structural_disposition, "COMPARISON_INPUTS_COMPLETE", "{:?}", report.incomplete_reasons);
         let corrected = report.pair_results[0].band_results[0]
             .background_corrected_model_source_level_db.expect("background-corrected level");
         assert!((corrected - 118.349).abs() < 0.01);
@@ -829,7 +829,7 @@ mod tests {
         band.signal_to_background_margin_db = 10.0;
         band.background_correction_applied = false;
         let report = audit(&case);
-        assert_eq!(report.structural_disposition, "ELIGIBLE", "{:?}", report.incomplete_reasons);
+        assert_eq!(report.structural_disposition, "COMPARISON_INPUTS_COMPLETE", "{:?}", report.incomplete_reasons);
         let source_level = report.pair_results[0].band_results[0]
             .background_corrected_model_source_level_db.expect("source level");
         assert!((source_level - (120.0 - band.facility_transfer_function_db)).abs() < 1.0e-12);
