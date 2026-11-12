@@ -88,6 +88,8 @@ struct NucleiDistributionComparison {
     run_evidence_sha256: String,
     expanded_uncertainty_confidence_level: Option<f64>,
     disposition: &'static str,
+    uncertainty_interpretation: &'static str,
+    declared_binwise_expanded_uncertainty_confidence_level: Option<f64>,
     reference_total_number_concentration_per_ml: Option<f64>,
     run_total_number_concentration_per_ml: Option<f64>,
     absolute_total_number_concentration_difference_per_ml: Option<f64>,
@@ -108,6 +110,7 @@ struct Case {
     evidence_kind: EvidenceKind,
     source: SourceEvidence,
     operating_condition_id: String,
+    reference_run_id: String,
     service_fingerprint_sha256: String,
     environment_fingerprint_sha256: String,
     hydrophone_instrument_id: String,
@@ -183,6 +186,7 @@ struct AuditReport {
     source_data_sha256: String,
     evidence_kind: &'static str,
     operating_condition_id: String,
+    reference_run_id: String,
     band_id: String,
     service_fingerprint_sha256: String,
     environment_fingerprint_sha256: String,
@@ -196,6 +200,7 @@ struct AuditReport {
     center_frequency_hz: f64,
     disposition: &'static str,
     claim_ceiling: &'static str,
+    cavitation_window_presence_definition: &'static str,
     run_reports: Vec<RunReport>,
     nuclei_distribution_coverage_fraction: f64,
     nuclei_distribution_comparisons: Vec<NucleiDistributionComparison>,
@@ -244,11 +249,11 @@ struct RunReport {
     excluded_unknown_background_method: usize,
     excluded_alignment_unresolved: usize,
     cavitation_annotation_coverage: f64,
-    cavitation_occupancy_fraction: Option<f64>,
-    observed_cavitation_onsets: Option<usize>,
-    observed_cavitation_onsets_per_hour: Option<f64>,
-    left_censored_active_segments: Option<usize>,
-    right_censored_active_segments: Option<usize>,
+    cavitation_window_presence_fraction: Option<f64>,
+    observed_false_to_true_window_transitions: Option<usize>,
+    observed_false_to_true_window_transitions_per_covered_hour: Option<f64>,
+    left_censored_active_window_segments: Option<usize>,
+    right_censored_active_window_segments: Option<usize>,
     acquisition_duration_s: f64,
     ittc_recommended_acquisition_duration_met: bool,
     energy_equivalent_mean_spl_db: Option<f64>,
@@ -412,6 +417,8 @@ fn compare_nuclei_distributions(
             run_evidence_sha256: candidate.evidence_sha256.clone(),
             expanded_uncertainty_confidence_level: None,
             disposition: "incomparable_distribution_method_or_binning",
+            uncertainty_interpretation: "not_computed",
+            declared_binwise_expanded_uncertainty_confidence_level: None,
             reference_total_number_concentration_per_ml: None,
             run_total_number_concentration_per_ml: None,
             absolute_total_number_concentration_difference_per_ml: None,
@@ -488,7 +495,8 @@ fn compare_nuclei_distributions(
         calibration_certificate_sha256: reference.calibration_certificate_sha256.clone(),
         reference_evidence_sha256: reference.evidence_sha256.clone(),
         run_evidence_sha256: candidate.evidence_sha256.clone(),
-        expanded_uncertainty_confidence_level: Some(reference.expanded_uncertainty_confidence_level),
+        uncertainty_interpretation: "conservative_interval_from_declared_binwise_marginal_expanded_uncertainties; no joint confidence level or independence assumption asserted",
+        declared_binwise_expanded_uncertainty_confidence_level: Some(reference.expanded_uncertainty_confidence_level),
         disposition,
         reference_total_number_concentration_per_ml: Some(reference_total),
         run_total_number_concentration_per_ml: Some(candidate_total),
@@ -681,6 +689,28 @@ fn validate_case(case: &Case) -> Vec<String> {
                 errors.push(format!("run {} windows overlap or are not chronological at {}", run.run_id, window.window_id));
             }
             previous_end = Some(window.end_time_s);
+        }
+    }
+    if !run_ids.contains(&case.reference_run_id) {
+        errors.push(format!("reference_run_id {} does not identify a declared run", case.reference_run_id));
+    }
+    if run_ids.len() != case.runs.len() {
+        errors.push("run IDs must be unique".to_string());
+    }
+    let mut water_evidence = BTreeSet::new();
+    let mut nuclei_measurements = BTreeSet::new();
+    let mut nuclei_evidence = BTreeSet::new();
+    for run in &case.runs {
+        if !water_evidence.insert(run.water_condition.evidence_sha256.clone()) {
+            errors.push(format!("run {} reuses a water-condition evidence digest", run.run_id));
+        }
+        if let Some(distribution) = &run.water_condition.nuclei_distribution {
+            if !nuclei_measurements.insert(distribution.measurement_id.clone()) {
+                errors.push(format!("run {} reuses a nuclei-distribution measurement ID", run.run_id));
+            }
+            if !nuclei_evidence.insert(distribution.evidence_sha256.clone()) {
+                errors.push(format!("run {} reuses a nuclei-distribution evidence digest", run.run_id));
+            }
         }
     }
     errors
@@ -957,11 +987,11 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
         excluded_unknown_background_method,
         excluded_alignment_unresolved,
         cavitation_annotation_coverage: annotation_coverage,
-        cavitation_occupancy_fraction: occupancy,
-        observed_cavitation_onsets: onsets,
-        observed_cavitation_onsets_per_hour: onsets_per_hour,
-        left_censored_active_segments: left_censored,
-        right_censored_active_segments: right_censored,
+        cavitation_window_presence_fraction: occupancy,
+        observed_false_to_true_window_transitions: onsets,
+        observed_false_to_true_window_transitions_per_covered_hour: onsets_per_hour,
+        left_censored_active_window_segments: left_censored,
+        right_censored_active_window_segments: right_censored,
         acquisition_duration_s,
         ittc_recommended_acquisition_duration_met: acquisition_duration_s > 20.0,
         energy_equivalent_mean_spl_db: energy_mean,
@@ -1005,7 +1035,10 @@ fn audit(case: &Case) -> AuditReport {
     let mut nuclei_distribution_comparisons = Vec::new();
 
     if validation_errors.is_empty() {
-        let reference_water = &case.runs[0].water_condition;
+        let reference_run = case.runs.iter()
+            .find(|run| run.run_id == case.reference_run_id)
+            .expect("reference_run_id is validated before audit");
+        let reference_water = &reference_run.water_condition;
         if nuclei_distribution_coverage_fraction > 0.0
             && nuclei_distribution_coverage_fraction < 1.0
         {
@@ -1016,13 +1049,13 @@ fn audit(case: &Case) -> AuditReport {
         }
 
         if nuclei_distribution_coverage_fraction == 1.0 && !case.runs.is_empty() {
-            let reference_distribution = case.runs[0].water_condition.nuclei_distribution.as_ref()
+            let reference_distribution = reference_run.water_condition.nuclei_distribution.as_ref()
                 .expect("100 percent nuclei distribution coverage checked");
-            for run in case.runs.iter().skip(1) {
+            for run in case.runs.iter().filter(|run| run.run_id != reference_run.run_id) {
                 let distribution = run.water_condition.nuclei_distribution.as_ref()
                     .expect("100 percent nuclei distribution coverage checked");
                 let comparison = compare_nuclei_distributions(
-                    &case.runs[0].run_id,
+                    &reference_run.run_id,
                     &run.run_id,
                     reference_distribution,
                     distribution,
@@ -1146,6 +1179,7 @@ fn audit(case: &Case) -> AuditReport {
             EvidenceKind::Measured => "measured",
         },
         operating_condition_id: case.operating_condition_id.clone(),
+        reference_run_id: case.reference_run_id.clone(),
         band_id: case.band.band_id.clone(),
         service_fingerprint_sha256: case.service_fingerprint_sha256.clone(),
         environment_fingerprint_sha256: case.environment_fingerprint_sha256.clone(),
@@ -1159,6 +1193,7 @@ fn audit(case: &Case) -> AuditReport {
         center_frequency_hz: case.band.center_frequency_hz,
         disposition,
         claim_ceiling: "distributional_summary_of_declared_model_scale_windows_only_no_full_scale_transfer_source_decomposition_causal_or_ecological_qualification",
+        cavitation_window_presence_definition: "fraction_of_aligned_acquisition_windows_with_any_cavitation_presence_not_within_window_time_occupancy",
         run_reports,
         nuclei_distribution_coverage_fraction,
         nuclei_distribution_comparisons,
@@ -1307,6 +1342,7 @@ mod tests {
                 independently_reviewed: true,
             },
             operating_condition_id: "J-0.8-sigma-nD-1".to_string(),
+            reference_run_id: "run-1".to_string(),
             service_fingerprint_sha256: digest('f'),
             environment_fingerprint_sha256: digest('3'),
             hydrophone_instrument_id: "hydrophone-H1".to_string(),
@@ -1544,6 +1580,44 @@ mod tests {
     }
 
     #[test]
+    fn reference_run_is_explicit_and_input_permutation_preserves_comparison() {
+        let mut input = case();
+        input.reference_run_id = "run-2".to_string();
+        let first = audit(&input);
+        input.runs.reverse();
+        let second = audit(&input);
+        assert_eq!(first.nuclei_distribution_coverage_fraction, second.nuclei_distribution_coverage_fraction);
+        assert_eq!(first.nuclei_distribution_comparisons[0].reference_run_id, "run-2");
+        assert_eq!(second.nuclei_distribution_comparisons[0].reference_run_id, "run-2");
+        assert_eq!(
+            first.nuclei_distribution_comparisons[0].disposition,
+            second.nuclei_distribution_comparisons[0].disposition
+        );
+    }
+
+    #[test]
+    fn reused_water_or_nuclei_evidence_is_invalid() {
+        let mut input = case();
+        input.runs[1].water_condition.evidence_sha256 =
+            input.runs[0].water_condition.evidence_sha256.clone();
+        assert_eq!(audit(&input).disposition, "INVALID");
+        let mut input = case();
+        let digest = input.runs[0].water_condition.nuclei_distribution.as_ref().unwrap().evidence_sha256.clone();
+        input.runs[1].water_condition.nuclei_distribution.as_mut().unwrap().evidence_sha256 = digest;
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn cavitation_window_presence_fraction_is_not_time_occupancy() {
+        let report = audit(&case());
+        assert_eq!(
+            report.cavitation_window_presence_definition,
+            "fraction_of_aligned_acquisition_windows_with_any_cavitation_presence_not_within_window_time_occupancy"
+        );
+        assert_eq!(report.run_reports[0].cavitation_window_presence_fraction, Some(0.5));
+    }
+
+    #[test]
     fn energy_mean_is_not_arithmetic_mean_in_db() {
         let levels = [100.0, 110.0];
         let result = energy_mean_db(&levels).unwrap();
@@ -1611,7 +1685,7 @@ mod tests {
         let report = audit(&case());
         assert_eq!(report.disposition, "INCOMPLETE");
         assert_eq!(report.run_reports.len(), 2);
-        assert_eq!(report.run_reports[0].cavitation_occupancy_fraction, Some(0.5));
+        assert_eq!(report.run_reports[0].cavitation_window_presence_fraction, Some(0.5));
         assert!(report.reasons.iter().any(|reason| reason.contains("synthetic evidence")));
     }
 
@@ -1619,9 +1693,9 @@ mod tests {
     fn occupancy_and_onset_rate_are_reported() {
         let report = audit(&case());
         let run = &report.run_reports[0];
-        assert_eq!(run.cavitation_occupancy_fraction, Some(0.5));
-        assert_eq!(run.observed_cavitation_onsets, Some(4));
-        assert!(run.observed_cavitation_onsets_per_hour.unwrap() > 0.0);
+        assert_eq!(run.cavitation_window_presence_fraction, Some(0.5));
+        assert_eq!(run.observed_false_to_true_window_transitions, Some(4));
+        assert!(run.observed_false_to_true_window_transitions_per_covered_hour.unwrap() > 0.0);
     }
 
     #[test]
@@ -1629,7 +1703,7 @@ mod tests {
         let mut input = case();
         input.runs[0].windows[0].cavitation_present = None;
         let report = audit(&input);
-        assert_eq!(report.run_reports[0].cavitation_occupancy_fraction, None);
+        assert_eq!(report.run_reports[0].cavitation_window_presence_fraction, None);
         assert_eq!(report.disposition, "INCOMPLETE");
     }
 
@@ -1708,7 +1782,7 @@ mod tests {
         assert_eq!(run.excluded_alignment_unresolved, 1);
         assert_eq!(run.usable_windows, 8);
         assert_eq!(run.cavitation_annotation_coverage, 7.0 / 8.0);
-        assert_eq!(run.cavitation_occupancy_fraction, None);
+        assert_eq!(run.cavitation_window_presence_fraction, None);
         assert_eq!(report.disposition, "INCOMPLETE");
     }
 
@@ -1753,9 +1827,9 @@ mod tests {
         windows[2].cavitation_present = Some(true);
         let report = audit(&input);
         let run = &report.run_reports[0];
-        assert_eq!(run.observed_cavitation_onsets, Some(2));
-        assert_eq!(run.left_censored_active_segments, Some(2));
-        assert_eq!(run.right_censored_active_segments, Some(1));
+        assert_eq!(run.observed_false_to_true_window_transitions, Some(2));
+        assert_eq!(run.left_censored_active_window_segments, Some(2));
+        assert_eq!(run.right_censored_active_window_segments, Some(1));
     }
 
     #[test]
@@ -1773,7 +1847,7 @@ mod tests {
         let mut input = case();
         input.runs[0].windows[7].cavitation_present = Some(true);
         let report = audit(&input);
-        assert_eq!(report.run_reports[0].right_censored_active_segments, Some(1));
+        assert_eq!(report.run_reports[0].right_censored_active_window_segments, Some(1));
     }
 
     #[test]
@@ -1786,7 +1860,7 @@ mod tests {
         assert_eq!(run.usable_windows, 7);
         assert_eq!(run.excluded_background_dominated, 1);
         // Four of eight independent cavitation observations are positive.
-        assert_eq!(run.cavitation_occupancy_fraction, Some(0.5));
+        assert_eq!(run.cavitation_window_presence_fraction, Some(0.5));
     }
 
     #[test]
@@ -1797,8 +1871,8 @@ mod tests {
         input.runs[0].windows[0].cavitation_present = Some(false);
         input.runs[0].windows[1].cavitation_present = Some(true);
         let report = audit(&input);
-        assert_eq!(report.run_reports[0].observed_cavitation_onsets, Some(4));
-        assert_eq!(report.run_reports[0].cavitation_occupancy_fraction, Some(0.5));
+        assert_eq!(report.run_reports[0].observed_false_to_true_window_transitions, Some(4));
+        assert_eq!(report.run_reports[0].cavitation_window_presence_fraction, Some(0.5));
     }
 
     #[test]
