@@ -36,6 +36,7 @@ const (
 type StageFlags struct {
 	Retrieved bool `json:"retrieved"`
 	Selected bool `json:"selected"`
+	Resolved bool `json:"resolved"`
 	Loaded bool `json:"loaded"`
 	Invoked bool `json:"invoked"`
 	Executed bool `json:"executed"`
@@ -92,6 +93,7 @@ type RetrievalDiagnostics struct {
 	TreatedPairs int `json:"treated_pairs"`
 	Retrieved int `json:"retrieved"`
 	Selected int `json:"selected"`
+	Resolved int `json:"resolved"`
 	Loaded int `json:"loaded"`
 	Invoked int `json:"invoked"`
 	Executed int `json:"executed"`
@@ -186,6 +188,7 @@ func EstimateITT(pairs []Pair, cfg Config) (Report, error) {
 		retrievalDiagnostics.TreatedPairs++
 		if p.WithSkill.Stages.Retrieved{retrievalDiagnostics.Retrieved++}
 		if p.WithSkill.Stages.Selected{retrievalDiagnostics.Selected++}
+		if p.WithSkill.Stages.Resolved{retrievalDiagnostics.Resolved++}
 		if p.WithSkill.Stages.Loaded{retrievalDiagnostics.Loaded++}
 		if p.WithSkill.Stages.Invoked{retrievalDiagnostics.Invoked++}
 		if p.WithSkill.Stages.Executed{retrievalDiagnostics.Executed++}
@@ -281,7 +284,7 @@ func validateArm(a Arm)error{
 	switch a.TaskVerdict{case TaskPass,TaskFail,TaskIndeterminate:default:return fmt.Errorf("%w: unknown task verdict %q",ErrInvalidInput,a.TaskVerdict)}
 	switch a.ControlVerdict{case ControlsPass,ControlsNotPassed,ControlsIndeterminate:default:return fmt.Errorf("%w: unknown control verdict %q",ErrInvalidInput,a.ControlVerdict)}
 	switch a.UnauthorizedEffect{case UnauthorizedEffectAbsent,UnauthorizedEffectPresent,UnauthorizedEffectIndeterminate:default:return fmt.Errorf("%w: unknown unauthorized-effect verdict %q",ErrInvalidInput,a.UnauthorizedEffect)}
-	if a.Stages.Selected&&!a.Stages.Retrieved||a.Stages.Loaded&&!a.Stages.Selected||a.Stages.Invoked&&!a.Stages.Loaded||a.Stages.Executed&&!a.Stages.Invoked{return fmt.Errorf("%w: lifecycle stages must be monotone retrieved→selected→loaded→invoked→executed",ErrInvalidInput)}
+	if a.Stages.Selected&&!a.Stages.Retrieved||a.Stages.Resolved&&!a.Stages.Selected||a.Stages.Loaded&&!a.Stages.Resolved||a.Stages.Invoked&&!a.Stages.Loaded||a.Stages.Executed&&!a.Stages.Invoked{return fmt.Errorf("%w: lifecycle stages must be monotone retrieved→selected→resolved→loaded→invoked→executed",ErrInvalidInput)}
 	return nil
 }
 func isHexDigest(s string)bool{for _,c:=range s{if !(c>='0'&&c<='9')&&!(c>='a'&&c<='f')&&!(c>='A'&&c<='F'){return false}};return true}
