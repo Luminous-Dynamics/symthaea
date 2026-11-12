@@ -94,7 +94,10 @@ enum Commands {
     PlanetaryReferenceAudit {
         #[arg(
             long,
-            default_value = "benchmarks/planetary-energy-service/v0.1/competitive-reference-snapshot.json"
+            default_value = concat!(
+                "benchmarks/planetary-energy-service/v0.1/",
+                "competitive-reference-snapshot.json"
+            )
         )]
         input: PathBuf,
         /// Optional path for the machine-readable audit report.
@@ -111,7 +114,10 @@ enum Commands {
         source_register: PathBuf,
         #[arg(
             long,
-            default_value = "benchmarks/planetary-energy-service/v0.1/competitive-reference-snapshot.json"
+            default_value = concat!(
+                "benchmarks/planetary-energy-service/v0.1/",
+                "competitive-reference-snapshot.json"
+            )
         )]
         competitive_snapshot: PathBuf,
         /// Optional path for the machine-readable audit report.
