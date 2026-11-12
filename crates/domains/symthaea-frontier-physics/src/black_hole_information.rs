@@ -3146,15 +3146,19 @@ pub struct SequentialEvaporationSample {
 /// Reproducible finite-register sequential-emission experiment.
 ///
 /// This is a U(1)-conserving qubit-chain toy model, not Hawking radiation:
-/// the initial state is Haar-random inside a fixed excitation sector, a
-/// charge-preserving two-qubit unitary acts on the active boundary pair, and
-/// the first active tensor factor is then frozen into R. Later gates act only
-/// on the remaining B factors. The equal-gap Hamiltonian is H = omega * N.
+/// the initial state is a low-entanglement computational-basis product state
+/// in a declared fixed-excitation sector. A seeded charge-preserving two-qubit
+/// unitary acts on the active boundary pair; the first factor is then frozen
+/// into R and never acted on again. The initial excitation pattern is seeded,
+/// but the first boundary pair is |10> for non-extremal sectors so the first
+/// interaction can create entanglement. The equal-gap Hamiltonian is H=omega*N.
 /// No gravitational dynamics, redshift, backreaction, or QES is represented.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SequentialEvaporationResult {
     pub number_of_qubits: usize,
     pub initial_excitations: usize,
+    /// Excited tensor-factor labels in the initial product state.
+    pub initial_excited_qubits: Vec<usize>,
     pub seed: u64,
     pub total_two_qubit_gates: usize,
     pub samples: Vec<SequentialEvaporationSample>,
@@ -3200,21 +3204,28 @@ pub fn simulate_u1_conserving_sequential_evaporation(
     let mut rng = ChaCha20Rng::seed_from_u64(seed);
     let mut amplitudes = vec![Complex64::new(0.0, 0.0); dimension];
 
-    // A normalized complex-Gaussian vector restricted to one Hamming-weight
-    // sector is Haar distributed on that fixed-charge subspace.
-    for (basis, amplitude) in amplitudes.iter_mut().enumerate() {
-        if basis.count_ones() as usize == initial_excitations {
-            *amplitude = complex_standard_normal(&mut rng);
-        }
+    // Begin from a product state, not a Haar-random state that is already
+    // at the fixed-charge equilibrium. For non-extremal sectors, occupy the
+    // first boundary site and leave the second empty so the first U(2) block
+    // can entangle the outgoing factor with the remaining register.
+    let mut initial_excited_qubits = Vec::with_capacity(initial_excitations);
+    if initial_excitations == number_of_qubits {
+        initial_excited_qubits.extend(0..number_of_qubits);
+    } else if initial_excitations > 0 {
+        initial_excited_qubits.push(0);
+        let mut remaining_sites = (2..number_of_qubits).collect::<Vec<_>>();
+        remaining_sites.shuffle(&mut rng);
+        initial_excited_qubits.extend(
+            remaining_sites
+                .into_iter()
+                .take(initial_excitations - 1),
+        );
     }
-    let initial_norm_squared: f64 = amplitudes.iter().map(|value| value.norm_sqr()).sum();
-    if !initial_norm_squared.is_finite() || initial_norm_squared <= 0.0 {
-        return Err(QuantumInformationError::NonFiniteState { index: dimension });
-    }
-    let inverse_initial_norm = initial_norm_squared.sqrt().recip();
-    for amplitude in &mut amplitudes {
-        *amplitude *= inverse_initial_norm;
-    }
+    initial_excited_qubits.sort_unstable();
+    let initial_basis = initial_excited_qubits.iter().fold(0usize, |basis, &qubit| {
+        basis | (1usize << (number_of_qubits - 1 - qubit))
+    });
+    amplitudes[initial_basis] = Complex64::new(1.0, 0.0);
 
     let mut black_hole_qubits = (0..number_of_qubits).collect::<Vec<_>>();
     let mut radiation_qubits = Vec::with_capacity(number_of_qubits);
@@ -3320,6 +3331,7 @@ pub fn simulate_u1_conserving_sequential_evaporation(
     Ok(SequentialEvaporationResult {
         number_of_qubits,
         initial_excitations,
+        initial_excited_qubits,
         seed,
         total_two_qubit_gates,
         samples,
@@ -3548,6 +3560,25 @@ mod sequential_evaporation_tests {
             simulate_u1_conserving_sequential_evaporation(8, 9, 1, TOLERANCE),
             Err(QuantumInformationError::InvalidExcitationSector { .. })
         ));
+    }
+
+    #[test]
+    fn sequential_emission_starts_product_then_generates_and_later_purifies_radiation() {
+        let result =
+            simulate_u1_conserving_sequential_evaporation(8, 4, 0xE_AA0, TOLERANCE).unwrap();
+        assert_eq!(result.initial_excited_qubits.len(), 4);
+        assert_eq!(result.initial_excited_qubits[0], 0);
+        assert!(!result.initial_excited_qubits.contains(&1));
+        assert_eq!(result.samples[0].radiation_entropy_nats, 0.0);
+        assert!(result.samples[1].radiation_entropy_nats > 1e-8);
+        assert!(
+            result.samples[1..result.samples.len() - 1]
+                .iter()
+                .any(|sample| sample.radiation_entropy_nats > 0.1)
+        );
+        let final_sample = result.samples.last().unwrap();
+        assert!(final_sample.radiation_entropy_nats.abs() < TOLERANCE);
+        assert!((final_sample.radiation_purity - 1.0).abs() < TOLERANCE);
     }
 
     #[test]
