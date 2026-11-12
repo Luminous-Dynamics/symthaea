@@ -525,6 +525,25 @@ fn parse_part(
                         .map_err(|_| MusicXmlMeasureAdapterError::ArithmeticOverflow)?;
                     maximum_cursor = max_exact(maximum_cursor, cursor);
                 }
+            } else if element.has_tag_name("barline") {
+                // MeasureMap V1 models outer measure spans, not a complete
+                // notational-boundary graph. Never discard internal bars or
+                // repeat/ending/playback semantics while claiming Supported.
+                let location = element.attribute("location").unwrap_or("right");
+                let has_unmodelled_semantics = element.children().any(|child| {
+                    child.is_element()
+                        && matches!(
+                            child.tag_name().name(),
+                            "wavy-line" | "segno" | "coda" | "fermata" | "ending" | "repeat"
+                        )
+                }) || element.attribute("segno").is_some()
+                    || element.attribute("coda").is_some();
+                if location == "middle"
+                    || !matches!(location, "left" | "right")
+                    || has_unmodelled_semantics
+                {
+                    return Ok(None);
+                }
             } else if element.has_tag_name("forward") || element.has_tag_name("backup") {
                 let duration_node = element
                     .children()
@@ -945,5 +964,58 @@ mod tests {
         let global = parse(xml);
         assert!(matches!(global.status, MeasureMapStatus::Unknown { .. }));
         assert!(global.measures.is_empty());
+    }
+
+    #[test]
+    fn middle_barline_is_not_silently_collapsed_into_measure_span() {
+        let xml = r#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><rest/><duration>8</duration></note>
+                <barline location="middle"><bar-style>dashed</bar-style></barline>
+                <note><rest/><duration>8</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let global = parse(xml);
+        assert!(matches!(global.status, MeasureMapStatus::Unknown { .. }));
+        assert!(global.measures.is_empty());
+        let parts = parse_musicxml_part_measure_maps(
+            xml.as_bytes(),
+            "sha256:internal-barline",
+            "score-clock-1",
+        ).unwrap();
+        assert_eq!(parts.len(), 1);
+        assert!(matches!(parts[0].map.status, MeasureMapStatus::Unknown { .. }));
+        assert!(parts[0].map.measures.is_empty());
+    }
+
+    #[test]
+    fn repeat_ending_and_playback_signposts_are_not_silently_dropped() {
+        let semantic_barline_fragments = [
+            r#"<barline location="left"><bar-style>heavy-light</bar-style><repeat direction="forward"/></barline>"#,
+            r#"<barline location="right"><bar-style>light-heavy</bar-style><repeat direction="backward" times="2"/></barline>"#,
+            r#"<barline location="right"><ending number="1" type="start">1.</ending></barline>"#,
+            r#"<barline location="right"><ending number="1" type="stop"/></barline>"#,
+            r#"<barline location="left"><segno/></barline>"#,
+            r#"<barline location="right"><coda/></barline>"#,
+            r#"<barline location="right"><fermata type="upright">normal</fermata></barline>"#,
+            r#"<barline location="right" segno="S1"><bar-style>light-heavy</bar-style></barline>"#,
+            r#"<barline location="left" coda="C1"><bar-style>heavy-light</bar-style></barline>"#,
+        ];
+        for (index, barline) in semantic_barline_fragments.iter().enumerate() {
+            let xml = format!(
+                r#"<score-partwise><part id="P1"><measure number="1">
+                    <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+                    <note><rest/><duration>16</duration></note>
+                    {barline}
+                </measure></part></score-partwise>"#
+            );
+            let map = parse(&xml);
+            assert!(
+                matches!(map.status, MeasureMapStatus::Unknown { .. }),
+                "barline semantic fixture {index} must not be flattened"
+            );
+            assert!(map.measures.is_empty());
+        }
     }
 }
