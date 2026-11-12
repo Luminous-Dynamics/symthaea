@@ -340,20 +340,47 @@ pub struct MusicXmlPartBarlineEventV1 {
     pub measure_offset: RationalBeat,
     pub score_offset: RationalBeat,
     pub bar_style: Option<String>,
+    pub divisions_override: Option<String>,
     pub repeat: Option<MusicXmlRepeatV1>,
     pub ending: Option<MusicXmlEndingV1>,
     pub segno: Option<String>,
     pub coda: Option<String>,
-    pub fermata_count: usize,
-    pub wavy_line_count: usize,
+    pub fermatas: Vec<MusicXmlFermataV1>,
+    pub wavy_lines: Vec<MusicXmlWavyLineV1>,
+    pub annotations: Vec<MusicXmlBarlineAnnotationV1>,
+    pub unrecognized_attributes: Vec<(String, String)>,
     pub staff: Option<String>,
 }
 
 /// Complete measure map plus every explicit MusicXML barline event for a part.
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MusicXmlFermataV1 {
+    pub fermata_type: Option<String>,
+    pub text: Option<String>,
+    pub content: Option<String>,
+}
+
+/// Typed wavy-line marker attached to a barline (for example, a trill line).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MusicXmlWavyLineV1 {
+    pub line_type: Option<String>,
+    pub number: Option<String>,
+    pub placement: Option<String>,
+}
+
+/// MusicXML footnote/level annotation retained without interpreting its prose.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MusicXmlBarlineAnnotationV1 {
+    pub element: String,
+    pub attributes: Vec<(String, String)>,
+    pub text: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MusicXmlPartNotationGraphV1 {
     pub part_id: String,
     pub map: MeasureMap,
+    pub non_controlling_measure_indices: Vec<usize>,
     pub barline_events: Vec<MusicXmlPartBarlineEventV1>,
 }
 
@@ -431,9 +458,15 @@ pub fn parse_musicxml_part_notation_graph(
                     status: MeasureMapStatus::Supported,
                     measures: spans,
                 };
+                let non_controlling_measure_indices = measures
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, measure)| measure.non_controlling.then_some(index))
+                    .collect();
                 output.push(MusicXmlPartNotationGraphV1 {
                     part_id: part_id.to_string(),
                     map,
+                    non_controlling_measure_indices,
                     barline_events,
                 });
             }
@@ -448,6 +481,7 @@ pub fn parse_musicxml_part_notation_graph(
                     },
                     measures: Vec::new(),
                 },
+                non_controlling_measure_indices: Vec::new(),
                 barline_events: Vec::new(),
             }),
             None => output.push(MusicXmlPartNotationGraphV1 {
@@ -461,6 +495,7 @@ pub fn parse_musicxml_part_notation_graph(
                     },
                     measures: Vec::new(),
                 },
+                non_controlling_measure_indices: Vec::new(),
                 barline_events: Vec::new(),
             }),
         }
@@ -595,6 +630,45 @@ fn parse_barline_events_for_part(
                     .and_then(|node| node.text())
                     .map(|value| value.trim().to_string())
                     .filter(|value| !value.is_empty());
+                let fermatas = element.children()
+                    .filter(|node| node.has_tag_name("fermata"))
+                    .map(|node| MusicXmlFermataV1 {
+                        fermata_type: node.attribute("type").map(str::to_string),
+                        text: node.attribute("text").map(str::to_string),
+                        content: node.text().map(|value| value.trim().to_string())
+                            .filter(|value| !value.is_empty()),
+                    })
+                    .collect();
+                let wavy_lines = element.children()
+                    .filter(|node| node.has_tag_name("wavy-line"))
+                    .map(|node| MusicXmlWavyLineV1 {
+                        line_type: node.attribute("type").map(str::to_string),
+                        number: node.attribute("number").map(str::to_string),
+                        placement: node.attribute("placement").map(str::to_string),
+                    })
+                    .collect();
+                let annotations = element.children()
+                    .filter(|node| node.has_tag_name("footnote") || node.has_tag_name("level"))
+                    .map(|node| MusicXmlBarlineAnnotationV1 {
+                        element: node.tag_name().name().to_string(),
+                        attributes: node.attributes()
+                            .map(|attribute| (
+                                attribute.name().to_string(),
+                                attribute.value().to_string(),
+                            ))
+                            .collect(),
+                        text: node.text().map(|value| value.trim().to_string())
+                            .filter(|value| !value.is_empty()),
+                    })
+                    .collect();
+                let known_attributes = ["id", "location", "segno", "coda", "divisions", "staff"];
+                let unrecognized_attributes = element.attributes()
+                    .filter(|attribute| !known_attributes.contains(&attribute.name()))
+                    .map(|attribute| (
+                        attribute.name().to_string(),
+                        attribute.value().to_string(),
+                    ))
+                    .collect();
                 let measure_number = measure.attribute("number").unwrap_or("");
                 events.push(MusicXmlPartBarlineEventV1 {
                     source_order,
@@ -606,12 +680,15 @@ fn parse_barline_events_for_part(
                     measure_offset,
                     score_offset,
                     bar_style,
+                    divisions_override: element.attribute("divisions").map(str::to_string),
                     repeat,
                     ending,
                     segno,
                     coda,
-                    fermata_count: element.children().filter(|node| node.has_tag_name("fermata")).count(),
-                    wavy_line_count: element.children().filter(|node| node.has_tag_name("wavy-line")).count(),
+                    fermatas,
+                    wavy_lines,
+                    annotations,
+                    unrecognized_attributes,
                     staff: element.attribute("staff").map(str::to_string),
                 });
                 source_order = source_order.saturating_add(1);
@@ -1374,6 +1451,7 @@ mod tests {
         assert_eq!(middle.measure_offset, RationalBeat::new(2, 1).unwrap());
         assert_eq!(middle.score_offset, RationalBeat::new(2, 1).unwrap());
         assert_eq!(middle.bar_style.as_deref(), Some("dashed"));
+        assert_eq!(graphs[0].non_controlling_measure_indices, Vec::<usize>::new());
 
         let right = &graphs[0].barline_events[1];
         assert_eq!(right.location, MusicXmlBarlineLocationV1::Right);
@@ -1381,6 +1459,9 @@ mod tests {
         assert_eq!(right.ending.as_ref().and_then(|value| value.number.as_deref()), Some("1"));
         assert_eq!(right.repeat.as_ref().and_then(|value| value.direction.as_deref()), Some("backward"));
         assert_eq!(right.repeat.as_ref().and_then(|value| value.times.as_deref()), Some("2"));
+        assert!(right.annotations.is_empty());
+        assert!(right.fermatas.is_empty());
+        assert!(right.wavy_lines.is_empty());
 
         let second_right = &graphs[0].barline_events[2];
         assert_eq!(second_right.score_offset, RationalBeat::new(5, 1).unwrap());
