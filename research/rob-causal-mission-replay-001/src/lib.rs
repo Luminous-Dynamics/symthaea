@@ -345,6 +345,20 @@ pub enum ReplayDisposition {
     Rejected,
 }
 
+/// Per-mission ratio of actuator applications whose complete physical lineage closes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CausalClosureMetric {
+    /// All actuator application records supplied, including Unknown/Invalid ones.
+    pub applications_examined: usize,
+    /// Applications with complete observation/decision/proposal/assurance lineage.
+    pub applications_linked: usize,
+    /// Applications whose linked lineage also has a complete physical transition.
+    pub applications_causally_closed: usize,
+    /// Floor(applications_causally_closed / applications_examined * 1,000,000).
+    /// None when no applications were supplied.
+    pub closure_ppm: Option<u32>,
+}
+
 /// Causal replay report. This report never grants actuator authority.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ReplayReport {
@@ -358,6 +372,8 @@ pub struct ReplayReport {
     pub applications_examined: usize,
     /// Number of applications with a complete linked chain.
     pub applications_linked: usize,
+    /// Causal closure of the observation-to-physical-effect lineage.
+    pub causal_closure: CausalClosureMetric,
     /// Whether a qualified terminal safe-stop/retreat receipt closed the mission.
     pub terminal_safe_stop_qualified: bool,
     /// Explicitly false; replay is retrospective and has no control authority.
@@ -839,6 +855,8 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
     }
 
     let mut applications_linked = 0_usize;
+    let mut linked_command_ids: BTreeSet<String> = BTreeSet::new();
+    let mut physically_closed_command_ids: BTreeSet<String> = BTreeSet::new();
     let mut application_by_command: BTreeMap<&str, &ActuatorApplication> = BTreeMap::new();
     for application in &trace.applications {
         let findings_before = findings.len();
@@ -1085,6 +1103,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             && decision.calibration_disposition == CalibrationDisposition::Qualified
         {
             applications_linked += 1;
+            linked_command_ids.insert(application.command_id.clone());
         }
     }
 
@@ -1096,14 +1115,17 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
     let mut last_physical_stamp: Option<&EventStamp> = None;
 
     for transition in transitions {
+        let mut transition_closed = true;
         last_physical_sequence = last_physical_sequence.max(transition.stamp.sequence);
-        if let Some(previous) = last_physical_stamp {
-            check_time_order(
+        if let Some(previous) = last_physical_stamp
+            && !check_time_order(
                 previous,
                 &transition.stamp,
                 &transition.transition_id,
                 &mut findings,
-            );
+            )
+        {
+            transition_closed = false;
         }
         if last_physical_stamp.is_none_or(|previous| previous.sequence < transition.stamp.sequence)
         {
@@ -1115,6 +1137,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             || transition.thermal_snapshot_digest.trim().is_empty()
             || transition.thermal_sensor_calibration_digest.trim().is_empty()
         {
+            transition_closed = false;
             push_finding(
                 &mut findings,
                 FindingSeverity::Unknown,
@@ -1123,6 +1146,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             );
         }
         if transition.predecessor_state_digest != expected_predecessor {
+            transition_closed = false;
             push_finding(
                 &mut findings,
                 FindingSeverity::Invalid,
@@ -1133,6 +1157,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         expected_predecessor = transition.resulting_state_digest.as_str();
 
         if !transition_commands.insert(transition.command_id.as_str()) {
+            transition_closed = false;
             push_finding(
                 &mut findings,
                 FindingSeverity::Invalid,
@@ -1143,6 +1168,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         match application_by_command.get(transition.command_id.as_str()) {
             Some(application) => {
                 if application.stamp.sequence >= transition.stamp.sequence {
+                    transition_closed = false;
                     push_finding(
                         &mut findings,
                         FindingSeverity::Invalid,
@@ -1150,20 +1176,24 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
                         &transition.transition_id,
                     );
                 } else {
-                    check_time_order(
+                    if !check_time_order(
                         &application.stamp,
                         &transition.stamp,
                         &transition.transition_id,
                         &mut findings,
-                    );
+                    ) {
+                        transition_closed = false;
+                    }
                 }
             }
-            None => push_finding(
+            None => {
+                transition_closed = false;
+                push_finding(
                 &mut findings,
                 FindingSeverity::Invalid,
                 "PHYSICAL_TRANSITION_WITHOUT_APPLICATION",
                 &transition.transition_id,
-            ),
+            );
         }
 
         let actual_nodes: BTreeSet<&str> = transition
@@ -1173,6 +1203,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             .collect();
         if actual_nodes.len() != transition.thermal_node_ids.len() || actual_nodes != required_nodes
         {
+            transition_closed = false;
             push_finding(
                 &mut findings,
                 FindingSeverity::Unknown,
@@ -1181,12 +1212,16 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             );
         }
         if transition.topology == TopologyDisposition::Unknown {
+            transition_closed = false;
             push_finding(
                 &mut findings,
                 FindingSeverity::Unknown,
                 "RECOVERY_TOPOLOGY_UNKNOWN",
                 &transition.transition_id,
             );
+        }
+        if transition_closed {
+            physically_closed_command_ids.insert(transition.command_id.clone());
         }
     }
 
@@ -1247,6 +1282,18 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         ),
     }
 
+    let applications_causally_closed = linked_command_ids
+        .intersection(&physically_closed_command_ids)
+        .count();
+    let causal_closure_ppm = if trace.applications.is_empty() {
+        None
+    } else {
+        Some(
+            ((applications_causally_closed as u128 * 1_000_000_u128)
+                / trace.applications.len() as u128) as u32,
+        )
+    };
+
     let disposition = if findings
         .iter()
         .any(|finding| finding.severity == FindingSeverity::Invalid)
@@ -1267,6 +1314,12 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         aoi_bounds,
         applications_examined: trace.applications.len(),
         applications_linked,
+        causal_closure: CausalClosureMetric {
+            applications_examined: trace.applications.len(),
+            applications_linked,
+            applications_causally_closed,
+            closure_ppm: causal_closure_ppm,
+        },
         terminal_safe_stop_qualified,
         actuation_authorized: false,
     }
@@ -1386,6 +1439,8 @@ mod tests {
         assert_eq!(report.disposition, ReplayDisposition::Closed);
         assert_eq!(report.applications_examined, 1);
         assert_eq!(report.applications_linked, 1);
+        assert_eq!(report.causal_closure.applications_causally_closed, 1);
+        assert_eq!(report.causal_closure.closure_ppm, Some(1_000_000));
         assert_eq!(report.aoi_bounds[0].minimum_age_ns, 100);
         assert_eq!(report.aoi_bounds[0].maximum_age_ns, 100);
         assert!(report.terminal_safe_stop_qualified);
@@ -1623,6 +1678,46 @@ mod tests {
         let report = replay_mission(&trace);
         assert_eq!(report.disposition, ReplayDisposition::Unknown);
         assert!(has_finding(&report, "RECOVERY_TOPOLOGY_UNKNOWN"));
+    }
+
+
+    #[test]
+    fn missing_physical_effect_does_not_count_as_causally_closed() {
+        let mut trace = valid_trace();
+        trace.physical_transitions.clear();
+        let report = replay_mission(&trace);
+        assert_eq!(report.causal_closure.applications_examined, 1);
+        assert_eq!(report.causal_closure.applications_linked, 1);
+        assert_eq!(report.causal_closure.applications_causally_closed, 0);
+        assert_eq!(report.causal_closure.closure_ppm, Some(0));
+    }
+
+    #[test]
+    fn unknown_topology_or_incomplete_thermal_nodes_do_not_count_as_closed() {
+        let mut topology = valid_trace();
+        topology.physical_transitions[0].topology = TopologyDisposition::Unknown;
+        assert_eq!(
+            replay_mission(&topology).causal_closure.closure_ppm,
+            Some(0)
+        );
+
+        let mut thermal = valid_trace();
+        thermal.physical_transitions[0].thermal_node_ids.pop();
+        assert_eq!(
+            replay_mission(&thermal).causal_closure.closure_ppm,
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn empty_application_denominator_has_no_causal_closure_percentage() {
+        let mut trace = valid_trace();
+        trace.applications.clear();
+        trace.physical_transitions.clear();
+        assert_eq!(
+            replay_mission(&trace).causal_closure.closure_ppm,
+            None
+        );
     }
 
     #[test]
