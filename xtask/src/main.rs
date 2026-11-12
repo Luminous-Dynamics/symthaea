@@ -87,6 +87,18 @@ enum Commands {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Audit the source-bound industry/programme competitive reference snapshot.
+    /// PASS means complete source/unit/boundary metadata only, not reproducible superiority.
+    PlanetaryReferenceAudit {
+        #[arg(
+            long,
+            default_value = "benchmarks/planetary-energy-service/v0.1/competitive-reference-snapshot.json"
+        )]
+        input: PathBuf,
+        /// Optional path for the machine-readable audit report.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -136,6 +148,9 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::PlanetaryServiceAudit { input, out } => {
             planetary_energy::run_service_audit(&input, out.as_deref())?;
+        }
+        Commands::PlanetaryReferenceAudit { input, out } => {
+            planetary_energy::run_competitive_reference_audit(&input, out.as_deref())?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
