@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "manifest_id": "APPAREL-TEXTILE-BENCHMARK-SOURCES-2026-11-12",
-  "purpose": "Versioned source register for research baselines in cloth simulation, robotic garment manipulation, textile sorting and sewing. This manifest does not declare any dataset ingested or authorize redistribution. This revision adds OpenTextile-NIR, two inverse-design research comparators, a design-sorting mismatch study and a 2026 critical fabric-design review. Reported percentages/metrics are source-specific and must not be treated as universal or reproduced Luminous results. This revision adds apparel scheduling comparators spanning dual-resource MIP/CP/heuristics, textile steam-aware multi-objective RL, source-load coordination, multi-line flow shops and human-centered scheduling. Published case results are scope-specific and are not a common leaderboard.",
+  "purpose": "Versioned source register for research baselines in cloth simulation, robotic garment manipulation, textile sorting and sewing. This manifest does not declare any dataset ingested or authorize redistribution. This revision adds OpenTextile-NIR, two inverse-design research comparators, a design-sorting mismatch study and a 2026 critical fabric-design review. Reported percentages/metrics are source-specific and must not be treated as universal or reproduced Luminous results. This revision adds apparel scheduling comparators spanning dual-resource MIP/CP/heuristics, textile steam-aware multi-objective RL, source-load coordination, multi-line flow shops and human-centered scheduling. Published case results are scope-specific and are not a common leaderboard. This revision adds ASTM D6673-10 pattern interchange, the Knitout v0.6 machine-independent knitting instruction format and an open parametric sweater reference generator. These formats cover different layers and must not be conflated as a complete garment digital thread.",
   "sources": [
     {
       "source_id": "RGBENCH-REAL-GARMENT-EVAL-V1",
@@ -564,6 +564,94 @@
       ],
       "intended_use": "human-centered scheduling comparator and workforce constraint taxonomy",
       "redistribution_action": "cite paper; check supplementary dataset rights"
+    },
+    {
+      "source_id": "ASTM-D6673-10",
+      "name": "ASTM D6673-10 Standard Practice for Sewn Products Pattern Data Interchange — Data Format",
+      "source_kind": "pattern_interchange_standard",
+      "source_url": "https://store.astm.org/d6673-10.html",
+      "publication_date": "2010",
+      "license_status": "copyrighted_standard_purchase_or_licensed_access_required",
+      "reported_scope": {
+        "format": "DXF constrained pattern representation plus associated grade-rule exchange",
+        "covers": [
+          "2D sewn pattern pieces",
+          "pattern piece/style information",
+          "grade-rule tables"
+        ],
+        "explicit_non_scope": [
+          "relationships between pattern pieces",
+          "2D-to-3D sewn-pattern geometry correspondence",
+          "numerical cutter instructions",
+          "plotter instructions",
+          "complete marker/spreading data",
+          "complete product data specification"
+        ]
+      },
+      "known_limitations": [
+        "not a complete garment engineering-thread schema",
+        "standard text cannot be copied into repository without permission",
+        "DXF compatibility does not imply semantic preservation by every CAD importer/exporter"
+      ],
+      "intended_use": "matched 2D pattern import/export interoperability comparator and semantic-loss test",
+      "redistribution_action": "cite standard metadata only; do not commit copyrighted standard text"
+    },
+    {
+      "source_id": "KNITOUT-V0.6",
+      "name": "Knitout machine-independent low-level knitting instruction format",
+      "source_kind": "open_machine_instruction_format_specification",
+      "source_url": "https://textiles-lab.github.io/knitout/knitout.html",
+      "repository_url": "https://github.com/textiles-lab/knitout",
+      "specification_version": "0.6",
+      "license_status": "specification_public_domain_as_documented_in_format_history; inspect code/repository files individually",
+      "reported_scope": {
+        "representation": "UTF-8 line-oriented low-level knitting instructions",
+        "operations_and_concepts": [
+          "knit",
+          "tuck",
+          "split",
+          "miss/amiss",
+          "transfer",
+          "racking",
+          "carriers"
+        ],
+        "design_intent": "machine-independent intermediate representation for design tools, simulators and machine-specific backends"
+      },
+      "known_limitations": [
+        "not a high-level garment model",
+        "not a universal machine-capability guarantee",
+        "machine-specific backends and supported extensions remain distinct",
+        "successful parse does not prove machine execution or physical product quality"
+      ],
+      "intended_use": "syntactic parse, operation-graph fidelity and machine-profile preflight benchmark",
+      "redistribution_action": "verify exact v0.6 specification revision and code licensing before embedding examples or parser fixtures"
+    },
+    {
+      "source_id": "TEXTILE-PARAMETRIC-SWEATER-KNITOUT",
+      "name": "Textiles Lab parametric complete-garment sweater pattern with Knitout",
+      "source_kind": "open_parametric_knitting_reference_project",
+      "repository_url": "https://github.com/textiles-lab/parametric-sweater",
+      "license_status": "repository_license_and_asset_rights_to_be_verified_before_code_or_asset_reuse",
+      "reported_scope": {
+        "inputs": [
+          "body measurements",
+          "design ease"
+        ],
+        "output": "Knitout low-level knitting program",
+        "stated_machine_validation": "developed for and tested on a Shima Seiki machine",
+        "other_backends": [
+          "Kniterate conversion is referenced",
+          "STOLL backend work described as in development"
+        ]
+      },
+      "known_limitations": [
+        "one specific garment family/project",
+        "machine-specific backends vary in maturity",
+        "does not establish universal size/fit or machine interoperability",
+        "must pin upstream commit and reproduce exact workflow"
+      ],
+      "intended_use": "reference pipeline for measurements → parametric garment pattern → Knitout and backend-specific comparison",
+      "redistribution_action": "read repository license, generated file rights and exact upstream commit before reusing source or assets"
     }
   ],
   "split_policy": [
@@ -575,5 +663,5 @@
   ],
   "cross_dataset_rule": "TexSortML visual garment-family labels are not fibre-composition labels. NIR-SORT composition observations are not garment-category labels. Fusion is permitted only with matched item identity, independent measurement provenance and explicit missing/unknown states.",
   "claim_ceiling": "This source register is a research intake manifest. It does not prove that any dataset has been downloaded, parsed, reproduced, licensed for redistribution, or evaluated by Luminous Dynamics. The companion RGBench garment asset subset is separately licensed for non-commercial research; do not treat its rights as inherited from the CC-BY-4.0 capture set.",
-  "revision": "2026-11-12-r3"
+  "revision": "2026-11-12-r4"
 }
