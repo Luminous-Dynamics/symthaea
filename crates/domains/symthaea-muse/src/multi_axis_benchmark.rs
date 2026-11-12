@@ -779,6 +779,7 @@ mod tests {
                             metric_id: "clews".into(),
                             value: 0.65,
                             sample_count: 373,
+                            evaluated_sample_manifest_sha256: digest('7'),
                             confidence_interval: Some(ClusteredConfidenceIntervalV1 {
                                 lower: 0.62,
                                 upper: 0.68,
