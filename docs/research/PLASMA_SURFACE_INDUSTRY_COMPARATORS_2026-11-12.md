@@ -146,7 +146,7 @@ The 20 October 2026 Péczi-Kovács and Kókai article provides particularly usef
 
 | Substrate + adhesive | Argon plasma result | Nitrogen plasma result | Interpretation |
 |---|---:|---:|---|
-| PET + Loctite 4860 | 2.4 ± 0.5 MPa; WCA 31° | 2.0 ± 0.1 MPa; WCA 13° | Argon gave stronger lap-shear despite the higher contact angle |
+| PET-G + Loctite 4860 | 2.4 ± 0.5 MPa; WCA 31° | 2.0 ± 0.1 MPa; WCA 13° | Argon gave stronger lap-shear despite the higher contact angle |
 | PP + Soudal Fix All Flexi | 0.8 MPa; WCA 60° | 0.3 ± 0.05 MPa; WCA 17° | Argon gave stronger bond despite the much higher contact angle |
 | HIPS + Soudal Fix All X-treme Power Express | 4.9 MPa; WCA 25° | 4.9 MPa; WCA 0° | Dramatically lower nitrogen contact angle did not improve the reported joint strength |
 | PVC + Loctite EA 9466 | — | 12.8 ± 2.3 MPa vs untreated 2.1 ± 0.3 MPa | Nitrogen was highly effective for this specific pairing; failure occurred in the polymer substrate |
@@ -156,3 +156,12 @@ These results do not establish that argon is generally superior. They establish 
 The study's test outcomes are literature observations, not Luminous measurements. Its selected lap-shear results do not establish long-term bondability, production duty-cycle reliability, full-system energy consumption, or the superiority of either gas for a different adhesive or application.
 
 Source: Péczi-Kovács & Kókai, published 20 October 2026, https://doi.org/10.1007/s44245-026-00396-4.
+
+
+## Method fidelity note for the 2026 polymer comparison
+
+The study used PET-G sheet (not an unspecified PET grade), and PP, HIPS, PVC and PC sheet. It prepared single-lap adhesive joints with a 12.5 mm overlap in accordance with ISO 4587:2003, and tested them at 10 mm/s. Three specimens were tested per treatment category. Bonding was carried out immediately after plasma treatment to minimize hydrophobic recovery; bondline thickness was not measured directly. Therefore its lap-shear values are useful matched literature observations, but they do not supply delayed-bonding data, a bondability-window estimate, a large-sample reliability distribution or production-energy boundary.
+
+For our first reconstruction, use the exact substrate grade / adhesive pairing and ISO 4587:2003 method as published. If another standard or geometry is chosen for a production-specific qualification, start a separate protocol stratum rather than pooling the values.
+
+ISO status reference: https://www.iso.org/standard/34852.html (ISO 4587:2003 remains published/current on the ISO page; confirmed 2021; systematic review stage began 2026-07-15).
