@@ -437,7 +437,7 @@
     {
       "id": "QI-4",
       "name": "Hayden-Preskill decoupling and reference recovery",
-      "status": "QI-4A direct decoupling source plus QI-4P one-step Petz recovery source authored; Rust execution pending",
+      "status": "QI-4A direct decoupling + QI-4P Petz recovery source and five new Rust tests authored; exact-head execution pending",
       "model": "Reference Q is initially maximally entangled with injected message M; black-hole register B is initially entangled with explicit early radiation R; a declared scrambler acts on M tensor B; emitted factors E are made accessible while remaining B' is inaccessible to the decoder.",
       "observables": [
         "mutual_information_Q_Bprime",
@@ -493,9 +493,13 @@
         "petz_fidelity": "Report entanglement fidelity F_e = 1/4 sum_s |Tr L_s|^2 for composite Kraus L_s=R_i K_j.",
         "petz_numerics": "Inverse-square-root uses unregularized 4x4 Hermitian Newton-Schulz iteration; report ||rho_A^(-1/2) rho_A rho_A^(-1/2)-I||_F; reject nonconvergence rather than floor eigenvalues.",
         "decoder_cost_boundary": "Report dense arithmetic cost and memory for this small classical channel simulation separately from physical quantum gate counts. This implementation does not synthesize a fault-tolerant decoder circuit.",
-        "petz_ensemble": "Report per-seed entanglement fidelity, Welford mean/standard error, min/max, maximum inverse-square-root residual and maximum trace-preservation residual; freeze seed schedule before evaluation."
+        "petz_ensemble": "Report per-seed entanglement fidelity, Welford mean/standard error, min/max, maximum inverse-square-root residual and maximum trace-preservation residual; freeze seed schedule before evaluation.",
+        "petz_identity_control": "U=I_4 must return entanglement fidelity 1 within 1e-10",
+        "petz_random_scrambler": "For each preregistered Haar U(4), report F_e in [0,1], inverse-square-root residual <1e-8, and trace-preservation residual <1e-8",
+        "petz_baseline": "Input-independent replacement decoder I/2 has qubit entanglement fidelity 1/4",
+        "petz_no_efficiency_claim": "A two-Kraus channel representation is not a physical circuit decomposition; do not claim decoder gate complexity or hardware efficiency."
       },
-      "implementation_status": "QI-4A direct decoupling trace-distance/Pinsker diagnostic; QI-4P one-step Petz decoder and independent-seed ensemble APIs; source authored, Rust runner validation pending. Exact SDP optimum, rotated-Petz, charge-sector-aware decoder, and circuit synthesis remain future work.",
+      "implementation_status": "QI-4A direct trace-distance/Pinsker decoupling and QI-4P one-step Petz recovery source/ensemble implemented; five dedicated Petz Rust tests authored; Rust validation pending at the new head. Exact SDP optimum, rotated-Petz, charge-sector-aware recovery, and circuit synthesis remain future work.",
       "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
       "fixtures": [
         "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
@@ -827,7 +831,7 @@
     }
   },
   "implementation_progress": {
-    "source_status": "partial_source_authored; exact-head focused Rust runner pending",
+    "source_status": "partial_source_authored; exact-head focused Rust runner pending for the latest Petz tests",
     "modules": [
       "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs"
     ],
@@ -855,10 +859,10 @@
       "QI_4A_direct_decoupling_trace_distance": "source_authored_not_executed",
       "QI_4A_quantum_Pinsker_consistency": "source_authored_not_executed",
       "QI_3H_joint_U1_hydrodynamic_scrambling_analysis": "source_authored_tests_pending_rust_execution",
-      "QI_4P_one_step_Petz_recovery": "source_authored_not_executed",
-      "QI_4P_unregularized_Hermitian_inverse_square_root": "source_authored_not_executed",
-      "QI_4P_Petz_recovery_ensemble_statistics": "source_authored_not_executed",
-      "QI_4P_identity_channel_analytic_control": "source_authored_not_executed",
+      "QI_4P_one_step_Petz_recovery": "source_authored_tests_added_runner_pending",
+      "QI_4P_unregularized_Hermitian_inverse_square_root": "source_authored_independent_numpy_crosscheck_runner_pending",
+      "QI_4P_Petz_recovery_ensemble_statistics": "source_authored_tests_added_runner_pending",
+      "QI_4P_identity_channel_analytic_control": "source_authored_tests_added_runner_pending",
       "QI_3_sequential_smaller_complementary_reduction": "source_authored_not_executed; only the smaller subsystem is materialized for each pure-state cut; complementary entropy and purity are reported via Schmidt-spectrum equality",
       "QI_2S_unequal_block_analytic_control": "source_authored_not_executed; N=4 K=1 A=1 and A=3 return 11/24 nats"
     },
@@ -881,12 +885,17 @@
     "runner_status": {
       "latest_formatter_head": "497ee59652a1948c1e0fdc918ca848f86736ab18",
       "formatter": "pinned Rust 1.96 rustfmt normalization succeeded",
-      "focused_rust_checks": "not yet rerun on formatter-normalized head",
+      "focused_rust_checks": "prior exact head green; new Petz test commit and fixture update require exact-head rerun",
       "test_inventory": {
-        "black_hole_information_authored_tests": 63
+        "black_hole_information_authored_tests": 68
       },
-      "claim_ceiling": "No Rust build, Clippy pass, or Rust test pass is claimed at this head."
-    }
+      "claim_ceiling": "No Rust build, Clippy pass, or Rust test pass is claimed at this head.",
+      "latest_source_head": "pending latest branch-head refresh",
+      "last_green_source_head": "1bbb97c95a21b9024c181c6c519bd252463580bf",
+      "last_green_focused_job": "43232825852",
+      "last_green_frontier_physics_tests": "127 passed; 0 failed at the prior exact head; does not cover the five new Petz tests"
+    },
+    "claim_ceiling": "The one-step Petz recovery map is a mathematically explicit finite-dimensional channel A=E tensor R -> Mhat. Its construction assumes the exact scrambler is known. No physical gate-level decoder compilation, efficient decoding claim, macroscopic black-hole recovery, or QES/island result is established."
   },
   "benchmark_policy": {
     "claim_boundary": "Petz recovery fidelity, Haar/Page equilibrium, finite-depth scrambling, U(1) transport and gravitational QES/island calculations are distinct model classes. A successful recovery toy model is not an evaporation result."
