@@ -47,6 +47,10 @@ pub enum QuantumInformationError {
         value: f64,
         tolerance: f64,
     },
+    InvalidSquaredCommutator {
+        value: f64,
+        tolerance: f64,
+    },
     InformationIdentityError {
         residual: f64,
         tolerance: f64,
@@ -127,6 +131,10 @@ impl fmt::Display for QuantumInformationError {
             Self::InvalidMutualInformation { value, tolerance } => write!(
                 f,
                 "mutual information {value} is below the allowed numerical tolerance {tolerance}"
+            ),
+            Self::InvalidSquaredCommutator { value, tolerance } => write!(
+                f,
+                "normalized squared commutator {value} is outside [0,2] beyond tolerance {tolerance}"
             ),
             Self::InformationIdentityError { residual, tolerance } => write!(
                 f,
@@ -2255,7 +2263,7 @@ pub fn simulate_u1_operator_spreading(
         .chain(squared_commutator_x.iter())
         .any(|value| !value.is_finite() || *value < -tolerance || *value > 2.0 + tolerance)
     {
-        return Err(QuantumInformationError::InvalidMutualInformation {
+        return Err(QuantumInformationError::InvalidSquaredCommutator {
             value: squared_commutator_z
                 .iter()
                 .chain(squared_commutator_x.iter())
