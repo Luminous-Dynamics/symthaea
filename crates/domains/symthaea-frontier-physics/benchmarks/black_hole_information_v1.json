@@ -402,7 +402,7 @@
     {
       "id": "QI-4",
       "name": "Hayden-Preskill decoupling and reference recovery",
-      "status": "planned",
+      "status": "QI-4A direct decoupling source plus QI-4P one-step Petz recovery source authored; Rust execution pending",
       "model": "Reference Q is initially maximally entangled with injected message M; black-hole register B is initially entangled with explicit early radiation R; a declared scrambler acts on M tensor B; emitted factors E are made accessible while remaining B' is inaccessible to the decoder.",
       "observables": [
         "mutual_information_Q_Bprime",
@@ -418,7 +418,10 @@
         "charge_sector_leakage",
         "noise_sensitivity",
         "quantum_Pinsker_upper_bound_and_slack",
-        "direct_decoupling_trace_distance_Q_Bprime"
+        "direct_decoupling_trace_distance_Q_Bprime",
+        "Petz_recovery_entanglement_fidelity",
+        "Petz_channel_trace_preservation_residual",
+        "Petz_inverse_square_root_residual"
       ],
       "decoder_baselines": [
         "exact_small_dimension_optimal_recovery_via_SDP_or_channel_optimization",
@@ -448,10 +451,19 @@
         "quantum_pinsker": "D_trace <= sqrt(I(Q:Bprime)/2) with mutual information in nats; violations beyond declared tolerance fail",
         "no_decoder_claim_from_decoupling": true,
         "pinsker_reference": "For natural-log mutual information in nats, require D_trace <= sqrt(I(Q:Bprime)/2), with declared numerical tolerance.",
-        "fixture": "hayden_preskill_decoupling_u4_v1.json records the Q,M,B,R register convention, accessible set A=E tensor R, direct trace-distance formula, and independent 32-seed NumPy comparator."
+        "fixture": "hayden_preskill_decoupling_u4_v1.json records the Q,M,B,R register convention, accessible set A=E tensor R, direct trace-distance formula, and independent 32-seed NumPy comparator.",
+        "petz_input": "The decoder receives only the accessible 4-dimensional A=E tensor R register. The inaccessible B' is traced out as the environment and cannot be passed to the recovery map.",
+        "petz_completeness": "Require sum_i R_i^dagger R_i = I_A within tolerance; do not silently add trace-preserving repair operators.",
+        "petz_fidelity": "Report entanglement fidelity F_e = 1/4 sum_s |Tr L_s|^2 for composite Kraus L_s=R_i K_j.",
+        "petz_numerics": "Inverse-square-root uses unregularized 4x4 Hermitian Newton-Schulz iteration; report ||rho_A^(-1/2) rho_A rho_A^(-1/2)-I||_F; reject nonconvergence rather than floor eigenvalues.",
+        "decoder_cost_boundary": "Report dense arithmetic cost and memory for this small classical channel simulation separately from physical quantum gate counts. This implementation does not synthesize a fault-tolerant decoder circuit."
       },
-      "implementation_status": "QI-4A direct trace-distance/Pinsker source and fixture authored; Rust validation pending; no recovery decoder implemented",
-      "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json"
+      "implementation_status": "QI-4A computes direct trace-distance decoupling and Pinsker consistency; QI-4P constructs the one-step Petz recovery channel acting only on A=E tensor R and reports entanglement fidelity and trace-preservation residual. No exact SDP optimum, rotated-Petz baseline, charge-sector decoder, or efficient quantum circuit decoder yet.",
+      "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
+      "fixtures": [
+        "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
+        "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_petz_recovery_u4_v1.json"
+      ]
     },
     {
       "id": "QI-5",
@@ -760,13 +772,15 @@
       "QI_3_sequential_product_state_initialization": "source_authored_not_executed",
       "QI_4A_direct_decoupling_trace_distance": "source_authored_not_executed",
       "QI_4A_quantum_Pinsker_consistency": "source_authored_not_executed",
-      "QI_3H_joint_U1_hydrodynamic_scrambling_analysis": "source_authored_tests_pending_rust_execution"
+      "QI_3H_joint_U1_hydrodynamic_scrambling_analysis": "source_authored_tests_pending_rust_execution",
+      "QI_4P_one_step_Petz_recovery": "source_authored_not_executed",
+      "QI_4P_unregularized_Hermitian_inverse_square_root": "source_authored_not_executed"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
       "finite_depth_random_circuit_ensembles": "seeded_Haar_U4_brickwork_and_all_to_all_matching_source_authored_not_executed; sequential_evaporation_and_energy_conserving_variants_not_implemented",
       "sequential_unitary_evaporation_model": "U(1)-conserving sequential factor-transfer source uses a seeded low-entanglement product state in a fixed Hamming-weight sector; Rust execution pending",
-      "hayden_preskill_recovery_decoders": "not implemented; current QI-4A diagnostic has no recovery map, entanglement-fidelity measurement, or decoder cost",
+      "hayden_preskill_recovery_decoders": "A one-step Petz recovery baseline for a four-qubit Haar-U4 channel is source-authored; no exact SDP optimum, rotated-Petz benchmark, charge-sector-aware recovery, scalable decoder circuit, or noise model yet.",
       "mps_entropy_from_validated_schmidt_spectrum": "not_qualified",
       "island_or_qes_calculation": "not_implemented",
       "energy_conserving_circuits": "U(1)-conserving equal-gap qubit gate family and sequential factor-transfer toy model authored; Rust execution pending",
@@ -783,7 +797,7 @@
       "formatter": "pinned Rust 1.96 rustfmt normalization succeeded",
       "focused_rust_checks": "not yet rerun on formatter-normalized head",
       "test_inventory": {
-        "black_hole_information_authored_tests": 57
+        "black_hole_information_authored_tests": 61
       },
       "claim_ceiling": "No Rust build, Clippy pass, or Rust test pass is claimed at this head."
     }
