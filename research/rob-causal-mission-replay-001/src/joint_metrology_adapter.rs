@@ -5,7 +5,8 @@
 //! authoritative MissionTrace. It is retrospective and never authorizes actuation.
 
 use super::{
-    FindingSeverity, MissionTrace, ReplayDisposition, ReplayFinding, ReplayReport, replay_mission,
+    ActuatorApplication, EventStamp, FindingSeverity, MissionTrace, ReplayDisposition,
+    ReplayFinding, ReplayReport, replay_mission,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,6 +58,7 @@ pub struct JointInstrumentReceipt {
 /// uncertainty propagation. This adapter never infers omitted flows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EnergyBoundaryReceipt {
+    pub boundary_manifest_digest: String,
     pub boundary_complete: bool,
     pub electrical_input_uj: u64,
     pub shaft_work_output_uj: u64,
@@ -66,13 +68,19 @@ pub struct EnergyBoundaryReceipt {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MotionOnsetReceipt {
+    pub command_id: String,
+    pub stamp: EventStamp,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct JointMetrologyEvidence {
     pub mission: MissionTrace,
     pub instruments: JointInstrumentReceipt,
     pub energy: EnergyBoundaryReceipt,
     pub expected_predecessor_reserve_digest: String,
     pub physical_state_reset: bool,
-    pub command_to_motion_latency_ns: Option<u64>,
+    pub motion_onset: Option<MotionOnsetReceipt>,
     pub command_to_motion_limit_ns: Option<u64>,
 }
 
@@ -86,7 +94,8 @@ pub struct EnergyClosureResult {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CommandResponseResult {
-    pub measured_latency_ns: Option<u64>,
+    pub minimum_latency_ns: Option<u64>,
+    pub maximum_latency_ns: Option<u64>,
     pub reference_limit_ns: Option<u64>,
     pub disposition: CommandResponseDisposition,
 }
@@ -214,49 +223,46 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
         );
     }
 
-    if let Some(application) = evidence.mission.applications.first() {
-        if application.actuator_id != instruments.actuator_id
+    if let Some(application) = evidence.mission.applications.first()
+        && (application.actuator_id != instruments.actuator_id
             || application.application_receipt_digest
-                != instruments.actuator_application_receipt_digest
-        {
-            push(
-                &mut findings,
-                FindingSeverity::Invalid,
-                "JOINT_ACTUATOR_RECEIPT_BINDING_MISMATCH",
-                &application.command_id,
-            );
-        }
+                != instruments.actuator_application_receipt_digest)
+    {
+        push(
+            &mut findings,
+            FindingSeverity::Invalid,
+            "JOINT_ACTUATOR_RECEIPT_BINDING_MISMATCH",
+            &application.command_id,
+        );
     }
 
-    if let Some(decision) = evidence.mission.decisions.first() {
-        if decision.calibration_digest != instruments.decision_calibration_receipt_digest
+    if let Some(decision) = evidence.mission.decisions.first()
+        && (decision.calibration_digest != instruments.decision_calibration_receipt_digest
             || decision.action_domain_digest != instruments.action_domain_digest
-            || decision.loss_model_digest != instruments.model_digest
-        {
-            push(
-                &mut findings,
-                FindingSeverity::Invalid,
-                "JOINT_DECISION_CALIBRATION_BINDING_MISMATCH",
-                &decision.decision_id,
-            );
-        }
+            || decision.loss_model_digest != instruments.model_digest)
+    {
+        push(
+            &mut findings,
+            FindingSeverity::Invalid,
+            "JOINT_DECISION_CALIBRATION_BINDING_MISMATCH",
+            &decision.decision_id,
+        );
     }
 
-    if let Some(chunk) = evidence.mission.chunks.first() {
-        if chunk.model_digest != instruments.model_digest
+    if let Some(chunk) = evidence.mission.chunks.first()
+        && (chunk.model_digest != instruments.model_digest
             || chunk.action_domain_digest != instruments.action_domain_digest
             || chunk.expected_executed_prefix_digest
                 != instruments.executed_prefix_expected_digest
             || chunk.observed_executed_prefix_digest
-                != instruments.executed_prefix_observed_digest
-        {
-            push(
-                &mut findings,
-                FindingSeverity::Invalid,
-                "JOINT_PROPOSAL_CONFIGURATION_OR_PREFIX_MISMATCH",
-                &chunk.proposal_id,
-            );
-        }
+                != instruments.executed_prefix_observed_digest)
+    {
+        push(
+            &mut findings,
+            FindingSeverity::Invalid,
+            "JOINT_PROPOSAL_CONFIGURATION_OR_PREFIX_MISMATCH",
+            &chunk.proposal_id,
+        );
     }
 
     if let Some(transition) = evidence.mission.physical_transitions.first() {
@@ -293,6 +299,24 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
         );
     }
 
+    if evidence.energy.boundary_manifest_digest.trim().is_empty() {
+        push(
+            &mut findings,
+            FindingSeverity::Unknown,
+            "JOINT_ENERGY_BOUNDARY_IDENTITY_MISSING",
+            mission_id,
+        );
+    } else if evidence.energy.boundary_manifest_digest
+        != instruments.energy_boundary_manifest_digest
+    {
+        push(
+            &mut findings,
+            FindingSeverity::Invalid,
+            "JOINT_ENERGY_BOUNDARY_MANIFEST_MISMATCH",
+            mission_id,
+        );
+    }
+
     let energy = energy_closure(evidence.energy);
     match energy.disposition {
         EnergyClosureDisposition::Balanced => {}
@@ -311,28 +335,89 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
     }
 
     let command_response = match (
-        evidence.command_to_motion_latency_ns,
+        evidence.mission.applications.first(),
+        evidence.motion_onset.as_ref(),
         evidence.command_to_motion_limit_ns,
     ) {
-        (Some(measured), Some(limit)) if measured <= limit => CommandResponseResult {
-            measured_latency_ns: Some(measured),
-            reference_limit_ns: Some(limit),
-            disposition: CommandResponseDisposition::WithinReference,
-        },
-        (Some(measured), Some(limit)) => {
-            push(
-                &mut findings,
-                FindingSeverity::Invalid,
-                "JOINT_COMMAND_TO_MOTION_LIMIT_EXCEEDED",
-                mission_id,
-            );
-            CommandResponseResult {
-                measured_latency_ns: Some(measured),
-                reference_limit_ns: Some(limit),
-                disposition: CommandResponseDisposition::ExceedsReference,
+        (Some(application), Some(onset), Some(limit)) => {
+            if onset.command_id != application.command_id
+                || onset.stamp.sequence <= application.stamp.sequence
+                || onset.stamp.tick < application.stamp.tick
+            {
+                push(
+                    &mut findings,
+                    FindingSeverity::Invalid,
+                    "JOINT_MOTION_ONSET_CAUSAL_BINDING_INVALID",
+                    &application.command_id,
+                );
+                CommandResponseResult {
+                    minimum_latency_ns: None,
+                    maximum_latency_ns: None,
+                    reference_limit_ns: Some(limit),
+                    disposition: CommandResponseDisposition::ExceedsReference,
+                }
+            } else if onset.stamp.robot_id != application.stamp.robot_id
+                || onset.stamp.clock_id != application.stamp.clock_id
+                || onset.stamp.boot_epoch != application.stamp.boot_epoch
+            {
+                push(
+                    &mut findings,
+                    FindingSeverity::Unknown,
+                    "JOINT_MOTION_ONSET_CLOCK_OR_ROBOT_MISMATCH",
+                    &application.command_id,
+                );
+                CommandResponseResult {
+                    minimum_latency_ns: None,
+                    maximum_latency_ns: None,
+                    reference_limit_ns: Some(limit),
+                    disposition: CommandResponseDisposition::Unknown,
+                }
+            } else if onset.stamp.timestamp.lower_ns < application.stamp.timestamp.upper_ns {
+                push(
+                    &mut findings,
+                    FindingSeverity::Unknown,
+                    "JOINT_MOTION_ONSET_TIME_ORDER_UNCERTAIN",
+                    &application.command_id,
+                );
+                CommandResponseResult {
+                    minimum_latency_ns: None,
+                    maximum_latency_ns: None,
+                    reference_limit_ns: Some(limit),
+                    disposition: CommandResponseDisposition::Unknown,
+                }
+            } else {
+                let minimum = onset.stamp.timestamp.lower_ns
+                    - application.stamp.timestamp.upper_ns;
+                let maximum = onset.stamp.timestamp.upper_ns
+                    - application.stamp.timestamp.lower_ns;
+                let disposition = if maximum <= limit {
+                    CommandResponseDisposition::WithinReference
+                } else if minimum > limit {
+                    push(
+                        &mut findings,
+                        FindingSeverity::Invalid,
+                        "JOINT_COMMAND_TO_MOTION_LIMIT_EXCEEDED",
+                        &application.command_id,
+                    );
+                    CommandResponseDisposition::ExceedsReference
+                } else {
+                    push(
+                        &mut findings,
+                        FindingSeverity::Unknown,
+                        "JOINT_COMMAND_TO_MOTION_LIMIT_OVERLAPS_UNCERTAINTY",
+                        &application.command_id,
+                    );
+                    CommandResponseDisposition::Unknown
+                };
+                CommandResponseResult {
+                    minimum_latency_ns: Some(minimum),
+                    maximum_latency_ns: Some(maximum),
+                    reference_limit_ns: Some(limit),
+                    disposition,
+                }
             }
         }
-        (measured, limit) => {
+        _ => {
             push(
                 &mut findings,
                 FindingSeverity::Unknown,
@@ -340,8 +425,9 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
                 mission_id,
             );
             CommandResponseResult {
-                measured_latency_ns: measured,
-                reference_limit_ns: limit,
+                minimum_latency_ns: None,
+                maximum_latency_ns: None,
+                reference_limit_ns: evidence.command_to_motion_limit_ns,
                 disposition: CommandResponseDisposition::Unknown,
             }
         }
@@ -470,7 +556,7 @@ mod tests {
             }],
             physical_transitions: vec![PhysicalTransition {
                 transition_id: "physical-01".to_owned(),
-                stamp: stamp("event-07", 7, 3, 120_000_000),
+                stamp: stamp("event-08", 8, 3, 128_000_000),
                 command_id: "command-01".to_owned(),
                 predecessor_state_digest: "reserve-0".to_owned(),
                 resulting_state_digest: "reserve-1".to_owned(),
@@ -484,7 +570,7 @@ mod tests {
                 topology: TopologyDisposition::Known,
             }],
             terminal: Some(TerminalRecord {
-                stamp: stamp("event-08", 8, 3, 130_000_000),
+                stamp: stamp("event-09", 9, 3, 135_000_000),
                 disposition: TerminalDisposition::SafeStopQualified,
                 reserve_state_digest: "reserve-1".to_owned(),
             }),
@@ -517,6 +603,7 @@ mod tests {
             mission,
             instruments,
             energy: EnergyBoundaryReceipt {
+                boundary_manifest_digest: "energy-boundary".to_owned(),
                 boundary_complete: true,
                 electrical_input_uj: 100_000_000,
                 shaft_work_output_uj: 70_000_000,
@@ -526,7 +613,10 @@ mod tests {
             },
             expected_predecessor_reserve_digest: "reserve-0".to_owned(),
             physical_state_reset: false,
-            command_to_motion_latency_ns: Some(15_000_000),
+            motion_onset: Some(MotionOnsetReceipt {
+                command_id: "command-01".to_owned(),
+                stamp: stamp("event-07", 7, 3, 125_000_000),
+            }),
             command_to_motion_limit_ns: Some(20_000_000),
         }
     }
@@ -614,7 +704,10 @@ mod tests {
     #[test]
     fn command_response_and_aoi_remain_independent_metrics() {
         let mut evidence = valid_evidence();
-        evidence.command_to_motion_latency_ns = Some(45_000_000);
+        evidence.motion_onset.as_mut().unwrap().stamp.timestamp = super::super::TimestampInterval {
+            lower_ns: 155_000_000,
+            upper_ns: 155_000_000,
+        };
         evidence.command_to_motion_limit_ns = Some(20_000_000);
         let report = qualify_joint_metrology(&evidence);
         assert_eq!(report.disposition, QualificationDisposition::Rejected);
@@ -645,13 +738,37 @@ mod tests {
     #[test]
     fn missing_command_response_evidence_is_unknown() {
         let mut evidence = valid_evidence();
-        evidence.command_to_motion_latency_ns = None;
+        evidence.motion_onset = None;
         let report = qualify_joint_metrology(&evidence);
         assert_eq!(report.disposition, QualificationDisposition::Unknown);
         assert_eq!(
             report.command_response.disposition,
             CommandResponseDisposition::Unknown
         );
+    }
+
+    #[test]
+    fn timestamp_uncertainty_overlapping_response_limit_remains_unknown() {
+        let mut evidence = valid_evidence();
+        evidence.motion_onset.as_mut().unwrap().stamp.timestamp =
+            super::super::TimestampInterval {
+                lower_ns: 129_000_000,
+                upper_ns: 132_000_000,
+            };
+        let report = qualify_joint_metrology(&evidence);
+        assert_eq!(
+            report.command_response.disposition,
+            CommandResponseDisposition::Unknown
+        );
+        assert_eq!(report.disposition, QualificationDisposition::Unknown);
+    }
+
+    #[test]
+    fn energy_manifest_must_match_the_measured_energy_receipt() {
+        let mut evidence = valid_evidence();
+        evidence.energy.boundary_manifest_digest = "different-boundary".to_owned();
+        let report = qualify_joint_metrology(&evidence);
+        assert_eq!(report.disposition, QualificationDisposition::Rejected);
     }
 
     #[test]
