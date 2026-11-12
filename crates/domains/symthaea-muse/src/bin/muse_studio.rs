@@ -439,9 +439,12 @@ struct Candidate {
     /// user didn't author one) — MIDI export re-derives the same performed
     /// voices from it, so the `.mid` matches the audio.
     spec: symthaea_music_theory::CompositionSpec,
-    /// Present only when FluidSynth produced a local artifact-bound receipt.
-    /// Native rendering is not yet instrumented at the synthesizer schedule boundary.
+    /// Successful external-render receipt. Native rendering and failed
+    /// external attempts may have no success receipt.
     render_receipt: Option<symthaea_muse::renderer_execution_receipt::RendererExecutionReceipt>,
+    /// Includes failed/spawned FluidSynth attempts; this is local wrapper
+    /// evidence, not trusted-host attestation.
+    render_invocation_observation: Option<serde_json::Value>,
     state: symthaea_muse::MusicalState,
     seed: u64,
     renderer: &'static str,
@@ -487,8 +490,9 @@ struct Candidate {
 }
 
 struct FluidCandidateRender {
-    wav_bytes: Vec<u8>,
-    receipt: symthaea_muse::renderer_execution_receipt::RendererExecutionReceipt,
+    wav_bytes: Option<Vec<u8>>,
+    receipt: Option<symthaea_muse::renderer_execution_receipt::RendererExecutionReceipt>,
+    invocation_observation: serde_json::Value,
 }
 
 struct Studio {
@@ -1016,6 +1020,7 @@ async fn main() {
         .route("/api/harmony/{id}", get(harmony_summary))
         .route("/api/piece/{id}/listen-bundle", get(listen_bundle))
         .route("/api/piece/{id}/render-receipt", get(render_execution_receipt))
+        .route("/api/piece/{id}/render-invocation", get(render_invocation_observation))
         .route("/api/motifs/{id}", get(motifs_summary))
         .route(
             "/api/piece/{id}/performance-bundle",
@@ -1382,13 +1387,22 @@ async fn cognitive_sonata_return(
     })
     .await
     .map_err(internal)?;
-    let renderer = if fluid_wav.is_some() {
+    let render_invocation_observation = fluid_wav
+        .as_ref()
+        .map(|render| render.invocation_observation.clone());
+    let renderer = if fluid_wav
+        .as_ref()
+        .is_some_and(|render| render.wav_bytes.is_some())
+    {
         "fluidsynth"
     } else {
         "native"
     };
     let (wav, render_receipt) = match fluid_wav {
-        Some(render) => (render.wav_bytes, Some(render.receipt)),
+        Some(render) => match render.wav_bytes {
+            Some(bytes) => (bytes, render.receipt),
+            None => (wav_bytes(&composition.audio).map_err(internal)?, None),
+        },
         None => (wav_bytes(&composition.audio).map_err(internal)?, None),
     };
 
@@ -1504,6 +1518,7 @@ async fn cognitive_sonata_return(
                 score: selected.score,
                 spec,
                 render_receipt,
+                render_invocation_observation,
                 state,
                 seed: intent.seed,
                 renderer,
@@ -2023,13 +2038,22 @@ async fn compose(
             let id = studio.next_id.fetch_add(1, Ordering::Relaxed);
             let fingerprint = symthaea_music_theory::fingerprint::exact_fingerprint(&score);
             let duplicate_of = mark_duplicate(&mut seen_fingerprints, fingerprint, id);
-            let renderer = if fluid_wav.is_some() {
+            let render_invocation_observation = fluid_wav
+                .as_ref()
+                .map(|render| render.invocation_observation.clone());
+            let renderer = if fluid_wav
+                .as_ref()
+                .is_some_and(|render| render.wav_bytes.is_some())
+            {
                 "fluidsynth"
             } else {
                 "native"
             };
             let (wav, render_receipt) = match fluid_wav {
-                Some(render) => (render.wav_bytes, Some(render.receipt)),
+                Some(render) => match render.wav_bytes {
+                    Some(bytes) => (bytes, render.receipt),
+                    None => (wav_bytes(&comp.audio).map_err(internal)?, None),
+                },
                 None => (wav_bytes(&comp.audio).map_err(internal)?, None),
             };
             let analysis = symthaea_music_theory::musical_phi(&score);
@@ -2146,6 +2170,7 @@ async fn compose(
                     score,
                     spec: cand_spec,
                     render_receipt: render_receipt.clone(),
+                    render_invocation_observation: render_invocation_observation.clone(),
                     state: state_used.clone(),
                     seed,
                     renderer,
@@ -2719,45 +2744,64 @@ fn fluidsynth_candidate_wav(
     let result = (|| -> Option<FluidCandidateRender> {
         symthaea_muse::midi_export::export_performance_midi(score, spec, seed, state, &path).ok()?;
         let midi_bytes = std::fs::read(&path).ok()?;
-        // The state sliders stay authoritative; the piece's performance dialect only
-        // shifts the room for the selected rendering style.
         let dialect = symthaea_muse::theory_realize::dialect_for_spec(spec);
         let color = symthaea_muse::fluid_render::room_for_dialect(
             symthaea_muse::fluid_render::RenderColor::from_state(state),
             dialect,
         );
-        let attempt = symthaea_muse::fluid_render::render_midi_to_wav_with_observation(
-            &path,
-            SAMPLE_RATE,
-            Some(color),
-        );
-        let wav_bytes = attempt.wav_bytes?;
+
+        let attempt =
+            symthaea_muse::fluid_render::render_midi_to_wav_with_observation_using_paths(
+                &path,
+                SAMPLE_RATE,
+                Some(color),
+                &binary,
+                &soundfont,
+            );
         let invocation_observation = attempt.observation;
+        let invocation_observation_json =
+            serde_json::to_value(&invocation_observation).ok()?;
+
+        // Keep the failed invocation observation even when the Studio falls
+        // back to native rendering. A failed FluidSynth attempt is not erased
+        // by the successful fallback.
+        let Some(wav_bytes) = attempt.wav_bytes else {
+            return Some(FluidCandidateRender {
+                wav_bytes: None,
+                receipt: None,
+                invocation_observation: invocation_observation_json,
+            });
+        };
+
         if invocation_observation.disposition
             != symthaea_muse::fluid_render::FluidSynthInvocationDispositionV1::Rendered
             || !invocation_observation.process_success
             || invocation_observation.process_exit_code != Some(0)
         {
-            return None;
+            return Some(FluidCandidateRender {
+                wav_bytes: None,
+                receipt: None,
+                invocation_observation: invocation_observation_json,
+            });
         }
-        // The observation binds the exact MIDI, executable and SoundFont
-        // hashes before and after the child invocation. It is local process
-        // evidence, not proof of which bytes a hostile host loaded.
+
+        // The observed pre/post digests must bind the exact MIDI and assets.
         let midi_bytes_after = std::fs::read(&path).ok()?;
         if sha256_hex(&midi_bytes_after) != sha256_hex(&midi_bytes) {
-            return None;
+            return Some(FluidCandidateRender {
+                wav_bytes: None,
+                receipt: None,
+                invocation_observation: invocation_observation_json,
+            });
         }
         let executable_sha256 = invocation_observation.executable_sha256_before.as_deref()?;
         let soundfont_sha256 = invocation_observation.soundfont_sha256_before.as_deref()?;
-        let invocation_observation_json =
-            serde_json::to_value(&invocation_observation).ok()?;
         let score_bytes = serde_json::to_vec(score).ok()?;
         let score_sha256 = sha256_hex(&score_bytes);
         let audio_summary = summarize_wav(&wav_bytes).ok()?;
 
         // Map lineage only when complete coverage and exact primary pitches
-        // verify. A failed map stays absent in the receipt; it does not
-        // discard otherwise valid output or claim preservation.
+        // verify. A failed map stays absent; it never claims preservation.
         let map_sha256 = PerformedEventMap::from_midi_bytes(
             &midi_bytes,
             &score_sha256,
@@ -2781,7 +2825,7 @@ fn fluidsynth_candidate_wav(
         });
 
         let render_config_bytes = serde_json::to_vec(&serde_json::json!({
-            "config_version": "muse-fluidsynth-render-config-v1",
+            "config_version": "muse-fluidsynth-render-config-v2",
             "renderer_path": binary.to_string_lossy(),
             "soundfont_path": soundfont.to_string_lossy(),
             "input_midi_path": path.to_string_lossy(),
@@ -2789,6 +2833,7 @@ fn fluidsynth_candidate_wav(
             "output_format": "wav",
             "sample_rate_hz": SAMPLE_RATE,
             "non_interactive": true,
+            "environment_allowlist": invocation_observation.environment,
             "color": {
                 "reverb_room": color.reverb_room,
                 "reverb_level": color.reverb_level,
@@ -2814,8 +2859,13 @@ fn fluidsynth_candidate_wav(
             invocation_observation: Some(&invocation_observation_json),
             performed_event_map_sha256: map_sha256.as_deref(),
             output_wav_bytes: &wav_bytes,
-        }).ok()?;
-        Some(FluidCandidateRender { wav_bytes, receipt })
+        }).ok();
+
+        Some(FluidCandidateRender {
+            wav_bytes: Some(wav_bytes),
+            receipt,
+            invocation_observation: invocation_observation_json,
+        })
     })();
     let _ = std::fs::remove_file(&path);
     result
@@ -4424,6 +4474,21 @@ async fn render_execution_receipt(
         candidate.render_receipt.clone().ok_or(StatusCode::NOT_FOUND)?
     };
     Ok(Json(receipt))
+}
+
+async fn render_invocation_observation(
+    State(studio): State<Arc<Studio>>,
+    AxPath(id): AxPath<u64>,
+) -> Result<Json<serde_json::Value>, StatusCode> {
+    let observation = {
+        let store = studio.candidates.lock().unwrap();
+        let candidate = store.get(&id).ok_or(StatusCode::NOT_FOUND)?;
+        candidate
+            .render_invocation_observation
+            .clone()
+            .ok_or(StatusCode::NOT_FOUND)?
+    };
+    Ok(Json(observation))
 }
 
 async fn listen_bundle(
