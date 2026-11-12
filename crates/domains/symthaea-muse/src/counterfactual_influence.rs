@@ -2044,6 +2044,15 @@ mod tests {
         assert_eq!(report.disposition, InfluenceDisposition::EffectDetected);
         assert!(report.affected_channel_windows > 0);
         assert!(verify_counterfactual_influence(&report, &experiment, &calibration).unwrap());
+
+        let wrong_delta = CounterfactualInfluenceInput {
+            intervention: EventIntervention::Transpose { semitones: 3 },
+            ..experiment
+        };
+        assert_eq!(
+            measure_counterfactual_influence(&wrong_delta, &calibration).unwrap_err(),
+            CounterfactualInfluenceError::CalibrationConfigMismatch
+        );
     }
 
     #[test]
@@ -2115,33 +2124,39 @@ mod tests {
         assert_eq!(base_target.end_frame, changed_target.end_frame);
         assert_eq!(changed_target.midi_note, base_target.midi_note + 2);
 
-        // A target pitch is not permission to change a protected event. The
-        // altered note fails the expected score-indexed pitch inventory before
-        // any acoustic difference can be accepted.
-        let mut altered_track = transposed_event_zero_midi(2);
-        let target_bytes = [0x90, 64, 90];
-        let position = altered_track
-            .windows(target_bytes.len())
-            .position(|window| window == target_bytes)
+        // Target timing is invariant under a pitch-only operation.
+        let changed_target = {
+            let mut row = changed_target.clone();
+            row.onset_frame += 1;
+            row
+        };
+        assert!(!transposed_target_rows_match(
+            &[base_target],
+            &[&changed_target],
+            2,
+        ));
+
+        // Protected events are exact, including note-on ordinal.
+        let baseline_protected = baseline_evidence
+            .performed_event_lineage()
+            .iter()
+            .find(|row| row.source_event_id == "score_event_index:1")
             .unwrap();
-        altered_track[position + 1] = 65;
-        let altered = build_render("transpose-protected-change", &altered_track, &samples);
-        assert_eq!(
-            verify_bound_render_with_pitches(&altered, &samples, &[62, 64], None)
-                .performed_event_lineage()
-                .iter()
-                .find(|row| row.source_event_id == "score_event_index:1")
-                .unwrap()
-                .midi_note,
-            65
-        );
-        assert_ne!(
-            sha256_hex(&[62, 64]),
-            altered.map.events.iter()
-                .find(|row| row.source_event_id == "score_event_index:0")
-                .map(|_| sha256_hex(&[62, 65]))
-                .unwrap()
-        );
+        let counterfactual_protected = valid_evidence
+            .performed_event_lineage()
+            .iter()
+            .find(|row| row.source_event_id == "score_event_index:1")
+            .unwrap();
+        let changed_protected = {
+            let mut row = counterfactual_protected.clone();
+            row.midi_note += 1;
+            row
+        };
+        assert!(!lineage_rows_match(
+            &[baseline_protected],
+            &[&changed_protected],
+            true,
+        ));
     }
 
     #[test]
