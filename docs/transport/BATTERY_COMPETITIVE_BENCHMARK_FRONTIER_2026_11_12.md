@@ -130,7 +130,67 @@ Research basis:
 
 The benchmark should compare an unstructured document binder, exact-version matching, one-axis configuration matching and a six-domain typed equivalence audit. Report false-green inheritance, detection of changed/unknown domains, result-state preservation, missing metrology/criteria, source-digest completeness and deterministic replay. The software's strongest positive disposition is only **candidate for competent human/authority review**. It cannot determine safety, predict propagation, certify a standard or authorize destructive testing.
 
-Draft PR #4881 adds a Rust/schema/fixture audit. Its exact-head focused workflow is skipped while the PR remains draft; compile, test, formatting and Clippy are not yet claimed as passing. Fixture evidence is synthetic.
+Draft PR #4881 adds the Rust/schema/fixture audit. Exact branch head `0a7ac498281d6f1839f16a275bbff4d7fa9996fb` passed its push-triggered focused workflow: schema/fixture validation, locked metadata, formatting, 21/21 tests and strict Clippy (https://github.com/Luminous-Dynamics/symtropy/actions/runs/43257362118). The PR-triggered job remains skipped while the PR is draft. Fixture evidence is synthetic.
+
+## Industry scorecard and benchmark targets
+
+Use public industry numbers to define the comparison boundary, not to claim parity from unlike tests.
+
+### 2025–2026 industrial reality
+
+- Global EV battery deployment reached about **1.2 TWh in 2025**, almost 30% above 2024. China represented 60% of EV battery deployment, and China-headquartered producers supplied almost 75% of global EV battery deployments. This is the scale and supply-chain context, not a performance benchmark. IEA: https://www.iea.org/reports/global-ev-outlook-2026/electric-vehicle-batteries
+- Average battery prices declined 8% in 2025. LFP packs were over 40% cheaper per kWh than NMC on average, but application mix and energy-density requirements matter. China pack prices were 30% below North America and 35% below Europe. IEA's figures are regional/product-mix averages, not a cell-specific procurement quote.
+- More than 4 TWh of global lithium-ion nameplate manufacturing capacity existed at end-2025; China held over 80%. The IEA says average production yields above **90%** are needed to compete in today's battery market and notes that new plants may take more than five years to approach nominal output. Treat >90% as an industry-referenced competitive threshold, not as a measured Luminous or partner yield.
+- Solid-state programmes are progressing, but the IEA notes that longer range and enhanced safety advantages have not yet been demonstrated at scale in real-world applications. Do not present laboratory cell demonstrations or announced future production dates as product qualification.
+
+IEA reference: https://www.iea.org/reports/global-ev-outlook-2026/electric-vehicle-batteries
+
+### Aspirational OEM / government programme comparator
+
+USABC's October 6, 2025 High-Energy EV performance goals specify **cell-level** end-of-life targets under declared conditions: 450 Wh/kg usable specific energy, 850 Wh/L usable energy density, 10-minute fast charge to 80% usable energy at 30°C, 750 dynamic-stress-test cycles with 25% fast charging, 15-year calendar life, 800 W/kg 30-second peak discharge, 300 W/kg regenerative power, $60/kWh at 250,000-unit US production, and more than 70% specific usable energy at -20°C without assistance.
+
+These are **aspirational USABC goals**, not today's industry average and not a pack-level guarantee. The benchmark must match cell/pack mass boundary, usable-energy definition, test protocol, temperature, EOL criterion and volume/cost assumptions before reporting a gap.
+
+Sources:
+- USABC goals page: https://uscar.org/usabc/goals/
+- High-Energy EV targets (version 6 October 2025): https://uscar.org/wp-content/uploads/2025/12/USABC-High-Energy-EV-RFPI.pdf
+
+### Published machine-learning comparator
+
+Discovery Learning reports **7.2% cycle-life test error** on 123 industrial large-format Li-ion pouch cells using features from the first 50 cycles for 51% of prototypes, trained using public datasets of different cell designs. It estimates 98% time and 95% energy savings under its conservative assumptions. This is a strong design-lifetime comparator, but the result is paper-specific: Luminous must reproduce its exact target, feature availability, physical-cell/design split, data rights and metric before claiming parity or improvement. Do not turn its estimate into a measured Luminous saving.
+
+Source: https://www.nature.com/articles/s41586-025-09951-7
+
+### Our competitive tournament
+
+For every candidate method, run the same frozen data/design portfolio and publish separate outcomes:
+
+| Layer | Matched benchmark | Required metrics | Non-comparable shortcuts to reject |
+|---|---|---|---|
+| Cell design | First-1/5/10/20/50-cycle life transfer | MAE/RMSE, relative error, calibration, interval coverage, worst-design error, time-to-EOL and censor-aware score | Randomly shuffled adjacent cycles; pooled-cell leakage |
+| Charging | Same cell, SOC interval, ambient, age and energy boundary | 10–80% / 20–80% time, delivered kWh, thermal derating, energy efficiency, fade and impedance growth | Peak charger kW or different SOC windows presented as equal |
+| Formation | Same exact cell design and process window | Formation hours/kWh, first-cycle efficiency, accepted yield, cell life and downstream charge interaction | Coin-cell-to-pouch extrapolation or recipe-only comparison |
+| Pack/mission | Same topology, duty trace, ambient and reserve | Useful service, mission completion, lower-bound power/energy, limiting-cell attribution, thermal margins | Cell Wh/kg substituted for pack/vehicle performance |
+| Manufacturing | Same line, lot, measurement system and acceptance limits | First-pass yield, scrap/rework, Cp/Cpk, cost per accepted kWh, between-lot variance | One pilot lot used to claim factory capability |
+| Safety / evidence | Same application, test level, article, trigger and standard revision | Evidence completeness, transfer blockers, retest triggers, false-green inheritance | Cross-level/cross-standard pass promotion |
+
+### Numeric targets to pursue
+
+**Software/epistemic gates (must be exact):**
+- zero source/target/lot/line/protocol leakage in preregistered held-out evaluations;
+- zero censored-to-observed EOL promotion;
+- zero probability fabricated from interval endpoints;
+- zero unsupported product/safety evidence inheritance;
+- 100% traceability for all benchmark inputs, model versions, splits, failed/censored/invalid results and resource budgets;
+- deterministic report parity under 100 input permutations.
+
+**Research performance targets (not claims):**
+- Reproduce Discovery Learning's 7.2% task-specific error before attempting to beat it. Then seek a lower error at equal or smaller data/experiment budgets while preserving worst-design error, calibrated uncertainty and physical holdout.
+- Reproduce USABC target dimensions only when we have comparable cell prototypes and valid methods. Treat 450 Wh/kg and 10-minute charge as long-horizon targets, not near-term product claims.
+- For formation/charge co-design, demonstrate a preregistered non-additive interaction and a Pareto improvement on independent lots; set the effect threshold after metrology repeatability and power analysis.
+- For manufacturing, reach and sustain >90% first-pass yield on a qualified production line before cost-parity claims; report accepted-good-cell cost, not theoretical bill-of-materials cost.
+- For sodium-ion, optimize cold-climate useful service and supply resilience; do not attempt to win a lithium-ion energy-density contest on a different system boundary.
+- For thermal propagation, software target is zero false-green evidence transfer; physical acceptance remains standard- and authority-specific.
 
 ## Additional materials frontier: sodium-ion and zero-excess sodium-metal
 
