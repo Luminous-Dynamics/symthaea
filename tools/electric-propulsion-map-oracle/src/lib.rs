@@ -1137,7 +1137,7 @@ mod tests {
 
         assert_eq!(envelope.intersected_cells.len(), 4);
         assert_eq!(envelope.efficiency_lower_bound, 0.835);
-        assert_eq!(envelope.efficiency_upper_bound, 0.865);
+        assert!((envelope.efficiency_upper_bound - 0.865).abs() < 1.0e-12);
     }
 
     #[test]
