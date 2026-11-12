@@ -165,7 +165,7 @@ struct RunReport {
     usable_observation_duration_s: f64,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum BackgroundFailure {
     BackgroundDominated,
     ExactTenDbBoundaryUnspecified,
@@ -345,10 +345,10 @@ fn validate_case(case: &Case) -> Vec<String> {
             {
                 errors.push(format!("run {} window {} has invalid times, duration, SPL or uncertainty", run.run_id, window.window_id));
             }
-            if let Some(end) = previous_end {
-                if window.start_time_s < end {
-                    errors.push(format!("run {} windows overlap or are not chronological at {}", run.run_id, window.window_id));
-                }
+            if let Some(end) = previous_end
+                && window.start_time_s < end
+            {
+                errors.push(format!("run {} windows overlap or are not chronological at {}", run.run_id, window.window_id));
             }
             previous_end = Some(window.end_time_s);
         }
