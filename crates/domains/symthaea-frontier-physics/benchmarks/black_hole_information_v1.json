@@ -308,9 +308,10 @@
         "initial_radiation_entropy_nats": 1e-12,
         "final_complete_radiation_entropy_nats": 1e-10,
         "initial_state_is_not_Haar_equilibrium": true,
-        "initial_charge_sector_exact": true
+        "initial_charge_sector_exact": true,
+        "smaller_complementary_reduction": "For a globally pure state, construct only the smaller side of each B|R cut under the dense reduced-dimension cap. Use Schmidt-spectrum equality for S(B)=S(R) and equal subsystem purity; record the complementarity residual. This avoids materializing a reduced matrix larger than the backend cap."
       },
-      "implementation_status": "U(1)-conserving low-entanglement product-state circuits, sequential factor transfer, domain-wall transport and operator spreading are source-authored; exact-head Rust validation pending",
+      "implementation_status": "product-state sequential factor transfer now evaluates the smaller complementary reduction only; Rust execution pending",
       "source_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/random_circuit_scrambling_v1.json",
       "claim_ceiling": "Finite-dimensional closed qubit-chain unitary circuits and tensor-factor transfer with exact excitation conservation and a symmetry-sector Haar reference. The sequential model starts from a low-entanglement product state. None of these are Hawking radiation, gravitational backreaction, a Page-island/QES calculation, or a four-dimensional black-hole evaporation derivation.",
       "sequential_evaporation_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/sequential_evaporation_u1_v1.json",
@@ -826,7 +827,7 @@
     }
   },
   "implementation_progress": {
-    "source_status": "partial_source_authored_not_executed",
+    "source_status": "partial_source_authored; exact-head focused Rust runner pending",
     "modules": [
       "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs"
     ],
@@ -857,12 +858,14 @@
       "QI_4P_one_step_Petz_recovery": "source_authored_not_executed",
       "QI_4P_unregularized_Hermitian_inverse_square_root": "source_authored_not_executed",
       "QI_4P_Petz_recovery_ensemble_statistics": "source_authored_not_executed",
-      "QI_4P_identity_channel_analytic_control": "source_authored_not_executed"
+      "QI_4P_identity_channel_analytic_control": "source_authored_not_executed",
+      "QI_3_sequential_smaller_complementary_reduction": "source_authored_not_executed; only the smaller subsystem is materialized for each pure-state cut; complementary entropy and purity are reported via Schmidt-spectrum equality",
+      "QI_2S_unequal_block_analytic_control": "source_authored_not_executed; N=4 K=1 A=1 and A=3 return 11/24 nats"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
       "finite_depth_random_circuit_ensembles": "seeded_Haar_U4_brickwork_and_all_to_all_matching_source_authored_not_executed; sequential_evaporation_and_energy_conserving_variants_not_implemented",
-      "sequential_unitary_evaporation_model": "U(1)-conserving sequential factor-transfer source uses a seeded low-entanglement product state in a fixed Hamming-weight sector; Rust execution pending",
+      "sequential_unitary_evaporation_model": "U(1)-conserving sequential factor-transfer source uses a seeded low-entanglement product state in a fixed Hamming-weight sector; only the smaller complementary subsystem is materialized under the 64-dimensional dense limit; Rust execution pending",
       "hayden_preskill_recovery_decoders": "A one-step Petz recovery baseline and ensemble statistics are now source-authored for the four-qubit Haar-U4 channel. No exact SDP optimum, rotated-Petz comparison, charge-sector-aware recovery, scalable decoder circuit, or noise model yet.",
       "mps_entropy_from_validated_schmidt_spectrum": "not_qualified",
       "island_or_qes_calculation": "not_implemented",
@@ -880,7 +883,7 @@
       "formatter": "pinned Rust 1.96 rustfmt normalization succeeded",
       "focused_rust_checks": "not yet rerun on formatter-normalized head",
       "test_inventory": {
-        "black_hole_information_authored_tests": 62
+        "black_hole_information_authored_tests": 63
       },
       "claim_ceiling": "No Rust build, Clippy pass, or Rust test pass is claimed at this head."
     }
