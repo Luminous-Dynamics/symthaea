@@ -568,25 +568,15 @@ impl RuntimeLedger {
         Ok(LedgerState::replay(&self.events)?.revision)
     }
 
-    pub fn current_output_sha256(&self) -> Result<&str, RuntimeError> {
-        match self.events.first() {
-            Some(RuntimeEvent::LedgerInitialized { .. }) => {}
-            _ => return Err(RuntimeError::LedgerNotInitialized),
-        }
-        let state = LedgerState::replay(&self.events)?;
-        // The value is owned by the replay state, so callers should use
-        // current_output_digest() when they need an owned value.
-        let _ = state;
-        match self.events.last() {
-            Some(RuntimeEvent::LedgerInitialized {
-                initial_output_sha256,
-            }) if self.events.len() == 1 => Ok(initial_output_sha256),
-            _ => Err(RuntimeError::InvalidTransition),
-        }
+    /// Return the current committed session head after replaying the ledger.
+    /// An unresolved dispatched/unknown attempt never advances this value.
+    pub fn current_output_sha256(&self) -> Result<Digest, RuntimeError> {
+        Ok(LedgerState::replay(&self.events)?.current_output_sha256)
     }
 
+    /// Backward-compatible descriptive alias for current_output_sha256().
     pub fn current_output_digest(&self) -> Result<Digest, RuntimeError> {
-        Ok(LedgerState::replay(&self.events)?.current_output_sha256)
+        self.current_output_sha256()
     }
 
     pub fn append(&mut self, event: RuntimeEvent) -> Result<(), RuntimeError> {
