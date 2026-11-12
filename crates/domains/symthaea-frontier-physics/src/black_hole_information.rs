@@ -2111,7 +2111,6 @@ pub struct HaydenPreskillDecouplingSummary {
     pub maximum_information_complementarity_residual_nats: f64,
 }
 
-
 /// Operational one-step Petz recovery result. The decoder acts only on the
 /// accessible A=E tensor R register (dimension four); B' is traced out as the
 /// channel environment and never supplied to the recovery map.
@@ -2207,8 +2206,7 @@ fn petz_recovery_from_scrambler(
                     value += channel_kraus[b_prime][intermediate * 2 + message].conj()
                         * inverse_sqrt_rho_a[intermediate * 4 + accessible];
                 }
-                recovery_kraus[b_prime][message * 4 + accessible] =
-                    value * inverse_sqrt_two;
+                recovery_kraus[b_prime][message * 4 + accessible] = value * inverse_sqrt_two;
             }
         }
     }
@@ -2229,8 +2227,8 @@ fn petz_recovery_from_scrambler(
     for row in 0..4 {
         for column in 0..4 {
             let expected = if row == column { 1.0 } else { 0.0 };
-            trace_preservation_residual = trace_preservation_residual
-                .max((completeness[row * 4 + column] - expected).norm());
+            trace_preservation_residual =
+                trace_preservation_residual.max((completeness[row * 4 + column] - expected).norm());
         }
     }
     if trace_preservation_residual > tolerance * 100.0 {
@@ -2291,14 +2289,12 @@ fn complex_matrix4_multiply(left: &ComplexMatrix4, right: &ComplexMatrix4) -> Co
     for row in 0..4 {
         for column in 0..4 {
             for inner in 0..4 {
-                product[row * 4 + column] +=
-                    left[row * 4 + inner] * right[inner * 4 + column];
+                product[row * 4 + column] += left[row * 4 + inner] * right[inner * 4 + column];
             }
         }
     }
     product
 }
-
 
 fn complex_matrix4_scaled(matrix: &ComplexMatrix4, scale: f64) -> ComplexMatrix4 {
     core::array::from_fn(|index| matrix[index] * scale)
@@ -2505,10 +2501,8 @@ mod hayden_preskill_decoupling_tests {
     #[test]
     fn random_hayden_preskill_petz_decoder_uses_only_accessible_system_and_is_trace_preserving() {
         for seed in 0..12 {
-            let sample = simulate_small_hayden_preskill_petz_recovery(
-                0x5045 + seed,
-                TOLERANCE,
-            ).unwrap();
+            let sample =
+                simulate_small_hayden_preskill_petz_recovery(0x5045 + seed, TOLERANCE).unwrap();
             assert!((0.0..=1.0 + TOLERANCE).contains(&sample.entanglement_fidelity));
             assert!(sample.inverse_square_root_residual < TOLERANCE * 100.0);
             assert!(sample.trace_preservation_residual < TOLERANCE * 100.0);
