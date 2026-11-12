@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "manifest_id": "APPAREL-TEXTILE-BENCHMARK-SOURCES-2026-11-12",
-  "purpose": "Versioned source register for research baselines in cloth simulation, robotic garment manipulation, textile sorting and sewing. This manifest does not declare any dataset ingested or authorize redistribution.",
+  "purpose": "Versioned source register for research baselines in cloth simulation, robotic garment manipulation, textile sorting and sewing. This manifest does not declare any dataset ingested or authorize redistribution. This revision adds OpenTextile-NIR, two inverse-design research comparators, a design-sorting mismatch study and a 2026 critical fabric-design review. Reported percentages/metrics are source-specific and must not be treated as universal or reproduced Luminous results.",
   "sources": [
     {
       "source_id": "RGBENCH-REAL-GARMENT-EVAL-V1",
@@ -278,6 +278,140 @@
       ],
       "intended_use": "non-commercial parameter/geometry research subset; supplement, not replacement for the nine-garment real capture benchmark",
       "redistribution_action": "no commercial use or redistribution without explicit license review/permission"
+    },
+    {
+      "source_id": "OPENTEXTILE-NIR-2026",
+      "name": "OpenTextile-NIR — NIR hyperspectral imaging and photography dataset",
+      "source_kind": "multimodal_textile_spectroscopy_dataset",
+      "paper_url": "https://doi.org/10.1016/j.dib.2026.112559",
+      "publication_date": "2026-04",
+      "license_status": "paper_cc_by; verify_exact_dataset_files_and_terms",
+      "public_scope": {
+        "samples": 71,
+        "origin": "post-industrial textiles collected in Finland",
+        "modalities": [
+          "NIR_hyperspectral_images",
+          "RGB_photographs",
+          "sample_metadata",
+          "fibre_composition",
+          "colour"
+        ],
+        "spectra_count_over": 11000000,
+        "annotated_spectra_count_over": 6000000,
+        "representative_sample_spectra_and_RGB_per_sample": true
+      },
+      "known_limitations": [
+        "post-industrial sample domain; transfer to post-consumer mixed garments must be tested",
+        "pixel spectra from a specimen are correlated; never split pixels from one physical sample across train/test",
+        "verify instrument/calibration, exact class balance and file-level reuse terms"
+      ],
+      "intended_use": "spatially resolved fibre/composition recognition, RGB-NIR fusion, sample-level held-out evaluation and calibration analysis",
+      "redistribution_action": "inspect article supplement and repository/data-package license before downloading or redistributing"
+    },
+    {
+      "source_id": "INVERSE-DESIGN-CURVED-YARNS-2026",
+      "name": "Inverse design of personalized textiles with architected curved yarns",
+      "source_kind": "inverse_textile_design_research",
+      "paper_url": "https://doi.org/10.1016/j.matdes.2026.116330",
+      "publication_date": "2026-07",
+      "license_status": "open_access_cc_license_reported; verify_article_and_supplement_terms",
+      "reported_scope": {
+        "architecture": "architected curved yarn textiles",
+        "methods": [
+          "streamline generation with spacing control",
+          "ANN design-space compression",
+          "surrogate-driven gradient optimization"
+        ],
+        "validation": "computational and experimental validation in three case studies"
+      },
+      "known_limitations": [
+        "specific curved-yarn/additive manufacturing design family; not a universal woven/knit inverse-design baseline",
+        "reproduce the declared case studies and test generalization before comparing performance"
+      ],
+      "intended_use": "matched inverse-design comparator for candidate generation, surrogate-driven optimization and physical validation",
+      "redistribution_action": "cite the paper; inspect supplement and license before reusing data or code"
+    },
+    {
+      "source_id": "FABRIC-TENSILE-INVERSE-ML-2026",
+      "name": "Data-driven prediction and inverse design of fabric tensile properties via machine learning",
+      "source_kind": "inverse_textile_design_research",
+      "paper_url": "https://doi.org/10.1016/j.mtcomm.2025.114433",
+      "publication_date": "2026-01",
+      "license_status": "open_access_cc_license_reported; verify_article_and_supplement_terms",
+      "reported_scope": {
+        "method": [
+          "finite-element-generated training data",
+          "DNN surrogate tensile-property prediction",
+          "inverse design of woven-fabric structural parameters"
+        ],
+        "target": "fabric tensile properties"
+      },
+      "known_limitations": [
+        "simulation-generated training data require physical transfer validation",
+        "reported scope is tensile response, not a complete fabric-property or manufacturing qualification"
+      ],
+      "intended_use": "baseline for FEM-to-ML forward prediction and inverse structural design",
+      "redistribution_action": "inspect article and supplement licenses before reuse"
+    },
+    {
+      "source_id": "DESIGN-SORTING-MISMATCH-2026",
+      "name": "Design–sorting mismatch limits circularity in fast-fashion garments",
+      "source_kind": "design_for_sorting_study",
+      "paper_url": "https://doi.org/10.1016/j.spc.2026.09.008",
+      "publication_date": "2026-11",
+      "license_status": "open_access_cc_license_reported; verify_reuse_terms",
+      "reported_scope": {
+        "product_variants": 47522,
+        "sources": [
+          "H&M product data",
+          "Uniqlo product data"
+        ],
+        "result": {
+          "variants_violating_at_least_one_baseline_sorting_rule_percent": 50.3,
+          "sensitivity_range_percent": [
+            45,
+            64
+          ],
+          "reported_barrier_shares_percent": {
+            "unsupported_recognition_scope": 36.4,
+            "more_than_two_fibre_blends": 20,
+            "minor_component_detectability": 17.3,
+            "black_colour_optical_risk_proxy": 13.7,
+            "surface_hidden_material_mismatch": 8.2
+          }
+        }
+      },
+      "known_limitations": [
+        "rule-based compatibility analysis, not physical plant sorting yields",
+        "retailer product-data and selected rules define the population and metric",
+        "reported 50.3% must not be generalized to all garments or all recycling systems without reproduction"
+      ],
+      "intended_use": "design-time sorting-compatibility rules, component visibility, blend detectability and hidden-material mismatch benchmark",
+      "redistribution_action": "reproduce the rule set and audit population definition; review retailer data terms"
+    },
+    {
+      "source_id": "AI-FABRIC-DESIGN-REVIEW-2026",
+      "name": "Artificial intelligence in fabric design: a critical review of technological advancements and socio-creative implications",
+      "source_kind": "systematic_critical_review",
+      "paper_url": "https://doi.org/10.1057/s41599-026-08095-x",
+      "publication_date": "2026-06-30",
+      "license_status": "open_access",
+      "reported_scope": {
+        "studies_reviewed": 65,
+        "literature_window": "2019-2024",
+        "reported_fid_median": {
+          "diffusion_models": 23.4,
+          "GANs": 45.2
+        },
+        "reported_material_property_prediction": "some reviewed DNN studies report R2 above 0.85"
+      },
+      "known_limitations": [
+        "underlying studies are heterogeneous and not a formal pooled meta-analysis",
+        "different architectures, datasets and evaluation conditions limit direct ranking",
+        "literature search closes at 2024; it is a synthesis, not a current 2026 benchmark leaderboard"
+      ],
+      "intended_use": "broad taxonomy, human-AI design workflow, aesthetic-vs-functional metric separation and background baseline",
+      "redistribution_action": "cite and use the study's heterogeneity caveat; no bulk reproduction"
     }
   ],
   "split_policy": [
@@ -288,5 +422,6 @@
     "report source, instrument, material, garment and task strata rather than only one pooled mean"
   ],
   "cross_dataset_rule": "TexSortML visual garment-family labels are not fibre-composition labels. NIR-SORT composition observations are not garment-category labels. Fusion is permitted only with matched item identity, independent measurement provenance and explicit missing/unknown states.",
-  "claim_ceiling": "This source register is a research intake manifest. It does not prove that any dataset has been downloaded, parsed, reproduced, licensed for redistribution, or evaluated by Luminous Dynamics. The companion RGBench garment asset subset is separately licensed for non-commercial research; do not treat its rights as inherited from the CC-BY-4.0 capture set."
+  "claim_ceiling": "This source register is a research intake manifest. It does not prove that any dataset has been downloaded, parsed, reproduced, licensed for redistribution, or evaluated by Luminous Dynamics. The companion RGBench garment asset subset is separately licensed for non-commercial research; do not treat its rights as inherited from the CC-BY-4.0 capture set.",
+  "revision": "2026-11-12-r2"
 }
