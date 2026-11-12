@@ -521,6 +521,81 @@ fn blank_independence_group_does_not_qualify_as_independent_evidence() {
 }
 
 #[test]
+fn whitespace_cannot_split_one_independence_group_into_two() {
+    let mut candidate = profile();
+    let mut supporting = measurement("support", EvidenceOutcome::SignalDetected);
+    supporting.independence_group = Some("shared-acquisition".to_owned());
+    let mut contradicting = measurement("contradict", EvidenceOutcome::NoDetection);
+    contradicting.independence_group = Some("shared-acquisition ".to_owned());
+    candidate.evidence.extend([supporting, contradicting]);
+    let mut property = finding(
+        Property::InformationRetention,
+        PropertyAssessment::InsufficientEvidence,
+        &["support", "contradict"],
+    );
+    property.evidence_conflicts.push(conflict(
+        ConflictResolution::Unresolved,
+        true,
+        &["support"],
+        &["contradict"],
+    ));
+    candidate.findings.push(property);
+
+    let errors = candidate.validate().expect_err("whitespace alias is not independent");
+    assert!(errors.iter().any(|error| error.contains("leading or trailing whitespace")));
+    assert!(errors.iter().any(|error| error.contains("share a common-cause group")));
+}
+
+#[test]
+fn invalid_or_not_acquired_records_cannot_be_conflict_evidence() {
+    let mut candidate = profile();
+    let mut supporting = measurement("support", EvidenceOutcome::InvalidMeasurement);
+    supporting.independence_group = Some("source-a".to_owned());
+    let mut contradicting = measurement("contradict", EvidenceOutcome::SignalDetected);
+    contradicting.independence_group = Some("source-b".to_owned());
+    candidate.evidence.extend([supporting, contradicting]);
+    let mut property = finding(
+        Property::InformationRetention,
+        PropertyAssessment::InsufficientEvidence,
+        &["support", "contradict"],
+    );
+    property.evidence_conflicts.push(conflict(
+        ConflictResolution::Unresolved,
+        true,
+        &["support"],
+        &["contradict"],
+    ));
+    candidate.findings.push(property);
+
+    let errors = candidate.validate().expect_err("invalid measurement cannot support a conflict");
+    assert!(errors.iter().any(|error| error.contains("unusable supporting evidence id support")));
+}
+
+#[test]
+fn not_observable_requires_sourced_instrument_limitation_evidence() {
+    let mut candidate = profile();
+    let mut limitation = measurement("instrument", EvidenceOutcome::InstrumentLimitation);
+    limitation.source_ref = None;
+    candidate.evidence.push(limitation);
+    let mut property = finding(
+        Property::InformationTransfer,
+        PropertyAssessment::NotObservableWithCurrentInstrument,
+        &["instrument"],
+    );
+    property.coverage = Some(coverage());
+    candidate.findings.push(property);
+
+    let errors = candidate
+        .validate()
+        .expect_err("unsourced instrument limitation is not verifiable");
+    assert!(errors.iter().any(|error| error.contains("requires sourced InstrumentLimitation evidence")));
+
+    candidate.evidence[0].source_ref =
+        Some("https://example.org/instrument-capability-spec".to_owned());
+    assert!(candidate.validate().is_ok());
+}
+
+#[test]
 fn unresolved_conflict_blocks_a_definitive_property_disposition() {
     let mut candidate = profile();
     let mut supporting = measurement("support-1", EvidenceOutcome::SignalDetected);
