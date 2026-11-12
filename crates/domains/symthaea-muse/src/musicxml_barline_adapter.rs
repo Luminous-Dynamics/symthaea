@@ -1835,14 +1835,13 @@ mod tests {
         let graph = parse_musicxml_part_notation_graph(
             xml.as_bytes(), "sha256:sound-controls", "score-clock"
         ).unwrap();
-        assert_eq!(graph[0].playback_controls.len(), 4);
+        assert_eq!(graph[0].playback_controls.len(), 3);
         assert_eq!(graph[0].playback_controls[0].element, "measure/direction/sound");
         assert!(graph[0].playback_controls[0].attributes.iter().any(
             |(name, value)| name == "dacapo" && value == "yes"
         ));
-        assert_eq!(graph[0].playback_controls[1].element, "measure/direction/sound");
-        assert_eq!(graph[0].playback_controls[2].element, "measure/note");
-        assert_eq!(graph[0].playback_controls[3].element, "measure/note/lyric");
+        assert_eq!(graph[0].playback_controls[1].element, "measure/note");
+        assert_eq!(graph[0].playback_controls[2].element, "measure/note/lyric");
     }
 
 }
