@@ -136,7 +136,10 @@ impl fmt::Display for QuantumInformationError {
                 f,
                 "normalized squared commutator {value} is outside [0,2] beyond tolerance {tolerance}"
             ),
-            Self::InformationIdentityError { residual, tolerance } => write!(
+            Self::InformationIdentityError {
+                residual,
+                tolerance,
+            } => write!(
                 f,
                 "information complementarity residual {residual} exceeds {tolerance}"
             ),
@@ -1486,9 +1489,7 @@ pub fn simulate_u1_domain_wall_transport(
 
     for layer in 0..=depth {
         let density_before = (0..number_of_qubits)
-            .map(|qubit| {
-                qubit_excitation_expectation(&amplitudes, number_of_qubits, qubit)
-            })
+            .map(|qubit| qubit_excitation_expectation(&amplitudes, number_of_qubits, qubit))
             .collect::<Vec<_>>();
         let mut currents = vec![0.0; number_of_qubits - 1];
         let mut gates_this_layer = 0usize;
@@ -1505,11 +1506,7 @@ pub fn simulate_u1_domain_wall_transport(
                     second,
                     &unitary,
                 )?;
-                let after_left = qubit_excitation_expectation(
-                    &amplitudes,
-                    number_of_qubits,
-                    first,
-                );
+                let after_left = qubit_excitation_expectation(&amplitudes, number_of_qubits, first);
                 currents[first] = before_left - after_left;
                 gates_this_layer += 1;
                 total_two_qubit_gates += 1;
@@ -1517,9 +1514,7 @@ pub fn simulate_u1_domain_wall_transport(
         }
 
         let density_profile = (0..number_of_qubits)
-            .map(|qubit| {
-                qubit_excitation_expectation(&amplitudes, number_of_qubits, qubit)
-            })
+            .map(|qubit| qubit_excitation_expectation(&amplitudes, number_of_qubits, qubit))
             .collect::<Vec<_>>();
         let left_charge: f64 = density_profile[..half].iter().sum();
         let right_charge: f64 = density_profile[half..].iter().sum();
@@ -1539,8 +1534,7 @@ pub fn simulate_u1_domain_wall_transport(
             })
             .fold(0.0_f64, f64::max);
 
-        let norm_squared: f64 =
-            amplitudes.iter().map(|value| value.norm_sqr()).sum();
+        let norm_squared: f64 = amplitudes.iter().map(|value| value.norm_sqr()).sum();
         if !norm_squared.is_finite() {
             return Err(QuantumInformationError::NonFiniteState { index: dimension });
         }
@@ -1550,8 +1544,7 @@ pub fn simulate_u1_domain_wall_transport(
                 tolerance,
             });
         }
-        let (charge_expectation, charge_variance) =
-            total_excitation_moments(&amplitudes);
+        let (charge_expectation, charge_variance) = total_excitation_moments(&amplitudes);
         if (charge_expectation - initial_left_charge).abs() > tolerance
             || charge_variance > tolerance
             || (total_charge - initial_left_charge).abs() > tolerance
@@ -1562,12 +1555,8 @@ pub fn simulate_u1_domain_wall_transport(
             });
         }
         let retained = (0..half).collect::<Vec<_>>();
-        let reduced = DensityMatrix::from_pure_state(
-            &amplitudes,
-            number_of_qubits,
-            &retained,
-            tolerance,
-        )?;
+        let reduced =
+            DensityMatrix::from_pure_state(&amplitudes, number_of_qubits, &retained, tolerance)?;
         let entropy = reduced.von_neumann_entropy(tolerance)?;
         let purity = reduced.diagnostics(tolerance)?.purity;
         samples.push(U1DomainWallTransportSample {
@@ -1619,8 +1608,7 @@ mod u1_domain_wall_transport_tests {
 
     #[test]
     fn depth_zero_domain_wall_has_exact_density_zero_entropy_and_charge() {
-        let result =
-            simulate_u1_domain_wall_transport(8, 4, 0, 0xD0A11, TOLERANCE).unwrap();
+        let result = simulate_u1_domain_wall_transport(8, 4, 0, 0xD0A11, TOLERANCE).unwrap();
         assert_eq!(result.samples.len(), 1);
         let sample = &result.samples[0];
         assert_eq!(
@@ -1636,8 +1624,7 @@ mod u1_domain_wall_transport_tests {
 
     #[test]
     fn domain_wall_layers_preserve_charge_and_report_current_continuity() {
-        let result =
-            simulate_u1_domain_wall_transport(8, 4, 12, 0xD1FF, TOLERANCE).unwrap();
+        let result = simulate_u1_domain_wall_transport(8, 4, 12, 0xD1FF, TOLERANCE).unwrap();
         assert_eq!(result.samples.len(), 13);
         for sample in &result.samples {
             assert!((sample.total_excitation_expectation - 4.0).abs() < TOLERANCE);
@@ -1646,8 +1633,11 @@ mod u1_domain_wall_transport_tests {
             assert!(sample.continuity_max_residual < TOLERANCE);
             assert!(sample.half_chain_entropy_nats >= -TOLERANCE);
             assert!((0.0..=1.0).contains(&sample.half_chain_purity));
-            assert!((sample.left_half_excitation_expectation
-                + sample.cumulative_cut_transport - 4.0).abs() < 1e-8);
+            assert!(
+                (sample.left_half_excitation_expectation + sample.cumulative_cut_transport - 4.0)
+                    .abs()
+                    < 1e-8
+            );
         }
         let final_sample = result.samples.last().unwrap();
         assert!(
@@ -1725,7 +1715,9 @@ pub fn sample_u1_domain_wall_transport_ensemble(
     tolerance: f64,
 ) -> Result<U1DomainWallTransportEnsembleSummary, QuantumInformationError> {
     if sample_count < 2 {
-        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(
+            sample_count,
+        ));
     }
     let mut trajectories = Vec::with_capacity(sample_count);
     for sample_index in 0..sample_count {
@@ -1786,12 +1778,11 @@ pub fn sample_u1_domain_wall_transport_ensemble(
 
             maximum_continuity_residual =
                 maximum_continuity_residual.max(sample.continuity_max_residual);
-            maximum_norm_drift = maximum_norm_drift
-                .max((sample.full_state_norm_squared - 1.0).abs());
+            maximum_norm_drift =
+                maximum_norm_drift.max((sample.full_state_norm_squared - 1.0).abs());
             maximum_charge_drift = maximum_charge_drift
                 .max((sample.total_excitation_expectation - initial_left_excitations as f64).abs());
-            maximum_charge_variance =
-                maximum_charge_variance.max(sample.total_excitation_variance);
+            maximum_charge_variance = maximum_charge_variance.max(sample.total_excitation_variance);
         }
 
         let denominator = (sample_count - 1) as f64;
@@ -1812,14 +1803,14 @@ pub fn sample_u1_domain_wall_transport_ensemble(
             mean_bond_currents: current_mean,
             bond_current_standard_error,
             mean_domain_wall_imbalance: imbalance_mean,
-            domain_wall_imbalance_standard_error:
-                (imbalance_m2 / denominator).sqrt() * inverse_sqrt_count,
+            domain_wall_imbalance_standard_error: (imbalance_m2 / denominator).sqrt()
+                * inverse_sqrt_count,
             mean_cumulative_cut_transport: cut_mean,
-            cumulative_cut_transport_standard_error:
-                (cut_m2 / denominator).sqrt() * inverse_sqrt_count,
+            cumulative_cut_transport_standard_error: (cut_m2 / denominator).sqrt()
+                * inverse_sqrt_count,
             mean_half_chain_entropy_nats: entropy_mean,
-            half_chain_entropy_standard_error:
-                (entropy_m2 / denominator).sqrt() * inverse_sqrt_count,
+            half_chain_entropy_standard_error: (entropy_m2 / denominator).sqrt()
+                * inverse_sqrt_count,
             mean_half_chain_purity: purity_mean,
             maximum_continuity_residual,
             maximum_norm_drift,
@@ -1846,9 +1837,8 @@ mod u1_domain_wall_transport_ensemble_tests {
 
     #[test]
     fn domain_wall_ensemble_reports_profile_transport_entropy_and_uncertainty() {
-        let summary = sample_u1_domain_wall_transport_ensemble(
-            8, 4, 6, 8, 0xE115, TOLERANCE,
-        ).unwrap();
+        let summary =
+            sample_u1_domain_wall_transport_ensemble(8, 4, 6, 8, 0xE115, TOLERANCE).unwrap();
         assert_eq!(summary.layers.len(), 7);
         for layer in &summary.layers {
             assert_eq!(layer.sample_count, 8);
@@ -1862,22 +1852,21 @@ mod u1_domain_wall_transport_ensemble_tests {
             assert!(layer.maximum_charge_variance < TOLERANCE);
             assert!(layer.domain_wall_imbalance_standard_error >= 0.0);
             assert!(layer.half_chain_entropy_standard_error >= 0.0);
-            assert!((layer.mean_density_profile.iter().sum::<f64>() - 4.0).abs()
-                < 1e-9);
-            assert!((layer.mean_cumulative_cut_transport
-                + layer.mean_density_profile[..4].iter().sum::<f64>() - 4.0).abs()
-                < 1e-8);
+            assert!((layer.mean_density_profile.iter().sum::<f64>() - 4.0).abs() < 1e-9);
+            assert!(
+                (layer.mean_cumulative_cut_transport
+                    + layer.mean_density_profile[..4].iter().sum::<f64>()
+                    - 4.0)
+                    .abs()
+                    < 1e-8
+            );
         }
     }
 
     #[test]
     fn domain_wall_ensemble_is_reproducible_for_a_frozen_seed_schedule() {
-        let a = sample_u1_domain_wall_transport_ensemble(
-            8, 4, 4, 4, 0xE115, TOLERANCE,
-        ).unwrap();
-        let b = sample_u1_domain_wall_transport_ensemble(
-            8, 4, 4, 4, 0xE115, TOLERANCE,
-        ).unwrap();
+        let a = sample_u1_domain_wall_transport_ensemble(8, 4, 4, 4, 0xE115, TOLERANCE).unwrap();
+        let b = sample_u1_domain_wall_transport_ensemble(8, 4, 4, 4, 0xE115, TOLERANCE).unwrap();
         assert_eq!(a, b);
     }
 
@@ -1945,8 +1934,10 @@ pub fn simulate_small_hayden_preskill_decoupling(
         &scrambler,
     )?;
 
-    let norm_squared: f64 =
-        amplitudes.iter().map(|amplitude| amplitude.norm_sqr()).sum();
+    let norm_squared: f64 = amplitudes
+        .iter()
+        .map(|amplitude| amplitude.norm_sqr())
+        .sum();
     if !norm_squared.is_finite() {
         return Err(QuantumInformationError::NonFiniteState {
             index: amplitudes.len(),
@@ -1960,13 +1951,8 @@ pub fn simulate_small_hayden_preskill_decoupling(
     }
 
     let entropy_of = |retained: &[usize]| -> Result<f64, QuantumInformationError> {
-        DensityMatrix::from_pure_state(
-            &amplitudes,
-            NUMBER_OF_QUBITS,
-            retained,
-            tolerance,
-        )?
-        .von_neumann_entropy(tolerance)
+        DensityMatrix::from_pure_state(&amplitudes, NUMBER_OF_QUBITS, retained, tolerance)?
+            .von_neumann_entropy(tolerance)
     };
 
     let reference_entropy = entropy_of(&[0])?;
@@ -1976,16 +1962,13 @@ pub fn simulate_small_hayden_preskill_decoupling(
     let reference_accessible_radiation_joint_entropy = entropy_of(&[0, 1, 3])?;
 
     let reference_black_hole_mutual_information =
-        reference_entropy + remaining_black_hole_entropy
-            - reference_black_hole_joint_entropy;
-    let reference_accessible_radiation_mutual_information =
-        reference_entropy + accessible_radiation_entropy
-            - reference_accessible_radiation_joint_entropy;
-    let information_complementarity_residual = (
-        reference_black_hole_mutual_information
-            + reference_accessible_radiation_mutual_information
-            - 2.0 * reference_entropy
-    )
+        reference_entropy + remaining_black_hole_entropy - reference_black_hole_joint_entropy;
+    let reference_accessible_radiation_mutual_information = reference_entropy
+        + accessible_radiation_entropy
+        - reference_accessible_radiation_joint_entropy;
+    let information_complementarity_residual = (reference_black_hole_mutual_information
+        + reference_accessible_radiation_mutual_information
+        - 2.0 * reference_entropy)
         .abs();
 
     for value in [
@@ -1993,10 +1976,7 @@ pub fn simulate_small_hayden_preskill_decoupling(
         reference_accessible_radiation_mutual_information,
     ] {
         if !value.is_finite() || value < -tolerance {
-            return Err(QuantumInformationError::InvalidMutualInformation {
-                value,
-                tolerance,
-            });
+            return Err(QuantumInformationError::InvalidMutualInformation { value, tolerance });
         }
     }
     if information_complementarity_residual > tolerance * 10.0 {
@@ -2019,8 +1999,7 @@ pub fn simulate_small_hayden_preskill_decoupling(
             reference_accessible_radiation_joint_entropy,
         reference_accessible_radiation_mutual_information_nats:
             reference_accessible_radiation_mutual_information.max(0.0),
-        information_complementarity_residual_nats:
-            information_complementarity_residual,
+        information_complementarity_residual_nats: information_complementarity_residual,
     })
 }
 
@@ -2043,7 +2022,9 @@ pub fn sample_small_hayden_preskill_decoupling_ensemble(
     tolerance: f64,
 ) -> Result<HaydenPreskillDecouplingSummary, QuantumInformationError> {
     if sample_count < 2 {
-        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(
+            sample_count,
+        ));
     }
     let mut mean_qb = 0.0;
     let mut m2_qb = 0.0;
@@ -2056,31 +2037,32 @@ pub fn sample_small_hayden_preskill_decoupling_ensemble(
             tolerance,
         )?;
         let count = (sample_index + 1) as f64;
-        let delta_qb =
-            sample.reference_remaining_black_hole_mutual_information_nats - mean_qb;
+        let delta_qb = sample.reference_remaining_black_hole_mutual_information_nats - mean_qb;
         mean_qb += delta_qb / count;
-        m2_qb += delta_qb
-            * (sample.reference_remaining_black_hole_mutual_information_nats - mean_qb);
-        let delta_qa =
-            sample.reference_accessible_radiation_mutual_information_nats - mean_qa;
+        m2_qb +=
+            delta_qb * (sample.reference_remaining_black_hole_mutual_information_nats - mean_qb);
+        let delta_qa = sample.reference_accessible_radiation_mutual_information_nats - mean_qa;
         mean_qa += delta_qa / count;
-        m2_qa += delta_qa
-            * (sample.reference_accessible_radiation_mutual_information_nats - mean_qa);
-        maximum_complementarity_residual = maximum_complementarity_residual
-            .max(sample.information_complementarity_residual_nats);
+        m2_qa +=
+            delta_qa * (sample.reference_accessible_radiation_mutual_information_nats - mean_qa);
+        maximum_complementarity_residual =
+            maximum_complementarity_residual.max(sample.information_complementarity_residual_nats);
     }
     let denominator = (sample_count - 1) as f64;
     Ok(HaydenPreskillDecouplingSummary {
         sample_count,
         first_seed,
         mean_reference_black_hole_mutual_information_nats: mean_qb,
-        standard_error_reference_black_hole_mutual_information_nats:
-            (m2_qb / denominator / sample_count as f64).sqrt(),
+        standard_error_reference_black_hole_mutual_information_nats: (m2_qb
+            / denominator
+            / sample_count as f64)
+            .sqrt(),
         mean_reference_accessible_radiation_mutual_information_nats: mean_qa,
-        standard_error_reference_accessible_radiation_mutual_information_nats:
-            (m2_qa / denominator / sample_count as f64).sqrt(),
-        maximum_information_complementarity_residual_nats:
-            maximum_complementarity_residual,
+        standard_error_reference_accessible_radiation_mutual_information_nats: (m2_qa
+            / denominator
+            / sample_count as f64)
+            .sqrt(),
+        maximum_information_complementarity_residual_nats: maximum_complementarity_residual,
     })
 }
 
@@ -2092,42 +2074,37 @@ mod hayden_preskill_decoupling_tests {
 
     #[test]
     fn one_step_hayden_preskill_toy_preserves_reference_entropy_and_information_balance() {
-        let sample =
-            simulate_small_hayden_preskill_decoupling(0x48A7, TOLERANCE).unwrap();
-        assert!((sample.reference_entropy_nats - core::f64::consts::LN_2).abs()
-            < TOLERANCE);
+        let sample = simulate_small_hayden_preskill_decoupling(0x48A7, TOLERANCE).unwrap();
+        assert!((sample.reference_entropy_nats - core::f64::consts::LN_2).abs() < TOLERANCE);
         assert!((sample.state_norm_squared - 1.0).abs() < TOLERANCE);
-        assert!(sample.reference_remaining_black_hole_mutual_information_nats
-            >= -TOLERANCE);
-        assert!(sample.reference_accessible_radiation_mutual_information_nats
-            >= -TOLERANCE);
-        assert!((sample.reference_black_hole_joint_entropy_nats
-            - sample.accessible_radiation_entropy_nats).abs() < TOLERANCE);
+        assert!(sample.reference_remaining_black_hole_mutual_information_nats >= -TOLERANCE);
+        assert!(sample.reference_accessible_radiation_mutual_information_nats >= -TOLERANCE);
+        assert!(
+            (sample.reference_black_hole_joint_entropy_nats
+                - sample.accessible_radiation_entropy_nats)
+                .abs()
+                < TOLERANCE
+        );
         assert!(sample.information_complementarity_residual_nats < TOLERANCE);
     }
 
     #[test]
     fn one_step_hayden_preskill_toy_is_seed_reproducible() {
-        let first =
-            simulate_small_hayden_preskill_decoupling(0x48A7, TOLERANCE).unwrap();
-        let second =
-            simulate_small_hayden_preskill_decoupling(0x48A7, TOLERANCE).unwrap();
+        let first = simulate_small_hayden_preskill_decoupling(0x48A7, TOLERANCE).unwrap();
+        let second = simulate_small_hayden_preskill_decoupling(0x48A7, TOLERANCE).unwrap();
         assert_eq!(first, second);
     }
 
     #[test]
     fn one_step_hayden_preskill_ensemble_reports_uncertainty_and_complementarity() {
-        let summary = sample_small_hayden_preskill_decoupling_ensemble(
-            32, 0x4850, TOLERANCE,
-        )
-        .unwrap();
+        let summary =
+            sample_small_hayden_preskill_decoupling_ensemble(32, 0x4850, TOLERANCE).unwrap();
         assert_eq!(summary.sample_count, 32);
-        assert!(summary.standard_error_reference_black_hole_mutual_information_nats
-            >= 0.0);
-        assert!(summary.standard_error_reference_accessible_radiation_mutual_information_nats
-            >= 0.0);
-        assert!(summary.maximum_information_complementarity_residual_nats
-            < TOLERANCE);
+        assert!(summary.standard_error_reference_black_hole_mutual_information_nats >= 0.0);
+        assert!(
+            summary.standard_error_reference_accessible_radiation_mutual_information_nats >= 0.0
+        );
+        assert!(summary.maximum_information_complementarity_residual_nats < TOLERANCE);
     }
 
     #[test]
@@ -2140,8 +2117,16 @@ mod hayden_preskill_decoupling_tests {
             residual: 0.02,
             tolerance: 1e-9,
         };
-        assert!(mutual_information.to_string().contains("mutual information"));
-        assert!(identity.to_string().contains("information complementarity residual"));
+        assert!(
+            mutual_information
+                .to_string()
+                .contains("mutual information")
+        );
+        assert!(
+            identity
+                .to_string()
+                .contains("information complementarity residual")
+        );
     }
 
     #[test]
@@ -2201,8 +2186,7 @@ pub fn simulate_u1_operator_spreading(
     let mut operator = vec![Complex64::new(0.0, 0.0); dimension * dimension];
     let source_mask = 1usize << (number_of_qubits - 1 - source_qubit);
     for basis in 0..dimension {
-        operator[basis * dimension + (basis ^ source_mask)] =
-            Complex64::new(1.0, 0.0);
+        operator[basis * dimension + (basis ^ source_mask)] = Complex64::new(1.0, 0.0);
     }
 
     let mut rng = ChaCha20Rng::seed_from_u64(seed);
@@ -2222,11 +2206,8 @@ pub fn simulate_u1_operator_spreading(
         }
     }
 
-    let norm_squared = operator
-        .iter()
-        .map(|value| value.norm_sqr())
-        .sum::<f64>()
-        / dimension as f64;
+    let norm_squared =
+        operator.iter().map(|value| value.norm_sqr()).sum::<f64>() / dimension as f64;
     if !norm_squared.is_finite() || (norm_squared - 1.0).abs() > tolerance * 10.0 {
         return Err(QuantumInformationError::NormalizationError {
             norm_squared,
@@ -2246,8 +2227,7 @@ pub fn simulate_u1_operator_spreading(
             for column in 0..dimension {
                 let z_column = if column & mask == 0 { 1.0 } else { -1.0 };
                 let entry = operator[row * dimension + column];
-                z_commutator_norm +=
-                    (entry * (z_column - z_row)).norm_sqr();
+                z_commutator_norm += (entry * (z_column - z_row)).norm_sqr();
 
                 let right_x = operator[row * dimension + (column ^ mask)];
                 let left_x = operator[flipped_row * dimension + column];
@@ -2312,7 +2292,9 @@ pub fn sample_u1_operator_spreading_ensemble(
     tolerance: f64,
 ) -> Result<U1OperatorSpreadingEnsembleSummary, QuantumInformationError> {
     if sample_count < 2 {
-        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(
+            sample_count,
+        ));
     }
     let mut mean_z = vec![0.0; number_of_qubits];
     let mut m2_z = vec![0.0; number_of_qubits];
@@ -2338,8 +2320,8 @@ pub fn sample_u1_operator_spreading_ensemble(
             mean_x[site] += delta_x / count;
             m2_x[site] += delta_x * (sample.squared_commutator_x[site] - mean_x[site]);
         }
-        maximum_norm_drift = maximum_norm_drift
-            .max((sample.operator_hilbert_schmidt_norm_squared - 1.0).abs());
+        maximum_norm_drift =
+            maximum_norm_drift.max((sample.operator_hilbert_schmidt_norm_squared - 1.0).abs());
     }
     let denominator = (sample_count - 1) as f64;
     let inverse_sqrt_count = 1.0 / (sample_count as f64).sqrt();
@@ -2374,31 +2356,26 @@ mod u1_operator_spreading_ensemble_tests {
 
     #[test]
     fn operator_spreading_ensemble_reports_per_site_uncertainty_and_norm() {
-        let summary = sample_u1_operator_spreading_ensemble(
-            6, 2, 6, 8, 0x0A70, TOLERANCE,
-        )
-        .unwrap();
+        let summary = sample_u1_operator_spreading_ensemble(6, 2, 6, 8, 0x0A70, TOLERANCE).unwrap();
         assert_eq!(summary.sample_count, 8);
         assert_eq!(summary.mean_squared_commutator_z.len(), 6);
         assert_eq!(summary.standard_error_squared_commutator_z.len(), 6);
         assert_eq!(summary.mean_squared_commutator_x.len(), 6);
         assert_eq!(summary.standard_error_squared_commutator_x.len(), 6);
         assert!(summary.maximum_operator_norm_drift < TOLERANCE);
-        assert!(summary
-            .standard_error_squared_commutator_z
-            .iter()
-            .chain(summary.standard_error_squared_commutator_x.iter())
-            .all(|value| *value >= 0.0));
+        assert!(
+            summary
+                .standard_error_squared_commutator_z
+                .iter()
+                .chain(summary.standard_error_squared_commutator_x.iter())
+                .all(|value| *value >= 0.0)
+        );
     }
 
     #[test]
     fn operator_spreading_ensemble_is_seed_reproducible() {
-        let a =
-            sample_u1_operator_spreading_ensemble(6, 2, 4, 4, 0x0A70, TOLERANCE)
-                .unwrap();
-        let b =
-            sample_u1_operator_spreading_ensemble(6, 2, 4, 4, 0x0A70, TOLERANCE)
-                .unwrap();
+        let a = sample_u1_operator_spreading_ensemble(6, 2, 4, 4, 0x0A70, TOLERANCE).unwrap();
+        let b = sample_u1_operator_spreading_ensemble(6, 2, 4, 4, 0x0A70, TOLERANCE).unwrap();
         assert_eq!(a, b);
     }
 
@@ -2478,8 +2455,7 @@ fn conjugate_operator_by_two_qubit_unitary(
             for row in 0..4 {
                 for column in 0..4 {
                     for inner in 0..4 {
-                        left_product[row][column] +=
-                            unitary[row][inner] * block[inner][column];
+                        left_product[row][column] += unitary[row][inner] * block[inner][column];
                     }
                 }
             }
@@ -2511,31 +2487,33 @@ mod u1_operator_spreading_tests {
 
     #[test]
     fn depth_zero_pauli_operator_has_exact_local_commutator_profile() {
-        let sample =
-            simulate_u1_operator_spreading(6, 2, 0, 0x0F70, TOLERANCE).unwrap();
+        let sample = simulate_u1_operator_spreading(6, 2, 0, 0x0F70, TOLERANCE).unwrap();
         assert_eq!(sample.two_qubit_gate_count, 0);
-        assert!((sample.operator_hilbert_schmidt_norm_squared - 1.0).abs()
-            < TOLERANCE);
+        assert!((sample.operator_hilbert_schmidt_norm_squared - 1.0).abs() < TOLERANCE);
         for qubit in 0..6 {
             let expected_z = if qubit == 2 { 2.0 } else { 0.0 };
-            assert!((sample.squared_commutator_z[qubit] - expected_z).abs()
-                < TOLERANCE);
+            assert!((sample.squared_commutator_z[qubit] - expected_z).abs() < TOLERANCE);
             assert!(sample.squared_commutator_x[qubit].abs() < TOLERANCE);
         }
     }
 
     #[test]
     fn u1_operator_spreading_preserves_operator_norm_and_commutator_bounds() {
-        let sample =
-            simulate_u1_operator_spreading(6, 2, 8, 0x07C0, TOLERANCE).unwrap();
-        assert!((sample.operator_hilbert_schmidt_norm_squared - 1.0).abs()
-            < TOLERANCE);
-        assert!(sample
-            .squared_commutator_z
-            .iter()
-            .chain(sample.squared_commutator_x.iter())
-            .all(|value| *value >= -TOLERANCE && *value <= 2.0 + TOLERANCE));
-        assert!(sample.squared_commutator_z.iter().any(|value| *value > 1e-8));
+        let sample = simulate_u1_operator_spreading(6, 2, 8, 0x07C0, TOLERANCE).unwrap();
+        assert!((sample.operator_hilbert_schmidt_norm_squared - 1.0).abs() < TOLERANCE);
+        assert!(
+            sample
+                .squared_commutator_z
+                .iter()
+                .chain(sample.squared_commutator_x.iter())
+                .all(|value| *value >= -TOLERANCE && *value <= 2.0 + TOLERANCE)
+        );
+        assert!(
+            sample
+                .squared_commutator_z
+                .iter()
+                .any(|value| *value > 1e-8)
+        );
     }
 
     #[test]
