@@ -1361,23 +1361,28 @@ mod sequential_evaporation_tests {
         let result = simulate_u1_conserving_sequential_evaporation(
             7, 3, 0x51A7E, TOLERANCE,
         ).unwrap();
-        let mut seen = vec![false; 7];
         for (step, sample) in result.samples.iter().enumerate() {
             assert_eq!(sample.radiation_qubits.len(), step);
             assert_eq!(sample.black_hole_qubits.len(), 7 - step);
+            let mut partition = vec![false; 7];
             for &qubit in &sample.radiation_qubits {
-                assert!(!seen[qubit], "qubit {qubit} was emitted more than once");
-                seen[qubit] = true;
+                assert!(!partition[qubit], "radiation contains a duplicate qubit {qubit}");
+                partition[qubit] = true;
             }
             for &qubit in &sample.black_hole_qubits {
-                assert!(!seen[qubit], "an emitted qubit re-entered the active register");
+                assert!(!partition[qubit], "an emitted qubit re-entered the active register");
+                partition[qubit] = true;
             }
+            assert!(partition.into_iter().all(|present| present));
             assert_eq!(
                 sample.two_qubit_gates_this_step,
                 usize::from(step > 0 && step < 7),
             );
         }
-        assert!(seen.into_iter().all(|emitted| emitted));
+        assert_eq!(
+            result.samples.last().unwrap().radiation_qubits,
+            (0..7).collect::<Vec<_>>(),
+        );
     }
 
     #[test]
