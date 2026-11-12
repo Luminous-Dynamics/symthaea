@@ -555,6 +555,71 @@
         "Future multi-stage, multi-kilowatt/megawatt and >90% efficiency targets are not prototype measurements."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "HTTES-REFRACTORY-950-1800C-MODELLING-2026",
+      "lane": "HIGH_TEMPERATURE_THERMAL_STORAGE",
+      "evidence_class": "PUBLISHED_NUMERICAL_STUDY",
+      "source": {
+        "title": "Refractory-based thermal energy storage for industrial process heat: one-dimensional modeling, control, and optimization",
+        "publisher": "Applied Thermal Engineering",
+        "publication_date": "2026-08",
+        "volume": "303",
+        "article_number": "132078",
+        "doi": "10.1016/j.applthermaleng.2026.132078",
+        "url": "https://doi.org/10.1016/j.applthermaleng.2026.132078",
+        "institutional_record": "https://research-hub.nlr.gov/en/publications/refractory-based-thermal-energy-storage-for-industrial-process-he/"
+      },
+      "observations": [
+        {
+          "metric": "modeled_storage_temperature_min",
+          "value": 950,
+          "unit": "degC"
+        },
+        {
+          "metric": "modeled_storage_temperature_max",
+          "value": 1800,
+          "unit": "degC"
+        },
+        {
+          "metric": "modeled_discharge_power_min",
+          "value": 5,
+          "unit": "MW_thermal"
+        },
+        {
+          "metric": "modeled_discharge_power_max",
+          "value": 30,
+          "unit": "MW_thermal"
+        },
+        {
+          "metric": "modeled_storage_capacity_max",
+          "value": 50,
+          "qualifier": "study analyzed capacities below 50 MWh",
+          "unit": "MWh_thermal",
+          "relation": "less_than"
+        },
+        {
+          "metric": "modeled_indicative_cost_map_min",
+          "value": 1.6,
+          "qualifier": "study-reported cost map; exact capital-cost scope and denominator must be extracted",
+          "unit": "USD_per_kWh"
+        },
+        {
+          "metric": "modeled_indicative_cost_map_max",
+          "value": 2,
+          "qualifier": "study-reported cost map; exact capital-cost scope and denominator must be extracted",
+          "unit": "USD_per_kWh"
+        }
+      ],
+      "source_conclusion": "Peer-reviewed one-dimensional modelling/control/optimization of electrically heated refractory brick sensible-heat storage, including gas-solid heat transfer, fan-assisted discharge, bypass control, reheating logic, fan power, insulation losses and genetic-algorithm geometry/insulation optimization.",
+      "comparison_status": "PUBLISHED_MODELLING_BASELINE_NOT_PLASMA_COMPARISON",
+      "blockers": [
+        "This is a numerical thermal-store study, not a physical trial or independent measured performance series.",
+        "The system uses electrical resistance/Joule heating; it provides a strong non-plasma incumbent, not evidence for plasma heating.",
+        "Extract the exact boundary, capital-cost denominator, power/temperature constraints, uncertainty and data rights before quantitative reproduction.",
+        "Its optimized geometry, fan operation and insulation assumptions must be matched before comparison with another store."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -627,6 +692,16 @@
       "control_id": "NC-DEC-003",
       "condition": "Treat all 17.6 MeV of D-T reaction energy as charged-particle energy available to electrostatic DEC.",
       "expected_disposition": "REJECT_NEUTRON_ALPHA_PARTITION_MISMATCH"
+    },
+    {
+      "control_id": "NC-HTTES-001",
+      "condition": "Treat the 2026 refractory-store modeled temperature, capacity or cost map as a physical prototype measurement.",
+      "expected_disposition": "REJECT_EVIDENCE_CLASS_MISMATCH"
+    },
+    {
+      "control_id": "NC-HTTES-002",
+      "condition": "Claim plasma-heater superiority against the refractory store without matching service, geometry, duration, wall-plug meter boundary and discharge profile.",
+      "expected_disposition": "NOT_COMPARABLE_MATCHED_BASELINE_REQUIRED"
     }
   ],
   "derived_reference_checks": [
