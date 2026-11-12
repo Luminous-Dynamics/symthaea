@@ -97,6 +97,9 @@ pub struct CounterfactualInfluenceIdentity {
     /// Stable identity of the source event being intervened on.
     pub source_event_id: String,
     pub intervention: CounterfactualIntervention,
+    /// Digest of the independently verified symbolic transformation receipt.
+    /// This module binds it but does not interpret or verify that receipt.
+    pub symbolic_intervention_receipt_sha256: String,
     pub baseline_schedule_sha256: String,
     pub counterfactual_schedule_sha256: String,
     /// Commits to renderer binary/assets/configuration/topology as defined by
@@ -112,6 +115,7 @@ pub struct CounterfactualInfluenceContext<'a> {
     pub source_score_sha256: &'a str,
     pub source_event_id: &'a str,
     pub intervention: CounterfactualIntervention,
+    pub symbolic_intervention_receipt_sha256: &'a str,
     pub baseline_schedule_sha256: &'a str,
     pub counterfactual_schedule_sha256: &'a str,
     pub renderer_profile_sha256: &'a str,
@@ -190,6 +194,7 @@ pub enum InfluenceInputError {
     LengthMismatch,
     MissingRepeatRender,
     RepeatReceiptCountMismatch,
+    UnchangedSchedule,
     InvalidSha256(&'static str),
     InvalidEventId,
     InvalidIntervention,
@@ -214,6 +219,9 @@ impl std::fmt::Display for InfluenceInputError {
             Self::MissingRepeatRender => write!(f, "at least one same-schedule repeat render is required"),
             Self::RepeatReceiptCountMismatch => {
                 write!(f, "repeat audio and repeat renderer receipt counts differ")
+            }
+            Self::UnchangedSchedule => {
+                write!(f, "counterfactual schedule digest must differ from the baseline schedule")
             }
             Self::InvalidSha256(field) => write!(f, "invalid SHA-256 field: {field}"),
             Self::InvalidEventId => write!(f, "source event identity is empty, too long or contains controls"),
@@ -409,12 +417,14 @@ pub fn verify_counterfactual_influence_report(
         source_score_sha256: &report.identity.source_score_sha256,
         source_event_id: &report.identity.source_event_id,
         intervention: report.identity.intervention,
+        symbolic_intervention_receipt_sha256: &report.identity.symbolic_intervention_receipt_sha256,
         baseline_schedule_sha256: &report.identity.baseline_schedule_sha256,
         counterfactual_schedule_sha256: &report.identity.counterfactual_schedule_sha256,
         renderer_profile_sha256: &report.identity.renderer_profile_sha256,
         baseline_render_receipt_sha256: &report.identity.baseline_render_receipt_sha256,
         baseline_repeat_receipt_sha256: &repeat_receipts,
         counterfactual_render_receipt_sha256: &report.identity.counterfactual_render_receipt_sha256,
+        symbolic_intervention_receipt_sha256: &report.identity.symbolic_intervention_receipt_sha256,
     };
     let expected = estimate_counterfactual_influence(
         baseline,
@@ -443,8 +453,12 @@ fn validate_context(
         ("renderer_profile_sha256", context.renderer_profile_sha256),
         ("baseline_render_receipt_sha256", context.baseline_render_receipt_sha256),
         ("counterfactual_render_receipt_sha256", context.counterfactual_render_receipt_sha256),
+        ("symbolic_intervention_receipt_sha256", context.symbolic_intervention_receipt_sha256),
     ] {
         validate_sha256(field, value)?;
+    }
+    if context.baseline_schedule_sha256 == context.counterfactual_schedule_sha256 {
+        return Err(InfluenceInputError::UnchangedSchedule);
     }
     if context.baseline_repeat_receipt_sha256.len() != repeat_count {
         return Err(InfluenceInputError::RepeatReceiptCountMismatch);
@@ -457,6 +471,7 @@ fn validate_context(
         source_score_sha256: context.source_score_sha256.to_owned(),
         source_event_id: context.source_event_id.to_owned(),
         intervention: context.intervention,
+        symbolic_intervention_receipt_sha256: context.symbolic_intervention_receipt_sha256.to_owned(),
         baseline_schedule_sha256: context.baseline_schedule_sha256.to_owned(),
         counterfactual_schedule_sha256: context.counterfactual_schedule_sha256.to_owned(),
         renderer_profile_sha256: context.renderer_profile_sha256.to_owned(),
@@ -1029,6 +1044,7 @@ mod tests {
             source_score_sha256: DIGEST_A,
             source_event_id: "score_event_index:3",
             intervention: CounterfactualIntervention::Remove,
+            symbolic_intervention_receipt_sha256: DIGEST_E,
             baseline_schedule_sha256: DIGEST_B,
             counterfactual_schedule_sha256: DIGEST_C,
             renderer_profile_sha256: DIGEST_D,
@@ -1440,6 +1456,26 @@ mod tests {
         .unwrap_err();
 
         assert_eq!(error, InfluenceInputError::InvalidRendererReceipt);
+    }
+
+    #[test]
+    fn unchanged_schedule_digest_rejects_declared_intervention() {
+        let baseline = sine(1024, 16_000, 440.0);
+        let repeat = baseline.clone();
+        let repeat_receipts = [DIGEST_A];
+        let mut invalid = context(&repeat_receipts);
+        invalid.counterfactual_schedule_sha256 = invalid.baseline_schedule_sha256;
+        assert_eq!(
+            estimate_counterfactual_influence(
+                view(&baseline),
+                &[view(&repeat)],
+                view(&baseline),
+                invalid,
+                &calibrated_config()
+            )
+            .unwrap_err(),
+            InfluenceInputError::UnchangedSchedule
+        );
     }
 
     #[test]
