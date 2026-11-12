@@ -338,7 +338,7 @@ fn round_to_six_decimals(value: f64) -> f64 {
 
 fn sha256_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
-    digest.iter().map(|byte| format!("{byte:02x}")).collect()
+    digest.iter().map(|byte| format!("{byte:02x}")).collect::<Vec<_>>().join("")
 }
 
 #[cfg(test)]
