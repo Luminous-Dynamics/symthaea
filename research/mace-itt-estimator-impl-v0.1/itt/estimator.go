@@ -72,9 +72,10 @@ type Estimate struct {
 	IndeterminateArms int `json:"indeterminate_arms"`
 	LowerBound float64 `json:"lower_bound"`
 	UpperBound float64 `json:"upper_bound"`
-	LowerBoundCI *Interval `json:"lower_bound_ci_95"`
-	UpperBoundCI *Interval `json:"upper_bound_ci_95"`
-	ConfidenceIntervalsAvailable bool `json:"confidence_intervals_available"`
+	LowerBoundCI *Interval `json:"lower_bound_ci_97_5_bonferroni"`
+	UpperBoundCI *Interval `json:"upper_bound_ci_97_5_bonferroni"`
+	JointConfidenceRegionLevel float64 `json:"joint_confidence_region_level"`
+	ConfidenceIntervalsAvailable bool `json:"confidence_region_available"`
 }
 
 type EndpointEstimates struct {
@@ -134,7 +135,8 @@ const (
 	endpointCount
 )
 type pairEffect struct { low, high float64; complete bool; indeterminateArms int }
-type taskEffect struct { taskID, domain string; effects [endpointCount]pairEffect; pairs int }
+type taskCompleteness struct { completePairs int; indeterminateArms int }
+type taskEffect struct { taskID, domain string; effects [endpointCount]pairEffect; completeness [endpointCount]taskCompleteness; pairs int }
 
 // EstimateITT computes four independent paired ITT endpoint effects across
 // every preregistered assignment. Task clusters receive equal weight after
@@ -211,7 +213,7 @@ func EstimateITT(pairs []Pair, cfg Config) (Report, error) {
 		for e:=endpoint(0);e<endpointCount;e++{
 			var low,high float64
 			complete,unknownArms:=0,0
-			for _,pair:=range repeated{low+=pair[e].low;high+=pair[e].high;if pair[e].complete{complete++};unknownArms+=pair[e].indeterminateArms}
+			for _,pair:=range repeated{low+=pair[e].low;high+=pair[e].high;if pair[e].complete{complete++};t.completeness[e].completePairs += btoi(pair[e].complete); t.completeness[e].indeterminateArms += pair[e].indeterminateArms; unknownArms+=pair[e].indeterminateArms}
 			n:=float64(len(repeated))
 			t.effects[e]=pairEffect{low:low/n,high:high/n,complete:complete==len(repeated),indeterminateArms:unknownArms}
 		}
@@ -252,9 +254,9 @@ func summarize(tasks []taskEffect,ep endpoint,cfg Config)(Estimate,error){
 	if len(tasks)==0{return Estimate{},ErrEmptyInput}
 	var low,high float64
 	pairCount,completePairs,indeterminateArms:=0,0,0
-	for _,t:=range tasks{low+=t.effects[ep].low;high+=t.effects[ep].high;pairCount+=t.pairs;if t.effects[ep].complete{completePairs+=t.pairs};indeterminateArms+=t.effects[ep].indeterminateArms}
+	for _,t:=range tasks{low+=t.effects[ep].low;high+=t.effects[ep].high;pairCount+=t.pairs;completePairs+=t.completeness[ep].completePairs;indeterminateArms+=t.completeness[ep].indeterminateArms}
 	n:=float64(len(tasks))
-	out:=Estimate{TaskClusters:len(tasks),PairCount:pairCount,CompletePairs:completePairs,IndeterminateArms:indeterminateArms,LowerBound:low/n,UpperBound:high/n}
+	out:=Estimate{TaskClusters:len(tasks),PairCount:pairCount,CompletePairs:completePairs,IndeterminateArms:indeterminateArms,LowerBound:low/n,UpperBound:high/n,JointConfidenceRegionLevel:0.95}
 	if len(tasks)<2{return out,nil}
 	rng:=rand.New(rand.NewSource(cfg.BootstrapSeed+int64(ep)*7919))
 	bootLow,bootHigh:=make([]float64,cfg.BootstrapReplicates),make([]float64,cfg.BootstrapReplicates)
@@ -288,5 +290,9 @@ func validateArm(a Arm)error{
 	return nil
 }
 func isHexDigest(s string)bool{for _,c:=range s{if !(c>='0'&&c<='9')&&!(c>='a'&&c<='f')&&!(c>='A'&&c<='F'){return false}};return true}
-func percentileInterval(v []float64)Interval{sort.Float64s(v);return Interval{Low:quantile(v,.025),High:quantile(v,.975)}}
+// percentileInterval returns a two-sided 97.5% component interval. Bonferroni
+// over the lower and upper identification endpoints gives at least 95%
+// asymptotic joint coverage for the two-endpoint confidence region.
+func percentileInterval(v []float64)Interval{sort.Float64s(v);return Interval{Low:quantile(v,.0125),High:quantile(v,.9875)}}
+func btoi(v bool) int { if v { return 1 }; return 0 }
 func quantile(sorted []float64,p float64)float64{if len(sorted)==0{return math.NaN()};x:=p*float64(len(sorted)-1);i:=int(math.Floor(x));f:=x-float64(i);if i+1>=len(sorted){return sorted[i]};return sorted[i]*(1-f)+sorted[i+1]*f}
