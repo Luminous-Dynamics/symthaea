@@ -82,7 +82,10 @@ struct OperatingPointPair {
     model_reynolds_number: f64,
     full_scale_reynolds_number: f64,
     operating_point_profile_sha256: String,
+    cavitation_pattern: String,
     cavitation_pattern_comparability: String,
+    wake_similarity_disposition: String,
+    water_quality_comparability: String,
     cavitation_pattern_evidence_sha256: String,
     model_raw_trace_sha256: String,
     background_measurement_method: String,
@@ -98,7 +101,8 @@ struct SpectralBand {
     model_upper_hz: f64,
     full_scale_lower_hz: f64,
     full_scale_upper_hz: f64,
-    model_source_level_db: f64,
+    model_signal_plus_background_source_level_db: f64,
+    model_background_source_level_db: f64,
     observed_full_scale_source_level_db: f64,
     signal_to_background_margin_db: f64,
     background_correction_applied: bool,
@@ -108,9 +112,9 @@ struct SpectralBand {
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct BandUncertainty {
-    model_measurement_db: f64,
-    scaling_model_db: f64,
-    full_scale_measurement_db: f64,
+    model_measurement_expanded_uncertainty_db: f64,
+    scaling_model_expanded_uncertainty_db: f64,
+    full_scale_measurement_expanded_uncertainty_db: f64,
     confidence_level: f64,
     composition: String,
     independence_evidence_ref: Option<String>,
@@ -145,6 +149,7 @@ struct BandResult {
     band_id: String,
     signal_to_background_margin_db: f64,
     background_correction_applied: bool,
+    background_corrected_model_source_level_db: Option<f64>,
     predicted_full_scale_source_level_db: Option<f64>,
     observed_full_scale_source_level_db: f64,
     residual_db: Option<f64>,
@@ -215,6 +220,11 @@ fn audit(case: &Case) -> AuditReport {
         && method.spectrum_quantity != "POWER_SPECTRAL_DENSITY"
     {
         blockers.push(format!("unsupported spectrum quantity: {}", method.spectrum_quantity));
+    }
+    if method.bandwidth_convention == "PROPORTIONAL"
+        && method.spectrum_quantity != "POWER_SPECTRUM"
+    {
+        blockers.push("proportional-band scaling requires a power spectrum; PSD is not interchangeable".to_string());
     }
     if method.band_mapping_method != "EXACT_SCALED_BOUNDS" {
         blockers.push("v0.1 supports exact scaled band bounds only; interpolation/rebinning is not qualified".to_string());
@@ -355,11 +365,28 @@ fn audit(case: &Case) -> AuditReport {
             blockers.push(format!("pair {} has unsupported background measurement method", pair.pair_id));
         }
 
+        match pair.cavitation_pattern.as_str() {
+            "SHEET" | "CLOUD" | "BUBBLE" => {}
+            "TIP_VORTEX" | "MIXED" => incomplete.push(format!("pair {} uses tip-vortex or mixed cavitation; Eq. 16 v0.1 does not implement the additional Reynolds-number cavitation-noise correction", pair.pair_id)),
+            "UNKNOWN" => incomplete.push(format!("pair {} has unknown cavitation pattern", pair.pair_id)),
+            other => blockers.push(format!("pair {} has unsupported cavitation pattern: {other}", pair.pair_id)),
+        }
         match pair.cavitation_pattern_comparability.as_str() {
             "MATCHED" => {}
             "MISMATCH" => blockers.push(format!("pair {} declares dissimilar model/full-scale cavitation patterns", pair.pair_id)),
             "PARTIAL" | "UNKNOWN" => incomplete.push(format!("pair {} lacks a demonstrated cavitation-pattern match", pair.pair_id)),
             other => blockers.push(format!("pair {} has unknown cavitation comparability state: {other}", pair.pair_id)),
+        }
+        for (label, disposition) in [
+            ("wake-field similarity", pair.wake_similarity_disposition.as_str()),
+            ("water-quality/cavitation-nuclei comparability", pair.water_quality_comparability.as_str()),
+        ] {
+            match disposition {
+                "MATCHED" => {}
+                "MISMATCH" => blockers.push(format!("pair {} declares {label} mismatch", pair.pair_id)),
+                "PARTIAL" | "UNKNOWN" => incomplete.push(format!("pair {} lacks demonstrated {label}", pair.pair_id)),
+                other => blockers.push(format!("pair {} has invalid {label} disposition: {other}", pair.pair_id)),
+            }
         }
 
         let mut band_ids = BTreeSet::new();
@@ -402,7 +429,8 @@ fn audit(case: &Case) -> AuditReport {
                 || !positive_finite(band.full_scale_upper_hz)
                 || band.model_lower_hz >= band.model_upper_hz
                 || band.full_scale_lower_hz >= band.full_scale_upper_hz
-                || !band.model_source_level_db.is_finite()
+                || !band.model_signal_plus_background_source_level_db.is_finite()
+                || !band.model_background_source_level_db.is_finite()
                 || !band.observed_full_scale_source_level_db.is_finite()
             {
                 blockers.push(format!("pair {} band {} has invalid frequency bounds or level", pair.pair_id, band.band_id));
@@ -417,22 +445,46 @@ fn audit(case: &Case) -> AuditReport {
                 blockers.push(format!("pair {} band {} is not an exact scaled-frequency match", pair.pair_id, band.band_id));
             }
 
+            let calculated_margin = band.model_signal_plus_background_source_level_db
+                - band.model_background_source_level_db;
             if !band.signal_to_background_margin_db.is_finite()
+                || !calculated_margin.is_finite()
                 || band.signal_to_background_margin_db < 0.0
+                || (calculated_margin - band.signal_to_background_margin_db).abs() > 0.05
             {
-                blockers.push(format!("pair {} band {} has an invalid signal/background margin", pair.pair_id, band.band_id));
-            } else if band.signal_to_background_margin_db < 3.0 {
-                incomplete.push(format!("pair {} band {} is background-dominated (<3 dB) and cannot be used for scaling", pair.pair_id, band.band_id));
-            } else if band.signal_to_background_margin_db < 10.0
-                && !band.background_correction_applied
-            {
-                incomplete.push(format!("pair {} band {} requires ITTC background correction in the 3–10 dB margin range", pair.pair_id, band.band_id));
+                blockers.push(format!("pair {} band {} has an invalid or inconsistent measured signal/background margin", pair.pair_id, band.band_id));
             }
+            let background_corrected_model_level = if calculated_margin < 3.0 {
+                incomplete.push(format!("pair {} band {} is background-dominated (<3 dB) and cannot be used for scaling", pair.pair_id, band.band_id));
+                None
+            } else if calculated_margin < 10.0 {
+                if !band.background_correction_applied {
+                    incomplete.push(format!("pair {} band {} requires ITTC energy-domain background subtraction in the 3–10 dB margin range", pair.pair_id, band.band_id));
+                    None
+                } else {
+                    let power_ratio = 10.0_f64.powf(-calculated_margin / 10.0);
+                    let correction_term = 1.0 - power_ratio;
+                    if correction_term <= 0.0 {
+                        blockers.push(format!("pair {} band {} has a non-positive background-subtracted power", pair.pair_id, band.band_id));
+                        None
+                    } else {
+                        Some(band.model_signal_plus_background_source_level_db
+                            + 10.0 * correction_term.log10())
+                    }
+                }
+            } else if band.background_correction_applied {
+                let power_ratio = 10.0_f64.powf(-calculated_margin / 10.0);
+                let correction_term = 1.0 - power_ratio;
+                Some(band.model_signal_plus_background_source_level_db
+                    + 10.0 * correction_term.log10())
+            } else {
+                Some(band.model_signal_plus_background_source_level_db)
+            };
 
             let u = &band.uncertainty;
-            let uncertainty_values_valid = finite_nonnegative(u.model_measurement_db)
-                && finite_nonnegative(u.scaling_model_db)
-                && finite_nonnegative(u.full_scale_measurement_db)
+            let uncertainty_values_valid = finite_nonnegative(u.model_measurement_expanded_uncertainty_db)
+                && finite_nonnegative(u.scaling_model_expanded_uncertainty_db)
+                && finite_nonnegative(u.full_scale_measurement_expanded_uncertainty_db)
                 && u.confidence_level.is_finite()
                 && u.confidence_level > 0.0
                 && u.confidence_level < 1.0;
@@ -447,14 +499,14 @@ fn audit(case: &Case) -> AuditReport {
                             incomplete.push(format!("pair {} band {} requests RSS without independence evidence", pair.pair_id, band.band_id));
                             (None, "UNAVAILABLE".to_string())
                         } else {
-                            let sum = u.model_measurement_db.powi(2)
-                                + u.scaling_model_db.powi(2)
-                                + u.full_scale_measurement_db.powi(2);
+                            let sum = u.model_measurement_expanded_uncertainty_db.powi(2)
+                                + u.scaling_model_expanded_uncertainty_db.powi(2)
+                                + u.full_scale_measurement_expanded_uncertainty_db.powi(2);
                             (Some(sum.sqrt()), "ROOT_SUM_SQUARE_SUPPORTED_INDEPENDENCE".to_string())
                         }
                     }
                     "CONSERVATIVE_LINEAR" => (
-                        Some(u.model_measurement_db + u.scaling_model_db + u.full_scale_measurement_db),
+                        Some(u.model_measurement_expanded_uncertainty_db + u.scaling_model_expanded_uncertainty_db + u.full_scale_measurement_expanded_uncertainty_db),
                         "CONSERVATIVE_LINEAR_BOUND".to_string(),
                     ),
                     other => {
@@ -464,7 +516,10 @@ fn audit(case: &Case) -> AuditReport {
                 }
             };
 
-            let predicted = delta_spl.map(|delta| band.model_source_level_db + delta);
+            let predicted = match (background_corrected_model_level, delta_spl) {
+                (Some(model_level), Some(delta)) => Some(model_level + delta),
+                _ => None,
+            };
             let residual = predicted.map(|value| band.observed_full_scale_source_level_db - value);
             let within = match (residual, combined_u) {
                 (Some(error), Some(limit)) => Some(error.abs() <= limit),
@@ -475,6 +530,7 @@ fn audit(case: &Case) -> AuditReport {
                 band_id: band.band_id.clone(),
                 signal_to_background_margin_db: band.signal_to_background_margin_db,
                 background_correction_applied: band.background_correction_applied,
+                background_corrected_model_source_level_db: background_corrected_model_level,
                 predicted_full_scale_source_level_db: predicted,
                 observed_full_scale_source_level_db: band.observed_full_scale_source_level_db,
                 residual_db: residual,
@@ -645,6 +701,9 @@ mod tests {
         make_measured(&mut case);
         let report = audit(&case);
         assert_eq!(report.structural_disposition, "ELIGIBLE", "{:?}", report.incomplete_reasons);
+        let corrected = report.pair_results[0].band_results[0]
+            .background_corrected_model_source_level_db.expect("background-corrected level");
+        assert!((corrected - 118.349).abs() < 0.01);
         assert_eq!(report.overall_disposition, "VALIDATED_WITHIN_DECLARED_UNCERTAINTY");
         assert!(report.pair_results.iter().flat_map(|p| p.band_results.iter())
             .all(|b| b.within_declared_uncertainty == Some(true)));
@@ -692,6 +751,8 @@ mod tests {
         let mut case = synthetic_case();
         make_measured(&mut case);
         let band = &mut case.operating_point_pairs[0].bands[0];
+        band.model_signal_plus_background_source_level_db = 120.0;
+        band.model_background_source_level_db = 115.0;
         band.signal_to_background_margin_db = 5.0;
         band.background_correction_applied = false;
         let report = audit(&case);
@@ -703,6 +764,8 @@ mod tests {
         let mut case = synthetic_case();
         make_measured(&mut case);
         let band = &mut case.operating_point_pairs[0].bands[0];
+        band.model_signal_plus_background_source_level_db = 120.0;
+        band.model_background_source_level_db = 115.0;
         band.signal_to_background_margin_db = 5.0;
         band.background_correction_applied = true;
         let report = audit(&case);
