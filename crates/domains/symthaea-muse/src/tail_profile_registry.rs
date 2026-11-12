@@ -1154,6 +1154,69 @@ mod tests {
         assert_eq!(upper_order_statistic_rank(59, 950_000, 950_000), Some(59));
     }
 
+
+    #[test]
+    fn quantile_rank_is_minimal_on_a_confidence_grid() {
+        for n in [2usize, 10, 30, 58, 59, 60, 100, 250] {
+            let log_fact = log_factorials(n);
+            for q_ppm in [500_000u32, 900_000, 950_000, 990_000] {
+                for confidence_ppm in [800_000u32, 900_000, 950_000, 990_000] {
+                    let q = q_ppm as f64 / PPM as f64;
+                    let confidence = confidence_ppm as f64 / PPM as f64;
+                    let rank = upper_order_statistic_rank(n, q_ppm, confidence_ppm);
+                    match rank {
+                        Some(k) => {
+                            let current = binomial_cdf_at_most(n, k - 1, q, &log_fact);
+                            assert!(
+                                current + 1e-12 >= confidence,
+                                "rank {k} for n={n}, q={q_ppm}, c={confidence_ppm} did not meet confidence"
+                            );
+                            if k > 1 {
+                                let previous = binomial_cdf_at_most(n, k - 2, q, &log_fact);
+                                assert!(
+                                    previous < confidence + 1e-12,
+                                    "rank {k} was not minimal for n={n}, q={q_ppm}, c={confidence_ppm}"
+                                );
+                            }
+                        }
+                        None => {
+                            let maximum = binomial_cdf_at_most(n, n - 1, q, &log_fact);
+                            assert!(
+                                maximum + 1e-12 < confidence,
+                                "rank should exist for n={n}, q={q_ppm}, c={confidence_ppm}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn clopper_pearson_upper_bound_is_conservative_and_monotone_on_grid() {
+        for trials in [10usize, 30, 59, 100, 250] {
+            for alpha_ppm in [10_000u32, 50_000, 100_000] {
+                let log_fact = log_factorials(trials);
+                let mut previous = 0u32;
+                for failures in 0..trials.min(5) {
+                    let upper = clopper_pearson_upper_ppm(failures, trials, alpha_ppm).unwrap();
+                    assert!(
+                        upper >= previous,
+                        "upper bound decreased when failures increased: n={trials}, alpha={alpha_ppm}"
+                    );
+                    let p_upper = upper as f64 / PPM as f64;
+                    let cdf = binomial_cdf_at_most(trials, failures, p_upper, &log_fact);
+                    let alpha = alpha_ppm as f64 / PPM as f64;
+                    assert!(
+                        cdf <= alpha + 1e-10,
+                        "reported upper bound is not conservative: n={trials}, failures={failures}, alpha={alpha_ppm}, cdf={cdf}"
+                    );
+                    previous = upper;
+                }
+            }
+        }
+    }
+
     #[test]
     fn zero_misses_in_59_qualification_lineages_meets_five_percent_ucb() {
         assert!(clopper_pearson_upper_ppm(0, 59, 50_000).unwrap() <= 50_000);
