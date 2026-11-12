@@ -294,14 +294,6 @@ fn validate_case(case: &Case) -> Vec<String> {
     {
         errors.push("frequency_match_tolerance_fraction must be strictly between 0 and 1".to_string());
     }
-    if case.scaling.bandwidth == Bandwidth::Proportional
-        && case.scaling.representation != SpectrumRepresentation::PowerSpectrum
-    {
-        errors.push(
-            "ITTC proportional-bandwidth exponent table requires power_spectrum representation"
-                .to_string(),
-        );
-    }
     if case.pairs.is_empty() {
         errors.push("at least one matched model/full-scale pair is required".to_string());
     }
@@ -531,6 +523,7 @@ fn audit(case: &Case) -> AuditReport {
                 any_frequency_mismatch = true;
                 band_reports.push(BandReport {
                     band_id: model_band.band_id.clone(),
+                    spl_scale_delta_db: delta_db,
                     model_source_level_db: model_source_level,
                     predicted_full_scale_source_level_db: predicted_full_scale,
                     predicted_interval_lower_db: None,
@@ -559,6 +552,7 @@ fn audit(case: &Case) -> AuditReport {
                 any_unresolved_band = true;
                 band_reports.push(BandReport {
                     band_id: model_band.band_id.clone(),
+                    spl_scale_delta_db: delta_db,
                     model_source_level_db: model_source_level,
                     predicted_full_scale_source_level_db: predicted_full_scale,
                     predicted_interval_lower_db: None,
@@ -592,6 +586,7 @@ fn audit(case: &Case) -> AuditReport {
             }
             band_reports.push(BandReport {
                 band_id: model_band.band_id.clone(),
+                spl_scale_delta_db: delta_db,
                 model_source_level_db: model_source_level,
                 predicted_full_scale_source_level_db: predicted_full_scale,
                 predicted_interval_lower_db: Some(predicted_lower),
