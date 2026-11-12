@@ -1,6 +1,6 @@
 {
   "schema": "luminous.black_hole_information.fixed_charge_page_u1.v1",
-  "status": "analytic_reference_and_independent_numpy_comparator; rust_sampler_authored_not_executed",
+  "status": "small_analytic_sector_controls_corrected_and_extended; Rust sampler authored, execution pending",
   "claim_ceiling": "Finite-dimensional Haar-random pure states restricted to a fixed excitation sector. This fixture is not an evaporating black hole, a local-circuit mixing result, a QES calculation, or evidence for gravitational information recovery.",
   "model": {
     "number_of_qubits": 8,
@@ -46,7 +46,8 @@
     "entropy_units": "nats",
     "exact_symmetry_resolved_page_mean": 2.206170090971405,
     "unconstrained_16x16_page_mean_for_contrast": 2.2748659695882867,
-    "difference_from_unconstrained_reference": 0.06869587861688187
+    "difference_from_unconstrained_reference": 0.06869587861688187,
+    "analytic_small_sector_controls": "N=2,K=1,A=1 gives 1/2; N=4,K=1,A=2 gives 7/12; N=4,K=2,A=2 has charge-block dimensions 1,4,1 and gives 19/20 nats."
   },
   "independent_numpy_comparator": {
     "generator": "normalized iid complex Gaussian amplitudes in the fixed Hamming-weight-4 sector; NumPy PRNG; separate partial-trace/eigenspectrum path",
@@ -85,5 +86,41 @@
     "normalized_mean_deviation",
     "runtime",
     "peak_memory"
+  ],
+  "small_sector_controls": [
+    {
+      "id": "U1-PAGE-CTRL-001",
+      "number_of_qubits": 2,
+      "total_excitations": 1,
+      "subsystem_a_qubits": 1,
+      "charge_block_dimensions": [
+        1,
+        1
+      ],
+      "exact_entropy_nats": 0.5
+    },
+    {
+      "id": "U1-PAGE-CTRL-002",
+      "number_of_qubits": 4,
+      "total_excitations": 1,
+      "subsystem_a_qubits": 2,
+      "charge_block_dimensions": [
+        2,
+        2
+      ],
+      "exact_entropy_nats": 0.5833333333333334
+    },
+    {
+      "id": "U1-PAGE-CTRL-003",
+      "number_of_qubits": 4,
+      "total_excitations": 2,
+      "subsystem_a_qubits": 2,
+      "charge_block_dimensions": [
+        1,
+        4,
+        1
+      ],
+      "exact_entropy_nats": 0.95
+    }
   ]
 }
