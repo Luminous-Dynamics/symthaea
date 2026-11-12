@@ -2344,7 +2344,6 @@ fn complex_hermitian_inverse_sqrt_4(
     let normalized = complex_matrix4_scaled(&matrix, trace.recip());
     let mut y = normalized;
     let mut z = complex_matrix4_identity();
-    let identity = complex_matrix4_identity();
     let mut residual = f64::INFINITY;
     for _iteration in 0..80 {
         let zy = complex_matrix4_multiply(&z, &y);
@@ -2362,7 +2361,6 @@ fn complex_hermitian_inverse_sqrt_4(
             return Ok((complex_matrix4_scaled(&z, trace.sqrt().recip()), residual));
         }
     }
-    let _ = identity;
     Err(QuantumInformationError::EigensolverNonconvergence {
         sweeps: 80,
         residual,
