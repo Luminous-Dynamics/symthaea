@@ -42,6 +42,12 @@ The audit receipt repeats the source dataset ID/digest, evidence kind, scaling m
 
 A research transfer comparison requires at least two model-scale propeller rotation-rate intervals that do not overlap after declared RPM expanded uncertainty is applied. Full-scale observations are compared only at the corresponding ITTC-mapped frequencies and for the same declared band IDs. The model and full-scale source-level records must use the same reference distance (normally 1 m).
 
+## Cavitation-pattern and sensor-provenance gates
+
+Every model/full-scale pair declares a cavitation-pattern class and an explicit comparability state. SHEET, CLOUD and BUBBLE are calculable only when the pattern is declared MATCHED. TIP_VORTEX and MIXED remain INCOMPLETE because the additional Reynolds-number acoustic scaling treatment is not implemented/validated here; UNKNOWN or PARTIAL comparability also remains INCOMPLETE. An explicit pattern mismatch is NOT_COMPARABLE.
+
+The receipt preserves model/full-scale hydrophone instrument IDs, calibration-certificate digests and the model facility-transfer-function evidence digest, in addition to timebase and raw-trace digests. These are identity/provenance references only: v0.1 checks digest syntax but does not authenticate certificates, verify raw trace bytes, resolve the calibration registry or consume the shared calibration/timebase binding receipt from #11641. That registry integration remains a prerequisite for real campaign use.
+
 ## Interpretation and limitations
 
 computational_comparison_only means only that the supplied numerical comparison and declared metadata passed this audit. It is not a validation of physical similarity, CFD, model-scale-to-full-scale generalization, an ISO/ITTC measurement, ecological impact, or improved propeller performance.
