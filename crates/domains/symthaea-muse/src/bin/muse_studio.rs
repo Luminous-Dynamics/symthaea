@@ -2739,9 +2739,21 @@ fn fluidsynth_candidate_wav(
         summarize_wav,
     };
 
-    let (binary, soundfont) = symthaea_muse::fluid_render::available()?;
     let path = fluidsynth_candidate_midi_path(seed);
     let result = (|| -> Option<FluidCandidateRender> {
+        let Some((binary, soundfont)) = symthaea_muse::fluid_render::available() else {
+            let attempt = symthaea_muse::fluid_render::render_midi_to_wav_with_observation(
+                &path,
+                SAMPLE_RATE,
+                None,
+            );
+            let invocation_observation = serde_json::to_value(&attempt.observation).ok()?;
+            return Some(FluidCandidateRender {
+                wav_bytes: None,
+                receipt: None,
+                invocation_observation,
+            });
+        };
         symthaea_muse::midi_export::export_performance_midi(score, spec, seed, state, &path).ok()?;
         let midi_bytes = std::fs::read(&path).ok()?;
         let dialect = symthaea_muse::theory_realize::dialect_for_spec(spec);
