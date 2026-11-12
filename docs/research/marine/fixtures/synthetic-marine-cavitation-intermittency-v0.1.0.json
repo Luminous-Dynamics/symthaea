@@ -155,7 +155,30 @@
         "instrument_id": "synthetic-alpha-meter-1",
         "calibration_certificate_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
         "evidence_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
-        "nuclei_distribution_evidence_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+        "nuclei_distribution": {
+          "measurement_id": "synthetic-nuclei-sample-1",
+          "method_id": "synthetic-laser-optical-nuclei-counter-v1",
+          "instrument_id": "synthetic-nuclei-counter-1",
+          "calibration_certificate_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "sample_volume_ml": 10,
+          "number_concentration_equivalence_tolerance_per_ml": 100,
+          "wasserstein1_equivalence_tolerance_um": 0.1,
+          "bins": [
+            {
+              "diameter_lower_um": 0.5,
+              "diameter_upper_um": 1,
+              "number_concentration_per_ml": 100,
+              "expanded_uncertainty_per_ml": 1
+            },
+            {
+              "diameter_lower_um": 1,
+              "diameter_upper_um": 2,
+              "number_concentration_per_ml": 50,
+              "expanded_uncertainty_per_ml": 1
+            }
+          ]
+        }
       },
       "operating_point_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
       "acoustic_cavitation_sync_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
@@ -293,7 +316,30 @@
         "instrument_id": "synthetic-alpha-meter-1",
         "calibration_certificate_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
         "evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
-        "nuclei_distribution_evidence_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+        "nuclei_distribution": {
+          "measurement_id": "synthetic-nuclei-sample-2",
+          "method_id": "synthetic-laser-optical-nuclei-counter-v1",
+          "instrument_id": "synthetic-nuclei-counter-1",
+          "calibration_certificate_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "evidence_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "sample_volume_ml": 10,
+          "number_concentration_equivalence_tolerance_per_ml": 100,
+          "wasserstein1_equivalence_tolerance_um": 0.1,
+          "bins": [
+            {
+              "diameter_lower_um": 0.5,
+              "diameter_upper_um": 1,
+              "number_concentration_per_ml": 100,
+              "expanded_uncertainty_per_ml": 1
+            },
+            {
+              "diameter_lower_um": 1,
+              "diameter_upper_um": 2,
+              "number_concentration_per_ml": 50,
+              "expanded_uncertainty_per_ml": 1
+            }
+          ]
+        }
       },
       "operating_point_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       "acoustic_cavitation_sync_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
