@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "manifest_id": "APPAREL-TEXTILE-BENCHMARK-SOURCES-2026-11-12",
-  "purpose": "Versioned source register for research baselines in cloth simulation, robotic garment manipulation, textile sorting and sewing. This manifest does not declare any dataset ingested or authorize redistribution. This revision adds OpenTextile-NIR, two inverse-design research comparators, a design-sorting mismatch study and a 2026 critical fabric-design review. Reported percentages/metrics are source-specific and must not be treated as universal or reproduced Luminous results.",
+  "purpose": "Versioned source register for research baselines in cloth simulation, robotic garment manipulation, textile sorting and sewing. This manifest does not declare any dataset ingested or authorize redistribution. This revision adds OpenTextile-NIR, two inverse-design research comparators, a design-sorting mismatch study and a 2026 critical fabric-design review. Reported percentages/metrics are source-specific and must not be treated as universal or reproduced Luminous results. This revision adds apparel scheduling comparators spanning dual-resource MIP/CP/heuristics, textile steam-aware multi-objective RL, source-load coordination, multi-line flow shops and human-centered scheduling. Published case results are scope-specific and are not a common leaderboard.",
   "sources": [
     {
       "source_id": "RGBENCH-REAL-GARMENT-EVAL-V1",
@@ -412,6 +412,158 @@
       ],
       "intended_use": "broad taxonomy, human-AI design workflow, aesthetic-vs-functional metric separation and background baseline",
       "redistribution_action": "cite and use the study's heterogeneity caveat; no bulk reproduction"
+    },
+    {
+      "source_id": "APPAREL-DRC-FJSSP-LCS-2026",
+      "name": "Scheduling a dual-resource flexible job-shop with sequence-dependent setup times: an industrial case study in garment manufacturing",
+      "source_kind": "industrial_scheduling_comparator",
+      "paper_url": "https://doi.org/10.1080/00207543.2026.2711058",
+      "publication_date": "2026",
+      "license_status": "publisher_access_requirements; abstract_public",
+      "reported_scope": {
+        "problem": "dual-resource constrained flexible job-shop scheduling (machines plus operators)",
+        "constraints": [
+          "sequence-dependent machine/operator setups",
+          "operator skills and availability"
+        ],
+        "methods": [
+          "MIP",
+          "constraint programming",
+          "Lowest Continuity Score heuristic"
+        ],
+        "reported_result": "exact methods reported unable to solve instances beyond 200 operations within one hour; LCS heuristic reported within 23% of analytical upper bound across most large-instance classes and below 20% gap in medium/large Q2-Q4"
+      },
+      "known_limitations": [
+        "reported case and upper-bound definition must be reproduced before direct comparison",
+        "not a full multi-stage dyeing/weaving/steam/water factory model",
+        "access to industrial instances may be restricted"
+      ],
+      "intended_use": "matched dual-resource apparel scheduling baseline and industrial scaling challenge",
+      "redistribution_action": "check full-text and industrial-instance reuse terms; do not assume raw instances are open"
+    },
+    {
+      "source_id": "TEXTILE-FJSP-STEAM-RL-2026",
+      "name": "Reinforcement learning-driven multi-objective optimization for energy-efficient flexible job shop scheduling considering steam consumption in textile production",
+      "source_kind": "multiobjective_energy_scheduling_research",
+      "paper_url": "https://doi.org/10.1016/j.swevo.2026.102498",
+      "publication_date": "2026-08",
+      "license_status": "publisher_access_requirements; abstract_public",
+      "reported_scope": {
+        "problem": "energy-efficient flexible job-shop scheduling with steam consumption",
+        "methods": [
+          "state-guided Q-learning-driven multi-objective evolutionary algorithm",
+          "adaptive operator selection"
+        ],
+        "objectives_and_constraints": [
+          "production performance",
+          "electricity/steam energy coordination"
+        ]
+      },
+      "known_limitations": [
+        "reproduce benchmark instances and baseline definitions before claims",
+        "energy results depend on declared steam/electricity model and plant scope"
+      ],
+      "intended_use": "energy-aware multi-objective scheduling comparator after deterministic baselines",
+      "redistribution_action": "verify article access and any supplementary data terms"
+    },
+    {
+      "source_id": "TEXTILE-SOURCE-LOAD-GRL-2025",
+      "name": "Graph reinforcement learning-driven source-load cooperative scheduling optimization for textile production",
+      "source_kind": "industrial_energy_scheduling_research",
+      "paper_url": "https://www.sciencedirect.com/science/article/pii/S2950550X25000275",
+      "publication_date": "2025",
+      "license_status": "data_on_request_reported",
+      "reported_scope": {
+        "method": "graph reinforcement learning / heterogeneous attention graph / PPO",
+        "reported_case": "Shanghai textile enterprise",
+        "reported_results_percent": {
+          "carbon_emissions_reduction": 10.1,
+          "energy_cost_reduction": 2.9,
+          "makespan_increase": 1.1
+        },
+        "reported_comparison": "reported objective differences versus OR-Tools below 4.0%, 2.8% and 0.1% respectively for energy cost, carbon emissions and makespan"
+      },
+      "known_limitations": [
+        "data available on request rather than public benchmark",
+        "case-specific source-load model and energy factor basis",
+        "reproduce functional unit and baseline before comparing"
+      ],
+      "intended_use": "industry result to audit for integrated source-load coordination",
+      "redistribution_action": "do not assume production data or source code are public"
+    },
+    {
+      "source_id": "MULTILINE-GARMENT-FLOW-SHOP-2026",
+      "name": "Scheduling challenges in multi-line garment production: Application to an Algerian case study",
+      "source_kind": "multi_line_textile_scheduling_research",
+      "paper_url": "https://doi.org/10.1016/j.procs.2026.02.164",
+      "publication_date": "2026",
+      "license_status": "open_access_cc_license_reported; verify_supplement_terms",
+      "reported_scope": {
+        "problem": "dedicated multi-line flow shop",
+        "constraints": [
+          "lot streaming",
+          "heterogeneous workforce assignment"
+        ],
+        "methods": [
+          "MILP benchmark",
+          "enhanced genetic algorithm"
+        ],
+        "objective": "makespan"
+      },
+      "known_limitations": [
+        "specific company and Algerian case study",
+        "objective scope must be matched; does not alone cover energy/water or lifecycle evidence"
+      ],
+      "intended_use": "multi-line route scheduling and large-instance GA comparator",
+      "redistribution_action": "inspect article/supplement and any instance files before reuse"
+    },
+    {
+      "source_id": "APPAREL-SCHEDULING-REVIEW-2026",
+      "name": "Scheduling problems in the apparel industries: a systematic literature review",
+      "source_kind": "systematic_literature_review",
+      "paper_url": "https://doi.org/10.1108/RJTA-09-2025-0213",
+      "publication_date": "2026",
+      "license_status": "licensed_reuse_rights_only",
+      "reported_scope": {
+        "studies_included": 82,
+        "initial_records_screened": 340,
+        "literature_window": "2005-2025",
+        "focus": [
+          "cutting",
+          "sewing",
+          "scheduling",
+          "human-centered and Industry 4.0 developments"
+        ]
+      },
+      "known_limitations": [
+        "English-language selected-database literature review",
+        "review evidence rather than performance dataset"
+      ],
+      "intended_use": "industrial scheduling taxonomy and baseline families",
+      "redistribution_action": "cite abstract/metadata only unless licensed full-text access"
+    },
+    {
+      "source_id": "HUMAN-CENTERED-GARMENT-SCHEDULING-2025",
+      "name": "Enhancing garment manufacturing efficiency through human-centered scheduling",
+      "source_kind": "human_centered_scheduling_research",
+      "paper_url": "https://doi.org/10.1007/s11740-025-01349-8",
+      "publication_date": "2025-05-14",
+      "license_status": "open_access",
+      "reported_scope": {
+        "problem": "Garment Flexible Manufacturing System scheduling",
+        "methods": "three-phase order prioritization, job selection and workstation matching",
+        "factors": [
+          "worker skills",
+          "historical performance",
+          "ergonomic considerations"
+        ]
+      },
+      "known_limitations": [
+        "case and method-specific evidence; requires matched human/workstation constraints",
+        "not a general operator-wellbeing certification method"
+      ],
+      "intended_use": "human-centered scheduling comparator and workforce constraint taxonomy",
+      "redistribution_action": "cite paper; check supplementary dataset rights"
     }
   ],
   "split_policy": [
@@ -423,5 +575,5 @@
   ],
   "cross_dataset_rule": "TexSortML visual garment-family labels are not fibre-composition labels. NIR-SORT composition observations are not garment-category labels. Fusion is permitted only with matched item identity, independent measurement provenance and explicit missing/unknown states.",
   "claim_ceiling": "This source register is a research intake manifest. It does not prove that any dataset has been downloaded, parsed, reproduced, licensed for redistribution, or evaluated by Luminous Dynamics. The companion RGBench garment asset subset is separately licensed for non-commercial research; do not treat its rights as inherited from the CC-BY-4.0 capture set.",
-  "revision": "2026-11-12-r2"
+  "revision": "2026-11-12-r3"
 }
