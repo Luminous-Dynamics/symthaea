@@ -1043,7 +1043,9 @@
         "The paper omits lower-reactivity secondary reaction channels and states that plasma stability/ignition physics are outside its scope.",
         "The source's simplified geometry and reaction-rate assumptions must be preserved in any reproduction."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "particle_energy_origin": "FUSION_BORN_PRIMARY_DHE3_AND_DD_SIDE_REACTION_PRODUCTS",
+      "fusion_born_output_demonstrated": false
     }
   ],
   "negative_controls": [
