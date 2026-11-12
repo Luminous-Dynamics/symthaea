@@ -224,6 +224,11 @@ fn audit(case: &Case) -> AuditReport {
     if method.bandwidth_convention == "PROPORTIONAL"
         && method.spectrum_quantity != "POWER_SPECTRUM"
     {
+        blockers.push("proportional-band scaling requires a power spectrum; power spectral density is not interchangeable".to_string());
+    }
+    if method.bandwidth_convention == "PROPORTIONAL"
+        && method.spectrum_quantity != "POWER_SPECTRUM"
+    {
         blockers.push("proportional-band scaling requires a power spectrum; PSD is not interchangeable".to_string());
     }
     if method.band_mapping_method != "EXACT_SCALED_BOUNDS" {
@@ -281,9 +286,6 @@ fn audit(case: &Case) -> AuditReport {
 
     if !campaign.background_measurement_per_condition_available {
         incomplete.push("background noise was not declared measured for every model test condition".to_string());
-    }
-    if !campaign.facility_transfer_function_applied {
-        incomplete.push("model facility acoustic transfer-function correction is not declared as applied".to_string());
     }
 
     let full = &case.full_scale_trial;
@@ -839,6 +841,15 @@ mod tests {
         let mut case = synthetic_case();
         make_measured(&mut case);
         case.method.band_mapping_method = "INTERPOLATE_NEAREST".to_string();
+        let report = audit(&case);
+        assert_eq!(report.structural_disposition, "INVALID");
+    }
+
+    #[test]
+    fn proportional_bandwidth_cannot_use_power_spectral_density() {
+        let mut case = synthetic_case();
+        make_measured(&mut case);
+        case.method.spectrum_quantity = "POWER_SPECTRAL_DENSITY".to_string();
         let report = audit(&case);
         assert_eq!(report.structural_disposition, "INVALID");
     }
