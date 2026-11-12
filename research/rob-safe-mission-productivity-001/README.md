@@ -15,8 +15,8 @@ The evaluator therefore reports separate measures:
 - task completions and physical safe-success;
 - evidence-qualified safe-success (qualified thermal and recovery receipts plus causal application closure);
 - SLO-qualified missions (evidence-qualified safe-success, no critical deadline miss and no service-floor breach);
-- task-class useful work per GPU-hour, using the task class's exact declared work unit;
-- per-robot starvation, service-floor breaches, deadline misses and causal closure;
+- task-class useful work per GPU-hour and per robot-hour, using the task class's exact declared work unit;
+- per-robot starvation, service-floor breaches, hard-safety/deadline misses and causal closure;
 - energy evidence coverage and measured joules, kept separate from productivity;
 - actuator-application causal closure, weighted by application counts rather than averaging mission percentages.
 
@@ -26,7 +26,7 @@ Failed, incomplete and unsafe missions remain in the denominator for throughput/
 
 Candidate/baseline comparisons require one-to-one pair_id matches and exact equality of the frozen workload, scenario, seed, initial state, robot, model, local control policy, hardware, observation budget and compute budget. Only the scheduler arm is allowed to differ.
 
-The report retains a vector per task class and per robot. It does not combine unlike task units or produce one fleet-wide weighted winner. A candidate is non-inferior only when declared safe-success, SLO-success, deadline, hard-violation, service-floor and causal-closure margins hold for every task class and robot. Productivity dominance is reported only when non-inferiority holds, no task class loses productivity, and at least one task class improves.
+The report retains a vector per task class and per robot, including per-robot hard-safety regressions. It does not combine unlike task units or produce one fleet-wide weighted winner. A candidate is non-inferior only when declared safe-success, SLO-success, deadline, hard-violation, service-floor and causal-closure margins hold for every task class and robot. Productivity dominance is reported only when non-inferiority holds, no task class loses productivity, and at least one task class improves.
 
 Energy, joules, EVSI, regret, latency and task work remain distinct quantities. Energy is a separate evidence/measurement coverage vector, not a productivity conversion factor.
 
@@ -46,7 +46,7 @@ Causal closure is derived as:
 
 It is weighted by the actual application denominator. It is not the unweighted mean of mission percentages. No actuator application means no causal-closure percentage and cannot earn SLO productivity credit.
 
-The task-class productivity rate is reported in fixed-point milli-work-units per GPU-hour. The denominator includes all GPU service consumed by that task class, including failed missions. Work units from different task classes are never pooled.
+Task-class productivity is reported in two independent rates: fixed-point milli-work-units per GPU-hour and per robot-hour. Both denominators include all consumed GPU service / elapsed mission time for that task class, including failed missions. Work units from different task classes are never pooled.
 
 ## Industry comparison matrix
 
