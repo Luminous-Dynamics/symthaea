@@ -452,12 +452,12 @@ pub fn plan_retention(
             .checked_add(context.token_count)
             .ok_or(RetentionError::TokenArithmeticOverflow)?;
     }
-    if let Some(scale) = request.required_loss_scale_id.as_deref() {
-        if scale.trim().is_empty() {
-            return Err(RetentionError::InvalidDecisionEvidence(
-                "<request-loss-scale>".to_owned(),
-            ));
-        }
+    if let Some(scale) = request.required_loss_scale_id.as_deref()
+        && scale.trim().is_empty()
+    {
+        return Err(RetentionError::InvalidDecisionEvidence(
+            "<request-loss-scale>".to_owned(),
+        ));
     }
 
     let mut candidates: Vec<&ContextEntry> = Vec::new();
@@ -587,13 +587,9 @@ mod tests {
     fn context(
         id: &str,
         tokens: u64,
-        last_access_tick: u64,
-        regret: u64,
-        recovery_critical: bool,
-        phase: u32,
-        reuse: u32,
-        prefill: u64,
+        fixture: (u64, u64, bool, u32, u32, u64),
     ) -> ContextEntry {
+        let (last_access_tick, regret, recovery_critical, phase, reuse, prefill) = fixture;
         ContextEntry {
             context_id: id.to_owned(),
             token_count: tokens,
@@ -636,9 +632,9 @@ mod tests {
 
     #[test]
     fn hard_pinned_context_is_never_evicted() {
-        let mut pinned = context("safety", 40, 1, 0, false, 0, 0, 1);
+        let mut pinned = context("safety", 40, (1, 0, false, 0, 0, 1));
         pinned.hard_pin_reason = Some("local-rta-state".to_owned());
-        let normal = context("normal", 40, 2, 1, false, 100, 100, 5);
+        let normal = context("normal", 40, (2, 1, false, 100, 100, 5));
         let plan = plan_retention(
             RetentionPolicy::LuminousDecisionRecoveryAware,
             &request(80, 40),
@@ -653,9 +649,9 @@ mod tests {
 
     #[test]
     fn unknown_decision_impact_is_protected_not_zero() {
-        let mut unknown = context("unknown", 40, 1, 0, false, 0, 0, 1);
+        let mut unknown = context("unknown", 40, (1, 0, false, 0, 0, 1));
         unknown.decision_impact = DecisionImpact::Unknown;
-        let normal = context("normal", 40, 2, 2, false, 100, 100, 5);
+        let normal = context("normal", 40, (2, 2, false, 100, 100, 5));
         let plan = plan_retention(
             RetentionPolicy::LuminousDecisionRecoveryAware,
             &request(80, 40),
@@ -673,14 +669,14 @@ mod tests {
 
     #[test]
     fn expired_decision_impact_is_protected() {
-        let mut expired = context("expired", 40, 1, 0, false, 0, 0, 1);
+        let mut expired = context("expired", 40, (1, 0, false, 0, 0, 1));
         if let DecisionImpact::Qualified {
             valid_through_tick, ..
         } = &mut expired.decision_impact
         {
             *valid_through_tick = 9;
         }
-        let normal = context("normal", 40, 2, 2, false, 100, 100, 5);
+        let normal = context("normal", 40, (2, 2, false, 100, 100, 5));
         let plan = plan_retention(
             RetentionPolicy::LuminousDecisionRecoveryAware,
             &request(80, 40),
@@ -698,8 +694,8 @@ mod tests {
 
     #[test]
     fn low_regret_non_recovery_context_precedes_high_regret_recovery_context() {
-        let low = context("low", 40, 100, 1, false, 50, 200_000, 5);
-        let recovery = context("recovery", 40, 1, 900, true, 900_000, 900_000, 500);
+        let low = context("low", 40, (100, 1, false, 50, 200_000, 5));
+        let recovery = context("recovery", 40, (1, 900, true, 900_000, 900_000, 500));
         let plan = plan_retention(
             RetentionPolicy::LuminousDecisionRecoveryAware,
             &request(80, 40),
@@ -711,7 +707,7 @@ mod tests {
 
     #[test]
     fn lru_control_can_choose_different_victim_than_luminous() {
-        let low_regret_recent = context("low-regret-recent", 40, 90, 1, false, 50, 200_000, 5);
+        let low_regret_recent = context("low-regret-recent", 40, (90, 1, false, 50, 200_000, 5));
         let high_regret_old_recovery = context(
             "high-regret-old-recovery",
             40,
@@ -736,8 +732,8 @@ mod tests {
 
     #[test]
     fn phase_affinity_control_evicts_low_next_phase_affinity() {
-        let high_affinity = context("high-phase", 40, 1, 0, false, 990_000, 800_000, 20);
-        let low_affinity = context("low-phase", 40, 100, 0, false, 10_000, 800_000, 20);
+        let high_affinity = context("high-phase", 40, (1, 0, false, 990_000, 800_000, 20));
+        let low_affinity = context("low-phase", 40, (100, 0, false, 10_000, 800_000, 20));
         let plan = plan_retention(
             RetentionPolicy::PhaseAffinity,
             &request(80, 40),
@@ -749,8 +745,8 @@ mod tests {
 
     #[test]
     fn transition_reuse_control_evicts_low_reuse_probability() {
-        let high_reuse = context("high-reuse", 40, 1, 0, false, 500_000, 990_000, 20);
-        let low_reuse = context("low-reuse", 40, 100, 0, false, 500_000, 10_000, 20);
+        let high_reuse = context("high-reuse", 40, (1, 0, false, 500_000, 990_000, 20));
+        let low_reuse = context("low-reuse", 40, (100, 0, false, 500_000, 10_000, 20));
         let plan = plan_retention(
             RetentionPolicy::TransitionReuse,
             &request(80, 40),
@@ -762,8 +758,8 @@ mod tests {
 
     #[test]
     fn recovery_critical_context_is_last_to_evict() {
-        let normal = context("normal", 40, 100, 10, false, 10_000, 10_000, 1);
-        let recovery = context("recovery", 40, 1, 10, true, 10_000, 10_000, 1);
+        let normal = context("normal", 40, (100, 10, false, 10_000, 10_000, 1));
+        let recovery = context("recovery", 40, (1, 10, true, 10_000, 10_000, 1));
         let plan = plan_retention(
             RetentionPolicy::LuminousDecisionRecoveryAware,
             &request(80, 40),
@@ -775,7 +771,7 @@ mod tests {
 
     #[test]
     fn incomparable_loss_scales_reject_global_regret_order() {
-        let mut other = context("other", 40, 2, 1, false, 100, 100, 5);
+        let mut other = context("other", 40, (2, 1, false, 100, 100, 5));
         if let DecisionImpact::Qualified { loss_scale_id, .. } = &mut other.decision_impact {
             *loss_scale_id = "other-task-loss".to_owned();
         }
@@ -783,7 +779,7 @@ mod tests {
             plan_retention(
                 RetentionPolicy::LuminousDecisionRecoveryAware,
                 &request(80, 40),
-                &[context("a", 40, 1, 1, false, 0, 0, 1), other],
+                &[context("a", 40, (1, 1, false, 0, 0, 1)), other],
             ),
             Err(RetentionError::IncomparableLossScales { .. })
         ));
@@ -791,8 +787,8 @@ mod tests {
 
     #[test]
     fn baselines_do_not_compare_unrelated_loss_scales() {
-        let a = context("a", 40, 1, 1, false, 100, 100, 1);
-        let mut b = context("b", 40, 2, 2, false, 100, 100, 2);
+        let a = context("a", 40, (1, 1, false, 100, 100, 1));
+        let mut b = context("b", 40, (2, 2, false, 100, 100, 2));
         if let DecisionImpact::Qualified { loss_scale_id, .. } = &mut b.decision_impact {
             *loss_scale_id = "other-task-loss".to_owned();
         }
@@ -805,9 +801,9 @@ mod tests {
 
     #[test]
     fn protected_capacity_excess_defers_without_partial_eviction() {
-        let mut hard = context("hard", 60, 1, 0, false, 100, 100, 1);
+        let mut hard = context("hard", 60, (1, 0, false, 100, 100, 1));
         hard.hard_pin_reason = Some("local-rta".to_owned());
-        let mut unknown = context("unknown", 30, 2, 0, false, 100, 100, 1);
+        let mut unknown = context("unknown", 30, (2, 0, false, 100, 100, 1));
         unknown.decision_impact = DecisionImpact::Unknown;
         let plan = plan_retention(
             RetentionPolicy::LuminousDecisionRecoveryAware,
@@ -825,7 +821,7 @@ mod tests {
 
     #[test]
     fn enough_capacity_requires_no_eviction() {
-        let contexts = vec![context("a", 20, 1, 1, false, 100, 100, 1)];
+        let contexts = vec![context("a", 20, (1, 1, false, 100, 100, 1))];
         let plan = plan_retention(
             RetentionPolicy::LuminousDecisionRecoveryAware,
             &request(100, 20),
@@ -839,8 +835,8 @@ mod tests {
 
     #[test]
     fn duplicate_context_ids_are_rejected() {
-        let a = context("same", 20, 1, 1, false, 100, 100, 1);
-        let b = context("same", 20, 2, 2, false, 100, 100, 1);
+        let a = context("same", 20, (1, 1, false, 100, 100, 1));
+        let b = context("same", 20, (2, 2, false, 100, 100, 1));
         assert_eq!(
             plan_retention(
                 RetentionPolicy::LuminousDecisionRecoveryAware,
@@ -853,7 +849,7 @@ mod tests {
 
     #[test]
     fn invalid_ppm_probability_is_rejected() {
-        let mut a = context("a", 40, 1, 1, false, 100, 100, 1);
+        let mut a = context("a", 40, (1, 1, false, 100, 100, 1));
         a.future_reuse_probability_ppm = Some(1_000_001);
         assert!(matches!(
             plan_retention(
@@ -867,8 +863,8 @@ mod tests {
 
     #[test]
     fn token_sum_overflow_is_rejected() {
-        let a = context("a", u64::MAX, 1, 1, false, 100, 100, 1);
-        let b = context("b", 1, 2, 1, false, 100, 100, 1);
+        let a = context("a", u64::MAX, (1, 1, false, 100, 100, 1));
+        let b = context("b", 1, (2, 1, false, 100, 100, 1));
         assert_eq!(
             plan_retention(RetentionPolicy::Lru, &request(u64::MAX, 1), &[a, b],),
             Err(RetentionError::TokenArithmeticOverflow)
@@ -877,9 +873,9 @@ mod tests {
 
     #[test]
     fn missing_phase_affinity_is_protected_for_phase_policy() {
-        let mut a = context("a", 40, 1, 1, false, 100, 100, 1);
+        let mut a = context("a", 40, (1, 1, false, 100, 100, 1));
         a.phase_affinity_ppm = None;
-        let b = context("b", 40, 2, 2, false, 100, 100, 1);
+        let b = context("b", 40, (2, 2, false, 100, 100, 1));
         let plan =
             plan_retention(RetentionPolicy::PhaseAffinity, &request(80, 40), &[a, b]).unwrap();
         assert_eq!(ids(&plan), vec!["b"]);
@@ -892,9 +888,9 @@ mod tests {
 
     #[test]
     fn missing_prefill_cost_is_protected_for_luminous_policy() {
-        let mut a = context("a", 40, 1, 1, false, 100, 100, 1);
+        let mut a = context("a", 40, (1, 1, false, 100, 100, 1));
         a.prefill_latency_ticks = None;
-        let b = context("b", 40, 2, 2, false, 100, 100, 2);
+        let b = context("b", 40, (2, 2, false, 100, 100, 2));
         let plan = plan_retention(
             RetentionPolicy::LuminousDecisionRecoveryAware,
             &request(80, 40),
@@ -911,7 +907,7 @@ mod tests {
 
     #[test]
     fn invalid_decision_evidence_rejects_instead_of_becoming_zero() {
-        let mut a = context("a", 40, 1, 0, false, 100, 100, 1);
+        let mut a = context("a", 40, (1, 0, false, 100, 100, 1));
         a.decision_impact = DecisionImpact::Invalid;
         assert_eq!(
             plan_retention(
@@ -925,9 +921,9 @@ mod tests {
 
     #[test]
     fn recovery_critical_without_recovery_digest_is_protected() {
-        let mut a = context("a", 40, 1, 0, true, 100, 100, 1);
+        let mut a = context("a", 40, (1, 0, true, 100, 100, 1));
         a.recovery_evidence_digest = None;
-        let b = context("b", 40, 2, 1, false, 100, 100, 1);
+        let b = context("b", 40, (2, 1, false, 100, 100, 1));
         let plan = plan_retention(
             RetentionPolicy::LuminousDecisionRecoveryAware,
             &request(80, 40),
@@ -945,7 +941,7 @@ mod tests {
 
     #[test]
     fn hard_pinned_contexts_alone_can_make_capacity_infeasible() {
-        let mut a = context("a", 80, 1, 0, false, 100, 100, 1);
+        let mut a = context("a", 80, (1, 0, false, 100, 100, 1));
         a.hard_pin_reason = Some("safe-stop-state".to_owned());
         let plan = plan_retention(
             RetentionPolicy::LuminousDecisionRecoveryAware,
