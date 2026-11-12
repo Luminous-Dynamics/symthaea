@@ -1,0 +1,185 @@
+{
+  "schema": "luminous.black_hole_information.u1_domain_wall_transport.v1",
+  "status": "independent_numpy_comparator; Rust transport APIs authored; Rust runner execution pending",
+  "claim_ceiling": "Finite-dimensional closed U(1)-conserving 1D qubit-chain transport experiment only. These data do not model Hawking radiation, black-hole evaporation, gravitational backreaction, a Page island, QES, or an information-recovery decoder.",
+  "model": {
+    "number_of_qubits": 12,
+    "initial_left_excitations": 6,
+    "initial_state": "|111111000000> in MSB-first convention",
+    "topology": "open 1D nearest-neighbour brickwork",
+    "gate_family": "independent Haar U(1) x U(2) x U(1) two-qubit gates",
+    "entropy_units": "nats",
+    "time_unit": "one brickwork matching layer",
+    "parity_schedule": "layer 1 applies even bonds (0,1),(2,3),...; layer 2 applies odd bonds (1,2),(3,4),...; repeat",
+    "seed_schedule": {
+      "first_seed_hex": "0xD1FF",
+      "sample_count": 12,
+      "seed_rule": "NumPy default_rng(first_seed + sample_index)"
+    },
+    "central_cut_bond": [
+      5,
+      6
+    ],
+    "density_imbalance": "I(t) = sum_(i=0..5) n_i(t) - sum_(i=6..11) n_i(t)",
+    "integrated_central_current": "Q_cut(t) = sum_(layers <= t) j_(5->6)",
+    "continuity": "delta n_i = j_(i-1->i) - j_(i->i+1)"
+  },
+  "independent_numpy_comparator": {
+    "implementation": "independent NumPy complex state-vector engine, QR-generated Haar U(2) blocks, direct gate contractions, direct occupations, current, partial trace and Hermitian eigenspectrum",
+    "sample_count": 12,
+    "max_norm_absolute_drift": 4.884981308350689e-15,
+    "max_total_charge_absolute_drift": 3.019806626980426e-14,
+    "max_local_continuity_residual": 1.1102230246251565e-15,
+    "max_left_charge_plus_integrated_cut_ledger_residual": 1.2e-14,
+    "output_layers": [
+      {
+        "layer": 0,
+        "imbalance_mean": 6,
+        "imbalance_standard_error": 0,
+        "integrated_cut_current_mean": 0,
+        "half_entropy_mean": 0,
+        "half_entropy_standard_error": 0
+      },
+      {
+        "layer": 1,
+        "imbalance_mean": 6,
+        "imbalance_standard_error": 3.3696907959038935e-16,
+        "integrated_cut_current_mean": 0,
+        "half_entropy_mean": 1.850371707708593e-17,
+        "half_entropy_standard_error": 5.60690662669736e-17
+      },
+      {
+        "layer": 2,
+        "imbalance_mean": 5.118471511247662,
+        "imbalance_standard_error": 0.18158317455428327,
+        "integrated_cut_current_mean": 0.4407642443761685,
+        "half_entropy_mean": 0.4716938663241761,
+        "half_entropy_standard_error": 0.062136563487893454
+      },
+      {
+        "layer": 4,
+        "imbalance_mean": 4.391782457837181,
+        "imbalance_standard_error": 0.16430766792443494,
+        "integrated_cut_current_mean": 0.8041087710814098,
+        "half_entropy_mean": 0.724075327601327,
+        "half_entropy_standard_error": 0.07182134617575642
+      },
+      {
+        "layer": 8,
+        "imbalance_mean": 3.9900047100109113,
+        "imbalance_standard_error": 0.1834112432739396,
+        "integrated_cut_current_mean": 1.0049976449945437,
+        "half_entropy_mean": 1.2835863267077003,
+        "half_entropy_standard_error": 0.07764904009163683
+      },
+      {
+        "layer": 12,
+        "imbalance_mean": 3.371563687310283,
+        "imbalance_standard_error": 0.20100473413198275,
+        "integrated_cut_current_mean": 1.3142181563448567,
+        "half_entropy_mean": 1.6626619607912267,
+        "half_entropy_standard_error": 0.07511239904124849
+      },
+      {
+        "layer": 16,
+        "imbalance_mean": 2.95877569396899,
+        "imbalance_standard_error": 0.14986311100436114,
+        "integrated_cut_current_mean": 1.520612153015504,
+        "half_entropy_mean": 1.9366453868581728,
+        "half_entropy_standard_error": 0.06808808797649683
+      },
+      {
+        "layer": 24,
+        "imbalance_mean": 2.05785989508032,
+        "imbalance_standard_error": 0.1090143529367335,
+        "integrated_cut_current_mean": 1.9710700524598375,
+        "half_entropy_mean": 2.569321684972969,
+        "half_entropy_standard_error": 0.07237114027871117
+      },
+      {
+        "layer": 32,
+        "imbalance_mean": 1.561428936565272,
+        "imbalance_standard_error": 0.09489411200434276,
+        "integrated_cut_current_mean": 2.219285531717361,
+        "half_entropy_mean": 3.00129620399122,
+        "half_entropy_standard_error": 0.062015012204804806
+      }
+    ],
+    "caveat": "Independent NumPy random generator and QR implementation; numerical values are ensemble comparators, not bitwise expected output for the Rust ChaCha20 stream."
+  },
+  "rust_contract": {
+    "trajectory_api": "simulate_u1_domain_wall_transport",
+    "ensemble_api": "sample_u1_domain_wall_transport_ensemble",
+    "recorded_per_layer": [
+      "site_density_profile",
+      "oriented_bond_currents",
+      "local_continuity_max_residual",
+      "left_half_charge",
+      "domain_wall_imbalance",
+      "integrated_cut_transport",
+      "full_state_norm_and_total_charge",
+      "half_chain_entropy_and_purity"
+    ],
+    "ensemble_statistics": "site-wise density and current means/standard errors; imbalance and transport standard errors; half-chain entropy standard error; maximum continuity, norm, charge and sector-variance residuals",
+    "status": "source_authored_not_executed"
+  },
+  "interpretation": [
+    "The first layer has zero transport because its even-bond matching remains within the initially occupied and initially empty halves.",
+    "The first cross-cut bond acts on layer 2, after which the ensemble exhibits nonzero charge current, decreasing domain-wall imbalance and growing half-chain entropy.",
+    "Entropy and charge transport are separately measured. Their co-evolution is not proof of a unique transport law.",
+    "The N=12, 12-seed run is a code-path comparator only. It is too small to establish a diffusion exponent or asymptotic diffusion constant."
+  ],
+  "research_targets": {
+    "multi_size_registers": [
+      8,
+      12,
+      16,
+      20
+    ],
+    "ensemble_size_target_per_size_and_depth": 256,
+    "domain_wall_imbalance_intermediate_time_fit": "I(t) proportional to t^(-1/2) if the circuit lies in the expected diffusive regime",
+    "target_diffusion_exponent": [
+      0.4,
+      0.6
+    ],
+    "required_controls": [
+      "finite-size scaling and boundary reflection exclusion",
+      "predeclared fit window and seed schedule",
+      "uncertainty on fit exponent and diffusion constant",
+      "independent implementation profile/current comparison",
+      "charge continuity and central-cut ledger checks"
+    ]
+  },
+  "negative_controls": [
+    "infer diffusion exponent from a single system size",
+    "infer transport from entropy alone",
+    "use all-to-all topology as a spatial diffusion comparator without defining a graph metric",
+    "omit current sign convention or integrated central-cut ledger",
+    "claim black-hole evaporation or a gravitational Page curve from a closed qubit chain"
+  ],
+  "required_receipt_fields": [
+    "source_sha",
+    "N",
+    "K",
+    "topology",
+    "depth",
+    "seed_schedule",
+    "sample_count",
+    "mean_density_profile",
+    "density_standard_error",
+    "mean_bond_currents",
+    "bond_current_standard_error",
+    "domain_wall_imbalance",
+    "imbalance_standard_error",
+    "integrated_cut_transport",
+    "cut_ledger_residual",
+    "continuity_max_residual",
+    "half_chain_entropy",
+    "entropy_standard_error",
+    "norm_drift",
+    "charge_drift",
+    "charge_variance",
+    "runtime",
+    "peak_memory"
+  ]
+}
