@@ -1,0 +1,676 @@
+{
+  "schema_version": "0.1.0",
+  "manifest_id": "SYNTH-SODIUM-BATTERY-MISSION-001",
+  "mission": {
+    "mission_id": "SYNTH-COLD-STATIONARY-001",
+    "application": "cold_climate_stationary",
+    "duty_cycle_ref": "SYNTH-DAILY-STATIONARY-DUTY",
+    "ambient_scenarios": [
+      {
+        "scenario_id": "REF25",
+        "ambient_c": 25,
+        "preheat_policy": "none"
+      },
+      {
+        "scenario_id": "COLD20",
+        "ambient_c": -20,
+        "preheat_policy": "none"
+      },
+      {
+        "scenario_id": "COLD40",
+        "ambient_c": -40,
+        "preheat_policy": "none"
+      }
+    ],
+    "system_boundary": "complete_cell",
+    "required_lifetime_energy_kwh": 1000,
+    "required_peak_power_kw": 2
+  },
+  "technology_lanes": [
+    {
+      "lane_id": "LANE-SIB",
+      "technology_lane": "commercial_sodium_ion",
+      "frontier_group": "commercial_cell_comparison",
+      "maturity_class": "pilot_line",
+      "allowed_comparator_lanes": [
+        "commercial_sodium_ion",
+        "lithium_iron_phosphate",
+        "nickel_manganese_cobalt"
+      ]
+    },
+    {
+      "lane_id": "LANE-LFP",
+      "technology_lane": "lithium_iron_phosphate",
+      "frontier_group": "commercial_cell_comparison",
+      "maturity_class": "commercial_product",
+      "allowed_comparator_lanes": [
+        "commercial_sodium_ion",
+        "lithium_iron_phosphate",
+        "nickel_manganese_cobalt"
+      ]
+    },
+    {
+      "lane_id": "LANE-ZEM",
+      "technology_lane": "zero_excess_sodium_metal",
+      "frontier_group": "post_lithium_research",
+      "maturity_class": "laboratory_pouch",
+      "allowed_comparator_lanes": [
+        "zero_excess_sodium_metal"
+      ]
+    }
+  ],
+  "specimens": [
+    {
+      "specimen_id": "SIB-01",
+      "design_id": "DESIGN-SIB-HC-PW",
+      "lane_id": "LANE-SIB",
+      "chemistry_description": "Hard carbon | Prussian White aqueous pilot pouch",
+      "cell_format": "pouch",
+      "mass_basis": "complete_cell_including_inactive_components",
+      "cell_mass_g": 150,
+      "cell_volume_cm3": 85,
+      "areal_loading_mg_cm2": 18,
+      "electrolyte_to_capacity_g_ah": 3,
+      "n_p_ratio": 1.05,
+      "stack_pressure_kpa": 100,
+      "source_lineage_ref": "SYNTH-LINEAGE-SIB-01",
+      "batch_group_id": "BATCH-SIB-A"
+    },
+    {
+      "specimen_id": "SIB-02",
+      "design_id": "DESIGN-SIB-HC-PW",
+      "lane_id": "LANE-SIB",
+      "chemistry_description": "Hard carbon | Prussian White aqueous pilot pouch",
+      "cell_format": "pouch",
+      "mass_basis": "complete_cell_including_inactive_components",
+      "cell_mass_g": 150,
+      "cell_volume_cm3": 85,
+      "areal_loading_mg_cm2": 18,
+      "electrolyte_to_capacity_g_ah": 3,
+      "n_p_ratio": 1.05,
+      "stack_pressure_kpa": 100,
+      "source_lineage_ref": "SYNTH-LINEAGE-SIB-02",
+      "batch_group_id": "BATCH-SIB-B"
+    },
+    {
+      "specimen_id": "LFP-01",
+      "design_id": "DESIGN-LFP-REF",
+      "lane_id": "LANE-LFP",
+      "chemistry_description": "Commercial LFP graphite reference cell",
+      "cell_format": "prismatic",
+      "mass_basis": "complete_cell_including_inactive_components",
+      "cell_mass_g": 150,
+      "cell_volume_cm3": 85,
+      "areal_loading_mg_cm2": 20,
+      "electrolyte_to_capacity_g_ah": 3,
+      "n_p_ratio": 1.05,
+      "stack_pressure_kpa": 100,
+      "source_lineage_ref": "SYNTH-LINEAGE-LFP-01",
+      "batch_group_id": "BATCH-LFP-A"
+    },
+    {
+      "specimen_id": "LFP-02",
+      "design_id": "DESIGN-LFP-REF",
+      "lane_id": "LANE-LFP",
+      "chemistry_description": "Commercial LFP graphite reference cell",
+      "cell_format": "prismatic",
+      "mass_basis": "complete_cell_including_inactive_components",
+      "cell_mass_g": 150,
+      "cell_volume_cm3": 85,
+      "areal_loading_mg_cm2": 20,
+      "electrolyte_to_capacity_g_ah": 3,
+      "n_p_ratio": 1.05,
+      "stack_pressure_kpa": 100,
+      "source_lineage_ref": "SYNTH-LINEAGE-LFP-02",
+      "batch_group_id": "BATCH-LFP-B"
+    },
+    {
+      "specimen_id": "ZEM-01",
+      "design_id": "DESIGN-ZERO-EXCESS-NA",
+      "lane_id": "LANE-ZEM",
+      "chemistry_description": "Zero-excess sodium-metal research pouch",
+      "cell_format": "pouch",
+      "mass_basis": "complete_cell_including_inactive_components",
+      "cell_mass_g": 150,
+      "cell_volume_cm3": 85,
+      "areal_loading_mg_cm2": 15,
+      "electrolyte_to_capacity_g_ah": 3,
+      "n_p_ratio": 1.05,
+      "stack_pressure_kpa": 200,
+      "source_lineage_ref": "SYNTH-LINEAGE-ZEM-01",
+      "batch_group_id": "BATCH-ZEM-A"
+    }
+  ],
+  "test_conditions": [
+    {
+      "condition_id": "SIB-01-REF25",
+      "specimen_id": "SIB-01",
+      "condition_profile_id": "REF25",
+      "temperature_c": 25,
+      "soc_min_pct": 10,
+      "soc_max_pct": 90,
+      "charge_c_rate": 0.5,
+      "discharge_c_rate": 1,
+      "voltage_window_ref": "SYNTH-VOLTAGE-WINDOW-001",
+      "protocol_ref": "SYNTH-PROTOCOL-REF25",
+      "formation_ref": "SYNTH-FORMATION-001",
+      "calibration_ref": "SYNTH-CALIBRATION-001",
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "condition_id": "SIB-01-COLD20",
+      "specimen_id": "SIB-01",
+      "condition_profile_id": "COLD20",
+      "temperature_c": -20,
+      "soc_min_pct": 10,
+      "soc_max_pct": 90,
+      "charge_c_rate": 0.5,
+      "discharge_c_rate": 1,
+      "voltage_window_ref": "SYNTH-VOLTAGE-WINDOW-001",
+      "protocol_ref": "SYNTH-PROTOCOL-COLD20",
+      "formation_ref": "SYNTH-FORMATION-001",
+      "calibration_ref": "SYNTH-CALIBRATION-001",
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "condition_id": "SIB-01-COLD40",
+      "specimen_id": "SIB-01",
+      "condition_profile_id": "COLD40",
+      "temperature_c": -40,
+      "soc_min_pct": 10,
+      "soc_max_pct": 90,
+      "charge_c_rate": 0.5,
+      "discharge_c_rate": 1,
+      "voltage_window_ref": "SYNTH-VOLTAGE-WINDOW-001",
+      "protocol_ref": "SYNTH-PROTOCOL-COLD40",
+      "formation_ref": "SYNTH-FORMATION-001",
+      "calibration_ref": "SYNTH-CALIBRATION-001",
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "condition_id": "SIB-02-REF25",
+      "specimen_id": "SIB-02",
+      "condition_profile_id": "REF25",
+      "temperature_c": 25,
+      "soc_min_pct": 10,
+      "soc_max_pct": 90,
+      "charge_c_rate": 0.5,
+      "discharge_c_rate": 1,
+      "voltage_window_ref": "SYNTH-VOLTAGE-WINDOW-001",
+      "protocol_ref": "SYNTH-PROTOCOL-REF25",
+      "formation_ref": "SYNTH-FORMATION-001",
+      "calibration_ref": "SYNTH-CALIBRATION-001",
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "condition_id": "SIB-02-COLD20",
+      "specimen_id": "SIB-02",
+      "condition_profile_id": "COLD20",
+      "temperature_c": -20,
+      "soc_min_pct": 10,
+      "soc_max_pct": 90,
+      "charge_c_rate": 0.5,
+      "discharge_c_rate": 1,
+      "voltage_window_ref": "SYNTH-VOLTAGE-WINDOW-001",
+      "protocol_ref": "SYNTH-PROTOCOL-COLD20",
+      "formation_ref": "SYNTH-FORMATION-001",
+      "calibration_ref": "SYNTH-CALIBRATION-001",
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "condition_id": "SIB-02-COLD40",
+      "specimen_id": "SIB-02",
+      "condition_profile_id": "COLD40",
+      "temperature_c": -40,
+      "soc_min_pct": 10,
+      "soc_max_pct": 90,
+      "charge_c_rate": 0.5,
+      "discharge_c_rate": 1,
+      "voltage_window_ref": "SYNTH-VOLTAGE-WINDOW-001",
+      "protocol_ref": "SYNTH-PROTOCOL-COLD40",
+      "formation_ref": "SYNTH-FORMATION-001",
+      "calibration_ref": "SYNTH-CALIBRATION-001",
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "condition_id": "LFP-01-REF25",
+      "specimen_id": "LFP-01",
+      "condition_profile_id": "REF25",
+      "temperature_c": 25,
+      "soc_min_pct": 10,
+      "soc_max_pct": 90,
+      "charge_c_rate": 0.5,
+      "discharge_c_rate": 1,
+      "voltage_window_ref": "SYNTH-VOLTAGE-WINDOW-001",
+      "protocol_ref": "SYNTH-PROTOCOL-REF25",
+      "formation_ref": "SYNTH-FORMATION-001",
+      "calibration_ref": "SYNTH-CALIBRATION-001",
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "condition_id": "LFP-01-COLD20",
+      "specimen_id": "LFP-01",
+      "condition_profile_id": "COLD20",
+      "temperature_c": -20,
+      "soc_min_pct": 10,
+      "soc_max_pct": 90,
+      "charge_c_rate": 0.5,
+      "discharge_c_rate": 1,
+      "voltage_window_ref": "SYNTH-VOLTAGE-WINDOW-001",
+      "protocol_ref": "SYNTH-PROTOCOL-COLD20",
+      "formation_ref": "SYNTH-FORMATION-001",
+      "calibration_ref": "SYNTH-CALIBRATION-001",
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "condition_id": "LFP-01-COLD40",
+      "specimen_id": "LFP-01",
+      "condition_profile_id": "COLD40",
+      "temperature_c": -40,
+      "soc_min_pct": 10,
+      "soc_max_pct": 90,
+      "charge_c_rate": 0.5,
+      "discharge_c_rate": 1,
+      "voltage_window_ref": "SYNTH-VOLTAGE-WINDOW-001",
+      "protocol_ref": "SYNTH-PROTOCOL-COLD40",
+      "formation_ref": "SYNTH-FORMATION-001",
+      "calibration_ref": "SYNTH-CALIBRATION-001",
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "condition_id": "LFP-02-REF25",
+      "specimen_id": "LFP-02",
+      "condition_profile_id": "REF25",
+      "temperature_c": 25,
+      "soc_min_pct": 10,
+      "soc_max_pct": 90,
+      "charge_c_rate": 0.5,
+      "discharge_c_rate": 1,
+      "voltage_window_ref": "SYNTH-VOLTAGE-WINDOW-001",
+      "protocol_ref": "SYNTH-PROTOCOL-REF25",
+      "formation_ref": "SYNTH-FORMATION-001",
+      "calibration_ref": "SYNTH-CALIBRATION-001",
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "condition_id": "LFP-02-COLD20",
+      "specimen_id": "LFP-02",
+      "condition_profile_id": "COLD20",
+      "temperature_c": -20,
+      "soc_min_pct": 10,
+      "soc_max_pct": 90,
+      "charge_c_rate": 0.5,
+      "discharge_c_rate": 1,
+      "voltage_window_ref": "SYNTH-VOLTAGE-WINDOW-001",
+      "protocol_ref": "SYNTH-PROTOCOL-COLD20",
+      "formation_ref": "SYNTH-FORMATION-001",
+      "calibration_ref": "SYNTH-CALIBRATION-001",
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "condition_id": "LFP-02-COLD40",
+      "specimen_id": "LFP-02",
+      "condition_profile_id": "COLD40",
+      "temperature_c": -40,
+      "soc_min_pct": 10,
+      "soc_max_pct": 90,
+      "charge_c_rate": 0.5,
+      "discharge_c_rate": 1,
+      "voltage_window_ref": "SYNTH-VOLTAGE-WINDOW-001",
+      "protocol_ref": "SYNTH-PROTOCOL-COLD40",
+      "formation_ref": "SYNTH-FORMATION-001",
+      "calibration_ref": "SYNTH-CALIBRATION-001",
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "condition_id": "ZEM-01-REF25",
+      "specimen_id": "ZEM-01",
+      "condition_profile_id": "REF25",
+      "temperature_c": 25,
+      "soc_min_pct": 10,
+      "soc_max_pct": 90,
+      "charge_c_rate": 0.5,
+      "discharge_c_rate": 1,
+      "voltage_window_ref": "SYNTH-VOLTAGE-WINDOW-001",
+      "protocol_ref": "SYNTH-PROTOCOL-REF25",
+      "formation_ref": "SYNTH-FORMATION-001",
+      "calibration_ref": "SYNTH-CALIBRATION-001",
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "condition_id": "ZEM-01-COLD20",
+      "specimen_id": "ZEM-01",
+      "condition_profile_id": "COLD20",
+      "temperature_c": -20,
+      "soc_min_pct": 10,
+      "soc_max_pct": 90,
+      "charge_c_rate": 0.5,
+      "discharge_c_rate": 1,
+      "voltage_window_ref": "SYNTH-VOLTAGE-WINDOW-001",
+      "protocol_ref": "SYNTH-PROTOCOL-COLD20",
+      "formation_ref": "SYNTH-FORMATION-001",
+      "calibration_ref": "SYNTH-CALIBRATION-001",
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    {
+      "condition_id": "ZEM-01-COLD40",
+      "specimen_id": "ZEM-01",
+      "condition_profile_id": "COLD40",
+      "temperature_c": -40,
+      "soc_min_pct": 10,
+      "soc_max_pct": 90,
+      "charge_c_rate": 0.5,
+      "discharge_c_rate": 1,
+      "voltage_window_ref": "SYNTH-VOLTAGE-WINDOW-001",
+      "protocol_ref": "SYNTH-PROTOCOL-COLD40",
+      "formation_ref": "SYNTH-FORMATION-001",
+      "calibration_ref": "SYNTH-CALIBRATION-001",
+      "raw_data_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "measurements": [
+    {
+      "measurement_id": "MEAS-SIB-01-REF25",
+      "specimen_id": "SIB-01",
+      "condition_id": "SIB-01-REF25",
+      "metric_id": "usable_capacity",
+      "value": 3,
+      "unit": "Ah",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-SIB-01-COLD20",
+      "specimen_id": "SIB-01",
+      "condition_id": "SIB-01-COLD20",
+      "metric_id": "usable_capacity",
+      "value": 2.8,
+      "unit": "Ah",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-SIB-01-COLD40",
+      "specimen_id": "SIB-01",
+      "condition_id": "SIB-01-COLD40",
+      "metric_id": "usable_capacity",
+      "value": 2.5,
+      "unit": "Ah",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-SIB-01-SPECIFIC-ENERGY",
+      "specimen_id": "SIB-01",
+      "condition_id": "SIB-01-REF25",
+      "metric_id": "specific_energy",
+      "value": 145,
+      "unit": "Wh/kg",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-SIB-02-REF25",
+      "specimen_id": "SIB-02",
+      "condition_id": "SIB-02-REF25",
+      "metric_id": "usable_capacity",
+      "value": 3,
+      "unit": "Ah",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-SIB-02-COLD20",
+      "specimen_id": "SIB-02",
+      "condition_id": "SIB-02-COLD20",
+      "metric_id": "usable_capacity",
+      "value": 2.8,
+      "unit": "Ah",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-SIB-02-COLD40",
+      "specimen_id": "SIB-02",
+      "condition_id": "SIB-02-COLD40",
+      "metric_id": "usable_capacity",
+      "value": 2.5,
+      "unit": "Ah",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-SIB-02-SPECIFIC-ENERGY",
+      "specimen_id": "SIB-02",
+      "condition_id": "SIB-02-REF25",
+      "metric_id": "specific_energy",
+      "value": 145,
+      "unit": "Wh/kg",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-LFP-01-REF25",
+      "specimen_id": "LFP-01",
+      "condition_id": "LFP-01-REF25",
+      "metric_id": "usable_capacity",
+      "value": 3.2,
+      "unit": "Ah",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-LFP-01-COLD20",
+      "specimen_id": "LFP-01",
+      "condition_id": "LFP-01-COLD20",
+      "metric_id": "usable_capacity",
+      "value": 2.8,
+      "unit": "Ah",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-LFP-01-COLD40",
+      "specimen_id": "LFP-01",
+      "condition_id": "LFP-01-COLD40",
+      "metric_id": "usable_capacity",
+      "value": 2.2,
+      "unit": "Ah",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-LFP-01-SPECIFIC-ENERGY",
+      "specimen_id": "LFP-01",
+      "condition_id": "LFP-01-REF25",
+      "metric_id": "specific_energy",
+      "value": 160,
+      "unit": "Wh/kg",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-LFP-02-REF25",
+      "specimen_id": "LFP-02",
+      "condition_id": "LFP-02-REF25",
+      "metric_id": "usable_capacity",
+      "value": 3.2,
+      "unit": "Ah",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-LFP-02-COLD20",
+      "specimen_id": "LFP-02",
+      "condition_id": "LFP-02-COLD20",
+      "metric_id": "usable_capacity",
+      "value": 2.8,
+      "unit": "Ah",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-LFP-02-COLD40",
+      "specimen_id": "LFP-02",
+      "condition_id": "LFP-02-COLD40",
+      "metric_id": "usable_capacity",
+      "value": 2.2,
+      "unit": "Ah",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-LFP-02-SPECIFIC-ENERGY",
+      "specimen_id": "LFP-02",
+      "condition_id": "LFP-02-REF25",
+      "metric_id": "specific_energy",
+      "value": 160,
+      "unit": "Wh/kg",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-ZEM-01-REF25",
+      "specimen_id": "ZEM-01",
+      "condition_id": "ZEM-01-REF25",
+      "metric_id": "usable_capacity",
+      "value": 3.4,
+      "unit": "Ah",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-ZEM-01-COLD20",
+      "specimen_id": "ZEM-01",
+      "condition_id": "ZEM-01-COLD20",
+      "metric_id": "usable_capacity",
+      "value": 2.8,
+      "unit": "Ah",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-ZEM-01-COLD40",
+      "specimen_id": "ZEM-01",
+      "condition_id": "ZEM-01-COLD40",
+      "metric_id": "usable_capacity",
+      "value": 2.1,
+      "unit": "Ah",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    },
+    {
+      "measurement_id": "MEAS-ZEM-01-SPECIFIC-ENERGY",
+      "specimen_id": "ZEM-01",
+      "condition_id": "ZEM-01-REF25",
+      "metric_id": "specific_energy",
+      "value": 205,
+      "unit": "Wh/kg",
+      "system_boundary": "complete_cell",
+      "evidence_id": "SYNTH-EVIDENCE"
+    }
+  ],
+  "lifetime_outcomes": [
+    {
+      "outcome_id": "LIFE-SIB-01",
+      "specimen_id": "SIB-01",
+      "status": "event_observed",
+      "observed_cycles": 900,
+      "event_cycle": 900,
+      "event_code": null,
+      "end_of_life_definition_ref": "SYNTH-80PCT-EOL"
+    },
+    {
+      "outcome_id": "LIFE-SIB-02",
+      "specimen_id": "SIB-02",
+      "status": "right_censored",
+      "observed_cycles": 650,
+      "event_cycle": null,
+      "event_code": null,
+      "end_of_life_definition_ref": "SYNTH-80PCT-EOL"
+    },
+    {
+      "outcome_id": "LIFE-LFP-01",
+      "specimen_id": "LFP-01",
+      "status": "event_observed",
+      "observed_cycles": 1600,
+      "event_cycle": 1600,
+      "event_code": null,
+      "end_of_life_definition_ref": "SYNTH-80PCT-EOL"
+    },
+    {
+      "outcome_id": "LIFE-LFP-02",
+      "specimen_id": "LFP-02",
+      "status": "right_censored",
+      "observed_cycles": 1400,
+      "event_cycle": null,
+      "event_code": null,
+      "end_of_life_definition_ref": "SYNTH-80PCT-EOL"
+    },
+    {
+      "outcome_id": "LIFE-ZEM-01",
+      "specimen_id": "ZEM-01",
+      "status": "competing_event",
+      "observed_cycles": 120,
+      "event_cycle": 120,
+      "event_code": "SYNTH-INVENTORY-LOSS",
+      "end_of_life_definition_ref": "SYNTH-ZEM-ENDPOINT"
+    }
+  ],
+  "evidence_registry": [
+    {
+      "evidence_id": "SYNTH-EVIDENCE",
+      "evidence_class": "synthetic_fixture",
+      "source_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "claim_scope": "synthetic comparison values and outcomes only",
+      "validity_domain": "schema fixture; no external or physical inference",
+      "rights_state": "evaluation_only"
+    }
+  ],
+  "comparison_sets": [
+    {
+      "comparison_set_id": "COMMERCIAL-CELL-COMPARISON",
+      "frontier_group": "commercial_cell_comparison",
+      "mission_id": "SYNTH-COLD-STATIONARY-001",
+      "lane_ids": [
+        "LANE-SIB",
+        "LANE-LFP"
+      ],
+      "specimen_ids": [
+        "SIB-01",
+        "SIB-02",
+        "LFP-01",
+        "LFP-02"
+      ],
+      "condition_profile_ids": [
+        "REF25",
+        "COLD20",
+        "COLD40"
+      ],
+      "system_boundary": "complete_cell"
+    },
+    {
+      "comparison_set_id": "POST-LITHIUM-RESEARCH-ONLY",
+      "frontier_group": "post_lithium_research",
+      "mission_id": "SYNTH-COLD-STATIONARY-001",
+      "lane_ids": [
+        "LANE-ZEM"
+      ],
+      "specimen_ids": [
+        "ZEM-01"
+      ],
+      "condition_profile_ids": [
+        "REF25",
+        "COLD20",
+        "COLD40"
+      ],
+      "system_boundary": "complete_cell"
+    }
+  ],
+  "comparison_policy": {
+    "require_matched_conditions": true,
+    "separate_frontier_groups": true,
+    "allow_active_material_to_full_cell_extrapolation": false,
+    "minimum_independent_specimens_per_design": 1
+  }
+}
