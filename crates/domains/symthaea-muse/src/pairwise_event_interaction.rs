@@ -1126,5 +1126,4 @@ mod tests {
             PairwiseInteractionError::LengthMismatch
         );
     }
-
 }
