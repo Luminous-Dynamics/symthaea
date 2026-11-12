@@ -17,6 +17,7 @@ on:
       - "research/melothaea-part-aware-midi-performance-v1"
       - "research/melothaea-amt-evaluation-v1"
       - "research/melothaea-part-separation-eval-v1"
+      - "research/melothaea-midi-meter-parse-v1"
     paths:
       - "crates/domains/symthaea-muse/src/midi_performance.rs"
       - "crates/domains/symthaea-muse/src/transcription_eval.rs"
