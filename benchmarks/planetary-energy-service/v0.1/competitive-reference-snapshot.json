@@ -1,0 +1,375 @@
+{
+  "schema_version": "planetary-energy-competitive-reference-v0.1",
+  "status": "source_reported_benchmarks_not_luminous_results",
+  "as_of_date": "2026-11-12",
+  "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11756",
+  "evidence_policy": {
+    "rules": [
+      "Each value retains its native system boundary and evidence class.",
+      "Cell PCE is not array specific power or deployed plant efficiency.",
+      "Programme goals and design targets are not achieved hardware results.",
+      "Published experimental results are not space-qualified or lunar-qualified unless the source says so.",
+      "Unknown values are omitted, never inferred from a nearby metric."
+    ]
+  },
+  "references": [
+    {
+      "reference_id": "nasa-soa-power-2026",
+      "source": "NASA SmallSat Institute State-of-the-Art: Power Subsystems (2026)",
+      "url": "https://www.nasa.gov/smallsat-institute/sst-soa/power-subsystems/",
+      "source_class": "government_technical_survey",
+      "published_year": 2026
+    },
+    {
+      "reference_id": "nasa-soa-power-table-2026",
+      "source": "NASA State-of-the-Art: Power Systems PDF (2026)",
+      "url": "https://www.nasa.gov/wp-content/uploads/2026/05/3-soa-power-2026-final.pdf",
+      "source_class": "government_technical_survey_product_table",
+      "published_year": 2026
+    },
+    {
+      "reference_id": "nasa-vsat-reference-design-2024",
+      "source": "NASA NTRS: Government Reference Design of the Vertical Solar Array Technology Demonstrator",
+      "url": "https://ntrs.nasa.gov/citations/20240004914",
+      "source_class": "government_design_reference",
+      "published_year": 2024
+    },
+    {
+      "reference_id": "nasa-vsat-50kw-sbir-2025",
+      "source": "NASA FY2025 SBIR Phase I Solicitation, second-generation 50-kW VSAT subtopic",
+      "url": "https://www.nasa.gov/wp-content/uploads/2024/01/2025-nasa-sbir-phase-i-solicitation-final-rev.pdf",
+      "source_class": "government_research_solicitation_target",
+      "published_year": 2025
+    },
+    {
+      "reference_id": "nasa-lunar-surface-technology",
+      "source": "NASA Lunar Surface Technology",
+      "url": "https://www.nasa.gov/lunar-surface-technology/",
+      "source_class": "government_programme_summary",
+      "published_year": 2026
+    },
+    {
+      "reference_id": "nasa-isrupower-techport",
+      "source": "NASA TechPort ISRUPower project 146991",
+      "url": "https://techport.nasa.gov/projects/146991",
+      "source_class": "government_project_record",
+      "published_year": 2026
+    },
+    {
+      "reference_id": "nasa-isam-2025",
+      "source": "NASA 2025 In-Space Servicing, Assembly, and Manufacturing State of Play",
+      "url": "https://ntrs.nasa.gov/citations/20250008988",
+      "source_class": "government_technology_survey",
+      "published_year": 2025
+    },
+    {
+      "reference_id": "nature-perovskite-closed-loop-2026",
+      "source": "Autonomous closed-loop framework for reproducible perovskite solar cells, Nature",
+      "url": "https://www.nature.com/articles/s41586-026-10482-y",
+      "source_class": "peer_reviewed_experimental_study",
+      "published_year": 2026
+    },
+    {
+      "reference_id": "nature-perovskite-cost-review-2026",
+      "source": "Cost-driven strategies towards industrially manufacturable perovskite photovoltaics, Nature Reviews Materials",
+      "url": "https://www.nature.com/articles/s41578-026-00973-9",
+      "source_class": "peer_reviewed_review",
+      "published_year": 2026
+    },
+    {
+      "reference_id": "nlr-pv-fleet",
+      "source": "NLR PV Fleet Performance Data Initiative",
+      "url": "https://www.nlr.gov/pv/fleet-performance-data-initiative",
+      "source_class": "field_fleet_dataset_summary",
+      "published_year": 2026
+    },
+    {
+      "reference_id": "nature-perovskite-commercialization",
+      "source": "Taking perovskite photovoltaics from promise to product, Nature Reviews Clean Technology",
+      "url": "https://www.nature.com/articles/s44359-026-00173-2",
+      "source_class": "peer_reviewed_perspective",
+      "published_year": 2026
+    },
+    {
+      "reference_id": "nasa-fission-surface-power",
+      "source": "NASA Fission Surface Power programme",
+      "url": "https://www.nasa.gov/exploration-systems-development-mission-directorate/fission-surface-power/",
+      "source_class": "government_programme_summary",
+      "published_year": 2026
+    },
+    {
+      "reference_id": "nasa-card",
+      "source": "NASA Carbothermal Reduction Demonstration integrated solar/regolith prototype update",
+      "url": "https://www.nasa.gov/centers-and-facilities/johnson/sunlight-extracts-oxygen-from-regolith-using-solar-chemistry/",
+      "source_class": "government_prototype_test_report",
+      "published_year": 2026
+    }
+  ],
+  "metrics": [
+    {
+      "metric_id": "space-iii-v-cell-efficiency-range",
+      "metric": "space_cell_beginning_of_life_efficiency",
+      "unit": "percent",
+      "value": {
+        "nominal": 30,
+        "high": 34
+      },
+      "boundary": "3-to-5-junction Group III-V solar cell, not module or deployed array",
+      "evidence_class": "government_survey_summary",
+      "reference_id": "nasa-soa-power-2026",
+      "caveats": [
+        "Do not treat as complete-array efficiency or as performance at all heliocentric distances."
+      ]
+    },
+    {
+      "metric_id": "azur-4g32-adv-bol",
+      "metric": "cell_beginning_of_life_efficiency",
+      "unit": "percent",
+      "value": 31.5,
+      "boundary": "AZUR Space 4G32-Adv cell, NASA 2026 manufacturer table",
+      "evidence_class": "manufacturer_product_value_reported_in_government_survey",
+      "reference_id": "nasa-soa-power-table-2026",
+      "caveats": [
+        "Cell-level BOL value; not module or array performance."
+      ]
+    },
+    {
+      "metric_id": "rocketlab-z4j-bol",
+      "metric": "cell_beginning_of_life_efficiency",
+      "unit": "percent",
+      "value": 31.3,
+      "boundary": "Rocket Lab Z4J cell, NASA 2026 manufacturer table",
+      "evidence_class": "manufacturer_product_value_reported_in_government_survey",
+      "reference_id": "nasa-soa-power-table-2026",
+      "caveats": [
+        "Cell-level BOL value; not module or array performance."
+      ]
+    },
+    {
+      "metric_id": "rocketlab-imma-bol",
+      "metric": "cell_beginning_of_life_efficiency",
+      "unit": "percent",
+      "value": 32,
+      "boundary": "Rocket Lab IMMα cell, NASA 2026 manufacturer table",
+      "evidence_class": "manufacturer_product_value_reported_in_government_survey",
+      "reference_id": "nasa-soa-power-table-2026",
+      "caveats": [
+        "Cell-level BOL value; not module or array performance."
+      ]
+    },
+    {
+      "metric_id": "spacecraft-array-specific-power-cluster",
+      "metric": "solar_array_specific_power",
+      "unit": "W/kg",
+      "value": 30,
+      "boundary": "Empirical spacecraft solar-array mission dataset; array-level",
+      "evidence_class": "government_survey_of_flown_mission_dataset",
+      "reference_id": "nasa-soa-power-2026",
+      "caveats": [
+        "Not a lunar surface installed-system benchmark."
+      ]
+    },
+    {
+      "metric_id": "spacecraft-array-specific-power-empirical-max",
+      "metric": "solar_array_specific_power",
+      "unit": "W/kg",
+      "value": 200,
+      "boundary": "Upper empirical point in the spacecraft solar-array dataset reviewed by NASA",
+      "evidence_class": "government_survey_of_flown_mission_dataset",
+      "reference_id": "nasa-soa-power-2026",
+      "caveats": [
+        "Not a representative fleet value, guaranteed product or lunar-surface system target."
+      ]
+    },
+    {
+      "metric_id": "vsat-first-generation-design-power",
+      "metric": "solar_array_beginning_of_life_power",
+      "unit": "kW",
+      "value": 10,
+      "boundary": "Lunar vertical solar array design reference",
+      "evidence_class": "government_design_reference",
+      "reference_id": "nasa-vsat-reference-design-2024",
+      "caveats": [
+        "Design concept, not completed operational lunar array performance."
+      ]
+    },
+    {
+      "metric_id": "vsat-first-generation-bottom-array-height",
+      "metric": "array_bottom_clearance",
+      "unit": "m",
+      "value": 10,
+      "boundary": "Minimum array height above lunar surface in the cited NASA government reference concept",
+      "evidence_class": "government_design_reference",
+      "reference_id": "nasa-vsat-reference-design-2024",
+      "caveats": [
+        "Concept parameter; not universal for all sites or all VSAT configurations."
+      ]
+    },
+    {
+      "metric_id": "vsat-first-generation-reference-array-footprint",
+      "metric": "array_blanket_geometry",
+      "unit": "m",
+      "value": {
+        "width": 6,
+        "height": 6
+      },
+      "boundary": "Original 10-kW VSAT concept geometry described in the NASA reference design",
+      "evidence_class": "government_design_reference",
+      "reference_id": "nasa-vsat-reference-design-2024",
+      "caveats": [
+        "Reference concept only; geometry and deployed area evolve with design."
+      ]
+    },
+    {
+      "metric_id": "vsat-next-generation-specific-power-goal",
+      "metric": "solar_array_specific_power_target",
+      "unit": "W/kg",
+      "value": {
+        "greater_than": 75
+      },
+      "boundary": "Second-generation modular lunar vertical array solicitation target",
+      "evidence_class": "government_research_solicitation_target",
+      "reference_id": "nasa-vsat-50kw-sbir-2025",
+      "caveats": [
+        "Solicitation goal, not demonstrated performance."
+      ]
+    },
+    {
+      "metric_id": "vsat-next-generation-power-goal",
+      "metric": "solar_array_power_target",
+      "unit": "kW",
+      "value": 50,
+      "boundary": "Second-generation modular lunar vertical array solicitation target",
+      "evidence_class": "government_research_solicitation_target",
+      "reference_id": "nasa-vsat-50kw-sbir-2025",
+      "caveats": [
+        "Programme target, not deployed system result."
+      ]
+    },
+    {
+      "metric_id": "vsat-mast-length-upper-description",
+      "metric": "vertical_array_mast_length",
+      "unit": "m",
+      "value": {
+        "up_to": 20
+      },
+      "boundary": "Current NASA Lunar Surface Technology public VSAT programme description",
+      "evidence_class": "government_programme_summary",
+      "reference_id": "nasa-lunar-surface-technology",
+      "caveats": [
+        "Programme description; do not infer array power, mass or operational life from mast length."
+      ]
+    },
+    {
+      "metric_id": "blue-alchemist-integrated-maturity",
+      "metric": "technology_readiness_level",
+      "unit": "TRL",
+      "value": 6,
+      "boundary": "NASA TechPort description of Blue Alchemist's integrated regolith-simulant process",
+      "evidence_class": "government_project_record",
+      "reference_id": "nasa-isrupower-techport",
+      "caveats": [
+        "Does not mean lunar flight operation or commercial plant deployment."
+      ]
+    },
+    {
+      "metric_id": "perovskite-cell-mppt",
+      "metric": "certified_maximum_power_point_efficiency",
+      "unit": "percent",
+      "value": 27.18,
+      "boundary": "0.05 cm2 perovskite research cell",
+      "evidence_class": "peer_reviewed_experimental_study",
+      "reference_id": "nature-perovskite-closed-loop-2026",
+      "caveats": [
+        "Small-area lab cell; not large-area module or space/lunar qualification."
+      ]
+    },
+    {
+      "metric_id": "perovskite-mini-module-pce",
+      "metric": "power_conversion_efficiency",
+      "unit": "percent",
+      "value": 23.49,
+      "boundary": "21.4 cm2 perovskite mini-module",
+      "evidence_class": "peer_reviewed_experimental_study",
+      "reference_id": "nature-perovskite-closed-loop-2026",
+      "caveats": [
+        "Mini-module research result; not commercial factory yield or space/lunar qualification."
+      ]
+    },
+    {
+      "metric_id": "perovskite-1200h-retention",
+      "metric": "initial_efficiency_retention",
+      "unit": "percent",
+      "value": 98.7,
+      "boundary": "Perovskite devices after 1,200 h continuous operation under the paper's stated ISOS-L-1I protocol",
+      "evidence_class": "peer_reviewed_experimental_study",
+      "reference_id": "nature-perovskite-closed-loop-2026",
+      "caveats": [
+        "Protocol-specific duration and conditions; not multiyear field/space lifetime."
+      ]
+    },
+    {
+      "metric_id": "perovskite-manufacturing-cost-range",
+      "metric": "manufacturing_cost",
+      "unit": "USD/W",
+      "value": {
+        "low": 0.3,
+        "high": 0.6
+      },
+      "boundary": "Perovskite PV manufacturing cost range discussed in the 2026 review",
+      "evidence_class": "peer_reviewed_review_estimate",
+      "reference_id": "nature-perovskite-cost-review-2026",
+      "caveats": [
+        "Review estimate; not a universal factory quote. Currency year and process boundary should be pinned before direct cost comparison."
+      ]
+    },
+    {
+      "metric_id": "crystalline-silicon-manufacturing-cost-reference",
+      "metric": "manufacturing_cost",
+      "unit": "USD/W",
+      "value": 0.1,
+      "boundary": "Mature crystalline-silicon PV manufacturing cost reference discussed in the same 2026 review",
+      "evidence_class": "peer_reviewed_review_estimate",
+      "reference_id": "nature-perovskite-cost-review-2026",
+      "caveats": [
+        "Review estimate; use same currency-year and manufacturing boundary before comparisons."
+      ]
+    },
+    {
+      "metric_id": "terrestrial-pv-fleet-median-performance-loss",
+      "metric": "performance_loss_rate",
+      "unit": "percent_per_year",
+      "value": 0.75,
+      "boundary": "U.S. PV plant fleet distribution, NLR dataset n=4,915",
+      "evidence_class": "field_fleet_dataset_summary",
+      "reference_id": "nlr-pv-fleet",
+      "caveats": [
+        "System-level performance loss, not pure module degradation; not transferable directly to lunar/Mars/space environments."
+      ]
+    },
+    {
+      "metric_id": "fission-surface-power-class",
+      "metric": "continuous_power_architecture_reference",
+      "unit": "kWe",
+      "value": 40,
+      "boundary": "NASA Fission Surface Power programme class",
+      "evidence_class": "government_programme_target",
+      "reference_id": "nasa-fission-surface-power",
+      "caveats": [
+        "Programme class/reference, not current deployed lunar plant."
+      ]
+    },
+    {
+      "metric_id": "nasa-card-demonstration-output",
+      "metric": "confirmed_process_product",
+      "unit": "qualitative",
+      "value": "carbon_monoxide",
+      "boundary": "Integrated ground prototype combining concentrated solar power and simulated lunar regolith in the CaRD project",
+      "evidence_class": "government_prototype_test_report",
+      "reference_id": "nasa-card",
+      "caveats": [
+        "CO production confirmed in the reported integrated test; do not claim an operational lunar oxygen plant or full-scale industrial output."
+      ]
+    }
+  ]
+}
