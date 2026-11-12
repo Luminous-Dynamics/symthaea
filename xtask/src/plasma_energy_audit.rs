@@ -923,6 +923,54 @@ mod tests {
     }
 
     #[test]
+    fn source_manifest_rejects_duplicate_case_and_control_ids() {
+        let duplicate_case = serde_json::json!({
+            "programme": "TEST",
+            "claim_ceiling": "SOURCE_ONLY",
+            "evidence_classes": ["PUBLISHED_LAB_EXPERIMENT"],
+            "cases": [
+                {
+                    "case_id": "same-case",
+                    "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+                    "luminous_reproduction": false,
+                    "source": {"url": "https://example.org/source-a"}
+                },
+                {
+                    "case_id": "same-case",
+                    "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+                    "luminous_reproduction": false,
+                    "source": {"url": "https://example.org/source-b"}
+                }
+            ],
+            "negative_controls": [{
+                "control_id": "nc-1",
+                "expected_disposition": "REJECTED"
+            }]
+        });
+        let case_error = audit_source_value(&duplicate_case, "duplicate-case.json").unwrap_err();
+        assert!(case_error.to_string().contains("duplicate source case ID"));
+
+        let duplicate_control = serde_json::json!({
+            "programme": "TEST",
+            "claim_ceiling": "SOURCE_ONLY",
+            "evidence_classes": ["PUBLISHED_LAB_EXPERIMENT"],
+            "cases": [{
+                "case_id": "case-1",
+                "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+                "luminous_reproduction": false,
+                "source": {"url": "https://example.org/source"}
+            }],
+            "negative_controls": [
+                {"control_id": "same-control", "expected_disposition": "REJECTED"},
+                {"control_id": "same-control", "expected_disposition": "BLOCKED"}
+            ]
+        });
+        let control_error =
+            audit_source_value(&duplicate_control, "duplicate-control.json").unwrap_err();
+        assert!(control_error.to_string().contains("duplicate negative-control ID"));
+    }
+
+    #[test]
     fn source_manifest_rejects_missing_source_url() {
         let source = serde_json::json!({
             "programme": "TEST",
