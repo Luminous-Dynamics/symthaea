@@ -5,20 +5,24 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema_version",
-    "case_id",
-    "evidence_kind",
-    "source",
-    "operating_condition_id",
-    "service_fingerprint_sha256",
-    "environment_fingerprint_sha256",
-    "hydrophone_instrument_id",
-    "calibration_certificate_sha256",
     "band",
-    "window_duration_s",
-    "minimum_usable_windows_per_run",
+    "calibration_certificate_sha256",
+    "case_id",
+    "cavitation_calibration_or_validation_sha256",
+    "cavitation_instrument_id",
+    "cavitation_observation_method_id",
+    "environment_fingerprint_sha256",
+    "evidence_kind",
+    "hydrophone_instrument_id",
+    "maximum_sync_alignment_uncertainty_s",
     "minimum_runs",
-    "runs"
+    "minimum_usable_windows_per_run",
+    "operating_condition_id",
+    "runs",
+    "schema_version",
+    "service_fingerprint_sha256",
+    "source",
+    "window_duration_s"
   ],
   "properties": {
     "schema_version": {
@@ -75,6 +79,21 @@
     },
     "service_fingerprint_sha256": {
       "$ref": "#/$defs/digest"
+    },
+    "cavitation_instrument_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cavitation_observation_method_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cavitation_calibration_or_validation_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "maximum_sync_alignment_uncertainty_s": {
+      "type": "number",
+      "exclusiveMinimum": 0
     }
   },
   "$defs": {
@@ -142,11 +161,13 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "acoustic_cavitation_sync_receipt_sha256",
         "background_method",
         "background_trace_sha256",
         "calibration_certificate_sha256",
         "environment_fingerprint_sha256",
         "hydrophone_instrument_id",
+        "operating_point_receipt_sha256",
         "run_id",
         "service_fingerprint_sha256",
         "timebase_receipt_sha256",
@@ -193,6 +214,12 @@
         },
         "water_condition": {
           "$ref": "#/$defs/waterCondition"
+        },
+        "operating_point_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "acoustic_cavitation_sync_receipt_sha256": {
+          "$ref": "#/$defs/digest"
         }
       }
     },
@@ -200,16 +227,18 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "window_id",
-        "start_time_s",
-        "end_time_s",
+        "acoustic_cavitation_alignment_expanded_uncertainty_s",
+        "acoustic_cavitation_alignment_offset_s",
         "acoustic_trace_sha256",
+        "background_expanded_uncertainty_db",
+        "background_spl_db",
         "cavitation_observation_sha256",
         "cavitation_present",
-        "total_spl_db",
-        "background_spl_db",
+        "end_time_s",
+        "start_time_s",
         "total_expanded_uncertainty_db",
-        "background_expanded_uncertainty_db"
+        "total_spl_db",
+        "window_id"
       ],
       "properties": {
         "window_id": {
@@ -247,6 +276,13 @@
           "exclusiveMinimum": 0
         },
         "background_expanded_uncertainty_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "acoustic_cavitation_alignment_offset_s": {
+          "type": "number"
+        },
+        "acoustic_cavitation_alignment_expanded_uncertainty_s": {
           "type": "number",
           "exclusiveMinimum": 0
         }
