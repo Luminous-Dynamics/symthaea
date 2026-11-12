@@ -1,0 +1,252 @@
+{
+  "schema_version": "planetary-energy-service-envelope-fixtures-v0.1",
+  "status": "synthetic_known_truth",
+  "created_for_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11756",
+  "scenarios": [
+    {
+      "scenario_id": "earth-clear-day-night-service",
+      "service_contract_id": "earth-24h-critical-services-v1",
+      "evidence_class": "synthetic_known_truth",
+      "mission_duration_h": 24,
+      "intervals": [
+        {
+          "interval_id": "earth-00-12",
+          "start_hour": 0,
+          "duration_hours": 12,
+          "capability_receipt_id": "synthetic:earth:interval-00-12",
+          "electricity": {
+            "required_energy_kwh": 8,
+            "deliverable_energy_after_reserve_kwh": 8.4,
+            "required_peak_power_kw": 2,
+            "deliverable_peak_power_kw": 2.5
+          },
+          "thermal_services": [
+            {
+              "service_id": "process-heat-80c",
+              "capability_receipt_id": "synthetic:earth:heat-00-12",
+              "required_useful_heat_kwh": 5,
+              "deliverable_useful_heat_kwh": 5.1,
+              "required_supply_temperature_c": 80,
+              "deliverable_supply_temperature_c": 82,
+              "required_peak_thermal_power_kw": 1,
+              "deliverable_peak_thermal_power_kw": 1.2
+            }
+          ]
+        },
+        {
+          "interval_id": "earth-12-24",
+          "start_hour": 12,
+          "duration_hours": 12,
+          "capability_receipt_id": "synthetic:earth:interval-12-24",
+          "electricity": {
+            "required_energy_kwh": 8,
+            "deliverable_energy_after_reserve_kwh": 8.2,
+            "required_peak_power_kw": 2,
+            "deliverable_peak_power_kw": 2.4
+          },
+          "thermal_services": [
+            {
+              "service_id": "process-heat-80c",
+              "capability_receipt_id": "synthetic:earth:heat-12-24",
+              "required_useful_heat_kwh": 5,
+              "deliverable_useful_heat_kwh": 5.2,
+              "required_supply_temperature_c": 80,
+              "deliverable_supply_temperature_c": 83,
+              "required_peak_thermal_power_kw": 1,
+              "deliverable_peak_thermal_power_kw": 1.2
+            }
+          ]
+        }
+      ],
+      "expected_disposition": "PASS_SYNTHETIC_SERVICE"
+    },
+    {
+      "scenario_id": "moon-long-darkness-reserve-shortfall",
+      "service_contract_id": "moon-south-pole-24h-v1",
+      "evidence_class": "synthetic_known_truth",
+      "mission_duration_h": 24,
+      "intervals": [
+        {
+          "interval_id": "moon-00-06",
+          "start_hour": 0,
+          "duration_hours": 6,
+          "capability_receipt_id": "synthetic:moon:00-06",
+          "electricity": {
+            "required_energy_kwh": 5,
+            "deliverable_energy_after_reserve_kwh": 5.3,
+            "required_peak_power_kw": 1.5,
+            "deliverable_peak_power_kw": 2
+          },
+          "thermal_services": []
+        },
+        {
+          "interval_id": "moon-06-12",
+          "start_hour": 6,
+          "duration_hours": 6,
+          "capability_receipt_id": "synthetic:moon:06-12",
+          "electricity": {
+            "required_energy_kwh": 5,
+            "deliverable_energy_after_reserve_kwh": 5.2,
+            "required_peak_power_kw": 1.5,
+            "deliverable_peak_power_kw": 2
+          },
+          "thermal_services": []
+        },
+        {
+          "interval_id": "moon-12-18",
+          "start_hour": 12,
+          "duration_hours": 6,
+          "capability_receipt_id": "synthetic:moon:12-18",
+          "electricity": {
+            "required_energy_kwh": 5,
+            "deliverable_energy_after_reserve_kwh": 5.1,
+            "required_peak_power_kw": 1.5,
+            "deliverable_peak_power_kw": 2
+          },
+          "thermal_services": []
+        },
+        {
+          "interval_id": "moon-18-24",
+          "start_hour": 18,
+          "duration_hours": 6,
+          "capability_receipt_id": "synthetic:moon:18-24",
+          "electricity": {
+            "required_energy_kwh": 5,
+            "deliverable_energy_after_reserve_kwh": 4.2,
+            "required_peak_power_kw": 1.5,
+            "deliverable_peak_power_kw": 2
+          },
+          "thermal_services": []
+        }
+      ],
+      "expected_disposition": "INFEASIBLE"
+    },
+    {
+      "scenario_id": "mars-dust-storm-unknown-generation",
+      "service_contract_id": "mars-dust-storm-48h-v1",
+      "evidence_class": "synthetic_known_truth",
+      "mission_duration_h": 48,
+      "intervals": [
+        {
+          "interval_id": "mars-00-24",
+          "start_hour": 0,
+          "duration_hours": 24,
+          "capability_receipt_id": "synthetic:mars:00-24",
+          "electricity": {
+            "required_energy_kwh": 20,
+            "deliverable_energy_after_reserve_kwh": null,
+            "required_peak_power_kw": 4,
+            "deliverable_peak_power_kw": 5
+          },
+          "thermal_services": []
+        },
+        {
+          "interval_id": "mars-24-48",
+          "start_hour": 24,
+          "duration_hours": 24,
+          "capability_receipt_id": "synthetic:mars:24-48",
+          "electricity": {
+            "required_energy_kwh": 20,
+            "deliverable_energy_after_reserve_kwh": 21,
+            "required_peak_power_kw": 4,
+            "deliverable_peak_power_kw": 5
+          },
+          "thermal_services": []
+        }
+      ],
+      "expected_disposition": "BLOCKED_UNKNOWN"
+    },
+    {
+      "scenario_id": "main-belt-thermal-grade-shortfall",
+      "service_contract_id": "main-belt-process-heat-24h-v1",
+      "evidence_class": "synthetic_known_truth",
+      "mission_duration_h": 24,
+      "intervals": [
+        {
+          "interval_id": "belt-00-12",
+          "start_hour": 0,
+          "duration_hours": 12,
+          "capability_receipt_id": "synthetic:belt:00-12",
+          "electricity": {
+            "required_energy_kwh": 2,
+            "deliverable_energy_after_reserve_kwh": 2.2,
+            "required_peak_power_kw": 0.5,
+            "deliverable_peak_power_kw": 0.8
+          },
+          "thermal_services": [
+            {
+              "service_id": "process-heat-600c",
+              "capability_receipt_id": "synthetic:belt:heat-00-12",
+              "required_useful_heat_kwh": 10,
+              "deliverable_useful_heat_kwh": 11,
+              "required_supply_temperature_c": 600,
+              "deliverable_supply_temperature_c": 540,
+              "required_peak_thermal_power_kw": 1,
+              "deliverable_peak_thermal_power_kw": 1.2
+            }
+          ]
+        },
+        {
+          "interval_id": "belt-12-24",
+          "start_hour": 12,
+          "duration_hours": 12,
+          "capability_receipt_id": "synthetic:belt:12-24",
+          "electricity": {
+            "required_energy_kwh": 2,
+            "deliverable_energy_after_reserve_kwh": 2.1,
+            "required_peak_power_kw": 0.5,
+            "deliverable_peak_power_kw": 0.8
+          },
+          "thermal_services": [
+            {
+              "service_id": "process-heat-600c",
+              "capability_receipt_id": "synthetic:belt:heat-12-24",
+              "required_useful_heat_kwh": 10,
+              "deliverable_useful_heat_kwh": 11,
+              "required_supply_temperature_c": 600,
+              "deliverable_supply_temperature_c": 545,
+              "required_peak_thermal_power_kw": 1,
+              "deliverable_peak_thermal_power_kw": 1.2
+            }
+          ]
+        }
+      ],
+      "expected_disposition": "INFEASIBLE"
+    },
+    {
+      "scenario_id": "outer-system-incomplete-time-coverage",
+      "service_contract_id": "outer-system-24h-load-v1",
+      "evidence_class": "synthetic_known_truth",
+      "mission_duration_h": 24,
+      "intervals": [
+        {
+          "interval_id": "outer-00-08",
+          "start_hour": 0,
+          "duration_hours": 8,
+          "capability_receipt_id": "synthetic:outer:00-08",
+          "electricity": {
+            "required_energy_kwh": 1,
+            "deliverable_energy_after_reserve_kwh": 1.2,
+            "required_peak_power_kw": 0.3,
+            "deliverable_peak_power_kw": 0.4
+          },
+          "thermal_services": []
+        },
+        {
+          "interval_id": "outer-10-24",
+          "start_hour": 10,
+          "duration_hours": 14,
+          "capability_receipt_id": "synthetic:outer:10-24",
+          "electricity": {
+            "required_energy_kwh": 1,
+            "deliverable_energy_after_reserve_kwh": 1.2,
+            "required_peak_power_kw": 0.3,
+            "deliverable_peak_power_kw": 0.4
+          },
+          "thermal_services": []
+        }
+      ],
+      "expected_disposition": "BLOCKED_UNKNOWN"
+    }
+  ]
+}
