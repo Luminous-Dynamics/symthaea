@@ -277,6 +277,147 @@
         "lunar PV manufacturing"
       ],
       "retrieved_on": "2026-02"
+    },
+    {
+      "source_id": "NASA-VSAT-GRD-2024",
+      "title": "Government Reference Design of the Vertical Solar Array Technology Demonstrator",
+      "publisher": "NASA Langley Research Center",
+      "published_or_updated": "2024-05-15",
+      "source_url": "https://ntrs.nasa.gov/citations/20240004914",
+      "evidence_class": "government_design_reference",
+      "technology_scope": [
+        "lunar_vertical_solar_array",
+        "mast_deployment",
+        "blanket_deployment_retraction",
+        "mechanism_design"
+      ],
+      "reported_facts": [
+        "The original reference concept specifies at least 10 kW capability and at least 10 m elevation from the lunar surface to the array bottom.",
+        "The cited concept describes approximately 6 m by 6 m total array geometry divided across two arrays on either side of a mast."
+      ],
+      "comparison_use": [
+        "first_generation_VSAT_design_reference",
+        "array_mast_and_deployment_mass_trade"
+      ],
+      "not_established": [
+        "completed operational lunar deployment",
+        "measured full-system specific power",
+        "long-duration mission availability",
+        "performance at all lunar sites"
+      ]
+    },
+    {
+      "source_id": "NASA-VSAT-SBIR-50KW-GOAL-2025",
+      "title": "NASA FY2025 SBIR Phase I — Second-generation modular 50-kW lunar vertical solar array subtopic",
+      "publisher": "NASA",
+      "published_or_updated": "2025",
+      "source_url": "https://www.nasa.gov/wp-content/uploads/2024/01/sbir80nsscfy25sbirphaseiamendment4signed.pdf",
+      "evidence_class": "government_research_solicitation_target",
+      "technology_scope": [
+        "modular_lunar_vertical_solar_array",
+        "50_kw_class_generation",
+        "specific_power_goal",
+        "deployment_and_relocation_mechanisms"
+      ],
+      "reported_facts": [
+        "The solicitation frames a second-generation modular 50-kW vertical array near the lunar South Pole.",
+        "The stated specific-power goal is greater than 75 W/kg.",
+        "The solicitation emphasizes compact packaging, safe transportation, reliable deployment, stable operation while Sun tracking, and occasional retraction and relocation."
+      ],
+      "comparison_use": [
+        "programme_goal_not_achieved_baseline",
+        "target_for_lunar_array_architecture_trade"
+      ],
+      "not_established": [
+        "demonstrated 50-kW system",
+        "measured >75 W/kg performance",
+        "flight or lunar operational qualification"
+      ]
+    },
+    {
+      "source_id": "NASA-LUNAR-LASER-POWER-BEAMING-2024",
+      "title": "Engineering Design Study of Laser Power Beaming for Applications on the Moon",
+      "publisher": "NASA Glenn Research Center",
+      "published_or_updated": "2024-09-04",
+      "source_url": "https://ntrs.nasa.gov/citations/20240011011",
+      "evidence_class": "government_engineering_design_study",
+      "technology_scope": [
+        "surface_to_surface_optical_power_beaming",
+        "orbital_to_surface_power_beaming",
+        "VSAT_transmitter_platform",
+        "remote_PV_receiver",
+        "receiver_storage"
+      ],
+      "reported_facts": [
+        "The surface-to-surface concept uses a VSAT-style 10-m mast and studies up to 10-km receiver distance.",
+        "The design requirement is 300 W continuous usable power, a five-year design life and total landed mass below 625 kg.",
+        "The study reports approximately 1,595 W optical beam output, 542 W incident on the receiver PV array and 300 W usable at the load, with 242 W routed to receiver batteries.",
+        "The study describes beam operation for approximately 57% of the time and idle periods when the VSAT itself is shadowed."
+      ],
+      "comparison_use": [
+        "optical_distribution_architecture_reference",
+        "matched_cable_vs_beaming_vs_local_generation_comparison"
+      ],
+      "not_established": [
+        "operational lunar laser link",
+        "measured five-year lifetime",
+        "flight qualification",
+        "generic 300-W service availability at arbitrary terrain locations"
+      ]
+    },
+    {
+      "source_id": "NATURE-PEROVSKITE-COST-REVIEW-2026",
+      "title": "Cost-driven strategies towards industrially manufacturable perovskite photovoltaics",
+      "publisher": "Nature Reviews Materials",
+      "published_or_updated": "2026-10-19",
+      "source_url": "https://www.nature.com/articles/s41578-026-00973-9",
+      "evidence_class": "peer_reviewed_review",
+      "technology_scope": [
+        "perovskite_PV_manufacturing_cost",
+        "large_area_yield",
+        "process_reliability",
+        "material_recycling",
+        "fabrication_simplification"
+      ],
+      "reported_facts": [
+        "The review discusses perovskite manufacturing costs of approximately US$0.3–0.6/W versus approximately US$0.1/W for mature crystalline silicon in its assessed context.",
+        "It identifies yield, process/material reliability, material cost, recycling and simpler fabrication as key industrialization levers."
+      ],
+      "comparison_use": [
+        "manufacturing_economics_baseline",
+        "yield_and_process_robustness_benchmark"
+      ],
+      "not_established": [
+        "universal factory quote",
+        "identical currency-year and accounting boundary across all manufacturers",
+        "lunar or space manufacturing cost"
+      ]
+    },
+    {
+      "source_id": "NATURE-PEROVSKITE-COMMERCIALIZATION-2026",
+      "title": "Taking perovskite photovoltaics from promise to product",
+      "publisher": "Nature Reviews Clean Technology",
+      "published_or_updated": "2026",
+      "source_url": "https://www.nature.com/articles/s44359-026-00173-2",
+      "evidence_class": "peer_reviewed_perspective",
+      "technology_scope": [
+        "perovskite_and_tandem_PV_scale_up",
+        "manufacturing_maturity",
+        "operational_stability",
+        "factory_economics",
+        "commercial_readiness"
+      ],
+      "reported_facts": [
+        "The perspective argues that laboratory efficiency gains have diminishing deployment value without scale-up, yield, operational stability, standards and factory-economics improvements."
+      ],
+      "comparison_use": [
+        "product_centric_PV_benchmark_design",
+        "commercialization_gap_analysis"
+      ],
+      "not_established": [
+        "a specific universal efficiency or cost target",
+        "independently measured factory yield for every technology"
+      ]
     }
   ]
 }
