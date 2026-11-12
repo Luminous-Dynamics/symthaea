@@ -111,7 +111,8 @@
       "sound_speed_profile_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "seabed_model_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
-      "timebase_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      "timebase_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "center_frequency_hz": 125
     },
     {
       "contribution_id": "contrib-b",
@@ -137,7 +138,8 @@
       "sound_speed_profile_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
       "seabed_model_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
       "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
-      "timebase_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+      "timebase_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "center_frequency_hz": 125
     }
   ],
   "ambient_observations": [
@@ -158,7 +160,10 @@
       "calibration_certificate_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
       "raw_trace_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
       "timebase_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
-      "ambient_only_basis": "independently_measured_ambient_reference"
+      "ambient_only_basis": "independently_measured_ambient_reference",
+      "quantity_id": "received_spl_db_re_1upa",
+      "center_frequency_hz": 125,
+      "uncertainty_confidence_level": 0.95
     }
   ],
   "exposure_limits": [
@@ -167,7 +172,8 @@
       "receiver_id": "receiver-1",
       "band_id": "one-third-octave-125Hz",
       "upper_sel_threshold_db": 80,
-      "requirement_reference": "synthetic-test-threshold-not-regulatory"
+      "requirement_reference": "synthetic-test-threshold-not-regulatory",
+      "quantity_id": "sound_exposure_level_db_re_1upa2_s"
     }
   ]
 }
