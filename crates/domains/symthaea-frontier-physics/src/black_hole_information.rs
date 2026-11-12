@@ -1866,6 +1866,254 @@ mod u1_domain_wall_transport_ensemble_tests {
     }
 }
 
+/// One-step, exactly enumerable Hayden-Preskill-style decoupling diagnostic.
+///
+/// Q is a reference maximally entangled with message M; the initial black-hole
+/// factor B is maximally entangled with early radiation R. A seeded Haar U(4)
+/// scrambler acts on M and B. The two output qubits are labelled outgoing E
+/// and remaining black-hole B'. The accessible output is A = R tensor E.
+///
+/// This computes a decoupling diagnostic only. It does not construct or run a
+/// recovery decoder, nor does this four-qubit model represent a macroscopic
+/// black hole or a gravitational evaporation process.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HaydenPreskillDecouplingSample {
+    pub seed: u64,
+    pub state_norm_squared: f64,
+    pub reference_entropy_nats: f64,
+    pub remaining_black_hole_entropy_nats: f64,
+    pub reference_black_hole_joint_entropy_nats: f64,
+    pub reference_remaining_black_hole_mutual_information_nats: f64,
+    pub accessible_radiation_entropy_nats: f64,
+    pub reference_accessible_radiation_joint_entropy_nats: f64,
+    pub reference_accessible_radiation_mutual_information_nats: f64,
+    /// For a pure Q B' A state, I(Q:B') + I(Q:A) = 2 S(Q).
+    pub information_complementarity_residual_nats: f64,
+}
+
+/// Single seeded one-qubit-message/one-qubit-black-hole decoupling experiment.
+pub fn simulate_small_hayden_preskill_decoupling(
+    seed: u64,
+    tolerance: f64,
+) -> Result<HaydenPreskillDecouplingSample, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    const NUMBER_OF_QUBITS: usize = 4;
+    // Register order is Q, M, B, R (MSB-first). Both pairs start in Bell states.
+    let mut amplitudes = vec![Complex64::new(0.0, 0.0); 1 << NUMBER_OF_QUBITS];
+    for message_bit in 0..2 {
+        for black_hole_bit in 0..2 {
+            let q = message_bit;
+            let m = message_bit;
+            let b = black_hole_bit;
+            let r = black_hole_bit;
+            let basis = (q << 3) | (m << 2) | (b << 1) | r;
+            amplitudes[basis] = Complex64::new(0.5, 0.0);
+        }
+    }
+
+    let mut rng = ChaCha20Rng::seed_from_u64(seed);
+    let scrambler = haar_unitary_4(&mut rng)?;
+    apply_two_qubit_unitary(
+        &mut amplitudes,
+        NUMBER_OF_QUBITS,
+        1, // message M
+        2, // initial black-hole register B
+        &scrambler,
+    )?;
+
+    let norm_squared: f64 =
+        amplitudes.iter().map(|amplitude| amplitude.norm_sqr()).sum();
+    if !norm_squared.is_finite() {
+        return Err(QuantumInformationError::NonFiniteState {
+            index: amplitudes.len(),
+        });
+    }
+    if (norm_squared - 1.0).abs() > tolerance {
+        return Err(QuantumInformationError::NormalizationError {
+            norm_squared,
+            tolerance,
+        });
+    }
+
+    let entropy_of = |retained: &[usize]| -> Result<f64, QuantumInformationError> {
+        DensityMatrix::from_pure_state(
+            &amplitudes,
+            NUMBER_OF_QUBITS,
+            retained,
+            tolerance,
+        )?
+        .von_neumann_entropy(tolerance)
+    };
+
+    let reference_entropy = entropy_of(&[0])?;
+    let remaining_black_hole_entropy = entropy_of(&[2])?;
+    let reference_black_hole_joint_entropy = entropy_of(&[0, 2])?;
+    let accessible_radiation_entropy = entropy_of(&[1, 3])?;
+    let reference_accessible_radiation_joint_entropy = entropy_of(&[0, 1, 3])?;
+
+    let reference_black_hole_mutual_information =
+        reference_entropy + remaining_black_hole_entropy
+            - reference_black_hole_joint_entropy;
+    let reference_accessible_radiation_mutual_information =
+        reference_entropy + accessible_radiation_entropy
+            - reference_accessible_radiation_joint_entropy;
+    let information_complementarity_residual = (
+        reference_black_hole_mutual_information
+            + reference_accessible_radiation_mutual_information
+            - 2.0 * reference_entropy
+    )
+        .abs();
+
+    for (name, value) in [
+        ("I(Q:B')", reference_black_hole_mutual_information),
+        ("I(Q:A)", reference_accessible_radiation_mutual_information),
+    ] {
+        if !value.is_finite() || value < -tolerance {
+            return Err(QuantumInformationError::InvalidPageEntropy(value));
+        }
+        if value.abs() < tolerance {
+            let _ = name;
+        }
+    }
+    if information_complementarity_residual > tolerance * 10.0 {
+        return Err(QuantumInformationError::TraceError {
+            real: information_complementarity_residual,
+            imaginary: 0.0,
+            tolerance,
+        });
+    }
+
+    Ok(HaydenPreskillDecouplingSample {
+        seed,
+        state_norm_squared: norm_squared,
+        reference_entropy_nats: reference_entropy,
+        remaining_black_hole_entropy_nats: remaining_black_hole_entropy,
+        reference_black_hole_joint_entropy_nats: reference_black_hole_joint_entropy,
+        reference_remaining_black_hole_mutual_information_nats:
+            reference_black_hole_mutual_information.max(0.0),
+        accessible_radiation_entropy_nats: accessible_radiation_entropy,
+        reference_accessible_radiation_joint_entropy_nats:
+            reference_accessible_radiation_joint_entropy,
+        reference_accessible_radiation_mutual_information_nats:
+            reference_accessible_radiation_mutual_information.max(0.0),
+        information_complementarity_residual_nats:
+            information_complementarity_residual,
+    })
+}
+
+/// Independent-seed ensemble statistics for the one-step decoupling diagnostic.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HaydenPreskillDecouplingSummary {
+    pub sample_count: usize,
+    pub first_seed: u64,
+    pub mean_reference_black_hole_mutual_information_nats: f64,
+    pub standard_error_reference_black_hole_mutual_information_nats: f64,
+    pub mean_reference_accessible_radiation_mutual_information_nats: f64,
+    pub standard_error_reference_accessible_radiation_mutual_information_nats: f64,
+    pub maximum_information_complementarity_residual_nats: f64,
+}
+
+/// Sample independent two-qubit scramblers and preserve per-ensemble uncertainty.
+pub fn sample_small_hayden_preskill_decoupling_ensemble(
+    sample_count: usize,
+    first_seed: u64,
+    tolerance: f64,
+) -> Result<HaydenPreskillDecouplingSummary, QuantumInformationError> {
+    if sample_count < 2 {
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+    }
+    let mut mean_qb = 0.0;
+    let mut m2_qb = 0.0;
+    let mut mean_qa = 0.0;
+    let mut m2_qa = 0.0;
+    let mut maximum_complementarity_residual: f64 = 0.0;
+    for sample_index in 0..sample_count {
+        let sample = simulate_small_hayden_preskill_decoupling(
+            first_seed.wrapping_add(sample_index as u64),
+            tolerance,
+        )?;
+        let count = (sample_index + 1) as f64;
+        let delta_qb =
+            sample.reference_remaining_black_hole_mutual_information_nats - mean_qb;
+        mean_qb += delta_qb / count;
+        m2_qb += delta_qb
+            * (sample.reference_remaining_black_hole_mutual_information_nats - mean_qb);
+        let delta_qa =
+            sample.reference_accessible_radiation_mutual_information_nats - mean_qa;
+        mean_qa += delta_qa / count;
+        m2_qa += delta_qa
+            * (sample.reference_accessible_radiation_mutual_information_nats - mean_qa);
+        maximum_complementarity_residual = maximum_complementarity_residual
+            .max(sample.information_complementarity_residual_nats);
+    }
+    let denominator = (sample_count - 1) as f64;
+    Ok(HaydenPreskillDecouplingSummary {
+        sample_count,
+        first_seed,
+        mean_reference_black_hole_mutual_information_nats: mean_qb,
+        standard_error_reference_black_hole_mutual_information_nats:
+            (m2_qb / denominator / sample_count as f64).sqrt(),
+        mean_reference_accessible_radiation_mutual_information_nats: mean_qa,
+        standard_error_reference_accessible_radiation_mutual_information_nats:
+            (m2_qa / denominator / sample_count as f64).sqrt(),
+        maximum_information_complementarity_residual_nats:
+            maximum_complementarity_residual,
+    })
+}
+
+#[cfg(test)]
+mod hayden_preskill_decoupling_tests {
+    use super::*;
+
+    const TOLERANCE: f64 = 1e-10;
+
+    #[test]
+    fn one_step_hayden_preskill_toy_preserves_reference_entropy_and_information_balance() {
+        let sample =
+            simulate_small_hayden_preskill_decoupling(0x48A7, TOLERANCE).unwrap();
+        assert!((sample.reference_entropy_nats - core::f64::consts::LN_2).abs()
+            < TOLERANCE);
+        assert!((sample.state_norm_squared - 1.0).abs() < TOLERANCE);
+        assert!(sample.reference_remaining_black_hole_mutual_information_nats
+            >= -TOLERANCE);
+        assert!(sample.reference_accessible_radiation_mutual_information_nats
+            >= -TOLERANCE);
+        assert!(sample.information_complementarity_residual_nats < TOLERANCE);
+    }
+
+    #[test]
+    fn one_step_hayden_preskill_toy_is_seed_reproducible() {
+        let first =
+            simulate_small_hayden_preskill_decoupling(0x48A7, TOLERANCE).unwrap();
+        let second =
+            simulate_small_hayden_preskill_decoupling(0x48A7, TOLERANCE).unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn one_step_hayden_preskill_ensemble_reports_uncertainty_and_complementarity() {
+        let summary = sample_small_hayden_preskill_decoupling_ensemble(
+            32, 0x4850, TOLERANCE,
+        )
+        .unwrap();
+        assert_eq!(summary.sample_count, 32);
+        assert!(summary.standard_error_reference_black_hole_mutual_information_nats
+            >= 0.0);
+        assert!(summary.standard_error_reference_accessible_radiation_mutual_information_nats
+            >= 0.0);
+        assert!(summary.maximum_information_complementarity_residual_nats
+            < TOLERANCE);
+    }
+
+    #[test]
+    fn one_step_hayden_preskill_ensemble_rejects_single_sample() {
+        assert!(matches!(
+            sample_small_hayden_preskill_decoupling_ensemble(1, 1, TOLERANCE),
+            Err(QuantumInformationError::InvalidEnsembleSampleCount(1))
+        ));
+    }
+}
+
 /// Sampling statistics for Haar-random states inside a fixed U(1) charge sector.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SymmetryResolvedPageEnsembleSummary {
