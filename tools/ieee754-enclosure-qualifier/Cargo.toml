@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.94"
 publish = false
-description = "Qualification-only IEEE-754 enclosure primitives with independent exact-rational checks"
+description = "IEEE-754 enclosure primitives with exact-rational qualification"
 license = "AGPL-3.0-or-later"
 
 [lib]
