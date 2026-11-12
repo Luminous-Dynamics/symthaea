@@ -56,6 +56,11 @@ pub struct BeatGridEvaluationConfigV1 {
     pub metric_level_variants_enabled: bool,
     pub continuity_phase_threshold_basis_points: u16,
     pub continuity_period_threshold_basis_points: u16,
+    pub goto_threshold_basis_points: u16,
+    pub goto_mean_abs_threshold_basis_points: u16,
+    pub goto_std_dev_threshold_basis_points: u16,
+    pub p_score_threshold_basis_points: u16,
+    pub information_gain_bins: u16,
 }
 
 impl Default for BeatGridEvaluationConfigV1 {
@@ -68,6 +73,11 @@ impl Default for BeatGridEvaluationConfigV1 {
             metric_level_variants_enabled: true,
             continuity_phase_threshold_basis_points: 1_750,
             continuity_period_threshold_basis_points: 1_750,
+            goto_threshold_basis_points: 3_500,
+            goto_mean_abs_threshold_basis_points: 2_000,
+            goto_std_dev_threshold_basis_points: 2_000,
+            p_score_threshold_basis_points: 2_000,
+            information_gain_bins: 41,
         }
     }
 }
@@ -128,6 +138,9 @@ pub struct BeatGridReferenceScoreV1 {
     /// mir_eval continuity: correct metric level continuous / total, and any
     /// metrical level continuous / total. These remain separate from strict F1.
     pub continuity_metrics: Option<BeatGridContinuityMetricsV1>,
+    pub goto_score: f64,
+    pub p_score: Option<f64>,
+    pub information_gain: f64,
     pub downbeat_metric: Option<BeatGridEventMetricV1>,
     pub beat_timing_error: BeatGridTimingErrorSummaryV1,
     pub downbeat_timing_error: Option<BeatGridTimingErrorSummaryV1>,
@@ -231,6 +244,31 @@ fn validate_config(
     if !(1..=5_000).contains(&config.continuity_period_threshold_basis_points) {
         return Err(BeatGridEvaluationIssueV1::InvalidConfig {
             field: "continuity_period_threshold_basis_points".into(),
+        });
+    }
+    if !(1..=9_000).contains(&config.goto_threshold_basis_points) {
+        return Err(BeatGridEvaluationIssueV1::InvalidConfig {
+            field: "goto_threshold_basis_points".into(),
+        });
+    }
+    if !(1..=9_000).contains(&config.goto_mean_abs_threshold_basis_points) {
+        return Err(BeatGridEvaluationIssueV1::InvalidConfig {
+            field: "goto_mean_abs_threshold_basis_points".into(),
+        });
+    }
+    if !(1..=9_000).contains(&config.goto_std_dev_threshold_basis_points) {
+        return Err(BeatGridEvaluationIssueV1::InvalidConfig {
+            field: "goto_std_dev_threshold_basis_points".into(),
+        });
+    }
+    if !(1..=5_000).contains(&config.p_score_threshold_basis_points) {
+        return Err(BeatGridEvaluationIssueV1::InvalidConfig {
+            field: "p_score_threshold_basis_points".into(),
+        });
+    }
+    if !(3..=1_001).contains(&config.information_gain_bins) {
+        return Err(BeatGridEvaluationIssueV1::InvalidConfig {
+            field: "information_gain_bins".into(),
         });
     }
     if config.minimum_evaluation_time_ms.is_some_and(|value| value > 30_000_000) {
@@ -697,6 +735,226 @@ fn continuity_metrics(
     }
 }
 
+fn metric_goto(
+    reference: &[f64],
+    estimated: &[f64],
+    config: &BeatGridEvaluationConfigV1,
+) -> f64 {
+    if reference.is_empty() || estimated.is_empty() {
+        return 0.0;
+    }
+    let mut beat_error = vec![1.0f64; reference.len()];
+    for reference_index in 1..reference.len().saturating_sub(1) {
+        let previous_half_interval =
+            0.5 * (reference[reference_index] - reference[reference_index - 1]);
+        let next_half_interval =
+            0.5 * (reference[reference_index + 1] - reference[reference_index]);
+        let window_min = reference[reference_index] - previous_half_interval;
+        let window_max = reference[reference_index] + next_half_interval;
+        let start = estimated.partition_point(|time| *time < window_min);
+        let end = estimated.partition_point(|time| *time < window_max);
+        if end.saturating_sub(start) != 1 {
+            continue;
+        }
+        let offset = estimated[start] - reference[reference_index];
+        beat_error[reference_index] = if offset < 0.0 {
+            offset / previous_half_interval
+        } else {
+            offset / next_half_interval
+        };
+    }
+
+    let incorrect: Vec<usize> = beat_error
+        .iter()
+        .enumerate()
+        .filter_map(|(index, error)| {
+            (error.abs() > f64::from(config.goto_threshold_basis_points) / 10_000.0)
+                .then_some(index)
+        })
+        .collect();
+    if incorrect.is_empty() {
+        return 0.0;
+    }
+
+    let mut track = Vec::new();
+    if incorrect.len() < 3 {
+        let start = incorrect[0].saturating_add(1);
+        let end = incorrect[incorrect.len() - 1].saturating_sub(1);
+        if start < end && end <= beat_error.len() {
+            track.extend_from_slice(&beat_error[start..end]);
+        }
+    } else {
+        let mut longest_gap = 0usize;
+        let mut longest_gap_start = 0usize;
+        for (index, pair) in incorrect.windows(2).enumerate() {
+            let gap = pair[1].saturating_sub(pair[0]);
+            if gap > longest_gap {
+                longest_gap = gap;
+                longest_gap_start = index;
+            }
+        }
+        if (longest_gap.saturating_sub(1)) as f64
+            > 0.25 * (reference.len().saturating_sub(2)) as f64
+        {
+            let start = incorrect[longest_gap_start];
+            let end = incorrect[longest_gap_start + 1];
+            track.extend_from_slice(&beat_error[start..=end]);
+        }
+    }
+    if track.is_empty() {
+        return 0.0;
+    }
+
+    let mean_absolute =
+        track.iter().map(|value| value.abs()).sum::<f64>() / track.len() as f64;
+    if track.len() < 2 {
+        return 0.0;
+    }
+    let mean = track.iter().sum::<f64>() / track.len() as f64;
+    let variance = track
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>()
+        / (track.len() - 1) as f64;
+    let std_dev = variance.sqrt();
+    if mean_absolute < f64::from(config.goto_mean_abs_threshold_basis_points) / 10_000.0
+        && std_dev < f64::from(config.goto_std_dev_threshold_basis_points) / 10_000.0
+    {
+        1.0
+    } else {
+        0.0
+    }
+}
+
+fn quantized_beat_indices(
+    beats: &[f64],
+    offset_seconds: f64,
+) -> Vec<u64> {
+    let mut indices: Vec<u64> = beats
+        .iter()
+        .map(|time| ((time - offset_seconds) * 100.0).ceil().max(0.0) as u64)
+        .collect();
+    indices.dedup();
+    indices
+}
+
+fn metric_p_score(
+    reference: &[f64],
+    estimated: &[f64],
+    config: &BeatGridEvaluationConfigV1,
+) -> Option<f64> {
+    if reference.len() <= 1 || estimated.len() <= 1 {
+        return Some(0.0);
+    }
+    let offset = reference[0].min(estimated[0]);
+    let reference_indices = quantized_beat_indices(reference, offset);
+    let estimated_indices = quantized_beat_indices(estimated, offset);
+    if reference_indices.len() <= 1 || estimated_indices.is_empty() {
+        return None;
+    }
+    let intervals: Vec<f64> = reference_indices
+        .windows(2)
+        .map(|pair| (pair[1] - pair[0]) as f64)
+        .collect();
+    let median_interval = median_of(intervals)?;
+    // numpy.round uses ties-to-even; Rust round_ties_even has the same rule.
+    let window = (f64::from(config.p_score_threshold_basis_points) / 10_000.0
+        * median_interval)
+        .round_ties_even()
+        .max(0.0) as u64;
+
+    let mut correlation_sum = 0u128;
+    for reference_index in &reference_indices {
+        let lower = reference_index.saturating_sub(window);
+        let upper = reference_index.saturating_add(window);
+        let start = estimated_indices.partition_point(|value| *value < lower);
+        let end = estimated_indices.partition_point(|value| *value <= upper);
+        correlation_sum = correlation_sum.saturating_add((end - start) as u128);
+    }
+    let denominator = reference.len().max(estimated.len());
+    Some(correlation_sum as f64 / denominator as f64)
+}
+
+fn information_gain_entropy(
+    reference: &[f64],
+    estimated: &[f64],
+    bins: usize,
+) -> Option<f64> {
+    if reference.len() <= 1 || estimated.is_empty() {
+        return Some(0.0);
+    }
+    let mut histogram = vec![0usize; bins];
+    let last_reference_index = reference.len() - 1;
+    for estimated_time in estimated {
+        let insertion = reference.partition_point(|time| *time < *estimated_time);
+        let nearest = if insertion == 0 {
+            0
+        } else if insertion == reference.len() {
+            last_reference_index
+        } else {
+            let prior_error = (*estimated_time - reference[insertion - 1]).abs();
+            let next_error = (reference[insertion] - *estimated_time).abs();
+            if prior_error <= next_error { insertion - 1 } else { insertion }
+        };
+        let absolute_error = estimated_time - reference[nearest];
+
+        // Match mir_eval 0.8.2's _get_entropy control flow exactly, including
+        // the first-reference/negative-error interval behavior.
+        let mut interval = if nearest == 0 {
+            0.5 * (reference[1] - reference[0])
+        } else {
+            0.5 * (reference[nearest] - reference[nearest - 1])
+        };
+        if nearest == last_reference_index {
+            interval = 0.5 * (reference[last_reference_index] - reference[last_reference_index - 1]);
+        } else if absolute_error < 0.0 {
+            interval = 0.5 * (reference[nearest] - reference[nearest.saturating_sub(1)]);
+            if nearest == 0 {
+                interval = 0.5 * (reference[0] - reference[last_reference_index]);
+            }
+        } else {
+            interval = 0.5 * (reference[nearest + 1] - reference[nearest]);
+        }
+        if !interval.is_finite() || interval == 0.0 {
+            return None;
+        }
+
+        let normalized_error = 0.5 * absolute_error / interval;
+        // np.mod(x + 0.5, -1.0) + 0.5 is equivalent to wrapping into
+        // (-0.5, 0.5], preserving the positive endpoint.
+        let wrapped_error = normalized_error - (normalized_error - 0.5).ceil();
+        let scaled_bin = ((wrapped_error + 0.5) * bins as f64).floor();
+        let bin = if scaled_bin >= bins as f64 {
+            bins - 1
+        } else {
+            scaled_bin.max(0.0) as usize
+        };
+        histogram[bin] += 1;
+    }
+    let total = estimated.len() as f64;
+    let mut entropy = 0.0;
+    for count in histogram {
+        let probability = if count == 0 { 1.0 } else { count as f64 / total };
+        entropy -= probability * probability.log2();
+    }
+    Some(entropy)
+}
+
+fn metric_information_gain(
+    reference: &[f64],
+    estimated: &[f64],
+    bins: usize,
+) -> Option<f64> {
+    if reference.len() <= 1 || estimated.len() <= 1 {
+        return Some(0.0);
+    }
+    let forward = information_gain_entropy(reference, estimated, bins)?;
+    let backward = information_gain_entropy(estimated, reference, bins)?;
+    let entropy = forward.max(backward);
+    let normalizer = (bins as f64).log2();
+    Some((normalizer - entropy) / normalizer)
+}
+
 fn score_one_reference(
     reference: &BeatGridReferenceV1,
     prediction: &BeatGridPredictionV1,
@@ -776,6 +1034,14 @@ fn score_one_reference(
         cemgil_score: cemgil,
         cemgil_best_metric_level: cemgil_best,
         continuity_metrics: Some(continuity_metrics(&reference_beats, &estimated_beats, config)),
+        goto_score: metric_goto(&reference_beats, &estimated_beats, config),
+        p_score: metric_p_score(&reference_beats, &estimated_beats, config),
+        information_gain: metric_information_gain(
+            &reference_beats,
+            &estimated_beats,
+            usize::from(config.information_gain_bins),
+        )
+        .unwrap_or(0.0),
         downbeat_metric,
         beat_timing_error,
         downbeat_timing_error,
