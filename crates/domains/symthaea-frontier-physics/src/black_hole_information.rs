@@ -2157,6 +2157,66 @@ pub fn simulate_identity_hayden_preskill_petz_control(
     petz_recovery_from_scrambler(&identity, 0, tolerance)
 }
 
+/// Independent-seed Petz recovery ensemble statistics.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HaydenPreskillPetzEnsembleSummary {
+    pub sample_count: usize,
+    pub first_seed: u64,
+    pub mean_entanglement_fidelity: f64,
+    pub standard_error_entanglement_fidelity: f64,
+    pub minimum_entanglement_fidelity: f64,
+    pub maximum_entanglement_fidelity: f64,
+    pub maximum_inverse_square_root_residual: f64,
+    pub maximum_trace_preservation_residual: f64,
+}
+
+/// Sample independent four-qubit Haar scramblers and report decoder uncertainty.
+pub fn sample_small_hayden_preskill_petz_ensemble(
+    sample_count: usize,
+    first_seed: u64,
+    tolerance: f64,
+) -> Result<HaydenPreskillPetzEnsembleSummary, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    if sample_count < 2 {
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+    }
+    let mut mean = 0.0;
+    let mut m2 = 0.0;
+    let mut minimum = f64::INFINITY;
+    let mut maximum: f64 = 0.0;
+    let mut maximum_inverse_square_root_residual: f64 = 0.0;
+    let mut maximum_trace_preservation_residual: f64 = 0.0;
+    for sample_index in 0..sample_count {
+        let sample = simulate_small_hayden_preskill_petz_recovery(
+            first_seed.wrapping_add(sample_index as u64),
+            tolerance,
+        )?;
+        let count = (sample_index + 1) as f64;
+        let delta = sample.entanglement_fidelity - mean;
+        mean += delta / count;
+        m2 += delta * (sample.entanglement_fidelity - mean);
+        minimum = minimum.min(sample.entanglement_fidelity);
+        maximum = maximum.max(sample.entanglement_fidelity);
+        maximum_inverse_square_root_residual =
+            maximum_inverse_square_root_residual.max(sample.inverse_square_root_residual);
+        maximum_trace_preservation_residual =
+            maximum_trace_preservation_residual.max(sample.trace_preservation_residual);
+    }
+    Ok(HaydenPreskillPetzEnsembleSummary {
+        sample_count,
+        first_seed,
+        mean_entanglement_fidelity: mean,
+        standard_error_entanglement_fidelity: (m2
+            / (sample_count - 1) as f64
+            / sample_count as f64)
+            .sqrt(),
+        minimum_entanglement_fidelity: minimum,
+        maximum_entanglement_fidelity: maximum,
+        maximum_inverse_square_root_residual,
+        maximum_trace_preservation_residual,
+    })
+}
+
 fn petz_recovery_from_scrambler(
     scrambler: &[[Complex64; 4]; 4],
     seed: u64,
@@ -2510,6 +2570,23 @@ mod hayden_preskill_decoupling_tests {
             assert_eq!(sample.recovered_message_dimension, 2);
             assert_eq!(sample.recovery_kraus_count, 2);
         }
+    }
+
+    #[test]
+    fn petz_recovery_ensemble_reports_fidelity_uncertainty_and_seed_reproducibility() {
+        let first =
+            sample_small_hayden_preskill_petz_ensemble(16, 0x5045, TOLERANCE).unwrap();
+        let repeated =
+            sample_small_hayden_preskill_petz_ensemble(16, 0x5045, TOLERANCE).unwrap();
+        assert_eq!(first, repeated);
+        assert_eq!(first.sample_count, 16);
+        assert!((0.0..=1.0).contains(&first.minimum_entanglement_fidelity));
+        assert!((0.0..=1.0).contains(&first.maximum_entanglement_fidelity));
+        assert!(first.minimum_entanglement_fidelity <= first.mean_entanglement_fidelity);
+        assert!(first.mean_entanglement_fidelity <= first.maximum_entanglement_fidelity);
+        assert!(first.standard_error_entanglement_fidelity >= 0.0);
+        assert!(first.maximum_inverse_square_root_residual < TOLERANCE * 100.0);
+        assert!(first.maximum_trace_preservation_residual < TOLERANCE * 100.0);
     }
 
     #[test]
