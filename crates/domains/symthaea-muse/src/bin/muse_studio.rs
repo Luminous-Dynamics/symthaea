@@ -5756,7 +5756,7 @@ mod compose_bars_contract_tests {
 
 #[cfg(test)]
 mod notation_summary_tests {
-    use super::summarize_imported_notation_structure;
+    use super::{summarize_imported_notation_structure, ImportedNotationArtifact};
     use symthaea_muse::symbolic_import::ImportedNotationStructureV1;
     use symthaea_muse_protocol::ImportedNotationStructureSummary;
 
@@ -5786,11 +5786,17 @@ mod notation_summary_tests {
         assert_eq!(summary.measure_count, 1);
         assert_eq!(summary.barline_event_count, 1);
         assert_eq!(summary.source_sha256, source_sha256);
-        let sidecar = sidecar.expect("MusicXML graph must be persisted");
+        let sidecar = match sidecar.expect("MusicXML graph must be persisted") {
+            ImportedNotationArtifact::MusicXmlGraph(bytes) => bytes,
+            ImportedNotationArtifact::MidiMeasureMaps(_) => {
+                panic!("MusicXML must persist a graph artifact")
+            }
+        };
         let decoded: Vec<symthaea_muse::musicxml_barline_adapter::MusicXmlPartNotationGraphV1> =
             serde_json::from_slice(&sidecar).unwrap();
         let digest = symthaea_muse::evidence_digest::canonical_json_sha256(&decoded).unwrap();
         assert_eq!(summary.graph_sha256.as_deref(), Some(digest.as_str()));
+        assert!(summary.measure_map_sha256.is_none());
     }
 
     #[test]
@@ -5798,7 +5804,7 @@ mod notation_summary_tests {
         let source_sha256 = "a".repeat(64);
         let (summary, sidecar): (
             ImportedNotationStructureSummary,
-            Option<Vec<u8>>,
+            Option<ImportedNotationArtifact>,
         ) = summarize_imported_notation_structure(
             &source_sha256,
             ImportedNotationStructureV1::Unknown {
@@ -5808,8 +5814,65 @@ mod notation_summary_tests {
         assert_eq!(summary.status, "unknown");
         assert_eq!(summary.source_sha256, source_sha256);
         assert!(summary.graph_sha256.is_none());
+        assert!(summary.measure_map_sha256.is_none());
         assert!(sidecar.is_none());
         assert!(summary.explanation.unwrap().contains("barline sidecar"));
     }
+
+    #[test]
+    fn midi_measure_map_summary_commits_the_normalized_sidecar_receipt() {
+        let midi: [u8; 26] = [
+            b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 1, 0, 1, 1, 0xE0,
+            b'M', b'T', b'r', b'k', 0, 0, 0, 4, 0, 0xFF, 0x2F, 0,
+        ];
+        let midi_sha256 = symthaea_muse::evidence_digest::sha256_hex(&midi);
+        let envelope = symthaea_muse::midi_measure_sidecar::MidiMeasureSidecarV1 {
+            schema: symthaea_muse::midi_measure_sidecar::MIDI_MEASURE_SIDECAR_SCHEMA_V1.into(),
+            midi_sha256: midi_sha256.clone(),
+            ticks_per_quarter: 480,
+            score_clock_id: "midi-summary-clock".into(),
+            parts: vec![symthaea_muse::midi_measure_sidecar::MidiPartMeasureSidecarV1 {
+                part_id: "Piano".into(),
+                source_track_index: 0,
+                measures: vec![symthaea_muse::midi_measure_sidecar::MidiMeasureSpanSidecarV1 {
+                    start_tick: 0,
+                    end_tick: 1920,
+                    kind: symthaea_muse::barline_eval::MeasureKind::Regular,
+                    measure_number: Some("1".into()),
+                    source_measure_id: None,
+                    display_text: None,
+                    implicit: false,
+                    non_controlling: false,
+                }],
+            }],
+        };
+        let input = serde_json::to_vec(&envelope).unwrap();
+        let receipt = symthaea_muse::midi_measure_sidecar::parse_midi_measure_sidecar(
+            &midi, &input, "midi-summary-clock"
+        ).unwrap();
+        let (summary, artifact) = summarize_imported_notation_structure(
+            &midi_sha256,
+            ImportedNotationStructureV1::MidiExplicitMeasureSidecar(receipt),
+        ).unwrap();
+        assert_eq!(summary.status, "supported");
+        assert_eq!(summary.source_sha256, midi_sha256);
+        assert_eq!(summary.part_count, 1);
+        assert_eq!(summary.measure_count, 1);
+        assert_eq!(summary.barline_event_count, 0);
+        assert!(summary.graph_sha256.is_none());
+        let bytes = match artifact.unwrap() {
+            ImportedNotationArtifact::MidiMeasureMaps(bytes) => bytes,
+            ImportedNotationArtifact::MusicXmlGraph(_) => {
+                panic!("MIDI sidecar must persist a measure-map artifact")
+            }
+        };
+        let decoded: symthaea_muse::midi_measure_sidecar::MidiMeasureSidecarReceiptV1 =
+            serde_json::from_slice(&bytes).unwrap();
+        let digest = symthaea_muse::midi_measure_sidecar::midi_measure_sidecar_commitment(
+            &decoded
+        ).unwrap();
+        assert_eq!(summary.measure_map_sha256.as_deref(), Some(digest.as_str()));
+    }
+
 }
 
