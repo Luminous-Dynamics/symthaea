@@ -553,7 +553,11 @@ mod tests {
     #[test]
     fn score_executable_soundfont_and_event_map_digests_are_bound() {
         let wav = test_wav(&[0, 0, 16384, -16384]);
-        let receipt = RendererExecutionReceipt::from_successful_render(fluid_inputs(&wav)).unwrap();
+        let observation = fluid_observation(&wav);
+        let receipt = RendererExecutionReceipt::from_successful_render(
+            fluid_inputs(&wav, &observation),
+        )
+        .unwrap();
         let mut changed_score = fluid_inputs(&wav, &observation);
         changed_score.score_bytes = br#"{"score":"different"}"#;
         assert!(receipt.verify_artifacts(changed_score).is_err());
@@ -571,6 +575,7 @@ mod tests {
     #[test]
     fn fluid_receipt_fails_closed_without_exact_input_or_success_status() {
         let wav = test_wav(&[0, 0, 1, -1]);
+        let observation = fluid_observation(&wav);
         let mut no_midi = fluid_inputs(&wav, &observation);
         no_midi.input_midi_bytes = None;
         assert_eq!(
