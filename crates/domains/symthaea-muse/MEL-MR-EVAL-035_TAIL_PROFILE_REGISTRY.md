@@ -156,17 +156,22 @@ The focused workflow requires root Cargo metadata to resolve. The current reposi
 
 ## 7. Initial tests authored
 
-Ten Rust tests cover:
-1. incomplete route evidence and topology-digest tampering reject;
-2. signed source-lineage evidence binds root composition and observed Score;
-3. altered source lineage and invalid signature reject;
-4. 58/59 sample-size boundary for q95/95% quantile UCB;
-5. zero/one held-out misses against the 5% upper-bound target;
-6. multiple events within one composition collapse to one maximum;
-7. calibration/qualification lineage overlap rejects;
-8. excessive held-out misses prevent profile qualification;
-9. profile digest replay rejects a modified guard;
-10. registry resolution checks publisher signature, revocation, pinned snapshot and exact topology; resolved profile cannot be applied to a different renderer.
+Fourteen Rust tests are authored:
+
+1. signed source-lineage evidence binds a root composition and observed Score;
+2. incomplete route evidence and topology-digest tampering reject;
+3. q95/95% quantile UCB has the 58/59 sample-size boundary;
+4. order-statistic rank is the smallest rank satisfying confidence over a parameter grid;
+5. Clopper–Pearson upper bounds are conservative and monotone over a parameter grid;
+6. zero/one held-out misses meet/fail the 5% upper-bound target as expected;
+7. multiple event observations within one composition collapse to one maximum;
+8. each source Score requires complete, unique event-index coverage;
+9. multiple complete baseline render scenarios still count as one root composition lineage;
+10. calibration/qualification lineage overlap rejects;
+11. excessive held-out tail misses prevent profile promotion;
+12. profile receipt replay rejects a modified guard;
+13. registry resolution checks profile signature metadata, revocation and pinned snapshot;
+14. resolved profiles apply only to an exact, previously unguarded renderer context.
 
 These are source-authored tests, not executed results.
 
