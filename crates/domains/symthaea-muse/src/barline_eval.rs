@@ -11,6 +11,7 @@
 //! Missing or unsupported measure structure yields `Unavailable`, never a
 //! fabricated zero or perfect score.
 
+use crate::evidence_digest::canonical_json_sha256;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 
@@ -50,9 +51,60 @@ impl RationalBeat {
         self.num as f64 / self.den as f64
     }
 
-    fn cmp_exact(self, other: Self) -> Ordering {
+    /// Checked exact addition for normalized score-clock coordinates.
+    pub fn checked_add(self, other: Self) -> Result<Self, EvaluationError> {
+        let numerator = i128::from(self.num)
+            .checked_mul(i128::from(other.den))
+            .and_then(|left| {
+                i128::from(other.num)
+                    .checked_mul(i128::from(self.den))
+                    .and_then(|right| left.checked_add(right))
+            })
+            .ok_or(EvaluationError::ArithmeticOverflow)?;
+        let denominator = i128::from(self.den)
+            .checked_mul(i128::from(other.den))
+            .ok_or(EvaluationError::ArithmeticOverflow)?;
+        Self::from_i128(numerator, denominator)
+    }
+
+    /// Checked exact subtraction; negative coordinates are rejected.
+    pub fn checked_sub(self, other: Self) -> Result<Self, EvaluationError> {
+        let numerator = i128::from(self.num)
+            .checked_mul(i128::from(other.den))
+            .and_then(|left| {
+                i128::from(other.num)
+                    .checked_mul(i128::from(self.den))
+                    .and_then(|right| left.checked_sub(right))
+            })
+            .ok_or(EvaluationError::ArithmeticOverflow)?;
+        if numerator < 0 {
+            return Err(EvaluationError::NegativeDuration);
+        }
+        let denominator = i128::from(self.den)
+            .checked_mul(i128::from(other.den))
+            .ok_or(EvaluationError::ArithmeticOverflow)?;
+        Self::from_i128(numerator, denominator)
+    }
+
+    fn from_i128(numerator: i128, denominator: i128) -> Result<Self, EvaluationError> {
+        if denominator <= 0 || numerator < 0 {
+            return Err(EvaluationError::ArithmeticOverflow);
+        }
+        let divisor = gcd_i128(numerator, denominator);
+        let num = i64::try_from(numerator / divisor)
+            .map_err(|_| EvaluationError::ArithmeticOverflow)?;
+        let den = i64::try_from(denominator / divisor)
+            .map_err(|_| EvaluationError::ArithmeticOverflow)?;
+        Self::new(num, den)
+    }
+
+    pub fn compare_exact(self, other: Self) -> Ordering {
         (i128::from(self.num) * i128::from(other.den))
             .cmp(&(i128::from(other.num) * i128::from(self.den)))
+    }
+
+    fn cmp_exact(self, other: Self) -> Ordering {
+        self.compare_exact(other)
     }
 
     fn within(self, other: Self, tolerance: Self) -> Result<bool, EvaluationError> {
@@ -137,6 +189,8 @@ pub enum MeasureKind {
     Pickup,
     Incomplete,
     Irregular,
+    /// A measure container is explicit, but meter is insufficient to classify its span.
+    Unclassified,
 }
 
 /// Explicit measure sequence supplied by a parser or annotation adapter.
@@ -168,7 +222,9 @@ pub enum EvaluationError {
     EmptyOrReversedMeasure { index: usize },
     NonContiguousMeasures { left_index: usize },
     ArithmeticOverflow,
+    NegativeDuration,
     InvalidTolerance,
+    SerializationFailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -190,6 +246,9 @@ pub struct PrecisionRecallF1 {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BarlineEvaluationReport {
     pub evaluator_version: String,
+    pub gold_input_sha256: String,
+    pub prediction_input_sha256: String,
+    pub report_sha256: String,
     pub gold_source_id: String,
     pub prediction_source_id: String,
     pub score_clock_id: String,
@@ -280,8 +339,13 @@ pub fn evaluate_measure_maps(
         match_measures(&gold.measures, &prediction.measures, tolerance)?;
     let measure_metrics = metrics(&measure_counts);
 
-    Ok(EvaluationOutcome::Evaluated(BarlineEvaluationReport {
+    let mut report = BarlineEvaluationReport {
         evaluator_version: BARLINE_EVALUATOR_VERSION.to_string(),
+        gold_input_sha256: canonical_json_sha256(gold)
+            .map_err(|_| EvaluationError::SerializationFailed)?,
+        prediction_input_sha256: canonical_json_sha256(prediction)
+            .map_err(|_| EvaluationError::SerializationFailed)?,
+        report_sha256: String::new(),
         gold_source_id: gold.source_id.clone(),
         prediction_source_id: prediction.source_id.clone(),
         score_clock_id: gold.score_clock_id.clone(),
@@ -298,7 +362,35 @@ pub fn evaluate_measure_maps(
         measure_metrics,
         matched_measure_class_agreements: class_agreements,
         matched_measure_class_disagreements: class_disagreements,
-    }))
+    };
+    report.report_sha256 = barline_report_commitment(&report)
+        .map_err(|_| EvaluationError::SerializationFailed)?;
+    Ok(EvaluationOutcome::Evaluated(report))
+}
+
+/// Canonical digest of the report payload, excluding its own digest field.
+///
+/// This is a content commitment, not a signature or source-authenticity proof.
+pub fn barline_report_commitment(
+    report: &BarlineEvaluationReport,
+) -> Result<String, serde_json::Error> {
+    let mut payload = report.clone();
+    payload.report_sha256.clear();
+    canonical_json_sha256(&payload)
+}
+
+/// Recompute the evaluation from both supplied measure maps and verify every
+/// report field plus the report digest. Changed inputs or outputs return false.
+pub fn validate_barline_evaluation_report(
+    gold: &MeasureMap,
+    prediction: &MeasureMap,
+    tolerance: RationalBeat,
+    report: &BarlineEvaluationReport,
+) -> Result<bool, EvaluationError> {
+    match evaluate_measure_maps(gold, prediction, tolerance)? {
+        EvaluationOutcome::Evaluated(recomputed) => Ok(recomputed == *report),
+        EvaluationOutcome::Unavailable(_) => Ok(false),
+    }
 }
 
 fn validate_map(map: &MeasureMap) -> Result<(), EvaluationError> {
@@ -653,6 +745,72 @@ mod tests {
             evaluate_measure_maps(&gold, &prediction, beat(1, 8)),
             Err(EvaluationError::CanonicalizationMismatch)
         );
+    }
+
+    #[test]
+    fn report_binds_inputs_and_replays_exactly() {
+        let gold = map(
+            "gold",
+            vec![
+                span((0, 1), (4, 1), MeasureKind::Regular),
+                span((4, 1), (8, 1), MeasureKind::Regular),
+            ],
+        );
+        let prediction = gold.clone();
+        let result = report(
+            evaluate_measure_maps(&gold, &prediction, beat(1, 8)).unwrap(),
+        );
+        assert_eq!(result.gold_input_sha256.len(), 64);
+        assert_eq!(result.prediction_input_sha256.len(), 64);
+        assert_eq!(result.report_sha256.len(), 64);
+        assert!(validate_barline_evaluation_report(
+            &gold,
+            &prediction,
+            beat(1, 8),
+            &result
+        )
+        .unwrap());
+    }
+
+    #[test]
+    fn report_replay_rejects_tampered_metrics_and_changed_inputs() {
+        let gold = map(
+            "gold",
+            vec![
+                span((0, 1), (4, 1), MeasureKind::Regular),
+                span((4, 1), (8, 1), MeasureKind::Regular),
+            ],
+        );
+        let prediction = gold.clone();
+        let mut result = report(
+            evaluate_measure_maps(&gold, &prediction, beat(1, 8)).unwrap(),
+        );
+        result.barline_counts.false_positives += 1;
+        assert!(!validate_barline_evaluation_report(
+            &gold,
+            &prediction,
+            beat(1, 8),
+            &result
+        )
+        .unwrap());
+
+        let original = report(
+            evaluate_measure_maps(&gold, &prediction, beat(1, 8)).unwrap(),
+        );
+        let changed_prediction = map(
+            "prediction",
+            vec![
+                span((0, 1), (4, 1), MeasureKind::Regular),
+                span((4, 1), (9, 1), MeasureKind::Irregular),
+            ],
+        );
+        assert!(!validate_barline_evaluation_report(
+            &gold,
+            &changed_prediction,
+            beat(1, 8),
+            &original
+        )
+        .unwrap());
     }
 
     #[test]
