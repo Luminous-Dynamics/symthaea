@@ -46,7 +46,7 @@ The source audit requires:
 This is metadata integrity only. The DEC-specific gate records that fusion-born electrical output was not demonstrated/attributed in the source case. This does not assert that a physical fusion-born contribution was exactly zero; unknown contributions remain unquantified. It prevents externally heated plasma recovery or a laboratory fundamental-unit experiment being silently promoted to demonstrated fusion-born energy recovery. It does not independently check paper contents, reproduce reported values, or establish that a source supports every interpretation in its case description.
 
 Current frozen input:
-- plasma-energy register: 28 cases / 28 controls, including five direct-energy-conversion cases, one D–³He/DT fuel-mixture model, four miniature/modular low-temperature plasma device references, and thermal-processing/ETES comparison references;
+- plasma-energy register: 29 cases / 29 controls, including five direct-energy-conversion cases, one D–³He/DT fuel-mixture model, four miniature/modular low-temperature plasma device references, and thermal-processing/ETES comparison references;
 - HTS fusion magnet register: 6 cases / 12 controls.
 
 ## 3. Synthetic thermal-store fixture
@@ -162,3 +162,6 @@ The source register now adds four external laboratory references under `LOW_TEMP
 The new negative controls prevent low parts cost from becoming lifecycle qualification, particle-size precision from becoming industrial throughput, one biofilm endpoint from becoming universal efficacy, and a five-cell demonstration from becoming a hundred-cell array claim.
 
 The programme is [MICROPLASMA-001 #11780](https://github.com/Luminous-Dynamics/symthaea/issues/11780).
+
+
+A fifth miniaturized-device source case records the Leibniz Institute's portable argon MobiPlas: integrated refillable gas tank, mobile powerbank, Raspberry Pi Pico controller, and approximately 10 minutes of operation per gas fill. Its paper also records occasional current instability associated with heating in the supply current-limitation circuit. The INPTDAT catalogue assigns TRL 4; that label remains institutional catalogue metadata and is not treated as independent qualification. The source case and negative control prevent short gas autonomy / single prototype leakage-current observations from becoming lifetime or regulatory claims.
