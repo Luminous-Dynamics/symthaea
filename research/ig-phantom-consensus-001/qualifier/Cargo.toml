@@ -1,3 +1,5 @@
+[workspace]
+
 [package]
 name = "ig-phantom-consensus-qualifier"
 version = "0.1.0"
