@@ -129,6 +129,27 @@ pub struct MidiTranscriptionTimingErrorSummaryV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MidiTranscriptionPartSeparationSummaryV1 {
+    pub reference_part_count: u32,
+    pub matched_reference_part_count: u32,
+    pub matched_prediction_track_count: u32,
+    pub mixed_prediction_track_count: u32,
+    pub matched_notes_in_mixed_tracks: u32,
+    pub matched_prediction_lane_count: u32,
+    pub mixed_prediction_lane_count: u32,
+    pub matched_notes_in_mixed_lanes: u32,
+    pub total_matched_notes: u32,
+    pub part_attributed_note_count: u32,
+    pub ambiguous_part_assignment_note_count: u32,
+    /// Fraction of matched notes assigned to the dominant PartId within each MIDI track.
+    pub note_weighted_track_purity: Option<f64>,
+    /// Fraction of matched notes assigned to the dominant PartId within each track/channel lane.
+    pub note_weighted_lane_purity: Option<f64>,
+    /// Distinct reference PartIds represented by at least one matched predicted note.
+    pub reference_part_coverage: Option<f64>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MidiTranscriptionEvaluationReportV1 {
     pub schema: String,
     pub algorithm: String,
@@ -157,6 +178,8 @@ pub struct MidiTranscriptionEvaluationReportV1 {
     pub exact_program_onset_metrics: MidiTranscriptionMetricV1,
     /// Exact GM program, pitch, onset and offset must match.
     pub exact_program_full_note_metrics: MidiTranscriptionMetricV1,
+    /// Diagnostic for whether predicted MIDI tracks keep distinct reference PartIds separate.
+    pub part_separation: Option<MidiTranscriptionPartSeparationSummaryV1>,
     /// Full-note match plus MIDI velocity within the configured tolerance.
     pub velocity_aware_full_note_metrics: Option<MidiTranscriptionMetricV1>,
     /// Framewise pitch activity; simultaneous same-pitch notes collapse into one active cell.
@@ -203,6 +226,7 @@ pub struct MidiTempoPointV1 {
 #[derive(Debug, Clone)]
 struct EvaluationNoteV1 {
     pitch_midi: u8,
+    part_id: u16,
     gm_program: u8,
     velocity_midi: u8,
     onset_seconds: f64,
@@ -229,6 +253,7 @@ struct ReportCommitmentV1<'a> {
     onset_pitch_metrics: &'a MidiTranscriptionMetricV1,
     full_note_metrics: &'a MidiTranscriptionMetricV1,
     average_overlap_ratio: f64,
+    part_separation: &'a Option<MidiTranscriptionPartSeparationSummaryV1>,
     exact_program_onset_metrics: &'a MidiTranscriptionMetricV1,
     exact_program_full_note_metrics: &'a MidiTranscriptionMetricV1,
     velocity_aware_full_note_metrics: &'a Option<MidiTranscriptionMetricV1>,
@@ -869,6 +894,7 @@ fn reference_notes(
         }
         notes.push(EvaluationNoteV1 {
             pitch_midi: note.pitch_midi,
+            part_id: note.part_id,
             gm_program: program,
             velocity_midi: note.velocity_midi,
             onset_seconds,
@@ -1409,6 +1435,116 @@ fn metric_from_set_counts(
     metric_from_matching(reference_count, predicted_count, true_positive_count)
 }
 
+fn part_separation_summary_v1(
+    reference_part_ids: &[u16],
+    reference: &[EvaluationNoteV1],
+    predicted: &[MidiTranscribedNoteV1],
+    matching: &[(usize, usize)],
+    candidate_part_ids_by_prediction: &[std::collections::BTreeSet<u16>],
+) -> Option<MidiTranscriptionPartSeparationSummaryV1> {
+    // PartId::UNASSIGNED is not an identity. It cannot be counted as a
+    // distinct reference part or used to claim an assignment.
+    let reference_parts: std::collections::BTreeSet<u16> = reference_part_ids
+        .iter()
+        .copied()
+        .filter(|part_id| *part_id != u16::MAX)
+        .collect();
+    if reference_parts.is_empty() {
+        return None;
+    }
+
+    // Evaluate both the physical MIDI track boundary and the logical
+    // track/channel lane. Type-0 files may place several logical parts on one
+    // track but separate them by channel.
+    let mut by_prediction_track: BTreeMap<u16, BTreeMap<u16, u32>> = BTreeMap::new();
+    let mut by_prediction_lane: BTreeMap<(u16, u8), BTreeMap<u16, u32>> = BTreeMap::new();
+    let mut matched_reference_parts = std::collections::BTreeSet::new();
+    let mut part_attributed_note_count = 0usize;
+    let mut ambiguous_part_assignment_note_count = 0usize;
+
+    for (reference_index, prediction_index) in matching {
+        let reference_note = reference.get(*reference_index)?;
+        let predicted_note = predicted.get(*prediction_index)?;
+        let possible_parts = candidate_part_ids_by_prediction.get(*prediction_index)?;
+        // A note may be perfectly correct in pitch/onset yet be unable to
+        // identify which logical part produced it (e.g. two parts double the
+        // same pitch on the same onset). Never let deterministic tie-breaking
+        // turn this into a false structural claim.
+        if possible_parts.len() != 1
+            || possible_parts.contains(&u16::MAX)
+            || reference_note.part_id == u16::MAX
+            || !possible_parts.contains(&reference_note.part_id)
+        {
+            ambiguous_part_assignment_note_count += 1;
+            continue;
+        }
+
+        part_attributed_note_count += 1;
+        *by_prediction_track
+            .entry(predicted_note.track_index)
+            .or_default()
+            .entry(reference_note.part_id)
+            .or_default() += 1;
+        *by_prediction_lane
+            .entry((predicted_note.track_index, predicted_note.midi_channel))
+            .or_default()
+            .entry(reference_note.part_id)
+            .or_default() += 1;
+        matched_reference_parts.insert(reference_note.part_id);
+    }
+
+    fn summarize_groups<K: Ord>(
+        groups: &BTreeMap<K, BTreeMap<u16, u32>>,
+    ) -> (usize, usize, usize) {
+        let mut mixed_count = 0usize;
+        let mut mixed_notes = 0usize;
+        let mut dominant_notes = 0usize;
+        for part_counts in groups.values() {
+            let group_note_count: usize =
+                part_counts.values().map(|count| *count as usize).sum();
+            if part_counts.len() > 1 {
+                mixed_count += 1;
+                mixed_notes += group_note_count;
+            }
+            dominant_notes +=
+                part_counts.values().copied().max().unwrap_or(0) as usize;
+        }
+        (mixed_count, mixed_notes, dominant_notes)
+    }
+    let (mixed_tracks, mixed_track_notes, dominant_track_notes) =
+        summarize_groups(&by_prediction_track);
+    let (mixed_lanes, mixed_lane_notes, dominant_lane_notes) =
+        summarize_groups(&by_prediction_lane);
+
+    Some(MidiTranscriptionPartSeparationSummaryV1 {
+        reference_part_count: u32::try_from(reference_parts.len()).unwrap_or(u32::MAX),
+        matched_reference_part_count: u32::try_from(matched_reference_parts.len())
+            .unwrap_or(u32::MAX),
+        matched_prediction_track_count: u32::try_from(by_prediction_track.len())
+            .unwrap_or(u32::MAX),
+        mixed_prediction_track_count: u32::try_from(mixed_tracks).unwrap_or(u32::MAX),
+        matched_notes_in_mixed_tracks: u32::try_from(mixed_track_notes).unwrap_or(u32::MAX),
+        matched_prediction_lane_count: u32::try_from(by_prediction_lane.len())
+            .unwrap_or(u32::MAX),
+        mixed_prediction_lane_count: u32::try_from(mixed_lanes).unwrap_or(u32::MAX),
+        matched_notes_in_mixed_lanes: u32::try_from(mixed_lane_notes).unwrap_or(u32::MAX),
+        total_matched_notes: u32::try_from(matching.len()).unwrap_or(u32::MAX),
+        part_attributed_note_count: u32::try_from(part_attributed_note_count)
+            .unwrap_or(u32::MAX),
+        ambiguous_part_assignment_note_count: u32::try_from(
+            ambiguous_part_assignment_note_count,
+        )
+        .unwrap_or(u32::MAX),
+        note_weighted_track_purity: (part_attributed_note_count > 0)
+            .then_some(dominant_track_notes as f64 / part_attributed_note_count as f64),
+        note_weighted_lane_purity: (part_attributed_note_count > 0)
+            .then_some(dominant_lane_notes as f64 / part_attributed_note_count as f64),
+        reference_part_coverage: Some(
+            matched_reference_parts.len() as f64 / reference_parts.len() as f64,
+        ),
+    })
+}
+
 fn value_error_summary(values: &[f64]) -> MidiTranscriptionValueErrorSummaryV1 {
     if values.is_empty() {
         return MidiTranscriptionValueErrorSummaryV1 {
@@ -1502,6 +1638,7 @@ pub fn midi_transcription_evaluation_commitment_v1(
         onset_pitch_metrics: &report.onset_pitch_metrics,
         full_note_metrics: &report.full_note_metrics,
         average_overlap_ratio: report.average_overlap_ratio,
+        part_separation: &report.part_separation,
         exact_program_onset_metrics: &report.exact_program_onset_metrics,
         exact_program_full_note_metrics: &report.exact_program_full_note_metrics,
         velocity_aware_full_note_metrics: &report.velocity_aware_full_note_metrics,
@@ -1544,6 +1681,7 @@ pub fn evaluate_midi_transcription_v1(
         .iter()
         .map(|note| EvaluationNoteV1 {
             pitch_midi: note.pitch_midi,
+            part_id: 0,
             gm_program: note.gm_program,
             velocity_midi: note.velocity_midi,
             onset_seconds: note.onset_seconds,
@@ -1561,11 +1699,32 @@ pub fn evaluate_midi_transcription_v1(
             build_offset_only_adjacency(&reference_notes, &predicted_notes, &config)?;
         maximum_cardinality_matching(&adjacency, predicted_notes.len())?
     };
-    let onset_matching = {
-        let adjacency =
-            build_adjacency(&reference_notes, &predicted_notes, &config, false, false, false)?;
-        maximum_cardinality_matching(&adjacency, predicted_notes.len())?
-    };
+    let onset_adjacency =
+        build_adjacency(&reference_notes, &predicted_notes, &config, false, false, false)?;
+    let onset_matching =
+        maximum_cardinality_matching(&onset_adjacency, predicted_notes.len())?;
+    let mut candidate_part_ids_by_prediction =
+        vec![std::collections::BTreeSet::new(); predicted_notes.len()];
+    for (reference_index, candidate_prediction_indices) in onset_adjacency.iter().enumerate() {
+        for prediction_index in candidate_prediction_indices {
+            candidate_part_ids_by_prediction[*prediction_index]
+                .insert(reference_notes[reference_index].part_id);
+        }
+    }
+    let reference_part_ids: Vec<u16> = reference
+        .manifest
+        .tracks
+        .iter()
+        .map(|track| track.part_id)
+        .collect();
+    let part_separation = part_separation_summary_v1(
+        &reference_part_ids,
+        &reference_notes,
+        &predicted_notes,
+        &onset_matching,
+        &candidate_part_ids_by_prediction,
+    );
+
     let full_matching = {
         let adjacency =
             build_adjacency(&reference_notes, &predicted_notes, &config, true, false, false)?;
@@ -1694,6 +1853,7 @@ pub fn evaluate_midi_transcription_v1(
             &predicted_notes,
             &full_matching,
         ),
+        part_separation,
         exact_program_onset_metrics: metric_from_matching(
             reference_notes.len(),
             predicted_notes.len(),
@@ -1915,6 +2075,249 @@ mod tests {
 
     fn default_config() -> MidiTranscriptionEvaluationConfigV1 {
         MidiTranscriptionEvaluationConfigV1::default()
+    }
+
+    fn reference_eval_note(part_id: u16, pitch_midi: u8) -> EvaluationNoteV1 {
+        EvaluationNoteV1 {
+            pitch_midi,
+            part_id,
+            gm_program: 40,
+            velocity_midi: 100,
+            onset_seconds: 0.0,
+            offset_seconds: Some(0.5),
+        }
+    }
+
+    fn predicted_eval_note(track_index: u16, pitch_midi: u8, ordinal: u32) -> MidiTranscribedNoteV1 {
+        predicted_eval_note_on_channel(track_index, 0, pitch_midi, ordinal)
+    }
+
+    fn predicted_eval_note_on_channel(
+        track_index: u16,
+        midi_channel: u8,
+        pitch_midi: u8,
+        ordinal: u32,
+    ) -> MidiTranscribedNoteV1 {
+        MidiTranscribedNoteV1 {
+            track_index,
+            midi_channel,
+            onset_tick: 0,
+            offset_tick: Some(480),
+            source_event_ordinal: ordinal,
+            gm_program: 40,
+            pitch_midi,
+            velocity_midi: 100,
+            onset_seconds: 0.0,
+            offset_seconds: Some(0.5),
+        }
+    }
+
+    #[test]
+    fn separate_prediction_tracks_preserve_reference_part_separation() {
+        let reference = vec![
+            reference_eval_note(1, 60),
+            reference_eval_note(2, 48),
+        ];
+        let predicted = vec![
+            predicted_eval_note(4, 60, 0),
+            predicted_eval_note(9, 48, 1),
+        ];
+        let summary =
+            part_separation_summary_v1(
+                &[1, 2],
+                &reference,
+                &predicted,
+                &[(0, 0), (1, 1)],
+                &[
+                    std::collections::BTreeSet::from([1]),
+                    std::collections::BTreeSet::from([2]),
+                ],
+            ).unwrap();
+        assert_eq!(summary.reference_part_count, 2);
+        assert_eq!(summary.matched_reference_part_count, 2);
+        assert_eq!(summary.matched_prediction_track_count, 2);
+        assert_eq!(summary.mixed_prediction_track_count, 0);
+        assert_eq!(summary.matched_notes_in_mixed_tracks, 0);
+        assert_eq!(summary.note_weighted_track_purity, Some(1.0));
+        assert_eq!(summary.reference_part_coverage, Some(1.0));
+    }
+
+    #[test]
+    fn merged_prediction_track_reports_part_contamination_even_when_notes_are_correct() {
+        let reference = vec![
+            reference_eval_note(1, 60),
+            reference_eval_note(2, 48),
+        ];
+        let predicted = vec![
+            predicted_eval_note(4, 60, 0),
+            predicted_eval_note(4, 48, 1),
+        ];
+        let summary =
+            part_separation_summary_v1(
+                &[1, 2],
+                &reference,
+                &predicted,
+                &[(0, 0), (1, 1)],
+                &[
+                    std::collections::BTreeSet::from([1]),
+                    std::collections::BTreeSet::from([2]),
+                ],
+            ).unwrap();
+        assert_eq!(summary.total_matched_notes, 2);
+        assert_eq!(summary.mixed_prediction_track_count, 1);
+        assert_eq!(summary.matched_notes_in_mixed_tracks, 2);
+        assert_eq!(summary.note_weighted_track_purity, Some(0.5));
+        assert_eq!(summary.reference_part_coverage, Some(1.0));
+    }
+
+    #[test]
+    fn type_zero_single_track_can_preserve_parts_on_distinct_midi_channels() {
+        let reference = vec![
+            reference_eval_note(1, 60),
+            reference_eval_note(2, 48),
+        ];
+        let predicted = vec![
+            predicted_eval_note_on_channel(0, 0, 60, 0),
+            predicted_eval_note_on_channel(0, 1, 48, 1),
+        ];
+        let summary =
+            part_separation_summary_v1(
+                &[1, 2],
+                &reference,
+                &predicted,
+                &[(0, 0), (1, 1)],
+                &[
+                    std::collections::BTreeSet::from([1]),
+                    std::collections::BTreeSet::from([2]),
+                ],
+            ).unwrap();
+        assert_eq!(summary.matched_prediction_track_count, 1);
+        assert_eq!(summary.mixed_prediction_track_count, 1);
+        assert_eq!(summary.note_weighted_track_purity, Some(0.5));
+        assert_eq!(summary.matched_prediction_lane_count, 2);
+        assert_eq!(summary.mixed_prediction_lane_count, 0);
+        assert_eq!(summary.note_weighted_lane_purity, Some(1.0));
+    }
+
+    #[test]
+    fn track_channel_lane_mixed_part_contamination_is_reported() {
+        let reference = vec![
+            reference_eval_note(1, 60),
+            reference_eval_note(2, 48),
+        ];
+        let predicted = vec![
+            predicted_eval_note_on_channel(0, 0, 60, 0),
+            predicted_eval_note_on_channel(0, 0, 48, 1),
+        ];
+        let summary =
+            part_separation_summary_v1(
+                &[1, 2],
+                &reference,
+                &predicted,
+                &[(0, 0), (1, 1)],
+                &[
+                    std::collections::BTreeSet::from([1]),
+                    std::collections::BTreeSet::from([2]),
+                ],
+            )
+            .unwrap();
+        assert_eq!(summary.mixed_prediction_lane_count, 1);
+        assert_eq!(summary.matched_notes_in_mixed_lanes, 2);
+        assert_eq!(summary.note_weighted_lane_purity, Some(0.5));
+    }
+
+    #[test]
+    fn part_coverage_exposes_a_missing_reference_part() {
+        let reference = vec![
+            reference_eval_note(1, 60),
+            reference_eval_note(2, 48),
+        ];
+        let predicted = vec![predicted_eval_note(4, 60, 0)];
+        let summary =
+            part_separation_summary_v1(
+                &[1, 2],
+                &reference,
+                &predicted,
+                &[(0, 0)],
+                &[std::collections::BTreeSet::from([1])],
+            ).unwrap();
+        assert_eq!(summary.matched_reference_part_count, 1);
+        assert_eq!(summary.reference_part_coverage, Some(0.5));
+        assert_eq!(summary.note_weighted_track_purity, Some(1.0));
+    }
+
+    #[test]
+    fn declared_silent_reference_part_still_reduces_part_coverage() {
+        let reference = vec![reference_eval_note(1, 60)];
+        let predicted = vec![predicted_eval_note(4, 60, 0)];
+        // Part 2 is declared in the reference manifest but has no note in
+        // this excerpt. It must still be part of the coverage denominator.
+        let summary =
+            part_separation_summary_v1(
+                &[1, 2],
+                &reference,
+                &predicted,
+                &[(0, 0)],
+                &[std::collections::BTreeSet::from([1])],
+            ).unwrap();
+        assert_eq!(summary.reference_part_count, 2);
+        assert_eq!(summary.matched_reference_part_count, 1);
+        assert_eq!(summary.reference_part_coverage, Some(0.5));
+    }
+
+    #[test]
+    fn zero_matched_notes_has_zero_part_coverage_and_no_purity_estimate() {
+        let reference = vec![reference_eval_note(1, 60)];
+        let predicted = vec![predicted_eval_note(4, 72, 0)];
+        let summary = part_separation_summary_v1(&[1, 2], &reference, &predicted, &[], &[]).unwrap();
+        assert_eq!(summary.reference_part_coverage, Some(0.0));
+        assert_eq!(summary.note_weighted_track_purity, None);
+        assert_eq!(summary.note_weighted_lane_purity, None);
+    }
+
+    #[test]
+    fn ambiguous_same_pitch_same_onset_part_assignment_is_not_claimed() {
+        let reference = vec![
+            reference_eval_note(1, 60),
+            reference_eval_note(2, 60),
+        ];
+        let predicted = vec![predicted_eval_note(4, 60, 0)];
+        // The event matches note-wise, but either source PartId could have
+        // generated it. The evaluator must not manufacture a part label.
+        let summary = part_separation_summary_v1(
+            &[1, 2],
+            &reference,
+            &predicted,
+            &[(0, 0)],
+            &[std::collections::BTreeSet::from([1, 2])],
+        )
+        .unwrap();
+        assert_eq!(summary.total_matched_notes, 1);
+        assert_eq!(summary.part_attributed_note_count, 0);
+        assert_eq!(summary.ambiguous_part_assignment_note_count, 1);
+        assert_eq!(summary.matched_reference_part_count, 0);
+        assert_eq!(summary.reference_part_coverage, Some(0.0));
+        assert_eq!(summary.note_weighted_track_purity, None);
+        assert_eq!(summary.note_weighted_lane_purity, None);
+    }
+
+    #[test]
+    fn part_separation_summary_is_bound_by_report_commitment() {
+        let notes = vec![(60, 0, 480)];
+        let reference = reference_artifact(&notes, 40);
+        let prediction = build_midi(&notes, 40, &[(0, 500_000)]);
+        let mut report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        let original = midi_transcription_evaluation_commitment_v1(&report).unwrap();
+        let mut summary = report.part_separation.clone().unwrap();
+        summary.note_weighted_track_purity = Some(0.0);
+        report.part_separation = Some(summary);
+        let tampered = midi_transcription_evaluation_commitment_v1(&report).unwrap();
+        assert_ne!(original, tampered);
     }
 
     #[test]

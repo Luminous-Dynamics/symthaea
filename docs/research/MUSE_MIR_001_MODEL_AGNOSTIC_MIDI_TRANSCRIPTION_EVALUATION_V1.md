@@ -69,6 +69,17 @@ V1 additionally reports instrument-agnostic pitch-frame F1 and exact-GM-program/
 
 Frame cells are half-open time intervals. A note activates every cell it overlaps. Repeated/overlapping notes of the same pitch collapse to one pitch/frame cell in the instrument-agnostic metric. This is a custom, explicit frame-occupancy view; do not claim direct numeric equivalence to another paper's Frame F1 until its frame hop, rounding, pitch mapping and evaluation code have been reproduced exactly.
 
+### Part separation — track topology is not the same as note accuracy
+
+The part-separation diagnostic uses the existing one-to-one onset+pitch matches to identify which reference PartId each matched predicted note corresponds to. It then reports two different topologies:
+
+- **Track purity:** group matched predictions by MIDI track. This reports whether multiple reference PartIds are mixed into the same physical MIDI track.
+- **Track/channel-lane purity:** group matched predictions by (MIDI track, MIDI channel). This recognises Type-0 files that put several logical parts on one physical track but separate them by channel.
+
+For both levels the report gives the number of prediction groups, number of mixed groups, number of matched notes residing in mixed groups and note-weighted purity (the fraction assigned to each group's most common reference PartId). It also reports reference-PartId coverage: the fraction of distinct PartIds declared in the reference manifest's track receipts that are represented by at least one matched note. A declared but silent PartId stays in the denominator.
+
+This is a structural metric, not an instrument identity classifier. It says whether note events associated with distinct score PartIds were kept in distinct MIDI output tracks or channel lanes. It does not prove which acoustic instrument played the source recording. Only unambiguous matched notes contribute to purity. If a matched MIDI event could correspond to notes from more than one reference PartId (for example, two parts doubling the same pitch at the same onset), the note remains a valid note match but is counted as an ambiguous part assignment and is excluded from part purity and coverage. This prevents deterministic bipartite tie-breaking from manufacturing a false structural claim. Unmatched extra notes are already counted as false positives by the note metrics and are not assigned a speculative PartId. A PartId can validly be spread across multiple tracks or lanes; the score is based on dominant-part purity rather than a strict one-track-per-part bijection.
+
 ### Velocity evaluation
 
 MIDI velocity is captured, but velocity metrics are disabled by default. Some transcription models do not estimate dynamics yet still serialize a conventional placeholder velocity. The caller must explicitly set velocity_metrics_enabled=true only when the prediction pipeline genuinely estimates velocity. When enabled, the report includes velocity-aware full-note F1 and direct absolute MIDI-velocity error summaries. Otherwise those fields are absent, not zero.
@@ -88,7 +99,7 @@ Capacity exhaustion is an explicit error, not a partial score.
 
 ## Tests authored
 
-Twenty-five focused Rust tests currently cover:
+Thirty-seven focused Rust tests currently cover:
 1. exact MIDI prediction produces perfect instrument-agnostic and exact-program scores;
 2. wrong GM program changes the exact-program metrics without hiding correct pitch/onset notes;
 3. onset outside the 50 ms window reduces onset and full-note scores;
@@ -114,6 +125,20 @@ Twenty-five focused Rust tests currently cover:
 23. an empty reference and empty prediction are scored as a negative example;
 24. false-positive notes are counted against an empty reference;
 25. velocity tolerances above the MIDI 1.0 range are rejected.
+26. distinct output tracks preserve two reference PartIds with perfect track and lane purity;
+27. notes can be pitch/onset-correct yet still reveal contamination when two PartIds share one output track;
+28. a Type-0 single-track file can preserve distinct parts on separate MIDI channels, yielding low track purity but perfect lane purity;
+29. mixed PartIds on the same track/channel lane reduce lane purity;
+30. a missing reference part reduces part coverage without penalizing the purity of correctly separated surviving parts;
+31. the part-separation summary is included in the report commitment;
+32. frame metrics are withheld when predicted notes have unclosed releases;
+33. velocity error is still measured for onset+pitch matches when note offsets are wrong;
+34. an empty reference is accepted as a valid all-false-positive evaluation case.
+35. a declared-but-silent manifest PartId remains in the part-coverage denominator;
+36. zero matched notes yields zero part coverage and no purity estimate.
+37. a same-pitch/same-onset note that could belong to multiple reference PartIds is withheld from part attribution while remaining a note-level match.
+35. a declared reference part with no notes in the excerpt remains in the part-coverage denominator;
+36. zero matched notes yields zero part coverage and no undefined purity value.
 
 These tests are authored, not compiled or run in the authoring environment.
 
@@ -171,15 +196,16 @@ References: https://mir-eval.readthedocs.io/latest/api/transcription.html and ht
 
 Two recent vendor-published studies add important, but non-independent, competitive evidence.
 
-**Songscription / Play Anything (October 2026).** On 200 multi-instrument recordings from RWC, JazzSAMBA and MulTTiPop, the authors report a composite MIDI accuracy average of three mir_eval-derived metrics (onset F1, onset-offset F1 and frame F1): Songscription 52.2, Mirelo 45.1, MuScriptor 41.0, Klangio 40.4, YourMT3+ 39.8 and Basic Pitch 32.7. This is not an individual F1 score, and it is not the same test set or protocol as MuScriptor's 372-track D_Test. The same report says its systems received the same full recordings, no separated stems and no manual corrections; each product was shown in its best-scoring mode. Its multi-instrument sheet-music comparison uses a separate private set of 28 professional transcriptions and reports Songscription 61.1 vs Klangio 46.5, so do not merge that score with the MIDI metric.
+**Songscription / Play Anything (October 2026).** The vendor reports two differently scoped datasets. Across 250 full-length songs, its headline composite MIDI score is 59.5 (Klangio 50.6, Mirelo 49.7, MuScriptor 46.6, YourMT3+ 46.3, Basic Pitch 35.8). On its 200 multi-instrument recordings from RWC, JazzSAMBA and MulTTiPop, it reports 52.2 (Mirelo 45.1, MuScriptor 41.0, Klangio 40.4, YourMT3+ 39.8, Basic Pitch 32.7). Both composites average three mir_eval-derived measures (onset F1, onset-offset F1 and frame F1); these are not individual F1 scores. The same report uses 50 classical-piano performances for its piano task. Its multi-instrument sheet-music comparison uses a separate private set of 28 professional transcriptions and reports Songscription 61.1 vs Klangio 46.5; this averages MUSTER and OMR-NED and must not be merged with MIDI metrics. The vendor says each system received the same full recordings, no separated stems and no manual fixes, and that each product was run in its best-scoring mode. This remains vendor-published rather than independently reproduced evidence.
 
-**Klangio (October 22, 2026).** Its benchmark uses 130 one-minute clips across 13 sets, with ten clips per set. The reported raw-note F1 uses a 100 ms onset tolerance, averaged over nine aligned sets: Klangio 0.82, Songscription 0.77, AnthemScore 0.76, MuScriptor 0.73 and YourMT3+ 0.72. Its mean final-score F1 across all 13 sets is 0.67, 0.47, 0.43, 0.29 and 0.19 respectively. It reports the leading score-F1 result on 12 of 13 sets and emphasizes beat, barline, meter and key structure before notation. This is a vendor-produced evaluation and includes internal recordings/sets, so it is not an independent public leaderboard. The 100 ms raw-note metric is not directly comparable to this evaluator's default 50 ms mir_eval-style threshold.
+**Klangio (October 22, 2026).** Its benchmark uses 130 one-minute clips across 13 sets (ten clips per set). The reported raw-note F1 uses a 100 ms onset tolerance, averaged over nine sets with aligned notes: Klangio 0.82, Songscription 0.77, AnthemScore 0.76, MuScriptor 0.73 and YourMT3+ 0.72. Across all 13 sets, its score F1 is 0.67, 0.47, 0.43, 0.29 and 0.19 respectively. It additionally reports mean bar F1 of 0.72, 0.47, 0.47, 0.17 and 0.10; time-signature accuracy of 92%, 78%, 85%, 43% and 31%; score-error rate of 0.41, 0.75, 0.72, 1.00 and 1.03; and score-note F1 of 0.78, 0.44, 0.64, 0.14 and 0.08, in the same system order. Its own analysis says beat, downbeat, meter and bar placement should be solved before writing notes to a score; it reports MuScriptor falling back to a default tempo on 117 of 130 clips. This is a vendor-produced evaluation, includes internal recordings/sets, and is not an independent public leaderboard. The 100 ms raw-note metric is not directly comparable to this evaluator's default 50 ms mir_eval-style threshold. Klangio's score F1 uses a 32nd-note grid and permits a global offset of up to three bars and tempo doublings; bar F1 measures barlines within one-sixth of a beat of annotated downbeats.
 
 The striking systems lesson is that **the score is not merely a container for transcribed notes**. Klangio reports a median 7 seconds per one-minute clip on one GPU versus 20 seconds for MuScriptor on the same GPU, but its comparison also says Songscription's 31-second browser time includes upload and queue time; that is not a matched latency test. It also reports MuScriptor default-tempo fallback on 117 of 130 of its clips. These are vendor-reported observations, not independently reproduced measurements.
 
 Sources:
-- Songscription / Play Anything, October 2026: https://playanything.ai/blog/state-of-the-art-music-transcription
+- Songscription / Play Anything, October 2026: https://playanything.app/blog/state-of-the-art-music-transcription
 - Klangio, October 22, 2026: https://klang.io/blog/music-transcription-benchmark-2026/
+- MulTTiPop paper and official dataset page: https://arxiv.org/abs/2607.08756 ; https://gclef-cmu.org/research/2026multtipop/
 
 **Melothaea response:** build the benchmark as a scorecard vector, not one average:
 1. note onset/full-note/frame metrics at standardized 50 ms tolerances;
@@ -228,7 +254,7 @@ A credible first external result is to reproduce MuScriptor's D_Test comparisons
 - beats 72.4 Frame F1 only after reproducing the same frame-evaluation details;
 - reports velocity separately on a dataset where velocity ground truth exists;
 - shows gains on genre-held-out and instrument-held-out splits, not only random tracks;
-- reproduces MulTTiPop YourMT3+ (11.51 exact-program onset F1; 28.74 harmonic/percussive onset F1) before claiming a win on that test;
+- reproduces MulTTiPop Table 4 exactly: YourMT3+ 11.51 exact-instrument onset F1 and 28.74 harmonic/percussive onset F1 at the standard 50 ms tolerance. Note the arXiv abstract says its best model reaches 38% Onset F1, which does not match the visible Table 4 values; resolve the paper/version/protocol discrepancy before treating 38% as a target. The dataset has 572 segments, 3.5 hours, 374 songs and 263 artists; its artist-separated test split has 403 segments / 152 minutes. The authors explicitly recommend evaluation-only use, not training; use the permitted linked segments and follow underlying rights.
 - reports symbolic metrics separately from playback-side scores and human preference correlation;
 - reports 95% confidence intervals, performance by instrument family, and failure rates on overlap/density strata.
 
