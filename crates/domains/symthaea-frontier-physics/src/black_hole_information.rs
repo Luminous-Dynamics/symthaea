@@ -1657,6 +1657,215 @@ mod u1_domain_wall_transport_tests {
     }
 }
 
+/// Mean and standard error for one layer of an independent-seed domain-wall run.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1DomainWallTransportLayerSummary {
+    pub layer: usize,
+    pub sample_count: usize,
+    pub mean_density_profile: Vec<f64>,
+    pub density_profile_standard_error: Vec<f64>,
+    pub mean_bond_currents: Vec<f64>,
+    pub bond_current_standard_error: Vec<f64>,
+    pub mean_domain_wall_imbalance: f64,
+    pub domain_wall_imbalance_standard_error: f64,
+    pub mean_cumulative_cut_transport: f64,
+    pub cumulative_cut_transport_standard_error: f64,
+    pub mean_half_chain_entropy_nats: f64,
+    pub half_chain_entropy_standard_error: f64,
+    pub mean_half_chain_purity: f64,
+    pub maximum_continuity_residual: f64,
+    pub maximum_norm_drift: f64,
+    pub maximum_charge_drift: f64,
+    pub maximum_charge_variance: f64,
+}
+
+/// Reproducible independent-seed domain-wall transport ensemble.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1DomainWallTransportEnsembleSummary {
+    pub number_of_qubits: usize,
+    pub initial_left_excitations: usize,
+    pub depth: usize,
+    pub sample_count: usize,
+    pub first_seed: u64,
+    pub layers: Vec<U1DomainWallTransportLayerSummary>,
+}
+
+/// Run independent ChaCha20-seeded domain-wall quenches and report per-layer
+/// means, standard errors, continuity, norm and charge qualification.
+pub fn sample_u1_domain_wall_transport_ensemble(
+    number_of_qubits: usize,
+    initial_left_excitations: usize,
+    depth: usize,
+    sample_count: usize,
+    first_seed: u64,
+    tolerance: f64,
+) -> Result<U1DomainWallTransportEnsembleSummary, QuantumInformationError> {
+    if sample_count < 2 {
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+    }
+    let mut trajectories = Vec::with_capacity(sample_count);
+    for sample_index in 0..sample_count {
+        trajectories.push(simulate_u1_domain_wall_transport(
+            number_of_qubits,
+            initial_left_excitations,
+            depth,
+            first_seed.wrapping_add(sample_index as u64),
+            tolerance,
+        )?);
+    }
+
+    let mut layers = Vec::with_capacity(depth + 1);
+    for layer_index in 0..=depth {
+        let qubits = number_of_qubits;
+        let bonds = number_of_qubits - 1;
+        let mut density_mean = vec![0.0; qubits];
+        let mut density_m2 = vec![0.0; qubits];
+        let mut current_mean = vec![0.0; bonds];
+        let mut current_m2 = vec![0.0; bonds];
+        let mut imbalance_mean = 0.0;
+        let mut imbalance_m2 = 0.0;
+        let mut cut_mean = 0.0;
+        let mut cut_m2 = 0.0;
+        let mut entropy_mean = 0.0;
+        let mut entropy_m2 = 0.0;
+        let mut purity_mean = 0.0;
+        let mut maximum_continuity_residual: f64 = 0.0;
+        let mut maximum_norm_drift: f64 = 0.0;
+        let mut maximum_charge_drift: f64 = 0.0;
+        let mut maximum_charge_variance: f64 = 0.0;
+
+        for (sample_index, trajectory) in trajectories.iter().enumerate() {
+            let sample = &trajectory.samples[layer_index];
+            let count = (sample_index + 1) as f64;
+            for site in 0..qubits {
+                let delta = sample.density_profile[site] - density_mean[site];
+                density_mean[site] += delta / count;
+                density_m2[site] += delta * (sample.density_profile[site] - density_mean[site]);
+            }
+            for bond in 0..bonds {
+                let delta = sample.bond_currents[bond] - current_mean[bond];
+                current_mean[bond] += delta / count;
+                current_m2[bond] += delta * (sample.bond_currents[bond] - current_mean[bond]);
+            }
+            let delta_imbalance = sample.domain_wall_imbalance - imbalance_mean;
+            imbalance_mean += delta_imbalance / count;
+            imbalance_m2 += delta_imbalance * (sample.domain_wall_imbalance - imbalance_mean);
+
+            let delta_cut = sample.cumulative_cut_transport - cut_mean;
+            cut_mean += delta_cut / count;
+            cut_m2 += delta_cut * (sample.cumulative_cut_transport - cut_mean);
+
+            let delta_entropy = sample.half_chain_entropy_nats - entropy_mean;
+            entropy_mean += delta_entropy / count;
+            entropy_m2 += delta_entropy * (sample.half_chain_entropy_nats - entropy_mean);
+            purity_mean += (sample.half_chain_purity - purity_mean) / count;
+
+            maximum_continuity_residual =
+                maximum_continuity_residual.max(sample.continuity_max_residual);
+            maximum_norm_drift = maximum_norm_drift
+                .max((sample.full_state_norm_squared - 1.0).abs());
+            maximum_charge_drift = maximum_charge_drift
+                .max((sample.total_excitation_expectation - initial_left_excitations as f64).abs());
+            maximum_charge_variance =
+                maximum_charge_variance.max(sample.total_excitation_variance);
+        }
+
+        let denominator = (sample_count - 1) as f64;
+        let inverse_sqrt_count = 1.0 / (sample_count as f64).sqrt();
+        let density_standard_error = density_m2
+            .iter()
+            .map(|m2| (m2 / denominator).sqrt() * inverse_sqrt_count)
+            .collect();
+        let bond_current_standard_error = current_m2
+            .iter()
+            .map(|m2| (m2 / denominator).sqrt() * inverse_sqrt_count)
+            .collect();
+        layers.push(U1DomainWallTransportLayerSummary {
+            layer: layer_index,
+            sample_count,
+            mean_density_profile: density_mean,
+            density_profile_standard_error,
+            mean_bond_currents: current_mean,
+            bond_current_standard_error,
+            mean_domain_wall_imbalance: imbalance_mean,
+            domain_wall_imbalance_standard_error:
+                (imbalance_m2 / denominator).sqrt() * inverse_sqrt_count,
+            mean_cumulative_cut_transport: cut_mean,
+            cumulative_cut_transport_standard_error:
+                (cut_m2 / denominator).sqrt() * inverse_sqrt_count,
+            mean_half_chain_entropy_nats: entropy_mean,
+            half_chain_entropy_standard_error:
+                (entropy_m2 / denominator).sqrt() * inverse_sqrt_count,
+            mean_half_chain_purity: purity_mean,
+            maximum_continuity_residual,
+            maximum_norm_drift,
+            maximum_charge_drift,
+            maximum_charge_variance,
+        });
+    }
+
+    Ok(U1DomainWallTransportEnsembleSummary {
+        number_of_qubits,
+        initial_left_excitations,
+        depth,
+        sample_count,
+        first_seed,
+        layers,
+    })
+}
+
+#[cfg(test)]
+mod u1_domain_wall_transport_ensemble_tests {
+    use super::*;
+
+    const TOLERANCE: f64 = 1e-10;
+
+    #[test]
+    fn domain_wall_ensemble_reports_profile_transport_entropy_and_uncertainty() {
+        let summary = sample_u1_domain_wall_transport_ensemble(
+            8, 4, 6, 8, 0xE115, TOLERANCE,
+        ).unwrap();
+        assert_eq!(summary.layers.len(), 7);
+        for layer in &summary.layers {
+            assert_eq!(layer.sample_count, 8);
+            assert_eq!(layer.mean_density_profile.len(), 8);
+            assert_eq!(layer.density_profile_standard_error.len(), 8);
+            assert_eq!(layer.mean_bond_currents.len(), 7);
+            assert_eq!(layer.bond_current_standard_error.len(), 7);
+            assert!(layer.maximum_continuity_residual < TOLERANCE);
+            assert!(layer.maximum_norm_drift < TOLERANCE);
+            assert!(layer.maximum_charge_drift < TOLERANCE);
+            assert!(layer.maximum_charge_variance < TOLERANCE);
+            assert!(layer.domain_wall_imbalance_standard_error >= 0.0);
+            assert!(layer.half_chain_entropy_standard_error >= 0.0);
+            assert!((layer.mean_density_profile.iter().sum::<f64>() - 4.0).abs()
+                < 1e-9);
+            assert!((layer.mean_cumulative_cut_transport
+                + layer.mean_density_profile[..4].iter().sum::<f64>() - 4.0).abs()
+                < 1e-8);
+        }
+    }
+
+    #[test]
+    fn domain_wall_ensemble_is_reproducible_for_a_frozen_seed_schedule() {
+        let a = sample_u1_domain_wall_transport_ensemble(
+            8, 4, 4, 4, 0xE115, TOLERANCE,
+        ).unwrap();
+        let b = sample_u1_domain_wall_transport_ensemble(
+            8, 4, 4, 4, 0xE115, TOLERANCE,
+        ).unwrap();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn domain_wall_ensemble_rejects_single_sample() {
+        assert!(matches!(
+            sample_u1_domain_wall_transport_ensemble(8, 4, 2, 1, 5, TOLERANCE),
+            Err(QuantumInformationError::InvalidEnsembleSampleCount(1))
+        ));
+    }
+}
+
 /// Sampling statistics for Haar-random states inside a fixed U(1) charge sector.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SymmetryResolvedPageEnsembleSummary {
