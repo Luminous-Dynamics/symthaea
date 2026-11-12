@@ -1112,7 +1112,7 @@ mod tests {
         assert_eq!(report.disposition, "INCOMPLETE");
         assert_eq!(report.component_metrics.len(), 3);
         assert_eq!(report.cell_comparisons.len(), 72);
-        assert_eq!(report.blockage.below_ittc_twenty_percent_recommendation, true);
+        assert!(report.blockage.below_ittc_twenty_percent_recommendation);
     }
 
     #[test]
