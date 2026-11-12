@@ -7,6 +7,8 @@ on:
       - "crates/domains/symthaea-circuits/src/lib.rs"
       - "crates/domains/symthaea-circuits/Cargo.toml"
       - "crates/domains/symthaea-circuits/README.md"
+      - "docs/research/fixtures/airroad-dc-dynamic-stability-v0.1.json"
+      - "tools/airroad-dc-stability-qualifier/verify_fixture.py"
       - ".github/workflows/airroad-dc-bus-stability.yml"
   push:
     branches:
@@ -15,6 +17,8 @@ on:
       - "crates/domains/symthaea-circuits/src/dc_bus_stability.rs"
       - "crates/domains/symthaea-circuits/src/lib.rs"
       - ".github/workflows/airroad-dc-bus-stability.yml"
+      - "docs/research/fixtures/airroad-dc-dynamic-stability-v0.1.json"
+      - "tools/airroad-dc-stability-qualifier/verify_fixture.py"
 
 permissions:
   contents: read
@@ -38,6 +42,9 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
+
+      - name: Verify exact-rational reference fixture
+        run: python3 tools/airroad-dc-stability-qualifier/verify_fixture.py
 
       - name: Check crate formatting
         run: cargo fmt --package symthaea-circuits -- --check
