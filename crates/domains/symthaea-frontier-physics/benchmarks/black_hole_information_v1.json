@@ -437,7 +437,7 @@
     {
       "id": "QI-4",
       "name": "Hayden-Preskill decoupling and reference recovery",
-      "status": "QI-4A direct decoupling + QI-4P Petz recovery + QI-4O theorem-backed Petz optimality diagnostic source authored; exact-head execution pending",
+      "status": "QI-4A direct decoupling + QI-4P Petz recovery + QI-4O semidefinite-QEC-square-root optimality source authored; exact-head runner validation pending",
       "model": "Reference Q is initially maximally entangled with injected message M; black-hole register B is initially entangled with explicit early radiation R; a declared scrambler acts on M tensor B; emitted factors E are made accessible while remaining B' is inaccessible to the decoder.",
       "observables": [
         "mutual_information_Q_Bprime",
@@ -462,7 +462,11 @@
         "Petz_optimality_commutator_Frobenius_norm",
         "Petz_auxiliary_T_hermiticity",
         "Petz_optimality_classification_by_theorem_criterion",
-        "Petz_optimality_ensemble_mean_and_standard_error"
+        "Petz_optimality_ensemble_mean_and_standard_error",
+        "Petz_QEC_positive_square_root_residual",
+        "Petz_QEC_numerical_support_rank",
+        "rank_deficient_QEC_positive_square_root_control",
+        "negative_spectrum_rejected_without_flooring"
       ],
       "decoder_baselines": [
         "exact_small_dimension_optimal_recovery_via_SDP_or_channel_optimization",
@@ -505,9 +509,14 @@
         "petz_no_efficiency_claim": "A two-Kraus channel representation is not a physical circuit decomposition; do not claim decoder gate complexity or hardware efficiency.",
         "petz_optimality_theorem": "For rho=sigma=I/2, evaluate [M_sigma, gamma tensor T]=0 with M_sigma[(i,k),(j,l)]=<i|sqrt(sigma)K_k^dagger K_l sqrt(sigma)|j>, gamma=sigma^(-1/2)rho, T=Tr_L[(gamma^dagger tensor I)sqrt(M_sigma)]. Petz is classified optimal only when the commutator residual is below a predeclared threshold.",
         "petz_optimality_source": "Li et al., Phys. Rev. Lett. 134, 200602 (2025), DOI 10.1103/PhysRevLett.134.200602. The commutator criterion is the commuting-rho/sigma specialization; the general theorem uses sqrt(M_sigma)(gamma tensor T) >= 0.",
-        "petz_optimality_no_generalization": "This four-qubit channel uses rho=sigma=I/2. No result is claimed for noncommuting/non-maximally-mixed states or larger logical/environment dimensions."
+        "petz_optimality_no_generalization": "This four-qubit channel uses rho=sigma=I/2. No result is claimed for noncommuting/non-maximally-mixed states or larger logical/environment dimensions.",
+        "petz_qec_square_root": "Use a Hermitian eigensystem square root sqrt(M_sigma) directly; support positive-semidefinite rank-deficient QEC matrices; reject material negative eigenvalues; do not floor small positive eigenvalues.",
+        "petz_qec_square_root_residual": "Report ||S*S-M_sigma||_F/max(1,||M_sigma||_F) and numerical support rank; exact small PSD controls include rank one and rank two.",
+        "petz_optimality_commutator": "The commuting-rho/sigma corollary checks [M_sigma,gamma tensor T]=0. The general theorem's condition is sqrt(M_sigma)(gamma tensor T) >= 0; do not infer general noncommuting optimality from the commutator test.",
+        "petz_optimality_numerics": "QEC square root is derived from an 8x8 real-symmetric embedding eigensystem with complex Gram-Schmidt reconstruction; tiny negative eigenvalues within tolerance are treated as zero; eigenvalues are not raised to a floor; the reconstructed S*S residual is reported.",
+        "petz_optimality_support_rank": "Report the numerical support rank at the declared eigenvalue tolerance; include rank-one and rank-two PSD controls."
       },
-      "implementation_status": "QI-4A direct trace-distance/Pinsker decoupling; QI-4P Petz recovery channel with five exact-head green tests at 132 crate tests; QI-4O implements the 2025 PRL commuting-state commutator optimality criterion for rho=sigma=I/2. Five new QI-4O tests authored; exact-head runner pending. Physical circuit synthesis and general/noncommuting-state optimal recovery remain future work.",
+      "implementation_status": "QI-4A direct trace-distance/Pinsker; QI-4P accessible-register Petz channel; QI-4O commuting-state theorem diagnostic. QI-4O now uses a support-aware Hermitian PSD square root of the QEC matrix instead of a full-rank inverse-square-root identity. Source and two rank-deficient PSD regressions authored; exact-head Rust runner validation pending.",
       "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
       "fixtures": [
         "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
@@ -876,7 +885,8 @@
       "QI_3_sequential_smaller_complementary_reduction": "source_authored_not_executed; only the smaller subsystem is materialized for each pure-state cut; complementary entropy and purity are reported via Schmidt-spectrum equality",
       "QI_2S_unequal_block_analytic_control": "source_authored_not_executed; N=4 K=1 A=1 and A=3 return 11/24 nats",
       "QI_4O_Petz_optimality_commutator_criterion": "source_authored_5_tests_added_runner_pending",
-      "QI_4O_QEC_matrix_and_auxiliary_T": "source_authored_independent_numpy_crosscheck_runner_pending"
+      "QI_4O_QEC_matrix_and_auxiliary_T": "source_authored_independent_numpy_crosscheck_runner_pending",
+      "QI_4O_support_aware_QEC_square_root": "source_authored_not_executed"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
@@ -890,7 +900,8 @@
       "QI_4O_general_noncommuting_Petz_optimality": "not implemented; current theorem criterion uses rho=sigma=I/2 and commuting-state corollary only",
       "exact_optimal_recovery_SDP": "not implemented; use the theorem criterion for cases it covers, and a separately qualified SDP/certified bound where it does not",
       "rotated_Petz_ensemble": "not implemented",
-      "gate_level_quantum_decoder_cost": "not implemented"
+      "gate_level_quantum_decoder_cost": "not implemented",
+      "QI_4O_general_noncommuting_optimality": "The code tests only the commuting rho=sigma=I/2 corollary. The general theorem's positive-semidefinite B criterion for noncommuting rho,sigma remains unimplemented."
     },
     "resource_limits": {
       "dense_state_qubits_max": 20,
