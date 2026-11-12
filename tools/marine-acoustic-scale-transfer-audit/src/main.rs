@@ -123,10 +123,43 @@ fn background_measurement_method_name(value: &BackgroundMeasurementMethod) -> &'
     }
 }
 
+fn cavitation_pattern_name(value: &CavitationPattern) -> &'static str {
+    match value {
+        CavitationPattern::Sheet => "sheet",
+        CavitationPattern::Cloud => "cloud",
+        CavitationPattern::Bubble => "bubble",
+        CavitationPattern::TipVortex => "tip_vortex",
+        CavitationPattern::Mixed => "mixed",
+        CavitationPattern::Unknown => "unknown",
+    }
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum CavitationPattern {
+    Sheet,
+    Cloud,
+    Bubble,
+    TipVortex,
+    Mixed,
+    Unknown,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum PatternComparability {
+    Matched,
+    Mismatch,
+    Partial,
+    Unknown,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ScalePair {
     pair_id: String,
+    cavitation_pattern: CavitationPattern,
+    cavitation_pattern_comparability: PatternComparability,
     model: ModelRun,
     full_scale: FullScaleRun,
 }
@@ -135,6 +168,9 @@ struct ScalePair {
 #[serde(deny_unknown_fields)]
 struct ModelRun {
     run_id: String,
+    hydrophone_instrument_id: String,
+    calibration_certificate_sha256: String,
+    facility_transfer_function_sha256: String,
     timebase_receipt_sha256: String,
     operating_point_receipt_sha256: String,
     raw_trace_sha256: String,
@@ -168,6 +204,8 @@ struct ModelBand {
 #[serde(deny_unknown_fields)]
 struct FullScaleRun {
     run_id: String,
+    hydrophone_instrument_id: String,
+    calibration_certificate_sha256: String,
     timebase_receipt_sha256: String,
     operating_point_receipt_sha256: String,
     raw_trace_sha256: String,
@@ -211,6 +249,12 @@ struct PairReport {
     pair_id: String,
     model_run_id: String,
     full_scale_run_id: String,
+    model_hydrophone_instrument_id: String,
+    model_calibration_certificate_sha256: String,
+    facility_transfer_function_sha256: String,
+    full_scale_hydrophone_instrument_id: String,
+    full_scale_calibration_certificate_sha256: String,
+    cavitation_pattern: &'static str,
     background_measurement_method: &'static str,
     background_trace_sha256: String,
     model_timebase_receipt_sha256: String,
@@ -453,7 +497,15 @@ fn validate_case(case: &Case) -> Vec<String> {
             ));
         }
 
+        if pair.model.hydrophone_instrument_id.trim().is_empty()
+            || pair.full_scale.hydrophone_instrument_id.trim().is_empty()
+        {
+            errors.push(format!("{}: model and full-scale hydrophone instrument IDs are required", pair.pair_id));
+        }
         for (label, digest) in [
+            ("model hydrophone calibration certificate", &pair.model.calibration_certificate_sha256),
+            ("model facility transfer function", &pair.model.facility_transfer_function_sha256),
+            ("full-scale hydrophone calibration certificate", &pair.full_scale.calibration_certificate_sha256),
             ("model timebase receipt", &pair.model.timebase_receipt_sha256),
             ("full-scale timebase receipt", &pair.full_scale.timebase_receipt_sha256),
             ("model operating-point receipt", &pair.model.operating_point_receipt_sha256),
@@ -555,14 +607,48 @@ fn audit(case: &Case) -> AuditReport {
 
     let mut reasons = Vec::new();
     let mut pair_reports = Vec::new();
+    let has_pattern_mismatch = case.pairs.iter().any(|pair| {
+        pair.cavitation_pattern_comparability == PatternComparability::Mismatch
+    });
+    let has_pattern_incomplete = case.pairs.iter().any(|pair| {
+        matches!(
+            pair.cavitation_pattern,
+            CavitationPattern::TipVortex | CavitationPattern::Mixed | CavitationPattern::Unknown
+        ) || matches!(
+            pair.cavitation_pattern_comparability,
+            PatternComparability::Partial | PatternComparability::Unknown
+        )
+    });
     let has_dissimilarity = [
         &case.similarity.wake,
         &case.similarity.cavitation_pattern,
         &case.similarity.gas_nuclei_state,
     ]
     .iter()
-    .any(|state| **state == SimilarityState::Dissimilar);
+    .any(|state| **state == SimilarityState::Dissimilar)
+        || has_pattern_mismatch;
 
+    for pair in &case.pairs {
+        match pair.cavitation_pattern {
+            CavitationPattern::Sheet | CavitationPattern::Cloud | CavitationPattern::Bubble => {}
+            CavitationPattern::TipVortex | CavitationPattern::Mixed => reasons.push(format!(
+                "{}: tip-vortex/mixed cavitation requires a separately validated Reynolds-scale noise correction",
+                pair.pair_id
+            )),
+            CavitationPattern::Unknown => reasons.push(format!(
+                "{}: cavitation pattern is unknown",
+                pair.pair_id
+            )),
+        }
+        match pair.cavitation_pattern_comparability {
+            PatternComparability::Matched => {}
+            PatternComparability::Mismatch => {}
+            PatternComparability::Partial | PatternComparability::Unknown => reasons.push(format!(
+                "{}: model/full-scale cavitation-pattern comparability is not demonstrated",
+                pair.pair_id
+            )),
+        }
+    }
     if case.evidence_kind == EvidenceKind::Synthetic {
         reasons.push("synthetic evidence cannot support measured validation".to_string());
     }
@@ -782,6 +868,12 @@ fn audit(case: &Case) -> AuditReport {
             pair_id: pair.pair_id.clone(),
             model_run_id: pair.model.run_id.clone(),
             full_scale_run_id: pair.full_scale.run_id.clone(),
+            model_hydrophone_instrument_id: pair.model.hydrophone_instrument_id.clone(),
+            model_calibration_certificate_sha256: pair.model.calibration_certificate_sha256.clone(),
+            facility_transfer_function_sha256: pair.model.facility_transfer_function_sha256.clone(),
+            full_scale_hydrophone_instrument_id: pair.full_scale.hydrophone_instrument_id.clone(),
+            full_scale_calibration_certificate_sha256: pair.full_scale.calibration_certificate_sha256.clone(),
+            cavitation_pattern: cavitation_pattern_name(&pair.cavitation_pattern),
             background_measurement_method: background_measurement_method_name(
                 &pair.model.background_measurement_method,
             ),
@@ -823,6 +915,7 @@ fn audit(case: &Case) -> AuditReport {
         || case.similarity.reynolds_scale_review != ReviewState::Reviewed
         || case.similarity.facility_transfer_function != FacilityTransferState::MeasuredAndApplied
         || has_unknown_background_method
+        || has_pattern_incomplete
         || unique_model_rotation_rates < 2
         || any_unresolved_band
         || any_frequency_mismatch
@@ -920,8 +1013,13 @@ mod tests {
         {
             pairs.push(ScalePair {
                 pair_id: format!("pair-{}", index + 1),
+                cavitation_pattern: CavitationPattern::Sheet,
+                cavitation_pattern_comparability: PatternComparability::Matched,
                 model: ModelRun {
                     run_id: format!("model-{}", index + 1),
+                    hydrophone_instrument_id: format!("synthetic-model-hydrophone-{}", index + 1),
+                    calibration_certificate_sha256: digest.to_string(),
+                    facility_transfer_function_sha256: digest.to_string(),
                     timebase_receipt_sha256: digest.to_string(),
                     operating_point_receipt_sha256: digest.to_string(),
                     raw_trace_sha256: digest.to_string(),
@@ -948,6 +1046,8 @@ mod tests {
                 },
                 full_scale: FullScaleRun {
                     run_id: format!("full-{}", index + 1),
+                    hydrophone_instrument_id: format!("synthetic-full-hydrophone-{}", index + 1),
+                    calibration_certificate_sha256: digest.to_string(),
                     timebase_receipt_sha256: digest.to_string(),
                     operating_point_receipt_sha256: digest.to_string(),
                     raw_trace_sha256: digest.to_string(),
@@ -1009,6 +1109,14 @@ mod tests {
         assert_eq!(
             report.pair_reports[0].full_scale_timebase_receipt_sha256,
             case.pairs[0].full_scale.timebase_receipt_sha256
+        );
+        assert_eq!(
+            report.pair_reports[0].model_hydrophone_instrument_id,
+            case.pairs[0].model.hydrophone_instrument_id
+        );
+        assert_eq!(
+            report.pair_reports[0].full_scale_calibration_certificate_sha256,
+            case.pairs[0].full_scale.calibration_certificate_sha256
         );
         assert_eq!(
             report.pair_reports[0].band_reports[0].frequency_regime_basis,
@@ -1098,6 +1206,31 @@ mod tests {
             scaling_exponents(&FrequencyRegime::LowFrequency, &Bandwidth::Constant),
             (0.75, 1.0, 1.5, 1.5)
         );
+    }
+
+    #[test]
+    fn tip_vortex_and_mixed_patterns_are_not_scaled_by_generic_eq16() {
+        let mut case = fixture_case();
+        case.pairs[0].cavitation_pattern = CavitationPattern::TipVortex;
+        let report = audit(&case);
+        assert_eq!(report.disposition, "incomplete");
+        assert!(report.reasons.iter().any(|reason| reason.contains("Reynolds-scale noise correction")));
+        case.pairs[0].cavitation_pattern = CavitationPattern::Mixed;
+        assert_eq!(audit(&case).disposition, "incomplete");
+    }
+
+    #[test]
+    fn pattern_mismatch_is_not_comparable() {
+        let mut case = fixture_case();
+        case.pairs[0].cavitation_pattern_comparability = PatternComparability::Mismatch;
+        assert_eq!(audit(&case).disposition, "not_comparable");
+    }
+
+    #[test]
+    fn missing_hydrophone_calibration_digest_is_invalid() {
+        let mut case = fixture_case();
+        case.pairs[0].model.calibration_certificate_sha256 = "missing".to_string();
+        assert_eq!(audit(&case).disposition, "invalid");
     }
 
     #[test]
