@@ -2,6 +2,7 @@ name: Battery design decision-value audit v0.1
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "docs/transport/BATTERY_DESIGN_DECISION_VALUE_V0_1.md"
       - "schemas/transport/battery_design_decision_value_v0_1.schema.json"
