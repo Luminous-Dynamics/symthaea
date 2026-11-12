@@ -1,5 +1,5 @@
 use jsonschema::draft202012;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -98,11 +98,15 @@ fn reject_external_schema_references(value: &Value, path: &str) -> Result<(), St
 
 fn validate_schema_document(schema: &Value) -> Result<(), String> {
     if get_str(schema, "$schema") != Some(DIALECT) {
-        return Err(format!("schema must declare Draft 2020-12 dialect {DIALECT}"));
+        return Err(format!(
+            "schema must declare Draft 2020-12 dialect {DIALECT}"
+        ));
     }
     reject_external_schema_references(schema, "$")?;
     if !draft202012::meta::is_valid(schema) {
-        return Err("schema document does not validate against the Draft 2020-12 meta-schema".into());
+        return Err(
+            "schema document does not validate against the Draft 2020-12 meta-schema".into(),
+        );
     }
     draft202012::new(schema)
         .map(|_| ())
@@ -136,8 +140,12 @@ fn validate_semantics(instance: &Value) -> Result<(), Vec<String>> {
     let operations = array(instance, "operations");
     let _operation_ids = unique_ids(operations, "operation_id", "operations", &mut errors);
     let projections = array(instance, "geometry_projections");
-    let projection_ids =
-        unique_ids(projections, "projection_id", "geometry_projections", &mut errors);
+    let projection_ids = unique_ids(
+        projections,
+        "projection_id",
+        "geometry_projections",
+        &mut errors,
+    );
     let physical_tests = array(instance, "physical_tests");
     let test_ids = unique_ids(physical_tests, "test_id", "physical_tests", &mut errors);
     let claims = array(instance, "claims");
@@ -146,7 +154,9 @@ fn validate_semantics(instance: &Value) -> Result<(), Vec<String>> {
     for (index, item) in array(instance, "bom").iter().enumerate() {
         let material_id = get_str(item, "material_id").unwrap_or_default();
         if !material_ids.contains(material_id) {
-            errors.push(format!("bom[{index}]: unresolved material_id {material_id}"));
+            errors.push(format!(
+                "bom[{index}]: unresolved material_id {material_id}"
+            ));
         }
         if get_str(item, "lot_binding") == Some("bound")
             && item.get("quantity").is_none_or(Value::is_null)
@@ -286,7 +296,9 @@ fn validate_semantic_corpus(corpus: &Value) -> Result<(usize, usize), Vec<String
     for (index, case) in cases.iter().enumerate() {
         let id = get_str(case, "case_id").unwrap_or_default();
         if id.trim().is_empty() || !ids.insert(id.to_owned()) {
-            errors.push(format!("semantic_cases[{index}]: missing or duplicate case_id"));
+            errors.push(format!(
+                "semantic_cases[{index}]: missing or duplicate case_id"
+            ));
         }
         if get_str(case, "mutation").is_none_or(str::is_empty)
             || get_str(case, "invariant").is_none_or(str::is_empty)
@@ -359,7 +371,9 @@ fn validate_source_manifest(manifest: &Value) -> Result<usize, Vec<String>> {
         .iter()
         .find(|source| get_str(source, "source_id") == Some("TEXSORTML-2026"))
     {
-        let garments = texsort.pointer("/public_scope/garments").and_then(Value::as_u64);
+        let garments = texsort
+            .pointer("/public_scope/garments")
+            .and_then(Value::as_u64);
         let stages = texsort
             .pointer("/public_scope/presentation_stages")
             .and_then(Value::as_u64);
@@ -368,7 +382,8 @@ fn validate_source_manifest(manifest: &Value) -> Result<usize, Vec<String>> {
             .and_then(Value::as_u64);
         if let (Some(garments), Some(stages), Some(frames)) = (garments, stages, frames) {
             if garments * stages != frames {
-                errors.push("TexSortML garment × stage count does not equal annotated_frames".into());
+                errors
+                    .push("TexSortML garment × stage count does not equal annotated_frames".into());
             }
         }
     }
@@ -408,7 +423,10 @@ fn parse_args() -> Result<Inputs, Box<dyn Error>> {
         if index + 1 >= args.len() || args[index + 1].starts_with("--") {
             return Err(format!("missing value for {key}").into());
         }
-        if options.insert(key.to_owned(), args[index + 1].clone()).is_some() {
+        if options
+            .insert(key.to_owned(), args[index + 1].clone())
+            .is_some()
+        {
             return Err(format!("duplicate argument {key}").into());
         }
         index += 2;
@@ -585,9 +603,11 @@ mod tests {
         let (_, mut instance, _, _) = example_inputs();
         instance["bom"][0]["material_id"] = json!("UNKNOWN-MATERIAL");
         let errors = validate_semantics(&instance).unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|error| error.contains("unresolved material_id")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("unresolved material_id"))
+        );
     }
 
     #[test]
@@ -595,9 +615,11 @@ mod tests {
         let (_, mut instance, _, _) = example_inputs();
         instance["claims"][1]["disposition"] = json!("supported_within_scope");
         let errors = validate_semantics(&instance).unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|error| error.contains("physical_test claim")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("physical_test claim"))
+        );
     }
 
     #[test]
@@ -606,9 +628,11 @@ mod tests {
         instance["physical_tests"][0]["status"] = json!("measured");
         instance["physical_tests"][0]["result"] = json!(7);
         let errors = validate_semantics(&instance).unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|error| error.contains("requires evidence_ref")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("requires evidence_ref"))
+        );
     }
 
     #[test]
@@ -616,9 +640,11 @@ mod tests {
         let (_, mut instance, _, _) = example_inputs();
         instance["design"]["revision"] = json!("B");
         let errors = validate_semantics(&instance).unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|error| error.contains("projection revision differs")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("projection revision differs"))
+        );
     }
 
     #[test]
@@ -627,9 +653,11 @@ mod tests {
         instance["expected_disposition"]["physical_qualification"] =
             json!("qualified_for_declared_scope");
         let errors = validate_semantics(&instance).unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|error| error.contains("synthetic fixture")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("synthetic fixture"))
+        );
     }
 
     #[test]
