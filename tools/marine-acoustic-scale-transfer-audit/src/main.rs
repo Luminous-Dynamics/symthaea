@@ -125,6 +125,7 @@ struct AuditReport {
     schema_version: &'static str,
     overall_disposition: String,
     structural_disposition: String,
+    comparison_disposition: String,
     physical_validation_disposition: String,
     method_id: String,
     equation_profile: String,
@@ -573,7 +574,7 @@ fn audit(case: &Case) -> AuditReport {
     } else if !incomplete.is_empty() {
         "INCOMPLETE"
     } else {
-        "ELIGIBLE"
+        "COMPARISON_INPUTS_COMPLETE"
     };
 
     let all_bands_within = pair_results.iter().flat_map(|p| p.band_results.iter())
@@ -581,10 +582,8 @@ fn audit(case: &Case) -> AuditReport {
     let any_band_outside = pair_results.iter().flat_map(|p| p.band_results.iter())
         .any(|b| b.within_declared_uncertainty == Some(false));
 
-    let physical_validation_disposition = if structural_disposition != "ELIGIBLE" {
+    let comparison_disposition = if structural_disposition != "COMPARISON_INPUTS_COMPLETE" {
         "NOT_EVALUATED"
-    } else if case.evidence_class == "SYNTHETIC" {
-        "NOT_EVALUATED_SYNTHETIC"
     } else if any_band_outside {
         "OUTSIDE_DECLARED_UNCERTAINTY"
     } else if all_bands_within && !pair_results.is_empty() {
@@ -593,14 +592,22 @@ fn audit(case: &Case) -> AuditReport {
         "NOT_EVALUATED"
     };
 
+    // This executable cannot authenticate certificates, verify raw traces or independently
+    // establish the declared physical-similarity evidence. Numerical agreement is not qualification.
+    let physical_validation_disposition = if case.evidence_class == "SYNTHETIC" {
+        "NOT_EVALUATED_SYNTHETIC"
+    } else {
+        "REQUIRES_INDEPENDENT_PHYSICAL_REVIEW"
+    };
+
     let overall_disposition = if structural_disposition == "INVALID" {
         "INVALID"
     } else if structural_disposition == "INCOMPLETE" || case.evidence_class == "SYNTHETIC" {
         "INCOMPLETE"
-    } else if physical_validation_disposition == "OUTSIDE_DECLARED_UNCERTAINTY" {
-        "VALIDATION_FAILURE"
-    } else if physical_validation_disposition == "WITHIN_DECLARED_UNCERTAINTY" {
-        "VALIDATED_WITHIN_DECLARED_UNCERTAINTY"
+    } else if comparison_disposition == "OUTSIDE_DECLARED_UNCERTAINTY" {
+        "COMPARISON_OUTSIDE_DECLARED_UNCERTAINTY"
+    } else if comparison_disposition == "WITHIN_DECLARED_UNCERTAINTY" {
+        "COMPARISON_WITHIN_DECLARED_UNCERTAINTY_REQUIRES_INDEPENDENT_REVIEW"
     } else {
         "INCOMPLETE"
     };
@@ -609,6 +616,7 @@ fn audit(case: &Case) -> AuditReport {
         schema_version: SCHEMA_VERSION,
         overall_disposition: overall_disposition.to_string(),
         structural_disposition: structural_disposition.to_string(),
+        comparison_disposition: comparison_disposition.to_string(),
         physical_validation_disposition: physical_validation_disposition.to_string(),
         method_id: method.id.clone(),
         equation_profile: profile_name,
@@ -645,7 +653,7 @@ fn main() {
     println!("{}", serde_json::to_string_pretty(&report).expect("report serialization"));
 
     match report.overall_disposition.as_str() {
-        "VALIDATED_WITHIN_DECLARED_UNCERTAINTY" => process::exit(0),
+        "COMPARISON_WITHIN_DECLARED_UNCERTAINTY_REQUIRES_INDEPENDENT_REVIEW" => process::exit(0),
         "INVALID" | "INCOMPLETE" | "VALIDATION_FAILURE" => process::exit(2),
         _ => process::exit(2),
     }
@@ -705,11 +713,13 @@ mod tests {
         let mut case = synthetic_case();
         make_measured(&mut case);
         let report = audit(&case);
-        assert_eq!(report.structural_disposition, "ELIGIBLE", "{:?}", report.incomplete_reasons);
+        assert_eq!(report.structural_disposition, "COMPARISON_INPUTS_COMPLETE", "{:?}", report.incomplete_reasons);
         let corrected = report.pair_results[0].band_results[0]
             .background_corrected_model_source_level_db.expect("background-corrected level");
         assert!((corrected - 120.0).abs() < 1.0e-12);
-        assert_eq!(report.overall_disposition, "VALIDATED_WITHIN_DECLARED_UNCERTAINTY");
+        assert_eq!(report.comparison_disposition, "WITHIN_DECLARED_UNCERTAINTY");
+        assert_eq!(report.physical_validation_disposition, "REQUIRES_INDEPENDENT_PHYSICAL_REVIEW");
+        assert_eq!(report.overall_disposition, "COMPARISON_WITHIN_DECLARED_UNCERTAINTY_REQUIRES_INDEPENDENT_REVIEW");
         assert!(report.pair_results.iter().flat_map(|p| p.band_results.iter())
             .all(|b| b.within_declared_uncertainty == Some(true)));
     }
@@ -869,8 +879,9 @@ mod tests {
         make_measured(&mut case);
         case.operating_point_pairs[0].bands[0].observed_full_scale_source_level_db += 20.0;
         let report = audit(&case);
-        assert_eq!(report.overall_disposition, "VALIDATION_FAILURE");
-        assert_eq!(report.physical_validation_disposition, "OUTSIDE_DECLARED_UNCERTAINTY");
+        assert_eq!(report.overall_disposition, "COMPARISON_OUTSIDE_DECLARED_UNCERTAINTY");
+        assert_eq!(report.comparison_disposition, "OUTSIDE_DECLARED_UNCERTAINTY");
+        assert_eq!(report.physical_validation_disposition, "REQUIRES_INDEPENDENT_PHYSICAL_REVIEW");
     }
 
     #[test]
