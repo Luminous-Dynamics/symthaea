@@ -17,9 +17,9 @@ use electric_propulsion_map_oracle::{
     EfficiencyMap2D, MapCoordinateBounds, MapCoordinateEnvelope, MapLookup, MapNode,
 };
 use electric_propulsion_observation_oracle::{
-    CalibrationStatus, MeasurementChannel, MeasurementQuantity, MeasurementSample,
-    MeasurementUnit, MotorMapOperatingPoint, ObservationError, RunManifest, SampleQuality,
-    SignConvention, TimeDomain, derive_motor_map_operating_point, synchronize_at,
+    CalibrationStatus, MeasurementChannel, MeasurementQuantity, MeasurementSample, MeasurementUnit,
+    MotorMapOperatingPoint, ObservationError, RunManifest, SampleQuality, SignConvention,
+    TimeDomain, derive_motor_map_operating_point, synchronize_at,
 };
 use electric_rotorcraft_drive_oracle::{
     DriveError, DriveInput, DriveMapExpectedContext, MotorShaftCoordinateMapEvidence,
@@ -27,9 +27,9 @@ use electric_rotorcraft_drive_oracle::{
     derive_motor_shaft_operating_point, evaluate_motor_shaft_coordinate_envelope,
 };
 use electric_thermal_loss_ledger_oracle::{
-    ElectricalLoad, ElectricalLoadKind, ElectricalLoadReport, HeatAllocationReport,
-    HeatLossKind, HeatLossSource, LedgerError, ThermalNodeAllocation,
-    allocate_loss_heat, evaluate_electrical_loads,
+    ElectricalLoad, ElectricalLoadKind, ElectricalLoadReport, HeatAllocationReport, HeatLossKind,
+    HeatLossSource, LedgerError, ThermalNodeAllocation, allocate_loss_heat,
+    evaluate_electrical_loads,
 };
 use std::f64::consts::TAU;
 use std::fmt;
@@ -184,11 +184,8 @@ fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationErro
 
     // Derive the motor-side point once. The sensor channels use these exact
     // coordinates so evidence joins are not based on hand-rounded values.
-    let expected_motor_point = derive_motor_shaft_operating_point(
-        drive_input,
-        transmission,
-        transmission_efficiency,
-    )?;
+    let expected_motor_point =
+        derive_motor_shaft_operating_point(drive_input, transmission, transmission_efficiency)?;
 
     let manifest = RunManifest {
         run_id: "synthetic-run-001".to_owned(),
@@ -300,10 +297,9 @@ fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationErro
         &motor_shaft_evidence,
     )?;
 
-    let rotor_shaft_power_w = drive_input.rotor_shaft_torque_nm
-        * (drive_input.rotor_speed_rpm * TAU / 60.0);
-    let transmission_loss_w =
-        drive_envelope.shaft_power_upper_bound_w - rotor_shaft_power_w;
+    let rotor_shaft_power_w =
+        drive_input.rotor_shaft_torque_nm * (drive_input.rotor_speed_rpm * TAU / 60.0);
+    let transmission_loss_w = drive_envelope.shaft_power_upper_bound_w - rotor_shaft_power_w;
 
     Ok(CoreResult {
         manifest,
@@ -446,10 +442,14 @@ mod tests {
 
         assert!(upper.motor_shaft_output_power_w > 10_000.0 / 0.90);
         assert!((report.motor_observation.shaft_power_w - 10_000.0 / 0.90).abs() < 1.0e-8);
-        assert!(report.motor_observation.shaft_power_lower_bound_w
-            < report.motor_observation.shaft_power_w);
-        assert!(report.motor_observation.shaft_power_upper_bound_w
-            > report.motor_observation.shaft_power_w);
+        assert!(
+            report.motor_observation.shaft_power_lower_bound_w
+                < report.motor_observation.shaft_power_w
+        );
+        assert!(
+            report.motor_observation.shaft_power_upper_bound_w
+                > report.motor_observation.shaft_power_w
+        );
         assert!((upper.motor_speed_rpm - 15_000.0).abs() < 1.0e-8);
         assert!(minimum.dc_bus_input_power_w < nominal.dc_bus_input_power_w);
         assert!(nominal.dc_bus_input_power_w < upper.dc_bus_input_power_w);
@@ -476,10 +476,7 @@ mod tests {
             report.motor_observation.evidence_manifest_digest
         );
 
-        assert!((upper.dc_bus_input_energy_j
-            - upper.dc_bus_input_power_w * 12.0)
-            .abs()
-            < 1.0e-7);
+        assert!((upper.dc_bus_input_energy_j - upper.dc_bus_input_power_w * 12.0).abs() < 1.0e-7);
         assert!(upper.energy_balance_residual_j.abs() < 1.0e-5);
 
         assert_eq!(
@@ -490,10 +487,7 @@ mod tests {
             report.electrical_loads.thermal_management_power_w,
             Some(250.0)
         );
-        assert_eq!(
-            report.electrical_loads.other_auxiliary_power_w,
-            Some(100.0)
-        );
+        assert_eq!(report.electrical_loads.other_auxiliary_power_w, Some(100.0));
         assert_eq!(
             report.electrical_loads.upstream_distribution_loss_power_w,
             Some(50.0)
@@ -511,14 +505,11 @@ mod tests {
                 < 1.0e-7
         );
 
-        let expected_declared_loss = report.motor_observation.shaft_power_upper_bound_w
-            - 10_000.0
+        let expected_declared_loss = report.motor_observation.shaft_power_upper_bound_w - 10_000.0
             + upper.motor_loss_w
             + upper.inverter_loss_w;
         assert!(
-            (report.thermal_allocation.total_declared_loss_power_w
-                - expected_declared_loss)
-                .abs()
+            (report.thermal_allocation.total_declared_loss_power_w - expected_declared_loss).abs()
                 < 1.0e-8
         );
         assert!(
@@ -530,11 +521,13 @@ mod tests {
         );
         assert!(report.thermal_allocation.total_unallocated_loss_power_w > 0.0);
         assert_eq!(report.thermal_allocation.sources.len(), 3);
-        assert!(!report
-            .thermal_allocation
-            .sources
-            .iter()
-            .any(|source| source.kind == HeatLossKind::ThermalManagementInternal));
+        assert!(
+            !report
+                .thermal_allocation
+                .sources
+                .iter()
+                .any(|source| source.kind == HeatLossKind::ThermalManagementInternal)
+        );
     }
 
     #[test]
@@ -564,12 +557,10 @@ mod tests {
     fn measurement_coordinate_uncertainty_widens_the_drive_efficiency_envelope() {
         let report = run_synthetic_fixture().unwrap();
         assert!(
-            report.drive_envelope.efficiency_lower_bound
-                < report.map_lookup.efficiency_lower_bound
+            report.drive_envelope.efficiency_lower_bound < report.map_lookup.efficiency_lower_bound
         );
         assert!(
-            report.drive_envelope.efficiency_upper_bound
-                > report.map_lookup.efficiency_upper_bound
+            report.drive_envelope.efficiency_upper_bound > report.map_lookup.efficiency_upper_bound
         );
         assert!(report.motor_observation.torque_absolute_uncertainty_nm > 0.0);
         assert!(report.motor_observation.speed_absolute_uncertainty_rpm > 0.0);
@@ -631,10 +622,7 @@ mod tests {
             },
             &core.motor_shaft_evidence,
         );
-        assert!(matches!(
-            result,
-            Err(DriveError::InvalidConfiguration(_))
-        ));
+        assert!(matches!(result, Err(DriveError::InvalidConfiguration(_))));
     }
 
     #[test]
