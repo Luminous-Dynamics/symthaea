@@ -1,0 +1,311 @@
+{
+  "schema_version": "planetary-optical-impact-fixtures-v0.1",
+  "status": "synthetic_known_truth",
+  "created_for_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11796",
+  "scenarios": [
+    {
+      "scenario_id": "solar-collector-reference",
+      "surface_role": "solar_collector",
+      "observer": {
+        "observer_id": "synthetic-observer-01",
+        "instrument_type": "synthetic-band-limited-detector",
+        "band_id": "visible-450-700nm",
+        "wavelength_min_um": 0.45,
+        "wavelength_max_um": 0.7,
+        "detector_response_receipt_id": "synthetic:detector-response:v1",
+        "integration_time_s": 1
+      },
+      "surface": {
+        "surface_id": "surface-solar-collector-reference",
+        "configuration_id": "cfg-solar-collector-reference-v1",
+        "material_lot_id": "lot-solar-collector-reference-001",
+        "measurement_temperature_c": 25,
+        "spectral_property_receipt_id": "synthetic:spectral-property:v1",
+        "brdf_measurement_receipt_id": "synthetic:brdf:solar-reference",
+        "angular_coverage_min_deg": 0,
+        "angular_coverage_max_deg": 85,
+        "angle_coverage_complete": true,
+        "solar_absorptance": 0.92,
+        "infrared_emissivity": 0.08,
+        "observer_band_radiance_w_m2_sr": 0.0005
+      },
+      "limits": {
+        "maximum_observer_band_radiance_w_m2_sr": 0.001,
+        "minimum_ir_emissivity": null
+      },
+      "safety": {
+        "optical_emitter_present": false,
+        "independent_interlock_verified": null,
+        "fail_safe_off_on_unknown": null,
+        "emergency_indicator_available": true
+      },
+      "expected_disposition": "PASS_CONTRACT_ONLY"
+    },
+    {
+      "scenario_id": "solar-collector-missing-brdf",
+      "surface_role": "solar_collector",
+      "observer": {
+        "observer_id": "synthetic-observer-01",
+        "instrument_type": "synthetic-band-limited-detector",
+        "band_id": "visible-450-700nm",
+        "wavelength_min_um": 0.45,
+        "wavelength_max_um": 0.7,
+        "detector_response_receipt_id": "synthetic:detector-response:v1",
+        "integration_time_s": 1
+      },
+      "surface": {
+        "surface_id": "surface-solar-collector-missing-brdf",
+        "configuration_id": "cfg-solar-collector-missing-brdf-v1",
+        "material_lot_id": "lot-solar-collector-missing-brdf-001",
+        "measurement_temperature_c": 25,
+        "spectral_property_receipt_id": "synthetic:spectral-property:v1",
+        "brdf_measurement_receipt_id": null,
+        "angular_coverage_min_deg": 0,
+        "angular_coverage_max_deg": 85,
+        "angle_coverage_complete": true,
+        "solar_absorptance": 0.92,
+        "infrared_emissivity": 0.08,
+        "observer_band_radiance_w_m2_sr": 0.0005
+      },
+      "limits": {
+        "maximum_observer_band_radiance_w_m2_sr": 0.001,
+        "minimum_ir_emissivity": null
+      },
+      "safety": {
+        "optical_emitter_present": false,
+        "independent_interlock_verified": null,
+        "fail_safe_off_on_unknown": null,
+        "emergency_indicator_available": true
+      },
+      "expected_disposition": "BLOCKED_UNKNOWN"
+    },
+    {
+      "scenario_id": "radiator-over-observer-budget",
+      "surface_role": "radiator",
+      "observer": {
+        "observer_id": "synthetic-observer-01",
+        "instrument_type": "synthetic-band-limited-detector",
+        "band_id": "visible-450-700nm",
+        "wavelength_min_um": 0.45,
+        "wavelength_max_um": 0.7,
+        "detector_response_receipt_id": "synthetic:detector-response:v1",
+        "integration_time_s": 1
+      },
+      "surface": {
+        "surface_id": "surface-radiator-over-observer-budget",
+        "configuration_id": "cfg-radiator-over-observer-budget-v1",
+        "material_lot_id": "lot-radiator-over-observer-budget-001",
+        "measurement_temperature_c": 25,
+        "spectral_property_receipt_id": "synthetic:spectral-property:v1",
+        "brdf_measurement_receipt_id": "synthetic:brdf:radiator",
+        "angular_coverage_min_deg": 0,
+        "angular_coverage_max_deg": 85,
+        "angle_coverage_complete": true,
+        "solar_absorptance": 0.22,
+        "infrared_emissivity": 0.8,
+        "observer_band_radiance_w_m2_sr": 0.002
+      },
+      "limits": {
+        "maximum_observer_band_radiance_w_m2_sr": 0.001,
+        "minimum_ir_emissivity": 0.75
+      },
+      "safety": {
+        "optical_emitter_present": false,
+        "independent_interlock_verified": null,
+        "fail_safe_off_on_unknown": null,
+        "emergency_indicator_available": true
+      },
+      "expected_disposition": "IMPACT_EXCEEDS_BUDGET"
+    },
+    {
+      "scenario_id": "radiator-insufficient-emissivity",
+      "surface_role": "radiator",
+      "observer": {
+        "observer_id": "synthetic-observer-01",
+        "instrument_type": "synthetic-band-limited-detector",
+        "band_id": "visible-450-700nm",
+        "wavelength_min_um": 0.45,
+        "wavelength_max_um": 0.7,
+        "detector_response_receipt_id": "synthetic:detector-response:v1",
+        "integration_time_s": 1
+      },
+      "surface": {
+        "surface_id": "surface-radiator-insufficient-emissivity",
+        "configuration_id": "cfg-radiator-insufficient-emissivity-v1",
+        "material_lot_id": "lot-radiator-insufficient-emissivity-001",
+        "measurement_temperature_c": 25,
+        "spectral_property_receipt_id": "synthetic:spectral-property:v1",
+        "brdf_measurement_receipt_id": "synthetic:brdf:low-emission-film",
+        "angular_coverage_min_deg": 0,
+        "angular_coverage_max_deg": 85,
+        "angle_coverage_complete": true,
+        "solar_absorptance": 0.048,
+        "infrared_emissivity": 0.08,
+        "observer_band_radiance_w_m2_sr": 0.0005
+      },
+      "limits": {
+        "maximum_observer_band_radiance_w_m2_sr": 0.001,
+        "minimum_ir_emissivity": 0.75
+      },
+      "safety": {
+        "optical_emitter_present": false,
+        "independent_interlock_verified": null,
+        "fail_safe_off_on_unknown": null,
+        "emergency_indicator_available": true
+      },
+      "expected_disposition": "INFEASIBLE"
+    },
+    {
+      "scenario_id": "optical-transmitter-interlock-unknown",
+      "surface_role": "optical_transmitter",
+      "observer": {
+        "observer_id": "synthetic-observer-01",
+        "instrument_type": "synthetic-band-limited-detector",
+        "band_id": "visible-450-700nm",
+        "wavelength_min_um": 0.45,
+        "wavelength_max_um": 0.7,
+        "detector_response_receipt_id": "synthetic:detector-response:v1",
+        "integration_time_s": 1
+      },
+      "surface": {
+        "surface_id": "surface-optical-transmitter-interlock-unknown",
+        "configuration_id": "cfg-optical-transmitter-interlock-unknown-v1",
+        "material_lot_id": "lot-optical-transmitter-interlock-unknown-001",
+        "measurement_temperature_c": 25,
+        "spectral_property_receipt_id": "synthetic:spectral-property:v1",
+        "brdf_measurement_receipt_id": "synthetic:brdf:transmitter",
+        "angular_coverage_min_deg": 0,
+        "angular_coverage_max_deg": 85,
+        "angle_coverage_complete": true,
+        "solar_absorptance": 0.22,
+        "infrared_emissivity": 0.8,
+        "observer_band_radiance_w_m2_sr": 0.0001
+      },
+      "limits": {
+        "maximum_observer_band_radiance_w_m2_sr": 0.001,
+        "minimum_ir_emissivity": null
+      },
+      "safety": {
+        "optical_emitter_present": true,
+        "independent_interlock_verified": null,
+        "fail_safe_off_on_unknown": true,
+        "emergency_indicator_available": true
+      },
+      "expected_disposition": "SAFETY_BLOCKED"
+    },
+    {
+      "scenario_id": "emergency-beacon-unavailable",
+      "surface_role": "beacon",
+      "observer": {
+        "observer_id": "synthetic-observer-01",
+        "instrument_type": "synthetic-band-limited-detector",
+        "band_id": "visible-450-700nm",
+        "wavelength_min_um": 0.45,
+        "wavelength_max_um": 0.7,
+        "detector_response_receipt_id": "synthetic:detector-response:v1",
+        "integration_time_s": 1
+      },
+      "surface": {
+        "surface_id": "surface-emergency-beacon-unavailable",
+        "configuration_id": "cfg-emergency-beacon-unavailable-v1",
+        "material_lot_id": "lot-emergency-beacon-unavailable-001",
+        "measurement_temperature_c": 25,
+        "spectral_property_receipt_id": "synthetic:spectral-property:v1",
+        "brdf_measurement_receipt_id": "synthetic:brdf:beacon",
+        "angular_coverage_min_deg": 0,
+        "angular_coverage_max_deg": 85,
+        "angle_coverage_complete": true,
+        "solar_absorptance": 0,
+        "infrared_emissivity": 0.2,
+        "observer_band_radiance_w_m2_sr": 0.0001
+      },
+      "limits": {
+        "maximum_observer_band_radiance_w_m2_sr": 0.001,
+        "minimum_ir_emissivity": null
+      },
+      "safety": {
+        "optical_emitter_present": false,
+        "independent_interlock_verified": null,
+        "fail_safe_off_on_unknown": null,
+        "emergency_indicator_available": false
+      },
+      "expected_disposition": "SAFETY_BLOCKED"
+    },
+    {
+      "scenario_id": "frame-surface-property-missing",
+      "surface_role": "structure",
+      "observer": {
+        "observer_id": "synthetic-observer-01",
+        "instrument_type": "synthetic-band-limited-detector",
+        "band_id": "visible-450-700nm",
+        "wavelength_min_um": 0.45,
+        "wavelength_max_um": 0.7,
+        "detector_response_receipt_id": "synthetic:detector-response:v1",
+        "integration_time_s": 1
+      },
+      "surface": {
+        "surface_id": "surface-frame-surface-property-missing",
+        "configuration_id": "cfg-frame-surface-property-missing-v1",
+        "material_lot_id": "lot-frame-surface-property-missing-001",
+        "measurement_temperature_c": 25,
+        "spectral_property_receipt_id": "synthetic:spectral-property:v1",
+        "brdf_measurement_receipt_id": null,
+        "angular_coverage_min_deg": 0,
+        "angular_coverage_max_deg": 85,
+        "angle_coverage_complete": true,
+        "solar_absorptance": null,
+        "infrared_emissivity": null,
+        "observer_band_radiance_w_m2_sr": 0.0005
+      },
+      "limits": {
+        "maximum_observer_band_radiance_w_m2_sr": 0.001,
+        "minimum_ir_emissivity": null
+      },
+      "safety": {
+        "optical_emitter_present": false,
+        "independent_interlock_verified": null,
+        "fail_safe_off_on_unknown": null,
+        "emergency_indicator_available": true
+      },
+      "expected_disposition": "BLOCKED_UNKNOWN"
+    },
+    {
+      "scenario_id": "observer-limit-unknown",
+      "surface_role": "solar_collector",
+      "observer": {
+        "observer_id": "synthetic-observer-01",
+        "instrument_type": "synthetic-band-limited-detector",
+        "band_id": "visible-450-700nm",
+        "wavelength_min_um": 0.45,
+        "wavelength_max_um": 0.7,
+        "detector_response_receipt_id": "synthetic:detector-response:v1",
+        "integration_time_s": 1
+      },
+      "surface": {
+        "surface_id": "surface-observer-limit-unknown",
+        "configuration_id": "cfg-observer-limit-unknown-v1",
+        "material_lot_id": "lot-observer-limit-unknown-001",
+        "measurement_temperature_c": 25,
+        "spectral_property_receipt_id": "synthetic:spectral-property:v1",
+        "brdf_measurement_receipt_id": "synthetic:brdf:observer-unknown",
+        "angular_coverage_min_deg": 0,
+        "angular_coverage_max_deg": 85,
+        "angle_coverage_complete": true,
+        "solar_absorptance": 0.92,
+        "infrared_emissivity": 0.08,
+        "observer_band_radiance_w_m2_sr": 0.0005
+      },
+      "limits": {
+        "maximum_observer_band_radiance_w_m2_sr": null,
+        "minimum_ir_emissivity": null
+      },
+      "safety": {
+        "optical_emitter_present": false,
+        "independent_interlock_verified": null,
+        "fail_safe_off_on_unknown": null,
+        "emergency_indicator_available": true
+      },
+      "expected_disposition": "BLOCKED_UNKNOWN"
+    }
+  ]
+}
