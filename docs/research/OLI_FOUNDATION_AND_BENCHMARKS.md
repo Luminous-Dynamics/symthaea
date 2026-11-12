@@ -83,7 +83,7 @@ This implements a narrow type-level guard; it does not establish calibrated dete
 
 ### Instrument capability evidence is not the same as a failed measurement
 
-The v0.3.0 internal context distinguishes `EvidenceOutcome::InstrumentLimitation` from `InvalidMeasurement`, `NotAcquired` and `NoDetection`. A `NOT_OBSERVABLE_WITH_CURRENT_INSTRUMENT` property assessment must link an explicit `InstrumentLimitation` record and a quantitative `ObservationCoverage` record with at least one miss-risk mode. A failed measurement is not proof that the instrument is incapable; a non-detection is not proof of absence.
+The v0.4.0 internal context distinguishes `EvidenceOutcome::InstrumentLimitation` from `InvalidMeasurement`, `NotAcquired` and `NoDetection`. A `NOT_OBSERVABLE_WITH_CURRENT_INSTRUMENT` property assessment must link an explicit `InstrumentLimitation` record and a quantitative `ObservationCoverage` record with at least one miss-risk mode. A failed measurement is not proof that the instrument is incapable; a non-detection is not proof of absence.
 
 ## 3A. 2026 false-negative and abiotic-baseline research
 
