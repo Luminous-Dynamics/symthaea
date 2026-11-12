@@ -1046,6 +1046,235 @@
       "luminous_reproduction": false,
       "particle_energy_origin": "FUSION_BORN_PRIMARY_DHE3_AND_DD_SIDE_REACTION_PRODUCTS",
       "fusion_born_output_demonstrated": false
+    },
+    {
+      "case_id": "PLASMA-MINI-APPJ-QUEENBELFAST-2026",
+      "lane": "LOW_TEMPERATURE_PLASMA_MINIATURIZATION",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "authors": "Mao et al.",
+        "title": "A miniaturized and low-cost atmospheric pressure helium plasma jet device with high antimicrobial efficiency",
+        "publisher": "Environmental Technology & Innovation",
+        "publication_date": "2026-03-09",
+        "volume": 42,
+        "article_number": "104852",
+        "doi": "10.1016/j.eti.2026.104852",
+        "url": "https://doi.org/10.1016/j.eti.2026.104852",
+        "full_text": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13290277/"
+      },
+      "device_profile": {
+        "plasma_regime": "ATMOSPHERIC_PRESSURE_NONTHERMAL_HELIUM_APPJ",
+        "power_supply_mass_g": 100,
+        "power_supply_dimensions_mm": {
+          "length": 150,
+          "width": 100,
+          "height": 20
+        },
+        "reported_dc_input_voltage_V": 10,
+        "reported_dc_input_current_A": 0.5,
+        "reported_supply_output_voltage_Vrms": 900,
+        "reported_supply_frequency_kHz": 83.6,
+        "continuous_supply_operation_before_biological_tests_hours": 20,
+        "tube_length_mm": 54,
+        "tube_inlet_inner_diameter_mm": 1,
+        "tube_inlet_outer_diameter_mm": 1.5,
+        "tube_outlet_diameter_mm": 0.6,
+        "ring_electrode_length_mm": 5,
+        "selected_electrode_spacing_mm": 3,
+        "helium_flow_L_min": 2,
+        "reported_component_cost_usd_upper_bound": 45
+      },
+      "reported_outcomes": [
+        {
+          "metric": "planktonic_bacterial_strains_completely_inactivated",
+          "value": 5,
+          "unit": "strains",
+          "qualifier": "source's specified in-vitro test conditions"
+        },
+        {
+          "metric": "complete_inactivation_time",
+          "value": 40,
+          "unit": "s",
+          "qualifier": "source's tested planktonic cultures; not clinical efficacy"
+        },
+        {
+          "metric": "hydrogen_peroxide_concentration",
+          "value": 800,
+          "unit": "micromolar",
+          "qualifier": "reported physiologically relevant concentration exceeded 800 μM in source tests"
+        },
+        {
+          "metric": "maximum_temperature_rise",
+          "value": 23.7,
+          "unit": "degC",
+          "qualifier": "source-reported minimal temperature rise under its test configuration"
+        }
+      ],
+      "source_conclusion": "A low-cost compact atmospheric-pressure helium plasma jet with a custom miniaturized power supply is demonstrated for in-vitro antimicrobial tests. The paper reports a system component cost below USD 45 and a compact 100 g / 15x10x2 cm supply.",
+      "comparison_status": "MINIATURE_SOURCE_DEMONSTRATION_LIFETIME_AND_TREATMENT_AREA_NOT_CLOSED",
+      "blockers": [
+        "The component-cost figure is not total lifecycle cost and does not include a universally comparable gas-supply or service boundary.",
+        "The 2 L/min helium flow is a material operating input and must be counted in complete system cost/resource comparisons.",
+        "The study notes limited treatment area / uneven coverage as practical plasma-jet limitations.",
+        "Long-duration electrode wear and device drift during antibacterial tests were not quantified in the present study.",
+        "In-vitro planktonic culture results do not establish clinical efficacy, sterilization validation, or safety qualification.",
+        "The reported output voltage/frequency and dimensions are source observations, not an admitted Luminous operating recipe."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "PLASMA-MICROFLUIDIC-MEMBRANE-CHIP-2025",
+      "lane": "LOW_TEMPERATURE_PLASMA_MINIATURIZATION",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "authors": "Liu et al.",
+        "title": "Semi-permeable membrane stabilized microfluidic plasma chip for continuous, tunable synthesis of sub-10 nm nanoparticles",
+        "publisher": "Lab on a Chip",
+        "publication_date": "2025-05-23",
+        "volume": 25,
+        "issue": 12,
+        "pages": "2807-2815",
+        "doi": "10.1039/D4LC00960F",
+        "url": "https://doi.org/10.1039/D4LC00960F",
+        "pubmed": "https://pubmed.ncbi.nlm.nih.gov/40406968/"
+      },
+      "device_profile": {
+        "plasma_regime": "ATMOSPHERIC_PRESSURE_DIELECTRIC_BARRIER_MICROPLASMA",
+        "architecture": "PLANAR_MICROFLUIDIC_GAS_LIQUID_INTERFACE",
+        "interface_stabilization": "HYDROPHOBIC_SEMIPERMEABLE_POROUS_MEMBRANE",
+        "membrane_function": "blocks_liquid_allows_plasma_gas_transfer",
+        "operation": "continuous_tunable_microfluidic_reaction"
+      },
+      "reported_outcomes": [
+        {
+          "metric": "gold_nanoparticle_diameter_min",
+          "value": 7.31,
+          "unit": "nm"
+        },
+        {
+          "metric": "gold_nanoparticle_diameter_max",
+          "value": 11.32,
+          "unit": "nm"
+        },
+        {
+          "metric": "gold_nanoparticle_size_standard_deviation",
+          "value": 1.8,
+          "unit": "nm"
+        }
+      ],
+      "source_conclusion": "A hydrophobic porous membrane stabilizes a microplasma/liquid interface and permits continuous, tunable synthesis of gold nanoparticles with a reported size range of 7.31–11.32 nm and 1.8 nm standard deviation.",
+      "comparison_status": "MICROFLUIDIC_PRECISION_DEMONSTRATION_THROUGHPUT_AND_WHOLE_SYSTEM_ENERGY_NOT_CLOSED",
+      "blockers": [
+        "The source is a nanomaterial-synthesis demonstration, not an industrial throughput or cost qualification.",
+        "Full grid-side energy, gas, liquid pumping, membrane replacement and downstream processing boundaries require extraction before efficiency comparison.",
+        "Microchannel interface stability, pressure-gradient sensitivity and membrane fouling/lifetime remain important translation questions.",
+        "Do not compare its particle-size result to devices with different chemistry, precursor, residence time, or product-quality criteria."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "PLASMA-ARRAY-LTCC-43-CELL-10CM-2025",
+      "lane": "LOW_TEMPERATURE_PLASMA_NUMBERING_UP",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "authors": "Bhattacharya et al.",
+        "title": "Fabrication and Characterization of a 10 × 10 cm Cold Atmospheric Pressure Plasma Array",
+        "publisher": "IEEE Transactions on Plasma Science",
+        "publication_date": "2025-12-30",
+        "volume": 54,
+        "issue": 2,
+        "pages": "496-502",
+        "doi": "10.1109/TPS.2025.3646554",
+        "url": "https://doi.org/10.1109/TPS.2025.3646554",
+        "full_text": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12923079/"
+      },
+      "device_profile": {
+        "plasma_regime": "COLD_ATMOSPHERIC_ARGON_DIELECTRIC_BARRIER_ARRAY",
+        "architecture": "PARALLEL_STACK_OF_LINEAR_DISCHARGE_ELEMENTS",
+        "discharge_elements": 43,
+        "treatment_area_cm2": {
+          "width": 10,
+          "height": 10
+        },
+        "substrate": "LOW_TEMPERATURE_COFIRED_CERAMIC",
+        "channel_length_cm": 10,
+        "discharge_gap_mm": 1.1,
+        "electrode": "EMBEDDED_OPPOSING_SILVER_ELECTRODES",
+        "ballast": "INTERNAL_BALLAST_RESISTORS_FOR_UNIFORMITY"
+      },
+      "reported_conditions": {
+        "source_frequency_kHz": 21,
+        "source_voltage_Vrms": 1550,
+        "typical_element_current_mA": [
+          3.5,
+          4
+        ],
+        "total_array_current_mArms": 178,
+        "argon_flow_L_min": 130
+      },
+      "reported_outcomes": [
+        {
+          "metric": "Pseudomonas_fluorescens_biofilm_colony_forming_unit_decrease",
+          "value": 91,
+          "unit": "percent",
+          "qualifier": "source-specific stainless-steel coupon treatment"
+        },
+        {
+          "metric": "treatment_duration",
+          "value": 150,
+          "unit": "s"
+        },
+        {
+          "metric": "treatment_standoff_distance",
+          "value": 1.5,
+          "unit": "cm"
+        }
+      ],
+      "source_conclusion": "A 43-element LTCC cold-atmospheric-plasma array provides a 10x10 cm treatment region; the source reports 91% CFU decrease for a specified Pseudomonas fluorescens biofilm coupon treatment.",
+      "comparison_status": "NUMBERED_UP_ARRAY_DEMONSTRATION_APPLICATION_SPECIFIC",
+      "blockers": [
+        "The biological endpoint is source-specific and must not be generalized to other organisms, matrices or surface geometries.",
+        "The 130 L/min argon flow and complete source/auxiliary energy boundary must be included in system-level comparisons.",
+        "A 43-element array does not establish linear throughput scaling, cell-to-cell dose uniformity across all loads, or long-term service life.",
+        "The design's ballast and gas-distribution strategy must be retained when evaluating its uniformity claim."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "PLASMA-ARRAY-INDIVIDUAL-RF-IGNITION-5-CELL-2023",
+      "lane": "LOW_TEMPERATURE_PLASMA_NUMBERING_UP",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "authors": "Martinet et al.",
+        "title": "Individual ignition of RF microplasma array at atmospheric pressure",
+        "publisher": "Plasma Processes and Polymers",
+        "publication_date": "2022-11-01",
+        "volume": 20,
+        "issue": 2,
+        "article_number": "e2200131",
+        "doi": "10.1002/ppap.202200131",
+        "url": "https://doi.org/10.1002/ppap.202200131"
+      },
+      "device_profile": {
+        "plasma_regime": "ATMOSPHERIC_PRESSURE_RF_MICROPLASMA",
+        "architecture": "INDIVIDUALLY_IGNITABLE_AND_QUENCHABLE_CELL_ARRAY",
+        "demonstrated_cell_count": 5,
+        "source_discussed_scale_out": "TENS_OR_HUNDREDS_OF_CELLS",
+        "ignition": "MULTIPLEXED_KHZ_HIGH_VOLTAGE_IGNITION_PULSE",
+        "sustain": "DISTRIBUTED_RF_SUPPLY"
+      },
+      "reported_conditions": {
+        "argon_ignition_voltage_V": 1300,
+        "rf_current_per_cell_mA": 70
+      },
+      "source_conclusion": "A five-cell atmospheric RF microplasma array is demonstrated with individual cell ignition and quenching; the authors discuss potential expansion to tens or hundreds of cells.",
+      "comparison_status": "INDIVIDUAL_CELL_CONTROL_DEMONSTRATED_LARGE_ARRAY_SCALE_OUT_NOT_QUALIFIED",
+      "blockers": [
+        "Potential scale-out to tens or hundreds of cells is an authors' stated design direction, not a demonstrated array result.",
+        "The source does not by itself qualify array-level gas/power distribution, uniformity, fault isolation or lifecycle performance.",
+        "Per-cell ignition/quenched status must not be treated as proof of an independently validated process outcome."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -1168,6 +1397,26 @@
       "control_id": "NC-DHE3-CHARGED-FRACTION-NOT-DEC-EFFICIENCY",
       "condition": "Promote the source-model 97.1% charged-product energy share for a 50%D/50%3He fuel mixture into direct-converter efficiency or net plant electricity.",
       "expected_disposition": "REJECT_OUTPUT_BOUNDARY_AND_EVIDENCE_CLASS_MISMATCH"
+    },
+    {
+      "control_id": "NC-MINI-APPJ-LOW-COST-IS-LIFETIME-QUALIFICATION",
+      "condition": "Promote a low component BOM cost and more than 20 h supply operation into complete-system lifecycle or electrode-life qualification.",
+      "expected_disposition": "REJECT_LIFECYCLE_EVIDENCE_INCOMPLETE"
+    },
+    {
+      "control_id": "NC-MICROFLUIDIC-PARTICLE-SIZE-IS-INDUSTRIAL-THROUGHPUT",
+      "condition": "Promote 7.31–11.32 nm nanoparticle size control into industrial throughput, grid-to-product energy efficiency or lifecycle qualification without the missing flow and energy boundaries.",
+      "expected_disposition": "REJECT_OUTPUT_BOUNDARY_AND_THROUGHPUT_EVIDENCE_MISMATCH"
+    },
+    {
+      "control_id": "NC-43-CELL-ARRAY-IS-UNIVERSAL-TREATMENT",
+      "condition": "Promote a source-specific 91% CFU decrease on a defined biofilm coupon into a universal antimicrobial, medical or sterilization efficacy claim.",
+      "expected_disposition": "REJECT_APPLICATION_AND_ENDPOINT_MISMATCH"
+    },
+    {
+      "control_id": "NC-FIVE-CELL-RF-ARRAY-IS-HUNDRED-CELL-QUALIFICATION",
+      "condition": "Promote the demonstrated five-cell individually ignited RF array and authors' proposed tens/hundreds scale-out into a qualified hundred-cell production array.",
+      "expected_disposition": "REJECT_SCALE_OUT_EXTRAPOLATION"
     }
   ],
   "derived_reference_checks": [
