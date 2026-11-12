@@ -501,3 +501,12 @@ The component and programme comparators are summarized in [PLANETARY_ENERGY_COMP
 The structured reference data is in [`competitive-reference-snapshot.json`](../../benchmarks/planetary-energy-service/v0.1/competitive-reference-snapshot.json). Do not compare values across unlike boundaries or promote a programme goal to achieved hardware performance.
 
 The strongest next lunar surface baseline is not an isolated PV module: it is a vertical/retractable array + site illumination/history + storage + power distribution + thermal management + dust/retraction/repair. NASA's public 10-kW VSAT design reference and 50-kW / >75 W/kg second-generation solicitation target are useful comparison anchors, but not deployed lunar operating results.
+
+
+### Lunar power distribution challenger: laser beaming
+
+In addition to local PV, cables and islanded microgrids, include centralized generation with remote laser power delivery as a candidate distribution architecture. NASA's 2024 design study targets 300 W continuous at a user receiver up to 10 km away, a five-year design life and total landed mass under 625 kg. Treat these as design-study requirements, not demonstrated performance.
+
+The trade must include source electrical input, laser wall-plug-to-optical efficiency, pointing and tracking, line-of-sight/outage, receiver conversion and thermal rejection, safety/exclusion zones, receiver mass, maintenance and alternate service paths. Beaming is a distribution conversion chain, not an energy source and not a way around occlusion.
+
+Source: https://ntrs.nasa.gov/citations/20240011011
