@@ -1,0 +1,12 @@
+[package]
+name = "battery-design-decision-value"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+license = "AGPL-3.0-or-later"
+description = "Finite known-truth decision-value benchmark for battery inverse-design experiments"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
