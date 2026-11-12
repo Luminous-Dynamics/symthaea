@@ -9,10 +9,15 @@ on:
       - "crates/domains/symthaea-circuits/src/dc_bus_interaction.rs"
       - "crates/domains/symthaea-circuits/src/lib.rs"
       - "crates/domains/symthaea-circuits/README.md"
+      - "docs/research/AIRROAD_PDCM_MIMO_001_V0_1.md"
+      - "docs/research/fixtures/airroad-pdcm-mimo-hidden-dynamics-v0.1.json"
+      - "tools/airroad-pdcm-impedance-qualifier/verify_mimo_hidden_dynamics.py"
+      - "crates/domains/symthaea-circuits/src/dc_bus_mimo_reference.rs"
       - ".github/workflows/airroad-pdcm-impedance-fixture.yml"
   push:
     branches:
       - research/airroad-pdcm-impedance-v0.1
+      - research/airroad-pdcm-mimo-v0.1
     paths:
       - "docs/research/AIRROAD_PDCM_IMPEDANCE_001_V0_1.md"
       - "docs/research/fixtures/airroad-pdcm-two-converter-shared-source-v0.1.json"
@@ -42,8 +47,14 @@ jobs:
         run: python3 -m py_compile tools/airroad-pdcm-impedance-qualifier/verify_two_converter_fixture.py
       - name: Verify exact-rational shared-source interaction fixture
         run: python3 tools/airroad-pdcm-impedance-qualifier/verify_two_converter_fixture.py
+      - name: Compile and verify 2x2 MIMO hidden-dynamics fixture
+        run: |
+          python3 -m py_compile tools/airroad-pdcm-impedance-qualifier/verify_mimo_hidden_dynamics.py
+          python3 tools/airroad-pdcm-impedance-qualifier/verify_mimo_hidden_dynamics.py
       - name: Check circuits crate formatting without workspace resolution
-        run: rustfmt --edition 2024 --check crates/domains/symthaea-circuits/src/lib.rs
+        run: |
+          rustfmt --edition 2024 --check crates/domains/symthaea-circuits/src/lib.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-circuits/src/dc_bus_mimo_reference.rs
       - name: Compile and run zero-dependency circuits tests
         run: |
           rustc --test --edition=2024 crates/domains/symthaea-circuits/src/lib.rs -o /tmp/symthaea-circuits-tests
