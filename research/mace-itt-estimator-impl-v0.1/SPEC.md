@@ -36,7 +36,7 @@ Unknown outcomes are [0,1], not silently omitted. Lower and upper partial-identi
 
 ## Uncertainty
 
-The percentile bootstrap resamples task clusters, preserving their within-task repeated seeds and aggregated endpoint bounds. It resamples the lower and upper identification endpoints separately. With one task cluster, confidence intervals are not emitted. The number of bootstrap replicates and seed are included in the report.
+The percentile bootstrap resamples task clusters, preserving their within-task repeated seeds and aggregated endpoint bounds. It resamples the lower and upper identification endpoints separately. Each component interval uses two-sided 97.5% percentile limits; Bonferroni provides at least 95% joint coverage for the two-endpoint confidence region under the bootstrap approximation. With one task cluster, confidence intervals are not emitted. The number of bootstrap replicates and seed are included in the report. Complete-pair and indeterminate-arm counts are tracked per pair, not inferred from whether an entire task cluster is complete.
 
 ## Interpretation boundaries
 
