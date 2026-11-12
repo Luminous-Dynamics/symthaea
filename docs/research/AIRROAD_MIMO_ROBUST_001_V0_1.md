@@ -84,6 +84,18 @@ For this fixture, the exact set-level decision rule is:
 
 A set touching the boundary is not robustly stable. A set containing both stable and unstable realizations is not labelled robustly unstable; it is not established.
 
+
+## 5A. Existential destabilization witness versus universal instability
+
+Do not collapse two distinct propositions:
+
+- **DESTABILIZATION_WITNESS:** there exists at least one parameter realization inside the admitted uncertainty set that is unstable.
+- **ROBUSTLY_UNSTABLE:** every parameter realization in the admitted uncertainty set is unstable.
+
+For the mixed set [1/16, 1/4], gamma=1/4 is a concrete destabilizing witness, but the set is not robustly unstable because it also contains stable realizations. Its universal disposition remains NOT_ESTABLISHED. At gamma=1/8 the system is marginal, not strictly unstable.
+
+This distinction matters for industry comparisons. A robust-stability margin upper bound or worst-case destabilizing perturbation is generally an existential witness, not proof that the entire uncertainty set is unstable. Record the witness, its exact admissibility and its closed-loop pole evidence separately from a universal set-level classification.
+
 ## 5. Independent exact-rational oracle
 
 The verifier at tools/airroad-mimo-robust-qualifier/verify_three_port_reference.py:
