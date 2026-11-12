@@ -135,7 +135,9 @@ fn nonempty(value: &str) -> bool {
 
 fn lower_hex(value: &str, size: usize) -> bool {
     value.len() == size
-        && value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
 fn push(
@@ -163,9 +165,13 @@ fn producer_state(value: OptionLedgerEvidenceDisposition) -> OptionLedgerReplayD
     match value {
         OptionLedgerEvidenceDisposition::Qualified => OptionLedgerReplayDisposition::Qualified,
         OptionLedgerEvidenceDisposition::Unknown => OptionLedgerReplayDisposition::Unknown,
-        OptionLedgerEvidenceDisposition::Inconclusive => OptionLedgerReplayDisposition::Inconclusive,
+        OptionLedgerEvidenceDisposition::Inconclusive => {
+            OptionLedgerReplayDisposition::Inconclusive
+        }
         OptionLedgerEvidenceDisposition::Rejected => OptionLedgerReplayDisposition::Rejected,
-        OptionLedgerEvidenceDisposition::NotEvaluated => OptionLedgerReplayDisposition::NotEvaluated,
+        OptionLedgerEvidenceDisposition::NotEvaluated => {
+            OptionLedgerReplayDisposition::NotEvaluated
+        }
     }
 }
 
@@ -200,7 +206,10 @@ pub fn replay_option_loss_receipt(
 ) -> OptionLedgerReplayReport {
     let mut findings = Vec::new();
     let causal = replay_mission(trace);
-    let mut disposition = conservative(replay_state(causal.disposition), producer_state(receipt.disposition));
+    let mut disposition = conservative(
+        replay_state(causal.disposition),
+        producer_state(receipt.disposition),
+    );
     let receipt_id = if nonempty(&receipt.physical_transition_id) {
         receipt.physical_transition_id.clone()
     } else {
@@ -208,7 +217,12 @@ pub fn replay_option_loss_receipt(
     };
 
     if receipt.actuation_authorized {
-        push(&mut findings, FindingSeverity::Invalid, "OPTION_LEDGER_ACTUATION_AUTHORITY_FORBIDDEN", &receipt_id);
+        push(
+            &mut findings,
+            FindingSeverity::Invalid,
+            "OPTION_LEDGER_ACTUATION_AUTHORITY_FORBIDDEN",
+            &receipt_id,
+        );
         disposition = OptionLedgerReplayDisposition::Rejected;
     }
 
@@ -220,15 +234,39 @@ pub fn replay_option_loss_receipt(
         ("payload_sha256", receipt.payload_sha256.as_str()),
         ("mission_id", receipt.mission_id.as_str()),
         ("robot_id", receipt.robot_id.as_str()),
-        ("scenario_manifest_digest", receipt.scenario_manifest_digest.as_str()),
+        (
+            "scenario_manifest_digest",
+            receipt.scenario_manifest_digest.as_str(),
+        ),
         ("decision_id", receipt.decision_id.as_str()),
-        ("action_domain_digest", receipt.action_domain_digest.as_str()),
-        ("observation_partition_digest", receipt.observation_partition_digest.as_str()),
-        ("branch_manifest_digest", receipt.branch_manifest_digest.as_str()),
-        ("physical_transition_id", receipt.physical_transition_id.as_str()),
-        ("predecessor_reserve_digest", receipt.predecessor_reserve_digest.as_str()),
-        ("result_reserve_digest", receipt.result_reserve_digest.as_str()),
-        ("ledger_transition_digest", receipt.ledger_transition_digest.as_str()),
+        (
+            "action_domain_digest",
+            receipt.action_domain_digest.as_str(),
+        ),
+        (
+            "observation_partition_digest",
+            receipt.observation_partition_digest.as_str(),
+        ),
+        (
+            "branch_manifest_digest",
+            receipt.branch_manifest_digest.as_str(),
+        ),
+        (
+            "physical_transition_id",
+            receipt.physical_transition_id.as_str(),
+        ),
+        (
+            "predecessor_reserve_digest",
+            receipt.predecessor_reserve_digest.as_str(),
+        ),
+        (
+            "result_reserve_digest",
+            receipt.result_reserve_digest.as_str(),
+        ),
+        (
+            "ledger_transition_digest",
+            receipt.ledger_transition_digest.as_str(),
+        ),
     ] {
         if !nonempty(value) {
             push(
@@ -267,11 +305,18 @@ pub fn replay_option_loss_receipt(
         || receipt.robot_id != trace.scope.robot_id
         || receipt.scenario_manifest_digest != trace.scope.scenario_manifest_digest
     {
-        push(&mut findings, FindingSeverity::Invalid, "OPTION_LEDGER_MISSION_SCOPE_MISMATCH", &receipt_id);
+        push(
+            &mut findings,
+            FindingSeverity::Invalid,
+            "OPTION_LEDGER_MISSION_SCOPE_MISMATCH",
+            &receipt_id,
+        );
         disposition = OptionLedgerReplayDisposition::Rejected;
     }
 
-    let matching_decisions = trace.decisions.iter()
+    let matching_decisions = trace
+        .decisions
+        .iter()
         .filter(|v| v.decision_id == receipt.decision_id)
         .collect::<Vec<_>>();
     match matching_decisions.as_slice() {
@@ -289,16 +334,28 @@ pub fn replay_option_loss_receipt(
             }
         }
         [] => {
-            push(&mut findings, FindingSeverity::Unknown, "OPTION_LEDGER_DECISION_NOT_FOUND", &receipt.decision_id);
+            push(
+                &mut findings,
+                FindingSeverity::Unknown,
+                "OPTION_LEDGER_DECISION_NOT_FOUND",
+                &receipt.decision_id,
+            );
             disposition = conservative(disposition, OptionLedgerReplayDisposition::Unknown);
         }
         _ => {
-            push(&mut findings, FindingSeverity::Invalid, "OPTION_LEDGER_DECISION_ID_AMBIGUOUS", &receipt.decision_id);
+            push(
+                &mut findings,
+                FindingSeverity::Invalid,
+                "OPTION_LEDGER_DECISION_ID_AMBIGUOUS",
+                &receipt.decision_id,
+            );
             disposition = OptionLedgerReplayDisposition::Rejected;
         }
     }
 
-    let matching_transitions = trace.physical_transitions.iter()
+    let matching_transitions = trace
+        .physical_transitions
+        .iter()
         .filter(|v| v.transition_id == receipt.physical_transition_id)
         .collect::<Vec<_>>();
     match matching_transitions.as_slice() {
@@ -324,7 +381,9 @@ pub fn replay_option_loss_receipt(
                 );
                 disposition = OptionLedgerReplayDisposition::Rejected;
             }
-            let applications = trace.applications.iter()
+            let applications = trace
+                .applications
+                .iter()
                 .filter(|v| v.command_id == transition.command_id)
                 .collect::<Vec<_>>();
             match applications.as_slice() {
@@ -362,11 +421,21 @@ pub fn replay_option_loss_receipt(
             }
         }
         [] => {
-            push(&mut findings, FindingSeverity::Unknown, "OPTION_LEDGER_PHYSICAL_TRANSITION_NOT_FOUND", &receipt_id);
+            push(
+                &mut findings,
+                FindingSeverity::Unknown,
+                "OPTION_LEDGER_PHYSICAL_TRANSITION_NOT_FOUND",
+                &receipt_id,
+            );
             disposition = conservative(disposition, OptionLedgerReplayDisposition::Unknown);
         }
         _ => {
-            push(&mut findings, FindingSeverity::Invalid, "OPTION_LEDGER_PHYSICAL_TRANSITION_ID_AMBIGUOUS", &receipt_id);
+            push(
+                &mut findings,
+                FindingSeverity::Invalid,
+                "OPTION_LEDGER_PHYSICAL_TRANSITION_ID_AMBIGUOUS",
+                &receipt_id,
+            );
             disposition = OptionLedgerReplayDisposition::Rejected;
         }
     }
@@ -383,9 +452,14 @@ pub fn replay_option_loss_receipt(
 
     match receipt.disposition {
         OptionLedgerEvidenceDisposition::Qualified => {
-            let has_both_sets = receipt.predecessor_option_set_digest.as_ref()
+            let has_both_sets = receipt
+                .predecessor_option_set_digest
+                .as_ref()
                 .is_some_and(|v| lower_hex(v, 64))
-                && receipt.result_option_set_digest.as_ref().is_some_and(|v| lower_hex(v, 64));
+                && receipt
+                    .result_option_set_digest
+                    .as_ref()
+                    .is_some_and(|v| lower_hex(v, 64));
             if !has_both_sets {
                 push(
                     &mut findings,
@@ -410,7 +484,8 @@ pub fn replay_option_loss_receipt(
                 );
                 disposition = OptionLedgerReplayDisposition::Rejected;
             } else {
-                disposition = conservative(disposition, OptionLedgerReplayDisposition::NotEvaluated);
+                disposition =
+                    conservative(disposition, OptionLedgerReplayDisposition::NotEvaluated);
             }
         }
         OptionLedgerEvidenceDisposition::Unknown
@@ -453,7 +528,10 @@ mod tests {
             robot_id: "robot-01".into(),
             clock_id: "robot-clock".into(),
             boot_epoch: 7,
-            timestamp: TimestampInterval { lower_ns: time, upper_ns: time },
+            timestamp: TimestampInterval {
+                lower_ns: time,
+                upper_ns: time,
+            },
         }
     }
 
@@ -587,54 +665,81 @@ mod tests {
     fn wrong_mission_scope_is_rejected() {
         let mut value = receipt();
         value.mission_id = "other".into();
-        assert_eq!(replay_option_loss_receipt(&trace(), &value).disposition, OptionLedgerReplayDisposition::Rejected);
+        assert_eq!(
+            replay_option_loss_receipt(&trace(), &value).disposition,
+            OptionLedgerReplayDisposition::Rejected
+        );
     }
 
     #[test]
     fn wrong_action_domain_or_observation_lineage_is_rejected() {
         let mut domain = receipt();
         domain.action_domain_digest = digest('1');
-        assert_eq!(replay_option_loss_receipt(&trace(), &domain).disposition, OptionLedgerReplayDisposition::Rejected);
+        assert_eq!(
+            replay_option_loss_receipt(&trace(), &domain).disposition,
+            OptionLedgerReplayDisposition::Rejected
+        );
 
         let mut observations = receipt();
         observations.source_observation_ids = vec!["other".into()];
-        assert_eq!(replay_option_loss_receipt(&trace(), &observations).disposition, OptionLedgerReplayDisposition::Rejected);
+        assert_eq!(
+            replay_option_loss_receipt(&trace(), &observations).disposition,
+            OptionLedgerReplayDisposition::Rejected
+        );
     }
 
     #[test]
     fn physical_reserve_digests_and_sequence_must_match() {
         let mut value = receipt();
         value.predecessor_reserve_digest = digest('0');
-        assert_eq!(replay_option_loss_receipt(&trace(), &value).disposition, OptionLedgerReplayDisposition::Rejected);
+        assert_eq!(
+            replay_option_loss_receipt(&trace(), &value).disposition,
+            OptionLedgerReplayDisposition::Rejected
+        );
 
         let mut value = receipt();
         value.physical_transition_sequence = 5;
-        assert_eq!(replay_option_loss_receipt(&trace(), &value).disposition, OptionLedgerReplayDisposition::Rejected);
+        assert_eq!(
+            replay_option_loss_receipt(&trace(), &value).disposition,
+            OptionLedgerReplayDisposition::Rejected
+        );
     }
 
     #[test]
     fn ledger_sequence_must_follow_physical_transition() {
         let mut value = receipt();
         value.ledger_event_sequence = 6;
-        assert_eq!(replay_option_loss_receipt(&trace(), &value).disposition, OptionLedgerReplayDisposition::Rejected);
+        assert_eq!(
+            replay_option_loss_receipt(&trace(), &value).disposition,
+            OptionLedgerReplayDisposition::Rejected
+        );
     }
 
     #[test]
     fn missing_physical_transition_remains_unknown() {
         let mut mission = trace();
         mission.physical_transitions.clear();
-        assert_eq!(replay_option_loss_receipt(&mission, &receipt()).disposition, OptionLedgerReplayDisposition::Unknown);
+        assert_eq!(
+            replay_option_loss_receipt(&mission, &receipt()).disposition,
+            OptionLedgerReplayDisposition::Unknown
+        );
     }
 
     #[test]
     fn producer_unknown_and_inconclusive_are_never_upgraded() {
         let mut unknown = receipt();
         unknown.disposition = OptionLedgerEvidenceDisposition::Unknown;
-        assert_eq!(replay_option_loss_receipt(&trace(), &unknown).disposition, OptionLedgerReplayDisposition::Unknown);
+        assert_eq!(
+            replay_option_loss_receipt(&trace(), &unknown).disposition,
+            OptionLedgerReplayDisposition::Unknown
+        );
 
         let mut inconclusive = receipt();
         inconclusive.disposition = OptionLedgerEvidenceDisposition::Inconclusive;
-        assert_eq!(replay_option_loss_receipt(&trace(), &inconclusive).disposition, OptionLedgerReplayDisposition::Inconclusive);
+        assert_eq!(
+            replay_option_loss_receipt(&trace(), &inconclusive).disposition,
+            OptionLedgerReplayDisposition::Inconclusive
+        );
     }
 
     #[test]
@@ -645,32 +750,47 @@ mod tests {
         value.result_option_set_digest = None;
         value.loss_entry_count = 0;
         value.restoration_entry_count = 0;
-        assert_eq!(replay_option_loss_receipt(&trace(), &value).disposition, OptionLedgerReplayDisposition::NotEvaluated);
+        assert_eq!(
+            replay_option_loss_receipt(&trace(), &value).disposition,
+            OptionLedgerReplayDisposition::NotEvaluated
+        );
     }
 
     #[test]
     fn incomplete_branch_or_action_domain_is_unknown() {
         let mut branch = receipt();
         branch.branch_manifest_complete = false;
-        assert_eq!(replay_option_loss_receipt(&trace(), &branch).disposition, OptionLedgerReplayDisposition::Unknown);
+        assert_eq!(
+            replay_option_loss_receipt(&trace(), &branch).disposition,
+            OptionLedgerReplayDisposition::Unknown
+        );
 
         let mut domain = receipt();
         domain.action_domain_complete = false;
-        assert_eq!(replay_option_loss_receipt(&trace(), &domain).disposition, OptionLedgerReplayDisposition::Unknown);
+        assert_eq!(
+            replay_option_loss_receipt(&trace(), &domain).disposition,
+            OptionLedgerReplayDisposition::Unknown
+        );
     }
 
     #[test]
     fn qualified_receipt_requires_both_option_set_digests() {
         let mut value = receipt();
         value.result_option_set_digest = None;
-        assert_eq!(replay_option_loss_receipt(&trace(), &value).disposition, OptionLedgerReplayDisposition::Unknown);
+        assert_eq!(
+            replay_option_loss_receipt(&trace(), &value).disposition,
+            OptionLedgerReplayDisposition::Unknown
+        );
     }
 
     #[test]
     fn actuation_authority_is_always_forbidden() {
         let mut value = receipt();
         value.actuation_authorized = true;
-        assert_eq!(replay_option_loss_receipt(&trace(), &value).disposition, OptionLedgerReplayDisposition::Rejected);
+        assert_eq!(
+            replay_option_loss_receipt(&trace(), &value).disposition,
+            OptionLedgerReplayDisposition::Rejected
+        );
     }
 
     #[test]
@@ -678,7 +798,10 @@ mod tests {
         let mut mission = trace();
         mission.physical_transitions[0].predecessor_state_digest = digest('0');
         let result = replay_option_loss_receipt(&mission, &receipt());
-        assert_eq!(result.causal_replay_disposition, ReplayDisposition::Rejected);
+        assert_eq!(
+            result.causal_replay_disposition,
+            ReplayDisposition::Rejected
+        );
         assert_eq!(result.disposition, OptionLedgerReplayDisposition::Rejected);
     }
 
@@ -686,10 +809,16 @@ mod tests {
     fn unsupported_schema_or_invalid_payload_digest_is_rejected() {
         let mut version = receipt();
         version.schema_version = "0.2.0".into();
-        assert_eq!(replay_option_loss_receipt(&trace(), &version).disposition, OptionLedgerReplayDisposition::Rejected);
+        assert_eq!(
+            replay_option_loss_receipt(&trace(), &version).disposition,
+            OptionLedgerReplayDisposition::Rejected
+        );
 
         let mut payload = receipt();
         payload.payload_sha256 = "not-a-digest".into();
-        assert_eq!(replay_option_loss_receipt(&trace(), &payload).disposition, OptionLedgerReplayDisposition::Rejected);
+        assert_eq!(
+            replay_option_loss_receipt(&trace(), &payload).disposition,
+            OptionLedgerReplayDisposition::Rejected
+        );
     }
 }
