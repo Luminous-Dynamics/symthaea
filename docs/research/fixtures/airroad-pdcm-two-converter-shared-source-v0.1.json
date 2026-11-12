@@ -1,0 +1,344 @@
+{
+  "schema": "luminous.airroad.pdcm_impedance.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_analytical_reference",
+  "case_id": "two-cpl-shared-source-rc-network",
+  "model": {
+    "equations": [
+      "C0*dV0/dt = Gs*(Vs - V0) - G1*(V0 - V1) - G2*(V0 - V2)",
+      "Ci*dVi/dt = Gi*(V0 - Vi) - Pi/Vi, i in {1,2}"
+    ],
+    "parameters": {
+      "Vs": {
+        "numerator": "5",
+        "denominator": "2",
+        "unit": "V"
+      },
+      "Rs": {
+        "numerator": "1",
+        "denominator": "1",
+        "unit": "ohm"
+      },
+      "C0": {
+        "numerator": "1",
+        "denominator": "1",
+        "unit": "F"
+      },
+      "R1": {
+        "numerator": "1",
+        "denominator": "1",
+        "unit": "ohm"
+      },
+      "R2": {
+        "numerator": "1",
+        "denominator": "1",
+        "unit": "ohm"
+      },
+      "C1": {
+        "numerator": "1",
+        "denominator": "1",
+        "unit": "F"
+      },
+      "C2": {
+        "numerator": "1",
+        "denominator": "1",
+        "unit": "F"
+      },
+      "P1": {
+        "numerator": "1",
+        "denominator": "2",
+        "unit": "W"
+      },
+      "P2": {
+        "numerator": "1",
+        "denominator": "2",
+        "unit": "W"
+      }
+    }
+  },
+  "equilibrium": {
+    "V0": {
+      "numerator": "3",
+      "denominator": "2",
+      "unit": "V"
+    },
+    "V1": {
+      "numerator": "1",
+      "denominator": "1",
+      "unit": "V"
+    },
+    "V2": {
+      "numerator": "1",
+      "denominator": "1",
+      "unit": "V"
+    },
+    "source_current": {
+      "numerator": "1",
+      "denominator": "1",
+      "unit": "A"
+    },
+    "branch_current_1": {
+      "numerator": "1",
+      "denominator": "2",
+      "unit": "A"
+    },
+    "branch_current_2": {
+      "numerator": "1",
+      "denominator": "2",
+      "unit": "A"
+    },
+    "source_resistor_loss": {
+      "numerator": "1",
+      "denominator": "1",
+      "unit": "W"
+    },
+    "feeder_1_loss": {
+      "numerator": "1",
+      "denominator": "4",
+      "unit": "W"
+    },
+    "feeder_2_loss": {
+      "numerator": "1",
+      "denominator": "4",
+      "unit": "W"
+    },
+    "total_load_power": {
+      "numerator": "1",
+      "denominator": "1",
+      "unit": "W"
+    },
+    "source_power": {
+      "numerator": "5",
+      "denominator": "2",
+      "unit": "W"
+    }
+  },
+  "isolated_branch_reference": {
+    "eigenvalue_1": {
+      "numerator": "-1",
+      "denominator": "2",
+      "unit": "s^-1"
+    },
+    "eigenvalue_2": {
+      "numerator": "-1",
+      "denominator": "2",
+      "unit": "s^-1"
+    }
+  },
+  "coupled_linearization": {
+    "state_order": [
+      "V0",
+      "V1",
+      "V2"
+    ],
+    "jacobian": [
+      [
+        {
+          "numerator": "-3",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "-1",
+          "denominator": "2"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "-1",
+          "denominator": "2"
+        }
+      ]
+    ],
+    "characteristic_polynomial_coefficients_descending": [
+      {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      {
+        "numerator": "4",
+        "denominator": "1"
+      },
+      {
+        "numerator": "5",
+        "denominator": "4"
+      },
+      {
+        "numerator": "-1",
+        "denominator": "4"
+      }
+    ],
+    "factorization": "(lambda + 1/2)*(lambda^2 + 7*lambda/2 - 1/2)",
+    "eigenvalues": [
+      {
+        "exact": "(-7 + sqrt(57))/4",
+        "sign": "positive",
+        "approx": "0.1374586",
+        "unit": "s^-1"
+      },
+      {
+        "exact": "-1/2",
+        "sign": "negative",
+        "approx": "-0.5",
+        "unit": "s^-1"
+      },
+      {
+        "exact": "(-7 - sqrt(57))/4",
+        "sign": "negative",
+        "approx": "-3.6374586",
+        "unit": "s^-1"
+      }
+    ],
+    "common_mode_jacobian": [
+      [
+        {
+          "numerator": "-3",
+          "denominator": "1"
+        },
+        {
+          "numerator": "2",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        {
+          "numerator": "-1",
+          "denominator": "2"
+        }
+      ]
+    ],
+    "differential_mode_eigenvalue": {
+      "numerator": "-1",
+      "denominator": "2"
+    },
+    "common_mode_determinant": {
+      "numerator": "-1",
+      "denominator": "2"
+    }
+  },
+  "conclusion": {
+    "isolated_branch_disposition": "locally_stable_when_bus_is_stiff",
+    "coupled_network_disposition": "small_signal_unstable",
+    "negative_control": "per_converter_stable_does_not_imply_shared_network_stable",
+    "claim_ceiling": "Synthetic RC/CPL interaction only; no converter-loop, measured impedance, PHIL, aircraft or certification evidence"
+  },
+  "frequency_domain": {
+    "linearization_note": "This is the symmetric common-mode SISO reduction of the two identical RC/CPL branches, not a general asymmetric or MIMO stability result.",
+    "negative_incremental_conductance_h": {
+      "numerator": "1",
+      "denominator": "2",
+      "unit": "S"
+    },
+    "branch_admittance": "Yi(s) = Gi*(Ci*s - hi)/(Ci*s + Gi - hi)",
+    "branch_admittance_numerator_coefficients_descending": [
+      {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      {
+        "numerator": "-1",
+        "denominator": "2"
+      }
+    ],
+    "branch_admittance_denominator_coefficients_descending": [
+      {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      {
+        "numerator": "1",
+        "denominator": "2"
+      }
+    ],
+    "source_impedance": "Zs(s) = 1/(Gs + C0*s)",
+    "source_impedance_denominator_coefficients_descending": [
+      {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      {
+        "numerator": "1",
+        "denominator": "1"
+      }
+    ],
+    "common_mode_return_ratio": "L(s) = Zs(s)*(Y1(s) + Y2(s))",
+    "common_mode_return_ratio_numerator_coefficients_descending": [
+      {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      {
+        "numerator": "-1",
+        "denominator": "1"
+      }
+    ],
+    "common_mode_return_ratio_denominator_coefficients_descending": [
+      {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      {
+        "numerator": "3",
+        "denominator": "2"
+      },
+      {
+        "numerator": "1",
+        "denominator": "2"
+      }
+    ],
+    "closed_loop_characteristic_condition": "1 + L(s) = 0",
+    "closed_loop_characteristic_polynomial_coefficients_descending": [
+      {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      {
+        "numerator": "7",
+        "denominator": "2"
+      },
+      {
+        "numerator": "-1",
+        "denominator": "2"
+      }
+    ],
+    "characteristic_roots": [
+      {
+        "exact": "(-7 + sqrt(57))/4",
+        "sign": "positive"
+      },
+      {
+        "exact": "(-7 - sqrt(57))/4",
+        "sign": "negative"
+      }
+    ]
+  }
+}
