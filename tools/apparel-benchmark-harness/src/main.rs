@@ -383,8 +383,7 @@ fn validate_source_manifest(manifest: &Value) -> Result<usize, Vec<String>> {
         if let (Some(garments), Some(stages), Some(frames)) = (garments, stages, frames)
             && garments * stages != frames
         {
-            errors
-                .push("TexSortML garment × stage count does not equal annotated_frames".into());
+            errors.push("TexSortML garment × stage count does not equal annotated_frames".into());
         }
     }
 
