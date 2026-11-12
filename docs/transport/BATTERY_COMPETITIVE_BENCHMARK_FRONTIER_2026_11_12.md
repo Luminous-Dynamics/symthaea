@@ -130,7 +130,7 @@ Research basis:
 
 The benchmark should compare an unstructured document binder, exact-version matching, one-axis configuration matching and a six-domain typed equivalence audit. Report false-green inheritance, detection of changed/unknown domains, result-state preservation, missing metrology/criteria, source-digest completeness and deterministic replay. The software's strongest positive disposition is only **candidate for competent human/authority review**. It cannot determine safety, predict propagation, certify a standard or authorize destructive testing.
 
-Draft PR #4881 adds the Rust/schema/fixture audit. Exact current branch head `84c70844f7eb3910f110f2ed7e0dfd44163203ff` passed its push-triggered focused workflow: Draft 2020-12 schema/fixture validation, locked metadata, formatting, 21/21 tests and strict Clippy (https://github.com/Luminous-Dynamics/symtropy/actions/runs/43258445101). The PR-triggered job remains skipped while the PR is draft. Fixture evidence is synthetic.
+Draft PR #4881 adds the Rust/schema/fixture audit. Exact current PR head `84c70844f7eb3910f110f2ed7e0dfd44163203ff` passed its push-triggered focused workflow: Draft 2020-12 schema/fixture validation, locked metadata, formatting, 21/21 tests and strict Clippy (https://github.com/Luminous-Dynamics/symtropy/actions/runs/43258445101). The PR-triggered job remains skipped while the PR is draft. Fixture evidence is synthetic.
 
 ## Industry scorecard and benchmark targets
 
@@ -220,7 +220,7 @@ Near-term benchmark ladder:
 5. Qualify manufacturing over multiple lots and lines; target >90% first-pass yield before making scale/cost claims.
 6. Benchmark prospective design/lifetime models against random, DOE/factorial, descriptor regression and Discovery Learning-style transfer baselines at equal data, experiment, time and energy budgets.
 
-First audit slice is in branch `research/assb-practical-translation-v0.1`: schema, fixture and a Rust read-only contract. It now rejects fabrication-pressure, batch, line, process-revision, design-revision and measurement-method confounding and audits inactive electrode mass plus complete-cell volume. Its evidence remains synthetic until exact-head tests pass; no electrochemical performance claim is made.
+Draft [PR #11770](https://github.com/Luminous-Dynamics/symthaea/pull/11770) implements the first read-only audit slice on branch `research/assb-practical-translation-v0.1`. Exact head `1075e8fbdd8311c9ebda3146f63485f43bcd1671` passed Draft 2020-12 schema/fixture validation, locked metadata, Rust 1.96 formatting, 23/23 tests and strict Clippy (https://github.com/Luminous-Dynamics/symthaea/actions/runs/43274827165). It rejects fabrication-pressure, batch, line, process-revision, design-revision, method/instrument and uncertainty confounding; audits inactive electrode mass plus complete-cell volume. All evidence remains synthetic; this is not an electrochemical performance claim.
 
 ## Additional materials frontier: sodium-ion and zero-excess sodium-metal
 
