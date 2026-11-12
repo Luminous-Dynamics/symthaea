@@ -120,6 +120,7 @@ struct WakeField {
     scale_basis: WakeBasis,
     propeller_revision: String,
     condition_fingerprint_sha256: String,
+    operating_point_receipt_sha256: String,
     reference_velocity_mps: f64,
     instrument_or_solver_id: String,
     calibration_or_solver_validation_sha256: String,
@@ -190,6 +191,7 @@ struct FieldSummary {
     field_id: String,
     method: &'static str,
     scale_basis: &'static str,
+    operating_point_receipt_sha256: String,
     point_count: usize,
     axial_coverage_fraction: f64,
     radial_coverage_fraction: f64,
@@ -444,6 +446,7 @@ fn validate_field(field: &WakeField, case: &Case, label: &str, errors: &mut Vec<
     }
     for (name, digest) in [
         ("condition fingerprint", &field.condition_fingerprint_sha256),
+        ("operating-point reduction receipt", &field.operating_point_receipt_sha256),
         ("calibration/solver validation", &field.calibration_or_solver_validation_sha256),
         ("raw data", &field.raw_data_sha256),
         ("area quadrature evidence", &field.area_weight_evidence_sha256),
@@ -654,6 +657,7 @@ fn compute_field_summary(field: &WakeField) -> FieldSummary {
         field_id: field.field_id.clone(),
         method: method_name(field.method),
         scale_basis: scale_name(field.scale_basis),
+        operating_point_receipt_sha256: field.operating_point_receipt_sha256.clone(),
         point_count: field.points.len(),
         axial_coverage_fraction: axial,
         radial_coverage_fraction: radial,
@@ -1056,6 +1060,7 @@ mod tests {
         WakeField{
             field_id:id.into(),method,scale_basis:WakeBasis::ModelScale,
             propeller_revision:"prop-r7".into(),condition_fingerprint_sha256:digest('1'),
+            operating_point_receipt_sha256:digest(if id=="target"{'8'}else{'9'}),
             reference_velocity_mps:5.0,instrument_or_solver_id:format!("{id}-sensor"),
             calibration_or_solver_validation_sha256:digest('2'),raw_data_sha256:digest(if id=="target"{'3'}else{'4'}),
             coordinate_frame:CoordinateFrame::PropellerLookingForwardFromAft,
@@ -1114,6 +1119,21 @@ mod tests {
         assert_eq!(report.component_metrics.len(), 3);
         assert_eq!(report.cell_comparisons.len(), 72);
         assert!(report.blockage.below_ittc_twenty_percent_recommendation);
+    }
+
+    #[test]
+    fn target_and_realized_summaries_preserve_separate_operating_point_receipts() {
+        let report = audit(&case());
+        assert_eq!(report.target_summary.operating_point_receipt_sha256, digest('8'));
+        assert_eq!(report.realized_summary.operating_point_receipt_sha256, digest('9'));
+    }
+
+    #[test]
+    fn malformed_operating_point_receipt_is_invalid() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        input.target.operating_point_receipt_sha256 = "missing".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
     }
 
     #[test]
