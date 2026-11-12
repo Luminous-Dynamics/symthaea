@@ -2928,14 +2928,34 @@ async fn imported_work_midi_measure_maps(
     let actual_digest =
         symthaea_muse::midi_measure_sidecar::midi_measure_sidecar_commitment(&receipt)
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let raw_sidecar = std::fs::read(
-        Path::new(IMPORT_ROOT).join(&id).join("midi-measure-sidecar.json"),
+    let import_dir = Path::new(IMPORT_ROOT).join(&id);
+    let raw_sidecar = std::fs::read(import_dir.join("midi-measure-sidecar.json"))
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let raw_sidecar_sha256 = sha256_hex(&raw_sidecar);
+    let mut source_path = None;
+    for entry in std::fs::read_dir(&import_dir).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)? {
+        let entry = entry.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let file_name = entry.file_name();
+        if file_name.to_string_lossy().starts_with("source.") {
+            if source_path.replace(entry.path()).is_some() {
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        }
+    }
+    let source_path = source_path.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+    let midi_bytes = std::fs::read(source_path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let replay_valid = symthaea_muse::midi_measure_sidecar::validate_midi_measure_sidecar_replay(
+        &midi_bytes,
+        &raw_sidecar,
+        &receipt.score_clock_id,
+        &receipt,
     )
     .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let raw_sidecar_sha256 = sha256_hex(&raw_sidecar);
     if actual_digest.as_str() != expected_digest
         || receipt.midi_sha256 != summary.manifest.source_sha256
         || receipt.sidecar_sha256 != raw_sidecar_sha256
+        || sha256_hex(&midi_bytes) != summary.manifest.source_sha256
+        || !replay_valid
     {
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
