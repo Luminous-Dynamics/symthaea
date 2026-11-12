@@ -458,7 +458,7 @@ mod tests {
         assert!(result.characteristic_coefficients[1] > 0.0);
         assert!(result.characteristic_coefficients[2] > 0.0);
         assert!(result.characteristic_coefficients[3] > 0.0);
-        assert!(result.routh_hurwitz_delta > 0.0);
+        assert!(result.normalized_routh_hurwitz_delta > 0.0);
     }
 
     #[test]
