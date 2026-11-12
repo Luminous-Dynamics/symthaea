@@ -2145,6 +2145,278 @@ mod hayden_preskill_decoupling_tests {
     }
 }
 
+/// Operator-spreading profile under a declared U(1)-conserving brickwork circuit.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1OperatorSpreadingSample {
+    pub number_of_qubits: usize,
+    pub source_qubit: usize,
+    pub depth: usize,
+    pub seed: u64,
+    pub two_qubit_gate_count: usize,
+    /// Normalized squared commutator with local Z probes, one per site.
+    pub squared_commutator_z: Vec<f64>,
+    /// Normalized squared commutator with local X probes, one per site.
+    pub squared_commutator_x: Vec<f64>,
+    pub operator_hilbert_schmidt_norm_squared: f64,
+}
+
+/// Evolve a local X operator by forward unitary conjugation and measure its
+/// commutator profile against local X and Z probes.
+///
+/// The declared operator convention is O <- U O U^dagger for each brickwork
+/// gate in circuit application order. The normalized squared commutator is
+/// ||[O,V]||_F^2/(2*2^N), which is zero for commuting probes and equals two
+/// for anticommuting Pauli operators. The gate family preserves total U(1)
+/// excitation number. This is an operator-influence diagnostic, not a decoder.
+pub fn simulate_u1_operator_spreading(
+    number_of_qubits: usize,
+    source_qubit: usize,
+    depth: usize,
+    seed: u64,
+    tolerance: f64,
+) -> Result<U1OperatorSpreadingSample, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    if number_of_qubits < 2 || number_of_qubits > 8 {
+        return Err(QuantumInformationError::DenseStateQubitLimit {
+            requested: number_of_qubits,
+            maximum: 8,
+        });
+    }
+    if source_qubit >= number_of_qubits {
+        return Err(QuantumInformationError::InvalidQubit {
+            qubit: source_qubit,
+            register_size: number_of_qubits,
+        });
+    }
+
+    let dimension = 1usize << number_of_qubits;
+    let mut operator = vec![Complex64::new(0.0, 0.0); dimension * dimension];
+    let source_mask = 1usize << (number_of_qubits - 1 - source_qubit);
+    for basis in 0..dimension {
+        operator[basis * dimension + (basis ^ source_mask)] =
+            Complex64::new(1.0, 0.0);
+    }
+
+    let mut rng = ChaCha20Rng::seed_from_u64(seed);
+    let mut gate_count = 0usize;
+    for layer in 0..depth {
+        let parity = layer % 2;
+        for first in (parity..(number_of_qubits - 1)).step_by(2) {
+            let gate = u1_conserving_unitary_4(&mut rng)?;
+            conjugate_operator_by_two_qubit_unitary(
+                &mut operator,
+                number_of_qubits,
+                first,
+                first + 1,
+                &gate,
+            )?;
+            gate_count += 1;
+        }
+    }
+
+    let norm_squared = operator
+        .iter()
+        .map(|value| value.norm_sqr())
+        .sum::<f64>()
+        / dimension as f64;
+    if !norm_squared.is_finite() || (norm_squared - 1.0).abs() > tolerance * 10.0 {
+        return Err(QuantumInformationError::NormalizationError {
+            norm_squared,
+            tolerance: tolerance * 10.0,
+        });
+    }
+
+    let mut squared_commutator_z = Vec::with_capacity(number_of_qubits);
+    let mut squared_commutator_x = Vec::with_capacity(number_of_qubits);
+    for qubit in 0..number_of_qubits {
+        let mask = 1usize << (number_of_qubits - 1 - qubit);
+        let mut z_commutator_norm = 0.0;
+        let mut x_commutator_norm = 0.0;
+        for row in 0..dimension {
+            let z_row = if row & mask == 0 { 1.0 } else { -1.0 };
+            let flipped_row = row ^ mask;
+            for column in 0..dimension {
+                let z_column = if column & mask == 0 { 1.0 } else { -1.0 };
+                let entry = operator[row * dimension + column];
+                z_commutator_norm +=
+                    (entry * (z_column - z_row)).norm_sqr();
+
+                let right_x = operator[row * dimension + (column ^ mask)];
+                let left_x = operator[flipped_row * dimension + column];
+                x_commutator_norm += (right_x - left_x).norm_sqr();
+            }
+        }
+        squared_commutator_z.push(z_commutator_norm / (2.0 * dimension as f64));
+        squared_commutator_x.push(x_commutator_norm / (2.0 * dimension as f64));
+    }
+
+    if squared_commutator_z
+        .iter()
+        .chain(squared_commutator_x.iter())
+        .any(|value| !value.is_finite() || *value < -tolerance || *value > 2.0 + tolerance)
+    {
+        return Err(QuantumInformationError::InvalidMutualInformation {
+            value: squared_commutator_z
+                .iter()
+                .chain(squared_commutator_x.iter())
+                .copied()
+                .find(|value| !value.is_finite() || *value < -tolerance || *value > 2.0 + tolerance)
+                .unwrap_or(f64::NAN),
+            tolerance,
+        });
+    }
+
+    Ok(U1OperatorSpreadingSample {
+        number_of_qubits,
+        source_qubit,
+        depth,
+        seed,
+        two_qubit_gate_count: gate_count,
+        squared_commutator_z,
+        squared_commutator_x,
+        operator_hilbert_schmidt_norm_squared: norm_squared,
+    })
+}
+
+/// Apply O <- U O U^dagger to an operator stored as a row-major d-by-d matrix.
+/// Rows and columns are grouped independently by the two acted-on tensor bits.
+fn conjugate_operator_by_two_qubit_unitary(
+    operator: &mut [Complex64],
+    number_of_qubits: usize,
+    first_qubit: usize,
+    second_qubit: usize,
+    unitary: &[[Complex64; 4]; 4],
+) -> Result<(), QuantumInformationError> {
+    if first_qubit >= number_of_qubits
+        || second_qubit >= number_of_qubits
+        || first_qubit == second_qubit
+    {
+        return Err(QuantumInformationError::InvalidQubit {
+            qubit: first_qubit.max(second_qubit),
+            register_size: number_of_qubits,
+        });
+    }
+    let dimension = 1usize
+        .checked_shl(number_of_qubits as u32)
+        .ok_or(QuantumInformationError::DimensionOverflow)?;
+    let expected = dimension
+        .checked_mul(dimension)
+        .ok_or(QuantumInformationError::DimensionOverflow)?;
+    if operator.len() != expected {
+        return Err(QuantumInformationError::DimensionMismatch {
+            expected,
+            actual: operator.len(),
+        });
+    }
+    let first_mask = 1usize << (number_of_qubits - 1 - first_qubit);
+    let second_mask = 1usize << (number_of_qubits - 1 - second_qubit);
+    let dagger = core::array::from_fn::<_, 4, _>(|row| {
+        core::array::from_fn::<_, 4, _>(|column| unitary[column][row].conj())
+    });
+
+    for row_base in 0..dimension {
+        if row_base & first_mask != 0 || row_base & second_mask != 0 {
+            continue;
+        }
+        let row_indices = [
+            row_base,
+            row_base | second_mask,
+            row_base | first_mask,
+            row_base | first_mask | second_mask,
+        ];
+        for column_base in 0..dimension {
+            if column_base & first_mask != 0 || column_base & second_mask != 0 {
+                continue;
+            }
+            let column_indices = [
+                column_base,
+                column_base | second_mask,
+                column_base | first_mask,
+                column_base | first_mask | second_mask,
+            ];
+            let mut block = [[Complex64::new(0.0, 0.0); 4]; 4];
+            for row in 0..4 {
+                for column in 0..4 {
+                    block[row][column] =
+                        operator[row_indices[row] * dimension + column_indices[column]];
+                }
+            }
+            let mut left_product = [[Complex64::new(0.0, 0.0); 4]; 4];
+            for row in 0..4 {
+                for column in 0..4 {
+                    for inner in 0..4 {
+                        left_product[row][column] +=
+                            unitary[row][inner] * block[inner][column];
+                    }
+                }
+            }
+            let mut transformed = [[Complex64::new(0.0, 0.0); 4]; 4];
+            for row in 0..4 {
+                for column in 0..4 {
+                    for inner in 0..4 {
+                        transformed[row][column] +=
+                            left_product[row][inner] * dagger[inner][column];
+                    }
+                }
+            }
+            for row in 0..4 {
+                for column in 0..4 {
+                    operator[row_indices[row] * dimension + column_indices[column]] =
+                        transformed[row][column];
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod u1_operator_spreading_tests {
+    use super::*;
+
+    const TOLERANCE: f64 = 1e-10;
+
+    #[test]
+    fn depth_zero_pauli_operator_has_exact_local_commutator_profile() {
+        let sample =
+            simulate_u1_operator_spreading(6, 2, 0, 0x0F70, TOLERANCE).unwrap();
+        assert_eq!(sample.two_qubit_gate_count, 0);
+        assert!((sample.operator_hilbert_schmidt_norm_squared - 1.0).abs()
+            < TOLERANCE);
+        for qubit in 0..6 {
+            let expected_z = if qubit == 2 { 2.0 } else { 0.0 };
+            assert!((sample.squared_commutator_z[qubit] - expected_z).abs()
+                < TOLERANCE);
+            assert!(sample.squared_commutator_x[qubit].abs() < TOLERANCE);
+        }
+    }
+
+    #[test]
+    fn u1_operator_spreading_preserves_operator_norm_and_commutator_bounds() {
+        let sample =
+            simulate_u1_operator_spreading(6, 2, 8, 0x07C0, TOLERANCE).unwrap();
+        assert!((sample.operator_hilbert_schmidt_norm_squared - 1.0).abs()
+            < TOLERANCE);
+        assert!(sample
+            .squared_commutator_z
+            .iter()
+            .chain(sample.squared_commutator_x.iter())
+            .all(|value| *value >= -TOLERANCE && *value <= 2.0 + TOLERANCE));
+        assert!(sample.squared_commutator_z.iter().any(|value| *value > 1e-8));
+    }
+
+    #[test]
+    fn u1_operator_spreading_is_seed_reproducible_and_rejects_oversized_dense_operator() {
+        let a = simulate_u1_operator_spreading(6, 2, 5, 0x07C0, TOLERANCE).unwrap();
+        let b = simulate_u1_operator_spreading(6, 2, 5, 0x07C0, TOLERANCE).unwrap();
+        assert_eq!(a, b);
+        assert!(matches!(
+            simulate_u1_operator_spreading(9, 2, 2, 1, TOLERANCE),
+            Err(QuantumInformationError::DenseStateQubitLimit { .. })
+        ));
+    }
+}
+
 /// Sampling statistics for Haar-random states inside a fixed U(1) charge sector.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SymmetryResolvedPageEnsembleSummary {
