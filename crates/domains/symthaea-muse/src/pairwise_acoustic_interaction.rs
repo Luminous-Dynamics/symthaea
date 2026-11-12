@@ -402,7 +402,7 @@ fn compute_window_interaction(
     fft.process(&mut s11);
 
     let mut spectral_sum_sq = 0.0f64;
-    let mut spectral_energy = 0.0f64;
+    let mut spectral_reference_energy = 0.0f64;
     for index in 0..=(y00.len() / 2) {
         let m00 = s00[index].norm();
         let m10 = s10[index].norm();
@@ -410,7 +410,10 @@ fn compute_window_interaction(
         let m11 = s11[index].norm();
         let residual = m00 - m10 - m01 + m11;
         spectral_sum_sq += f64::from(residual) * f64::from(residual);
-        spectral_energy += f64::from(m00 + m10 + m01 + m11);
+        spectral_reference_energy += f64::from(m00) * f64::from(m00)
+            + f64::from(m10) * f64::from(m10)
+            + f64::from(m01) * f64::from(m01)
+            + f64::from(m11) * f64::from(m11);
     }
 
     let pcm_rms = (pcm_sum_sq / y00.len() as f64).sqrt() as f32;
@@ -419,8 +422,8 @@ fn compute_window_interaction(
         pcm_rms,
         pcm_peak,
         spectral_rms,
-        normalized_spectral: (f64::from(spectral_rms)
-            / spectral_energy.max(f64::from(epsilon))) as f32,
+        normalized_spectral: (spectral_sum_sq.sqrt()
+            / spectral_reference_energy.sqrt().max(f64::from(epsilon))) as f32,
     }
 }
 
@@ -559,7 +562,7 @@ pub fn measure_pairwise_acoustic_interaction(
         audio_sha256(&remove_both.audio),
     ];
 
-    for group in [&schedules[..], &map_artifacts[..], &map_receipts[..]] {
+    for group in [&schedules[..], &map_artifacts[..], &map_receipts[..], &renderer_receipts[..]] {
         let unique: std::collections::BTreeSet<&str> = group.iter().map(String::as_str).collect();
         if unique.len() != 4 {
             return Err(PairwiseInteractionError::DuplicateCoalitionArtifact);
@@ -567,7 +570,7 @@ pub fn measure_pairwise_acoustic_interaction(
     }
 
     let windows = window_starts(total_frames, config);
-    let mut taper = hann_window(config.window_size_frames);
+    let taper = hann_window(config.window_size_frames);
     if taper.len() != config.window_size_frames {
         return Err(PairwiseInteractionError::InvalidConfig("window taper length mismatch"));
     }
