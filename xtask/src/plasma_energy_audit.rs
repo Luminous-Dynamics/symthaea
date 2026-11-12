@@ -881,8 +881,23 @@ mod tests {
         let plasma_summary = audit_source_value(&plasma, "plasma-source-cases").unwrap();
         let hts_summary = audit_source_value(&hts, "hts-source-cases").unwrap();
 
-        assert_eq!(plasma_summary.case_count, 24);
-        assert_eq!(plasma_summary.negative_control_count, 24);
+        assert_eq!(plasma_summary.case_count, 28);
+        assert_eq!(plasma_summary.negative_control_count, 28);
+        let plasma_case_ids: BTreeSet<_> = plasma
+            .get("cases")
+            .and_then(Value::as_array)
+            .unwrap()
+            .iter()
+            .filter_map(|case| case.get("case_id").and_then(Value::as_str))
+            .collect();
+        for expected in [
+            "PLASMA-MINI-APPJ-QUEENBELFAST-2026",
+            "PLASMA-MICROFLUIDIC-MEMBRANE-CHIP-2025",
+            "PLASMA-ARRAY-LTCC-43-CELL-10CM-2025",
+            "PLASMA-ARRAY-INDIVIDUAL-RF-IGNITION-5-CELL-2023",
+        ] {
+            assert!(plasma_case_ids.contains(expected), "missing {expected}");
+        }
         assert!(plasma.cases.as_array().unwrap().iter().any(|case| {
             case.get("case_id").and_then(Value::as_str)
                 == Some("FUSION-FUEL-DHE3-ARC-NEUTRON-PARTITION-2026")
