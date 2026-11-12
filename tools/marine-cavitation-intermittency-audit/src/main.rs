@@ -72,6 +72,9 @@ struct Run {
     run_id: String,
     timebase_receipt_sha256: String,
     service_fingerprint_sha256: String,
+    environment_fingerprint_sha256: String,
+    hydrophone_instrument_id: String,
+    calibration_certificate_sha256: String,
     background_method: BackgroundMethod,
     background_trace_sha256: String,
     windows: Vec<Window>,
@@ -129,6 +132,9 @@ struct RunReport {
     run_id: String,
     timebase_receipt_sha256: String,
     service_fingerprint_sha256: String,
+    environment_fingerprint_sha256: String,
+    hydrophone_instrument_id: String,
+    calibration_certificate_sha256: String,
     background_method: &'static str,
     background_trace_sha256: String,
     window_evidence: Vec<WindowEvidenceRef>,
@@ -278,6 +284,8 @@ fn validate_case(case: &Case) -> Vec<String> {
         for (label, digest) in [
             ("timebase receipt", &run.timebase_receipt_sha256),
             ("run service fingerprint", &run.service_fingerprint_sha256),
+            ("run environment fingerprint", &run.environment_fingerprint_sha256),
+            ("run calibration certificate", &run.calibration_certificate_sha256),
             ("background trace", &run.background_trace_sha256),
         ] {
             if !is_sha256(digest) {
@@ -286,6 +294,15 @@ fn validate_case(case: &Case) -> Vec<String> {
         }
         if run.service_fingerprint_sha256 != case.service_fingerprint_sha256 {
             errors.push(format!("run {} service fingerprint differs from the frozen case", run.run_id));
+        }
+        if run.environment_fingerprint_sha256 != case.environment_fingerprint_sha256 {
+            errors.push(format!("run {} environment fingerprint differs from the frozen case", run.run_id));
+        }
+        if run.hydrophone_instrument_id != case.hydrophone_instrument_id {
+            errors.push(format!("run {} hydrophone instrument differs from the frozen case", run.run_id));
+        }
+        if run.calibration_certificate_sha256 != case.calibration_certificate_sha256 {
+            errors.push(format!("run {} calibration certificate differs from the frozen case", run.run_id));
         }
         if run.windows.is_empty() {
             errors.push(format!("run {} has no windows", run.run_id));
@@ -448,6 +465,9 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
         run_id: run.run_id.clone(),
         timebase_receipt_sha256: run.timebase_receipt_sha256.clone(),
         service_fingerprint_sha256: run.service_fingerprint_sha256.clone(),
+        environment_fingerprint_sha256: run.environment_fingerprint_sha256.clone(),
+        hydrophone_instrument_id: run.hydrophone_instrument_id.clone(),
+        calibration_certificate_sha256: run.calibration_certificate_sha256.clone(),
         background_method: match run.background_method {
             BackgroundMethod::BareHub => "bare_hub",
             BackgroundMethod::PressureSuppressed => "pressure_suppressed",
@@ -653,6 +673,9 @@ mod tests {
             run_id: id.to_string(),
             timebase_receipt_sha256: digest('e'),
             service_fingerprint_sha256: digest('f'),
+            environment_fingerprint_sha256: digest('3'),
+            hydrophone_instrument_id: "hydrophone-H1".to_string(),
+            calibration_certificate_sha256: digest('4'),
             background_method: BackgroundMethod::BareHub,
             background_trace_sha256: digest(if run_index == 0 { '1' } else { '2' }),
             windows,
@@ -803,6 +826,19 @@ mod tests {
         assert_eq!(report.run_reports.len(), 2);
         assert_eq!(report.run_reports[0].total_windows, 8);
         assert_eq!(report.run_reports[1].total_windows, 8);
+    }
+
+    #[test]
+    fn per_run_sensor_environment_and_calibration_must_match_frozen_case() {
+        let mut input = case();
+        input.runs[1].environment_fingerprint_sha256 = digest('9');
+        assert_eq!(audit(&input).disposition, "INVALID");
+        let mut input = case();
+        input.runs[0].hydrophone_instrument_id = "hydrophone-H2".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
+        let mut input = case();
+        input.runs[0].calibration_certificate_sha256 = digest('8');
+        assert_eq!(audit(&input).disposition, "INVALID");
     }
 
     #[test]
