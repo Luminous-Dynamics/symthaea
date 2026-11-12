@@ -67,7 +67,8 @@
     "transparency_recovery",
     "signal_susceptibility",
     "pluralism_preservation",
-    "run_validity"
+    "run_validity",
+    "synthetic_transparency_recovery_l2_improvement"
   ],
   "qualification_gates": [
     "all_synthetic_oracles_reproduced",
@@ -93,7 +94,8 @@
   "implementation_status": {
     "implemented_metric_ids": [
       "peer_private_belief_l2_error",
-      "phantom_consensus_incidence"
+      "phantom_consensus_incidence",
+      "synthetic_transparency_recovery_l2_improvement"
     ],
     "deferred_metric_ids": [
       "private_public_gap",
