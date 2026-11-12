@@ -34,6 +34,11 @@ exclude = [
     "crates/domains/symthaea-spore/fuzz",
     # Incomplete REA evidence-verifier directory has no crate manifest yet; see #8673/#9361.
     "crates/domains/symthaea-rea-evidence-verifier",
+    # Architecture-engineering remains a design/protocol work-in-progress (#8888):
+    # lib.rs declares source modules not present in this tree, so it is not yet a
+    # complete Cargo package. Keep it out of workspace discovery until source ownership
+    # and the full candidate evaluator are committed; do not add placeholder modules.
+    "crates/domains/symthaea-architecture-engineering",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
     # ARCHIVED 2026-07-16 (vision review P2.2): real SigLIP/Moondream/ocrs ONNX
