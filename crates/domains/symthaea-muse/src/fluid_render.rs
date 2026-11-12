@@ -281,7 +281,7 @@ fn drain_stream<R: Read>(mut reader: R) -> std::io::Result<DrainedStream> {
         preview.extend_from_slice(&buffer[..count.min(remaining)]);
     }
     Ok(DrainedStream {
-        sha256: hex_digest(hasher.finalize().as_slice()),
+        sha256: hex_digest(&hasher.finalize()),
         preview: String::from_utf8_lossy(&preview).into_owned(),
         total_bytes,
         truncated: total_bytes > preview.len() as u64,
