@@ -1376,7 +1376,7 @@ mod sequential_evaporation_tests {
             assert!(partition.into_iter().all(|present| present));
             assert_eq!(
                 sample.two_qubit_gates_this_step,
-                usize::from(step > 0 && step < 7),
+                if step > 0 && step < 7 { 1 } else { 0 },
             );
         }
         assert_eq!(
