@@ -125,6 +125,14 @@ pub struct InvocationArgumentV1 {
     pub raw_os_hex: String,
 }
 
+/// One allowlisted environment variable passed to the renderer. Values are
+/// represented only by a digest so secrets cannot leak into the receipt.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct InvocationEnvironmentV1 {
+    pub name: String,
+    pub value_sha256: String,
+}
+
 /// Result state for a local renderer invocation. These values describe the
 /// observable wrapper/child-process path, not a cryptographic attestation.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -153,6 +161,7 @@ pub struct FluidSynthInvocationObservationV1 {
     pub disposition: FluidSynthInvocationDispositionV1,
     pub program: Option<InvocationArgumentV1>,
     pub arguments: Vec<InvocationArgumentV1>,
+    pub environment: Vec<InvocationEnvironmentV1>,
     pub executable_sha256_before: Option<String>,
     pub executable_sha256_after: Option<String>,
     pub soundfont_sha256_before: Option<String>,
@@ -288,6 +297,7 @@ fn empty_observation(
         disposition,
         program: None,
         arguments: Vec::new(),
+        environment: Vec::new(),
         executable_sha256_before: None,
         executable_sha256_after: None,
         soundfont_sha256_before: None,
@@ -415,7 +425,34 @@ fn render_midi_to_wav_with_paths(
         midi_path.as_os_str().to_os_string(),
     ]);
 
+    // Avoid inheriting an unbounded process environment (which may contain
+    // credentials or unrelated state). Pass only the renderer's explicit
+    // runtime allowlist and bind each value by digest in the observation.
+    const ENV_ALLOWLIST: [&str; 6] = [
+        "PATH",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "LD_LIBRARY_PATH",
+        "XDG_CONFIG_HOME",
+    ];
+    let child_environment: Vec<(OsString, OsString)> = ENV_ALLOWLIST
+        .iter()
+        .filter_map(|name| {
+            std::env::var_os(name).map(|value| (OsString::from(name), value))
+        })
+        .collect();
+    let environment_observation: Vec<InvocationEnvironmentV1> = child_environment
+        .iter()
+        .map(|(name, value)| InvocationEnvironmentV1 {
+            name: name.to_string_lossy().into_owned(),
+            value_sha256: sha256_hex_bytes(&raw_os_bytes(value)),
+        })
+        .collect();
+
     let mut command = Command::new(binary);
+    command.env_clear();
+    command.envs(child_environment.iter().cloned());
     command.args(&args);
     command.stdout(Stdio::piped()).stderr(Stdio::piped());
 
@@ -427,6 +464,7 @@ fn render_midi_to_wav_with_paths(
     );
     observation.program = Some(program);
     observation.arguments = arguments;
+    observation.environment = environment_observation;
     observation.executable_sha256_before = executable_before;
     observation.soundfont_sha256_before = soundfont_before;
     observation.midi_sha256_before = midi_before;
