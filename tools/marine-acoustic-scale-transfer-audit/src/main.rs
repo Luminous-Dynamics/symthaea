@@ -107,6 +107,22 @@ enum FacilityTransferState {
     Rejected,
 }
 
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum BackgroundMeasurementMethod {
+    BareHub,
+    PressureSuppressed,
+    Unknown,
+}
+
+fn background_measurement_method_name(value: &BackgroundMeasurementMethod) -> &'static str {
+    match value {
+        BackgroundMeasurementMethod::BareHub => "bare_hub",
+        BackgroundMeasurementMethod::PressureSuppressed => "pressure_suppressed",
+        BackgroundMeasurementMethod::Unknown => "unknown",
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ScalePair {
@@ -127,6 +143,8 @@ struct ModelRun {
     rpm_u95_hz: f64,
     cavitation_number_n_d: f64,
     source_reference_distance_m: f64,
+    background_measurement_method: BackgroundMeasurementMethod,
+    background_trace_sha256: String,
     bands: Vec<ModelBand>,
 }
 
@@ -193,6 +211,8 @@ struct PairReport {
     pair_id: String,
     model_run_id: String,
     full_scale_run_id: String,
+    background_measurement_method: &'static str,
+    background_trace_sha256: String,
     model_timebase_receipt_sha256: String,
     full_scale_timebase_receipt_sha256: String,
     model_operating_point_receipt_sha256: String,
@@ -210,8 +230,8 @@ struct BandReport {
     frequency_regime_basis: String,
     spl_scale_delta_db: f64,
     scale_transfer_u95_db: f64,
-    model_source_level_db: f64,
-    predicted_full_scale_source_level_db: f64,
+    model_source_level_db: Option<f64>,
+    predicted_full_scale_source_level_db: Option<f64>,
     signed_error_db: Option<f64>,
     absolute_error_db: Option<f64>,
     predicted_interval_lower_db: Option<f64>,
@@ -273,6 +293,23 @@ fn background_corrected_spl(total_db: f64, background_db: f64) -> Option<f64> {
     }
     let corrected = total_db + 10.0 * (1.0 - relative_background).log10();
     corrected.is_finite().then_some(corrected)
+}
+
+// ITTC Rev.03 §2.5.3: below 3 dB the signal is background-dominated;
+// from 3 dB through 10 dB, subtract background in the energy domain;
+// above 10 dB, no correction is required.
+fn ittc_cavitation_spl(total_db: f64, background_db: f64) -> Option<f64> {
+    if !total_db.is_finite() || !background_db.is_finite() || total_db <= background_db {
+        return None;
+    }
+    let margin_db = total_db - background_db;
+    if margin_db < 3.0 {
+        None
+    } else if margin_db > 10.0 {
+        Some(total_db)
+    } else {
+        background_corrected_spl(total_db, background_db)
+    }
 }
 
 fn scaling_exponents(
@@ -421,6 +458,7 @@ fn validate_case(case: &Case) -> Vec<String> {
             ("full-scale timebase receipt", &pair.full_scale.timebase_receipt_sha256),
             ("model operating-point receipt", &pair.model.operating_point_receipt_sha256),
             ("model raw trace", &pair.model.raw_trace_sha256),
+            ("model background trace", &pair.model.background_trace_sha256),
             ("full-scale operating-point receipt", &pair.full_scale.operating_point_receipt_sha256),
             ("full-scale raw trace", &pair.full_scale.raw_trace_sha256),
         ] {
@@ -531,6 +569,11 @@ fn audit(case: &Case) -> AuditReport {
     if !case.source.independently_reviewed {
         reasons.push("source evidence has not been independently reviewed".to_string());
     }
+    for pair in &case.pairs {
+        if pair.model.background_measurement_method == BackgroundMeasurementMethod::Unknown {
+            reasons.push(format!("{}: background measurement method is unknown", pair.pair_id));
+        }
+    }
     for (name, state) in [
         ("wake similarity", &case.similarity.wake),
         ("cavitation-pattern similarity", &case.similarity.cavitation_pattern),
@@ -569,11 +612,37 @@ fn audit(case: &Case) -> AuditReport {
                 &model_band.frequency_regime,
                 &case.scaling.bandwidth,
             );
-            let corrected = background_corrected_spl(
+            let Some(corrected) = ittc_cavitation_spl(
                 model_band.total_spl_db,
                 model_band.background_spl_db,
-            )
-            .expect("central background correction is validated before audit computation");
+            ) else {
+                any_unresolved_band = true;
+                band_reports.push(BandReport {
+                    band_id: model_band.band_id.clone(),
+                    frequency_regime: frequency_regime_name(&model_band.frequency_regime),
+                    frequency_regime_basis: model_band.frequency_regime_basis.clone(),
+                    spl_scale_delta_db: delta_db,
+                    scale_transfer_u95_db: model_band.scale_transfer_u95_db,
+                    model_source_level_db: None,
+                    predicted_full_scale_source_level_db: None,
+                    signed_error_db: None,
+                    absolute_error_db: None,
+                    predicted_interval_lower_db: None,
+                    predicted_interval_upper_db: None,
+                    mapped_frequency_hz: mapped_frequency_hz(
+                        &pair.model,
+                        &pair.full_scale,
+                        model_band.center_frequency_hz,
+                    ),
+                    observed_frequency_hz: None,
+                    frequency_relative_error: None,
+                    observed_full_scale_source_level_db: None,
+                    observed_interval_lower_db: None,
+                    observed_interval_upper_db: None,
+                    comparison: "background_dominated_unusable",
+                });
+                continue;
+            };
             let model_source_level = corrected - model_band.facility_transfer_function_db;
             let predicted_full_scale = model_source_level + delta_db;
             let mapped_frequency = mapped_frequency_hz(
@@ -590,8 +659,8 @@ fn audit(case: &Case) -> AuditReport {
                     frequency_regime_basis: model_band.frequency_regime_basis.clone(),
                     spl_scale_delta_db: delta_db,
                     scale_transfer_u95_db: model_band.scale_transfer_u95_db,
-                    model_source_level_db: model_source_level,
-                    predicted_full_scale_source_level_db: predicted_full_scale,
+                    model_source_level_db: Some(model_source_level),
+                    predicted_full_scale_source_level_db: Some(predicted_full_scale),
                     signed_error_db: None,
                     absolute_error_db: None,
                     predicted_interval_lower_db: None,
@@ -617,8 +686,8 @@ fn audit(case: &Case) -> AuditReport {
                     frequency_regime_basis: model_band.frequency_regime_basis.clone(),
                     spl_scale_delta_db: delta_db,
                     scale_transfer_u95_db: model_band.scale_transfer_u95_db,
-                    model_source_level_db: model_source_level,
-                    predicted_full_scale_source_level_db: predicted_full_scale,
+                    model_source_level_db: Some(model_source_level),
+                    predicted_full_scale_source_level_db: Some(predicted_full_scale),
                     signed_error_db: Some(predicted_full_scale - full_band.source_level_db),
                     absolute_error_db: Some((predicted_full_scale - full_band.source_level_db).abs()),
                     predicted_interval_lower_db: None,
@@ -635,11 +704,11 @@ fn audit(case: &Case) -> AuditReport {
             }
 
             // Conservative endpoint propagation; no statistical independence assumption is made.
-            let predicted_lower = background_corrected_spl(
+            let predicted_lower = ittc_cavitation_spl(
                 model_band.total_spl_db - model_band.total_u95_db,
                 model_band.background_spl_db + model_band.background_u95_db,
             );
-            let predicted_upper = background_corrected_spl(
+            let predicted_upper = ittc_cavitation_spl(
                 model_band.total_spl_db + model_band.total_u95_db,
                 model_band.background_spl_db - model_band.background_u95_db,
             );
@@ -651,8 +720,8 @@ fn audit(case: &Case) -> AuditReport {
                     frequency_regime_basis: model_band.frequency_regime_basis.clone(),
                     spl_scale_delta_db: delta_db,
                     scale_transfer_u95_db: model_band.scale_transfer_u95_db,
-                    model_source_level_db: model_source_level,
-                    predicted_full_scale_source_level_db: predicted_full_scale,
+                    model_source_level_db: Some(model_source_level),
+                    predicted_full_scale_source_level_db: Some(predicted_full_scale),
                     signed_error_db: Some(predicted_full_scale - full_band.source_level_db),
                     absolute_error_db: Some((predicted_full_scale - full_band.source_level_db).abs()),
                     predicted_interval_lower_db: None,
@@ -690,8 +759,8 @@ fn audit(case: &Case) -> AuditReport {
                 frequency_regime_basis: model_band.frequency_regime_basis.clone(),
                 spl_scale_delta_db: delta_db,
                 scale_transfer_u95_db: model_band.scale_transfer_u95_db,
-                model_source_level_db: model_source_level,
-                predicted_full_scale_source_level_db: predicted_full_scale,
+                model_source_level_db: Some(model_source_level),
+                predicted_full_scale_source_level_db: Some(predicted_full_scale),
                 signed_error_db: Some(predicted_full_scale - full_band.source_level_db),
                 absolute_error_db: Some((predicted_full_scale - full_band.source_level_db).abs()),
                 predicted_interval_lower_db: Some(predicted_lower),
@@ -710,6 +779,10 @@ fn audit(case: &Case) -> AuditReport {
             pair_id: pair.pair_id.clone(),
             model_run_id: pair.model.run_id.clone(),
             full_scale_run_id: pair.full_scale.run_id.clone(),
+            background_measurement_method: background_measurement_method_name(
+                &pair.model.background_measurement_method,
+            ),
+            background_trace_sha256: pair.model.background_trace_sha256.clone(),
             model_timebase_receipt_sha256: pair.model.timebase_receipt_sha256.clone(),
             full_scale_timebase_receipt_sha256: pair.full_scale.timebase_receipt_sha256.clone(),
             model_operating_point_receipt_sha256: pair.model.operating_point_receipt_sha256.clone(),
@@ -853,6 +926,8 @@ mod tests {
                     rpm_u95_hz: 0.01,
                     cavitation_number_n_d: 1.0,
                     source_reference_distance_m: 1.0,
+                    background_measurement_method: BackgroundMeasurementMethod::BareHub,
+                    background_trace_sha256: digest.to_string(),
                     bands: vec![ModelBand {
                         band_id: "bpf-fundamental".to_string(),
                         center_frequency_hz: model_frequency,
@@ -1013,8 +1088,40 @@ mod tests {
 
     #[test]
     fn background_correction_uses_linear_energy_subtraction() {
-        let corrected = background_corrected_spl(110.0, 100.0).unwrap();
+        let corrected = ittc_cavitation_spl(110.0, 100.0).unwrap();
         assert!((corrected - 109.54242509439325).abs() < 1e-9);
+    }
+
+    #[test]
+    fn background_margin_below_three_db_is_not_scaled() {
+        assert_eq!(ittc_cavitation_spl(102.9, 100.0), None);
+        let mut case = fixture_case();
+        case.pairs[0].model.bands[0].total_spl_db = 102.9;
+        let report = audit(&case);
+        assert_eq!(report.disposition, "incomplete");
+        assert_eq!(
+            report.pair_reports[0].band_reports[0].comparison,
+            "background_dominated_unusable"
+        );
+        assert_eq!(report.pair_reports[0].band_reports[0].model_source_level_db, None);
+    }
+
+    #[test]
+    fn background_margin_above_ten_db_is_not_corrected() {
+        assert_eq!(ittc_cavitation_spl(110.1, 100.0), Some(110.1));
+        let mut case = fixture_case();
+        case.pairs[0].model.bands[0].total_spl_db = 110.1;
+        let report = audit(&case);
+        assert!((report.pair_reports[0].band_reports[0].model_source_level_db.unwrap() - 90.1).abs() < 1e-12);
+    }
+
+    #[test]
+    fn background_unknown_method_and_missing_trace_are_not_eligible() {
+        let mut case = fixture_case();
+        case.pairs[0].model.background_measurement_method = BackgroundMeasurementMethod::Unknown;
+        case.pairs[0].model.background_trace_sha256 = "missing".to_string();
+        let report = audit(&case);
+        assert_eq!(report.disposition, "invalid");
     }
 
     #[test]
