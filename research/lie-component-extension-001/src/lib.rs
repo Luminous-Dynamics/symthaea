@@ -280,21 +280,6 @@ fn validate_group(group: &FiniteGroupV1) -> Result<(Vec<usize>, usize), Qualific
         }
     }
 
-    let mut inverses = vec![usize::MAX; order];
-    for element in 0..order {
-        let inverse = (0..order).find(|candidate| {
-            group.multiplication[element][*candidate] == group.identity
-                && group.multiplication[*candidate][element] == group.identity
-        });
-        let Some(inverse) = inverse else {
-            return Err(QualificationErrorV1::MissingInverse);
-        };
-        inverses[element] = inverse;
-        checks = checks
-            .checked_add(order)
-            .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
-    }
-
     for a in 0..order {
         for b in 0..order {
             for c in 0..order {
@@ -308,6 +293,21 @@ fn validate_group(group: &FiniteGroupV1) -> Result<(Vec<usize>, usize), Qualific
                 }
             }
         }
+    }
+
+    let mut inverses = vec![usize::MAX; order];
+    for element in 0..order {
+        let inverse = (0..order).find(|candidate| {
+            group.multiplication[element][*candidate] == group.identity
+                && group.multiplication[*candidate][element] == group.identity
+        });
+        let Some(inverse) = inverse else {
+            return Err(QualificationErrorV1::MissingInverse);
+        };
+        inverses[element] = inverse;
+        checks = checks
+            .checked_add(order)
+            .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
     }
     Ok((inverses, checks))
 }
@@ -749,7 +749,7 @@ mod tests {
             QualificationProfileV1::default(),
         )
         .unwrap();
-        assert_eq!(receipt.jacobi_checks, 8);
+        assert_eq!(receipt.jacobi_checks, 16);
         assert_eq!(receipt.bracket_automorphism_checks, 16);
     }
 
@@ -781,6 +781,8 @@ mod tests {
         extension.lie_algebra.generators = vec![[[1, 0], [0, 0]], [[0, 0], [0, 1]]];
         extension.lie_algebra.structure_constants =
             vec![vec![vec![0, 0], vec![0, 0]], vec![vec![0, 0], vec![0, 0]]];
+        extension.component_representation.adjoint_matrices[0] =
+            vec![vec![1, 0], vec![0, 1]];
         extension.component_representation.adjoint_matrices[1] = vec![vec![1, 1], vec![0, 1]];
         assert_eq!(
             verify_split_extension(&extension, QualificationProfileV1::default()),
