@@ -253,6 +253,24 @@ pub struct ClusterResult {
     pub critical_safety_regression: bool,
 }
 
+
+/// Exact distribution-free order-statistic interval for the median paired effect.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExactMedianEffectInterval {
+    /// Lower endpoint in safe-success PPM.
+    pub lower_bound_ppm: i64,
+    /// Upper endpoint in safe-success PPM.
+    pub upper_bound_ppm: i64,
+    /// One-based order-statistic rank used for each tail.
+    pub order_statistic_rank: u16,
+    /// Exact attained coverage numerator.
+    pub coverage_numerator: u128,
+    /// Exact attained coverage denominator (2^n).
+    pub coverage_denominator: u128,
+    /// Bonferroni-adjusted alpha used to select the interval.
+    pub adjusted_alpha_ppm: u32,
+}
+
 /// Full benchmark-validity report.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ComparisonReport {
@@ -288,6 +306,9 @@ pub struct ComparisonReport {
     pub median_delta_lower_ppm: Option<i64>,
     /// Upper median of qualified independent-cluster safe-success deltas in PPM.
     pub median_delta_upper_ppm: Option<i64>,
+    /// Distribution-free exact interval for the median paired effect, when
+    /// the qualified independent-cluster count supports the declared coverage.
+    pub median_effect_interval: Option<ExactMedianEffectInterval>,
     /// Exact sign-test result over independent cluster differences.
     pub sign_test: ExactSignTest,
     /// Per-cluster descriptive results in canonical cluster-ID order.
@@ -377,6 +398,72 @@ pub fn exact_sign_test(
         adjusted_alpha_ppm,
         significant: left <= right,
     })
+}
+
+
+/// Build a two-sided, distribution-free order-statistic interval for the population median.
+///
+/// For n independent cluster effects, the interval is [X_(k), X_(n-k+1)].
+/// The exact coverage is 1 - 2 * P(Binomial(n, 0.5) <= k-1). The narrowest
+/// interval meeting the declared adjusted alpha is selected. When the number
+/// of independent clusters is too small to attain that coverage with a finite
+/// nontrivial interval, None is returned rather than inventing precision.
+pub fn exact_median_effect_interval(
+    sorted_effects: &[i64],
+    adjusted_alpha_ppm: u32,
+) -> Result<Option<ExactMedianEffectInterval>, ComparisonError> {
+    if adjusted_alpha_ppm == 0 || adjusted_alpha_ppm > PPM_SCALE {
+        return Err(ComparisonError::InvalidAlpha);
+    }
+    let n = sorted_effects.len() as u32;
+    if n == 0 {
+        return Ok(None);
+    }
+    if n > MAX_INDEPENDENT_CLUSTERS as u32 {
+        return Err(ComparisonError::TooManyClusters {
+            maximum: MAX_INDEPENDENT_CLUSTERS,
+            observed: n as usize,
+        });
+    }
+    let denominator = 1_u128
+        .checked_shl(n)
+        .ok_or(ComparisonError::ExactArithmeticOverflow)?;
+    let mut selected = None;
+    for rank in 1..=((n + 1) / 2) {
+        let mut lower_tail = 0_u128;
+        for k in 0..rank {
+            lower_tail = lower_tail
+                .checked_add(binomial(n, k)?)
+                .ok_or(ComparisonError::ExactArithmeticOverflow)?;
+        }
+        let excluded = lower_tail
+            .checked_mul(2)
+            .ok_or(ComparisonError::ExactArithmeticOverflow)?;
+        let left = excluded
+            .checked_mul(u128::from(PPM_SCALE))
+            .ok_or(ComparisonError::ExactArithmeticOverflow)?;
+        let right = denominator
+            .checked_mul(u128::from(adjusted_alpha_ppm))
+            .ok_or(ComparisonError::ExactArithmeticOverflow)?;
+        if left <= right {
+            selected = Some((rank, excluded));
+        } else {
+            break;
+        }
+    }
+    let Some((rank, excluded)) = selected else {
+        return Ok(None);
+    };
+    let lower_index = (rank - 1) as usize;
+    let upper_index = (n - rank) as usize;
+    Ok(Some(ExactMedianEffectInterval {
+        lower_bound_ppm: sorted_effects[lower_index],
+        upper_bound_ppm: sorted_effects[upper_index],
+        order_statistic_rank: rank as u16,
+        coverage_numerator: denominator - excluded,
+        coverage_denominator: denominator,
+        adjusted_alpha_ppm,
+    }))
 }
 
 fn binomial(n: u32, k: u32) -> Result<u128, ComparisonError> {
@@ -630,6 +717,8 @@ pub fn compare_paired_clusters(
     } else {
         Some(qualified_deltas[qualified_deltas.len() / 2])
     };
+    let median_effect_interval =
+        exact_median_effect_interval(&qualified_deltas, adjusted_alpha_ppm)?;
     let sign_test = exact_sign_test(positive, negative, ties, adjusted_alpha_ppm)?;
     let disposition = if rejected_independence {
         ComparisonDisposition::Rejected
@@ -667,6 +756,7 @@ pub fn compare_paired_clusters(
         critical_safety_regression_clusters: safety_regressions,
         median_delta_lower_ppm,
         median_delta_upper_ppm,
+        median_effect_interval,
         sign_test,
         clusters: results,
         actuation_authorized: false,
@@ -732,6 +822,38 @@ mod tests {
             candidate_arm: arm("candidate", "same-model"),
             clusters,
         }
+    }
+
+    #[test]
+    fn exact_median_interval_reports_attained_finite_sample_coverage() {
+        let effects = vec![10, 20, 30, 40, 50, 60, 70, 80];
+        let interval = exact_median_effect_interval(&effects, 50_000)
+            .unwrap()
+            .unwrap();
+        assert_eq!(interval.lower_bound_ppm, 10);
+        assert_eq!(interval.upper_bound_ppm, 80);
+        assert_eq!(interval.order_statistic_rank, 1);
+        assert_eq!(interval.coverage_numerator, 254);
+        assert_eq!(interval.coverage_denominator, 256);
+        assert_eq!(interval.adjusted_alpha_ppm, 50_000);
+    }
+
+    #[test]
+    fn exact_median_interval_declines_to_invent_precision_for_small_n() {
+        let effects = vec![10, 20, 30, 40, 50];
+        assert_eq!(
+            exact_median_effect_interval(&effects, 50_000).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn multiplicity_adjustment_also_widens_or_removes_median_interval() {
+        let effects = vec![10, 20, 30, 40, 50, 60, 70, 80];
+        assert_eq!(
+            exact_median_effect_interval(&effects, 3_846).unwrap(),
+            None
+        );
     }
 
     #[test]
