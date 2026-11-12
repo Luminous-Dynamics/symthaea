@@ -721,7 +721,12 @@ mod tests {
             qualified_support_channel_windows: 0,
             bridged_gap_channel_windows: 0,
             tail_extension_frames_applied: 0,
-            measured_influence_intervals: Vec::new(),
+            // A raw threshold-positive spike is retained for diagnostics,
+            // but it did not form a qualified episode and must not reach EVAL-019.
+            measured_influence_intervals: vec![crate::counterfactual_influence::FrameInterval {
+                start_frame: 8,
+                end_frame: 24,
+            }],
             qualified_support_intervals: Vec::new(),
             qualified_support_by_channel: Vec::new(),
             measurements: Vec::new(),
@@ -731,6 +736,8 @@ mod tests {
 
         let verified = build_event_support(&report, &input).unwrap();
         let evidence = verified.evidence();
+        assert_eq!(report.measured_influence_intervals.len(), 1);
+        assert!(report.qualified_support_intervals.is_empty());
         assert_eq!(evidence.source_event_index, 1);
         assert_eq!(evidence.output_frame_count, 67);
         assert!(evidence.support.acoustic_support.is_empty());
