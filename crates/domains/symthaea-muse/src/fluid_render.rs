@@ -350,7 +350,26 @@ pub fn render_midi_to_wav_with_observation(
             ),
         };
     };
-    render_midi_to_wav_with_paths(midi_path, sample_rate, color, &binary, &soundfont)
+    render_midi_to_wav_with_observation_using_paths(
+        midi_path,
+        sample_rate,
+        color,
+        &binary,
+        &soundfont,
+    )
+}
+
+/// Render with the exact executable and SoundFont selected by the caller.
+/// This prevents a second environment lookup from silently changing the
+/// actual command after the caller has frozen its render configuration.
+pub fn render_midi_to_wav_with_observation_using_paths(
+    midi_path: &Path,
+    sample_rate: u32,
+    color: Option<RenderColor>,
+    binary: &Path,
+    soundfont: &Path,
+) -> FluidSynthRenderAttemptV1 {
+    render_midi_to_wav_with_paths(midi_path, sample_rate, color, binary, soundfont)
 }
 
 /// Compatibility API retained for existing callers. New evidence-producing
