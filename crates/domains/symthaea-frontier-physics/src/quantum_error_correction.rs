@@ -122,7 +122,7 @@ mod tests {
     fn test_bit_flip_single_error() {
         // |000⟩ with qubit 1 flipped → |010⟩
         let (logical, syndrome) = three_qubit_bit_flip_syndrome([false, true, false]);
-        assert_eq!(logical, false); // Majority says 0
+        assert!(!logical); // Majority says 0
         assert_eq!(syndrome, 2); // Error on qubit 1
     }
 
