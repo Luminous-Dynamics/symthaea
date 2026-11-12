@@ -778,7 +778,9 @@ mod tests {
 
     #[test]
     fn episodes_and_control_ticks_do_not_inflate_independent_n() {
-        let mut clusters = vec![cluster(0, 5, 8); 8];
+        let mut clusters = (0..8)
+            .map(|index| cluster(index, 5, 8))
+            .collect::<Vec<_>>();
         for cluster in &mut clusters {
             cluster.baseline = tally(1000, 500, 0, 0);
             cluster.candidate = tally(1000, 800, 0, 0);
