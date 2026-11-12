@@ -437,7 +437,7 @@
     {
       "id": "QI-4",
       "name": "Hayden-Preskill decoupling and reference recovery",
-      "status": "QI-4A direct decoupling + QI-4P Petz recovery source and tests pass exact-head Rust 1.96 focused CI",
+      "status": "QI-4A direct decoupling + QI-4P Petz recovery source and tests pass exact-head Rust 1.96 focused CI at c86955874e7c1b3324f153905770dff509a221b2",
       "model": "Reference Q is initially maximally entangled with injected message M; black-hole register B is initially entangled with explicit early radiation R; a declared scrambler acts on M tensor B; emitted factors E are made accessible while remaining B' is inaccessible to the decoder.",
       "observables": [
         "mutual_information_Q_Bprime",
@@ -499,7 +499,7 @@
         "petz_baseline": "Input-independent replacement decoder I/2 has qubit entanglement fidelity 1/4",
         "petz_no_efficiency_claim": "A two-Kraus channel representation is not a physical circuit decomposition; do not claim decoder gate complexity or hardware efficiency."
       },
-      "implementation_status": "QI-4A direct trace-distance/Pinsker decoupling and QI-4P one-step Petz recovery source/ensemble; five dedicated Petz tests passed in the exact-head focused Rust run (132 crate tests total). Exact SDP optimum, rotated-Petz, charge-sector-aware recovery, and circuit synthesis remain future work.",
+      "implementation_status": "QI-4A direct trace-distance/Pinsker decoupling and QI-4P one-step Petz recovery source/ensemble; five dedicated Petz tests pass in the exact-head focused Rust run (132 crate tests total). Exact SDP optimum, rotated-Petz, charge-sector-aware recovery, and circuit synthesis remain future work.",
       "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
       "fixtures": [
         "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
@@ -831,7 +831,7 @@
     }
   },
   "implementation_progress": {
-    "source_status": "Rust 1.96 exact-head format, Clippy and focused frontier-physics tests passed at 79859caf77ff5b3214e8074fc8324d4bc5dfa615",
+    "source_status": "Rust 1.96 exact-head format, Clippy and focused frontier-physics tests passed at 79859caf77ff5b3214e8074fc8324d4bc5dfa615; re-confirmed after manifest-only update at c86955874e7c1b3324f153905770dff509a221b2",
     "modules": [
       "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs"
     ],
@@ -885,19 +885,19 @@
     "runner_status": {
       "latest_formatter_head": "497ee59652a1948c1e0fdc918ca848f86736ab18",
       "formatter": "pinned Rust 1.96 rustfmt normalization succeeded",
-      "focused_rust_checks": "success at exact head: format pass, Clippy pass, 132 crate tests passed, 0 failed",
+      "focused_rust_checks": "success at exact head c86955874e7c1b3324f153905770dff509a221b2: Rust 1.96 format pass, Clippy pass, 132 crate tests passed, 0 failed",
       "test_inventory": {
         "black_hole_information_authored_tests": 68,
         "frontier_physics_crate_tests_passed": 132,
         "petz_recovery_tests_passed": 5
       },
       "claim_ceiling": "No Rust build, Clippy pass, or Rust test pass is claimed at this head.",
-      "latest_source_head": "79859caf77ff5b3214e8074fc8324d4bc5dfa615",
+      "latest_source_head": "c86955874e7c1b3324f153905770dff509a221b2",
       "last_green_source_head": "1bbb97c95a21b9024c181c6c519bd252463580bf",
       "last_green_focused_job": "43232825852",
       "last_green_frontier_physics_tests": "127 passed; 0 failed at the prior exact head; does not cover the five new Petz tests",
-      "latest_focused_run": "43259019192",
-      "latest_focused_job": "131324957583"
+      "latest_focused_run": "43259393357",
+      "latest_focused_job": "131326291486"
     },
     "claim_ceiling": "The one-step Petz recovery map is a mathematically explicit finite-dimensional channel A=E tensor R -> Mhat. Its construction assumes the exact scrambler is known. No physical gate-level decoder compilation, efficient decoding claim, macroscopic black-hole recovery, or QES/island result is established."
   },
