@@ -826,6 +826,61 @@ mod tests {
     }
 
     #[test]
+    fn frozen_plasma_and_hts_source_registers_pass_metadata_audit() {
+        let plasma: Value = serde_json::from_str(include_str!(
+            "../../data/research/plasma_energy_reference_cases_v0_1.json"
+        ))
+        .unwrap();
+        let hts: Value = serde_json::from_str(include_str!(
+            "../../data/research/hts_fusion_magnet_reference_cases_v0_1.json"
+        ))
+        .unwrap();
+
+        let plasma_summary = audit_source_value(&plasma, "plasma-source-cases").unwrap();
+        let hts_summary = audit_source_value(&hts, "hts-source-cases").unwrap();
+
+        assert_eq!(plasma_summary.case_count, 13);
+        assert_eq!(plasma_summary.negative_control_count, 11);
+        assert_eq!(hts_summary.case_count, 6);
+        assert_eq!(hts_summary.negative_control_count, 12);
+    }
+
+    #[test]
+    fn frozen_thermal_fixture_matches_every_expected_disposition() {
+        let fixture: ThermalFixtureManifest = serde_json::from_str(include_str!(
+            "../../data/research/thermal_store_accounting_fixtures_v0_1.json"
+        ))
+        .unwrap();
+        validate_fixture_header(&fixture).unwrap();
+
+        let mut scenarios = BTreeMap::<String, &ThermalScenario>::new();
+        let mut results = BTreeMap::<String, ScenarioResult>::new();
+        for scenario in &fixture.scenarios {
+            let result = evaluate_scenario(scenario);
+            assert_eq!(
+                result.disposition,
+                scenario.expected_disposition,
+                "unexpected result for {}: {}",
+                scenario.scenario_id,
+                result.reason
+            );
+            scenarios.insert(scenario.scenario_id.clone(), scenario);
+            results.insert(scenario.scenario_id.clone(), result);
+        }
+
+        for comparison in &fixture.comparisons {
+            let result = evaluate_comparison(comparison, &scenarios, &results);
+            assert_eq!(
+                result.disposition,
+                comparison.expected_disposition,
+                "unexpected comparison result for {}: {}",
+                comparison.comparison_id,
+                result.reason
+            );
+        }
+    }
+
+    #[test]
     fn source_manifest_rejects_luminous_reproduction_promotion() {
         let source = serde_json::json!({
             "programme": "TEST",
