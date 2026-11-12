@@ -1,0 +1,41 @@
+name: AIRROAD Three-Port Robust Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_MIMO_ROBUST_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-three-port-robust-v0.1.json"
+      - "tools/airroad-mimo-robust-qualifier/verify_three_port_reference.py"
+      - ".github/workflows/airroad-mimo-robust-reference.yml"
+  push:
+    branches:
+      - research/airroad-mimo-robust-v0.1
+    paths:
+      - "docs/research/AIRROAD_MIMO_ROBUST_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-three-port-robust-v0.1.json"
+      - "tools/airroad-mimo-robust-qualifier/verify_three_port_reference.py"
+      - ".github/workflows/airroad-mimo-robust-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-mimo-robust-reference-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rational-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute exact-rational oracle
+        run: |
+          python3 -m py_compile tools/airroad-mimo-robust-qualifier/verify_three_port_reference.py
+          python3 tools/airroad-mimo-robust-qualifier/verify_three_port_reference.py
+      - name: Validate fixture JSON
+        run: |
+          python3 -m json.tool docs/research/fixtures/airroad-mimo-three-port-robust-v0.1.json > /dev/null
