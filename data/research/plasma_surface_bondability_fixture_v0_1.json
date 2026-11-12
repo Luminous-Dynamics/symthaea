@@ -1,0 +1,257 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "plasma-surface-bondability-synthetic-v0-1",
+  "evidence_class": "SYNTHETIC",
+  "synthetic_only": true,
+  "luminous_physical_reproduction": false,
+  "claim_ceiling": "Validates comparison identity, full-system energy accounting, bondability-window calculations, substrate-preservation gates, and contact-angle negative controls only. Contains no measured plasma or bond data.",
+  "service_profile": {
+    "service_profile_id": "SYNTHETIC_PP_RIGID_ADHEREND_ADHESIVE_A_LAPSHEAR_V1",
+    "substrate_family": "PP",
+    "substrate_grade": "SYNTHETIC_GRADE_A",
+    "substrate_lot": "SYNTHETIC_LOT_001",
+    "adhesive_system": "SYNTHETIC_ADHESIVE_A",
+    "joint_geometry": "single_lap_rigid_plastic",
+    "test_method": "ASTM_D3163_01_2023",
+    "acceptance_threshold_mpa": 5,
+    "minimum_acceptance_fraction": 0.8,
+    "bondability_delays_hours": [
+      0,
+      24,
+      168
+    ],
+    "storage_profile_id": "SYNTHETIC_STORAGE_23C_50RH",
+    "required_property_gates": [
+      {
+        "property": "substrate_functional_property_retention",
+        "unit": "fraction_of_untreated_control",
+        "minimum": 0.95
+      }
+    ]
+  },
+  "energy_boundary": {
+    "energy_boundary_contract_id": "SYNTHETIC_GRID_TO_ACCEPTED_BONDED_AREA_V1",
+    "basis": "kWh_per_m2_treated",
+    "required_subsystems": [
+      "power_conversion",
+      "process_gas_or_compressed_air",
+      "cooling",
+      "extraction",
+      "controls",
+      "standby_and_startup"
+    ],
+    "missing_load_policy": "UNKNOWN_NOT_ZERO"
+  },
+  "arms": [
+    {
+      "arm_id": "untreated_control",
+      "process_class": "NO_ACTIVATION",
+      "energy_boundary_contract_id": "SYNTHETIC_GRID_TO_ACCEPTED_BONDED_AREA_V1",
+      "complete_system_energy_kwh_per_m2": 0,
+      "subsystem_energy_kwh_per_m2": {
+        "power_conversion": 0,
+        "process_gas_or_compressed_air": 0,
+        "cooling": 0,
+        "extraction": 0,
+        "controls": 0,
+        "standby_and_startup": 0
+      },
+      "contact_angle_deg": 98,
+      "substrate_functional_property_retention": 1,
+      "bond_strength_mpa_by_delay": {
+        "0": [
+          2.1,
+          2.3,
+          2.2,
+          2,
+          2.4
+        ],
+        "24": [
+          2,
+          2.2,
+          2.1,
+          2.1,
+          2.3
+        ],
+        "168": [
+          2.1,
+          2,
+          2.2,
+          2.1,
+          2.2
+        ]
+      }
+    },
+    {
+      "arm_id": "corona_reference",
+      "process_class": "INCUMBENT_REFERENCE",
+      "energy_boundary_contract_id": "SYNTHETIC_GRID_TO_ACCEPTED_BONDED_AREA_V1",
+      "complete_system_energy_kwh_per_m2": 0.12,
+      "subsystem_energy_kwh_per_m2": {
+        "power_conversion": 0.025,
+        "process_gas_or_compressed_air": 0.035,
+        "cooling": 0.01,
+        "extraction": 0.025,
+        "controls": 0.01,
+        "standby_and_startup": 0.015
+      },
+      "contact_angle_deg": 68,
+      "substrate_functional_property_retention": 0.99,
+      "bond_strength_mpa_by_delay": {
+        "0": [
+          6.4,
+          6.1,
+          6.3,
+          6,
+          6.2
+        ],
+        "24": [
+          6,
+          5.8,
+          6.1,
+          5.9,
+          5.7
+        ],
+        "168": [
+          5.4,
+          5.2,
+          5.5,
+          5.1,
+          5.3
+        ]
+      }
+    },
+    {
+      "arm_id": "modular_argon_candidate",
+      "process_class": "PLASMA_CANDIDATE",
+      "energy_boundary_contract_id": "SYNTHETIC_GRID_TO_ACCEPTED_BONDED_AREA_V1",
+      "complete_system_energy_kwh_per_m2": 0.09,
+      "subsystem_energy_kwh_per_m2": {
+        "power_conversion": 0.025,
+        "process_gas_or_compressed_air": 0.02,
+        "cooling": 0.01,
+        "extraction": 0.02,
+        "controls": 0.005,
+        "standby_and_startup": 0.01
+      },
+      "contact_angle_deg": 61,
+      "substrate_functional_property_retention": 0.99,
+      "bond_strength_mpa_by_delay": {
+        "0": [
+          7.4,
+          7.1,
+          7.3,
+          7,
+          7.2
+        ],
+        "24": [
+          7.1,
+          6.9,
+          7,
+          6.8,
+          7.2
+        ],
+        "168": [
+          6.6,
+          6.4,
+          6.5,
+          6.3,
+          6.7
+        ]
+      }
+    },
+    {
+      "arm_id": "nitrogen_low_angle_control",
+      "process_class": "PLASMA_NEGATIVE_CONTROL",
+      "energy_boundary_contract_id": "SYNTHETIC_GRID_TO_ACCEPTED_BONDED_AREA_V1",
+      "complete_system_energy_kwh_per_m2": 0.1,
+      "subsystem_energy_kwh_per_m2": {
+        "power_conversion": 0.03,
+        "process_gas_or_compressed_air": 0.025,
+        "cooling": 0.01,
+        "extraction": 0.02,
+        "controls": 0.005,
+        "standby_and_startup": 0.01
+      },
+      "contact_angle_deg": 48,
+      "substrate_functional_property_retention": 0.98,
+      "bond_strength_mpa_by_delay": {
+        "0": [
+          6.8,
+          6.5,
+          6.6,
+          6.4,
+          6.7
+        ],
+        "24": [
+          6.1,
+          5.9,
+          6,
+          5.8,
+          6.2
+        ],
+        "168": [
+          5.2,
+          5,
+          5.1,
+          4.9,
+          5.3
+        ]
+      }
+    },
+    {
+      "arm_id": "over_treatment_damage_control",
+      "process_class": "PLASMA_NEGATIVE_CONTROL",
+      "energy_boundary_contract_id": "SYNTHETIC_GRID_TO_ACCEPTED_BONDED_AREA_V1",
+      "complete_system_energy_kwh_per_m2": 0.15,
+      "subsystem_energy_kwh_per_m2": {
+        "power_conversion": 0.04,
+        "process_gas_or_compressed_air": 0.035,
+        "cooling": 0.015,
+        "extraction": 0.035,
+        "controls": 0.01,
+        "standby_and_startup": 0.015
+      },
+      "contact_angle_deg": 42,
+      "substrate_functional_property_retention": 0.82,
+      "bond_strength_mpa_by_delay": {
+        "0": [
+          5.7,
+          5.4,
+          5.5,
+          5.2,
+          5.6
+        ],
+        "24": [
+          5.1,
+          4.9,
+          5,
+          4.8,
+          5.2
+        ],
+        "168": [
+          4.5,
+          4.2,
+          4.4,
+          4.1,
+          4.6
+        ]
+      }
+    }
+  ],
+  "expected_contract_checks": {
+    "same_service_profile_required": true,
+    "same_energy_boundary_id_required": true,
+    "subsystem_energy_sum_must_equal_declared_total": true,
+    "missing_subsystem_load_must_block": true,
+    "contact_angle_must_not_determine_winner": true,
+    "property_gate_violation_must_reject_candidate": true,
+    "all_replicates_and_delays_must_be_retained": true
+  },
+  "interpretation": {
+    "best_contact_angle_arm": "over_treatment_damage_control",
+    "expected_best_contact_angle_is_not_best_accepted_service": true,
+    "synthetic_candidate_hypothesis": "modular_argon_candidate has lower synthetic full-system energy than corona_reference and clears synthetic bond and substrate-preservation thresholds at all declared delays.",
+    "synthetic_negative_controls": "The nitrogen control has the lowest contact angle but is not the bondability winner; the over-treatment control has the lowest contact angle and fails the declared substrate-preservation and late bondability gates."
+  }
+}
