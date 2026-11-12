@@ -305,7 +305,7 @@ pub fn validate_bundle(
                     position.channel_id.clone(),
                 )),
             },
-            None => errors.push(AcousticValidationError::MissingMicrophonePosition(
+            None => errors.push(AcousticValidationError::MicrophonePositionWithoutChannel(
                 position.microphone_id.clone(),
             )),
         }
@@ -972,7 +972,7 @@ mod tests {
 
         let errors = validate_bundle(&input).unwrap_err();
         assert!(errors.contains(
-            &AcousticValidationError::UnexpectedMicrophonePosition(
+            &AcousticValidationError::MicrophoneChannelWithoutPosition(
                 "mic-ch-02".to_owned()
             )
         ));
@@ -1030,9 +1030,12 @@ mod tests {
     #[test]
     fn duplicate_channels_rotors_and_operating_points_fail_closed() {
         let mut input = bundle();
-        input.channels.push(input.channels[0].clone());
-        input.rotors.push(input.rotors[0].clone());
-        input.rotor_operating_points.push(input.rotor_operating_points[0].clone());
+        let duplicate_channel = input.channels[0].clone();
+        input.channels.push(duplicate_channel);
+        let duplicate_rotor = input.rotors[0].clone();
+        input.rotors.push(duplicate_rotor);
+        let duplicate_point = input.rotor_operating_points[0].clone();
+        input.rotor_operating_points.push(duplicate_point);
 
         let errors = validate_bundle(&input).unwrap_err();
         assert!(errors.contains(&AcousticValidationError::DuplicateChannelId));
