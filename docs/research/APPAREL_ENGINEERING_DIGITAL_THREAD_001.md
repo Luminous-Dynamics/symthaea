@@ -526,3 +526,22 @@ The focused test suite contains structural negative controls (unknown property a
 The GitHub workflow is triggered by relevant research/harness paths, checks the exact commit, uses pinned Rust 1.96.0, generates a separate lockfile for the isolated harness, runs tests, Clippy and formatting, then writes/uploads a content-addressed receipt. No hosted-runner result is claimed until the workflow has executed on the exact PR head.
 
 Even a passing receipt validates the declared schema and synthetic contract only. It does not validate dataset rights, scientific predictions, physical textile properties, fit, quality, manufacturing yield, recycling yield, safety or regulatory compliance.
+
+
+## 21. Pattern-to-machine-program interoperability
+
+A newly identified gap is the lack of a complete semantic bridge from a sewn 2D pattern or knitted garment design through 3D product geometry to a machine-specific executable program. Two important open/standardized primitives already exist, but they solve different layers:
+
+- **ASTM D6673-10 / DXF** provides a 2D sewn-pattern exchange convention and associated grade-rule exchange. Its own scope excludes pattern-piece relationships and 2D-to-3D sewn-pattern geometry correspondence, and does not carry numerical cutter/plotter instructions or full marker/spreading/product-specification data. It is therefore a useful CAD interoperability baseline, not a full garment engineering twin. See [ASTM's standard listing](https://store.astm.org/d6673-10.html).
+- **Knitout v0.6** is a public, machine-independent, UTF-8 line-oriented representation of low-level knitting instructions. It is an intermediate instruction format for design tools, simulators and machine backends, not a high-level garment specification or guarantee that every machine supports every operation. See the [Knitout v0.6 specification](https://textiles-lab.github.io/knitout/knitout.html) and [format repository](https://github.com/textiles-lab/knitout).
+- **Textiles Lab's parametric sweater** is a concrete public reference that maps body measurements/ease into a parametric complete-garment pattern and Knitout. Its README says it was developed for and tested on a Shima Seiki machine; it references Kniterate conversion and says STOLL backend support was under development. This is a comparator with a declared machine boundary, not universal knitting interoperability. See [parametric-sweater](https://github.com/textiles-lab/parametric-sweater).
+
+The architecture and two new work items are:
+- [Symthaea #11750 — APPAREL-INTEROP-001](https://github.com/Luminous-Dynamics/symthaea/issues/11750): semantic preservation across 2D pattern, 3D garment and machine-program revisions.
+- [Symtropy #4878 — TEXTILE-KNIT-PREFLIGHT-001](https://github.com/Luminous-Dynamics/symtropy/issues/4878): deterministic Knitout parsing and preflight against versioned machine capabilities.
+
+The new source register revision is `2026-11-12-r4` with 21 sources. It explicitly marks ASTM text as copyrighted and requires checking the parametric-sweater repository/code/asset license before reuse.
+
+This interoperability work should preserve source-native formats and add typed, versioned sidecars for seam topology, piece-to-piece relationships, pattern-to-3D correspondence, machine profile, backend/compiler, program identity and actual execution evidence. Unsupported semantics must be reported as unsupported/lossy, never silently dropped.
+
+The key benchmark is not merely whether a file opens. It is whether the supported product semantics survive a deterministic round trip and whether the named machine profile accepts the resulting program without unsupported operations or hidden conversion.
