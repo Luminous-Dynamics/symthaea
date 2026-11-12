@@ -2286,6 +2286,131 @@ pub fn simulate_u1_operator_spreading(
     })
 }
 
+/// Independent-seed statistics for U(1)-conserving operator spreading.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1OperatorSpreadingEnsembleSummary {
+    pub number_of_qubits: usize,
+    pub source_qubit: usize,
+    pub depth: usize,
+    pub sample_count: usize,
+    pub first_seed: u64,
+    pub mean_squared_commutator_z: Vec<f64>,
+    pub standard_error_squared_commutator_z: Vec<f64>,
+    pub mean_squared_commutator_x: Vec<f64>,
+    pub standard_error_squared_commutator_x: Vec<f64>,
+    pub maximum_operator_norm_drift: f64,
+}
+
+/// Sample independent operator-spreading circuits and report per-site
+/// squared-commutator means and standard errors.
+pub fn sample_u1_operator_spreading_ensemble(
+    number_of_qubits: usize,
+    source_qubit: usize,
+    depth: usize,
+    sample_count: usize,
+    first_seed: u64,
+    tolerance: f64,
+) -> Result<U1OperatorSpreadingEnsembleSummary, QuantumInformationError> {
+    if sample_count < 2 {
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+    }
+    let mut mean_z = vec![0.0; number_of_qubits];
+    let mut m2_z = vec![0.0; number_of_qubits];
+    let mut mean_x = vec![0.0; number_of_qubits];
+    let mut m2_x = vec![0.0; number_of_qubits];
+    let mut maximum_norm_drift: f64 = 0.0;
+
+    for sample_index in 0..sample_count {
+        let sample = simulate_u1_operator_spreading(
+            number_of_qubits,
+            source_qubit,
+            depth,
+            first_seed.wrapping_add(sample_index as u64),
+            tolerance,
+        )?;
+        let count = (sample_index + 1) as f64;
+        for site in 0..number_of_qubits {
+            let delta_z = sample.squared_commutator_z[site] - mean_z[site];
+            mean_z[site] += delta_z / count;
+            m2_z[site] += delta_z * (sample.squared_commutator_z[site] - mean_z[site]);
+
+            let delta_x = sample.squared_commutator_x[site] - mean_x[site];
+            mean_x[site] += delta_x / count;
+            m2_x[site] += delta_x * (sample.squared_commutator_x[site] - mean_x[site]);
+        }
+        maximum_norm_drift = maximum_norm_drift
+            .max((sample.operator_hilbert_schmidt_norm_squared - 1.0).abs());
+    }
+    let denominator = (sample_count - 1) as f64;
+    let inverse_sqrt_count = 1.0 / (sample_count as f64).sqrt();
+    let standard_error_z = m2_z
+        .iter()
+        .map(|m2| (m2 / denominator).sqrt() * inverse_sqrt_count)
+        .collect();
+    let standard_error_x = m2_x
+        .iter()
+        .map(|m2| (m2 / denominator).sqrt() * inverse_sqrt_count)
+        .collect();
+
+    Ok(U1OperatorSpreadingEnsembleSummary {
+        number_of_qubits,
+        source_qubit,
+        depth,
+        sample_count,
+        first_seed,
+        mean_squared_commutator_z: mean_z,
+        standard_error_squared_commutator_z: standard_error_z,
+        mean_squared_commutator_x: mean_x,
+        standard_error_squared_commutator_x: standard_error_x,
+        maximum_operator_norm_drift: maximum_norm_drift,
+    })
+}
+
+#[cfg(test)]
+mod u1_operator_spreading_ensemble_tests {
+    use super::*;
+
+    const TOLERANCE: f64 = 1e-10;
+
+    #[test]
+    fn operator_spreading_ensemble_reports_per_site_uncertainty_and_norm() {
+        let summary = sample_u1_operator_spreading_ensemble(
+            6, 2, 6, 8, 0x0A70, TOLERANCE,
+        )
+        .unwrap();
+        assert_eq!(summary.sample_count, 8);
+        assert_eq!(summary.mean_squared_commutator_z.len(), 6);
+        assert_eq!(summary.standard_error_squared_commutator_z.len(), 6);
+        assert_eq!(summary.mean_squared_commutator_x.len(), 6);
+        assert_eq!(summary.standard_error_squared_commutator_x.len(), 6);
+        assert!(summary.maximum_operator_norm_drift < TOLERANCE);
+        assert!(summary
+            .standard_error_squared_commutator_z
+            .iter()
+            .chain(summary.standard_error_squared_commutator_x.iter())
+            .all(|value| *value >= 0.0));
+    }
+
+    #[test]
+    fn operator_spreading_ensemble_is_seed_reproducible() {
+        let a =
+            sample_u1_operator_spreading_ensemble(6, 2, 4, 4, 0x0A70, TOLERANCE)
+                .unwrap();
+        let b =
+            sample_u1_operator_spreading_ensemble(6, 2, 4, 4, 0x0A70, TOLERANCE)
+                .unwrap();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn operator_spreading_ensemble_rejects_single_sample() {
+        assert!(matches!(
+            sample_u1_operator_spreading_ensemble(6, 2, 4, 1, 0x0A70, TOLERANCE),
+            Err(QuantumInformationError::InvalidEnsembleSampleCount(1))
+        ));
+    }
+}
+
 /// Apply O <- U O U^dagger to an operator stored as a row-major d-by-d matrix.
 /// Rows and columns are grouped independently by the two acted-on tensor bits.
 fn conjugate_operator_by_two_qubit_unitary(
