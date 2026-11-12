@@ -976,6 +976,54 @@ mod tests {
     }
 
     #[test]
+    fn no_nuclei_distribution_data_is_reported_as_missing_not_fabricated() {
+        let mut input = case();
+        make_measured(&mut input);
+        for run in &mut input.runs {
+            run.water_condition.nuclei_distribution_evidence_sha256 = None;
+        }
+        let report = audit(&input);
+        assert_eq!(report.nuclei_distribution_coverage_fraction, 0.0);
+        assert_eq!(report.disposition, "DISTRIBUTIONAL_SUMMARY_ONLY");
+        assert!(report.reasons.iter().any(|reason| reason.contains("nuclei number/size distribution evidence was not supplied")));
+    }
+
+    #[test]
+    fn run_report_preserves_water_condition_and_evidence_lineage() {
+        let report = audit(&case());
+        let water = &report.run_reports[0].water_condition;
+        assert_eq!(water.measure, SusceptibilityMeasure::CavitationSusceptibilityAlpha);
+        assert_eq!(water.method_id, "synthetic-alpha-method");
+        assert_eq!(water.evidence_sha256, digest('6'));
+        assert_eq!(report.nuclei_distribution_coverage_fraction, 1.0);
+    }
+
+    #[test]
+    fn schema_and_fixture_require_water_condition_for_every_run() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/marine-cavitation-intermittency-v0.1.0.schema.json"
+        )).expect("schema JSON parses");
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/fixtures/synthetic-marine-cavitation-intermittency-v0.1.0.json"
+        )).expect("fixture JSON parses");
+        assert!(schema["$defs"]["run"]["required"]
+            .as_array().unwrap().iter().any(|value| value == "water_condition"));
+        for required in [
+            "measure", "value", "unit", "expanded_uncertainty",
+            "equivalence_tolerance", "method_id", "instrument_id",
+            "calibration_certificate_sha256", "evidence_sha256",
+            "nuclei_distribution_evidence_sha256"
+        ] {
+            assert!(schema["$defs"]["waterCondition"]["required"]
+                .as_array().unwrap().iter().any(|value| value == required));
+        }
+        for run in fixture["runs"].as_array().unwrap() {
+            assert!(run.get("water_condition").is_some());
+            assert_eq!(run["water_condition"]["evidence_sha256"].as_str().unwrap().len(), 64);
+        }
+    }
+
+    #[test]
     fn energy_mean_is_not_arithmetic_mean_in_db() {
         let levels = [100.0, 110.0];
         let result = energy_mean_db(&levels).unwrap();
