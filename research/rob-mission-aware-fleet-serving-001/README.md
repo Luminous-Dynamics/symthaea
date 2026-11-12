@@ -203,3 +203,37 @@ A candidate context policy is not better merely because KV hit rate or token thr
 ## Claim boundary
 
 The fixtures qualify only finite protocol semantics. They do not establish real network timing, scheduler hard-real-time guarantees, model quality, physical energy accounting, clock validity, thermal forecasts, viability or actuation authority. Local runtime assurance and the physical controller remain independent.
+
+
+## 2026-11-12 SOTA refresh: factory productivity and fleet capacity
+
+The original baseline matrix is incomplete without a shared-pool robotics-serving system. Add the following external comparison arms as **system-level references**, distinct from the request-ordering algorithms above:
+
+- **ROSA shared GPU-pool serving** (Jiang et al., arXiv:2607.01088, 1 July 2026): shared server-class GPU pool, multi-model robot pipelines, per-task performance requirements/failure handling, and factory-objective-driven scheduling. The authors report up to **12.06× factory productivity** over conventional dedicated serving systems in their evaluated settings. This is a reported result from its own workload; it is neither a matched Luminous result nor a guaranteed gain on our robot/task mix.
+- **Static active-episode cap** (He, arXiv:2611.01404, 1 November 2026): a direct capacity-control baseline, not a new learned scheduler. In its sustained brain-replay setting, 20→32 concurrent robots reduced request throughput from about 2.4 to 0.6 requests/s; an active-episode cap restored about 2.24–2.25 requests/s and increased completed trace-program throughput from 1.30 to 5.00–5.55 episodes/min. Retain the exact model/trace/GPU setting in citations and do not extrapolate these values to Luminous hardware.
+- **ROSA-style SLO scheduler + Luminous constrained admission**: compare a factory-objective scheduler with our per-robot admission contract on the same trace, shared-GPU capacity, model mix, network and robot/action deadlines. Count only completed work that satisfies the relevant task and safety SLOs.
+
+### New required fleet-productivity metrics
+
+Report two ledgers side by side:
+
+1. **Factory productivity:** completed safe task stages / episodes per wall-clock hour; useful work per robot-hour; number of robots simultaneously in productive execution; GPU utilization, memory-bandwidth utilization, prefill/decode time and energy per accepted task.
+2. **Robot service integrity:** per-robot critical-deadline miss probability, longest no-valid-action interval, action-buffer exhaustion, p50/p95/p99 action application latency, AoI, local fallback/safe-stop, RTA veto, per-robot service-floor breach and sequential mission safe-success.
+
+A task counts as productive only when its task-specific completion criteria and safety disposition are met. A raw throughput increase accompanied by one critical deadline miss is not an admissible improvement.
+
+### New experimental controls
+
+- Dedicated/on-robot GPU baseline.
+- Shared GPU pool with unconstrained best-effort batching.
+- Static active-episode/concurrency cap.
+- ROSA-style task-SLO / factory-productivity scheduler (where a reproducible implementation is available).
+- Round Robin, EDF, Armory Lookahead and RED.
+- Luminous constrained mission-aware admission.
+- Evaluator-only clairvoyant upper bound.
+
+Match robot/task/model/weights, action deadlines, local controller, observation budget, available GPU capacity and network topology. When the ROSA implementation or its exact task semantics cannot be reproduced, label the arm **reported external reference**, and do not plot its published 12.06× as a matched datapoint.
+
+### Revised prospective target
+
+The primary objective is now the **safe-service/productivity Pareto frontier**. Stretch target: at least 10% more *SLO-qualified completed task work per fixed GPU-hour* than the best reproducible shared-pool baseline, with no worsening in any robot's critical miss-rate, service-floor, safe-stop or adverse-event strata. Pre-register confidence intervals and held-out workload mixes. A result that merely increases accepted requests, token throughput or GPU utilization does not meet this target.
