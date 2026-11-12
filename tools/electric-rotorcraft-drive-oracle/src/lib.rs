@@ -716,7 +716,7 @@ pub fn evaluate_motor_shaft_coordinate_envelope(
         || config.energy_balance_tolerance_j <= 0.0
     {
         return Err(DriveError::InvalidConfiguration(
-            "inverter efficiency, bus limits, voltage, duration and tolerance must be finite and valid",
+            "drive settings must be finite and valid",
         ));
     }
     if config.dc_bus_voltage_v < config.minimum_dc_bus_voltage_v {
@@ -743,7 +743,7 @@ pub fn evaluate_motor_shaft_coordinate_envelope(
         || evidence.nominal_motor_speed_rpm > evidence.speed_upper_bound_rpm
     {
         return Err(DriveError::InvalidOperatingPoint(
-            "motor torque/speed bounds must be finite, positive, ordered and contain the nominal point",
+            "coordinate bounds must be positive, ordered and contain the nominal values",
         ));
     }
 
