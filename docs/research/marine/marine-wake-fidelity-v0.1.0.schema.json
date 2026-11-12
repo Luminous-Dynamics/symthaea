@@ -1,0 +1,420 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-wake-fidelity-v0.1.0.schema.json",
+  "title": "Marine propeller-plane wake fidelity audit v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "evidence_kind",
+    "source",
+    "propeller",
+    "condition_fingerprint_sha256",
+    "reference_velocity_mps",
+    "coordinate_frame",
+    "angular_origin",
+    "positive_azimuth",
+    "axial_positive_direction",
+    "tolerances",
+    "max_fourier_harmonic",
+    "blockage",
+    "target",
+    "realized"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_kind": {
+      "enum": [
+        "synthetic",
+        "measured"
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/sourceEvidence"
+    },
+    "propeller": {
+      "$ref": "#/$defs/propeller"
+    },
+    "condition_fingerprint_sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "reference_velocity_mps": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "coordinate_frame": {
+      "enum": [
+        "propeller_looking_forward_from_aft"
+      ]
+    },
+    "angular_origin": {
+      "enum": [
+        "top_dead_centre"
+      ]
+    },
+    "positive_azimuth": {
+      "enum": [
+        "clockwise_viewed_from_aft",
+        "counter_clockwise_viewed_from_aft"
+      ]
+    },
+    "axial_positive_direction": {
+      "enum": [
+        "toward_bow",
+        "toward_stern"
+      ]
+    },
+    "tolerances": {
+      "$ref": "#/$defs/tolerances"
+    },
+    "max_fourier_harmonic": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "blockage": {
+      "$ref": "#/$defs/blockage"
+    },
+    "target": {
+      "$ref": "#/$defs/wakeField"
+    },
+    "realized": {
+      "$ref": "#/$defs/wakeField"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "sourceEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "citation",
+        "raw_data_sha256",
+        "rights_status",
+        "independently_reviewed"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "rights_status": {
+          "enum": [
+            "public_or_permitted",
+            "unknown",
+            "restricted"
+          ]
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "propeller": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "revision",
+        "diameter_m",
+        "hub_ratio"
+      ],
+      "properties": {
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "diameter_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "hub_ratio": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        }
+      }
+    },
+    "tolerances": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "axial",
+        "radial",
+        "tangential",
+        "nominal_wake_fraction"
+      ],
+      "properties": {
+        "axial": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "radial": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "tangential": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "nominal_wake_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "blockage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "section_shape",
+        "method",
+        "review_state"
+      ],
+      "properties": {
+        "section_shape": {
+          "enum": [
+            "rectangular",
+            "circular"
+          ]
+        },
+        "section_width_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "section_height_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "section_diameter_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "method": {
+          "enum": [
+            "wire_screen",
+            "dummy_hull",
+            "full_hull",
+            "other_declared"
+          ]
+        },
+        "maximum_hull_frontal_area_m2": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "other_blocking_area_m2": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "other_basis_description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_state": {
+          "enum": [
+            "not_required",
+            "reviewed",
+            "unknown"
+          ]
+        },
+        "review_evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "wakeField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field_id",
+        "method",
+        "scale_basis",
+        "propeller_revision",
+        "condition_fingerprint_sha256",
+        "reference_velocity_mps",
+        "instrument_or_solver_id",
+        "calibration_or_solver_validation_sha256",
+        "raw_data_sha256",
+        "coordinate_frame",
+        "angular_origin",
+        "positive_azimuth",
+        "axial_positive_direction",
+        "area_weight_method_id",
+        "area_weight_evidence_sha256",
+        "points"
+      ],
+      "properties": {
+        "field_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method": {
+          "enum": [
+            "five_hole_pitot",
+            "other_pitot",
+            "rans",
+            "cfd",
+            "wire_screen_derived",
+            "other_measured"
+          ]
+        },
+        "scale_basis": {
+          "enum": [
+            "model_scale",
+            "full_scale"
+          ]
+        },
+        "propeller_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "condition_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "reference_velocity_mps": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "instrument_or_solver_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_or_solver_validation_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "coordinate_frame": {
+          "enum": [
+            "propeller_looking_forward_from_aft"
+          ]
+        },
+        "angular_origin": {
+          "enum": [
+            "top_dead_centre"
+          ]
+        },
+        "positive_azimuth": {
+          "enum": [
+            "clockwise_viewed_from_aft",
+            "counter_clockwise_viewed_from_aft"
+          ]
+        },
+        "axial_positive_direction": {
+          "enum": [
+            "toward_bow",
+            "toward_stern"
+          ]
+        },
+        "area_weight_method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "area_weight_evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "points": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/wakePoint"
+          }
+        }
+      }
+    },
+    "wakePoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "r_over_r",
+        "azimuth_deg",
+        "area_weight"
+      ],
+      "properties": {
+        "r_over_r": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "azimuth_deg": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360
+        },
+        "area_weight": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "vx_over_vref": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "expanded_uncertainty"
+          ],
+          "properties": {
+            "value": {
+              "type": "number"
+            },
+            "expanded_uncertainty": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "vr_over_vref": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "expanded_uncertainty"
+          ],
+          "properties": {
+            "value": {
+              "type": "number"
+            },
+            "expanded_uncertainty": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "vt_over_vref": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "expanded_uncertainty"
+          ],
+          "properties": {
+            "value": {
+              "type": "number"
+            },
+            "expanded_uncertainty": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      }
+    }
+  }
+}
