@@ -460,6 +460,15 @@ pub fn plan_retention(
         }
     }
 
+    let mut candidates: Vec<&ContextEntry> = Vec::new();
+    let mut protected_contexts = Vec::new();
+    for context in contexts {
+        match protection_reason(request, policy, context)? {
+            Some(reason) => protected_contexts.push((context.context_id.clone(), reason)),
+            None => candidates.push(context),
+        }
+    }
+
     let requested_total = used
         .checked_add(request.requested_additional_tokens)
         .ok_or(RetentionError::TokenArithmeticOverflow)?;
@@ -473,18 +482,9 @@ pub fn plan_retention(
             used_tokens_after: requested_total,
             remaining_capacity_tokens: request.capacity_tokens - requested_total,
             evictions: Vec::new(),
-            protected_contexts: Vec::new(),
+            protected_contexts,
             actuation_authorized: false,
         });
-    }
-
-    let mut candidates: Vec<&ContextEntry> = Vec::new();
-    let mut protected_contexts = Vec::new();
-    for context in contexts {
-        match protection_reason(request, policy, context)? {
-            Some(reason) => protected_contexts.push((context.context_id.clone(), reason)),
-            None => candidates.push(context),
-        }
     }
 
     let protected_tokens = contexts
@@ -766,7 +766,7 @@ mod tests {
         let recovery = context("recovery", 40, 1, 10, true, 10_000, 10_000, 1);
         let plan = plan_retention(
             RetentionPolicy::LuminousDecisionRecoveryAware,
-            &request(40, 40),
+            &request(80, 40),
             &[recovery, normal],
         )
         .unwrap();
