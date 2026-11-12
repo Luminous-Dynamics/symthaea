@@ -597,8 +597,7 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         )?;
         for feature in &cell.feature_observations {
             require_nonempty(&feature.feature_id, "feature ID")?;
-            if feature.available_cycle == 0
-                || feature.available_cycle > cell.feature_cutoff_cycle
+            if feature.available_cycle == 0 || feature.available_cycle > cell.feature_cutoff_cycle
                 || feature.available_cycle > cell.cycles_observed
             {
                 return Err(AuditError(format!(
