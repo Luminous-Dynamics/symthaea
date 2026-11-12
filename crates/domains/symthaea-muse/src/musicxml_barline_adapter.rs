@@ -283,7 +283,7 @@ pub fn parse_musicxml_part_measure_maps(
             non_controlling_measure_indices: non_controlling_indices,
             map: MeasureMap {
                 source_id: format!("{source_id}#part={part_id}"),
-                score_clock_id: format!("{score_clock_id}#part={part_id}"),
+                score_clock_id: score_clock_id.to_string(),
                 canonicalization_version: MUSICXML_BARLINE_CANONICALIZATION_V1.into(),
                 status,
                 measures,
@@ -706,10 +706,10 @@ mod tests {
         assert_eq!(maps[0].map.measures[1].start, RationalBeat::new(3, 1).unwrap());
         assert_eq!(maps[1].map.measures[1].start, RationalBeat::new(2, 1).unwrap());
         assert_eq!(maps[1].non_controlling_measure_indices, vec![1, 2]);
-        assert_ne!(
+        assert_eq!(
             maps[0].map.score_clock_id,
             maps[1].map.score_clock_id,
-            "part-qualified clock identity prevents cross-part barline comparison"
+            "all parts share one exact notated score-clock coordinate frame"
         );
     }
 
