@@ -532,8 +532,10 @@ fn audit(case: &Case) -> AuditReport {
 
     let disposition = if !validation_errors.is_empty() {
         "INVALID"
-    } else if has_spatial_variation || has_repeatability_failure {
+    } else if has_spatial_variation {
         "SPATIALLY_VARIABLE"
+    } else if has_repeatability_failure {
+        "REPEATABILITY_FAILED"
     } else if has_provisional_basis {
         "PROVISIONAL_SOURCE_BASIS"
     } else if case.evidence_kind == EvidenceKind::Synthetic
@@ -742,6 +744,19 @@ mod tests {
     }
 
     #[test]
+    fn free_field_tvr_source_basis_uncertainty_is_preserved_in_bound() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        input.projector.tvr_basis = TvRBasis::ManufacturerFreeField;
+        for sample in &mut input.samples {
+            sample.additional_source_basis_uncertainty_db = Some(1.5);
+        }
+        let report = audit(&input);
+        let sample = &report.position_band_results[0].samples[0];
+        assert_eq!(sample.expanded_bound_db, Some(1.7));
+    }
+
+    #[test]
     fn changed_receiver_position_is_a_distinct_spatial_group() {
         let mut input = case();
         input.evidence_kind = EvidenceKind::Measured;
@@ -767,10 +782,13 @@ mod tests {
     }
 
     #[test]
-    fn different_signal_quantity_or_bandwidth_is_not_pooled() {
+    fn different_signal_quantity_or_bandwidth_is_invalid() {
         let mut input = case();
         input.samples[1].quantity = FrequencyQuantity::PowerSpectralDensity;
-        assert_eq!(audit(&input).disposition, "INCOMPLETE");
+        assert_eq!(audit(&input).disposition, "INVALID");
+        let mut input = case();
+        input.samples[1].bandwidth_id = "different-bandwidth".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
     }
 
     #[test]
@@ -781,11 +799,11 @@ mod tests {
     }
 
     #[test]
-    fn same_position_repeat_scatter_above_tolerance_is_spatially_variable() {
+    fn same_position_repeat_scatter_above_tolerance_is_repeatability_failure() {
         let mut input = case();
         input.evidence_kind = EvidenceKind::Measured;
         input.samples[1].received_spl_db = 124.0;
-        assert_eq!(audit(&input).disposition, "SPATIALLY_VARIABLE");
+        assert_eq!(audit(&input).disposition, "REPEATABILITY_FAILED");
     }
 
     #[test]
