@@ -1,0 +1,78 @@
+name: Muse Pairwise Acoustic Interaction
+
+on:
+  push:
+    branches:
+      - "research/mel-mr-eval-018-*"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse/src/performed_event_map.rs"
+      - "crates/domains/symthaea-muse/src/counterfactual_influence.rs"
+      - "crates/domains/symthaea-muse/src/pairwise_acoustic_interaction.rs"
+      - ".github/workflows/muse-pairwise-acoustic-interaction.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse/src/performed_event_map.rs"
+      - "crates/domains/symthaea-muse/src/counterfactual_influence.rs"
+      - "crates/domains/symthaea-muse/src/pairwise_acoustic_interaction.rs"
+      - ".github/workflows/muse-pairwise-acoustic-interaction.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-pairwise-acoustic-interaction-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: exact-head-pairwise-interaction-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'exact_head=%s\n' "$actual"
+
+      - name: Check touched Rust files only
+        run: |
+          rustfmt --edition 2024 --check --config skip_children=true \
+            crates/domains/symthaea-muse/src/lib.rs \
+            crates/domains/symthaea-muse/src/performed_event_map.rs \
+            crates/domains/symthaea-muse/src/counterfactual_influence.rs \
+            crates/domains/symthaea-muse/src/pairwise_acoustic_interaction.rs
+
+      - name: Verify exact multi-event performed-map exclusions
+        run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib exact_multi_event_exclusion_preserves_all_other_source_events
+
+      - name: Run pairwise acoustic interaction tests
+        run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib pairwise_acoustic_interaction::tests
+
+      - name: Run counterfactual renderer-binding tests
+        run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib counterfactual_influence::tests
+
+      - name: Run Clippy for the touched Muse library surface
+        run: cargo clippy --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib --tests -- -D warnings
