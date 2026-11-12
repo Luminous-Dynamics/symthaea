@@ -80,6 +80,8 @@ pub enum EvidenceOutcome {
     InterventionResponse,
     SimulationResult,
     DerivedResult,
+    /// Qualified calibration curve or reference-standard evidence for a detector/method.
+    CalibrationReference,
     /// Qualified instrument or method capability evidence showing that a property
     /// cannot be resolved within the declared operating envelope.
     InstrumentLimitation,
@@ -629,11 +631,9 @@ impl SystemProfile {
                 coverage.validate(&format!("{path}.coverage"), &mut issues);
                 if let Some(calibration_id) = &coverage.calibration_evidence_id {
                     match self.evidence.iter().find(|record| record.id == *calibration_id) {
-                        Some(record)
-                            if record.outcome != EvidenceOutcome::InvalidMeasurement
-                                && record.outcome != EvidenceOutcome::NotAcquired => {}
+                        Some(record) if record.outcome == EvidenceOutcome::CalibrationReference => {}
                         _ => issues.push(format!(
-                            "{path}.coverage.calibration_evidence_id references missing or unusable evidence: {calibration_id}"
+                            "{path}.coverage.calibration_evidence_id must reference CalibrationReference evidence: {calibration_id}"
                         )),
                     }
                 }
