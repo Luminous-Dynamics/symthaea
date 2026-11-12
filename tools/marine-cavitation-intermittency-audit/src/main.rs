@@ -179,8 +179,6 @@ struct RunReport {
     environment_fingerprint_sha256: String,
     hydrophone_instrument_id: String,
     calibration_certificate_sha256: String,
-    operating_point_receipt_sha256: String,
-    acoustic_cavitation_sync_receipt_sha256: String,
     background_method: &'static str,
     background_trace_sha256: String,
     water_condition: WaterCondition,
