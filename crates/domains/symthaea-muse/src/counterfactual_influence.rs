@@ -69,10 +69,17 @@ impl Default for InfluenceAnalysisConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EventIntervention {
+    /// Remove exactly one source event (existing qualified operation).
     Remove,
+    /// Shift every performed descendant of one event by an exact integer
+    /// semitone interval while preserving timing and all other event fields.
+    /// Qualified by MEL-MR-EVAL-036 v0.2.
     Transpose { semitones: i16 },
+    /// Reserved until PPQ, raw ticks and tempo-map identity are in the event map.
     ShiftOnset { delta_ticks: i64 },
+    /// Reserved until PPQ, raw ticks and tempo-map identity are in the event map.
     ChangeDuration { delta_ticks: i64 },
+    /// Reserved until per-descendant note-on velocity is retained in the map.
     ChangeVelocity { delta: i16 },
 }
 
@@ -502,7 +509,9 @@ pub struct CounterfactualInfluenceInput<'view, 'audio> {
     pub performed_event_map_bytes: &'view [u8],
     pub counterfactual_performed_event_map_bytes: &'view [u8],
     pub expected_score_event_count: usize,
-    /// Expected MIDI pitch indexed by canonical source Score event index.
+    /// Baseline MIDI pitch indexed by canonical source Score event index.
+    /// The counterfactual inventory is derived internally from this vector and
+    /// the typed intervention; it is never caller-supplied as a second vector.
     pub expected_primary_midi_by_score_index: &'view [u8],
     pub baseline_schedule_bytes: &'view [u8],
     pub counterfactual_schedule_bytes: &'view [u8],
@@ -2136,6 +2145,21 @@ mod tests {
             &[&changed_target],
             2,
         ));
+        let changed_target_pitch = {
+            let mut row = (*valid_evidence
+                .performed_event_lineage()
+                .iter()
+                .find(|row| row.source_event_id == "score_event_index:0")
+                .unwrap())
+            .clone();
+            row.midi_note += 1;
+            row
+        };
+        assert!(!transposed_target_rows_match(
+            &[base_target],
+            &[&changed_target_pitch],
+            2,
+        ));
 
         // Protected events are exact, including note-on ordinal.
         let baseline_protected = baseline_evidence
@@ -2156,6 +2180,16 @@ mod tests {
         assert!(!lineage_rows_match(
             &[baseline_protected],
             &[&changed_protected],
+            true,
+        ));
+        let changed_protected_ordinal = {
+            let mut row = (*counterfactual_protected).clone();
+            row.note_on_ordinal += 1;
+            row
+        };
+        assert!(!lineage_rows_match(
+            &[baseline_protected],
+            &[&changed_protected_ordinal],
             true,
         ));
     }
