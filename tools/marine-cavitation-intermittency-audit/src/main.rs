@@ -1147,6 +1147,18 @@ mod tests {
     }
 
     #[test]
+    fn corrected_spl_expanded_bounds_are_preserved_per_window() {
+        let report = audit(&case());
+        let window = &report.run_reports[0].window_evidence[0];
+        let central = window.corrected_spl_db.unwrap();
+        let lower = window.corrected_spl_expanded_lower_bound_db.unwrap();
+        let upper = window.corrected_spl_expanded_upper_bound_db.unwrap();
+        assert!(lower <= central);
+        assert!(central <= upper);
+        assert_eq!(window.cavitation_component_upper_limit_db, None);
+    }
+
+    #[test]
     fn exact_ten_db_background_margin_is_unresolved() {
         assert!(matches!(
             ittc_background_corrected_spl(100.0, 90.0),
