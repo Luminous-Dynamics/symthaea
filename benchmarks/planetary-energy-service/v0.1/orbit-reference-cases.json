@@ -3,7 +3,7 @@
   "status": "analytic_screening_only",
   "created_for_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11756",
   "reference_model": {
-    "solar_irradiance_at_1_au_w_m2": 1361.0,
+    "solar_irradiance_at_1_au_w_m2": 1361,
     "equation": "S(r) = S_1AU / r^2",
     "distance_unit": "AU",
     "irradiance_unit": "W/m^2",
@@ -13,24 +13,42 @@
       "distance values are representative screening points, not mission ephemerides",
       "values do not represent panel-plane or annual-average irradiance"
     ],
-    "claim_ceiling": "The values validate only the declared inverse-square screening arithmetic. They do not establish energy yield, PV output, storage sufficiency, site suitability or mission feasibility."
+    "claim_ceiling": "The values validate only the declared inverse-square screening arithmetic. They do not establish energy yield, PV output, storage sufficiency, site suitability or mission feasibility.",
+    "rounding_tolerance_w_m2": 0.00051,
+    "rounding_policy": "nearest_0.001_w_m2"
   },
   "cases": [
     {
       "case_id": "earth-1au-reference",
       "body_or_region": "Earth",
-      "heliocentric_distance_au": 1.0,
-      "normal_incidence_top_of_atmosphere_irradiance_w_m2": 1361.0,
+      "heliocentric_distance_au": 1,
+      "normal_incidence_top_of_atmosphere_irradiance_w_m2": 1361,
       "evidence_class": "analytic_derived",
-      "required_downstream_inputs": ["time_resolved_ephemeris", "panel_orientation", "atmosphere_weather", "module_temperature", "soiling", "system_losses"]
+      "required_downstream_inputs": [
+        "time_resolved_ephemeris",
+        "panel_orientation",
+        "atmosphere_weather",
+        "module_temperature",
+        "soiling",
+        "system_losses"
+      ]
     },
     {
       "case_id": "moon-1au-reference",
       "body_or_region": "Moon",
-      "heliocentric_distance_au": 1.0,
-      "normal_incidence_top_of_atmosphere_irradiance_w_m2": 1361.0,
+      "heliocentric_distance_au": 1,
+      "normal_incidence_top_of_atmosphere_irradiance_w_m2": 1361,
       "evidence_class": "analytic_derived",
-      "required_downstream_inputs": ["lunar_site_frame", "terrain_horizon", "solar_disc_visibility", "panel_orientation", "thermal_environment", "dust", "radiation", "system_losses"]
+      "required_downstream_inputs": [
+        "lunar_site_frame",
+        "terrain_horizon",
+        "solar_disc_visibility",
+        "panel_orientation",
+        "thermal_environment",
+        "dust",
+        "radiation",
+        "system_losses"
+      ]
     },
     {
       "case_id": "mars-mean-distance-screen",
@@ -38,7 +56,14 @@
       "heliocentric_distance_au": 1.524,
       "normal_incidence_top_of_atmosphere_irradiance_w_m2": 585.987,
       "evidence_class": "analytic_derived",
-      "required_downstream_inputs": ["time_resolved_ephemeris", "atmospheric_opacity", "dust_storm_profile", "panel_soiling", "temperature", "system_losses"]
+      "required_downstream_inputs": [
+        "time_resolved_ephemeris",
+        "atmospheric_opacity",
+        "dust_storm_profile",
+        "panel_soiling",
+        "temperature",
+        "system_losses"
+      ]
     },
     {
       "case_id": "main-belt-inner-screen",
@@ -46,7 +71,13 @@
       "heliocentric_distance_au": 2.2,
       "normal_incidence_top_of_atmosphere_irradiance_w_m2": 281.198,
       "evidence_class": "analytic_derived",
-      "required_downstream_inputs": ["target_body_ephemeris", "panel_orientation", "thermal_environment", "array_mass_model", "system_losses"]
+      "required_downstream_inputs": [
+        "target_body_ephemeris",
+        "panel_orientation",
+        "thermal_environment",
+        "array_mass_model",
+        "system_losses"
+      ]
     },
     {
       "case_id": "main-belt-reference-screen",
@@ -54,15 +85,27 @@
       "heliocentric_distance_au": 2.7,
       "normal_incidence_top_of_atmosphere_irradiance_w_m2": 186.694,
       "evidence_class": "analytic_derived",
-      "required_downstream_inputs": ["target_body_ephemeris", "panel_orientation", "thermal_environment", "array_mass_model", "system_losses"]
+      "required_downstream_inputs": [
+        "target_body_ephemeris",
+        "panel_orientation",
+        "thermal_environment",
+        "array_mass_model",
+        "system_losses"
+      ]
     },
     {
       "case_id": "main-belt-outer-screen",
       "body_or_region": "Main asteroid belt study point",
       "heliocentric_distance_au": 3.2,
-      "normal_incidence_top_of_atmosphere_irradiance_w_m2": 132.910,
+      "normal_incidence_top_of_atmosphere_irradiance_w_m2": 132.91,
       "evidence_class": "analytic_derived",
-      "required_downstream_inputs": ["target_body_ephemeris", "panel_orientation", "thermal_environment", "array_mass_model", "system_losses"]
+      "required_downstream_inputs": [
+        "target_body_ephemeris",
+        "panel_orientation",
+        "thermal_environment",
+        "array_mass_model",
+        "system_losses"
+      ]
     },
     {
       "case_id": "jupiter-distance-control",
@@ -70,15 +113,29 @@
       "heliocentric_distance_au": 5.2,
       "normal_incidence_top_of_atmosphere_irradiance_w_m2": 50.333,
       "evidence_class": "analytic_derived",
-      "required_downstream_inputs": ["mission_ephemeris", "panel_orientation", "radiation_environment", "thermal_environment", "array_mass_model", "firm_power_comparator"]
+      "required_downstream_inputs": [
+        "mission_ephemeris",
+        "panel_orientation",
+        "radiation_environment",
+        "thermal_environment",
+        "array_mass_model",
+        "firm_power_comparator"
+      ]
     },
     {
       "case_id": "saturn-distance-control",
       "body_or_region": "Saturn-distance outer-system control",
       "heliocentric_distance_au": 9.5,
-      "normal_incidence_top_of_atmosphere_irradiance_w_m2": 15.080,
+      "normal_incidence_top_of_atmosphere_irradiance_w_m2": 15.08,
       "evidence_class": "analytic_derived",
-      "required_downstream_inputs": ["mission_ephemeris", "panel_orientation", "radiation_environment", "thermal_environment", "array_mass_model", "firm_power_comparator"]
+      "required_downstream_inputs": [
+        "mission_ephemeris",
+        "panel_orientation",
+        "radiation_environment",
+        "thermal_environment",
+        "array_mass_model",
+        "firm_power_comparator"
+      ]
     }
   ]
 }
