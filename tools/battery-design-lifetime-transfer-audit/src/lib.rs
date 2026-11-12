@@ -820,13 +820,26 @@ mod tests {
     #[test]
     fn rejects_design_group_leakage() {
         let mut manifest = valid_manifest();
-        manifest.split.train_cell_ids.push("B1".into());
+        manifest.cells.push(CellObservation {
+            cell_id: "B2".into(),
+            design_group_id: "DESIGN-B".into(),
+            protocol_group_id: "P2".into(),
+            feature_available_through_cycle: 50,
+            prediction_cutoff_cycle: 50,
+            feature_evidence_ref: "SYNTH-B2".into(),
+        });
+        manifest.split.train_cell_ids.push("B2".into());
         manifest
             .split
             .train_design_group_ids
             .push("DESIGN-B".into());
-        manifest.split.test_cell_ids.clear();
-        manifest.split.test_design_group_ids.clear();
+        manifest.outcomes.push(CycleLifeOutcome {
+            cell_id: "B2".into(),
+            kind: OutcomeKind::EventObserved,
+            observed_through_cycle: 1200,
+            event_cycle: Some(1200),
+            event_code: None,
+        });
 
         let error = audit_design_lifetime_manifest(&manifest).expect_err("design leakage fails");
         assert!(error.0.contains("leaks across"));
@@ -906,7 +919,10 @@ mod tests {
     #[test]
     fn rejects_outcome_horizon_before_prediction_cutoff() {
         let mut manifest = valid_manifest();
+        manifest.outcomes[2].kind = OutcomeKind::RightCensored;
         manifest.outcomes[2].observed_through_cycle = 40;
+        manifest.outcomes[2].event_cycle = None;
+        manifest.outcomes[2].event_code = None;
 
         let error =
             audit_design_lifetime_manifest(&manifest).expect_err("short outcome horizon fails");
@@ -920,6 +936,7 @@ mod tests {
     #[test]
     fn rejects_prediction_at_or_after_observed_event() {
         let mut manifest = valid_manifest();
+        manifest.cutoff_cycles.push(950);
         manifest.cells[2].prediction_cutoff_cycle = 950;
         manifest.cells[2].feature_available_through_cycle = 950;
         manifest.predictions[0].prediction_cutoff_cycle = 950;
@@ -932,11 +949,13 @@ mod tests {
     #[test]
     fn censored_outcomes_are_not_scored_as_point_lifetimes() {
         let mut manifest = valid_manifest();
+        manifest.split.kind = SplitKind::LeaveOneCellOut;
         manifest.split.test_cell_ids = vec!["A2".into()];
         manifest.split.train_cell_ids = vec!["A1".into(), "B1".into(), "C1".into()];
         manifest.split.train_design_group_ids =
             vec!["DESIGN-A".into(), "DESIGN-B".into(), "DESIGN-C".into()];
         manifest.split.test_design_group_ids = vec!["DESIGN-A".into()];
+        manifest.split.test_protocol_group_ids = vec!["P1".into()];
         manifest.predictions[0].cell_id = "A2".into();
         manifest.predictions[0].design_group_id = "DESIGN-A".into();
         manifest.predictions[0].prediction_cutoff_cycle = 50;
