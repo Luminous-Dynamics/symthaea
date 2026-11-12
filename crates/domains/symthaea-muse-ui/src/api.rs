@@ -267,6 +267,13 @@ pub fn imported_midi_measure_maps_url(backend: &str, work_id: &str) -> String {
     )
 }
 
+pub fn imported_midi_measure_maps_url(backend: &str, work_id: &str) -> String {
+    format!(
+        "{}/api/music/import/{work_id}/midi-measure-maps",
+        backend.trim_end_matches('/')
+    )
+}
+
 pub fn imported_audio_url(backend: &str, work_id: &str) -> String {
     format!(
         "{}/api/music/import/{work_id}/audio",
