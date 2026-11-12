@@ -218,8 +218,7 @@ pub fn enclose_mimo_impedance_sweep(
 ) -> Result<MimoImpedanceSweepEnclosure, MatrixEnclosureError> {
     let method_reference = validate_semantics(semantics)?;
     validate_mimo_impedance_sweep(sweep)?;
-    let evidence_class =
-        validate_mimo_impedance_sweep(sweep)?.evidence_class;
+    let evidence_class = validate_mimo_impedance_sweep(sweep)?.evidence_class;
 
     let mut frequency_matrices = Vec::with_capacity(sweep.frequency_slices.len());
     for (frequency_index, slice) in sweep.frequency_slices.iter().enumerate() {
@@ -289,23 +288,23 @@ fn build_matrix_enclosure(
                 })
             })?;
 
-        let denominator_squared = denominator_squared_interval(
-            column.injected_current_a,
-            column.absolute_error_bound_a,
-        )
-        .map_err(|error| match error {
-            MatrixEnclosureError::CurrentUncertaintyIncludesZero {
-                frequency_index: _,
-                driven_port_id: _,
-            } => error,
-            _ => MatrixEnclosureError::ElementArithmeticFailure {
-                frequency_index,
-                observed_port_id: "<denominator>".to_string(),
-                driven_port_id: column.driven_port_id.clone(),
-            },
-        })?;
+        let denominator_squared =
+            denominator_squared_interval(column.injected_current_a, column.absolute_error_bound_a)
+                .map_err(|error| match error {
+                    MatrixEnclosureError::DenominatorIntervalIncludesZero => {
+                        MatrixEnclosureError::CurrentUncertaintyIncludesZero {
+                            frequency_index,
+                            driven_port_id: column.driven_port_id.clone(),
+                        }
+                    }
+                    _ => MatrixEnclosureError::ElementArithmeticFailure {
+                        frequency_index,
+                        observed_port_id: "<denominator>".to_string(),
+                        driven_port_id: column.driven_port_id.clone(),
+                    },
+                })?;
         let current_magnitude = NumericInterval::new(
-            denominator_squared.lower.sqrt().max(0.0),
+            outward_down(denominator_squared.lower.sqrt())?.max(0.0),
             outward_up(denominator_squared.upper.sqrt())?,
         )?;
 
@@ -327,7 +326,6 @@ fn build_matrix_enclosure(
                 column.injected_current_a,
                 column.absolute_error_bound_a,
                 denominator_squared,
-                current_magnitude,
             )
             .map_err(|_| MatrixEnclosureError::ElementArithmeticFailure {
                 frequency_index,
@@ -385,7 +383,6 @@ fn enclose_complex_quotient(
     current: ComplexValue,
     _current_radius: f64,
     denominator_squared: NumericInterval,
-    _current_magnitude: NumericInterval,
 ) -> Result<(NumericInterval, NumericInterval), MatrixEnclosureError> {
     let voltage_real = NumericInterval::around(voltage.real, voltage_radius)?;
     let voltage_imag = NumericInterval::around(voltage.imag, voltage_radius)?;
@@ -431,10 +428,7 @@ fn denominator_squared_interval(
     let magnitude_lower = outward_down(norm_lower - radius)?;
     let magnitude_upper = outward_up(norm_upper + radius)?;
     if magnitude_lower <= 0.0 {
-        return Err(MatrixEnclosureError::CurrentUncertaintyIncludesZero {
-            frequency_index: usize::MAX,
-            driven_port_id: String::new(),
-        });
+        return Err(MatrixEnclosureError::DenominatorIntervalIncludesZero);
     }
 
     let squared_lower = outward_down(magnitude_lower * magnitude_lower)?;
