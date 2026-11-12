@@ -25,7 +25,7 @@ source = "git+https://github.com/Luminous-Dynamics/symthaea?rev=d81f5b4f1ee050d6
 [[package]]
 name = "electric-rotorcraft-drive-oracle"
 version = "0.6.0"
-source = "git+https://github.com/Luminous-Dynamics/symthaea?rev=02678481c93f9ae6728f6acb9e6b3727425ddb67#02678481c93f9ae6728f6acb9e6b3727425ddb67"
+source = "git+https://github.com/Luminous-Dynamics/symthaea?rev=cc91e1dcfbc064aeaefaa17f55753e3707d57a90#cc91e1dcfbc064aeaefaa17f55753e3707d57a90"
 
 [[package]]
 name = "electric-thermal-loss-ledger-oracle"
