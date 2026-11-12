@@ -417,6 +417,8 @@ fn compare_nuclei_distributions(
     let total_upper = total_delta + total_uncertainty;
     let total_tolerance = reference.number_concentration_equivalence_tolerance_per_ml;
 
+    let reference_total_central = reference_total;
+    let candidate_total_central = candidate_total;
     let mut w1 = 0.0;
     let mut w1_lower = 0.0;
     let mut w1_upper = 0.0;
@@ -426,8 +428,6 @@ fn compare_nuclei_distributions(
         let next_center = (reference.bins[index + 1].diameter_lower_um
             + reference.bins[index + 1].diameter_upper_um) / 2.0;
         let width = next_center - reference_center;
-        let reference_total_central = distribution_total(reference).0;
-        let candidate_total_central = distribution_total(candidate).0;
         let reference_cdf = reference.bins[..=index].iter()
             .map(|bin| bin.number_concentration_per_ml)
             .sum::<f64>() / reference_total_central;
@@ -559,7 +559,7 @@ fn validate_case(case: &Case) -> Vec<String> {
                 || !finite_positive(distribution.sample_volume_ml)
                 || !finite_positive(distribution.number_concentration_equivalence_tolerance_per_ml)
                 || !finite_positive(distribution.wasserstein1_equivalence_tolerance_um)
-                || distribution.bins.is_empty()
+                || distribution.bins.len() < 2
             {
                 errors.push(format!("run {} has incomplete or invalid nuclei number/size distribution evidence", run.run_id));
             }
@@ -959,9 +959,10 @@ fn audit(case: &Case) -> AuditReport {
         0.0
     } else {
         case.runs.iter()
-            .filter(|run| run.water_condition.nuclei_distribution_evidence_sha256.is_some())
+            .filter(|run| run.water_condition.nuclei_distribution.is_some())
             .count() as f64 / case.runs.len() as f64
     };
+    let mut nuclei_distribution_comparisons = Vec::new();
 
     if validation_errors.is_empty() {
         let reference_water = &case.runs[0].water_condition;
@@ -972,6 +973,33 @@ fn audit(case: &Case) -> AuditReport {
             water_condition_unresolved = true;
         } else if nuclei_distribution_coverage_fraction == 0.0 {
             reasons.push("recommended nuclei number/size distribution evidence was not supplied; water comparison relies on the declared gas-content or cavitation-susceptibility measure".to_string());
+        }
+
+        if nuclei_distribution_coverage_fraction == 1.0 && !case.runs.is_empty() {
+            let reference_distribution = case.runs[0].water_condition.nuclei_distribution.as_ref()
+                .expect("100 percent nuclei distribution coverage checked");
+            for run in case.runs.iter().skip(1) {
+                let distribution = run.water_condition.nuclei_distribution.as_ref()
+                    .expect("100 percent nuclei distribution coverage checked");
+                let comparison = compare_nuclei_distributions(
+                    &case.runs[0].run_id,
+                    &run.run_id,
+                    reference_distribution,
+                    distribution,
+                );
+                match comparison.disposition {
+                    "outside_equivalence_tolerance" | "incomparable_distribution_method_or_binning" => {
+                        reasons.push(format!("run {} nuclei number/size distribution is not comparable to the reference run", run.run_id));
+                        water_condition_incomparable = true;
+                    }
+                    "uncertainty_overlaps_equivalence_tolerance" => {
+                        reasons.push(format!("run {} nuclei number/size distribution uncertainty does not establish equivalence to the reference run", run.run_id));
+                        water_condition_unresolved = true;
+                    }
+                    _ => {}
+                }
+                nuclei_distribution_comparisons.push(comparison);
+            }
         }
 
         for run in case.runs.iter().skip(1) {
@@ -1093,6 +1121,7 @@ fn audit(case: &Case) -> AuditReport {
         claim_ceiling: "distributional_summary_of_declared_model_scale_windows_only_no_full_scale_transfer_source_decomposition_causal_or_ecological_qualification",
         run_reports,
         nuclei_distribution_coverage_fraction,
+        nuclei_distribution_comparisons,
         run_to_run_energy_mean_sd_db: run_to_run_sd,
         run_to_run_energy_mean_range_db: run_range,
         reasons,
@@ -1163,6 +1192,33 @@ mod tests {
         }
     }
 
+    fn nuclei_distribution(run_index: usize) -> NucleiDistribution {
+        NucleiDistribution {
+            measurement_id: format!("synthetic-nuclei-measurement-{run_index}"),
+            method_id: "laser-optical-nuclei-counter-v1".to_string(),
+            instrument_id: "synthetic-nuclei-counter-1".to_string(),
+            calibration_certificate_sha256: digest('a'),
+            evidence_sha256: digest(if run_index == 0 { 'b' } else { 'c' }),
+            sample_volume_ml: 10.0,
+            number_concentration_equivalence_tolerance_per_ml: 100.0,
+            wasserstein1_equivalence_tolerance_um: 0.10,
+            bins: vec![
+                NucleiBin {
+                    diameter_lower_um: 0.5,
+                    diameter_upper_um: 1.0,
+                    number_concentration_per_ml: 100.0,
+                    expanded_uncertainty_per_ml: 1.0,
+                },
+                NucleiBin {
+                    diameter_lower_um: 1.0,
+                    diameter_upper_um: 2.0,
+                    number_concentration_per_ml: 50.0,
+                    expanded_uncertainty_per_ml: 1.0,
+                },
+            ],
+        }
+    }
+
     fn run(id: &str, run_index: usize, levels: &[f64], cavitation: &[bool]) -> Run {
         let windows = levels.iter().zip(cavitation)
             .enumerate()
@@ -1189,7 +1245,7 @@ mod tests {
                 instrument_id: "synthetic-alpha-meter-1".to_string(),
                 calibration_certificate_sha256: digest('5'),
                 evidence_sha256: digest(if run_index == 0 { '6' } else { '7' }),
-                nuclei_distribution_evidence_sha256: Some(digest(if run_index == 0 { '8' } else { '9' })),
+                nuclei_distribution: Some(nuclei_distribution(run_index)),
             },
             windows,
         }
