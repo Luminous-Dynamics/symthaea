@@ -236,3 +236,14 @@ Safety/authority:
 `miniature cell != useful miniature system != reliable modular array != qualified industrial product`
 
 Every transition needs its own matched evidence.
+
+
+### 2.5 Integrated portable argon MobiPlas — 2024
+
+Bansemer et al., *On the Development and Characterization of the Novel Portable Plasma Device MobiPlas*, Plasma Medicine 14(4), 39–51, DOI 10.1615/PlasmaMed.2025057641.
+
+The device integrates a refillable steel argon tank, mobile powerbank and Raspberry Pi Pico controller. The paper reports approximately 10 minutes of operation per gas fill, maximum patient leakage current of 11 μA and a tip temperature reaching 40°C. It also documents occasional leakage-current fluctuation caused by heating in the high-voltage generator's current-limitation circuit. The INPTDAT institutional catalogue labels the device TRL 4; this is catalog metadata, not independent qualification.
+
+The comparison lesson is that a portable plasma device must be scored on **autonomous useful service per gas fill and battery charge**, refill/recharge downtime, drift over the duty cycle and thermal/electrical stability—not just mass or absence of mains connections.
+
+Sources: https://doi.org/10.1615/PlasmaMed.2025057641 and https://www.inptdat.de/mobiplas.
