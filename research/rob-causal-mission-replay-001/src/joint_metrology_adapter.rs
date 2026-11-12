@@ -91,7 +91,7 @@ pub struct JointMetrologyEvidence {
     pub command_to_motion_limit_ns: Option<u64>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnergyClosureResult {
     pub boundary_complete: bool,
     pub receipt_digest: Option<String>,
