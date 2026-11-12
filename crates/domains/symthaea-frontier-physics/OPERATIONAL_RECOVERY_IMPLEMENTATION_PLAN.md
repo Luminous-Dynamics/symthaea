@@ -77,7 +77,7 @@ Do not equate QSVT iteration count with physical gate count. Do not claim an eff
 
 For small channel dimensions, construct an independent recovery-optimization oracle. If the Petz theorem's exact hypotheses apply, use the theorem's necessary-and-sufficient criterion and verify all preconditions. When they do not apply, compare with an SDP over recovery Choi matrices subject to complete positivity and trace preservation. The SDP implementation must be independent from the Rust recovery implementation, use frozen channel fixtures, and report primal feasibility, dual feasibility and a primal-dual gap.
 
-A rotated-Petz grid is not an exact optimum oracle. A high entanglement fidelity is not proof of optimality. A QSVT approximation to Petz cannot exceed the Petz map's performance unless a different recovery family or optimization is introduced.
+A rotated-Petz grid is not an exact optimum oracle. A high entanglement fidelity is not proof of optimality. A QSVT approximation targets the Petz construction, but a finite polynomial approximation is a distinct implemented channel: do not assume it is better or worse in every metric. Any apparent improvement over ideal Petz must be treated as a distinct decoder result and independently checked against the exact small-instance optimum or a certified bound.
 
 ## U(1)-preserving MPS/TEBD work remains a separate, mandatory scale path
 
