@@ -616,27 +616,27 @@ pub fn decision_sufficiency_horizon(
     if let Some(first_calibration) = first.calibration.as_ref()
         && steps.len() as u64 > first_calibration.maximum_horizon_ticks
     {
-            return Ok(HorizonResult {
-                first_tick: first.tick,
-                last_sufficient_tick: None,
-                stopped_at_tick: Some(first.tick),
-                stop_reason: Some(HorizonStopReason::EvidenceUnknown(
-                    UnknownReason::HorizonExceedsCalibrationScope {
+        return Ok(HorizonResult {
+            first_tick: first.tick,
+            last_sufficient_tick: None,
+            stopped_at_tick: Some(first.tick),
+            stop_reason: Some(HorizonStopReason::EvidenceUnknown(
+                UnknownReason::HorizonExceedsCalibrationScope {
+                    observed_ticks: steps.len(),
+                    maximum_ticks: first_calibration.maximum_horizon_ticks,
+                },
+            )),
+            max_regret_upper_units: None,
+            assessments: vec![TickAssessment {
+                tick: first.tick,
+                disposition: TickDisposition::Unknown {
+                    reason: UnknownReason::HorizonExceedsCalibrationScope {
                         observed_ticks: steps.len(),
                         maximum_ticks: first_calibration.maximum_horizon_ticks,
                     },
-                )),
-                max_regret_upper_units: None,
-                assessments: vec![TickAssessment {
-                    tick: first.tick,
-                    disposition: TickDisposition::Unknown {
-                        reason: UnknownReason::HorizonExceedsCalibrationScope {
-                            observed_ticks: steps.len(),
-                            maximum_ticks: first_calibration.maximum_horizon_ticks,
-                        },
-                    },
-                }],
-            });
+                },
+            }],
+        });
     }
 
     let anchor_action_id = first.selected_action_id.as_str();
@@ -705,19 +705,19 @@ pub fn decision_sufficiency_horizon(
         if let Some(calibration) = evidence.calibration.as_ref()
             && steps.len() as u64 > calibration.maximum_horizon_ticks
         {
-                let reason = UnknownReason::HorizonExceedsCalibrationScope {
-                    observed_ticks: steps.len(),
-                    maximum_ticks: calibration.maximum_horizon_ticks,
-                };
-                result.assessments.push(TickAssessment {
-                    tick: evidence.tick,
-                    disposition: TickDisposition::Unknown {
-                        reason: reason.clone(),
-                    },
-                });
-                result.stopped_at_tick = Some(evidence.tick);
-                result.stop_reason = Some(HorizonStopReason::EvidenceUnknown(reason));
-                return Ok(result);
+            let reason = UnknownReason::HorizonExceedsCalibrationScope {
+                observed_ticks: steps.len(),
+                maximum_ticks: calibration.maximum_horizon_ticks,
+            };
+            result.assessments.push(TickAssessment {
+                tick: evidence.tick,
+                disposition: TickDisposition::Unknown {
+                    reason: reason.clone(),
+                },
+            });
+            result.stopped_at_tick = Some(evidence.tick);
+            result.stop_reason = Some(HorizonStopReason::EvidenceUnknown(reason));
+            return Ok(result);
         }
 
         let disposition = assess_tick(contract, evidence)?;
