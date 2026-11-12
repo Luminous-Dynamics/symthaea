@@ -1445,7 +1445,9 @@ mod tests {
     fn changed_nuclei_size_bins_are_incomparable_not_interpolated() {
         let mut input = case();
         input.evidence_kind = EvidenceKind::Measured;
-        input.runs[1].water_condition.nuclei_distribution.as_mut().unwrap().bins[0].diameter_upper_um = 0.9;
+        let bins = &mut input.runs[1].water_condition.nuclei_distribution.as_mut().unwrap().bins;
+        bins[0].diameter_upper_um = 0.9;
+        bins[1].diameter_lower_um = 0.9;
         let report = audit(&input);
         assert_eq!(report.disposition, "INCOMPARABLE_CONDITION");
         assert_eq!(
