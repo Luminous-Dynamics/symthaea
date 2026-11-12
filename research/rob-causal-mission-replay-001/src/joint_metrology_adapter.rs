@@ -356,6 +356,21 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
                     reference_limit_ns: Some(limit),
                     disposition: CommandResponseDisposition::ExceedsReference,
                 }
+            } else if onset.stamp.event_id.trim().is_empty()
+                || onset.stamp.timestamp.lower_ns > onset.stamp.timestamp.upper_ns
+            {
+                push(
+                    &mut findings,
+                    FindingSeverity::Invalid,
+                    "JOINT_MOTION_ONSET_STAMP_INVALID",
+                    &application.command_id,
+                );
+                CommandResponseResult {
+                    minimum_latency_ns: None,
+                    maximum_latency_ns: None,
+                    reference_limit_ns: Some(limit),
+                    disposition: CommandResponseDisposition::ExceedsReference,
+                }
             } else if onset.stamp.robot_id != application.stamp.robot_id
                 || onset.stamp.clock_id != application.stamp.clock_id
                 || onset.stamp.boot_epoch != application.stamp.boot_epoch
@@ -708,6 +723,16 @@ mod tests {
             lower_ns: 155_000_000,
             upper_ns: 155_000_000,
         };
+        evidence.mission.physical_transitions[0].stamp.timestamp =
+            super::super::TimestampInterval {
+                lower_ns: 160_000_000,
+                upper_ns: 160_000_000,
+            };
+        evidence.mission.terminal.as_mut().unwrap().stamp.timestamp =
+            super::super::TimestampInterval {
+                lower_ns: 165_000_000,
+                upper_ns: 165_000_000,
+            };
         evidence.command_to_motion_limit_ns = Some(20_000_000);
         let report = qualify_joint_metrology(&evidence);
         assert_eq!(report.disposition, QualificationDisposition::Rejected);
@@ -754,6 +779,16 @@ mod tests {
             super::super::TimestampInterval {
                 lower_ns: 129_000_000,
                 upper_ns: 132_000_000,
+            };
+        evidence.mission.physical_transitions[0].stamp.timestamp =
+            super::super::TimestampInterval {
+                lower_ns: 140_000_000,
+                upper_ns: 140_000_000,
+            };
+        evidence.mission.terminal.as_mut().unwrap().stamp.timestamp =
+            super::super::TimestampInterval {
+                lower_ns: 150_000_000,
+                upper_ns: 150_000_000,
             };
         let report = qualify_joint_metrology(&evidence);
         assert_eq!(
