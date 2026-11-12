@@ -196,6 +196,7 @@ pub enum InfluenceInputError {
     NoOpIntervention,
     InvalidConfig(&'static str),
     SerializationFailure,
+    InvalidRendererReceipt,
 }
 
 impl std::fmt::Display for InfluenceInputError {
@@ -220,6 +221,7 @@ impl std::fmt::Display for InfluenceInputError {
             Self::NoOpIntervention => write!(f, "intervention must declare a non-zero symbolic change"),
             Self::InvalidConfig(reason) => write!(f, "invalid influence config: {reason}"),
             Self::SerializationFailure => write!(f, "could not serialize influence report"),
+            Self::InvalidRendererReceipt => write!(f, "renderer receipt does not verify against exact output bytes"),
         }
     }
 }
@@ -684,6 +686,264 @@ fn compute_receipt_sha256(
     hasher.update(b"luminous-dynamics-mel-mr-eval-017-influence-report-v1\0");
     hasher.update(bytes);
     Ok(format!("{:x}", hasher.finalize()))
+}
+
+
+/// Renderer evidence for one output. The receipt is independently replayed
+/// against its exact score, schedule, configuration and WAV bytes before the
+/// audio is admitted to the influence experiment.
+pub struct RendererInfluenceEvidence<'a> {
+    pub receipt: &'a crate::renderer_execution_receipt::RendererExecutionReceipt,
+    pub inputs: crate::renderer_execution_receipt::RendererReceiptInputs<'a>,
+}
+
+/// Request-level identity. Schedule and receipt digests are derived from the
+/// verified evidence rather than accepted as caller assertions.
+pub struct VerifiedInfluenceRequest<'a> {
+    pub source_score_sha256: &'a str,
+    pub source_event_id: &'a str,
+    pub intervention: CounterfactualIntervention,
+    pub baseline_schedule_sha256: &'a str,
+    pub counterfactual_schedule_sha256: &'a str,
+    pub renderer_profile_sha256: &'a str,
+}
+
+struct VerifiedPcm {
+    samples: Vec<f32>,
+    sample_rate_hz: u32,
+    channels: usize,
+}
+
+/// Verify three independently supplied evidence groups (baseline, repeats,
+/// counterfactual), decode the exact WAV bytes bound by each receipt, check
+/// that baseline/repeats share the same source schedule and renderer backend,
+/// and then estimate the paired acoustic influence.
+///
+/// This is the preferred entry point. The lower-level estimator remains
+/// available for controlled research fixtures, but it only validates supplied
+/// digest syntax and cannot independently verify renderer receipts.
+pub fn estimate_from_verified_renderer_evidence(
+    baseline: RendererInfluenceEvidence<'_>,
+    baseline_repeats: Vec<RendererInfluenceEvidence<'_>>,
+    counterfactual: RendererInfluenceEvidence<'_>,
+    request: VerifiedInfluenceRequest<'_>,
+    config: &CounterfactualInfluenceConfig,
+) -> Result<CounterfactualInfluenceReport, InfluenceInputError> {
+    if baseline_repeats.is_empty() {
+        return Err(InfluenceInputError::MissingRepeatRender);
+    }
+    let expected_schedule = (
+        request.baseline_schedule_sha256,
+        request.counterfactual_schedule_sha256,
+    );
+    validate_sha256("baseline_schedule_sha256", expected_schedule.0)?;
+    validate_sha256("counterfactual_schedule_sha256", expected_schedule.1)?;
+    validate_sha256("source_score_sha256", request.source_score_sha256)?;
+    validate_sha256("renderer_profile_sha256", request.renderer_profile_sha256)?;
+    if expected_schedule.0 == expected_schedule.1 {
+        return Err(InfluenceInputError::ContextMismatch);
+    }
+
+    let baseline_verified = verify_and_decode_render(baseline)?;
+    let mut repeat_verified = Vec::with_capacity(baseline_repeats.len());
+    for repeat in baseline_repeats {
+        repeat_verified.push(verify_and_decode_render(repeat)?);
+    }
+    let counterfactual_verified = verify_and_decode_render(counterfactual)?;
+
+    let baseline_metadata = &baseline_verified.metadata;
+    if baseline_metadata.score_sha256 != request.source_score_sha256
+        || baseline_metadata.schedule_sha256 != expected_schedule.0
+    {
+        return Err(InfluenceInputError::ContextMismatch);
+    }
+    ensure_same_renderer_profile(baseline_metadata, &counterfactual_verified.metadata)?;
+    if counterfactual_verified.metadata.score_sha256 != request.source_score_sha256
+        || counterfactual_verified.metadata.schedule_sha256 != expected_schedule.1
+    {
+        return Err(InfluenceInputError::ContextMismatch);
+    }
+
+    let mut repeat_receipt_digests = Vec::with_capacity(repeat_verified.len());
+    let mut repeat_views = Vec::with_capacity(repeat_verified.len());
+    for repeat in &repeat_verified {
+        ensure_same_renderer_profile(baseline_metadata, &repeat.metadata)?;
+        if repeat.metadata.score_sha256 != request.source_score_sha256
+            || repeat.metadata.schedule_sha256 != expected_schedule.0
+        {
+            return Err(InfluenceInputError::ContextMismatch);
+        }
+        repeat_receipt_digests.push(repeat.metadata.receipt_sha256.as_str());
+        repeat_views.push(repeat.pcm.view());
+    }
+
+    // Receipt reuse would make a nominal "repeat render" vacuous. Distinct
+    // receipt identities are required even when deterministic PCM is identical.
+    let mut receipt_ids = std::collections::BTreeSet::new();
+    receipt_ids.insert(baseline_metadata.receipt_sha256.as_str());
+    receipt_ids.insert(counterfactual_verified.metadata.receipt_sha256.as_str());
+    for repeat in &repeat_verified {
+        if !receipt_ids.insert(repeat.metadata.receipt_sha256.as_str()) {
+            return Err(InfluenceInputError::ContextMismatch);
+        }
+    }
+
+    let context = CounterfactualInfluenceContext {
+        source_score_sha256: request.source_score_sha256,
+        source_event_id: request.source_event_id,
+        intervention: request.intervention,
+        baseline_schedule_sha256: request.baseline_schedule_sha256,
+        counterfactual_schedule_sha256: request.counterfactual_schedule_sha256,
+        renderer_profile_sha256: request.renderer_profile_sha256,
+        baseline_render_receipt_sha256: &baseline_metadata.receipt_sha256,
+        baseline_repeat_receipt_sha256: &repeat_receipt_digests,
+        counterfactual_render_receipt_sha256: &counterfactual_verified.metadata.receipt_sha256,
+    };
+    estimate_counterfactual_influence(
+        baseline_verified.pcm.view(),
+        &repeat_views,
+        counterfactual_verified.pcm.view(),
+        context,
+        config,
+    )
+}
+
+struct VerifiedRenderMetadata {
+    score_sha256: String,
+    schedule_sha256: String,
+    backend: crate::renderer_execution_receipt::RendererBackend,
+    renderer_executable_sha256: Option<String>,
+    soundfont_sha256: Option<String>,
+    sample_rate_hz: u32,
+    channels: usize,
+    frame_count: u64,
+    receipt_sha256: String,
+}
+
+struct VerifiedRender {
+    pcm: VerifiedPcm,
+    metadata: VerifiedRenderMetadata,
+}
+
+impl VerifiedPcm {
+    fn view(&self) -> AudioView<'_> {
+        AudioView {
+            interleaved_samples: &self.samples,
+            sample_rate_hz: self.sample_rate_hz,
+            channels: self.channels,
+        }
+    }
+}
+
+fn verify_and_decode_render(
+    evidence: RendererInfluenceEvidence<'_>,
+) -> Result<VerifiedRender, InfluenceInputError> {
+    use crate::renderer_execution_receipt::{
+        DecodedSampleFormat, RendererBackend, summarize_wav,
+    };
+
+    let receipt = evidence.receipt;
+    let inputs = evidence.inputs;
+    let schedule_sha256 = match (
+        inputs.backend,
+        inputs.input_midi_bytes,
+        inputs.performed_schedule_bytes,
+    ) {
+        (RendererBackend::FluidSynth, Some(bytes), None) => {
+            crate::renderer_execution_receipt::sha256_hex(bytes)
+        }
+        (RendererBackend::NativeMuse, None, Some(bytes)) => {
+            crate::renderer_execution_receipt::sha256_hex(bytes)
+        }
+        _ => return Err(InfluenceInputError::ContextMismatch),
+    };
+    let score_sha256 = crate::renderer_execution_receipt::sha256_hex(inputs.score_bytes);
+    let wav_bytes = inputs.output_wav_bytes;
+    let executable_sha256 = inputs.renderer_executable_sha256.map(str::to_owned);
+    let soundfont_sha256 = inputs.soundfont_sha256.map(str::to_owned);
+
+    receipt
+        .verify_artifacts(inputs)
+        .map_err(|_| InfluenceInputError::InvalidRendererReceipt)?;
+
+    let summary = summarize_wav(wav_bytes)
+        .map_err(|_| InfluenceInputError::InvalidRendererReceipt)?;
+    let mut reader = hound::WavReader::new(std::io::Cursor::new(wav_bytes))
+        .map_err(|_| InfluenceInputError::InvalidRendererReceipt)?;
+    let spec = reader.spec();
+    let mut samples = Vec::new();
+    match spec.sample_format {
+        hound::SampleFormat::Float => {
+            if spec.bits_per_sample != 32 {
+                return Err(InfluenceInputError::InvalidRendererReceipt);
+            }
+            for sample in reader.samples::<f32>() {
+                let sample = sample.map_err(|_| InfluenceInputError::InvalidRendererReceipt)?;
+                if !sample.is_finite() {
+                    return Err(InfluenceInputError::NonFiniteSample);
+                }
+                samples.push(sample);
+            }
+        }
+        hound::SampleFormat::Int => {
+            let scale = 2_f64.powi(i32::from(spec.bits_per_sample) - 1);
+            for sample in reader.samples::<i32>() {
+                let sample = sample.map_err(|_| InfluenceInputError::InvalidRendererReceipt)?;
+                let normalized = (f64::from(sample) / scale) as f32;
+                if !normalized.is_finite() {
+                    return Err(InfluenceInputError::NonFiniteSample);
+                }
+                samples.push(normalized);
+            }
+        }
+    }
+    if samples.is_empty()
+        || samples.len() % usize::from(spec.channels) != 0
+        || summary.sample_rate_hz != spec.sample_rate
+        || usize::from(summary.channels) != usize::from(spec.channels)
+        || summary.frame_count != (samples.len() / usize::from(spec.channels)) as u64
+        || summary.sample_format
+            != match spec.sample_format {
+                hound::SampleFormat::Int => DecodedSampleFormat::PcmInteger,
+                hound::SampleFormat::Float => DecodedSampleFormat::PcmFloat,
+            }
+    {
+        return Err(InfluenceInputError::InvalidRendererReceipt);
+    }
+    Ok(VerifiedRender {
+        pcm: VerifiedPcm {
+            samples,
+            sample_rate_hz: spec.sample_rate,
+            channels: usize::from(spec.channels),
+        },
+        metadata: VerifiedRenderMetadata {
+            score_sha256,
+            schedule_sha256,
+            backend: receipt.backend,
+            renderer_executable_sha256: executable_sha256,
+            soundfont_sha256,
+            sample_rate_hz: summary.sample_rate_hz,
+            channels: usize::from(summary.channels),
+            frame_count: summary.frame_count,
+            receipt_sha256: receipt.receipt_sha256.clone(),
+        },
+    })
+}
+
+fn ensure_same_renderer_profile(
+    baseline: &VerifiedRenderMetadata,
+    candidate: &VerifiedRenderMetadata,
+) -> Result<(), InfluenceInputError> {
+    if baseline.backend != candidate.backend
+        || baseline.renderer_executable_sha256 != candidate.renderer_executable_sha256
+        || baseline.soundfont_sha256 != candidate.soundfont_sha256
+        || baseline.sample_rate_hz != candidate.sample_rate_hz
+        || baseline.channels != candidate.channels
+        || baseline.frame_count != candidate.frame_count
+    {
+        return Err(InfluenceInputError::ContextMismatch);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
