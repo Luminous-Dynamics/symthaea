@@ -17,6 +17,7 @@ struct Report {
     phantom_cases: usize,
     peer_estimates_scored: usize,
     distribution_l2_sum: f64,
+    synthetic_recovery_controls: usize,
     digest_records: usize,
 }
 
@@ -148,6 +149,21 @@ fn validate_estimate_roster(
     if seen != *ids { add(errors, format!("{context}: estimate roster differs from baseline roster")); }
     missing
 }
+fn mean_peer_error(rows: &[Value], estimates: &[Value], opts: &[String], nested: bool) -> Option<f64> {
+    let mut sum = 0.0;
+    let mut count = 0usize;
+    for estimate in estimates {
+        let record = if nested { &estimate["peer_estimate"] } else { estimate };
+        if record["estimate_status"].as_str() != Some("reported") { continue; }
+        let agent = estimate["agent_id"].as_str()?;
+        let index = rows.iter().position(|row| row["agent_id"].as_str() == Some(agent))?;
+        let probabilities = record.get("probabilities_permille")?;
+        sum += peer_distribution_l2_error(rows, index, opts, probabilities)?;
+        count += 1;
+    }
+    if count == 0 { None } else { Some(sum / count as f64) }
+}
+
 fn validate_fixture(f: &Value, arms: &BTreeSet<String>) -> (Vec<String>, usize, f64) {
     let mut errors = Vec::new();
     let opts = options(f);
@@ -251,6 +267,12 @@ fn validate_fixture(f: &Value, arms: &BTreeSet<String>) -> (Vec<String>, usize, 
         }
     }
 
+    let pre_recovery_mean = if reported_count == 0 {
+        None
+    } else {
+        Some(distribution_l2_sum / reported_count as f64)
+    };
+
     let transparency = &f["transparency"];
     if transparency["gold_label_disclosed"].as_bool() != Some(false) { add(&mut errors, "transparency must not reveal task answer"); }
     match transparency["disclosure"].as_str().unwrap_or("") {
@@ -276,11 +298,27 @@ fn validate_fixture(f: &Value, arms: &BTreeSet<String>) -> (Vec<String>, usize, 
         }
         _ => add(&mut errors, "unknown transparency disclosure"),
     }
-    if !arr(transparency, "recovery_estimates").is_empty() {
+    let recovery_records = arr(transparency, "recovery_estimates");
+    let disclosure = transparency["disclosure"].as_str().unwrap_or("");
+    let recovery_mean = if disclosure == "none" {
+        if !recovery_records.is_empty() { add(&mut errors, "recovery estimates are forbidden without transparency disclosure"); }
+        None
+    } else if recovery_records.is_empty() {
+        add(&mut errors, "transparency disclosure requires post-disclosure recovery estimates");
+        None
+    } else {
         let recovery_missing = validate_estimate_roster(
-            arr(transparency, "recovery_estimates"), &ids, &opts, &mut errors, "transparency.recovery_estimates"
+            recovery_records, &ids, &opts, &mut errors, "transparency.recovery_estimates"
         );
         if recovery_missing > 0 { add(&mut errors, "recovery estimates must be complete when disclosure occurs"); }
+        mean_peer_error(baseline, recovery_records, &opts, false)
+    };
+    let observed_recovery_improvement = match (pre_recovery_mean, recovery_mean) {
+        (Some(pre), Some(post)) => post + 1e-12 < pre,
+        _ => false,
+    };
+    if f["expected"]["transparency_recovery_improves"].as_bool() != Some(observed_recovery_improvement) {
+        add(&mut errors, "transparency recovery improvement oracle does not match paired pre/post peer-belief error");
     }
 
     let actual_phantom = phantom_oracle(f);
@@ -307,7 +345,7 @@ fn validate_metric_status(protocol: &Value) -> Result<(), String> {
     let combined: BTreeSet<String> = implemented.union(&deferred).cloned().collect();
     if !overlap.is_empty() { return Err("metric implementation sets overlap".into()); }
     if combined != all { return Err("every declared metric must be exactly implemented or deferred".into()); }
-    for required in ["peer_private_belief_l2_error", "phantom_consensus_incidence"] {
+    for required in ["peer_private_belief_l2_error", "phantom_consensus_incidence", "synthetic_transparency_recovery_l2_improvement"] {
         if !implemented.contains(required) { return Err(format!("implemented metric missing: {required}")); }
     }
     for required in ["private_public_gap", "collective_rationality_failure", "transparency_recovery",
@@ -367,6 +405,7 @@ fn main_run(args: &[String]) -> Result<Report, String> {
             return Err(format!("{id}: {}", errors.join("; ")));
         }
         if fixture["expected"]["phantom_consensus"].as_bool() == Some(true) { report.phantom_cases += 1; }
+        if fixture["expected"]["transparency_recovery_improves"].as_bool() == Some(true) { report.synthetic_recovery_controls += 1; }
         println!("{id}: disposition={expected}; baseline_sha256={baseline_digest}; intervention_sha256={intervention_digest}");
     }
     Ok(report)
@@ -375,8 +414,8 @@ fn main() -> ExitCode {
     match main_run(&env::args().skip(1).collect::<Vec<_>>()) {
         Ok(r) => {
             let mean = if r.peer_estimates_scored == 0 { 0.0 } else { r.distribution_l2_sum / r.peer_estimates_scored as f64 };
-            println!("QUALIFIED: fixtures={} pass={} indeterminate={} rejected_negative_controls={} phantom_cases={} peer_estimates_scored={} mean_peer_distribution_l2_error={:.6} digest_records={}",
-                r.fixtures, r.pass, r.indeterminate, r.rejected_controls, r.phantom_cases, r.peer_estimates_scored, mean, r.digest_records);
+            println!("QUALIFIED: fixtures={} pass={} indeterminate={} rejected_negative_controls={} phantom_cases={} synthetic_recovery_controls={} peer_estimates_scored={} mean_peer_distribution_l2_error={:.6} digest_records={}",
+                r.fixtures, r.pass, r.indeterminate, r.rejected_controls, r.phantom_cases, r.synthetic_recovery_controls, r.peer_estimates_scored, mean, r.digest_records);
             ExitCode::SUCCESS
         }
         Err(e) => { eprintln!("NOT_QUALIFIED: {e}"); ExitCode::FAILURE }
@@ -467,6 +506,28 @@ mod tests {
     fn anonymous_tally_rejects_unexpected_categories() {
         let mut f = fixture("PHC-006");
         f["transparency"]["disclosed_tally"]["UNDECLARED"] = serde_json::json!(0);
+        let (errors, _, _) = validate_fixture(&f, &declared_arms());
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn authentic_disclosure_improves_synthetic_peer_belief_error() {
+        let f = fixture("PHC-006");
+        let opts = options(&f);
+        let pre = mean_peer_error(arr(&f, "private_baseline"), arr(&f, "post_signal"), &opts, true).unwrap();
+        let post = mean_peer_error(
+            arr(&f, "private_baseline"), arr(&f["transparency"], "recovery_estimates"), &opts, false
+        ).unwrap();
+        assert!(post < pre);
+    }
+
+    #[test]
+    fn recovery_oracle_rejects_non_improving_post_disclosure_estimates() {
+        let mut f = fixture("PHC-006");
+        for estimate in f["transparency"]["recovery_estimates"].as_array_mut().unwrap() {
+            estimate["probabilities_permille"] =
+                serde_json::json!({"A":200,"B":800,"C":0,"ABSTAIN":0,"UNKNOWN":0});
+        }
         let (errors, _, _) = validate_fixture(&f, &declared_arms());
         assert!(!errors.is_empty());
     }
