@@ -53,7 +53,8 @@
         "maximum_frame_gap_us",
         "maximum_sensor_clock_skew_us",
         "visual_weight_ppm",
-        "vehicle_encoder_seed_phrase"
+        "vehicle_encoder_seed_phrase",
+        "maximum_observation_delivery_age_us"
       ],
       "properties": {
         "identity": {
@@ -138,6 +139,10 @@
               "type": "null"
             }
           ]
+        },
+        "maximum_observation_delivery_age_us": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     },
