@@ -40,6 +40,8 @@ pub enum InteractionError {
     NonFiniteDerivedValue(&'static str),
     InvalidAngularFrequency,
     SingularFrequencyResponse,
+    InvalidConductanceInterval,
+    UnrepresentableCriticalConductance,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -68,6 +70,158 @@ pub struct InteractionAnalysis {
     pub normalized_routh_hurwitz_delta: f64,
     /// Conservative numerical disposition; not a physical safety decision.
     pub stability: StabilityDisposition,
+}
+
+/// Closed positive interval for a conductance-like parameter, in siemens.
+///
+/// Bounds must be deterministic hard limits. Statistical confidence intervals
+/// and datasheet typical values are not automatically admissible hard bounds.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ConductanceIntervalSiemens {
+    pub lower_siemens: f64,
+    pub upper_siemens: f64,
+}
+
+impl ConductanceIntervalSiemens {
+    /// Construct a finite, strictly positive, ordered interval.
+    pub fn new(lower_siemens: f64, upper_siemens: f64) -> Result<Self, InteractionError> {
+        if !lower_siemens.is_finite()
+            || !upper_siemens.is_finite()
+            || !lower_siemens.is_normal()
+            || !upper_siemens.is_normal()
+            || lower_siemens <= 0.0
+            || upper_siemens <= 0.0
+            || lower_siemens > upper_siemens
+        {
+            return Err(InteractionError::InvalidConductanceInterval);
+        }
+        Ok(Self { lower_siemens, upper_siemens })
+    }
+}
+
+/// Distribution-free disposition for the symmetric two-feeder RC/CPL model.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RobustStabilityDisposition {
+    /// Every admitted parameter combination is strictly Hurwitz stable.
+    RobustlyHurwitzStable,
+    /// Every admitted parameter combination has a positive real common-mode pole.
+    RobustlyUnstablePositiveRealPole,
+    /// The uncertainty set touches or overlaps the critical threshold range.
+    NotEstablishedBoundaryOrOverlap,
+}
+
+/// Robust endpoint classification for the symmetric two-converter model.
+///
+/// The threshold bounds include a conservative binary64 guard. This is not a
+/// formally outward-rounded interval proof; exact-rational fixtures are the
+/// independent reference for the frozen known-answer cases.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct RobustStabilityReport {
+    /// Conservative lower bound on the critical conductance, siemens.
+    pub critical_threshold_lower_siemens: f64,
+    /// Conservative upper bound on the critical conductance, siemens.
+    pub critical_threshold_upper_siemens: f64,
+    /// Absolute binary64 arithmetic guard applied to each threshold, siemens.
+    pub numerical_guard_siemens: f64,
+    /// Dimensionless strict separation margin for a robust disposition.
+    /// Zero for a boundary/mixed/not-established result.
+    pub normalized_margin: f64,
+    pub disposition: RobustStabilityDisposition,
+}
+
+/// Classify a symmetric two-converter RC/CPL network for rectangular hard bounds.
+///
+/// The model requires one common source conductance Gs, two identical feeder
+/// conductances G, and two identical CPL negative incremental conductances h,
+/// all in siemens. Its exact common-mode threshold is:
+///
+/// h_crit(Gs, G) = Gs*G / (Gs + 2*G).
+///
+/// The threshold is strictly increasing in both Gs and G, so its exact extrema
+/// over independent positive intervals occur at the corresponding endpoints.
+/// No parameter-grid sampling or probability model is used.
+pub fn classify_symmetric_hard_bounds(
+    source_conductance: ConductanceIntervalSiemens,
+    feeder_conductance: ConductanceIntervalSiemens,
+    negative_incremental_conductance: ConductanceIntervalSiemens,
+) -> Result<RobustStabilityReport, InteractionError> {
+    let threshold_lower = common_mode_critical_conductance(
+        source_conductance.lower_siemens,
+        feeder_conductance.lower_siemens,
+    )?;
+    let threshold_upper = common_mode_critical_conductance(
+        source_conductance.upper_siemens,
+        feeder_conductance.upper_siemens,
+    )?;
+    if threshold_lower > threshold_upper {
+        return Err(InteractionError::UnrepresentableCriticalConductance);
+    }
+
+    let scale = threshold_lower.max(threshold_upper);
+    let guard = 64.0 * f64::EPSILON * scale;
+    if !guard.is_finite() || guard <= 0.0 {
+        return Err(InteractionError::UnrepresentableCriticalConductance);
+    }
+
+    // Widen the threshold range instead of allowing nearest-rounded values to
+    // create a false strict separation.
+    let conservative_lower = threshold_lower - guard;
+    let conservative_upper = threshold_upper + guard;
+    if !conservative_upper.is_finite() {
+        return Err(InteractionError::UnrepresentableCriticalConductance);
+    }
+
+    let (disposition, normalized_margin) =
+        if negative_incremental_conductance.upper_siemens < conservative_lower
+            && conservative_lower > 0.0
+        {
+            (
+                RobustStabilityDisposition::RobustlyHurwitzStable,
+                (conservative_lower - negative_incremental_conductance.upper_siemens)
+                    / conservative_lower,
+            )
+        } else if negative_incremental_conductance.lower_siemens > conservative_upper
+            && conservative_upper > 0.0
+        {
+            (
+                RobustStabilityDisposition::RobustlyUnstablePositiveRealPole,
+                (negative_incremental_conductance.lower_siemens - conservative_upper)
+                    / conservative_upper,
+            )
+        } else {
+            (RobustStabilityDisposition::NotEstablishedBoundaryOrOverlap, 0.0)
+        };
+
+    if !normalized_margin.is_finite() || normalized_margin < 0.0 {
+        return Err(InteractionError::UnrepresentableCriticalConductance);
+    }
+
+    Ok(RobustStabilityReport {
+        critical_threshold_lower_siemens: conservative_lower,
+        critical_threshold_upper_siemens: conservative_upper,
+        numerical_guard_siemens: guard,
+        normalized_margin,
+        disposition,
+    })
+}
+
+/// Evaluate Gs*G/(Gs+2G) without forming the potentially overflowing product.
+fn common_mode_critical_conductance(
+    source_conductance_siemens: f64,
+    feeder_conductance_siemens: f64,
+) -> Result<f64, InteractionError> {
+    let value = if source_conductance_siemens >= feeder_conductance_siemens {
+        feeder_conductance_siemens
+            / (1.0 + 2.0 * (feeder_conductance_siemens / source_conductance_siemens))
+    } else {
+        source_conductance_siemens
+            / ((source_conductance_siemens / feeder_conductance_siemens) + 2.0)
+    };
+
+    if !value.is_finite() || !value.is_normal() || value <= 0.0 {
+        return Err(InteractionError::UnrepresentableCriticalConductance);
+    }
+    Ok(value)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -492,6 +646,108 @@ mod tests {
             scaled.characteristic_coefficients[3],
             baseline.characteristic_coefficients[3] / 1000.0,
             1e-12,
+        );
+    }
+
+    #[test]
+    fn robust_hard_bounds_classify_a_stable_set() {
+        let result = classify_symmetric_hard_bounds(
+            ConductanceIntervalSiemens::new(0.9, 1.1).unwrap(),
+            ConductanceIntervalSiemens::new(0.9, 1.1).unwrap(),
+            ConductanceIntervalSiemens::new(0.05, 0.1).unwrap(),
+        ).unwrap();
+        assert_eq!(result.disposition, RobustStabilityDisposition::RobustlyHurwitzStable);
+        close(result.normalized_margin, 2.0 / 3.0, 1e-12);
+    }
+
+    #[test]
+    fn robust_hard_bounds_classify_an_unstable_set() {
+        let result = classify_symmetric_hard_bounds(
+            ConductanceIntervalSiemens::new(0.9, 1.1).unwrap(),
+            ConductanceIntervalSiemens::new(0.9, 1.1).unwrap(),
+            ConductanceIntervalSiemens::new(0.5, 0.6).unwrap(),
+        ).unwrap();
+        assert_eq!(
+            result.disposition,
+            RobustStabilityDisposition::RobustlyUnstablePositiveRealPole
+        );
+        close(result.normalized_margin, 4.0 / 11.0, 1e-12);
+    }
+
+    #[test]
+    fn robust_hard_bounds_with_overlap_do_not_claim_stability() {
+        let result = classify_symmetric_hard_bounds(
+            ConductanceIntervalSiemens::new(0.8, 1.2).unwrap(),
+            ConductanceIntervalSiemens::new(0.9, 1.1).unwrap(),
+            ConductanceIntervalSiemens::new(0.3, 0.35).unwrap(),
+        ).unwrap();
+        assert_eq!(
+            result.disposition,
+            RobustStabilityDisposition::NotEstablishedBoundaryOrOverlap
+        );
+        assert_eq!(result.normalized_margin, 0.0);
+    }
+
+    #[test]
+    fn exact_threshold_touch_is_not_a_robust_pass() {
+        let result = classify_symmetric_hard_bounds(
+            ConductanceIntervalSiemens::new(1.0, 1.0).unwrap(),
+            ConductanceIntervalSiemens::new(1.0, 1.0).unwrap(),
+            ConductanceIntervalSiemens::new(1.0 / 3.0, 1.0 / 3.0).unwrap(),
+        ).unwrap();
+        assert_eq!(
+            result.disposition,
+            RobustStabilityDisposition::NotEstablishedBoundaryOrOverlap
+        );
+    }
+
+    #[test]
+    fn robust_normalized_margin_is_invariant_to_conductance_scaling() {
+        let scale = 1_000_000.0;
+        let base = classify_symmetric_hard_bounds(
+            ConductanceIntervalSiemens::new(0.9, 1.1).unwrap(),
+            ConductanceIntervalSiemens::new(0.9, 1.1).unwrap(),
+            ConductanceIntervalSiemens::new(0.05, 0.1).unwrap(),
+        ).unwrap();
+        let scaled = classify_symmetric_hard_bounds(
+            ConductanceIntervalSiemens::new(0.9 * scale, 1.1 * scale).unwrap(),
+            ConductanceIntervalSiemens::new(0.9 * scale, 1.1 * scale).unwrap(),
+            ConductanceIntervalSiemens::new(0.05 * scale, 0.1 * scale).unwrap(),
+        ).unwrap();
+        assert_eq!(base.disposition, scaled.disposition);
+        close(base.normalized_margin, scaled.normalized_margin, 1e-12);
+    }
+
+    #[test]
+    fn widening_a_stable_interval_can_only_weaken_the_disposition() {
+        let source = ConductanceIntervalSiemens::new(0.9, 1.1).unwrap();
+        let feeder = ConductanceIntervalSiemens::new(0.9, 1.1).unwrap();
+        let narrow = classify_symmetric_hard_bounds(
+            source, feeder, ConductanceIntervalSiemens::new(0.05, 0.1).unwrap()
+        ).unwrap();
+        let widened = classify_symmetric_hard_bounds(
+            source, feeder, ConductanceIntervalSiemens::new(0.05, 0.31).unwrap()
+        ).unwrap();
+        assert_eq!(narrow.disposition, RobustStabilityDisposition::RobustlyHurwitzStable);
+        assert_eq!(
+            widened.disposition,
+            RobustStabilityDisposition::NotEstablishedBoundaryOrOverlap
+        );
+    }
+
+    #[test]
+    fn invalid_hard_intervals_fail_closed() {
+        assert_eq!(
+            ConductanceIntervalSiemens::new(0.0, 1.0),
+            Err(InteractionError::InvalidConductanceInterval)
+        );
+        assert_eq!(
+            ConductanceIntervalSiemens::new(1.0, 0.5),
+            Err(InteractionError::InvalidConductanceInterval)
+        );
+        assert_eq!(
+            ConductanceIntervalSiemens::new(0.1, f64::INFINITY),
+            Err(InteractionError::InvalidConductanceInterval)
         );
     }
 
