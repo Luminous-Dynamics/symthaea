@@ -528,6 +528,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
     let mut findings = Vec::new();
     let mut aoi_bounds = Vec::new();
     stamp_index(trace, &mut findings);
+    let stamp_index_valid = findings.is_empty();
 
     for (field, value) in [
         ("mission_id", trace.scope.mission_id.as_str()),
@@ -553,8 +554,10 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
     }
 
     let mut required_nodes = BTreeSet::new();
+    let mut required_thermal_manifest_valid = true;
     for node_id in &trace.scope.required_thermal_node_ids {
         if node_id.trim().is_empty() || !required_nodes.insert(node_id.as_str()) {
+            required_thermal_manifest_valid = false;
             push_finding(
                 &mut findings,
                 FindingSeverity::Invalid,
@@ -564,6 +567,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         }
     }
     if required_nodes.is_empty() {
+        required_thermal_manifest_valid = false;
         push_finding(
             &mut findings,
             FindingSeverity::Unknown,
@@ -873,10 +877,11 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
                 &application.command_id,
             );
         }
-        if application_by_command
+        let duplicate_application_command = application_by_command
             .insert(application.command_id.as_str(), application)
-            .is_some()
-        {
+            .is_some();
+        if duplicate_application_command {
+            linked_command_ids.remove(&application.command_id);
             push_finding(
                 &mut findings,
                 FindingSeverity::Invalid,
@@ -1092,7 +1097,8 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             && chunk.action_domain_digest == decision.action_domain_digest
             && chunk.expected_executed_prefix_digest == chunk.observed_executed_prefix_digest;
 
-        if findings.len() == findings_before
+        if !duplicate_application_command
+            && findings.len() == findings_before
             && command_aoi_complete
             && gate_ok
             && remote_ok
@@ -1107,6 +1113,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         }
     }
 
+    applications_linked = linked_command_ids.len();
     let mut transitions = trace.physical_transitions.iter().collect::<Vec<_>>();
     transitions.sort_by_key(|record| record.stamp.sequence);
     let mut expected_predecessor = trace.scope.initial_reserve_state_digest.as_str();
@@ -1115,7 +1122,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
     let mut last_physical_stamp: Option<&EventStamp> = None;
 
     for transition in transitions {
-        let mut transition_closed = true;
+        let mut transition_closed = required_thermal_manifest_valid;
         last_physical_sequence = last_physical_sequence.max(transition.stamp.sequence);
         if let Some(previous) = last_physical_stamp
             && !check_time_order(
@@ -1190,11 +1197,12 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             None => {
                 transition_closed = false;
                 push_finding(
-                &mut findings,
-                FindingSeverity::Invalid,
-                "PHYSICAL_TRANSITION_WITHOUT_APPLICATION",
-                &transition.transition_id,
-            );
+                    &mut findings,
+                    FindingSeverity::Invalid,
+                    "PHYSICAL_TRANSITION_WITHOUT_APPLICATION",
+                    &transition.transition_id,
+                );
+            }
         }
 
         let actual_nodes: BTreeSet<&str> = transition
@@ -1283,9 +1291,13 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         ),
     }
 
-    let applications_causally_closed = linked_command_ids
-        .intersection(&physically_closed_command_ids)
-        .count();
+    let applications_causally_closed = if stamp_index_valid {
+        linked_command_ids
+            .intersection(&physically_closed_command_ids)
+            .count()
+    } else {
+        0
+    };
     let causal_closure_ppm = if trace.applications.is_empty() {
         None
     } else {
@@ -1718,6 +1730,45 @@ mod tests {
         assert_eq!(
             replay_mission(&trace).causal_closure.closure_ppm,
             None
+        );
+    }
+
+
+    #[test]
+    fn malformed_required_thermal_manifest_blocks_all_positive_closure() {
+        let mut empty = valid_trace();
+        empty.scope.required_thermal_node_ids.clear();
+        assert_eq!(
+            replay_mission(&empty).causal_closure.closure_ppm,
+            Some(0)
+        );
+
+        let mut duplicate = valid_trace();
+        duplicate.scope.required_thermal_node_ids.push("motor".to_owned());
+        assert_eq!(
+            replay_mission(&duplicate).causal_closure.closure_ppm,
+            Some(0)
+        );
+    }
+
+    #[test]
+    fn duplicate_application_identity_cannot_count_as_linked_or_closed() {
+        let mut trace = valid_trace();
+        trace.applications.push(trace.applications[0].clone());
+        let report = replay_mission(&trace);
+        assert_eq!(report.causal_closure.applications_examined, 2);
+        assert_eq!(report.causal_closure.applications_linked, 0);
+        assert_eq!(report.causal_closure.applications_causally_closed, 0);
+        assert_eq!(report.causal_closure.closure_ppm, Some(0));
+    }
+
+    #[test]
+    fn duplicate_event_identity_forces_zero_closure() {
+        let mut trace = valid_trace();
+        trace.decisions[0].stamp.event_id = trace.observations[0].stamp.event_id.clone();
+        assert_eq!(
+            replay_mission(&trace).causal_closure.closure_ppm,
+            Some(0)
         );
     }
 
