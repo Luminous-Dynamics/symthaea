@@ -44,6 +44,8 @@ pub mod audio_analyzer;
 pub mod audio_preservation;
 pub mod counterfactual_influence;
 #[cfg(feature = "theory")]
+pub mod pairwise_acoustic_interaction;
+#[cfg(feature = "theory")]
 pub mod edit_contract;
 pub mod performed_event_map;
 pub mod renderer_execution_receipt;
