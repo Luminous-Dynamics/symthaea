@@ -128,7 +128,19 @@
       ],
       "environment_fingerprint_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
       "hydrophone_instrument_id": "synthetic-hydrophone-H1",
-      "calibration_certificate_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+      "calibration_certificate_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "water_condition": {
+        "measure": "cavitation_susceptibility_alpha",
+        "value": 0.62,
+        "unit": "dimensionless",
+        "expanded_uncertainty": 0.01,
+        "equivalence_tolerance": 0.05,
+        "method_id": "synthetic-alpha-method",
+        "instrument_id": "synthetic-alpha-meter-1",
+        "calibration_certificate_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "evidence_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "nuclei_distribution_evidence_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+      }
     },
     {
       "run_id": "synthetic-run-2",
@@ -236,7 +248,19 @@
       ],
       "environment_fingerprint_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
       "hydrophone_instrument_id": "synthetic-hydrophone-H1",
-      "calibration_certificate_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+      "calibration_certificate_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "water_condition": {
+        "measure": "cavitation_susceptibility_alpha",
+        "value": 0.63,
+        "unit": "dimensionless",
+        "expanded_uncertainty": 0.01,
+        "equivalence_tolerance": 0.05,
+        "method_id": "synthetic-alpha-method",
+        "instrument_id": "synthetic-alpha-meter-1",
+        "calibration_certificate_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+        "evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+        "nuclei_distribution_evidence_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+      }
     }
   ],
   "service_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
