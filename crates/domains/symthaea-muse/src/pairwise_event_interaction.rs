@@ -862,10 +862,10 @@ mod tests {
         }
     }
 
-    const ALL_EVENT_IDS: [&str; 3] = ["event-a", "event-b", "event-c"];
-    const NO_A_EVENT_IDS: [&str; 2] = ["event-b", "event-c"];
-    const NO_B_EVENT_IDS: [&str; 2] = ["event-a", "event-c"];
-    const NO_AB_EVENT_IDS: [&str; 1] = ["event-c"];
+    static ALL_EVENT_IDS: [&str; 3] = ["event-a", "event-b", "event-c"];
+    static NO_A_EVENT_IDS: [&str; 2] = ["event-b", "event-c"];
+    static NO_B_EVENT_IDS: [&str; 2] = ["event-a", "event-c"];
+    static NO_AB_EVENT_IDS: [&str; 1] = ["event-c"];
 
     fn event_ids() -> [&'static str; 3] {
         ALL_EVENT_IDS
@@ -1038,4 +1038,37 @@ mod tests {
             PairwiseInteractionError::DuplicateRendererReceipt
         );
     }
+    #[test]
+    fn repeat_quartet_must_reuse_the_exact_event_map_commitments() {
+        let a = sine(1024, 440.0);
+        let b = sine(1024, 660.0);
+        let sum: Vec<f32> = a.iter().zip(&b).map(|(x, y)| x + y).collect();
+        let zero = vec![0.0; a.len()];
+        let primary = quartet(&sum, &b, &a, &zero, 0);
+        let mut repeat = quartet(&sum, &b, &a, &zero, 8);
+        repeat.y00.performed_event_map_sha256 = H_F;
+        assert_eq!(
+            measure(&primary, &repeat, &calibrated_config()).unwrap_err(),
+            PairwiseInteractionError::RepeatScheduleMismatch
+        );
+    }
+
+    #[test]
+    fn repeat_quartet_must_preserve_sample_layout() {
+        let a = sine(1024, 440.0);
+        let b = sine(1024, 660.0);
+        let sum: Vec<f32> = a.iter().zip(&b).map(|(x, y)| x + y).collect();
+        let zero = vec![0.0; a.len()];
+        let short_a = sine(960, 440.0);
+        let short_b = sine(960, 660.0);
+        let short_sum: Vec<f32> = short_a.iter().zip(&short_b).map(|(x, y)| x + y).collect();
+        let short_zero = vec![0.0; short_a.len()];
+        let primary = quartet(&sum, &b, &a, &zero, 0);
+        let repeat = quartet(&short_sum, &short_b, &short_a, &short_zero, 8);
+        assert_eq!(
+            measure(&primary, &repeat, &calibrated_config()).unwrap_err(),
+            PairwiseInteractionError::LengthMismatch
+        );
+    }
+
 }
