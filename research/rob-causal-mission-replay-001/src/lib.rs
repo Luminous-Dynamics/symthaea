@@ -1158,6 +1158,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
 
         if !transition_commands.insert(transition.command_id.as_str()) {
             transition_closed = false;
+            physically_closed_command_ids.remove(&transition.command_id);
             push_finding(
                 &mut findings,
                 FindingSeverity::Invalid,
