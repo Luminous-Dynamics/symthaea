@@ -47,4 +47,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add Cargo.lock "$FILE"
           git commit -m "style(black-hole): apply pinned rustfmt to information module"
+          git pull --rebase origin research/bh-info-page-curve-benchmark
           git push origin HEAD:research/bh-info-page-curve-benchmark
