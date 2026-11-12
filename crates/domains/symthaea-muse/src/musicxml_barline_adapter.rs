@@ -25,6 +25,7 @@ pub enum MusicXmlMeasureAdapterError {
     InvalidDuration { value: i64 },
     ArithmeticOverflow,
     MissingPartId,
+    DuplicatePartId { id: String },
     UnsupportedRoot { root: String },
     NoParts,
     UnsupportedPartMap { part_id: String },
@@ -232,11 +233,17 @@ pub fn parse_musicxml_part_measure_maps(
     }
 
     let mut output = Vec::with_capacity(parts.len());
+    let mut seen_part_ids = std::collections::BTreeSet::new();
     for part in parts {
         let part_id = part
             .attribute("id")
             .filter(|value| !value.trim().is_empty())
             .ok_or(MusicXmlMeasureAdapterError::MissingPartId)?;
+        if !seen_part_ids.insert(part_id.to_string()) {
+            return Err(MusicXmlMeasureAdapterError::DuplicatePartId {
+                id: part_id.to_string(),
+            });
+        }
         let parsed = parse_part(part)?;
         let (status, measures, non_controlling_indices) = match parsed {
             Some(parsed) if !parsed.is_empty() => {
@@ -292,6 +299,10 @@ pub fn parse_musicxml_part_measure_maps(
 
 
 /// Exact cross-part boundary alignment without erasing non-controlling bars.
+///
+/// Only unmatched boundaries that are *not* marked non-controlling are
+/// surfaced as required-alignment discrepancies. Unmatched non-controlling
+/// boundaries remain visible in their own fields but do not count as failures.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MusicXmlPartBoundaryAlignmentV1 {
     pub left_part_id: String,
@@ -304,7 +315,8 @@ pub struct MusicXmlPartBoundaryAlignmentV1 {
 }
 
 /// Compare two per-part maps in their shared exact score-clock coordinate
-/// system. Coincidence is exact; no tolerance or audio-clock conversion applies.
+/// system. No tolerance or audio-time conversion is applied: notated barline
+/// coincidence is exact in the canonical quarter-beat representation.
 pub fn compare_musicxml_part_boundaries(
     left: &MusicXmlPartMeasureMapV1,
     right: &MusicXmlPartMeasureMapV1,
@@ -319,10 +331,14 @@ pub fn compare_musicxml_part_boundaries(
         return Err(MusicXmlMeasureAdapterError::PartCanonicalizationMismatch);
     }
     if left.map.status != MeasureMapStatus::Supported {
-        return Err(MusicXmlMeasureAdapterError::UnsupportedPartMap { part_id: left.part_id.clone() });
+        return Err(MusicXmlMeasureAdapterError::UnsupportedPartMap {
+            part_id: left.part_id.clone(),
+        });
     }
     if right.map.status != MeasureMapStatus::Supported {
-        return Err(MusicXmlMeasureAdapterError::UnsupportedPartMap { part_id: right.part_id.clone() });
+        return Err(MusicXmlMeasureAdapterError::UnsupportedPartMap {
+            part_id: right.part_id.clone(),
+        });
     }
 
     let left_boundaries = part_internal_boundaries(left);
@@ -336,10 +352,12 @@ pub fn compare_musicxml_part_boundaries(
         unmatched_non_controlling_left: Vec::new(),
         unmatched_non_controlling_right: Vec::new(),
     };
-    let (mut left_index, mut right_index) = (0, 0);
+
+    let mut left_index = 0;
+    let mut right_index = 0;
     while left_index < left_boundaries.len() && right_index < right_boundaries.len() {
-        let (left_beat, left_nc) = left_boundaries[left_index];
-        let (right_beat, right_nc) = right_boundaries[right_index];
+        let (left_beat, left_non_controlling) = left_boundaries[left_index];
+        let (right_beat, right_non_controlling) = right_boundaries[right_index];
         match left_beat.compare_exact(right_beat) {
             std::cmp::Ordering::Equal => {
                 result.coincident_boundaries.push(left_beat);
@@ -351,7 +369,7 @@ pub fn compare_musicxml_part_boundaries(
                     &mut result.unmatched_required_left,
                     &mut result.unmatched_non_controlling_left,
                     left_beat,
-                    left_nc,
+                    left_non_controlling,
                 );
                 left_index += 1;
             }
@@ -360,29 +378,30 @@ pub fn compare_musicxml_part_boundaries(
                     &mut result.unmatched_required_right,
                     &mut result.unmatched_non_controlling_right,
                     right_beat,
-                    right_nc,
+                    right_non_controlling,
                 );
                 right_index += 1;
             }
         }
     }
+
     while left_index < left_boundaries.len() {
-        let (beat, nc) = left_boundaries[left_index];
+        let (beat, non_controlling) = left_boundaries[left_index];
         push_unmatched_boundary(
             &mut result.unmatched_required_left,
             &mut result.unmatched_non_controlling_left,
             beat,
-            nc,
+            non_controlling,
         );
         left_index += 1;
     }
     while right_index < right_boundaries.len() {
-        let (beat, nc) = right_boundaries[right_index];
+        let (beat, non_controlling) = right_boundaries[right_index];
         push_unmatched_boundary(
             &mut result.unmatched_required_right,
             &mut result.unmatched_non_controlling_right,
             beat,
-            nc,
+            non_controlling,
         );
         right_index += 1;
     }
@@ -392,9 +411,18 @@ pub fn compare_musicxml_part_boundaries(
 fn part_internal_boundaries(
     part: &MusicXmlPartMeasureMapV1,
 ) -> Vec<(RationalBeat, bool)> {
-    part.map.measures.iter().enumerate().skip(1).map(|(index, measure)| {
-        (measure.start, part.non_controlling_measure_indices.contains(&index))
-    }).collect()
+    part.map
+        .measures
+        .iter()
+        .enumerate()
+        .skip(1)
+        .map(|(index, measure)| {
+            (
+                measure.start,
+                part.non_controlling_measure_indices.contains(&index),
+            )
+        })
+        .collect()
 }
 
 fn push_unmatched_boundary(
@@ -474,7 +502,19 @@ fn parse_part(
                         }
                         divisions = Some(value);
                     } else if attribute.has_tag_name("time") {
-                        expected_measure_length = parse_time_length(attribute);
+                        // Time-signature changes must occur at a measure
+                        // origin for this V1 measure-span adapter. A change
+                        // after notes have advanced the cursor requires the
+                        // richer internal-boundary/time-event graph.
+                        if cursor.compare_exact(RationalBeat::new(0, 1).unwrap())
+                            != std::cmp::Ordering::Equal
+                        {
+                            return Ok(None);
+                        }
+                        let Some(length) = parse_time_length(attribute) else {
+                            return Ok(None);
+                        };
+                        expected_measure_length = Some(length);
                     }
                 }
             } else if element.has_tag_name("note") {
@@ -507,6 +547,25 @@ fn parse_part(
                         .checked_add(duration)
                         .map_err(|_| MusicXmlMeasureAdapterError::ArithmeticOverflow)?;
                     maximum_cursor = max_exact(maximum_cursor, cursor);
+                }
+            } else if element.has_tag_name("barline") {
+                // V1 MeasureMap represents outer measure boundaries only.
+                // A MusicXML middle barline is a separate notational event;
+                // returning Unknown prevents silently flattening it away.
+                let location = element.attribute("location").unwrap_or("right");
+                let has_unmodelled_semantics = element.children().any(|child| {
+                    child.is_element()
+                        && matches!(
+                            child.tag_name().name(),
+                            "repeat" | "ending" | "segno" | "coda" | "fermata" | "wavy-line"
+                        )
+                }) || element.attribute("segno").is_some()
+                    || element.attribute("coda").is_some();
+                if location == "middle"
+                    || !matches!(location, "left" | "right")
+                    || has_unmodelled_semantics
+                {
+                    return Ok(None);
                 }
             } else if element.has_tag_name("forward") || element.has_tag_name("backup") {
                 let duration_node = element
@@ -833,31 +892,143 @@ mod tests {
     }
 
     #[test]
+    fn middle_barline_is_not_silently_collapsed_into_measure_span() {
+        let xml = r#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+                <note><rest/><duration>8</duration></note>
+                <barline location="middle"><bar-style>dashed</bar-style></barline>
+                <note><rest/><duration>8</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let global = parse(xml);
+        assert!(matches!(global.status, MeasureMapStatus::Unknown { .. }));
+        assert!(global.measures.is_empty());
+
+        let parts = parse_musicxml_part_measure_maps(
+            xml.as_bytes(),
+            "sha256:internal-barline",
+            "score-clock-1",
+        )
+        .unwrap();
+        assert_eq!(parts.len(), 1);
+        assert!(matches!(parts[0].map.status, MeasureMapStatus::Unknown { .. }));
+        assert!(parts[0].map.measures.is_empty());
+    }
+
+
+    #[test]
+    fn duplicate_musicxml_part_ids_are_rejected() {
+        let xml = r#"<score-partwise>
+            <part id="P1"><measure number="1"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>16</duration></note></measure></part>
+            <part id="P1"><measure number="1"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>16</duration></note></measure></part>
+        </score-partwise>"#;
+        assert_eq!(
+            parse_musicxml_part_measure_maps(
+                xml.as_bytes(),
+                "sha256:duplicate-id",
+                "score-clock",
+            ),
+            Err(MusicXmlMeasureAdapterError::DuplicatePartId { id: "P1".into() })
+        );
+    }
+
+    #[test]
+    fn mid_measure_time_signature_change_is_not_flattened() {
+        let xml = r#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><rest/><duration>8</duration></note>
+                <attributes><time><beats>3</beats><beat-type>4</beat-type></time></attributes>
+                <note><rest/><duration>8</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let global = parse(xml);
+        assert!(matches!(global.status, MeasureMapStatus::Unknown { .. }));
+        assert!(global.measures.is_empty());
+    }
+
+    #[test]
+    fn malformed_explicit_time_signature_is_not_replaced_by_previous_meter() {
+        let xml = r#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><rest/><duration>16</duration></note>
+            </measure>
+            <measure number="2">
+                <attributes><time><beats>0</beats><beat-type>8</beat-type></time></attributes>
+                <note><rest/><duration>16</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let global = parse(xml);
+        assert!(matches!(global.status, MeasureMapStatus::Unknown { .. }));
+        assert!(global.measures.is_empty());
+    }
+
+    #[test]
+    fn repeat_ending_and_playback_signposts_are_not_silently_dropped() {
+        let semantic_barline_fragments = [
+            r#"<barline location="left"><bar-style>heavy-light</bar-style><repeat direction="forward"/></barline>"#,
+            r#"<barline location="right"><bar-style>light-heavy</bar-style><repeat direction="backward" times="2"/></barline>"#,
+            r#"<barline location="right"><ending number="1" type="start">1.</ending></barline>"#,
+            r#"<barline location="right"><ending number="1" type="stop"/></barline>"#,
+            r#"<barline location="left"><segno/></barline>"#,
+            r#"<barline location="right"><coda/></barline>"#,
+            r#"<barline location="right"><fermata type="upright">normal</fermata></barline>"#,
+            r#"<barline location="right" segno="S1"><bar-style>light-heavy</bar-style></barline>"#,
+            r#"<barline location="left" coda="C1"><bar-style>heavy-light</bar-style></barline>"#,
+        ];
+
+        for (index, barline) in semantic_barline_fragments.iter().enumerate() {
+            let xml = format!(
+                r#"<score-partwise><part id="P1"><measure number="1">
+                    <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                    <note><rest/><duration>16</duration></note>
+                    {barline}
+                </measure></part></score-partwise>"#
+            );
+            let map = parse(&xml);
+            assert!(
+                matches!(map.status, MeasureMapStatus::Unknown { .. }),
+                "barline semantic fixture {index} must not be flattened"
+            );
+            assert!(map.measures.is_empty());
+        }
+    }
+
+
+    #[test]
     fn pairwise_alignment_separates_non_controlling_polymetric_bars() {
         let xml = r#"<score-partwise>
             <part id="P1">
-                <measure number="1"><attributes><divisions>4</divisions><time><beats>3</beats><beat-type>4</beat-type></attributes><note><rest/><duration>12</duration></note></measure>
+                <measure number="1"><attributes><divisions>4</divisions><time><beats>3</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>12</duration></note></measure>
                 <measure number="2" non-controlling="yes"><note><rest/><duration>12</duration></note></measure>
             </part>
             <part id="P2">
-                <measure number="1"><attributes><divisions>4</divisions><time><beats>2</beats><beat-type>4</beat-type></attributes><note><rest/><duration>8</duration></note></measure>
+                <measure number="1"><attributes><divisions>4</divisions><time><beats>2</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>8</duration></note></measure>
                 <measure number="2" non-controlling="yes"><note><rest/><duration>8</duration></note></measure>
                 <measure number="3" non-controlling="yes"><note><rest/><duration>8</duration></note></measure>
             </part>
         </score-partwise>"#;
-        let maps = parse_musicxml_part_measure_maps(xml.as_bytes(), "sha256:poly", "score-clock").unwrap();
+        let maps = parse_musicxml_part_measure_maps(
+            xml.as_bytes(),
+            "sha256:poly",
+            "score-clock",
+        )
+        .unwrap();
         let alignment = compare_musicxml_part_boundaries(&maps[0], &maps[1]).unwrap();
         assert!(alignment.coincident_boundaries.is_empty());
         assert!(alignment.unmatched_required_left.is_empty());
         assert!(alignment.unmatched_required_right.is_empty());
         assert_eq!(alignment.unmatched_non_controlling_left, vec![RationalBeat::new(3, 1).unwrap()]);
-        assert_eq!(alignment.unmatched_non_controlling_right, vec![
-            RationalBeat::new(2, 1).unwrap(), RationalBeat::new(4, 1).unwrap()
-        ]);
+        assert_eq!(
+            alignment.unmatched_non_controlling_right,
+            vec![RationalBeat::new(2, 1).unwrap(), RationalBeat::new(4, 1).unwrap()]
+        );
     }
 
     #[test]
-    fn aligned_part_boundaries_are_exact_coincidences() {
+    fn aligned_part_boundaries_are_reported_as_exact_coincidences() {
         let xml = r#"<score-partwise>
             <part id="P1">
                 <measure number="1"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>16</duration></note></measure>
@@ -868,7 +1039,12 @@ mod tests {
                 <measure number="2"><note><rest/><duration>32</duration></note></measure>
             </part>
         </score-partwise>"#;
-        let maps = parse_musicxml_part_measure_maps(xml.as_bytes(), "sha256:aligned", "score-clock").unwrap();
+        let maps = parse_musicxml_part_measure_maps(
+            xml.as_bytes(),
+            "sha256:aligned",
+            "score-clock",
+        )
+        .unwrap();
         let alignment = compare_musicxml_part_boundaries(&maps[0], &maps[1]).unwrap();
         assert_eq!(alignment.coincident_boundaries, vec![RationalBeat::new(4, 1).unwrap()]);
         assert!(alignment.unmatched_required_left.is_empty());
@@ -876,13 +1052,23 @@ mod tests {
     }
 
     #[test]
-    fn incompatible_part_score_clock_is_rejected() {
-        let xml = r#"<score-partwise>
-            <part id="P1"><measure number="1"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes><note><rest/><duration>16</duration></note></measure></part>
-            <part id="P2"><measure number="1"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes><note><rest/><duration>16</duration></note></measure></part>
-        </score-partwise>"#;
-        let mut maps = parse_musicxml_part_measure_maps(xml.as_bytes(), "sha256:clock", "score-clock").unwrap();
-        maps[1].map.score_clock_id = "different-clock".into();
-        assert_eq!(compare_musicxml_part_boundaries(&maps[0], &maps[1]), Err(MusicXmlMeasureAdapterError::PartClockMismatch));
+    fn clock_mismatch_prevents_cross_part_alignment() {
+        let xml = r#"<score-partwise><part id="P1">
+            <measure number="1"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>16</duration></note></measure>
+            <measure number="2"><note><rest/><duration>16</duration></note></measure>
+        </part><part id="P2">
+            <measure number="1"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>16</duration></note></measure>
+            <measure number="2"><note><rest/><duration>16</duration></note></measure>
+        </part></score-partwise>"#;
+        let mut maps = parse_musicxml_part_measure_maps(
+            xml.as_bytes(),
+            "sha256:clock",
+            "score-clock",
+        ).unwrap();
+        maps[1].map.score_clock_id = "other-clock".into();
+        assert_eq!(
+            compare_musicxml_part_boundaries(&maps[0], &maps[1]),
+            Err(MusicXmlMeasureAdapterError::PartClockMismatch)
+        );
     }
 }
