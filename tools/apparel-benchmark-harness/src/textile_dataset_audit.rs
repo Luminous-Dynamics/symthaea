@@ -15,6 +15,7 @@ struct Inputs {
     ground_truth: PathBuf,
     rgb_mean: PathBuf,
     spectra_mean: PathBuf,
+    spectra_coordinates: PathBuf,
     source_metadata: PathBuf,
     split_manifest: PathBuf,
     expected_head: String,
@@ -33,7 +34,7 @@ struct GroundTruthReport {
     states: BTreeMap<String, LabelState>,
     composition_column_count: usize,
     known_complete_compositions: usize,
-    known_incomplete_compositions: usize,
+    known_sparse_compositions: usize,
     composition_sum_residuals: Vec<(String, f64)>,
 }
 
@@ -231,6 +232,74 @@ fn parse_rgb<R: Read>(reader: R) -> Result<BTreeSet<String>, String> {
     Ok(ids)
 }
 
+
+fn parse_spectra_coordinates<R: Read>(
+    reader: R,
+    expected_image_width: u64,
+    maximum_image_height: u64,
+) -> Result<BTreeSet<String>, String> {
+    let mut csv = ReaderBuilder::new()
+        .delimiter(b';')
+        .flexible(false)
+        .from_reader(reader);
+    let headers = csv.headers().map_err(|error| error.to_string())?.clone();
+    let id_index = label_index(&headers)?;
+    let column = |name: &str| {
+        headers
+            .iter()
+            .position(|value| normalize_header(value) == name)
+            .ok_or_else(|| format!("spectral-coordinate CSV is missing {name}"))
+    };
+    let y_start_index = column("y_start")?;
+    let y_end_index = column("y_end")?;
+    let x_start_index = column("x_start")?;
+    let x_end_index = column("x_end")?;
+
+    let mut ids = BTreeSet::new();
+    for (row_index, row) in csv.records().enumerate() {
+        let row = row.map_err(|error| format!("coordinate row {}: {error}", row_index + 2))?;
+        if empty_record(&row) {
+            continue;
+        }
+        let sample_id = row.get(id_index).unwrap_or_default().trim().to_owned();
+        if sample_id.is_empty() {
+            return Err(format!("coordinate row {} has empty specimen ID", row_index + 2));
+        }
+        if !ids.insert(sample_id.clone()) {
+            return Err(format!("duplicate coordinate specimen ID {sample_id}"));
+        }
+
+        let parse_integer = |index: usize, name: &str| -> Result<u64, String> {
+            let value = parse_numeric(row.get(index).unwrap_or_default(), name, &sample_id)?;
+            if value < 0.0 || value.fract() != 0.0 {
+                return Err(format!(
+                    "{name} for {sample_id} must be a non-negative integer, found {value}"
+                ));
+            }
+            Ok(value as u64)
+        };
+        let y_start = parse_integer(y_start_index, "y_start")?;
+        let y_end = parse_integer(y_end_index, "y_end")?;
+        let x_start = parse_integer(x_start_index, "x_start")?;
+        let x_end = parse_integer(x_end_index, "x_end")?;
+
+        if y_start >= y_end || y_end > maximum_image_height {
+            return Err(format!(
+                "invalid y-coordinate interval for {sample_id}: {y_start}..{y_end}, max {maximum_image_height}"
+            ));
+        }
+        if x_start >= x_end || x_end > expected_image_width {
+            return Err(format!(
+                "invalid x-coordinate interval for {sample_id}: {x_start}..{x_end}, max {expected_image_width}"
+            ));
+        }
+    }
+    if ids.is_empty() {
+        return Err("spectral-coordinate CSV contains no specimen rows".into());
+    }
+    Ok(ids)
+}
+
 fn parse_mean_spectra<R: Read>(reader: R, expected_wavelengths: usize) -> Result<(BTreeSet<String>, usize), String> {
     let mut csv = ReaderBuilder::new()
         .delimiter(b';')
@@ -390,6 +459,8 @@ fn validate_source_metadata(
     outlier_count: usize,
     composition_column_count: usize,
     wavelength_count: usize,
+    image_width: usize,
+    maximum_image_height: usize,
 ) -> Result<(), String> {
     if metadata.get("source_id").and_then(Value::as_str) != Some(DATASET_ID) {
         return Err(format!("source metadata source_id must be {DATASET_ID}"));
@@ -402,6 +473,8 @@ fn validate_source_metadata(
         ("expected_outlier_count", outlier_count),
         ("expected_composition_column_count", composition_column_count),
         ("expected_wavelength_count", wavelength_count),
+        ("expected_image_width", image_width),
+        ("expected_max_image_height", maximum_image_height),
     ] {
         let expected = metadata
             .get(key)
@@ -429,6 +502,7 @@ fn parse_args() -> Result<Inputs, Box<dyn Error>> {
         "--ground-truth",
         "--rgb-mean",
         "--spectra-mean",
+        "--spectra-coordinates",
         "--source-metadata",
         "--split-manifest",
         "--expected-head",
@@ -466,6 +540,7 @@ fn parse_args() -> Result<Inputs, Box<dyn Error>> {
         ground_truth: required("--ground-truth")?,
         rgb_mean: required("--rgb-mean")?,
         spectra_mean: required("--spectra-mean")?,
+        spectra_coordinates: required("--spectra-coordinates")?,
         source_metadata: required("--source-metadata")?,
         split_manifest: required("--split-manifest")?,
         expected_head,
@@ -489,6 +564,7 @@ fn run(inputs: Inputs) -> Result<Value, Box<dyn Error>> {
     let ground_truth_bytes = read_bytes(&inputs.ground_truth)?;
     let rgb_bytes = read_bytes(&inputs.rgb_mean)?;
     let spectra_bytes = read_bytes(&inputs.spectra_mean)?;
+    let coordinates_bytes = read_bytes(&inputs.spectra_coordinates)?;
     let (metadata_bytes, metadata) = read_json(&inputs.source_metadata)?;
     let (split_bytes, split_manifest) = read_json(&inputs.split_manifest)?;
 
@@ -499,6 +575,12 @@ fn run(inputs: Inputs) -> Result<Value, Box<dyn Error>> {
     let (spectra_ids, wavelength_count) =
         parse_mean_spectra(spectra_bytes.as_slice(), 288)
             .map_err(|error| format!("mean-spectrum intake failed: {error}"))?;
+    let coordinate_ids = parse_spectra_coordinates(
+        coordinates_bytes.as_slice(),
+        379,
+        414,
+    )
+    .map_err(|error| format!("mean-spectrum coordinate intake failed: {error}"))?;
 
     let ground_truth_ids: BTreeSet<String> = ground_truth.states.keys().cloned().collect();
     if rgb_ids != ground_truth_ids {
@@ -506,6 +588,9 @@ fn run(inputs: Inputs) -> Result<Value, Box<dyn Error>> {
     }
     if spectra_ids != ground_truth_ids {
         return Err("mean-spectrum specimen IDs do not exactly match ground-truth IDs".into());
+    }
+    if coordinate_ids != ground_truth_ids {
+        return Err("mean-spectrum coordinate specimen IDs do not exactly match ground-truth IDs".into());
     }
 
     let unknown_count = ground_truth
@@ -527,6 +612,8 @@ fn run(inputs: Inputs) -> Result<Value, Box<dyn Error>> {
         outlier_count,
         ground_truth.composition_column_count,
         wavelength_count,
+        379,
+        414,
     )
     .map_err(|error| format!("source metadata rejected: {error}"))?;
 
@@ -551,6 +638,7 @@ fn run(inputs: Inputs) -> Result<Value, Box<dyn Error>> {
             "ground_truth": {"path": inputs.ground_truth.display().to_string(), "sha256": sha256(&ground_truth_bytes)},
             "rgb_mean": {"path": inputs.rgb_mean.display().to_string(), "sha256": sha256(&rgb_bytes)},
             "spectra_mean": {"path": inputs.spectra_mean.display().to_string(), "sha256": sha256(&spectra_bytes)},
+            "spectra_coordinates": {"path": inputs.spectra_coordinates.display().to_string(), "sha256": sha256(&coordinates_bytes)},
             "source_metadata": {"path": inputs.source_metadata.display().to_string(), "sha256": sha256(&metadata_bytes)},
             "split_manifest": {"path": inputs.split_manifest.display().to_string(), "sha256": sha256(&split_bytes)}
         },
@@ -561,7 +649,7 @@ fn run(inputs: Inputs) -> Result<Value, Box<dyn Error>> {
             "outlier": outlier_count,
             "known_complete_compositions": ground_truth.known_complete_compositions,
             "composition_column_count": ground_truth.composition_column_count,
-            "known_incomplete_compositions": ground_truth.known_incomplete_compositions,
+            "known_sparse_compositions": ground_truth.known_incomplete_compositions,
             "composition_sum_residuals": residuals
         },
         "modalities": {
@@ -655,9 +743,11 @@ mod tests {
         let gt = small_ground_truth();
         let rgb = parse_rgb(RGB.as_bytes()).unwrap();
         let (spectra, count) = parse_mean_spectra(SPECTRA.as_bytes(), 3).unwrap();
+        let coordinates = parse_spectra_coordinates(COORDINATES.as_bytes(), 379, 414).unwrap();
         let gt_ids: BTreeSet<String> = gt.states.keys().cloned().collect();
         assert_eq!(rgb, gt_ids);
         assert_eq!(spectra, gt_ids);
+        assert_eq!(coordinates, gt_ids);
         assert_eq!(count, 3);
     }
 
@@ -703,6 +793,20 @@ mod tests {
         let bad = SPECTRA.replace("0.1;0.2;0.3", "0.1;NaN;0.3");
         let error = parse_mean_spectra(bad.as_bytes(), 3).unwrap_err();
         assert!(error.contains("not finite"));
+    }
+
+    #[test]
+    fn rejects_invalid_spectral_coordinate_bounds() {
+        let bad = COORDINATES.replace("sample_A;10;40;20;60", "sample_A;40;10;20;60");
+        let error = parse_spectra_coordinates(bad.as_bytes(), 379, 414).unwrap_err();
+        assert!(error.contains("invalid y-coordinate interval"));
+    }
+
+    #[test]
+    fn rejects_non_integer_spectral_coordinates() {
+        let bad = COORDINATES.replace("sample_A;10;40;20;60", "sample_A;10.5;40;20;60");
+        let error = parse_spectra_coordinates(bad.as_bytes(), 379, 414).unwrap_err();
+        assert!(error.contains("non-negative integer"));
     }
 
     #[test]
