@@ -151,11 +151,11 @@ pub struct EvsiReport {
     pub decision_loss_cost: f64,
     pub net_decision_value: f64,
     pub outcome_values: Vec<OutcomeDecisionValue>,
-    pub attempted_outcome_count: usize,
-    pub failed_outcome_count: usize,
-    pub censored_outcome_count: usize,
-    pub invalid_outcome_count: usize,
-    pub missing_outcome_count: usize,
+    pub world_outcome_hypothesis_count: usize,
+    pub failed_world_outcome_hypothesis_count: usize,
+    pub censored_world_outcome_hypothesis_count: usize,
+    pub invalid_world_outcome_hypothesis_count: usize,
+    pub missing_world_outcome_hypothesis_count: usize,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -635,20 +635,20 @@ pub fn evaluate_evsi(
         .iter()
         .flat_map(|row| row.outcomes.iter().map(|outcome| outcome.disposition))
         .collect();
-    let attempted_outcome_count = dispositions.len();
-    let failed_outcome_count = dispositions
+    let world_outcome_hypothesis_count = dispositions.len();
+    let failed_world_outcome_hypothesis_count = dispositions
         .iter()
         .filter(|item| **item == OutcomeDisposition::Failed)
         .count();
-    let censored_outcome_count = dispositions
+    let censored_world_outcome_hypothesis_count = dispositions
         .iter()
         .filter(|item| **item == OutcomeDisposition::Censored)
         .count();
-    let invalid_outcome_count = dispositions
+    let invalid_world_outcome_hypothesis_count = dispositions
         .iter()
         .filter(|item| **item == OutcomeDisposition::Invalid)
         .count();
-    let missing_outcome_count = dispositions
+    let missing_world_outcome_hypothesis_count = dispositions
         .iter()
         .filter(|item| **item == OutcomeDisposition::Missing)
         .count();
@@ -663,11 +663,11 @@ pub fn evaluate_evsi(
         decision_loss_cost: experiment.decision_loss_cost,
         net_decision_value: gross_evsi - experiment.decision_loss_cost,
         outcome_values,
-        attempted_outcome_count,
-        failed_outcome_count,
-        censored_outcome_count,
-        invalid_outcome_count,
-        missing_outcome_count,
+        world_outcome_hypothesis_count,
+        failed_world_outcome_hypothesis_count,
+        censored_world_outcome_hypothesis_count,
+        invalid_world_outcome_hypothesis_count,
+        missing_world_outcome_hypothesis_count,
     })
 }
 
@@ -1084,11 +1084,11 @@ mod tests {
         item.outcomes_by_world[1].outcomes[1].disposition = OutcomeDisposition::Missing;
         case.worlds.reverse();
         let report = evaluate_evsi(&case, &item).expect("outcome statuses remain auditable");
-        assert_eq!(report.attempted_outcome_count, 4);
-        assert_eq!(report.failed_outcome_count, 1);
-        assert_eq!(report.censored_outcome_count, 1);
-        assert_eq!(report.invalid_outcome_count, 1);
-        assert_eq!(report.missing_outcome_count, 1);
+        assert_eq!(report.world_outcome_hypothesis_count, 4);
+        assert_eq!(report.failed_world_outcome_hypothesis_count, 1);
+        assert_eq!(report.censored_world_outcome_hypothesis_count, 1);
+        assert_eq!(report.invalid_world_outcome_hypothesis_count, 1);
+        assert_eq!(report.missing_world_outcome_hypothesis_count, 1);
     }
 
     #[test]
