@@ -246,6 +246,91 @@
         "denominator": "2500"
       },
       "initial_voltage_behavior": "No positive equilibrium exists; no equilibrium basin is reported."
+    },
+    {
+      "id": "scaled-400v-1500kw",
+      "model_parameters": {
+        "Vs": {
+          "value": "400",
+          "unit": "V",
+          "exact_rational": {
+            "numerator": "400",
+            "denominator": "1"
+          }
+        },
+        "Rs": {
+          "value": "0.02",
+          "unit": "ohm",
+          "exact_rational": {
+            "numerator": "1",
+            "denominator": "50"
+          }
+        },
+        "C": {
+          "value": "0.005",
+          "unit": "F",
+          "exact_rational": {
+            "numerator": "1",
+            "denominator": "200"
+          }
+        }
+      },
+      "P": {
+        "value": "1500000",
+        "unit": "W",
+        "exact_rational": {
+          "numerator": "1500000",
+          "denominator": "1"
+        }
+      },
+      "delta": {
+        "value": "40000",
+        "unit": "V^2",
+        "exact_rational": {
+          "numerator": "40000",
+          "denominator": "1"
+        }
+      },
+      "roots": [
+        {
+          "voltage": "300",
+          "unit": "V",
+          "current": "5000",
+          "current_unit": "A",
+          "eigenvalue": {
+            "numerator": "-20000",
+            "denominator": "3",
+            "unit": "s^-1"
+          },
+          "classification": "locally_asymptotically_stable"
+        },
+        {
+          "voltage": "100",
+          "unit": "V",
+          "current": "15000",
+          "current_unit": "A",
+          "eigenvalue": {
+            "numerator": "20000",
+            "denominator": "1",
+            "unit": "s^-1"
+          },
+          "classification": "unstable"
+        }
+      ],
+      "disposition": "two_equilibria",
+      "power_loading_fraction": {
+        "numerator": "3",
+        "denominator": "4"
+      },
+      "normalized_static_fold_margin": {
+        "numerator": "1",
+        "denominator": "4"
+      },
+      "initial_voltage_basin": {
+        "high_voltage_equilibrium": "V0 > 100 V",
+        "unstable_equilibrium": "V0 = 100 V",
+        "outside_high_voltage_basin": "0 < V0 < 100 V leads toward the zero-voltage domain boundary"
+      }
     }
   ],
   "limitations": [
