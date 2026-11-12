@@ -32,7 +32,289 @@
       "minItems": 42,
       "maxItems": 42,
       "items": {
-        "type": "object"
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "scenario_id",
+          "block_id",
+          "seed",
+          "task",
+          "candidate_view",
+          "oracle",
+          "cue",
+          "expected",
+          "claim_ceiling"
+        ],
+        "properties": {
+          "scenario_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "block_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "seed": {
+            "type": "integer"
+          },
+          "task": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "option_ids",
+              "prior_expected_payoffs",
+              "preview_value_class",
+              "information_budget"
+            ],
+            "properties": {
+              "option_ids": {
+                "const": [
+                  "A",
+                  "B"
+                ]
+              },
+              "prior_expected_payoffs": {
+                "$ref": "#/$defs/payoffs"
+              },
+              "preview_value_class": {
+                "enum": [
+                  "high",
+                  "low"
+                ]
+              },
+              "information_budget": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          },
+          "candidate_view": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "task_id",
+              "option_ids",
+              "prior_expected_payoffs",
+              "information_budget",
+              "delivered_cue"
+            ],
+            "properties": {
+              "task_id": {
+                "type": "string"
+              },
+              "option_ids": {
+                "const": [
+                  "A",
+                  "B"
+                ]
+              },
+              "prior_expected_payoffs": {
+                "$ref": "#/$defs/payoffs"
+              },
+              "information_budget": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "delivered_cue": {
+                "$ref": "#/$defs/cue"
+              }
+            }
+          },
+          "oracle": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "hidden_from_candidate",
+              "realized_payoffs",
+              "optimal_option",
+              "optimal_payoff"
+            ],
+            "properties": {
+              "hidden_from_candidate": {
+                "const": true
+              },
+              "realized_payoffs": {
+                "$ref": "#/$defs/payoffs"
+              },
+              "optimal_option": {
+                "enum": [
+                  "A",
+                  "B"
+                ]
+              },
+              "optimal_payoff": {
+                "type": "integer"
+              }
+            }
+          },
+          "cue": {
+            "$ref": "#/$defs/cue"
+          },
+          "expected": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "baseline_option",
+              "posterior_option",
+              "policy_class",
+              "action",
+              "baseline_regret",
+              "decision_regret"
+            ],
+            "properties": {
+              "baseline_option": {
+                "enum": [
+                  "A",
+                  "B"
+                ]
+              },
+              "posterior_option": {
+                "enum": [
+                  "A",
+                  "B"
+                ]
+              },
+              "policy_class": {
+                "enum": [
+                  "baseline_policy",
+                  "incorporate_verified_information",
+                  "presentation_only_invariance",
+                  "require_verification"
+                ]
+              },
+              "action": {
+                "enum": [
+                  "A",
+                  "B",
+                  "REQUIRE_VERIFICATION"
+                ]
+              },
+              "baseline_regret": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "decision_regret": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              }
+            }
+          },
+          "claim_ceiling": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "payoffs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "A",
+        "B"
+      ],
+      "properties": {
+        "A": {
+          "type": "integer"
+        },
+        "B": {
+          "type": "integer"
+        }
+      }
+    },
+    "cue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cue_type",
+        "epistemic_status",
+        "target_option",
+        "claimed_payoff",
+        "observation",
+        "evidence_refs",
+        "source_id"
+      ],
+      "properties": {
+        "cue_type": {
+          "enum": [
+            "no_cue",
+            "verified_high_value_preview",
+            "verified_low_value_preview",
+            "unverified_recommendation",
+            "default_preselection",
+            "salience_highlight",
+            "unsupported_fact_claim"
+          ]
+        },
+        "epistemic_status": {
+          "enum": [
+            "none",
+            "verified_observation",
+            "unverified_opinion",
+            "presentation_only",
+            "unverified_fact"
+          ]
+        },
+        "target_option": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "claimed_payoff": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "observation": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "option_id",
+                "value",
+                "evidence_id"
+              ],
+              "properties": {
+                "option_id": {
+                  "enum": [
+                    "A",
+                    "B"
+                  ]
+                },
+                "value": {
+                  "type": "integer"
+                },
+                "evidence_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ]
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "source_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     }
   }

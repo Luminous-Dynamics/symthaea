@@ -31,11 +31,16 @@
           "A": 6,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 6,
-          "B": 5
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "no_cue",
+          "epistemic_status": "none",
+          "target_option": null,
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -91,11 +96,22 @@
           "A": 6,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 6,
-          "B": 10
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "verified_high_value_preview",
+          "epistemic_status": "verified_observation",
+          "target_option": "B",
+          "claimed_payoff": null,
+          "observation": {
+            "option_id": "B",
+            "value": 10,
+            "evidence_id": "OBS-NC-001-B"
+          },
+          "evidence_refs": [
+            "OBS-NC-001-B"
+          ],
+          "source_id": "SENSOR-NC-001"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -157,11 +173,22 @@
           "A": 6,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 6,
-          "B": 10
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "verified_low_value_preview",
+          "epistemic_status": "verified_observation",
+          "target_option": "B",
+          "claimed_payoff": null,
+          "observation": {
+            "option_id": "B",
+            "value": 10,
+            "evidence_id": "OBS-NC-001-B"
+          },
+          "evidence_refs": [
+            "OBS-NC-001-B"
+          ],
+          "source_id": "SENSOR-NC-001"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -223,11 +250,16 @@
           "A": 6,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 6,
-          "B": 5
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "unverified_recommendation",
+          "epistemic_status": "unverified_opinion",
+          "target_option": "B",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": "UNVERIFIED-PEER"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -283,11 +315,16 @@
           "A": 6,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 6,
-          "B": 5
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "default_preselection",
+          "epistemic_status": "presentation_only",
+          "target_option": "B",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -343,11 +380,16 @@
           "A": 6,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 6,
-          "B": 5
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "salience_highlight",
+          "epistemic_status": "presentation_only",
+          "target_option": "B",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -403,11 +445,16 @@
           "A": 6,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 6,
-          "B": 5
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "unsupported_fact_claim",
+          "epistemic_status": "unverified_fact",
+          "target_option": "B",
+          "claimed_payoff": 13,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": "UNVERIFIED-CLAIMANT"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -463,11 +510,16 @@
           "A": 5,
           "B": 6
         },
-        "decision_expected_payoffs": {
-          "A": 5,
-          "B": 6
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "no_cue",
+          "epistemic_status": "none",
+          "target_option": null,
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -523,11 +575,22 @@
           "A": 5,
           "B": 6
         },
-        "decision_expected_payoffs": {
-          "A": 10,
-          "B": 6
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "verified_high_value_preview",
+          "epistemic_status": "verified_observation",
+          "target_option": "A",
+          "claimed_payoff": null,
+          "observation": {
+            "option_id": "A",
+            "value": 10,
+            "evidence_id": "OBS-NC-002-A"
+          },
+          "evidence_refs": [
+            "OBS-NC-002-A"
+          ],
+          "source_id": "SENSOR-NC-002"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -589,11 +652,22 @@
           "A": 5,
           "B": 6
         },
-        "decision_expected_payoffs": {
-          "A": 10,
-          "B": 6
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "verified_low_value_preview",
+          "epistemic_status": "verified_observation",
+          "target_option": "A",
+          "claimed_payoff": null,
+          "observation": {
+            "option_id": "A",
+            "value": 10,
+            "evidence_id": "OBS-NC-002-A"
+          },
+          "evidence_refs": [
+            "OBS-NC-002-A"
+          ],
+          "source_id": "SENSOR-NC-002"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -655,11 +729,16 @@
           "A": 5,
           "B": 6
         },
-        "decision_expected_payoffs": {
-          "A": 5,
-          "B": 6
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "unverified_recommendation",
+          "epistemic_status": "unverified_opinion",
+          "target_option": "A",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": "UNVERIFIED-PEER"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -715,11 +794,16 @@
           "A": 5,
           "B": 6
         },
-        "decision_expected_payoffs": {
-          "A": 5,
-          "B": 6
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "default_preselection",
+          "epistemic_status": "presentation_only",
+          "target_option": "A",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -775,11 +859,16 @@
           "A": 5,
           "B": 6
         },
-        "decision_expected_payoffs": {
-          "A": 5,
-          "B": 6
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "salience_highlight",
+          "epistemic_status": "presentation_only",
+          "target_option": "A",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -835,11 +924,16 @@
           "A": 5,
           "B": 6
         },
-        "decision_expected_payoffs": {
-          "A": 5,
-          "B": 6
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "unsupported_fact_claim",
+          "epistemic_status": "unverified_fact",
+          "target_option": "A",
+          "claimed_payoff": 13,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": "UNVERIFIED-CLAIMANT"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -895,11 +989,16 @@
           "A": 7,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 7,
-          "B": 5
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "no_cue",
+          "epistemic_status": "none",
+          "target_option": null,
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -955,11 +1054,22 @@
           "A": 7,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 7,
-          "B": 4
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "verified_high_value_preview",
+          "epistemic_status": "verified_observation",
+          "target_option": "B",
+          "claimed_payoff": null,
+          "observation": {
+            "option_id": "B",
+            "value": 4,
+            "evidence_id": "OBS-NC-003-B"
+          },
+          "evidence_refs": [
+            "OBS-NC-003-B"
+          ],
+          "source_id": "SENSOR-NC-003"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -1021,11 +1131,22 @@
           "A": 7,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 7,
-          "B": 4
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "verified_low_value_preview",
+          "epistemic_status": "verified_observation",
+          "target_option": "B",
+          "claimed_payoff": null,
+          "observation": {
+            "option_id": "B",
+            "value": 4,
+            "evidence_id": "OBS-NC-003-B"
+          },
+          "evidence_refs": [
+            "OBS-NC-003-B"
+          ],
+          "source_id": "SENSOR-NC-003"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -1087,11 +1208,16 @@
           "A": 7,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 7,
-          "B": 5
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "unverified_recommendation",
+          "epistemic_status": "unverified_opinion",
+          "target_option": "B",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": "UNVERIFIED-PEER"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -1147,11 +1273,16 @@
           "A": 7,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 7,
-          "B": 5
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "default_preselection",
+          "epistemic_status": "presentation_only",
+          "target_option": "B",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -1207,11 +1338,16 @@
           "A": 7,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 7,
-          "B": 5
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "salience_highlight",
+          "epistemic_status": "presentation_only",
+          "target_option": "B",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -1267,11 +1403,16 @@
           "A": 7,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 7,
-          "B": 5
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "unsupported_fact_claim",
+          "epistemic_status": "unverified_fact",
+          "target_option": "B",
+          "claimed_payoff": 7,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": "UNVERIFIED-CLAIMANT"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -1327,11 +1468,16 @@
           "A": 5,
           "B": 7
         },
-        "decision_expected_payoffs": {
-          "A": 5,
-          "B": 7
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "no_cue",
+          "epistemic_status": "none",
+          "target_option": null,
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -1387,11 +1533,22 @@
           "A": 5,
           "B": 7
         },
-        "decision_expected_payoffs": {
-          "A": 4,
-          "B": 7
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "verified_high_value_preview",
+          "epistemic_status": "verified_observation",
+          "target_option": "A",
+          "claimed_payoff": null,
+          "observation": {
+            "option_id": "A",
+            "value": 4,
+            "evidence_id": "OBS-NC-004-A"
+          },
+          "evidence_refs": [
+            "OBS-NC-004-A"
+          ],
+          "source_id": "SENSOR-NC-004"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -1453,11 +1610,22 @@
           "A": 5,
           "B": 7
         },
-        "decision_expected_payoffs": {
-          "A": 4,
-          "B": 7
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "verified_low_value_preview",
+          "epistemic_status": "verified_observation",
+          "target_option": "A",
+          "claimed_payoff": null,
+          "observation": {
+            "option_id": "A",
+            "value": 4,
+            "evidence_id": "OBS-NC-004-A"
+          },
+          "evidence_refs": [
+            "OBS-NC-004-A"
+          ],
+          "source_id": "SENSOR-NC-004"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -1519,11 +1687,16 @@
           "A": 5,
           "B": 7
         },
-        "decision_expected_payoffs": {
-          "A": 5,
-          "B": 7
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "unverified_recommendation",
+          "epistemic_status": "unverified_opinion",
+          "target_option": "A",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": "UNVERIFIED-PEER"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -1579,11 +1752,16 @@
           "A": 5,
           "B": 7
         },
-        "decision_expected_payoffs": {
-          "A": 5,
-          "B": 7
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "default_preselection",
+          "epistemic_status": "presentation_only",
+          "target_option": "A",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -1639,11 +1817,16 @@
           "A": 5,
           "B": 7
         },
-        "decision_expected_payoffs": {
-          "A": 5,
-          "B": 7
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "salience_highlight",
+          "epistemic_status": "presentation_only",
+          "target_option": "A",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -1699,11 +1882,16 @@
           "A": 5,
           "B": 7
         },
-        "decision_expected_payoffs": {
-          "A": 5,
-          "B": 7
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "unsupported_fact_claim",
+          "epistemic_status": "unverified_fact",
+          "target_option": "A",
+          "claimed_payoff": 7,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": "UNVERIFIED-CLAIMANT"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -1759,11 +1947,16 @@
           "A": 6,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 6,
-          "B": 5
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "no_cue",
+          "epistemic_status": "none",
+          "target_option": null,
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -1819,11 +2012,22 @@
           "A": 6,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 6,
-          "B": 4
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "verified_high_value_preview",
+          "epistemic_status": "verified_observation",
+          "target_option": "B",
+          "claimed_payoff": null,
+          "observation": {
+            "option_id": "B",
+            "value": 4,
+            "evidence_id": "OBS-NC-005-B"
+          },
+          "evidence_refs": [
+            "OBS-NC-005-B"
+          ],
+          "source_id": "SENSOR-NC-005"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -1885,11 +2089,22 @@
           "A": 6,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 6,
-          "B": 4
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "verified_low_value_preview",
+          "epistemic_status": "verified_observation",
+          "target_option": "B",
+          "claimed_payoff": null,
+          "observation": {
+            "option_id": "B",
+            "value": 4,
+            "evidence_id": "OBS-NC-005-B"
+          },
+          "evidence_refs": [
+            "OBS-NC-005-B"
+          ],
+          "source_id": "SENSOR-NC-005"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -1951,11 +2166,16 @@
           "A": 6,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 6,
-          "B": 5
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "unverified_recommendation",
+          "epistemic_status": "unverified_opinion",
+          "target_option": "B",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": "UNVERIFIED-PEER"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -2011,11 +2231,16 @@
           "A": 6,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 6,
-          "B": 5
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "default_preselection",
+          "epistemic_status": "presentation_only",
+          "target_option": "B",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -2071,11 +2296,16 @@
           "A": 6,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 6,
-          "B": 5
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "salience_highlight",
+          "epistemic_status": "presentation_only",
+          "target_option": "B",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -2131,11 +2361,16 @@
           "A": 6,
           "B": 5
         },
-        "decision_expected_payoffs": {
-          "A": 6,
-          "B": 5
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "unsupported_fact_claim",
+          "epistemic_status": "unverified_fact",
+          "target_option": "B",
+          "claimed_payoff": 7,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": "UNVERIFIED-CLAIMANT"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -2191,11 +2426,16 @@
           "A": 5,
           "B": 6
         },
-        "decision_expected_payoffs": {
-          "A": 5,
-          "B": 6
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "no_cue",
+          "epistemic_status": "none",
+          "target_option": null,
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -2251,11 +2491,22 @@
           "A": 5,
           "B": 6
         },
-        "decision_expected_payoffs": {
-          "A": 11,
-          "B": 6
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "verified_high_value_preview",
+          "epistemic_status": "verified_observation",
+          "target_option": "A",
+          "claimed_payoff": null,
+          "observation": {
+            "option_id": "A",
+            "value": 11,
+            "evidence_id": "OBS-NC-006-A"
+          },
+          "evidence_refs": [
+            "OBS-NC-006-A"
+          ],
+          "source_id": "SENSOR-NC-006"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -2317,11 +2568,22 @@
           "A": 5,
           "B": 6
         },
-        "decision_expected_payoffs": {
-          "A": 11,
-          "B": 6
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "verified_low_value_preview",
+          "epistemic_status": "verified_observation",
+          "target_option": "A",
+          "claimed_payoff": null,
+          "observation": {
+            "option_id": "A",
+            "value": 11,
+            "evidence_id": "OBS-NC-006-A"
+          },
+          "evidence_refs": [
+            "OBS-NC-006-A"
+          ],
+          "source_id": "SENSOR-NC-006"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -2383,11 +2645,16 @@
           "A": 5,
           "B": 6
         },
-        "decision_expected_payoffs": {
-          "A": 5,
-          "B": 6
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "unverified_recommendation",
+          "epistemic_status": "unverified_opinion",
+          "target_option": "A",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": "UNVERIFIED-PEER"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -2443,11 +2710,16 @@
           "A": 5,
           "B": 6
         },
-        "decision_expected_payoffs": {
-          "A": 5,
-          "B": 6
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "default_preselection",
+          "epistemic_status": "presentation_only",
+          "target_option": "A",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -2503,11 +2775,16 @@
           "A": 5,
           "B": 6
         },
-        "decision_expected_payoffs": {
-          "A": 5,
-          "B": 6
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "salience_highlight",
+          "epistemic_status": "presentation_only",
+          "target_option": "A",
+          "claimed_payoff": null,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": null
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,
@@ -2563,11 +2840,16 @@
           "A": 5,
           "B": 6
         },
-        "decision_expected_payoffs": {
-          "A": 5,
-          "B": 6
-        },
-        "information_budget": 2
+        "information_budget": 2,
+        "delivered_cue": {
+          "cue_type": "unsupported_fact_claim",
+          "epistemic_status": "unverified_fact",
+          "target_option": "A",
+          "claimed_payoff": 14,
+          "observation": null,
+          "evidence_refs": [],
+          "source_id": "UNVERIFIED-CLAIMANT"
+        }
       },
       "oracle": {
         "hidden_from_candidate": true,

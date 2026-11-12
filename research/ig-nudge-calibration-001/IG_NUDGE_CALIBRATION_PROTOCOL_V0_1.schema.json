@@ -27,13 +27,15 @@
       "const": "0.1.0"
     },
     "status": {
-      "const": "synthetic_protocol_proposal"
+      "const": "synthetic_one_step_cue_contract"
     },
     "title": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "research_question": {
-      "type": "string"
+      "type": "string",
+      "minLength": 1
     },
     "composition": {
       "type": "object",
@@ -48,7 +50,46 @@
       "uniqueItems": true
     },
     "task_contract": {
-      "type": "object"
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "option_count",
+        "payoff_unit",
+        "candidate_visible_fields",
+        "oracle_only_fields",
+        "tie_policy",
+        "hidden_truth_leakage_permitted",
+        "scope_note"
+      ],
+      "properties": {
+        "option_count": {
+          "const": 2
+        },
+        "payoff_unit": {
+          "type": "string"
+        },
+        "candidate_visible_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "oracle_only_fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tie_policy": {
+          "type": "string"
+        },
+        "hidden_truth_leakage_permitted": {
+          "const": false
+        },
+        "scope_note": {
+          "type": "string"
+        }
+      }
     },
     "metric_ids": {
       "type": "array",
@@ -57,18 +98,27 @@
     },
     "implemented_metric_ids": {
       "type": "array",
-      "minItems": 3,
-      "uniqueItems": true
+      "minItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
     },
     "deferred_metric_ids": {
       "type": "array",
-      "minItems": 5,
-      "uniqueItems": true
+      "minItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
     },
     "qualification_gates": {
       "type": "array",
-      "minItems": 10,
-      "uniqueItems": true
+      "minItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
     },
     "claim_ceiling": {
       "type": "object"

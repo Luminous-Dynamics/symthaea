@@ -1,9 +1,9 @@
 {
   "protocol_id": "IG-NUDGE-CALIBRATION-001",
   "version": "0.1.0",
-  "status": "synthetic_protocol_proposal",
-  "title": "Decision-theoretic cue sensitivity and value-of-information calibration",
-  "research_question": "Can an agent use accurate high-value information, avoid overreacting to accurate low-value information or presentation-only cues, and reject unsupported factual claims?",
+  "status": "synthetic_one_step_cue_contract",
+  "title": "Selective cue responsiveness: evidence value, presentation invariance and verification deferral",
+  "research_question": "Can a decision agent use accurate information that changes the best-supported choice, avoid overreacting to accurate but decision-irrelevant observations or presentation-only cues, and defer unsupported factual claims?",
   "composition": {
     "contagion": "https://github.com/Luminous-Dynamics/symthaea/issues/11320",
     "communication_topology": "https://github.com/Luminous-Dynamics/symthaea/issues/11337",
@@ -31,12 +31,11 @@
   ],
   "task_contract": {
     "option_count": 2,
-    "payoff_unit": "fictional utility points",
+    "payoff_unit": "synthetic utility points",
     "candidate_visible_fields": [
       "task_id",
       "option_ids",
       "prior_expected_payoffs",
-      "decision_expected_payoffs",
       "information_budget",
       "delivered_cue"
     ],
@@ -46,49 +45,53 @@
       "optimal_payoff"
     ],
     "tie_policy": "NO_DECISION",
-    "hidden_truth_leakage_permitted": false
+    "hidden_truth_leakage_permitted": false,
+    "scope_note": "This v0.1 slice qualifies one-step observation value and cue provenance only. It does not implement the PNAS multiattribute sequential cell-reveal environment."
   },
   "metric_ids": [
     "baseline_choice_regret",
-    "decision_view_regret",
+    "decision_regret_after_verified_observation",
     "cue_value_classification_accuracy",
-    "verified_preview_uptake",
     "presentation_only_displacement",
     "unsupported_claim_acceptance",
-    "information_efficiency",
+    "sequential_value_of_information_regret",
+    "information_acquisition_efficiency",
     "compute_latency_tradeoff"
   ],
   "implemented_metric_ids": [
     "baseline_choice_regret",
-    "decision_view_regret",
-    "cue_value_classification_accuracy"
+    "decision_regret_after_verified_observation",
+    "cue_value_classification_accuracy",
+    "presentation_only_displacement",
+    "unsupported_claim_acceptance"
   ],
   "deferred_metric_ids": [
-    "verified_preview_uptake",
-    "presentation_only_displacement",
-    "unsupported_claim_acceptance",
-    "information_efficiency",
+    "sequential_value_of_information_regret",
+    "information_acquisition_efficiency",
     "compute_latency_tradeoff"
   ],
   "qualification_gates": [
     "42_frozen_known_answer_scenarios",
     "six_matched_task_blocks",
     "seven_cue_arms_per_block",
-    "candidate_view_excludes_full_oracle_truth",
-    "verified_observation_matches_oracle",
-    "high_value_preview_changes_decision_argmax",
-    "low_value_preview_preserves_decision_argmax",
-    "presentation_only_cues_do_not_change_decision_view",
+    "candidate_view_contains_raw_cue_not_evaluator_computed_posterior",
+    "candidate_view_excludes_oracle_truth",
+    "verified_observation_matches_oracle_and_evidence_reference",
+    "high_value_preview_changes_argmax",
+    "low_value_preview_preserves_argmax",
+    "presentation_only_cues_do_not_add_evidence",
     "unsupported_claims_are_false_and_unverified",
+    "deferred_action_has_null_decision_regret",
     "matched_blocks_hold_task_and_oracle_constant",
     "unknown_outcomes_never_pass"
   ],
   "claim_ceiling": {
-    "synthetic": "Validates deterministic cue/task/oracle contracts and fixture-level payoff calculations only.",
-    "model": "Requires separately executed pinned model experiments.",
+    "synthetic": "Validates deterministic one-step cue/task/oracle contracts and fixture-level payoff arithmetic only.",
+    "model": "Requires separately executed pinned model experiments. No model score is produced by this corpus.",
     "excluded": [
       "human nudge sensitivity",
       "human cognition equivalence",
+      "multi-step PNAS task reproduction",
       "production decision safety",
       "autonomous deployment readiness"
     ]
