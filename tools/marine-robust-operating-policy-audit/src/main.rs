@@ -792,6 +792,39 @@ mod tests {
     }
 
     #[test]
+    fn committed_schema_is_valid_json_and_binds_source_level_limits() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/marine-robust-operating-policy-v0.1.0.schema.json"
+        )).expect("schema is valid JSON");
+        assert_eq!(
+            schema["$schema"],
+            "https://json-schema.org/draft/2020-12/schema"
+        );
+        assert_eq!(schema["additionalProperties"], false);
+        assert_eq!(
+            schema["$defs"]["sourceLevel"]["properties"]["quantity_id"]["const"],
+            SOURCE_LEVEL_QUANTITY
+        );
+        assert_eq!(
+            schema["$defs"]["candidate"]["properties"]["scenario_fingerprint_sha256"]["$ref"],
+            "#/$defs/digest"
+        );
+        assert!(schema["$defs"]["candidateMetrics"]["required"]
+            .as_array().unwrap().iter().any(|value| value == "source_levels"));
+    }
+
+    #[test]
+    fn pareto_objectives_use_conservative_upper_bounds() {
+        let input = case();
+        let objectives = robust_objectives(&input.candidates[0]);
+        assert_eq!(
+            objectives.iter().find(|x| x.objective_id == "primary_energy_kwh_per_tonne_nm").unwrap().conservative_value,
+            0.141
+        );
+        assert!(objectives.iter().any(|x| x.objective_id == "source_level_db_re_1upa_at_1m:one-third-octave-1000hz"));
+    }
+
+    #[test]
     fn synthetic_fixture_never_selects_a_physical_policy() {
         let report = audit(&case());
         assert_eq!(report.disposition, "NO_ROBUST_FEASIBLE_CANDIDATE");
