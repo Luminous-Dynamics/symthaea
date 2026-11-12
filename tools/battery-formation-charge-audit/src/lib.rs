@@ -234,22 +234,36 @@ fn require_admitted<'a>(
     Ok(record)
 }
 
-fn protocol_pair(arm: &ProtocolArm) -> String {
-    format!(
-        "{}@{}|{}@{}",
-        arm.formation_profile_id,
-        arm.formation_revision,
-        arm.charge_policy_id,
-        arm.charge_policy_revision
-    )
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum HoldoutGroup {
+    Lot(String),
+    Line(String),
+    ProtocolPair {
+        formation_profile_id: String,
+        formation_revision: String,
+        charge_policy_id: String,
+        charge_policy_revision: String,
+    },
+    Design {
+        design_id: String,
+        design_revision: String,
+    },
 }
 
-fn holdout_group(cell: &CellObservation, arm: &ProtocolArm, axis: HoldoutAxis) -> String {
+fn holdout_group(cell: &CellObservation, arm: &ProtocolArm, axis: HoldoutAxis) -> HoldoutGroup {
     match axis {
-        HoldoutAxis::Lot => cell.lot_id.clone(),
-        HoldoutAxis::Line => cell.line_id.clone(),
-        HoldoutAxis::ProtocolPair => protocol_pair(arm),
-        HoldoutAxis::Design => format!("{}@{}", cell.design_id, cell.design_revision),
+        HoldoutAxis::Lot => HoldoutGroup::Lot(cell.lot_id.clone()),
+        HoldoutAxis::Line => HoldoutGroup::Line(cell.line_id.clone()),
+        HoldoutAxis::ProtocolPair => HoldoutGroup::ProtocolPair {
+            formation_profile_id: arm.formation_profile_id.clone(),
+            formation_revision: arm.formation_revision.clone(),
+            charge_policy_id: arm.charge_policy_id.clone(),
+            charge_policy_revision: arm.charge_policy_revision.clone(),
+        },
+        HoldoutAxis::Design => HoldoutGroup::Design {
+            design_id: cell.design_id.clone(),
+            design_revision: cell.design_revision.clone(),
+        },
     }
 }
 
@@ -511,8 +525,8 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
 
     let mut lot_digests = BTreeMap::new();
     let mut line_digests = BTreeMap::new();
-    let mut split_by_group = BTreeMap::<String, DataSplit>::new();
-    let mut used_holdout_groups = BTreeSet::new();
+    let mut split_by_group = BTreeMap::<HoldoutGroup, DataSplit>::new();
+    let mut used_holdout_groups = BTreeSet::<HoldoutGroup>::new();
     let mut observed_eol_count = 0;
     let mut right_censored_count = 0;
     let mut competing_failure_count = 0;
@@ -571,7 +585,7 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         match split_by_group.insert(group.clone(), cell.split) {
             Some(previous) if previous != cell.split => {
                 return Err(AuditError(format!(
-                    "holdout group {group} crosses {:?} and {:?} splits",
+                    "holdout group {group:?} crosses {:?} and {:?} splits",
                     previous, cell.split
                 )));
             }
@@ -849,6 +863,38 @@ mod tests {
         }
         value.cells[4].split = DataSplit::Test;
         assert!(audit_campaign(&value).is_err());
+    }
+
+    #[test]
+    fn protocol_pair_ids_with_delimiters_do_not_collide() {
+        let mut value = fixture();
+        value.campaign.holdout_axis = HoldoutAxis::ProtocolPair;
+        for cell in &mut value.cells {
+            cell.split = DataSplit::Train;
+        }
+        value.arms[0].formation_profile_id = "A".into();
+        value.arms[0].formation_revision = "B|C".into();
+        value.arms[0].charge_policy_id = "D".into();
+        value.arms[0].charge_policy_revision = "E".into();
+        value.arms[1].formation_profile_id = "A".into();
+        value.arms[1].formation_revision = "B".into();
+        value.arms[1].charge_policy_id = "D".into();
+        value.arms[1].charge_policy_revision = "E".into();
+        value.arms[2].formation_profile_id = "A".into();
+        value.arms[2].formation_revision = "B|C".into();
+        value.arms[2].charge_policy_id = "C|D".into();
+        value.arms[2].charge_policy_revision = "E".into();
+        value.arms[3].formation_profile_id = "A".into();
+        value.arms[3].formation_revision = "B".into();
+        value.arms[3].charge_policy_id = "C|D".into();
+        value.arms[3].charge_policy_revision = "E".into();
+
+        for cell in &mut value.cells {
+            if cell.arm_id == "joint" {
+                cell.split = DataSplit::Test;
+            }
+        }
+        assert!(audit_campaign(&value).is_ok());
     }
 
     #[test]
