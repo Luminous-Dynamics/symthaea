@@ -115,7 +115,7 @@ A human-assisted run must not be ranked as a blind run. Any provided meter, key,
 
 Random excerpt splits are inadequate for the primary generalization claims. At least one grouped holdout must be preregistered for each of:
 
-- composer/work;
+- composer/work (an in-distribution work holdout may repeat composers; an OOD composer claim holds out the composer group itself);
 - artist/performer;
 - recording session/source recording;
 - instrument family/ensemble;
