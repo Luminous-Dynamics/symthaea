@@ -173,6 +173,10 @@ pub enum RejectReason {
     UnknownMissRisk,
     /// PoMA upper bound exceeds the request-specific limit.
     MissRiskTooHigh,
+    /// Supplied probability-of-miss upper bound exceeds one million ppm.
+    InvalidProbabilityBound(u32),
+    /// Request probability threshold exceeds one million ppm.
+    InvalidProbabilityLimit(u32),
     /// Local fallback is not ready.
     NoLocalFallback,
     /// Request data is not allowed to leave the robot/declared trust boundary.
@@ -875,7 +879,7 @@ mod tests {
 
     #[test]
     fn evsi_per_compute_refuses_unrelated_loss_scales() {
-        let mut a = request("q1", "r1");
+        let a = request("q1", "r1");
         let mut b = request("q2", "r2");
         b.loss_scale_id = Some("other-task-v1".to_owned());
         assert_eq!(
