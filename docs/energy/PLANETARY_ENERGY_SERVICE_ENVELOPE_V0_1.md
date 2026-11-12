@@ -76,11 +76,11 @@ The first benchmark release contains seven analytic orbital-distance cases and o
 
 These are **analytic screening values**, calculated from the explicitly declared approximation:
 
-[
-S(r)=rac{1361}{r^2};mathrm{W/m^2}
-]
+\[
+S(r)=\frac{1361}{r^2}\;\mathrm{W/m^2}
+\]
 
-where (r) is distance in astronomical units. They are not site measurements, ephemerides, panel-plane irradiance, annual energy, delivered electricity or mission power predictions. The ideal incident-power collector-area multiplier is \`r²\`: 7.29× at 2.7 AU and 90.25× at 9.5 AU, before any angle, atmospheric, conversion, storage, thermal, structural or reliability penalties. Real analyses must use time-resolved ephemerides and exact mission epochs. Earth and Mars additionally require atmosphere/weather/dust models. The lunar surface requires terrain horizon, solar-disc visibility, local slope and panel orientation. An asteroid's heliocentric distance and composition are specific to the target object and epoch.
+where \(r\) is distance in astronomical units. They are not site measurements, ephemerides, panel-plane irradiance, annual energy, delivered electricity or mission power predictions. The ideal incident-power collector-area multiplier is `r²`: 7.29× at 2.7 AU and 90.25× at 9.5 AU, before any angle, atmospheric, conversion, storage, thermal, structural or reliability penalties. Real analyses must use time-resolved ephemerides and exact mission epochs. Earth and Mars additionally require atmosphere/weather/dust models. The lunar surface requires terrain horizon, solar-disc visibility, local slope and panel orientation. An asteroid's heliocentric distance and composition are specific to the target object and epoch.
 
 The machine-readable seed cases are in [`benchmarks/planetary-energy-service/v0.1/orbit-reference-cases.json`](../../benchmarks/planetary-energy-service/v0.1/orbit-reference-cases.json).
 
