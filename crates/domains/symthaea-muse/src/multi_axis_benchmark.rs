@@ -125,7 +125,7 @@ pub struct RendererIdentityV1 {
     pub tempo_map_policy: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BenchmarkProtocolV1 {
     pub schema: String,
     pub protocol_id: String,
@@ -754,7 +754,7 @@ mod tests {
                                 upper: (mv2h + 0.02).min(1.0),
                                 confidence_level: 0.95,
                                 cluster_unit: GroupingUnitV1::Composer,
-                                cluster_count: 3,
+                                cluster_count: 2,
                                 method: "cluster bootstrap by composer".into(),
                             }),
                         },
@@ -762,7 +762,14 @@ mod tests {
                             metric_id: "clews".into(),
                             value: 0.65,
                             sample_count: 373,
-                            confidence_interval: None,
+                            confidence_interval: Some(ClusteredConfidenceIntervalV1 {
+                                lower: 0.62,
+                                upper: 0.68,
+                                confidence_level: 0.95,
+                                cluster_unit: GroupingUnitV1::Composer,
+                                cluster_count: 2,
+                                method: "cluster bootstrap by composer".into(),
+                            }),
                         },
                     ],
                 },
