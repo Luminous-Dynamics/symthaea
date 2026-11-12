@@ -1692,7 +1692,7 @@ fn measure_phase_fraction_v1(
 
 fn measure_phase_summary_v1(
     reference: &[EvaluationNoteV1],
-    predicted: &[MidiTranscribedNoteV1],
+    predicted: &[EvaluationNoteV1],
     matching: &[(usize, usize)],
     reference_ticks_per_quarter: u16,
     prediction_ticks_per_quarter: u16,
@@ -2716,17 +2716,9 @@ mod tests {
     #[test]
     fn measure_phase_is_invariant_to_ticks_per_quarter_representation() {
         let reference = vec![reference_eval_note(1, 60)];
-        let predicted = vec![MidiTranscribedNoteV1 {
-            track_index: 1,
-            midi_channel: 0,
+        let predicted = vec![EvaluationNoteV1 {
             onset_tick: 120,
-            offset_tick: Some(240),
-            source_event_ordinal: 0,
-            gm_program: 40,
-            pitch_midi: 60,
-            velocity_midi: 100,
-            onset_seconds: 0.25,
-            offset_seconds: Some(0.5),
+            ..reference_eval_note(1, 60)
         }];
         let reference_with_tick = vec![EvaluationNoteV1 {
             onset_tick: 240,
@@ -2752,17 +2744,9 @@ mod tests {
             onset_tick: 3_840,
             ..reference_eval_note(1, 60)
         }];
-        let predicted = vec![MidiTranscribedNoteV1 {
-            track_index: 1,
-            midi_channel: 0,
+        let predicted = vec![EvaluationNoteV1 {
             onset_tick: 0,
-            offset_tick: Some(120),
-            source_event_ordinal: 0,
-            gm_program: 40,
-            pitch_midi: 60,
-            velocity_midi: 100,
-            onset_seconds: 0.0,
-            offset_seconds: Some(0.125),
+            ..reference_eval_note(1, 60)
         }];
         let summary =
             measure_phase_summary_v1(&reference, &predicted, &[(0, 0)], 960, 960, 4, 4)
