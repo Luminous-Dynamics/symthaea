@@ -363,6 +363,10 @@ pub enum ProbeAuditError {
     ClusterCountMismatch { arm_id: String, expected: usize, observed: usize },
     /// Duplicate or empty independent-cluster identifier.
     DuplicateOrEmptyClusterId(String),
+    /// Distinct cluster IDs reused one episode-set or independence receipt.
+    DuplicateClusterReceipt(String),
+    /// A non-privileged probe used an input family absent from the candidate.
+    ProbeInputOutsideCandidate { arm_id: String, family: InputFamily },
     /// Missing pairing or independence receipt identity.
     MissingClusterReceipt(String),
     /// One arm omitted a cluster from the frozen manifest.
@@ -532,6 +536,8 @@ fn index_clusters<'a>(
         });
     }
     let mut indexed = BTreeMap::new();
+    let mut paired_manifests = BTreeSet::new();
+    let mut independence_receipts = BTreeSet::new();
     for cluster in clusters {
         require_nonempty("cluster_id", &cluster.cluster_id)?;
         require_nonempty(
@@ -544,6 +550,13 @@ fn index_clusters<'a>(
             &cluster.independence_receipt_digest,
         )
         .map_err(|_| ProbeAuditError::MissingClusterReceipt(cluster.cluster_id.clone()))?;
+        if !paired_manifests.insert(cluster.paired_episode_manifest_digest.clone())
+            || !independence_receipts.insert(cluster.independence_receipt_digest.clone())
+        {
+            return Err(ProbeAuditError::DuplicateClusterReceipt(
+                cluster.cluster_id.clone(),
+            ));
+        }
         if cluster.independence_disposition == EvidenceDisposition::Rejected {
             return Err(ProbeAuditError::RejectedIndependenceEvidence(
                 cluster.cluster_id.clone(),
@@ -633,10 +646,21 @@ fn median_range(values: &[i64]) -> Option<(i64, i64)> {
 
 fn summarize_probe(
     scope: &ProbeAuditScope,
+    candidate_manifest: &ArmManifest,
     candidate_clusters: &BTreeMap<String, &ClusterOutcome>,
     probe: &ProbeRun,
 ) -> Result<ProbeArmReport, ProbeAuditError> {
     validate_arm_manifest(scope, &probe.manifest, false)?;
+    let candidate_families: BTreeSet<_> =
+        candidate_manifest.input_families.iter().copied().collect();
+    for family in &probe.manifest.input_families {
+        if !family.is_privileged() && !candidate_families.contains(family) {
+            return Err(ProbeAuditError::ProbeInputOutsideCandidate {
+                arm_id: probe.manifest.arm_id.clone(),
+                family: *family,
+            });
+        }
+    }
     let expected = usize::from(scope.expected_independent_clusters);
     let probe_clusters = index_clusters(&probe.manifest.arm_id, &probe.clusters, expected)?;
     let mut cluster_gaps = paired_cluster_gaps(candidate_clusters, &probe_clusters)?;
@@ -794,6 +818,7 @@ pub fn audit_probe_controls(
         }
         reports.push(summarize_probe(
             &input.scope,
+            &input.candidate_manifest,
             &candidate_clusters,
             probe,
         )?);
@@ -913,6 +938,7 @@ mod tests {
                 "candidate",
                 ModelFamily::FullCandidatePolicy,
                 vec![
+                    InputFamily::TaskMetadata,
                     InputFamily::LanguageInstruction,
                     InputFamily::VisualObservation,
                     InputFamily::RobotState,
