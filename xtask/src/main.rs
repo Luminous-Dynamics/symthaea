@@ -75,6 +75,18 @@ enum Commands {
         #[arg(long)]
         out: Option<PathBuf>,
     },
+    /// Audit time-indexed service capability receipts against synthetic mission contracts.
+    /// This does not calculate PV, storage dispatch, thermal, or electrical-network physics.
+    PlanetaryServiceAudit {
+        #[arg(
+            long,
+            default_value = "benchmarks/planetary-energy-service/v0.1/service-envelope-cases.json"
+        )]
+        input: PathBuf,
+        /// Optional path for the machine-readable audit report.
+        #[arg(long)]
+        out: Option<PathBuf>,
+    },
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -121,6 +133,9 @@ fn main() -> anyhow::Result<()> {
         }
         Commands::PlanetaryEnergyAudit { input, out } => {
             planetary_energy::run(&input, out.as_deref())?;
+        }
+        Commands::PlanetaryServiceAudit { input, out } => {
+            planetary_energy::run_service_audit(&input, out.as_deref())?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
