@@ -62,7 +62,8 @@
             "required": [
               "scenario_id",
               "ambient_c",
-              "preheat_policy"
+              "preheat_policy",
+              "condition_profile_id"
             ],
             "properties": {
               "scenario_id": {
@@ -79,6 +80,10 @@
                   "excluded",
                   "unknown"
                 ]
+              },
+              "condition_profile_id": {
+                "type": "string",
+                "minLength": 1
               }
             }
           }
