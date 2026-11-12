@@ -46,7 +46,7 @@ The source audit requires:
 This is metadata integrity only. The DEC-specific gate records that fusion-born electrical output was not demonstrated/attributed in the source case. This does not assert that a physical fusion-born contribution was exactly zero; unknown contributions remain unquantified. It prevents externally heated plasma recovery or a laboratory fundamental-unit experiment being silently promoted to demonstrated fusion-born energy recovery. It does not independently check paper contents, reproduce reported values, or establish that a source supports every interpretation in its case description.
 
 Current frozen input:
-- plasma-energy register: 29 cases / 29 controls, including five direct-energy-conversion cases, one D–³He/DT fuel-mixture model, five miniature/modular low-temperature plasma device references, and thermal-processing/ETES comparison references;
+- plasma-energy register: 35 cases / 36 controls, including five direct-energy-conversion cases, one D–³He/DT fuel-mixture model, five miniature/modular low-temperature plasma device references, a compact ambient-air surface DBD, a grid-like bioaerosol DBD, a flexible DBD water-treatment result and three water-treatment review/comparison cases;
 - HTS fusion magnet register: 6 cases / 12 controls.
 
 ## 3. Synthetic thermal-store fixture
@@ -168,3 +168,12 @@ A fifth miniaturized-device source case records the Leibniz Institute's portable
 
 
 The 2026 miniature helium APPJ article annotates its 2 L/min helium use at approximately £0.2/min under its stated supply-cost basis. At that stated rate, sustained operation would be roughly £12 per operating hour; this is the paper's source-specific estimate, not a universal helium price. This makes gas autonomy and gas consumed per useful output first-order miniature-device metrics, not footnotes.
+
+
+## Ambient-air DBD application track
+
+The corpus now includes the 2026 grid-like air DBD (GAPS) study and the compact ambient-air surface-DBD architecture reference. The GAPS paper reports up to 4.5-log single-pass *E. coli* bioaerosol reduction, but its EEO calculation excludes power-supply losses and preliminary outlet ozone was approximately 9 ppm. The correct benchmark is post-abatement clean-air delivery at wall-plug energy, not plasma-discharge power or log reduction alone. See PLASMA-AIR-DBD-001 (#11804).
+
+## Water treatment and plasma-liquid catalysis
+
+The corpus now includes the 2026 flexible coplanar DBD bacterial water-treatment result and 2026 reviews on plasma-liquid catalysis, multiphase reactor intensification and cross-study AOP energy metrics. Separate CFU/J, EEO, contaminant conversion, mineralization, transformation-product toxicity, catalyst leaching and complete-system energy. Cross-study median EEO values are not matched-trial rankings. See PLASMA-WATER-QUAL-001 (#11805).
