@@ -1,0 +1,158 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "TEXTILE-SORT-FUSION-CASES-001",
+  "fixture_class": "synthetic",
+  "cases": [
+    {
+      "case_id": "SORT-001-CURRENT-NIR",
+      "case_kind": "spectral_admission",
+      "mutation": "A spectral observation uses the declared instrument, an unrevoked calibration valid at acquisition, the supported wavelength interval, valid signal quality and a closed composition estimate.",
+      "expected": {
+        "disposition": "admitted",
+        "reason": null
+      },
+      "invariant": "A composition estimate is admitted only when instrument, calibration, domain, quality, method and composition semantics are coherent."
+    },
+    {
+      "case_id": "SORT-002-EXPIRED-CALIBRATION",
+      "case_kind": "spectral_admission",
+      "mutation": "Acquire the sample after calibration valid_until_ns.",
+      "expected": {
+        "disposition": "unknown",
+        "reason": "CalibrationNotValidAtAcquisition"
+      },
+      "invariant": "An out-of-validity acquisition abstains rather than producing an admitted fibre-composition claim."
+    },
+    {
+      "case_id": "SORT-003-REVOKED-CALIBRATION",
+      "case_kind": "spectral_admission",
+      "mutation": "Mark the calibration profile revoked after the spectral acquisition.",
+      "expected": {
+        "disposition": "rejected",
+        "reason": "CalibrationRevoked"
+      },
+      "invariant": "Explicit calibration revocation blocks use of the associated observation."
+    },
+    {
+      "case_id": "SORT-004-SATURATED-SIGNAL",
+      "case_kind": "spectral_admission",
+      "mutation": "Set spectral quality to Saturated while retaining an otherwise valid estimate.",
+      "expected": {
+        "disposition": "unknown",
+        "reason": "Saturated"
+      },
+      "invariant": "Saturated sensor channels are not silently normalized into a valid composition."
+    },
+    {
+      "case_id": "SORT-005-OUTSIDE-WAVELENGTH-PROFILE",
+      "case_kind": "spectral_admission",
+      "mutation": "The observation wavelength_start_nm is below the declared qualified instrument profile.",
+      "expected": {
+        "disposition": "unknown",
+        "reason": "WavelengthOutsideQualifiedProfile"
+      },
+      "invariant": "Instrument transfer and wavelength domain must be explicit; a model trained on one range does not automatically qualify another."
+    },
+    {
+      "case_id": "SORT-006-UNKNOWN-FIBRE-FRACTION",
+      "case_kind": "spectral_admission",
+      "mutation": "A nominally closed composition includes an explicit non-zero Unknown fibre fraction.",
+      "expected": {
+        "disposition": "unknown",
+        "reason": "UnknownFibreFraction"
+      },
+      "invariant": "Known fractions may be retained, but an unresolved component prevents a fully admitted fibre identity."
+    },
+    {
+      "case_id": "SORT-007-VISUAL-ONLY",
+      "case_kind": "paired_identity",
+      "mutation": "Supply a valid visual jacket observation without an NIR spectral observation.",
+      "expected": {
+        "disposition": "unknown",
+        "reason": "MissingSpectral"
+      },
+      "invariant": "Visual garment-family recognition cannot produce fibre-composition evidence."
+    },
+    {
+      "case_id": "SORT-008-SUBJECT-MISMATCH",
+      "case_kind": "paired_identity",
+      "mutation": "Pair a visual frame from ITEM-A with a spectral observation from ITEM-B.",
+      "expected": {
+        "disposition": "rejected",
+        "reason": "SubjectMismatch"
+      },
+      "invariant": "Cross-modal results can only be paired when both observations bind to the same physical item."
+    },
+    {
+      "case_id": "SORT-009-VISUAL-LOW-CONFIDENCE",
+      "case_kind": "visual_admission",
+      "mutation": "Visual confidence is below the caller-declared minimum confidence threshold.",
+      "expected": {
+        "disposition": "unknown",
+        "reason": "BelowDeclaredConfidenceThreshold"
+      },
+      "invariant": "Confidence thresholds are a declared policy input and are not silently hard-coded as universal truth."
+    },
+    {
+      "case_id": "SORT-010-VISUAL-UNKNOWN-CATEGORY",
+      "case_kind": "visual_admission",
+      "mutation": "The visual model emits an Unknown garment category or Unknown presentation state.",
+      "expected": {
+        "disposition": "unknown",
+        "reason": "CategoryUnknown"
+      },
+      "invariant": "Out-of-taxonomy and incomplete visual states remain unknown."
+    },
+    {
+      "case_id": "SORT-011-GARMENT-FRAME-LEAKAGE",
+      "case_kind": "dataset_split",
+      "mutation": "Two TexSortML-style frames with one garment_id are assigned to Train and Test.",
+      "expected": {
+        "disposition": "group_leakage",
+        "reason": "GroupLeakage:GarmentIdentity"
+      },
+      "invariant": "All frames from the same physical garment stay in one split/fold."
+    },
+    {
+      "case_id": "SORT-012-NIR-REPLICATE-LEAKAGE",
+      "case_kind": "dataset_split",
+      "mutation": "Two NIR spectra with one specimen_id are assigned to Train and Validation.",
+      "expected": {
+        "disposition": "group_leakage",
+        "reason": "GroupLeakage:PhysicalSpecimen"
+      },
+      "invariant": "Replicate spectra from the same physical specimen stay in one split/fold."
+    },
+    {
+      "case_id": "SORT-013-COMPOSITION-FRACTION-NOT-CLOSED",
+      "case_kind": "spectral_admission",
+      "mutation": "Nominal fibre fractions sum to 800000 ppm rather than 1000000 ppm.",
+      "expected": {
+        "disposition": "rejected",
+        "reason": "CompositionInvalid:FractionTotalMismatch"
+      },
+      "invariant": "Fibre fraction estimates must close to exactly 100% at the declared integer scale."
+    },
+    {
+      "case_id": "SORT-014-INSTRUMENT-MISMATCH",
+      "case_kind": "spectral_admission",
+      "mutation": "Observation instrument_id differs from the instrument profile and calibration identity.",
+      "expected": {
+        "disposition": "rejected",
+        "reason": "InstrumentProfileMismatch"
+      },
+      "invariant": "Results cannot silently transfer across different NIR instruments or calibration profiles."
+    },
+    {
+      "case_id": "SORT-015-GROUPED-SPLIT-VALID",
+      "case_kind": "dataset_split",
+      "mutation": "All repeated observations for one garment or one NIR specimen remain assigned to the same partition.",
+      "expected": {
+        "disposition": "valid_split",
+        "reason": null
+      },
+      "invariant": "Grouped split integrity permits multiple rows from one physical subject when they remain in one partition."
+    }
+  ],
+  "claim_ceiling": "Synthetic test-intention corpus only. It does not contain real spectra or garment images, implement a fibre classifier, validate a physical sorting line, or qualify recycling, secondary grade, safety or lifecycle benefit."
+}
