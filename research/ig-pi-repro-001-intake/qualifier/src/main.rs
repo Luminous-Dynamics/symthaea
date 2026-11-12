@@ -105,6 +105,9 @@ fn validate(manifest: &Value) -> Result<(), Vec<String>> {
     if str_at(manifest,&["dataset_audit","viewer_status"]) != Some("DatasetGenerationCastError") {
         fail(&mut errors,"Hugging Face mixed-schema viewer failure must remain recorded");
     }
+    if str_at(manifest,&["dataset_audit","dataset_admission_status"]) != Some("blocked_schema_and_rights_review") {
+        fail(&mut errors,"dataset admission must remain blocked pending schema and rights review");
+    }
     if bool_at(manifest,&["upstream","repository_metadata","root_license_file_present"])!=Some(false)
         || !manifest["upstream"]["repository_metadata"]["repository_api_detected_license"].is_null()
         || str_at(manifest,&["upstream","repository_metadata","code_reuse_status"])!=Some("blocked_unresolved") {
@@ -202,6 +205,18 @@ mod tests {
         let mut m=manifest();
         m["dataset_audit"]["dataset_admission_status"]=Value::String("admitted".into());
         assert!(validate(&m).is_err() || m["custody"]["rights_admission"].as_str()!=Some("admitted"));
+    }
+    #[test]
+    fn dataset_viewer_cast_error_cannot_be_marked_admitted() {
+        let mut m=manifest();
+        m["dataset_audit"]["dataset_admission_status"]=Value::String("admitted".into());
+        assert!(validate(&m).is_err());
+    }
+    #[test]
+    fn scorer_validation_artifacts_cannot_be_marked_reconciled() {
+        let mut m=manifest();
+        m["validation_audit"]["reconciliation_status"]=Value::String("reconciled".into());
+        assert!(validate(&m).is_err());
     }
     #[test]
     fn synthetic_80_20_assignment_is_not_a_human_population_prior() {
