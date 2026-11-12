@@ -325,3 +325,15 @@ geometry match != comfort, safety or clinical fit
 Synthetic fixtures qualify only deterministic schema/logic behavior. Simulation qualifies only its declared model and applicability domain. Physical testing qualifies only the tested samples, methods, configurations and conditions. Human-use, protective, medical, environmental and regulatory claims require separate owners and evidence.
 
 **The success criterion is a reproducible chain from a defined garment requirement to an inspected physical article and traceable lifecycle record—not a visually impressive render or an unqualified AI benchmark score.**
+
+
+## 13. Machine-readable seed fixture
+
+The first synthetic cross-system record is now committed alongside this specification:
+
+- `docs/research/fixtures/apparel_engineering_thread_v0_1/apparel_thread.schema.json`
+- `docs/research/fixtures/apparel_engineering_thread_v0_1/apparel_thread.example.json`
+
+Fixture ID: `APPAREL-TWIN-SYNTH-0001`. It binds a synthetic overshirt product, design revision, pattern pieces, fabric/thread lots, BOM, planned cut/sew/inspect operations, geometry projections, unperformed physical tests and four claims. Its expected result is **structurally complete but physically unqualified**. The fabric's key mechanical properties remain unknown/not measured, the physical article has not been manufactured, and an incomplete modelled drape projection cannot support a physical drape claim.
+
+This is deliberately a negative epistemic example: a structurally connected digital thread must not be mistaken for a physically qualified garment. The schema and example were locally JSON-parsed after authoring. An independent JSON Schema Draft 2020-12 validator and cross-field semantic validator have **not** yet been run; no validation result beyond JSON parsing is claimed.
