@@ -992,6 +992,10 @@ async fn main() {
             "/api/music/import/{id}/notation-graph",
             get(imported_work_notation_graph),
         )
+        .route(
+            "/api/music/import/{id}/midi-measure-maps",
+            get(imported_work_midi_measure_maps),
+        )
         .route("/api/music/import/{id}/audio", get(imported_work_audio))
         .route("/api/teaching", get(teaching_summary))
         .route("/api/teaching/{lesson_id}/audio", get(teaching_audio))
@@ -2388,6 +2392,7 @@ async fn import_music(
     let mut authorization_basis_raw = None;
     let mut content_license_raw = None;
     let mut upload: Option<(String, Vec<u8>)> = None;
+    let mut measure_sidecar: Option<Vec<u8>> = None;
     while let Some(field) = multipart
         .next_field()
         .await
@@ -2407,6 +2412,18 @@ async fn import_music(
                 ));
             }
             upload = Some((filename, bytes.to_vec()));
+        } else if name == "measure_sidecar" {
+            let bytes = field
+                .bytes()
+                .await
+                .map_err(|error| (StatusCode::BAD_REQUEST, error.to_string()))?;
+            if bytes.len() > MAX_SYMBOLIC_IMPORT_BYTES {
+                return Err((
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    "MIDI measure sidecar exceeds 12 MiB".to_owned(),
+                ));
+            }
+            measure_sidecar = Some(bytes.to_vec());
         } else {
             let value = field
                 .text()
@@ -2483,6 +2500,12 @@ async fn import_music(
             "supported formats are MIDI, MusicXML, and Muse score JSON".to_owned(),
         )
     })?;
+    if measure_sidecar.is_some() && !matches!(&format, symthaea_muse_protocol::SymbolicImportFormat::Midi) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "measure_sidecar is only valid with MIDI uploads".to_owned(),
+        ));
+    }
 
     // Everything from here is CPU/IO-bound (parsing, analysis, rendering,
     // hashing, filesystem writes) -- matches this codebase's own
@@ -2492,17 +2515,24 @@ async fn import_music(
     tokio::task::spawn_blocking(move || {
         let source_sha256 = sha256_hex(&source);
         let score_clock_id = format!("source-score-clock:{source_sha256}");
-        let structured = symthaea_muse::symbolic_import::parse_symbolic_with_structure(
-            &source,
-            format.clone(),
-            &score_clock_id,
-        )
+        let structured = match measure_sidecar.as_deref() {
+            Some(sidecar) => symthaea_muse::symbolic_import::parse_symbolic_with_midi_measure_sidecar(
+                &source,
+                sidecar,
+                &score_clock_id,
+            ),
+            None => symthaea_muse::symbolic_import::parse_symbolic_with_structure(
+                &source,
+                format.clone(),
+                &score_clock_id,
+            ),
+        }
         .map_err(|error| (StatusCode::UNPROCESSABLE_ENTITY, error))?;
         if structured.source_sha256 != source_sha256 {
             return Err(internal("symbolic importer source digest changed during import"));
         }
         let score = structured.score;
-        let (notation_structure, notation_graph_json) =
+        let (notation_structure, notation_artifact) =
             summarize_imported_notation_structure(
                 &source_sha256,
                 structured.notation_structure,
@@ -2577,8 +2607,17 @@ async fn import_music(
             std::fs::write(staging.join(format!("source.{extension}")), &source)?;
             std::fs::write(staging.join("score.json"), score_json)?;
             std::fs::write(staging.join("summary.json"), summary_json)?;
-            if let Some(notation_graph_json) = &notation_graph_json {
-                std::fs::write(staging.join("notation-graph.json"), notation_graph_json)?;
+            match &notation_artifact {
+                Some(ImportedNotationArtifact::MusicXmlGraph(bytes)) => {
+                    std::fs::write(staging.join("notation-graph.json"), bytes)?;
+                }
+                Some(ImportedNotationArtifact::MidiMeasureMaps(bytes)) => {
+                    std::fs::write(staging.join("midi-measure-maps.json"), bytes)?;
+                }
+                None => {}
+            }
+            if let Some(sidecar) = &measure_sidecar {
+                std::fs::write(staging.join("midi-measure-sidecar.json"), sidecar)?;
             }
             std::fs::write(staging.join("audition.wav"), &wav)?;
             std::fs::rename(&staging, &destination)
