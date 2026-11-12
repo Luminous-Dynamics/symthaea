@@ -39,7 +39,9 @@
           "total_spl_db": 101,
           "background_spl_db": 90,
           "total_expanded_uncertainty_db": 0.2,
-          "background_expanded_uncertainty_db": 0.2
+          "background_expanded_uncertainty_db": 0.2,
+          "acoustic_cavitation_alignment_offset_s": 0,
+          "acoustic_cavitation_alignment_expanded_uncertainty_s": 0.001
         },
         {
           "window_id": "window-2",
@@ -51,7 +53,9 @@
           "total_spl_db": 111,
           "background_spl_db": 90,
           "total_expanded_uncertainty_db": 0.2,
-          "background_expanded_uncertainty_db": 0.2
+          "background_expanded_uncertainty_db": 0.2,
+          "acoustic_cavitation_alignment_offset_s": 0,
+          "acoustic_cavitation_alignment_expanded_uncertainty_s": 0.001
         },
         {
           "window_id": "window-3",
@@ -63,7 +67,9 @@
           "total_spl_db": 101,
           "background_spl_db": 90,
           "total_expanded_uncertainty_db": 0.2,
-          "background_expanded_uncertainty_db": 0.2
+          "background_expanded_uncertainty_db": 0.2,
+          "acoustic_cavitation_alignment_offset_s": 0,
+          "acoustic_cavitation_alignment_expanded_uncertainty_s": 0.001
         },
         {
           "window_id": "window-4",
@@ -75,7 +81,9 @@
           "total_spl_db": 111,
           "background_spl_db": 90,
           "total_expanded_uncertainty_db": 0.2,
-          "background_expanded_uncertainty_db": 0.2
+          "background_expanded_uncertainty_db": 0.2,
+          "acoustic_cavitation_alignment_offset_s": 0,
+          "acoustic_cavitation_alignment_expanded_uncertainty_s": 0.001
         },
         {
           "window_id": "window-5",
@@ -87,7 +95,9 @@
           "total_spl_db": 101,
           "background_spl_db": 90,
           "total_expanded_uncertainty_db": 0.2,
-          "background_expanded_uncertainty_db": 0.2
+          "background_expanded_uncertainty_db": 0.2,
+          "acoustic_cavitation_alignment_offset_s": 0,
+          "acoustic_cavitation_alignment_expanded_uncertainty_s": 0.001
         },
         {
           "window_id": "window-6",
@@ -99,7 +109,9 @@
           "total_spl_db": 111,
           "background_spl_db": 90,
           "total_expanded_uncertainty_db": 0.2,
-          "background_expanded_uncertainty_db": 0.2
+          "background_expanded_uncertainty_db": 0.2,
+          "acoustic_cavitation_alignment_offset_s": 0,
+          "acoustic_cavitation_alignment_expanded_uncertainty_s": 0.001
         },
         {
           "window_id": "window-7",
@@ -111,7 +123,9 @@
           "total_spl_db": 101,
           "background_spl_db": 90,
           "total_expanded_uncertainty_db": 0.2,
-          "background_expanded_uncertainty_db": 0.2
+          "background_expanded_uncertainty_db": 0.2,
+          "acoustic_cavitation_alignment_offset_s": 0,
+          "acoustic_cavitation_alignment_expanded_uncertainty_s": 0.001
         },
         {
           "window_id": "window-8",
@@ -123,7 +137,9 @@
           "total_spl_db": 111,
           "background_spl_db": 90,
           "total_expanded_uncertainty_db": 0.2,
-          "background_expanded_uncertainty_db": 0.2
+          "background_expanded_uncertainty_db": 0.2,
+          "acoustic_cavitation_alignment_offset_s": 0,
+          "acoustic_cavitation_alignment_expanded_uncertainty_s": 0.001
         }
       ],
       "environment_fingerprint_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
@@ -140,7 +156,9 @@
         "calibration_certificate_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
         "evidence_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
         "nuclei_distribution_evidence_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
-      }
+      },
+      "operating_point_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "acoustic_cavitation_sync_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
     },
     {
       "run_id": "synthetic-run-2",
@@ -159,7 +177,9 @@
           "total_spl_db": 101,
           "background_spl_db": 90,
           "total_expanded_uncertainty_db": 0.2,
-          "background_expanded_uncertainty_db": 0.2
+          "background_expanded_uncertainty_db": 0.2,
+          "acoustic_cavitation_alignment_offset_s": 0,
+          "acoustic_cavitation_alignment_expanded_uncertainty_s": 0.001
         },
         {
           "window_id": "window-2",
@@ -171,7 +191,9 @@
           "total_spl_db": 111,
           "background_spl_db": 90,
           "total_expanded_uncertainty_db": 0.2,
-          "background_expanded_uncertainty_db": 0.2
+          "background_expanded_uncertainty_db": 0.2,
+          "acoustic_cavitation_alignment_offset_s": 0,
+          "acoustic_cavitation_alignment_expanded_uncertainty_s": 0.001
         },
         {
           "window_id": "window-3",
@@ -183,7 +205,9 @@
           "total_spl_db": 101,
           "background_spl_db": 90,
           "total_expanded_uncertainty_db": 0.2,
-          "background_expanded_uncertainty_db": 0.2
+          "background_expanded_uncertainty_db": 0.2,
+          "acoustic_cavitation_alignment_offset_s": 0,
+          "acoustic_cavitation_alignment_expanded_uncertainty_s": 0.001
         },
         {
           "window_id": "window-4",
@@ -195,7 +219,9 @@
           "total_spl_db": 111,
           "background_spl_db": 90,
           "total_expanded_uncertainty_db": 0.2,
-          "background_expanded_uncertainty_db": 0.2
+          "background_expanded_uncertainty_db": 0.2,
+          "acoustic_cavitation_alignment_offset_s": 0,
+          "acoustic_cavitation_alignment_expanded_uncertainty_s": 0.001
         },
         {
           "window_id": "window-5",
@@ -207,7 +233,9 @@
           "total_spl_db": 101,
           "background_spl_db": 90,
           "total_expanded_uncertainty_db": 0.2,
-          "background_expanded_uncertainty_db": 0.2
+          "background_expanded_uncertainty_db": 0.2,
+          "acoustic_cavitation_alignment_offset_s": 0,
+          "acoustic_cavitation_alignment_expanded_uncertainty_s": 0.001
         },
         {
           "window_id": "window-6",
@@ -219,7 +247,9 @@
           "total_spl_db": 111,
           "background_spl_db": 90,
           "total_expanded_uncertainty_db": 0.2,
-          "background_expanded_uncertainty_db": 0.2
+          "background_expanded_uncertainty_db": 0.2,
+          "acoustic_cavitation_alignment_offset_s": 0,
+          "acoustic_cavitation_alignment_expanded_uncertainty_s": 0.001
         },
         {
           "window_id": "window-7",
@@ -231,7 +261,9 @@
           "total_spl_db": 101,
           "background_spl_db": 90,
           "total_expanded_uncertainty_db": 0.2,
-          "background_expanded_uncertainty_db": 0.2
+          "background_expanded_uncertainty_db": 0.2,
+          "acoustic_cavitation_alignment_offset_s": 0,
+          "acoustic_cavitation_alignment_expanded_uncertainty_s": 0.001
         },
         {
           "window_id": "window-8",
@@ -243,7 +275,9 @@
           "total_spl_db": 111,
           "background_spl_db": 90,
           "total_expanded_uncertainty_db": 0.2,
-          "background_expanded_uncertainty_db": 0.2
+          "background_expanded_uncertainty_db": 0.2,
+          "acoustic_cavitation_alignment_offset_s": 0,
+          "acoustic_cavitation_alignment_expanded_uncertainty_s": 0.001
         }
       ],
       "environment_fingerprint_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
@@ -260,8 +294,14 @@
         "calibration_certificate_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
         "evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
         "nuclei_distribution_evidence_sha256": "9999999999999999999999999999999999999999999999999999999999999999"
-      }
+      },
+      "operating_point_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "acoustic_cavitation_sync_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
     }
   ],
-  "service_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+  "service_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "cavitation_instrument_id": "synthetic-high-speed-camera-C1",
+  "cavitation_observation_method_id": "synthetic-synchronized-blade-phase-annotation-v1",
+  "cavitation_calibration_or_validation_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+  "maximum_sync_alignment_uncertainty_s": 0.01
 }
