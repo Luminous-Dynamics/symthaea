@@ -1,0 +1,119 @@
+{
+  "schema_version": "0.1.0",
+  "evidence_class": "SYNTHETIC",
+  "propeller_revision": "synthetic-propeller-rev-a",
+  "service_fingerprint_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "method": {
+    "id": "ITTC_18TH_COMMITTEE_EQ15_EQ16",
+    "bandwidth_convention": "PROPORTIONAL",
+    "acoustic_efficiency_regime": "LOW_FREQUENCY",
+    "spectrum_quantity": "POWER_SPECTRUM",
+    "band_mapping_method": "EXACT_SCALED_BOUNDS",
+    "exponents": {
+      "w": 1,
+      "x": 1,
+      "y": 2,
+      "z": 1
+    }
+  },
+  "model_campaign": {
+    "campaign_id": "synthetic-model-campaign-001",
+    "facility_id": "synthetic-cavitation-tunnel-001",
+    "propeller_revision": "synthetic-propeller-rev-a",
+    "model_propeller_diameter_m": 0.2,
+    "model_rotation_rates_rps": [
+      10,
+      12
+    ],
+    "calibration_certificate_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "facility_transfer_function_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "wake_field_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "cavitation_state_evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+    "water_quality_nuclei_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+    "background_noise_corrected": true,
+    "facility_transfer_function_applied": true
+  },
+  "full_scale_trial": {
+    "trial_id": "synthetic-full-scale-trial-001",
+    "propeller_revision": "synthetic-propeller-rev-a",
+    "full_scale_propeller_diameter_m": 2,
+    "source_level_basis": "SOURCE_LEVEL",
+    "source_level_method_id": "SYNTHETIC_SOURCE_LEVEL_REDUCTION",
+    "propagation_separated": true,
+    "calibration_certificate_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+    "raw_trace_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+    "source_level_reduction_evidence_sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+  },
+  "operating_point_pairs": [
+    {
+      "pair_id": "synthetic-pair-10rps",
+      "model_rotation_rate_rps": 10,
+      "full_scale_rotation_rate_rps": 2,
+      "model_cavitation_number_n_d": 1,
+      "full_scale_cavitation_number_n_d": 0.8,
+      "model_reference_distance_m": 1,
+      "full_scale_reference_distance_m": 100,
+      "model_reynolds_number": 500000,
+      "full_scale_reynolds_number": 50000000,
+      "operating_point_profile_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "cavitation_pattern_comparability": "MATCHED",
+      "cavitation_pattern_evidence_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "model_raw_trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "bands": [
+        {
+          "band_id": "synthetic-band-a",
+          "model_lower_hz": 900,
+          "model_upper_hz": 1100,
+          "full_scale_lower_hz": 161,
+          "full_scale_upper_hz": 196.774,
+          "model_source_level_db": 120,
+          "observed_full_scale_source_level_db": 110.5,
+          "model_signal_above_background": true,
+          "uncertainty": {
+            "model_measurement_db": 1,
+            "scaling_model_db": 2,
+            "full_scale_measurement_db": 1,
+            "confidence_level": 0.95,
+            "composition": "CONSERVATIVE_LINEAR",
+            "independence_evidence_ref": null
+          }
+        }
+      ]
+    },
+    {
+      "pair_id": "synthetic-pair-12rps",
+      "model_rotation_rate_rps": 12,
+      "full_scale_rotation_rate_rps": 2.4,
+      "model_cavitation_number_n_d": 1,
+      "full_scale_cavitation_number_n_d": 0.8,
+      "model_reference_distance_m": 1,
+      "full_scale_reference_distance_m": 100,
+      "model_reynolds_number": 600000,
+      "full_scale_reynolds_number": 60000000,
+      "operating_point_profile_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "cavitation_pattern_comparability": "MATCHED",
+      "cavitation_pattern_evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "model_raw_trace_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "bands": [
+        {
+          "band_id": "synthetic-band-b",
+          "model_lower_hz": 1800,
+          "model_upper_hz": 2200,
+          "full_scale_lower_hz": 321.992,
+          "full_scale_upper_hz": 393.548,
+          "model_source_level_db": 118.5,
+          "observed_full_scale_source_level_db": 109,
+          "model_signal_above_background": true,
+          "uncertainty": {
+            "model_measurement_db": 1,
+            "scaling_model_db": 2,
+            "full_scale_measurement_db": 1,
+            "confidence_level": 0.95,
+            "composition": "CONSERVATIVE_LINEAR",
+            "independence_evidence_ref": null
+          }
+        }
+      ]
+    }
+  ]
+}
