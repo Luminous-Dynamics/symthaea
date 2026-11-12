@@ -333,6 +333,45 @@ Runner-independent work should begin with P1 fixtures and P2 pure accounting/sch
 Source URLs are discovery pointers. Each future admitted case must pin the exact publication/product version, date, system boundary, evidence class, applicability, data rights and source bytes/digest. Links alone are not qualification evidence.
 
 
+## 12A. Updated lunar and space architecture findings
+
+The following findings sharpen the first benchmark release.
+
+### Lunar vertical, triangular and distributed arrays
+
+NASA's Lunar Surface Technology programme describes VSAT as an autonomous vertical-array concept with masts up to 20 m, deployment/retraction and mobility for uneven terrain. NASA also lists regenerative fuel cells, LunaGrid-Lite tethered distribution and Harmonia radioisotope power for the lunar night. These are active technology programmes; their public summary does not supply a comparable whole-system W/kg or measured availability result.
+
+The 2026 lunar-energy review additionally describes triangular arrays with three vertical faces, tent arrays, vertical arrays such as LAMPS, and non-contact vibration-based dust cleaning. It notes the trade: vertical arrays may reduce dust accumulation and simplify orientation but mast installation can require excavation and stabilization. A more visible panel is not necessarily a better system after mast, foundation, shadowing, cable and repair mass are counted.
+
+Sources:
+- NASA Lunar Surface Technology: <https://www.nasa.gov/lunar-surface-technology/>
+- NASA NextSTEP-3 solicitation: <https://www.nasa.gov/news-release/nasa-calls-for-proposals-to-accelerate-lunar-surface-technologies/>
+- Gao et al., 2026: <https://www.nature.com/articles/s44453-026-00053-w>
+
+### PV/T, radiative cooling and CSP
+
+The 2026 review identifies photovoltaic/thermal concepts, deep-space radiative cooling, regolith thermal storage, parabolic-trough and linear-Fresnel CSP, and ORC / closed-Brayton power cycles. It reports roughly 50% higher solar-energy utilization for a cited PV/T configuration. That percentage is study-specific; retrieve the primary reference, boundary and numerator before adopting it as a benchmark target.
+
+The benchmark should compare electrical yield, useful heat at the right temperature, parasitic pumping, storage losses, radiator mass/area, view factor and lifetime separately. A PV/T plant with more combined energy is not automatically superior if it produces heat the mission cannot use.
+
+### Space-array mass is a critical design variable
+
+NASA's 2026 SmallSat Institute survey says empirical spacecraft solar arrays cluster near 30 W/kg across its cited mission dataset, with a broad empirical envelope of roughly 1–200 W/kg. The product catalogue lists examples including Redwire ROSA at 100 W/kg and MMA Design Hawk at 121 W/kg. These are spacecraft-array product/missionscale references, not lunar surface installed-system numbers. NASA explicitly notes that higher efficiency alone cannot resolve deep-space mass feasibility; array structure, stowage, deployment mechanisms and cell mass all matter.
+
+Benchmark implication: specific power must be published at multiple mass boundaries, adjusted to the declared heliocentric flux, and compared against equal mission power. Do not confuse an array product's W/kg with total plant W/kg after radiators, storage, deployment mechanisms, cable and repair equipment.
+
+Source: <https://www.nasa.gov/smallsat-institute/sst-soa/power-subsystems/>
+
+### Perovskite autonomous manufacturing baseline
+
+The 14 April 2026 *Nature* autonomous manufacturing study reports 27.18% certified MPPT efficiency for 0.05 cm² cells, 23.49% PCE for 21.4 cm² mini-modules, 98.7% retention after 1,200 hours under ISOS-L-1I, and nearly fivefold greater efficiency reproducibility than manual fabrication. This is a strong process-automation baseline. It is not a large-area factory-yield, lunar-qualification or radiation-lifetime result.
+
+Benchmark implication: reproduce the study's exact cell/module areas, illumination, stability, reproducibility and test protocols before claiming performance comparisons. Then test scale-up, batch yield, process tolerance, recycling and complete lifetime energy.
+
+Source: <https://doi.org/10.1038/s41586-026-10482-y>
+
+The machine-readable discovery register is at [`research/planetary-energy/source-register-v0.1.json`](../../research/planetary-energy/source-register-v0.1.json). It separates programme summaries, peer-reviewed experiments, reviews, and field-data programmes, and states what each source does not establish.
+
 ## 13. Industry comparison snapshot — 12 November 2026
 
 These references establish what an external comparator can currently support. They are not one interchangeable leaderboard.
