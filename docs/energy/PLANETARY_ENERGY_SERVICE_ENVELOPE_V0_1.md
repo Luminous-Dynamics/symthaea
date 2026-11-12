@@ -555,6 +555,26 @@ cargo run -p xtask -- planetary-reference-audit \
 
 It verifies unique source/reference/metric identities, required evidence and claim-boundary metadata, HTTPS source pointers, non-empty units and system boundaries, caveats, and metric-to-source references. It does not authenticate external URLs, reproduce a paper, verify the truth of a reported number, or validate a technology.
 
+### 14.4 Joined source-register audit
+
+The joined source-register / competitive-ledger audit is a separate command:
+
+~~~bash
+cargo run -p xtask -- planetary-source-audit
+~~~
+
+It checks source IDs, required claim/evidence boundaries, HTTPS pointers and metric-to-source cross references. It does not independently authenticate cited material.
+
+### 14.5 Optical-impact contract audit
+
+The low-optical-impact contract is specified in [PLANETARY_OPTICAL_IMPACT_STANDARD_V0_1.md](PLANETARY_OPTICAL_IMPACT_STANDARD_V0_1.md) and tracked in issue #11796.
+
+~~~bash
+cargo run -p xtask -- planetary-optical-impact-audit
+~~~
+
+The first synthetic corpus contains eight cases and distinguishes contract-only pass, observer-budget exceedance, radiator infeasibility, missing evidence and safety-blocked optical emitters / indicators. PASS_CONTRACT_ONLY is not a physical optical-safety or laser-safety qualification.
+
 ### Tests and claim ceiling
 
 Focused tests are authored under `xtask/src/planetary_energy.rs` and can be run with:
