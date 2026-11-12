@@ -14,7 +14,7 @@ The crate is standard-library-only and declares its own nested Cargo workspace.
 
 ## Implemented contract
 
-- Exact source artifact IDs, types, modalities and SHA-256 digests; canonical request contracts and a SHA-256 binding to the frozen registry snapshot.
+- Exact source artifact IDs, types, modalities and SHA-256 digests; source, operator and observer rights states with digest-bound licence/consent/authorization bases; canonical request contracts and a SHA-256 binding to the frozen registry snapshot.
 - Typed edit stages with explicit source/stage input bindings and topological dependencies.
 - Operator matching on operation, input/output types, modality, capabilities, locality ceiling, preservation guarantees, pre/postconditions, receipts, controls, rights, reproducibility, risk and resource estimates.
 - Deterministic candidate ranking; equal-cost/equal-risk top candidates return an explicit Ambiguous result unless the request names an exact preferred operator version.
