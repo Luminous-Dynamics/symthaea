@@ -15,8 +15,8 @@ type SUTLayer string
 const (
 	LayerFoundationModel SUTLayer = "foundation-model"
 	LayerInteractionAccess SUTLayer = "interaction-access"
-	LayerOrchestrationScheduler SUTLayer = "orchestration-scheduler"
-	LayerExecutionInfrastructure SUTLayer = "execution-infrastructure"
+	LayerExecutionScheduling SUTLayer = "execution-scheduling"
+	LayerUnderlyingInfrastructure SUTLayer = "underlying-infrastructure"
 )
 
 type AgentScenario string
@@ -67,8 +67,8 @@ var (
 var knownLayers = map[SUTLayer]bool{
 	LayerFoundationModel:true,
 	LayerInteractionAccess:true,
-	LayerOrchestrationScheduler:true,
-	LayerExecutionInfrastructure:true,
+	LayerExecutionScheduling:true,
+	LayerUnderlyingInfrastructure:true,
 }
 var knownScenarios = map[AgentScenario]bool{
 	ScenarioToolUsing:true,
