@@ -41,12 +41,12 @@ The source audit requires:
 - a source URL using HTTP(S);
 - an explicit `luminous_reproduction=false` field on every case;
 - an expected disposition for each negative control;
-- every `FUSION_DIRECT_ENERGY_CONVERSION` case has `particle_energy_origin`, `fusion_born_output_demonstrated=false`, and `comparison_status`.
+- every `FUSION_DIRECT_ENERGY_CONVERSION` and `FUSION_FUEL_ENERGY_PARTITION` case has `particle_energy_origin`, `fusion_born_output_demonstrated=false`, and `comparison_status`.
 
 This is metadata integrity only. The DEC-specific gate records that fusion-born electrical output was not demonstrated/attributed in the source case. This does not assert that a physical fusion-born contribution was exactly zero; unknown contributions remain unquantified. It prevents externally heated plasma recovery or a laboratory fundamental-unit experiment being silently promoted to demonstrated fusion-born energy recovery. It does not independently check paper contents, reproduce reported values, or establish that a source supports every interpretation in its case description.
 
 Current frozen input:
-- plasma-energy register: 24 cases / 24 controls, including five direct-energy-conversion cases, a D–³He/DT fuel-mixture neutron-partition model, and thermal-processing/ETES comparison references;
+- plasma-energy register: 24 cases / 24 controls, including five direct-energy-conversion cases and one separate D–³He fuel-mixture partition case, a D–³He/DT fuel-mixture neutron-partition model, and thermal-processing/ETES comparison references;
 - HTS fusion magnet register: 6 cases / 12 controls.
 
 ## 3. Synthetic thermal-store fixture
@@ -147,4 +147,4 @@ The next validation step is to execute the exact-head Rust tests on a Rust-capab
 
 The plasma source register includes a 2026 numerical ARC-class tokamak fuel-mixture study comparing D–T with 50% D / 50% ³He. It reports a 525 MW model comparison with source-specific temperatures/densities, average energy per reaction and neutron fractions. A derived arithmetic check records the modeled charged-energy fractions and their ratio.
 
-This is not a DEC experiment. The D–³He primary reaction produces charged alpha/proton products, but the D–³He fuel mixture still produces neutrons through D–D and secondary D–T reactions. Its much lower modelled neutron share is bought with a much higher temperature/density point and unresolved ignition/stability requirements in the source model. The charged-energy fraction must not be promoted to a converter efficiency or plant net electricity.
+This is not a DEC experiment. The D–³He primary reaction produces charged alpha/proton products, but the D–³He fuel mixture still produces neutrons through D–D and secondary D–T reactions. The fuel-partition record is explicitly origin-tagged and keeps `fusion_born_output_demonstrated=false` because it contains no direct-converter experiment. Its much lower modelled neutron share is bought with a much higher temperature/density point and unresolved ignition/stability requirements in the source model. The charged-energy fraction must not be promoted to a converter efficiency or plant net electricity.
