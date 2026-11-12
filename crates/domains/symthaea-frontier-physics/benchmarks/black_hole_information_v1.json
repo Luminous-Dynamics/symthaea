@@ -437,7 +437,7 @@
     {
       "id": "QI-4",
       "name": "Hayden-Preskill decoupling and reference recovery",
-      "status": "QI-4A direct decoupling + QI-4P Petz recovery source and five new Rust tests authored; exact-head execution pending",
+      "status": "QI-4A direct decoupling + QI-4P Petz recovery source and tests pass exact-head Rust 1.96 focused CI",
       "model": "Reference Q is initially maximally entangled with injected message M; black-hole register B is initially entangled with explicit early radiation R; a declared scrambler acts on M tensor B; emitted factors E are made accessible while remaining B' is inaccessible to the decoder.",
       "observables": [
         "mutual_information_Q_Bprime",
@@ -499,7 +499,7 @@
         "petz_baseline": "Input-independent replacement decoder I/2 has qubit entanglement fidelity 1/4",
         "petz_no_efficiency_claim": "A two-Kraus channel representation is not a physical circuit decomposition; do not claim decoder gate complexity or hardware efficiency."
       },
-      "implementation_status": "QI-4A direct trace-distance/Pinsker decoupling and QI-4P one-step Petz recovery source/ensemble implemented; five dedicated Petz Rust tests authored; Rust validation pending at the new head. Exact SDP optimum, rotated-Petz, charge-sector-aware recovery, and circuit synthesis remain future work.",
+      "implementation_status": "QI-4A direct trace-distance/Pinsker decoupling and QI-4P one-step Petz recovery source/ensemble; five dedicated Petz tests passed in the exact-head focused Rust run (132 crate tests total). Exact SDP optimum, rotated-Petz, charge-sector-aware recovery, and circuit synthesis remain future work.",
       "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
       "fixtures": [
         "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
@@ -831,7 +831,7 @@
     }
   },
   "implementation_progress": {
-    "source_status": "partial_source_authored; exact-head focused Rust runner pending for the latest Petz tests",
+    "source_status": "Rust 1.96 exact-head format, Clippy and focused frontier-physics tests passed at 79859caf77ff5b3214e8074fc8324d4bc5dfa615",
     "modules": [
       "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs"
     ],
@@ -859,10 +859,10 @@
       "QI_4A_direct_decoupling_trace_distance": "source_authored_not_executed",
       "QI_4A_quantum_Pinsker_consistency": "source_authored_not_executed",
       "QI_3H_joint_U1_hydrodynamic_scrambling_analysis": "source_authored_tests_pending_rust_execution",
-      "QI_4P_one_step_Petz_recovery": "source_authored_tests_added_runner_pending",
-      "QI_4P_unregularized_Hermitian_inverse_square_root": "source_authored_independent_numpy_crosscheck_runner_pending",
-      "QI_4P_Petz_recovery_ensemble_statistics": "source_authored_tests_added_runner_pending",
-      "QI_4P_identity_channel_analytic_control": "source_authored_tests_added_runner_pending",
+      "QI_4P_one_step_Petz_recovery": "Rust 1.96 exact-head validated; five dedicated Petz tests passed",
+      "QI_4P_unregularized_Hermitian_inverse_square_root": "Rust 1.96 exact-head validated; independent NumPy eigensolver agreement also recorded",
+      "QI_4P_Petz_recovery_ensemble_statistics": "Rust 1.96 exact-head validated; independent-seed ensemble and uncertainty tests passed",
+      "QI_4P_identity_channel_analytic_control": "Rust 1.96 exact-head validated; identity channel entanglement fidelity 1 regression passed",
       "QI_3_sequential_smaller_complementary_reduction": "source_authored_not_executed; only the smaller subsystem is materialized for each pure-state cut; complementary entropy and purity are reported via Schmidt-spectrum equality",
       "QI_2S_unequal_block_analytic_control": "source_authored_not_executed; N=4 K=1 A=1 and A=3 return 11/24 nats"
     },
@@ -870,7 +870,7 @@
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
       "finite_depth_random_circuit_ensembles": "seeded_Haar_U4_brickwork_and_all_to_all_matching_source_authored_not_executed; sequential_evaporation_and_energy_conserving_variants_not_implemented",
       "sequential_unitary_evaporation_model": "U(1)-conserving sequential factor-transfer source uses a seeded low-entanglement product state in a fixed Hamming-weight sector; only the smaller complementary subsystem is materialized under the 64-dimensional dense limit; Rust execution pending",
-      "hayden_preskill_recovery_decoders": "A one-step Petz recovery baseline and ensemble statistics are now source-authored for the four-qubit Haar-U4 channel. No exact SDP optimum, rotated-Petz comparison, charge-sector-aware recovery, scalable decoder circuit, or noise model yet.",
+      "hayden_preskill_recovery_decoders": "A one-step Petz recovery channel is implemented and exact-head Rust tested for the N=4 toy channel. Exact optimal SDP, rotated-Petz, charge-sector-resolved recovery, physical circuit synthesis, gate/depth cost, fault tolerance, and noisy/hardware decoder evaluation remain unimplemented.",
       "mps_entropy_from_validated_schmidt_spectrum": "not_qualified",
       "island_or_qes_calculation": "not_implemented",
       "energy_conserving_circuits": "U(1)-conserving equal-gap qubit gate family and sequential factor-transfer toy model authored; Rust execution pending",
@@ -885,15 +885,19 @@
     "runner_status": {
       "latest_formatter_head": "497ee59652a1948c1e0fdc918ca848f86736ab18",
       "formatter": "pinned Rust 1.96 rustfmt normalization succeeded",
-      "focused_rust_checks": "prior exact head green; new Petz test commit and fixture update require exact-head rerun",
+      "focused_rust_checks": "success at exact head: format pass, Clippy pass, 132 crate tests passed, 0 failed",
       "test_inventory": {
-        "black_hole_information_authored_tests": 68
+        "black_hole_information_authored_tests": 68,
+        "frontier_physics_crate_tests_passed": 132,
+        "petz_recovery_tests_passed": 5
       },
       "claim_ceiling": "No Rust build, Clippy pass, or Rust test pass is claimed at this head.",
-      "latest_source_head": "pending latest branch-head refresh",
+      "latest_source_head": "79859caf77ff5b3214e8074fc8324d4bc5dfa615",
       "last_green_source_head": "1bbb97c95a21b9024c181c6c519bd252463580bf",
       "last_green_focused_job": "43232825852",
-      "last_green_frontier_physics_tests": "127 passed; 0 failed at the prior exact head; does not cover the five new Petz tests"
+      "last_green_frontier_physics_tests": "127 passed; 0 failed at the prior exact head; does not cover the five new Petz tests",
+      "latest_focused_run": "43259019192",
+      "latest_focused_job": "131324957583"
     },
     "claim_ceiling": "The one-step Petz recovery map is a mathematically explicit finite-dimensional channel A=E tensor R -> Mhat. Its construction assumes the exact scrambler is known. No physical gate-level decoder compilation, efficient decoding claim, macroscopic black-hole recovery, or QES/island result is established."
   },
