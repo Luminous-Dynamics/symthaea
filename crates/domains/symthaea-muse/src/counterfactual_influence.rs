@@ -2380,6 +2380,199 @@ mod tests {
         );
     }
 
+    fn synthetic_measurement(
+        start_frame: usize,
+        end_frame: usize,
+        channel: usize,
+        enter: bool,
+        release: bool,
+    ) -> InfluenceWindowMeasurement {
+        InfluenceWindowMeasurement {
+            start_frame,
+            end_frame,
+            channel,
+            rms_delta: if enter { 1.0 } else if release { 0.5 } else { 0.0 },
+            peak_sample_delta: if enter { 1.0 } else if release { 0.5 } else { 0.0 },
+            spectral_magnitude_distance: if enter { 1.0 } else if release { 0.5 } else { 0.0 },
+            calibrated_rms_threshold: 0.8,
+            calibrated_spectral_threshold: 0.8,
+            calibrated_release_rms_threshold: 0.4,
+            calibrated_release_spectral_threshold: 0.4,
+            effect_detected: enter,
+            release_detected: release,
+            in_qualified_episode: false,
+            bridged_gap: false,
+        }
+    }
+
+    fn support_policy(
+        minimum_release_windows: usize,
+        maximum_gap_windows: usize,
+        tail_extension_frames: usize,
+    ) -> InfluenceSupportPolicy {
+        InfluenceSupportPolicy {
+            release_ratio_ppm: 700_000,
+            minimum_release_windows,
+            maximum_gap_windows,
+            tail_extension_frames,
+        }
+    }
+
+    #[test]
+    fn hysteresis_rejects_isolated_enter_spike_but_preserves_raw_trace() {
+        let mut measurements = vec![
+            synthetic_measurement(0, 16, 0, true, true),
+            synthetic_measurement(8, 24, 0, false, false),
+            synthetic_measurement(16, 32, 0, false, false),
+        ];
+        let (episodes, bridged, tail) =
+            qualify_support_episodes(&mut measurements, 1, 32, &support_policy(2, 1, 8))
+                .unwrap();
+        assert!(episodes.is_empty());
+        assert_eq!(bridged, 0);
+        assert_eq!(tail, 0);
+        assert!(measurements[0].effect_detected);
+        assert!(!measurements[0].in_qualified_episode);
+    }
+
+    #[test]
+    fn hysteresis_keeps_sustained_release_windows_after_enter_drops() {
+        let mut measurements = vec![
+            synthetic_measurement(0, 16, 0, true, true),
+            synthetic_measurement(8, 24, 0, false, true),
+            synthetic_measurement(16, 32, 0, false, true),
+            synthetic_measurement(24, 40, 0, false, false),
+        ];
+        let (episodes, bridged, tail) =
+            qualify_support_episodes(&mut measurements, 1, 40, &support_policy(2, 1, 0))
+                .unwrap();
+        assert_eq!(episodes.len(), 1);
+        assert_eq!(episodes[0].start_frame, 0);
+        assert_eq!(episodes[0].measured_end_frame, 32);
+        assert_eq!(episodes[0].end_frame, 32);
+        assert_eq!(bridged, 0);
+        assert_eq!(tail, 0);
+        assert!(measurements[..3].iter().all(|m| m.in_qualified_episode));
+    }
+
+    #[test]
+    fn hysteresis_bridges_one_sub_release_gap_but_keeps_gap_labelled() {
+        let mut measurements = vec![
+            synthetic_measurement(0, 16, 0, true, true),
+            synthetic_measurement(8, 24, 0, false, true),
+            synthetic_measurement(16, 32, 0, false, false),
+            synthetic_measurement(24, 40, 0, false, true),
+            synthetic_measurement(32, 48, 0, false, true),
+        ];
+        let (episodes, bridged, _) =
+            qualify_support_episodes(&mut measurements, 1, 48, &support_policy(2, 1, 0))
+                .unwrap();
+        assert_eq!(episodes.len(), 1);
+        assert_eq!(bridged, 1);
+        assert!(measurements[2].bridged_gap);
+        assert!(measurements[2].in_qualified_episode);
+        assert_eq!(episodes[0].measured_end_frame, 48);
+    }
+
+    #[test]
+    fn hysteresis_closes_episode_after_gap_budget_is_exhausted() {
+        let mut measurements = vec![
+            synthetic_measurement(0, 16, 0, true, true),
+            synthetic_measurement(8, 24, 0, false, true),
+            synthetic_measurement(16, 32, 0, false, false),
+            synthetic_measurement(24, 40, 0, false, false),
+            synthetic_measurement(32, 48, 0, true, true),
+            synthetic_measurement(40, 56, 0, false, true),
+        ];
+        let (episodes, bridged, _) =
+            qualify_support_episodes(&mut measurements, 1, 56, &support_policy(2, 1, 0))
+                .unwrap();
+        assert_eq!(episodes.len(), 2);
+        assert_eq!(bridged, 0);
+        assert_eq!(episodes[0].measured_end_frame, 24);
+        assert_eq!(episodes[1].start_frame, 32);
+        assert_eq!(episodes[1].measured_end_frame, 56);
+        assert!(!measurements[3].in_qualified_episode);
+    }
+
+    #[test]
+    fn hysteresis_preserves_raw_spike_without_planner_support() {
+        let mut measurements = vec![
+            synthetic_measurement(0, 16, 0, true, true),
+            synthetic_measurement(8, 24, 0, false, false),
+            synthetic_measurement(16, 32, 0, false, false),
+        ];
+        let raw_count = measurements.iter().filter(|m| m.effect_detected).count();
+        let (episodes, _, _) =
+            qualify_support_episodes(&mut measurements, 1, 32, &support_policy(2, 0, 16))
+                .unwrap();
+        assert_eq!(raw_count, 1);
+        assert!(episodes.is_empty());
+        assert!(measurements[0].effect_detected);
+        assert!(!measurements[0].in_qualified_episode);
+    }
+
+    #[test]
+    fn explicit_tail_extension_is_bounded_to_rendered_horizon() {
+        let mut measurements = vec![
+            synthetic_measurement(0, 16, 0, true, true),
+            synthetic_measurement(8, 24, 0, false, true),
+        ];
+        let (episodes, _, tail) =
+            qualify_support_episodes(&mut measurements, 1, 28, &support_policy(2, 0, 8))
+                .unwrap();
+        assert_eq!(episodes.len(), 1);
+        assert_eq!(episodes[0].measured_end_frame, 24);
+        assert_eq!(episodes[0].end_frame, 28);
+        assert_eq!(episodes[0].tail_extension_frames, 4);
+        assert_eq!(tail, 4);
+    }
+
+    #[test]
+    fn measured_empty_never_becomes_support_due_to_nonzero_tail_policy() {
+        let mut measurements = vec![
+            synthetic_measurement(0, 16, 0, false, false),
+            synthetic_measurement(8, 24, 0, false, false),
+        ];
+        let (episodes, _, tail) =
+            qualify_support_episodes(&mut measurements, 1, 24, &support_policy(1, 1, 20))
+                .unwrap();
+        assert!(episodes.is_empty());
+        assert_eq!(tail, 0);
+    }
+
+    #[test]
+    fn support_episodes_are_qualified_per_channel_before_interval_union() {
+        let mut measurements = vec![
+            synthetic_measurement(0, 16, 0, true, true),
+            synthetic_measurement(0, 16, 1, false, false),
+            synthetic_measurement(8, 24, 0, false, true),
+            synthetic_measurement(8, 24, 1, false, true),
+            synthetic_measurement(16, 32, 0, false, true),
+            synthetic_measurement(16, 32, 1, false, false),
+        ];
+        let (episodes, _, _) =
+            qualify_support_episodes(&mut measurements, 2, 32, &support_policy(2, 0, 0))
+                .unwrap();
+        assert_eq!(episodes.len(), 1);
+        assert_eq!(episodes[0].channel, 0);
+        assert_eq!(episodes[0].start_frame, 0);
+        assert_eq!(episodes[0].measured_end_frame, 32);
+    }
+
+    #[test]
+    fn support_policy_rejects_non_hysteretic_ratios_and_unbounded_tail() {
+        let mut config = config();
+        config.support_policy.release_ratio_ppm = 1_000_000;
+        assert!(validate_config(&config).is_err());
+        config.support_policy.release_ratio_ppm = 700_000;
+        config.support_policy.minimum_release_windows = 0;
+        assert!(validate_config(&config).is_err());
+        config.support_policy.minimum_release_windows = 2;
+        config.support_policy.tail_extension_frames = 10_000_001;
+        assert!(validate_config(&config).is_err());
+    }
+
     #[test]
     fn malformed_audio_and_analysis_config_fail_closed() {
         let empty = AudioView {
