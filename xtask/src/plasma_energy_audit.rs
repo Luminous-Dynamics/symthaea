@@ -8,7 +8,7 @@
 //! physical plant. It validates source metadata and declared accounting
 //! identities. A balanced synthetic scenario is not a physical observation.
 
-use anyhow::{Context, Result, bail, ensure};
+use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -28,7 +28,7 @@ pub struct SourceManifestSummary {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum ScenarioDisposition {
+pub enum ScenarioDisposition {
     Pass,
     Blocked,
     Rejected,
@@ -36,7 +36,7 @@ enum ScenarioDisposition {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum ComparisonDisposition {
+pub enum ComparisonDisposition {
     Comparable,
     NotComparable,
     Blocked,
@@ -265,120 +265,11 @@ pub fn run_audit(
 }
 
 fn audit_source_manifest(path: &Path) -> Result<SourceManifestSummary> {
-    let bytes = fs::read(path).with_context(|| format!("read source manifest {}", path.display()))?;
+    let bytes = fs::read(path)
+        .with_context(|| format!("read source manifest {}", path.display()))?;
     let root: Value = serde_json::from_slice(&bytes)
         .with_context(|| format!("parse source manifest {}", path.display()))?;
-
-    let programme = root
-        .get("programme")
-        .and_then(Value::as_str)
-        .filter(|value| !value.trim().is_empty())
-        .context("source manifest has no non-empty programme")?
-        .to_owned();
-    let claim_ceiling = root
-        .get("claim_ceiling")
-        .and_then(Value::as_str)
-        .filter(|value| !value.trim().is_empty())
-        .context("source manifest has no explicit claim ceiling")?;
-    ensure!(
-        !claim_ceiling.trim().is_empty(),
-        "source manifest claim ceiling must not be empty"
-    );
-
-    let evidence_classes = root
-        .get("evidence_classes")
-        .and_then(Value::as_array)
-        .context("source manifest has no evidence_classes array")?;
-    let mut admitted_classes = BTreeSet::new();
-    for class in evidence_classes {
-        let class = class
-            .as_str()
-            .filter(|value| !value.trim().is_empty())
-            .context("source manifest contains an empty/non-string evidence class")?;
-        ensure!(
-            admitted_classes.insert(class.to_owned()),
-            "duplicate declared evidence class: {class}"
-        );
-    }
-    ensure!(
-        !admitted_classes.is_empty(),
-        "source manifest has no declared evidence classes"
-    );
-
-    let cases = root
-        .get("cases")
-        .and_then(Value::as_array)
-        .context("source manifest has no cases array")?;
-    ensure!(!cases.is_empty(), "source manifest has no source cases");
-
-    let mut case_ids = BTreeSet::new();
-    for case in cases {
-        let case_id = case
-            .get("case_id")
-            .and_then(Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-            .context("source case has no non-empty case_id")?;
-        ensure!(
-            case_ids.insert(case_id.to_owned()),
-            "duplicate source case ID: {case_id}"
-        );
-
-        let evidence_class = case
-            .get("evidence_class")
-            .and_then(Value::as_str)
-            .context("source case has no evidence_class")?;
-        ensure!(
-            admitted_classes.contains(evidence_class),
-            "source case {case_id} uses undeclared evidence class {evidence_class}"
-        );
-
-        ensure!(
-            case.get("luminous_reproduction").and_then(Value::as_bool) == Some(false),
-            "source case {case_id} does not explicitly preserve luminous_reproduction=false"
-        );
-
-        let source_url = case
-            .get("source")
-            .and_then(|source| source.get("url"))
-            .and_then(Value::as_str)
-            .filter(|value| {
-                value.starts_with("https://") || value.starts_with("http://")
-            })
-            .with_context(|| format!("source case {case_id} has no valid HTTP(S) source URL"))?;
-        ensure!(
-            !source_url.trim().is_empty(),
-            "source case {case_id} source URL is empty"
-        );
-    }
-
-    let controls = root
-        .get("negative_controls")
-        .and_then(Value::as_array)
-        .context("source manifest has no negative_controls array")?;
-    ensure!(!controls.is_empty(), "source manifest has no negative controls");
-    let mut control_ids = BTreeSet::new();
-    for control in controls {
-        let control_id = control
-            .get("control_id")
-            .and_then(Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-            .context("negative control has no non-empty control_id")?;
-        ensure!(
-            control_ids.insert(control_id.to_owned()),
-            "duplicate negative-control ID: {control_id}"
-        );
-        ensure!(
-            control.get("expected_disposition").and_then(Value::as_str).is_some(),
-            "negative control {control_id} has no expected_disposition"
-        );
-    }
-
-    Ok(SourceManifestSummary {
-        path: path.display().to_string(),
-        programme,
-        case_count: cases.len(),
-        negative_control_count: controls.len(),
-    })
+    audit_source_value(&root, &path.display().to_string())
 }
 
 fn validate_fixture_header(fixture: &ThermalFixtureManifest) -> Result<()> {
@@ -541,8 +432,8 @@ fn evaluate_scenario(scenario: &ThermalScenario) -> ScenarioResult {
     if hold_reconstructed != charge.stored_energy_increase_j {
         return reject("charge-end stored energy does not close to post-hold energy plus hold loss");
     }
-    if hold.hold_duration_s > scenario.service.delivery_duration_s.saturating_mul(86_400) {
-        return reject("hold duration exceeds representable scenario horizon");
+    if hold.hold_duration_s == 0 {
+        return blocked("storage hold duration is absent");
     }
 
     let Some(discharge_reconstructed) = discharge
