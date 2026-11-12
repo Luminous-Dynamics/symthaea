@@ -16,7 +16,7 @@ use std::path::{Component, Path, PathBuf};
 
 use symthaea_camera_driving_bridge::{
     BridgeConfig, CameraDrivingBridge, CapturedDrivingObservation, DrivingObservationReceipt,
-    DrivingRunIdentity, UpstreamCameraObservation, RECEIPT_SCHEMA_VERSION,
+    DrivingRunIdentity, RECEIPT_SCHEMA_VERSION, UpstreamCameraObservation,
 };
 use symthaea_vehicle::VehicleState;
 use symthaea_vision_manifold::VisionConfig;
@@ -85,7 +85,9 @@ fn safe_relative_path(value: &str) -> Result<PathBuf, String> {
             )
         })
     {
-        return Err(format!("pixels_file must be a safe relative path, got {value:?}"));
+        return Err(format!(
+            "pixels_file must be a safe relative path, got {value:?}"
+        ));
     }
     Ok(path.to_path_buf())
 }
@@ -103,7 +105,9 @@ fn resolve_input_file(base: &Path, relative: &Path) -> Result<PathBuf, String> {
     let metadata = fs::metadata(&candidate)
         .map_err(|error| format!("cannot inspect pixel artifact {relative:?}: {error}"))?;
     if !metadata.is_file() {
-        return Err(format!("pixel artifact is not a regular file: {relative:?}"));
+        return Err(format!(
+            "pixel artifact is not a regular file: {relative:?}"
+        ));
     }
     Ok(candidate)
 }
@@ -157,20 +161,17 @@ fn process_episode(
         .into());
     }
     if request.observations.is_empty() || request.observations.len() > MAX_EPISODE_OBSERVATIONS {
-        return Err(format!(
-            "observations must contain 1..={MAX_EPISODE_OBSERVATIONS} entries"
-        )
-        .into());
+        return Err(
+            format!("observations must contain 1..={MAX_EPISODE_OBSERVATIONS} entries").into(),
+        );
     }
 
     let input_base = request_path
         .parent()
         .filter(|parent| !parent.as_os_str().is_empty())
         .unwrap_or_else(|| Path::new("."));
-    let mut bridge = CameraDrivingBridge::try_new(
-        request.bridge_config.clone(),
-        request.vision_config,
-    )?;
+    let mut bridge =
+        CameraDrivingBridge::try_new(request.bridge_config.clone(), request.vision_config)?;
     let initial_training_steps = bridge.training_steps();
 
     if output_path.exists() {
@@ -217,10 +218,8 @@ fn process_episode(
             upstream: observation.upstream.clone(),
         })?;
 
-        let policy_input_bytes = encode_policy_hv(
-            result.policy_input.dim(),
-            result.policy_input.as_slice(),
-        )?;
+        let policy_input_bytes =
+            encode_policy_hv(result.policy_input.dim(), result.policy_input.as_slice())?;
         let policy_input_sha256 = sha256_hex(&policy_input_bytes);
         let policy_input_byte_length = policy_input_bytes.len();
         if policy_input_sha256 != result.receipt.fused_policy_input_sha256 {
@@ -235,7 +234,9 @@ fn process_episode(
             .checked_add(policy_input_bytes.len() as u64)
             .ok_or("aggregate policy-input output size overflow")?;
         if aggregate_policy_output_bytes > MAX_EPISODE_POLICY_OUTPUT_BYTES {
-            return Err("aggregate policy-input artifacts exceed the 1 GiB episode output bound".into());
+            return Err(
+                "aggregate policy-input artifacts exceed the 1 GiB episode output bound".into(),
+            );
         }
 
         let artifact_name = format!("policy_input_{:08}.f32le", observation.sequence);
@@ -252,8 +253,9 @@ fn process_episode(
         });
         receipts.push(result.receipt);
 
-        if index > 0 && receipts[index].previous_receipt_sha256.as_ref()
-            != Some(&receipts[index - 1].receipt_sha256)
+        if index > 0
+            && receipts[index].previous_receipt_sha256.as_ref()
+                != Some(&receipts[index - 1].receipt_sha256)
         {
             return Err(format!(
                 "receipt chain mismatch between sequences {} and {}",
@@ -300,7 +302,10 @@ fn process_episode(
     }
 
     let encoded_output = serde_json::to_vec_pretty(&output)?;
-    if let Some(parent) = output_path.parent().filter(|path| !path.as_os_str().is_empty()) {
+    if let Some(parent) = output_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+    {
         fs::create_dir_all(parent)?;
     }
     fs::write(output_path, encoded_output)?;
@@ -335,7 +340,6 @@ fn main() {
         std::process::exit(2);
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -477,11 +481,7 @@ mod tests {
                 }
             ]
         });
-        fs::write(
-            &request_path,
-            serde_json::to_vec_pretty(&request).unwrap(),
-        )
-        .unwrap();
+        fs::write(&request_path, serde_json::to_vec_pretty(&request).unwrap()).unwrap();
 
         let error = process_episode(&request_path, &output_path, &policy_input_dir)
             .err()
@@ -495,10 +495,7 @@ mod tests {
 
     #[test]
     fn rejects_non_empty_policy_input_output_directory_before_processing() {
-        let unique = format!(
-            "symthaea-camera-bridge-output-test-{}",
-            std::process::id()
-        );
+        let unique = format!("symthaea-camera-bridge-output-test-{}", std::process::id());
         let base = std::env::temp_dir().join(unique);
         let policy_dir = base.join("policy-inputs");
         let output_path = base.join("receipts.json");
