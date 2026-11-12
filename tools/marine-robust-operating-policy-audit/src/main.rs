@@ -50,6 +50,7 @@ struct DatasetEvidence {
 struct ServiceScenario {
     vessel_id: String,
     vessel_configuration_sha256: String,
+    scenario_fingerprint_sha256: String,
     propeller_design_id: String,
     propeller_revision: String,
     service_fingerprint_sha256: String,
@@ -296,6 +297,7 @@ fn validate_case(case: &Case) -> Vec<String> {
     }
     for (label, digest) in [
         ("vessel configuration", &case.scenario.vessel_configuration_sha256),
+        ("scenario fingerprint", &case.scenario.scenario_fingerprint_sha256),
         ("service fingerprint", &case.scenario.service_fingerprint_sha256),
         ("environment fingerprint", &case.scenario.environment_fingerprint_sha256),
         ("hull state", &case.scenario.hull_state_sha256),
@@ -370,8 +372,8 @@ fn validate_case(case: &Case) -> Vec<String> {
                 errors.push(format!("{}: {label} digest is invalid", candidate.candidate_id));
             }
         }
-        if candidate.scenario_fingerprint_sha256 != case.scenario.service_fingerprint_sha256 {
-            errors.push(format!("{}: candidate does not bind to the frozen service-scenario fingerprint", candidate.candidate_id));
+        if candidate.scenario_fingerprint_sha256 != case.scenario.scenario_fingerprint_sha256 {
+            errors.push(format!("{}: candidate does not bind to the frozen vessel/service scenario fingerprint", candidate.candidate_id));
         }
         if !finite_positive(candidate.propeller_rpm) || !finite_positive(candidate.vessel_speed_knots) {
             errors.push(format!("{}: propeller RPM and vessel speed must be finite and positive", candidate.candidate_id));
@@ -525,6 +527,9 @@ fn evaluate_candidate(case: &Case, candidate: &Candidate) -> CandidateReport {
     let evidence_eligible = matches!(
         candidate.evidence_kind,
         EvidenceKind::MeasuredFullScale | EvidenceKind::IndependentlyValidatedTransfer
+    ) && matches!(
+        case.evidence_kind,
+        EvidenceKind::MeasuredFullScale | EvidenceKind::IndependentlyValidatedTransfer
     ) && candidate.independently_reviewed
         && case.rights_status == RightsStatus::PublicOrPermitted
         && case.independently_reviewed;
@@ -622,7 +627,7 @@ fn audit(case: &Case) -> AuditReport {
         case_id: case.case_id.clone(),
         dataset_id: case.source.dataset_id.clone(),
         service_fingerprint_sha256: case.scenario.service_fingerprint_sha256.clone(),
-        scenario_fingerprint_sha256: case.scenario.vessel_configuration_sha256.clone(),
+        scenario_fingerprint_sha256: case.scenario.scenario_fingerprint_sha256.clone(),
         disposition,
         candidate_reports,
         feasible_pareto_frontier_candidate_ids: frontier,
@@ -747,6 +752,7 @@ mod tests {
             scenario: ServiceScenario {
                 vessel_id: "V-001".to_string(),
                 vessel_configuration_sha256: digest('8'),
+                scenario_fingerprint_sha256: digest('2'),
                 propeller_design_id: "P-001".to_string(),
                 propeller_revision: "rev-7".to_string(),
                 service_fingerprint_sha256: digest('2'),
@@ -858,8 +864,6 @@ mod tests {
         input.candidates[0].evidence_kind = EvidenceKind::MeasuredFullScale;
         input.candidates[1].evidence_kind = EvidenceKind::MeasuredFullScale;
         input.candidates[2].evidence_kind = EvidenceKind::MeasuredFullScale;
-        input.candidates[2].metrics.primary_energy_kwh_per_tonne_nm = 0.19;
-        input.candidates[2].metrics.well_to_wake_ghg_gco2e_per_tonne_nm = 0.09;
         let report = audit(&input);
         assert!(!report.feasible_pareto_frontier_candidate_ids.contains(&"C".to_string()));
         assert_eq!(
@@ -892,6 +896,39 @@ mod tests {
         let report = audit(&input);
         assert_eq!(report.candidate_reports[0].disposition, "INFEASIBLE");
         assert_eq!(report.candidate_reports[1].disposition, "INFEASIBLE");
+    }
+
+    #[test]
+    fn equality_at_a_declared_robust_limit_is_feasible() {
+        assert_eq!(max_gate(9.5, 0.5, 10.0), GateResult::Pass);
+        assert_eq!(min_gate(10.5, 0.5, 10.0), GateResult::Pass);
+    }
+
+    #[test]
+    fn physical_evidence_requires_both_case_and_candidate_status() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::MeasuredFullScale;
+        input.rights_status = RightsStatus::PublicOrPermitted;
+        input.candidates[0].evidence_kind = EvidenceKind::MeasuredFullScale;
+        input.candidates[1].evidence_kind = EvidenceKind::MeasuredFullScale;
+        input.candidates[2].evidence_kind = EvidenceKind::PredictionOnly;
+        let report = audit(&input);
+        assert_eq!(report.candidate_reports.iter().find(|x| x.candidate_id == "A").unwrap().disposition, "FEASIBLE");
+        assert_eq!(report.candidate_reports.iter().find(|x| x.candidate_id == "C").unwrap().disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn identical_policies_are_both_preserved_as_nondominated() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::MeasuredFullScale;
+        input.rights_status = RightsStatus::PublicOrPermitted;
+        input.candidates[0].evidence_kind = EvidenceKind::MeasuredFullScale;
+        input.candidates[1] = input.candidates[0].clone();
+        input.candidates[1].candidate_id = "A-copy".to_string();
+        input.candidates[1].operating_point_id = "op-A-copy".to_string();
+        let report = audit(&input);
+        assert!(report.feasible_pareto_frontier_candidate_ids.contains(&"A".to_string()));
+        assert!(report.feasible_pareto_frontier_candidate_ids.contains(&"A-copy".to_string()));
     }
 
     #[test]
