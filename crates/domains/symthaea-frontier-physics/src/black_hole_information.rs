@@ -1433,7 +1433,7 @@ pub fn simulate_u1_domain_wall_transport(
             maximum: MAX_DENSE_STATE_QUBITS,
         });
     }
-    if initial_left_excitations * 2 != number_of_qubits {
+    if initial_left_excitations != number_of_qubits / 2 {
         return Err(QuantumInformationError::InvalidExcitationSector {
             excitations: initial_left_excitations,
             number_of_qubits,
