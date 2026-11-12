@@ -25,8 +25,6 @@
   "pairs": [
     {
       "pair_id": "pair-1",
-      "shared_timebase_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "scale_transfer_u95_db": 0.4,
       "model": {
         "run_id": "model-1",
         "operating_point_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -46,9 +44,12 @@
             "background_u95_db": 0.2,
             "facility_transfer_u95_db": 0.1,
             "frequency_regime": "low_frequency",
-            "frequency_regime_basis": "Synthetic known-answer selection only; no physical regime claim"
+            "frequency_regime_basis": "Synthetic known-answer selection only; no physical regime claim",
+            "scale_transfer_u95_db": 0.4
           }
-        ]
+        ],
+        "timebase_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "rpm_u95_hz": 0.01
       },
       "full_scale": {
         "run_id": "full-1",
@@ -66,13 +67,12 @@
             "source_level_db": 115.56302500767288,
             "source_level_u95_db": 0.5
           }
-        ]
+        ],
+        "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
       }
     },
     {
       "pair_id": "pair-2",
-      "shared_timebase_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-      "scale_transfer_u95_db": 0.4,
       "model": {
         "run_id": "model-2",
         "operating_point_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -92,9 +92,12 @@
             "background_u95_db": 0.2,
             "facility_transfer_u95_db": 0.1,
             "frequency_regime": "low_frequency",
-            "frequency_regime_basis": "Synthetic known-answer selection only; no physical regime claim"
+            "frequency_regime_basis": "Synthetic known-answer selection only; no physical regime claim",
+            "scale_transfer_u95_db": 0.4
           }
-        ]
+        ],
+        "timebase_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "rpm_u95_hz": 0.01
       },
       "full_scale": {
         "run_id": "full-2",
@@ -112,7 +115,8 @@
             "source_level_db": 116.56302500767288,
             "source_level_u95_db": 0.5
           }
-        ]
+        ],
+        "timebase_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
       }
     }
   ]
