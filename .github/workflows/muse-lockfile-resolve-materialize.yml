@@ -1,0 +1,35 @@
+name: Muse Lockfile Resolve Materialization
+
+on:
+  push:
+    branches:
+      - "research/mel-mr-eval-036-*"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/muse-lockfile-resolve-materialize.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+      - name: Resolve workspace lockfile and emit exact Cargo output
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo metadata --format-version 1 > /tmp/cargo-metadata.json
+          echo "CARGO_LOCK_BEGIN"
+          base64 -w0 Cargo.lock
+          echo
+          echo "CARGO_LOCK_END"
+          git status --short
