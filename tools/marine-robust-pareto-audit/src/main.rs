@@ -629,10 +629,10 @@ fn evaluate_candidate(case: &Case, candidate: &Candidate) -> EvaluatedCandidate 
     }
 
     gate_results.sort_by(|left, right| left.gate_id.cmp(&right.gate_id));
-    let disposition = if service_incomparable {
-        "INCOMPARABLE_SERVICE"
-    } else if gate_failed {
+    let disposition = if gate_failed {
         "EXCLUDED_HARD_GATE"
+    } else if service_incomparable {
+        "INCOMPARABLE_SERVICE"
     } else if service_unresolved || gate_unresolved {
         "HOLD_UNRESOLVED"
     } else {
@@ -1234,7 +1234,7 @@ mod tests {
     }
 
     #[test]
-    fn overflowed_metric_interval_is_invalid() {
+    fn overflowed_metric_interval_is_rejected() {
         let mut input = case();
         let metric = input.candidates[0].metrics.iter_mut()
             .find(|metric| metric.metric_id == "energy_per_cargo_work")
@@ -1242,6 +1242,53 @@ mod tests {
         metric.value = f64::MAX;
         metric.expanded_uncertainty = f64::MAX;
         assert_eq!(audit(&input).disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn hard_gate_failure_is_never_masked_by_service_mismatch() {
+        let mut input = case();
+        input.candidates[0].service_fingerprint_sha256 = digest('9');
+        input.candidates[0].gate_receipts[0].status = GateStatus::Failed;
+        let report = audit(&input);
+        assert_eq!(report.candidate_reports[0].disposition, "EXCLUDED_HARD_GATE");
+        assert!(report.robust_frontier.iter().all(|entry| entry.candidate_id != "A"));
+    }
+
+    #[test]
+    fn metric_gate_unit_mismatch_is_rejected_before_comparison() {
+        let mut input = case();
+        input.hard_gates[0].unit = Some("wrong_unit".to_string());
+        assert_eq!(audit(&input).disposition, "INCOMPLETE");
+        assert!(audit(&input).pairwise_relations.is_empty());
+    }
+
+    #[test]
+    fn external_receipt_contract_mismatch_is_rejected() {
+        let mut input = case();
+        input.candidates[0].gate_receipts[0].audit_contract_id = "different-audit".to_string();
+        assert_eq!(audit(&input).disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn maximizing_objective_uses_lower_interval_against_upper_interval() {
+        let mut input = case();
+        input.objectives.push(ObjectiveDefinition {
+            metric_id: "availability".to_string(),
+            direction: Direction::Maximize,
+            unit: "fraction".to_string(),
+        });
+        for candidate in &mut input.candidates {
+            let mut observation = metric("availability", if candidate.candidate_id == "A" {0.99} else {0.95}, "fraction");
+            observation.expanded_uncertainty = 0.001;
+            observation.operating_point_receipt_sha256 = candidate.operating_point_receipt_sha256.clone();
+            candidate.metrics.push(observation);
+        }
+        let report = audit(&input);
+        let relation = &report.pairwise_relations[0];
+        let availability = relation.objective_evidence.iter()
+            .find(|item| item.metric_id == "availability").unwrap();
+        assert!(availability.a_definitely_better);
+        assert!(!availability.b_definitely_better);
     }
 
     #[test]
