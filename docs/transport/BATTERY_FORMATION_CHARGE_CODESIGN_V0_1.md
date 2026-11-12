@@ -31,7 +31,7 @@ For each exact cell design, freeze a complete formation × charge-policy matrix:
 
 Extend the matrix when more than two factor levels are scientifically justified. Randomize physical cells within lot/line blocks. Record the executed waveforms and environment, not just the intended protocol names.
 
-The v0.1 software contract requires at least two distinct formation profiles, two distinct charge policies, every Cartesian pairing per design revision, and exactly one declared reference arm. It also declares a blocking axis (lot or line) and rejects any block that does not contain every arm, so the interaction is not inferred from unpaired missing treatment groups.
+The v0.1 software contract requires at least two distinct formation profiles, two distinct charge policies, every Cartesian pairing per design revision, and exactly one reference arm per exact design revision. It also declares a blocking axis (lot or line) and rejects any block that does not contain every arm, so the interaction is not inferred from unpaired missing treatment groups.
 
 ## Compose existing owners
 
