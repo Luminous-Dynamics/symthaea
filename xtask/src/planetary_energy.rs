@@ -552,7 +552,6 @@ struct ServiceInterval {
     duration_hours: f64,
     capability_receipt_id: String,
     electricity: ElectricService,
-    #[serde(default)]
     thermal_services: Vec<ThermalService>,
 }
 
@@ -949,7 +948,7 @@ pub fn audit_service_corpus(bytes: &[u8]) -> Result<ServiceAuditReport> {
         } else {
             "PASS_SYNTHETIC_SERVICE"
         };
-        let expectation_matches = actual_disposition == scenario.expected_disposition;
+        let expectation_matches = actual_disposition == scenario.expected_disposition.as_str();
         if !expectation_matches {
             findings.push(finding(
                 "EXPECTED_DISPOSITION_MISMATCH",
@@ -1004,7 +1003,7 @@ pub fn audit_service_corpus(bytes: &[u8]) -> Result<ServiceAuditReport> {
         report_schema: "planetary-energy-service-audit-report-v0.1",
         source_sha256,
         status,
-        claim_ceiling: "synthetic_upstream_service_receipt_completeness_and_comparison_only",
+        claim_ceiling: "synthetic_receipt_identity_presence_and_declared_service_comparison_only",
         scenario_count: scenarios.len(),
         passed_count,
         infeasible_count,
@@ -1229,6 +1228,18 @@ mod service_tests {
         let permuted = audit_service_corpus(&bytes).expect("service corpus parses");
         assert_eq!(original.status, permuted.status);
         assert_eq!(original.scenarios, permuted.scenarios);
+    }
+
+
+    #[test]
+    fn thermal_service_list_must_be_explicit_even_when_empty() {
+        let mut value = value_from_fixture();
+        value["scenarios"][1]["intervals"][0]
+            .as_object_mut()
+            .expect("interval object")
+            .remove("thermal_services");
+        let bytes = serde_json::to_vec(&value).expect("fixture serializes");
+        assert!(audit_service_corpus(&bytes).is_err());
     }
 
     #[test]
