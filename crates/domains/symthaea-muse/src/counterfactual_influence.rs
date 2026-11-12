@@ -2126,7 +2126,7 @@ mod tests {
 
         // Target timing is invariant under a pitch-only operation.
         let changed_target = {
-            let mut row = changed_target.clone();
+            let mut row = (*changed_target).clone();
             row.onset_frame += 1;
             row
         };
@@ -2148,7 +2148,7 @@ mod tests {
             .find(|row| row.source_event_id == "score_event_index:1")
             .unwrap();
         let changed_protected = {
-            let mut row = counterfactual_protected.clone();
+            let mut row = (*counterfactual_protected).clone();
             row.midi_note += 1;
             row
         };
