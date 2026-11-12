@@ -226,7 +226,7 @@ A task counts as productive only when its task-specific completion criteria and 
 
 - Dedicated/on-robot GPU baseline.
 - Shared GPU pool with unconstrained best-effort batching.
-- Static active-episode/concurrency cap.
+- Static active-episode/concurrency cap, with an executable deterministic selector in [fleet-admission reference PR #11652](https://github.com/Luminous-Dynamics/symthaea/pull/11652). It preserves incumbents, fills free slots deterministically, defers excess candidates, and refuses a cap reduction that would silently preempt active episodes.
 - ROSA-style task-SLO / factory-productivity scheduler (where a reproducible implementation is available).
 - Round Robin, EDF, Armory Lookahead and RED.
 - Luminous constrained mission-aware admission.
