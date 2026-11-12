@@ -142,6 +142,7 @@ struct AmbientObservation {
     duration_s: f64,
     ambient_spl_db: f64,
     expanded_uncertainty_db: f64,
+    uncertainty_confidence_level: f64,
     measurement_method_id: String,
     instrument_id: String,
     calibration_certificate_sha256: String,
@@ -200,6 +201,7 @@ struct ExposurePartitionReport {
     ambient_reference_sel_db: Option<f64>,
     ambient_reference_sel_lower_db: Option<f64>,
     ambient_reference_sel_upper_db: Option<f64>,
+    ambient_reference_uncertainty_confidence_level: Option<f64>,
     ambient_observation_refs: Vec<AmbientObservationRef>,
     ambient_only_basis: &'static str,
 }
@@ -211,6 +213,7 @@ struct AmbientObservationRef {
     calibration_certificate_sha256: String,
     measurement_method_id: String,
     instrument_id: String,
+    uncertainty_confidence_level: f64,
     timebase_receipt_sha256: String,
 }
 
@@ -529,6 +532,9 @@ fn validate_case(case: &Case) -> Vec<String> {
             || observation.end_time_s > case.period.end_time_s
             || !observation.ambient_spl_db.is_finite()
             || !finite_positive(observation.expanded_uncertainty_db)
+            || !observation.uncertainty_confidence_level.is_finite()
+            || observation.uncertainty_confidence_level <= 0.0
+            || observation.uncertainty_confidence_level >= 1.0
         {
             errors.push(format!("ambient observation {} has invalid identity, timing, method or level", observation.observation_id));
         }
@@ -564,6 +570,9 @@ fn validate_case(case: &Case) -> Vec<String> {
         for pair in records.windows(2) {
             if pair[1].start_time_s < pair[0].end_time_s - TIME_TOLERANCE_S {
                 errors.push(format!("ambient reference for receiver {receiver_id}, band {band_id} contains overlapping samples that would double-count ambient SEL"));
+            }
+            if (pair[1].uncertainty_confidence_level - pair[0].uncertainty_confidence_level).abs() > 1.0e-12 {
+                errors.push(format!("ambient reference for receiver {receiver_id}, band {band_id} uses inconsistent uncertainty confidence levels"));
             }
         }
     }
@@ -704,6 +713,8 @@ fn calculate_ambient_sel(
             raw_trace_sha256:observation.raw_trace_sha256.clone(),
             calibration_certificate_sha256:observation.calibration_certificate_sha256.clone(),
             measurement_method_id:observation.measurement_method_id.clone(),
+            instrument_id:observation.instrument_id.clone(),
+            uncertainty_confidence_level:observation.uncertainty_confidence_level,
             timebase_receipt_sha256:observation.timebase_receipt_sha256.clone(),
         });
     }
@@ -807,6 +818,7 @@ fn audit(case:&Case)->AuditReport {
         let ambient_refs:Vec<&AmbientObservation>=case.ambient_observations.iter()
             .filter(|obs|obs.receiver_id==receiver_id&&obs.band_id==band_id).collect();
         let (ambient_sel,ambient_lower,ambient_upper,ambient_observation_refs)=calculate_ambient_sel(&ambient_refs);
+        let ambient_confidence=ambient_refs.first().map(|observation|observation.uncertainty_confidence_level);
         partitions.push(ExposurePartitionReport {
             receiver_id:receiver_id.clone(),
             band_id:band_id.clone(),
@@ -829,6 +841,7 @@ fn audit(case:&Case)->AuditReport {
             ambient_reference_sel_db:ambient_sel,
             ambient_reference_sel_lower_db:ambient_lower,
             ambient_reference_sel_upper_db:ambient_upper,
+            ambient_reference_uncertainty_confidence_level:ambient_confidence,
             ambient_observation_refs,
             ambient_only_basis:"separate_ambient_reference_not_added_to_ship_energy",
         });
@@ -1062,6 +1075,7 @@ mod tests {
             duration_s:100.0,
             ambient_spl_db:50.0,
             expanded_uncertainty_db:1.0,
+            uncertainty_confidence_level:0.95,
             measurement_method_id:"ambient-monitoring-v1".to_string(),
             instrument_id:"hydrophone-1".to_string(),
             calibration_certificate_sha256:digest('f'),
@@ -1153,6 +1167,18 @@ mod tests {
         input.contributions[1].end_time_s=20.0;
         assert!((audit(&input).partitions[0].maximum_simultaneous_ship_received_level_db.unwrap()-60.0).abs()<1e-12);
         assert!((audit(&input).partitions[0].unique_temporal_coverage_s-20.0).abs()<1e-12);
+    }
+
+    #[test]
+    fn ambient_uncertainty_confidence_must_match_within_partition() {
+        let mut input=case();
+        let mut second=ambient();
+        second.observation_id="ambient-2".to_string();
+        second.start_time_s=100.0;
+        second.end_time_s=200.0;
+        second.uncertainty_confidence_level=0.99;
+        input.ambient_observations.push(second);
+        assert_eq!(audit(&input).disposition,"INVALID");
     }
 
     #[test]
