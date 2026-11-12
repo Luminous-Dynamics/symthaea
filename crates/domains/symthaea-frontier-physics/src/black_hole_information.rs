@@ -2235,8 +2235,7 @@ fn petz_recovery_from_scrambler(
                 for message in 0..2 {
                     let input = (message << 1) | r;
                     let output = (e << 1) | b_prime;
-                    kraus[accessible * 2 + message] =
-                        scrambler[output][input] * inverse_sqrt_two;
+                    kraus[accessible * 2 + message] = scrambler[output][input] * inverse_sqrt_two;
                 }
             }
         }
