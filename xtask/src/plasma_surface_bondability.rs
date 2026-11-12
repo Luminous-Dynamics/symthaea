@@ -90,7 +90,7 @@ struct Arm {
     energy_boundary_contract_id: String,
     complete_system_energy_kwh_per_m2: f64,
     subsystem_energy_kwh_per_m2: BTreeMap<String, f64>,
-    contact_angle_deg: f64,
+    contact_angle_deg: Option<f64>,
     substrate_functional_property_retention: f64,
     bond_strength_mpa_by_delay: BTreeMap<String, Vec<f64>>,
     expected_disposition: ArmDisposition,
@@ -343,10 +343,10 @@ fn evaluate_arm(
     {
         return rejected("complete-system energy must be finite and non-negative");
     }
-    if !arm.contact_angle_deg.is_finite()
-        || !(0.0..=180.0).contains(&arm.contact_angle_deg)
-    {
-        return rejected("contact-angle diagnostic must be finite and within [0, 180]");
+    if let Some(angle) = arm.contact_angle_deg {
+        if !angle.is_finite() || !(0.0..=180.0).contains(&angle) {
+            return rejected("contact-angle diagnostic must be finite and within [0, 180]");
+        }
     }
     if !arm.substrate_functional_property_retention.is_finite()
         || arm.substrate_functional_property_retention < 0.0
@@ -460,7 +460,7 @@ fn arm_result(
         disposition,
         reason: reason.to_owned(),
         complete_system_energy_kwh_per_m2: Some(arm.complete_system_energy_kwh_per_m2),
-        contact_angle_deg_diagnostic_only: Some(arm.contact_angle_deg),
+        contact_angle_deg_diagnostic_only: arm.contact_angle_deg,
         substrate_functional_property_retention: Some(arm.substrate_functional_property_retention),
         bondability_window_hours,
         delay_results,
@@ -603,7 +603,7 @@ mod tests {
         let mut input = fixture();
         let before = evaluate_fixture(input.clone()).unwrap();
         for arm in &mut input.arms {
-            arm.contact_angle_deg = 1.0 + (180.0 - arm.contact_angle_deg);
+            arm.contact_angle_deg = arm.contact_angle_deg.map(|angle| 1.0 + (180.0 - angle));
         }
         let after = evaluate_fixture(input).unwrap();
         for arm_id in [
@@ -631,6 +631,21 @@ mod tests {
                 .map(|x| x.disposition)
                 .collect::<Vec<_>>()
         );
+    }
+
+
+    #[test]
+    fn missing_contact_angle_diagnostic_does_not_block_bondability_evaluation() {
+        let mut input = fixture();
+        input.arms[2].contact_angle_deg = None;
+        let result = evaluate_arm(
+            &input.arms[2],
+            &input.service_profile,
+            &input.energy_boundary,
+        );
+        assert_eq!(result.disposition, ArmDisposition::Pass);
+        assert_eq!(result.contact_angle_deg_diagnostic_only, None);
+        assert_eq!(result.bondability_window_hours, Some(168));
     }
 
     #[test]
