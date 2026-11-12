@@ -1058,6 +1058,7 @@ mod tests {
         value.cells[0].status = LifetimeStatus::ObservedEol;
         value.cells[0].event_cycle = Some(400);
         value.cells[0].outcome_evidence_id = "E-PHYSICAL".into();
+        value.cells[0].feature_observations[0].evidence_id = "E-PHYSICAL".into();
         let report = audit_campaign(&value).expect("physical observation is admissible");
         assert_eq!(report.physical_lifetime_outcome_count, 1);
         assert_eq!(report.observed_eol_count, 1);
@@ -1087,6 +1088,7 @@ mod tests {
         value.cells[0].status = LifetimeStatus::RightCensored;
         value.cells[0].event_cycle = None;
         value.cells[0].outcome_evidence_id = "E-PHYSICAL".into();
+        value.cells[0].feature_observations[0].evidence_id = "E-PHYSICAL".into();
         let report = audit_campaign(&value).expect("right censor is valid");
         assert_eq!(report.right_censored_count, 1);
         assert_eq!(report.observed_eol_count, 0);
@@ -1105,6 +1107,7 @@ mod tests {
         value.cells[0].event_cycle = Some(100);
         value.cells[0].failure_mode = Some("separator_short".into());
         value.cells[0].outcome_evidence_id = "E-PHYSICAL".into();
+        value.cells[0].feature_observations[0].evidence_id = "E-PHYSICAL".into();
         let report = audit_campaign(&value).expect("competing failure remains distinct");
         assert_eq!(report.competing_failure_count, 1);
     }
