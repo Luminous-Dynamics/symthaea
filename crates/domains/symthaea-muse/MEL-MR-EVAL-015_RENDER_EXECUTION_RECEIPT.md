@@ -30,7 +30,7 @@ The new renderer_execution_receipt.rs module provides:
 - Studio exposes the invocation observation at `GET /api/piece/{id}/render-invocation`. Failed FluidSynth invocations and an unavailable renderer are retained alongside a native fallback candidate instead of being collapsed to an absent result.
 - Successful-render receipt creation now validates the invocation observation against exact MIDI, pre/post executable/SoundFont digests, zero exit status, and mastered WAV digest before accepting it as a successful FluidSynth receipt.
 - A Studio temp-MIDI path fix: concurrent candidate renders with the same seed no longer derive the same temp filename from process-ID plus seed alone; a per-process monotonic nonce is included. One focused regression test is authored.
-- Four Unix fake-child tests are authored for successful invocation/argument/allowlist/stream capture, non-zero exit diagnostics, MIDI substitution during child execution, and stderr draining beyond the preview limit. Three fixture tuple-shape mistakes found during source review have been corrected.
+- Seven Unix fake-child tests are authored for successful invocation/argument/allowlist/stream capture; non-zero exit diagnostics; MIDI substitution; SoundFont substitution; successful exit without output; spawn failure caused by a non-executable renderer; and stderr draining beyond the preview limit. These exercise local wrapper classification, not a malicious kernel or host. Three fixture tuple-shape mistakes found during source review have been corrected.
 
 ## Not implemented yet
 
