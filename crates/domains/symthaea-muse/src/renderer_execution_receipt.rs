@@ -71,9 +71,6 @@ pub struct RendererExecutionReceipt {
     pub soundfont_sha256: Option<String>,
     pub render_config_sha256: String,
     pub process_exit_code: Option<i32>,
-    /// Complete wrapper-observed invocation record for external renderers.
-    /// This is local evidence, not trusted-host execution attestation.
-    pub invocation_observation: Option<serde_json::Value>,
     pub performed_event_map_sha256: Option<String>,
     pub output: AudioArtifactSummary,
     /// SHA-256 over this receipt with receipt_sha256 blank.
@@ -135,7 +132,6 @@ pub struct RendererReceiptInputs<'a> {
     pub renderer_executable_sha256: Option<&'a str>,
     pub soundfont_sha256: Option<&'a str>,
     pub process_exit_code: Option<i32>,
-    pub invocation_observation: Option<&'a serde_json::Value>,
     pub performed_event_map_sha256: Option<&'a str>,
     pub output_wav_bytes: &'a [u8],
 }
@@ -189,60 +185,6 @@ fn optional_digest_is_valid(
     Ok(())
 }
 
-fn observation_string<'a>(observation: &'a serde_json::Value, key: &str) -> Option<&'a str> {
-    observation.get(key)?.as_str()
-}
-
-fn observation_bool(observation: &serde_json::Value, key: &str) -> Option<bool> {
-    observation.get(key)?.as_bool()
-}
-
-fn observation_i64(observation: &serde_json::Value, key: &str) -> Option<i64> {
-    observation.get(key)?.as_i64()
-}
-
-fn validate_invocation_observation(
-    inputs: &RendererReceiptInputs<'_>,
-) -> Result<(), RendererReceiptError> {
-    match inputs.backend {
-        RendererBackend::FluidSynth => {
-            let Some(observation) = inputs.invocation_observation else {
-                return Err(RendererReceiptError::InvalidExecutionStatus);
-            };
-            let midi_sha256 = inputs
-                .input_midi_bytes
-                .map(sha256_hex)
-                .ok_or(RendererReceiptError::InvalidInputArtifacts)?;
-            let output_sha256 = sha256_hex(inputs.output_wav_bytes);
-            let valid = observation_string(observation, "disposition") == Some("Rendered")
-                && observation_bool(observation, "process_spawned") == Some(true)
-                && observation_bool(observation, "process_success") == Some(true)
-                && observation_i64(observation, "process_exit_code") == Some(0)
-                && observation_string(observation, "midi_sha256_before") == Some(midi_sha256.as_str())
-                && observation_string(observation, "midi_sha256_after") == Some(midi_sha256.as_str())
-                && observation_string(observation, "executable_sha256_before")
-                    == inputs.renderer_executable_sha256
-                && observation_string(observation, "executable_sha256_after")
-                    == inputs.renderer_executable_sha256
-                && observation_string(observation, "soundfont_sha256_before")
-                    == inputs.soundfont_sha256
-                && observation_string(observation, "soundfont_sha256_after")
-                    == inputs.soundfont_sha256
-                && observation_string(observation, "mastered_wav_sha256")
-                    == Some(output_sha256.as_str());
-            if !valid {
-                return Err(RendererReceiptError::InvalidExecutionStatus);
-            }
-        }
-        RendererBackend::NativeMuse => {
-            if inputs.invocation_observation.is_some() {
-                return Err(RendererReceiptError::InvalidInputArtifacts);
-            }
-        }
-    }
-    Ok(())
-}
-
 fn validate_inputs(inputs: &RendererReceiptInputs<'_>) -> Result<(), RendererReceiptError> {
     if !valid_render_id(inputs.render_id) {
         return Err(RendererReceiptError::InvalidRenderId);
@@ -250,7 +192,6 @@ fn validate_inputs(inputs: &RendererReceiptInputs<'_>) -> Result<(), RendererRec
     if inputs.score_bytes.is_empty() || inputs.render_config_bytes.is_empty() {
         return Err(RendererReceiptError::InvalidInputArtifacts);
     }
-    validate_invocation_observation(inputs)?;
     optional_digest_is_valid(inputs.renderer_executable_sha256, "renderer_executable_sha256")?;
     optional_digest_is_valid(inputs.soundfont_sha256, "soundfont_sha256")?;
     optional_digest_is_valid(
@@ -305,7 +246,6 @@ impl RendererExecutionReceipt {
             soundfont_sha256: inputs.soundfont_sha256.map(str::to_owned),
             render_config_sha256: sha256_hex(inputs.render_config_bytes),
             process_exit_code: inputs.process_exit_code,
-            invocation_observation: inputs.invocation_observation.cloned(),
             performed_event_map_sha256: inputs.performed_event_map_sha256.map(str::to_owned),
             output,
             receipt_sha256: String::new(),
@@ -448,27 +388,7 @@ mod tests {
         cursor.into_inner()
     }
 
-    fn fluid_observation(wav: &[u8]) -> serde_json::Value {
-        serde_json::json!({
-            "schema": "urn:luminous-dynamics:muse:fluidsynth-invocation-observation:v1",
-            "disposition": "Rendered",
-            "process_spawned": true,
-            "process_success": true,
-            "process_exit_code": 0,
-            "executable_sha256_before": DIGEST_C,
-            "executable_sha256_after": DIGEST_C,
-            "soundfont_sha256_before": DIGEST_D,
-            "soundfont_sha256_after": DIGEST_D,
-            "midi_sha256_before": sha256_hex(b"MThd-fixture-midi"),
-            "midi_sha256_after": sha256_hex(b"MThd-fixture-midi"),
-            "mastered_wav_sha256": sha256_hex(wav),
-        })
-    }
-
-    fn fluid_inputs<'a>(
-        wav: &'a [u8],
-        observation: &'a serde_json::Value,
-    ) -> RendererReceiptInputs<'a> {
+    fn fluid_inputs<'a>(wav: &'a [u8]) -> RendererReceiptInputs<'a> {
         RendererReceiptInputs {
             render_id: "render-test-1",
             backend: RendererBackend::FluidSynth,
@@ -479,7 +399,6 @@ mod tests {
             renderer_executable_sha256: Some(DIGEST_C),
             soundfont_sha256: Some(DIGEST_D),
             process_exit_code: Some(0),
-            invocation_observation: Some(observation),
             performed_event_map_sha256: Some(DIGEST_E),
             output_wav_bytes: wav,
         }
@@ -501,13 +420,8 @@ mod tests {
     #[test]
     fn exact_artifact_set_replays_the_same_receipt() {
         let wav = test_wav(&[0, 0, 16384, -16384]);
-        let observation = fluid_observation(&wav);
-        let receipt =
-            RendererExecutionReceipt::from_successful_render(fluid_inputs(&wav, &observation))
-                .unwrap();
-        receipt
-            .verify_artifacts(fluid_inputs(&wav, &observation))
-            .unwrap();
+        let receipt = RendererExecutionReceipt::from_successful_render(fluid_inputs(&wav)).unwrap();
+        receipt.verify_artifacts(fluid_inputs(&wav)).unwrap();
         assert_eq!(receipt.output.frame_count, 2);
         assert_eq!(receipt.process_exit_code, Some(0));
     }
@@ -516,14 +430,9 @@ mod tests {
     fn changed_wav_bytes_and_decoded_pcm_are_rejected() {
         let original = test_wav(&[0, 0, 16384, -16384]);
         let changed = test_wav(&[0, 0, 8192, -8192]);
-        let original_observation = fluid_observation(&original);
-        let changed_observation = fluid_observation(&changed);
-        let receipt = RendererExecutionReceipt::from_successful_render(
-            fluid_inputs(&original, &original_observation),
-        )
-        .unwrap();
+        let receipt = RendererExecutionReceipt::from_successful_render(fluid_inputs(&original)).unwrap();
         assert_eq!(
-            receipt.verify_artifacts(fluid_inputs(&changed, &changed_observation)),
+            receipt.verify_artifacts(fluid_inputs(&changed)),
             Err(RendererReceiptError::ArtifactMismatch("receipt context or output"))
         );
     }
@@ -531,18 +440,14 @@ mod tests {
     #[test]
     fn changed_midi_and_configuration_are_rejected() {
         let wav = test_wav(&[0, 0, 16384, -16384]);
-        let observation = fluid_observation(&wav);
-        let receipt = RendererExecutionReceipt::from_successful_render(
-            fluid_inputs(&wav, &observation),
-        )
-        .unwrap();
-        let mut changed_midi = fluid_inputs(&wav, &observation);
+        let receipt = RendererExecutionReceipt::from_successful_render(fluid_inputs(&wav)).unwrap();
+        let mut changed_midi = fluid_inputs(&wav);
         changed_midi.input_midi_bytes = Some(b"MThd-substituted-midi");
         assert_eq!(
             receipt.verify_artifacts(changed_midi),
             Err(RendererReceiptError::ArtifactMismatch("receipt context or output"))
         );
-        let mut changed_config = fluid_inputs(&wav, &observation);
+        let mut changed_config = fluid_inputs(&wav);
         changed_config.render_config_bytes = br#"{"gain":0.7,"sample_rate_hz":48000}"#;
         assert_eq!(
             receipt.verify_artifacts(changed_config),
@@ -553,21 +458,17 @@ mod tests {
     #[test]
     fn score_executable_soundfont_and_event_map_digests_are_bound() {
         let wav = test_wav(&[0, 0, 16384, -16384]);
-        let observation = fluid_observation(&wav);
-        let receipt = RendererExecutionReceipt::from_successful_render(
-            fluid_inputs(&wav, &observation),
-        )
-        .unwrap();
-        let mut changed_score = fluid_inputs(&wav, &observation);
+        let receipt = RendererExecutionReceipt::from_successful_render(fluid_inputs(&wav)).unwrap();
+        let mut changed_score = fluid_inputs(&wav);
         changed_score.score_bytes = br#"{"score":"different"}"#;
         assert!(receipt.verify_artifacts(changed_score).is_err());
-        let mut changed_binary = fluid_inputs(&wav, &observation);
+        let mut changed_binary = fluid_inputs(&wav);
         changed_binary.renderer_executable_sha256 = Some(DIGEST_F);
         assert!(receipt.verify_artifacts(changed_binary).is_err());
-        let mut changed_soundfont = fluid_inputs(&wav, &observation);
+        let mut changed_soundfont = fluid_inputs(&wav);
         changed_soundfont.soundfont_sha256 = Some(DIGEST_1);
         assert!(receipt.verify_artifacts(changed_soundfont).is_err());
-        let mut changed_map = fluid_inputs(&wav, &observation);
+        let mut changed_map = fluid_inputs(&wav);
         changed_map.performed_event_map_sha256 = Some(DIGEST_2);
         assert!(receipt.verify_artifacts(changed_map).is_err());
     }
@@ -575,14 +476,13 @@ mod tests {
     #[test]
     fn fluid_receipt_fails_closed_without_exact_input_or_success_status() {
         let wav = test_wav(&[0, 0, 1, -1]);
-        let observation = fluid_observation(&wav);
-        let mut no_midi = fluid_inputs(&wav, &observation);
+        let mut no_midi = fluid_inputs(&wav);
         no_midi.input_midi_bytes = None;
         assert_eq!(
             RendererExecutionReceipt::from_successful_render(no_midi).unwrap_err(),
             RendererReceiptError::InvalidInputArtifacts
         );
-        let mut failed = fluid_inputs(&wav, &observation);
+        let mut failed = fluid_inputs(&wav);
         failed.process_exit_code = Some(1);
         assert_eq!(
             RendererExecutionReceipt::from_successful_render(failed).unwrap_err(),
@@ -603,7 +503,6 @@ mod tests {
             renderer_executable_sha256: Some(DIGEST_F),
             soundfont_sha256: None,
             process_exit_code: None,
-            invocation_observation: None,
             performed_event_map_sha256: None,
             output_wav_bytes: &wav,
         };
@@ -637,14 +536,10 @@ mod tests {
     #[test]
     fn receipt_tampering_is_rejected_even_when_artifacts_are_unchanged() {
         let wav = test_wav(&[0, 0, 16384, -16384]);
-        let observation = fluid_observation(&wav);
-        let mut receipt = RendererExecutionReceipt::from_successful_render(
-            fluid_inputs(&wav, &observation),
-        )
-        .unwrap();
+        let mut receipt = RendererExecutionReceipt::from_successful_render(fluid_inputs(&wav)).unwrap();
         receipt.process_exit_code = Some(7);
         assert_eq!(
-            receipt.verify_artifacts(fluid_inputs(&wav, &observation)),
+            receipt.verify_artifacts(fluid_inputs(&wav)),
             Err(RendererReceiptError::InvalidReceipt)
         );
     }
