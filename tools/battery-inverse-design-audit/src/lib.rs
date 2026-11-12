@@ -170,9 +170,9 @@ fn validate_sha256(value: &str, label: &str) -> Result<(), AuditError> {
     Ok(())
 }
 
-fn validate_evidence_registry(
-    evidence: &[EvidenceRecord],
-) -> Result<BTreeMap<&str, &EvidenceRecord>, AuditError> {
+fn validate_evidence_registry<'a>(
+    evidence: &'a [EvidenceRecord],
+) -> Result<BTreeMap<&'a str, &'a EvidenceRecord>, AuditError> {
     if evidence.is_empty() {
         return Err(AuditError("at least one evidence record is required".into()));
     }
@@ -197,7 +197,7 @@ fn validate_evidence_registry(
 }
 
 fn require_evidence<'a>(
-    records: &'a BTreeMap<&str, &'a EvidenceRecord>,
+    records: &BTreeMap<&'a str, &'a EvidenceRecord>,
     evidence_id: &str,
     owner: &str,
 ) -> Result<&'a EvidenceRecord, AuditError> {
@@ -206,12 +206,12 @@ fn require_evidence<'a>(
     })
 }
 
-fn validate_manifest(
+fn validate_manifest<'a>(
     scenarios: &[Scenario],
     objectives: &[Objective],
-    evidence: &[EvidenceRecord],
+    evidence: &'a [EvidenceRecord],
     candidates: &[Candidate],
-) -> Result<BTreeMap<&str, &EvidenceRecord>, AuditError> {
+) -> Result<BTreeMap<&'a str, &'a EvidenceRecord>, AuditError> {
     if scenarios.is_empty() {
         return Err(AuditError("at least one scenario is required".into()));
     }
