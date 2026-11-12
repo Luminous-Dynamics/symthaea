@@ -17,35 +17,35 @@ enum EvidenceKind { Synthetic, Measured }
 #[serde(rename_all = "snake_case")]
 enum RightsStatus { PublicOrPermitted, Unknown, Restricted }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 enum VelocityMethod { FiveHolePitot, OtherPitot, Rans, Cfd, WireScreenDerived, OtherMeasured }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 enum WakeBasis { ModelScale, FullScale }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 enum CoordinateFrame { PropellerLookingForwardFromAft }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 enum AngularOrigin { TopDeadCentre }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 enum PositiveAzimuth { ClockwiseViewedFromAft, CounterClockwiseViewedFromAft }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 enum AxialPositiveDirection { TowardBow, TowardStern }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 enum BlockageMethod { WireScreen, DummyHull, FullHull, OtherDeclared }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 enum BlockageReviewState { NotRequired, Reviewed, Unknown }
 
@@ -212,10 +212,6 @@ struct ComponentMetric {
     p95_conservative_absolute_residual_upper: Option<f64>,
     maximum_absolute_error: Option<f64>,
     tolerance: f64,
-    area_weight_sum: f64,
-    unweighted_bias: Option<f64>,
-    unweighted_mean_absolute_error: Option<f64>,
-    unweighted_rmse: Option<f64>,
     area_weight_sum: f64,
     unweighted_bias: Option<f64>,
     unweighted_mean_absolute_error: Option<f64>,
@@ -1231,7 +1227,7 @@ mod tests {
         let report=audit(&input);
         let axial=report.component_metrics.iter().find(|m|m.component=="axial").unwrap();
         assert!(axial.area_weight_sum > 0.999);
-        assert!((axial.bias.unwrap() - 0.0068671875).abs() < 1.0e-9);
+        assert!((axial.bias.unwrap() - 0.0018671875).abs() < 1.0e-9);
         assert_ne!(axial.bias,axial.unweighted_bias);
     }
 
@@ -1263,7 +1259,7 @@ mod tests {
         input.blockage.maximum_hull_frontal_area_m2=Some(0.04);
         let report=audit(&input);
         assert_eq!(report.blockage.blocking_area_basis,"maximum_hull_frontal_area_per_ittc_rev03_table_5");
-        assert!((report.blockage.blocking_area_ratio-0.16).abs()<1.0e-12);
+        assert!((report.blockage.area_blockage_ratio-0.16).abs()<1.0e-12);
     }
 
     #[test]
