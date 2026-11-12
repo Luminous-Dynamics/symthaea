@@ -5,7 +5,10 @@ Dependency-free Rust 1.96 read-only audit for complete-cell solid-state battery 
 Checks:
 - separate fabrication and operating pressure;
 - declared pressure measurement method, instrument and uncertainty;
-- complete-cell mass closure;
+- complete-cell mass closure including inactive electrode fractions, plus a separately digested external-volume boundary;
+- same design revision, batch, manufacturing line and process revision across pressure-only comparisons;
+- fabrication-pressure matching within combined measurement uncertainty and identical pressure measurement method;
+- evidence rights reference;
 - matched conditions for pressure comparisons;
 - technology-lane and full/symmetric/half-cell separation;
 - evidence admission, physical vs synthetic and right-censored outcome semantics;
