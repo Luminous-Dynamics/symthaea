@@ -54,6 +54,8 @@ pub struct BeatGridEvaluationConfigV1 {
     /// None is the default: retain the complete annotated clip.
     pub minimum_evaluation_time_ms: Option<u32>,
     pub metric_level_variants_enabled: bool,
+    pub continuity_phase_threshold_basis_points: u16,
+    pub continuity_period_threshold_basis_points: u16,
 }
 
 impl Default for BeatGridEvaluationConfigV1 {
@@ -64,6 +66,8 @@ impl Default for BeatGridEvaluationConfigV1 {
             cemgil_sigma_ms: BEAT_GRID_DEFAULT_CEMGIL_SIGMA_MS_V1,
             minimum_evaluation_time_ms: None,
             metric_level_variants_enabled: true,
+            continuity_phase_threshold_basis_points: 1_750,
+            continuity_period_threshold_basis_points: 1_750,
         }
     }
 }
@@ -99,6 +103,15 @@ pub struct BeatGridIntervalErrorSummaryV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BeatGridContinuityMetricsV1 {
+    pub correct_metric_level_continuous: f64,
+    pub correct_metric_level_total: f64,
+    pub any_metric_level_continuous: f64,
+    pub any_metric_level_total: f64,
+    pub evaluated_reference_variants: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BeatGridReferenceScoreV1 {
     pub reference_id: String,
     pub annotation_source: String,
@@ -112,6 +125,9 @@ pub struct BeatGridReferenceScoreV1 {
     /// Maximum Cemgil score over reference, offbeat, double, and half-time variants.
     /// This is a diagnostic for metrical-level ambiguity, not strict beat accuracy.
     pub cemgil_best_metric_level: Option<f64>,
+    /// mir_eval continuity: correct metric level continuous / total, and any
+    /// metrical level continuous / total. These remain separate from strict F1.
+    pub continuity_metrics: Option<BeatGridContinuityMetricsV1>,
     pub downbeat_metric: Option<BeatGridEventMetricV1>,
     pub beat_timing_error: BeatGridTimingErrorSummaryV1,
     pub downbeat_timing_error: Option<BeatGridTimingErrorSummaryV1>,
@@ -205,6 +221,16 @@ fn validate_config(
     if config.cemgil_sigma_ms == 0 || config.cemgil_sigma_ms > 1_000 {
         return Err(BeatGridEvaluationIssueV1::InvalidConfig {
             field: "cemgil_sigma_ms".into(),
+        });
+    }
+    if !(1..=5_000).contains(&config.continuity_phase_threshold_basis_points) {
+        return Err(BeatGridEvaluationIssueV1::InvalidConfig {
+            field: "continuity_phase_threshold_basis_points".into(),
+        });
+    }
+    if !(1..=5_000).contains(&config.continuity_period_threshold_basis_points) {
+        return Err(BeatGridEvaluationIssueV1::InvalidConfig {
+            field: "continuity_period_threshold_basis_points".into(),
         });
     }
     if config.minimum_evaluation_time_ms.is_some_and(|value| value > 30_000_000) {
@@ -543,6 +569,134 @@ fn metric_level_variants(reference: &[f64]) -> [Vec<f64>; 5] {
     ]
 }
 
+fn continuity_for_reference_variant(
+    reference: &[f64],
+    estimated: &[f64],
+    phase_threshold: f64,
+    period_threshold: f64,
+) -> (f64, f64) {
+    if estimated.len() <= 1 || reference.len() <= 1 {
+        return (0.0, 0.0);
+    }
+
+    let annotation_count = reference.len().max(estimated.len());
+    let mut used_annotations = vec![false; annotation_count];
+    let mut beat_successes = vec![false; annotation_count];
+
+    for estimated_index in 0..estimated.len() {
+        let estimated_time = estimated[estimated_index];
+        // Match numpy.argmin: select the first reference index on ties.
+        let mut nearest_index = 0usize;
+        let mut minimum_difference = (estimated_time - reference[0]).abs();
+        for (reference_index, reference_time) in reference.iter().enumerate().skip(1) {
+            let difference = (estimated_time - reference_time).abs();
+            if difference < minimum_difference {
+                minimum_difference = difference;
+                nearest_index = reference_index;
+            }
+        }
+
+        if used_annotations[nearest_index] {
+            continue;
+        }
+
+        let (reference_interval, estimated_interval) =
+            if estimated_index == 0 || nearest_index == 0 {
+                let reference_interval = if nearest_index + 1 < reference.len() {
+                    reference[nearest_index + 1] - reference[nearest_index]
+                } else {
+                    reference[nearest_index] - reference[nearest_index - 1]
+                };
+                let estimated_interval = if estimated_index + 1 < estimated.len() {
+                    estimated[estimated_index + 1] - estimated[estimated_index]
+                } else {
+                    estimated[estimated_index] - estimated[estimated_index - 1]
+                };
+                (reference_interval, estimated_interval)
+            } else {
+                (
+                    reference[nearest_index] - reference[nearest_index - 1],
+                    estimated[estimated_index] - estimated[estimated_index - 1],
+                )
+            };
+
+        let phase = if reference_interval == 0.0 {
+            if minimum_difference == 0.0 { 1.0 } else { f64::INFINITY }
+        } else {
+            minimum_difference / reference_interval
+        };
+        let period = if reference_interval == 0.0 {
+            if estimated_interval == 0.0 { 0.0 } else { f64::INFINITY }
+        } else {
+            (1.0 - estimated_interval / reference_interval).abs()
+        };
+
+        if phase < phase_threshold && period < period_threshold {
+            used_annotations[nearest_index] = true;
+            beat_successes[estimated_index] = true;
+        }
+    }
+
+    let total_success = beat_successes.iter().filter(|success| **success).count();
+    let mut longest_run = 0usize;
+    let mut current_run = 0usize;
+    for success in &beat_successes {
+        if *success {
+            current_run += 1;
+            longest_run = longest_run.max(current_run);
+        } else {
+            current_run = 0;
+        }
+    }
+    (
+        longest_run as f64 / annotation_count as f64,
+        total_success as f64 / annotation_count as f64,
+    )
+}
+
+fn continuity_metrics(
+    reference: &[f64],
+    estimated: &[f64],
+    config: &BeatGridEvaluationConfigV1,
+) -> BeatGridContinuityMetricsV1 {
+    let phase_threshold =
+        f64::from(config.continuity_phase_threshold_basis_points) / 10_000.0;
+    let period_threshold =
+        f64::from(config.continuity_period_threshold_basis_points) / 10_000.0;
+    let variants = if config.metric_level_variants_enabled {
+        metric_level_variants(reference)
+    } else {
+        [reference.to_vec(), Vec::new(), Vec::new(), Vec::new(), Vec::new()]
+    };
+
+    let mut variant_scores = Vec::new();
+    for variant in variants.iter().filter(|variant| !variant.is_empty()) {
+        variant_scores.push(continuity_for_reference_variant(
+            variant,
+            estimated,
+            phase_threshold,
+            period_threshold,
+        ));
+    }
+    let direct = variant_scores.first().copied().unwrap_or((0.0, 0.0));
+    let any_continuous = variant_scores
+        .iter()
+        .map(|(continuous, _)| *continuous)
+        .fold(0.0f64, f64::max);
+    let any_total = variant_scores
+        .iter()
+        .map(|(_, total)| *total)
+        .fold(0.0f64, f64::max);
+
+    BeatGridContinuityMetricsV1 {
+        correct_metric_level_continuous: direct.0,
+        correct_metric_level_total: direct.1,
+        any_metric_level_continuous: any_continuous,
+        any_metric_level_total: any_total,
+        evaluated_reference_variants: u32::try_from(variant_scores.len()).unwrap_or(u32::MAX),
+    }
+}
+
 fn score_one_reference(
     reference: &BeatGridReferenceV1,
     prediction: &BeatGridPredictionV1,
@@ -621,6 +775,7 @@ fn score_one_reference(
         beat_f_measure,
         cemgil_score: cemgil,
         cemgil_best_metric_level: cemgil_best,
+        continuity_metrics: Some(continuity_metrics(&reference_beats, &estimated_beats, config)),
         downbeat_metric,
         beat_timing_error,
         downbeat_timing_error,
@@ -1008,6 +1163,51 @@ mod tests {
         )
         .unwrap();
         assert!(report.median_pairwise_reference_agreement.is_none());
+    }
+
+    #[test]
+    fn continuity_metrics_expose_a_break_in_the_beat_sequence() {
+        let reference_times = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5];
+        let predicted_times = [0.0, 0.5, 1.0, 1.85, 2.35, 2.85];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&predicted_times, &[]),
+            &[reference("clip", None, &reference_times, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        let continuity = report.reference_scores[0].continuity_metrics.as_ref().unwrap();
+        assert!(continuity.correct_metric_level_total < 1.0);
+        assert!(continuity.correct_metric_level_continuous < 1.0);
+        assert!(continuity.any_metric_level_total >= continuity.correct_metric_level_total);
+    }
+
+    #[test]
+    fn continuity_any_metric_level_detects_a_half_time_sequence() {
+        let reference_times = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
+        let predicted_times = [0.0, 1.0, 2.0, 3.0];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&predicted_times, &[]),
+            &[reference("clip", None, &reference_times, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        let continuity = report.reference_scores[0].continuity_metrics.as_ref().unwrap();
+        assert!(continuity.correct_metric_level_total < continuity.any_metric_level_total);
+    }
+
+    #[test]
+    fn continuity_is_zero_when_beat_intervals_cannot_be_computed() {
+        let reference_times = [0.0, 0.5];
+        let predicted_times = [0.0, 0.5];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&predicted_times, &[]),
+            &[reference("clip", None, &reference_times, &[])],
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        let continuity = report.reference_scores[0].continuity_metrics.as_ref().unwrap();
+        assert_eq!(continuity.correct_metric_level_continuous, 0.0);
+        assert_eq!(continuity.correct_metric_level_total, 0.0);
     }
 
     #[test]
