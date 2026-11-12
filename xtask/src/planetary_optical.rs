@@ -129,7 +129,12 @@ pub fn run(input: &Path, output: Option<&Path>) -> Result<()> {
         if let Some(parent) = path.parent() {
             if !parent.as_os_str().is_empty() {
                 fs::create_dir_all(parent)
-                    .with_context(|| format!("creating optical-impact report directory {}", parent.display()))?;
+                    .with_context(|| {
+                        format!(
+                            "creating optical-impact report directory {}",
+                            parent.display()
+                        )
+                    })?;
             }
         }
         fs::write(path, &rendered)
@@ -257,7 +262,11 @@ pub fn audit_corpus(bytes: &[u8]) -> Result<OpticalAuditReport> {
                 "temperature and angular measurement coverage must be finite and ordered",
             ));
         }
-        if surface.spectral_property_receipt_id.as_deref().is_none_or(str::is_empty) {
+        if surface
+            .spectral_property_receipt_id
+            .as_deref()
+            .is_none_or(str::is_empty)
+        {
             unknown = true;
             findings.push(optical_finding(
                 "SPECTRAL_PROPERTY_EVIDENCE_MISSING",
@@ -270,7 +279,10 @@ pub fn audit_corpus(bytes: &[u8]) -> Result<OpticalAuditReport> {
             unknown = true;
             findings.push(optical_finding(
                 "BRDF_EVIDENCE_INCOMPLETE",
-                "BRDF receipt and complete angular coverage are required; missing angles are not zero reflectance",
+                concat!(
+                    "BRDF receipt and complete angular coverage are required; ",
+                    "missing angles are not zero reflectance"
+                ),
             ));
         }
 
@@ -333,7 +345,11 @@ pub fn audit_corpus(bytes: &[u8]) -> Result<OpticalAuditReport> {
                 }
                 _ => {}
             }
-        } else if scenario.limits.minimum_ir_emissivity.is_some_and(|v| !v.is_finite() || !(0.0..=1.0).contains(&v)) {
+        } else if scenario
+            .limits
+            .minimum_ir_emissivity
+            .is_some_and(|v| !v.is_finite() || !(0.0..=1.0).contains(&v))
+        {
             invalid = true;
             findings.push(optical_finding(
                 "IR_EMISSIVITY_LIMIT_INVALID",
@@ -349,7 +365,7 @@ pub fn audit_corpus(bytes: &[u8]) -> Result<OpticalAuditReport> {
                 if measured.is_finite()
                     && measured >= 0.0
                     && limit.is_finite()
-                    && limit > 0.0
+                    && limit >= 0.0
                     && measured > limit + EPSILON =>
             {
                 impact_exceeded = true;
@@ -365,7 +381,7 @@ pub fn audit_corpus(bytes: &[u8]) -> Result<OpticalAuditReport> {
                 if !measured.is_finite()
                     || measured < 0.0
                     || !limit.is_finite()
-                    || limit <= 0.0 =>
+                    || limit < 0.0 =>
             {
                 invalid = true;
                 findings.push(optical_finding(
@@ -412,7 +428,15 @@ pub fn audit_corpus(bytes: &[u8]) -> Result<OpticalAuditReport> {
             }
         }
 
+        if !ALLOWED_DISPOSITIONS.contains(&scenario.expected_disposition.as_str()) {
+            invalid = true;
+            findings.push(optical_finding(
+                "EXPECTED_DISPOSITION_INVALID",
+                "expected_disposition is not a supported v0.1 disposition",
+            ));
+        }
         findings.sort();
+
         let actual_disposition = if invalid {
             "INVALID"
         } else if safety_blocked {
@@ -427,15 +451,8 @@ pub fn audit_corpus(bytes: &[u8]) -> Result<OpticalAuditReport> {
             "PASS_CONTRACT_ONLY"
         };
 
-        if !ALLOWED_DISPOSITIONS.contains(&scenario.expected_disposition.as_str()) {
-            invalid = true;
-            findings.push(optical_finding(
-                "EXPECTED_DISPOSITION_INVALID",
-                "expected_disposition is not a supported v0.1 disposition",
-            ));
-        }
         let expectation_matches =
-            !invalid && actual_disposition == scenario.expected_disposition.as_str();
+            actual_disposition == scenario.expected_disposition.as_str();
         if !expectation_matches {
             findings.push(optical_finding(
                 "EXPECTED_DISPOSITION_MISMATCH",
@@ -488,7 +505,11 @@ pub fn audit_corpus(bytes: &[u8]) -> Result<OpticalAuditReport> {
     Ok(OpticalAuditReport {
         report_schema: "planetary-optical-impact-audit-report-v0.1",
         source_sha256,
-        status: if expectation_mismatch_count == 0 { "PASS" } else { "BLOCKED" },
+        status: if expectation_mismatch_count == 0 {
+            "PASS"
+        } else {
+            "BLOCKED"
+        },
         claim_ceiling: "synthetic_surface_evidence_and_declared_observer_budget_contract_only",
         scenario_count: results.len(),
         contract_only_pass_count,
@@ -511,7 +532,11 @@ fn optical_finding(code: &str, message: impl Into<String>) -> OpticalFinding {
 
 fn sha256_hex(bytes: &[u8]) -> String {
     let digest = sha2::Sha256::digest(bytes);
-    digest.iter().map(|byte| format!("{byte:02x}")).collect::<Vec<_>>().join("")
+    digest
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 #[cfg(test)]
@@ -526,7 +551,11 @@ mod tests {
     }
 
     fn scenario<'a>(report: &'a OpticalAuditReport, id: &str) -> &'a OpticalScenarioResult {
-        report.scenarios.iter().find(|s| s.scenario_id == id).expect("scenario exists")
+        report
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == id)
+            .expect("scenario exists")
     }
 
     #[test]
@@ -619,7 +648,10 @@ mod tests {
     #[test]
     fn contract_pass_is_never_labelled_physical_qualification() {
         let report = audit_corpus(FIXTURE.as_bytes()).expect("fixture parses");
-        assert_eq!(report.claim_ceiling, "synthetic_surface_evidence_and_declared_observer_budget_contract_only");
+        assert_eq!(
+            report.claim_ceiling,
+            "synthetic_surface_evidence_and_declared_observer_budget_contract_only"
+        );
         assert_eq!(
             scenario(&report, "solar-collector-reference").actual_disposition,
             "PASS_CONTRACT_ONLY"
