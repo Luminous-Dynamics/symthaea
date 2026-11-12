@@ -67,3 +67,12 @@ The cubic Routh-Hurwitz test normalizes its coefficients by a characteristic pol
 The `dc_bus_mimo_reference` module provides a narrow exact 2×2 cross-port return-ratio example. It retains both off-diagonal terms, computes `det(I + L(jω))`, carries active open-loop right-half-plane channel-pole metadata, and derives the cleared characteristic polynomial when both cross channels are present.
 
 It demonstrates that diagonal-only SISO projections can omit a coupled unstable mode, and that determinant cancellation must not erase an active realization pole. This is a synthetic benchmark/reference, not a generalized-Nyquist solver or physical converter/aircraft model. See `docs/research/AIRROAD_PDCM_MIMO_001_V0_1.md`.
+
+
+## MIMO impedance matrix evidence passport
+
+The `mimo_impedance_passport` module validates complete multi-port impedance sweeps. Each matrix column is one injected-current port; every output voltage port must be observed at every exact frequency knot. The sweep binds configuration, operating-point and sweep digests, explicit port voltage/current sign conventions, column excitation/payload digests, uncertainty bounds, and measured/simulated/analytical evidence origin.
+
+Measured sweeps require instrument, calibration-certificate, channel-map and synchronization digests. Matrix lookup is exact-knot only; interpolation and extrapolation are not authorized. Missing cross-port responses are errors, never implicit zeros. Derived impedances are point estimates; supplied voltage/current error bounds are retained but not propagated into a formal complex interval enclosure.
+
+See `docs/research/AIRROAD_PDCM_MIMO_PASSPORT_001_V0_1.md`.
