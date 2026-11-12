@@ -881,6 +881,15 @@ fn audit(case: &Case) -> AuditReport {
     let mut has_definite_failure = false;
     let mut unresolved = !errors.is_empty();
     let grid_matches = same_grid(&case.target,&case.realized);
+    let axial_only = case.target.points.iter().all(|point| {
+        point.vx_over_vref.is_some()
+            && point.vr_over_vref.is_none()
+            && point.vt_over_vref.is_none()
+    }) && case.realized.points.iter().all(|point| {
+        point.vx_over_vref.is_some()
+            && point.vr_over_vref.is_none()
+            && point.vt_over_vref.is_none()
+    });
 
     if !grid_matches {
         reasons.push("target and realized wake fields do not have exactly the same polar grid; interpolation is prohibited in v0.1".to_string());
@@ -921,19 +930,6 @@ fn audit(case: &Case) -> AuditReport {
                 cell_comparisons.extend(cells);
             }
         }
-        let axial_only = coverage[0]
-            && !coverage[1]
-            && !coverage[2]
-            && case.target.points.iter().all(|point| {
-                point.vx_over_vref.is_some()
-                    && point.vr_over_vref.is_none()
-                    && point.vt_over_vref.is_none()
-            })
-            && case.realized.points.iter().all(|point| {
-                point.vx_over_vref.is_some()
-                    && point.vr_over_vref.is_none()
-                    && point.vt_over_vref.is_none()
-            });
         if !coverage[1] || !coverage[2] {
             reasons.push("one or more wake velocity components are missing; axial-only results cannot qualify full-vector wake similarity".to_string());
             unresolved |= !axial_only;
