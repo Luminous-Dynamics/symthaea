@@ -25,24 +25,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          persist-credentials: true
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
       - name: Format Rust source
         run: cargo fmt --manifest-path tools/marine-acoustic-scale-transfer-audit/Cargo.toml
-      - name: Preserve rustfmt output for exact-head commit
+      - name: Generate isolated Cargo lockfile
+        run: cargo generate-lockfile --manifest-path tools/marine-acoustic-scale-transfer-audit/Cargo.toml
+      - name: Preserve formatted source and lockfile
         uses: actions/upload-artifact@v4
         with:
           name: marine-acoustic-scale-transfer-rustfmt
-          path: tools/marine-acoustic-scale-transfer-audit/src/main.rs
+          path: |
+            tools/marine-acoustic-scale-transfer-audit/src/main.rs
+            tools/marine-acoustic-scale-transfer-audit/Cargo.lock
           if-no-files-found: error
       - name: Verify formatting
         run: cargo fmt --manifest-path tools/marine-acoustic-scale-transfer-audit/Cargo.toml -- --check
       - name: Clippy
-        run: cargo clippy --manifest-path tools/marine-acoustic-scale-transfer-audit/Cargo.toml --all-targets -- -D warnings
+        run: cargo clippy --locked --manifest-path tools/marine-acoustic-scale-transfer-audit/Cargo.toml --all-targets -- -D warnings
       - name: Run unit tests
-        run: cargo test --manifest-path tools/marine-acoustic-scale-transfer-audit/Cargo.toml
+        run: cargo test --locked --manifest-path tools/marine-acoustic-scale-transfer-audit/Cargo.toml
       - name: Validate fixture JSON and schema JSON syntax
         run: |
           python3 -c "import json; json.load(open('docs/research/marine/marine-acoustic-scale-transfer-v0.1.0.schema.json')); json.load(open('docs/research/marine/fixtures/synthetic-marine-acoustic-scale-transfer-v0.1.0.json'))"
@@ -53,6 +61,8 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin "${GITHUB_HEAD_REF}"
+          git rebase "origin/${GITHUB_HEAD_REF}"
           git add tools/marine-acoustic-scale-transfer-audit/src/main.rs tools/marine-acoustic-scale-transfer-audit/Cargo.lock
           if git diff --cached --quiet; then
             echo "Rust source already matches rustfmt."
