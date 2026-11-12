@@ -2710,8 +2710,8 @@ fn fluidsynth_candidate_wav(
 ) -> Option<FluidCandidateRender> {
     use symthaea_muse::performed_event_map::PerformedEventMap;
     use symthaea_muse::renderer_execution_receipt::{
-        RendererBackend, RendererExecutionReceipt, RendererReceiptInputs, sha256_file,
-        sha256_hex, summarize_wav,
+        RendererBackend, RendererExecutionReceipt, RendererReceiptInputs, sha256_hex,
+        summarize_wav,
     };
 
     let (binary, soundfont) = symthaea_muse::fluid_render::available()?;
@@ -2726,16 +2726,31 @@ fn fluidsynth_candidate_wav(
             symthaea_muse::fluid_render::RenderColor::from_state(state),
             dialect,
         );
-        let wav_bytes =
-            symthaea_muse::fluid_render::render_midi_to_wav(&path, SAMPLE_RATE, Some(color))?;
-        // Ensure the exact file observed by the receipt did not change while
-        // the renderer was consuming the temporary MIDI path.
+        let attempt = symthaea_muse::fluid_render::render_midi_to_wav_with_observation(
+            &path,
+            SAMPLE_RATE,
+            Some(color),
+        );
+        let wav_bytes = attempt.wav_bytes?;
+        let invocation_observation = attempt.observation;
+        if invocation_observation.disposition
+            != symthaea_muse::fluid_render::FluidSynthInvocationDispositionV1::Rendered
+            || !invocation_observation.process_success
+            || invocation_observation.process_exit_code != Some(0)
+        {
+            return None;
+        }
+        // The observation binds the exact MIDI, executable and SoundFont
+        // hashes before and after the child invocation. It is local process
+        // evidence, not proof of which bytes a hostile host loaded.
         let midi_bytes_after = std::fs::read(&path).ok()?;
         if sha256_hex(&midi_bytes_after) != sha256_hex(&midi_bytes) {
             return None;
         }
-        let executable_sha256 = sha256_file(&binary).ok()?;
-        let soundfont_sha256 = sha256_file(&soundfont).ok()?;
+        let executable_sha256 = invocation_observation.executable_sha256_before.as_deref()?;
+        let soundfont_sha256 = invocation_observation.soundfont_sha256_before.as_deref()?;
+        let invocation_observation_json =
+            serde_json::to_value(&invocation_observation).ok()?;
         let score_bytes = serde_json::to_vec(score).ok()?;
         let score_sha256 = sha256_hex(&score_bytes);
         let audio_summary = summarize_wav(&wav_bytes).ok()?;
@@ -2793,9 +2808,10 @@ fn fluidsynth_candidate_wav(
             render_config_bytes: &render_config_bytes,
             input_midi_bytes: Some(&midi_bytes),
             performed_schedule_bytes: None,
-            renderer_executable_sha256: Some(&executable_sha256),
-            soundfont_sha256: Some(&soundfont_sha256),
-            process_exit_code: Some(0),
+            renderer_executable_sha256: Some(executable_sha256),
+            soundfont_sha256: Some(soundfont_sha256),
+            process_exit_code: invocation_observation.process_exit_code,
+            invocation_observation: Some(&invocation_observation_json),
             performed_event_map_sha256: map_sha256.as_deref(),
             output_wav_bytes: &wav_bytes,
         }).ok()?;
