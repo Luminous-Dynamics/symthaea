@@ -711,7 +711,7 @@ mod tests {
 
     #[test]
     fn full_cell_mass_must_close(){
-        let mut m=fixture();
+        let mut m = fixture();
         m.observations[0].mass_inventory.as_mut().unwrap().declared_full_cell_mass_mg=250.0;
         assert!(audit_manifest(&m).is_err());
     }
@@ -776,51 +776,54 @@ mod tests {
     }
 
     #[test]
-    fn false_matched_axis_is_rejected(){
+    fn false_matched_axis_is_rejected() {
         let mut m=fixture();
-        m.observations[1].design.temperature_c=45.0;
+        m.observations[1].design.temperature_c = 45.0;
         assert!(audit_manifest(&m).is_err());
     }
 
     #[test]
-    fn missing_matched_axis_is_rejected(){
+    fn missing_matched_axis_is_rejected() {
         let mut m=fixture();
         m.comparisons[0].matched_axes.pop();
         assert!(audit_manifest(&m).is_err());
     }
 
     #[test]
-    fn right_censoring_remains_distinct(){
+    fn right_censoring_remains_distinct() {
         let mut m=fixture();
-        m.observations[0].outcome_status=OutcomeStatus::RightCensored;
-        m.observations[0].event_cycle=None;
-        let r=audit_manifest(&m).expect("right censor valid");
-        assert_eq!(r.right_censored_count,1);
+        m.observations[0].outcome_status = OutcomeStatus::RightCensored;
+        m.observations[0].event_cycle = None;
+        let r = audit_manifest(&m).expect("right censor valid");
+        assert_eq!(r.right_censored_count, 1);
     }
 
     #[test]
-    fn synthetic_result_cannot_be_promoted_to_physical_eol(){
+    fn synthetic_result_cannot_be_promoted_to_physical_eol() {
         let mut m=fixture();
-        m.observations[0].outcome_status=OutcomeStatus::ObservedEol;
-        m.observations[0].event_cycle=Some(90);
+        m.observations[0].outcome_status = OutcomeStatus::ObservedEol;
+        m.observations[0].event_cycle = Some(90);
         assert!(audit_manifest(&m).is_err());
     }
 
     #[test]
-    fn missing_evidence_admission_is_rejected(){
+    fn missing_evidence_admission_is_rejected() {
         let mut m=fixture();
-        m.evidence[0].admission=Admission::Unknown;
+        m.evidence[0].admission = Admission::Unknown;
         assert!(audit_manifest(&m).is_err());
     }
 
     #[test]
-    fn input_permutation_preserves_report(){
-        let m=fixture();
-        let expected=audit_manifest(&m).expect("fixture valid");
-        let mut p=m;
+    fn input_permutation_preserves_report() {
+        let m = fixture();
+        let expected = audit_manifest(&m).expect("fixture valid");
+        let mut p = m;
         p.observations.reverse();
         p.evidence.reverse();
         p.comparisons.reverse();
-        assert_eq!(expected,audit_manifest(&p).expect("permuted fixture valid"));
+        assert_eq!(
+            expected,
+            audit_manifest(&p).expect("permuted fixture valid")
+        );
     }
 }
