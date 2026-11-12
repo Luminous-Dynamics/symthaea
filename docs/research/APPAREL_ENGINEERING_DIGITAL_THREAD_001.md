@@ -421,3 +421,55 @@ The positive controls make two things explicit:
 - a sensor can correctly abstain and request a remeasurement rather than force an unsupported material class.
 
 These cases are expected outcomes for a future semantic validator; they are not yet executable tests. The current structural schema alone cannot enforce the cross-field causal/applicability rules. A dedicated semantic validator remains a P0 implementation task.
+
+
+## 16. Inverse textile design: beyond generative pattern aesthetics
+
+A separate research lane is now tracked in [TEXTILE-INVERSE-DESIGN-001 #11746](https://github.com/Luminous-Dynamics/symthaea/issues/11746).
+
+The field already has real inverse-design work; we must reproduce it rather than imply the area is empty:
+- [Data-driven prediction and inverse design of fabric tensile properties via machine learning](https://doi.org/10.1016/j.mtcomm.2025.114433), January 2026, combines finite-element-generated training examples and DNN surrogate models for woven tensile-property prediction/inverse design.
+- [Inverse design of personalized textiles with architected curved yarns](https://doi.org/10.1016/j.matdes.2026.116330), July 2026, uses a streamline/spacing-controlled curved-yarn construction, ANN design-space compression and surrogate-driven gradient optimization, with computational and experimental validation in three case studies.
+- [Machine Learning-Based Inverse Design for Functional Materials](https://doi.org/10.1002/adfm.75070), 9 April 2026, surveys direct inverse mappings, topology optimization, surrogate and hybrid pipelines, and challenges involving data scarcity and coupled physical constraints.
+- The [2026 fabric-design review](https://doi.org/10.1057/s41599-026-08095-x) covers 65 studies through 2024. It reports promising aesthetic-generation and material-property results, but also notes heterogeneity, dataset quality, interpretability and workflow-integration limitations. Its cross-study numerical summaries are not a matched benchmark leaderboard.
+
+The Luminous opportunity is to connect inverse design to calibrated physical models, manufacturing constraints and active experiment design:
+1. propose several non-dominated fibre/yarn/fabric architectures for a declared performance envelope;
+2. estimate uncertainty and detect out-of-domain candidates;
+3. reject candidates that cannot be manufactured on the declared machine/process route;
+4. select the next physical coupon test by expected information gain/value-of-information;
+5. test candidates and update only from admitted physical evidence;
+6. preserve held-out specimens for final assessment.
+
+A surrogate prediction is not a physical material property. The benchmark must report prediction error, uncertainty calibration, physical target hit-rate among top-k candidates, hard-constraint violations, number/cost of experiments and Pareto trade-offs. Compare FEM-only, simple regression, random forest/boosting, Gaussian-process or equivalent uncertainty-aware surrogate, FEM/ML hybrid, direct inverse mapping and expert/space-filling experiment selection under equal data and candidate budgets.
+
+## 17. Design-for-sorting and design-for-disassembly
+
+[DESIGN-FOR-SORTING-001 #11747](https://github.com/Luminous-Dynamics/symthaea/issues/11747) adds an upstream circularity lane.
+
+A November 2026 study, [Design–sorting mismatch limits circularity in fast-fashion garments](https://doi.org/10.1016/j.spc.2026.09.008), analysed 47,522 colour-specific H&M/Uniqlo product variants using a rule-based sorting-compatibility framework. It reports that 50.3% violated at least one study-specific baseline sorting rule (sensitivity range 45.0–64.0%). Main reported barriers included recognition-scope mismatch, multi-fibre blends, low-share components, optical-risk proxies and surface/hidden-material mismatch.
+
+This result is a product-data/rule analysis, not a measured sorting-line yield and not a universal estimate for all garments.
+
+The paradigm is to design around the actual target sensor and recovery plant:
+- make fibre composition detectable, including hidden and low-share components;
+- disclose and physically verify linings, membranes, coatings, trims and attachments;
+- prefer joining methods that can be separated by the declared repair/disassembly route;
+- model the damage and labour/tooling required to remove components;
+- verify the output feedstock actually meets the downstream plant's acceptance envelope.
+
+Evaluate false-safe design decisions, material identification coverage, disassembly success, labour/tool time, damage, stream purity, mass closure, secondary grade and functional acceptance. A product is not "recyclable" simply because a rule checker says its design is compatible; physical recovery and output-grade evidence remain necessary.
+
+## 18. Current machine-readable research corpus
+
+The benchmark source manifest is now at revision `2026-11-12-r2` with 12 distinct sources. The current source set spans:
+- real garment dynamics and cloth manipulation;
+- visual garment-category sorting;
+- NIR specimen-level and hyperspectral textile composition;
+- inverse textile/material design;
+- robotic sewing;
+- design-to-sorting compatibility.
+
+Each source record distinguishes paper-reported results, publicly downloadable scope, licensing/redistribution status, domain limitations and intended use. The manifest does not claim any dataset has been downloaded or reproduced.
+
+The source split rules are strict: repeated pixels/spectra/frames from the same physical specimen remain in one split; garment identities and material families are held out where possible; simulation outputs never become physical labels; and source-domain transfer is evaluated explicitly.
