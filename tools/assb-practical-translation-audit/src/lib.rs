@@ -150,6 +150,7 @@ pub struct EvidenceRecord {
     pub evidence_class: EvidenceClass,
     pub admission: Admission,
     pub claim_scope: String,
+    pub rights_ref: String,
     pub metrology_ref: Option<String>,
 }
 
@@ -288,6 +289,7 @@ fn evidence_registry<'a>(
     for record in records {
         validate_digest(&record.source_digest, "evidence source digest")?;
         require_nonempty(&record.claim_scope, "evidence claim scope")?;
+        require_nonempty(&record.rights_ref, "evidence rights reference")?;
         if record.evidence_class == EvidenceClass::PhysicalMeasurement
             || record.evidence_class == EvidenceClass::IndependentLaboratory
         {
@@ -715,7 +717,8 @@ mod tests {
     fn evidence(id:&str,ch:char)->EvidenceRecord{
         EvidenceRecord{
             evidence_id:id.into(),source_digest:digest(ch),evidence_class:EvidenceClass::Synthetic,
-            admission:Admission::AdmittedForEvaluation,claim_scope:"synthetic fixture".into(),metrology_ref:None
+            admission:Admission::AdmittedForEvaluation,claim_scope:"synthetic fixture".into(),
+            rights_ref:"SYNTHETIC-ONLY-NO-PRODUCTION-DATA".into(),metrology_ref:None
         }
     }
 
@@ -781,6 +784,10 @@ mod tests {
         assert_eq!(r.comparison_count,1);
         assert_eq!(r.comparisons[0].baseline_operating_pressure_milli_mpa,5000);
         assert_eq!(r.comparisons[0].candidate_operating_pressure_milli_mpa,300);
+        assert_eq!(r.comparisons[0].baseline_fabrication_pressure_milli_mpa,100000);
+        assert_eq!(r.comparisons[0].candidate_fabrication_pressure_milli_mpa,100000);
+        assert_eq!(r.comparisons[0].fabrication_pressure_delta_milli_mpa,0);
+        assert_eq!(r.comparisons[0].pressure_measurement_method,"calibrated load-cell fixture");
         assert_eq!(r.comparisons[0].pressure_delta_milli_mpa,-4700);
     }
 
@@ -820,7 +827,7 @@ mod tests {
     }
 
     #[test]
-    fn fabrication_and_operating_pressure_are_both_required(){
+    fn zero_fabrication_pressure_remains_a_declared_measurement(){
         let mut m=fixture();
         m.observations[0].pressure.fabrication_pressure_mpa=0.0;
         assert!(audit_manifest(&m).is_ok());
