@@ -5,8 +5,8 @@
 //! authoritative MissionTrace. It is retrospective and never authorizes actuation.
 
 use super::{
-    ActuatorApplication, EventStamp, FindingSeverity, MissionTrace, ReplayDisposition,
-    ReplayFinding, ReplayReport, replay_mission,
+    EventStamp, FindingSeverity, MissionTrace, ReplayDisposition, ReplayFinding, ReplayReport,
+    replay_mission,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
