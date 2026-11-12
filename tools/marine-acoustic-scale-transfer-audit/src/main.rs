@@ -802,6 +802,17 @@ fn audit(case: &Case) -> AuditReport {
             spectrum_representation: spectrum_representation_name(&case.scaling.representation),
             disposition: "invalid",
             comparison_outcome: "not_evaluated",
+            calibration_comparison_outcome: "not_evaluated",
+            held_out_comparison_outcome: "not_evaluated",
+            split_manifest_sha256: case.validation_split.split_manifest_sha256.clone(),
+            split_protocol_id: case.validation_split.protocol_id.clone(),
+            grouping_dimensions: case.validation_split.grouping_dimensions.iter()
+                .map(|dimension| grouping_dimension_name(*dimension))
+                .collect(),
+            calibration_group_count: calibration_groups_count(&case.validation_split),
+            held_out_group_count: held_out_groups_count(&case.validation_split),
+            calibration_pair_count: 0,
+            held_out_pair_count: 0,
             unique_model_rotation_rates,
             pair_reports: Vec::new(),
             reasons: validation_errors,
