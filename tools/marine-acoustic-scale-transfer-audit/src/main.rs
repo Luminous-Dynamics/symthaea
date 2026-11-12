@@ -77,8 +77,8 @@ struct OperatingPointPair {
     full_scale_rotation_rate_rps: f64,
     model_cavitation_number_n_d: f64,
     full_scale_cavitation_number_n_d: f64,
-    model_reference_distance_m: f64,
-    full_scale_reference_distance_m: f64,
+    model_source_level_reference_distance_m: f64,
+    full_scale_source_level_reference_distance_m: f64,
     model_reynolds_number: f64,
     full_scale_reynolds_number: f64,
     operating_point_profile_sha256: String,
@@ -274,7 +274,7 @@ fn audit(case: &Case) -> AuditReport {
     if full.trial_id.trim().is_empty() || full.source_level_method_id.trim().is_empty() {
         incomplete.push("full-scale trial or source-level method identity is missing".to_string());
     }
-    if full.source_level_basis != "SOURCE_LEVEL" {
+    if full.source_level_basis != "SOURCE_LEVEL_AT_1M" {
         blockers.push("full-scale comparison must use source level, not received level or radiated-noise level".to_string());
     }
     if !full.propagation_separated {
@@ -320,12 +320,12 @@ fn audit(case: &Case) -> AuditReport {
             || !positive_finite(pair.full_scale_rotation_rate_rps)
             || !positive_finite(pair.model_cavitation_number_n_d)
             || !positive_finite(pair.full_scale_cavitation_number_n_d)
-            || !positive_finite(pair.model_reference_distance_m)
-            || !positive_finite(pair.full_scale_reference_distance_m)
+            || !positive_finite(pair.model_source_level_reference_distance_m)
+            || !positive_finite(pair.full_scale_source_level_reference_distance_m)
             || !positive_finite(pair.model_reynolds_number)
             || !positive_finite(pair.full_scale_reynolds_number)
         {
-            blockers.push(format!("pair {} has invalid scale, cavitation, distance or Reynolds inputs", pair.pair_id));
+            blockers.push(format!("pair {} has invalid scale/cavitation/Reynolds inputs or source levels not normalized to 1 m", pair.pair_id));
             continue;
         }
 
@@ -366,7 +366,7 @@ fn audit(case: &Case) -> AuditReport {
                 let n_d_ratio = (pair.full_scale_rotation_rate_rps * full.full_scale_propeller_diameter_m)
                     / (pair.model_rotation_rate_rps * campaign.model_propeller_diameter_m);
                 let multiplier = sigma_ratio.powf(w)
-                    * (pair.model_reference_distance_m / pair.full_scale_reference_distance_m).powf(x)
+                    * (pair.model_source_level_reference_distance_m / pair.full_scale_source_level_reference_distance_m).powf(x)
                     * n_d_ratio.powf(y)
                     * diameter_ratio.powf(z);
                 if positive_finite(multiplier) {
@@ -590,10 +590,11 @@ mod tests {
 
     #[test]
     fn eq16_proportional_low_frequency_known_answer() {
-        let multiplier = 0.8_f64 * 0.01_f64 * 2.0_f64.powi(2) * 10.0_f64;
-        assert!((multiplier - 0.32).abs() < 1.0e-14);
+        // Both input levels are source levels normalized to the same 1 m reference.
+        let multiplier = 0.8_f64 * 1.0_f64 * 2.0_f64.powi(2) * 10.0_f64;
+        assert!((multiplier - 32.0).abs() < 1.0e-14);
         let delta = 20.0 * multiplier.log10();
-        assert!((delta - (-9.89700043360188)).abs() < 1.0e-12);
+        assert!((delta - 30.10299956639812).abs() < 1.0e-12);
     }
 
     #[test]
@@ -614,7 +615,9 @@ mod tests {
     }
 
     #[test]
-    fn measured_fixture_can_validate_with_conservative_uncertainty() {
+    fn measured_disposition_logic_unit_vector_only() {
+        // This in-memory evidence-class mutation exercises the status branch only;
+        // it is not physical measurement evidence or a claim about the fixture.
         let mut case = synthetic_case();
         make_measured(&mut case);
         let report = audit(&case);
