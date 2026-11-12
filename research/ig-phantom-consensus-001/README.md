@@ -35,7 +35,7 @@ cargo run --manifest-path research/ig-phantom-consensus-001/qualifier/Cargo.toml
   research/ig-phantom-consensus-001/PHANTOM_CONSENSUS_FIXTURES_V0_1.json \
   research/ig-phantom-consensus-001/PHANTOM_CONSENSUS_FIXTURES_V0_1.schema.json
 
-The qualifier checks a bounded schema header and explicit structural invariants. It does not claim complete JSON Schema implementation. It computes peer distributions from the recorded baseline, checks probability-vector completeness, calculates multiclass Brier scores, and verifies the expected phantom-consensus oracle. Baseline and intervention payload digests are emitted for reproducible run receipts.
+The qualifier checks a bounded schema header and explicit structural invariants. It does not claim complete JSON Schema implementation. It computes peer distributions from the recorded baseline, checks probability-vector completeness, calculates squared L2 probability-vector error against the recorded empirical peer distribution, and verifies the expected phantom-consensus oracle. Baseline and intervention payload digests are emitted for reproducible run receipts.
 
 ## Measurement semantics
 
