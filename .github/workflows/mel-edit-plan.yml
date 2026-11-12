@@ -1,0 +1,49 @@
+name: MEL Capability Edit Plan
+
+on:
+  pull_request:
+    paths:
+      - "tools/mel-edit-plan/**"
+      - ".github/workflows/mel-edit-plan.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mel-edit-plan-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: exact-head-edit-plan-reference
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify exact checked-out head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'exact_head=%s\n' "$actual"
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/mel-edit-plan/Cargo.toml --all -- --check
+
+      - name: Run deterministic contract tests
+        run: cargo test --manifest-path tools/mel-edit-plan/Cargo.toml --locked
+
+      - name: Run Clippy
+        run: cargo clippy --manifest-path tools/mel-edit-plan/Cargo.toml --all-targets --locked -- -D warnings
