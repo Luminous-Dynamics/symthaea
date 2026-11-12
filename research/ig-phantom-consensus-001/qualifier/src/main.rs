@@ -16,7 +16,7 @@ struct Report {
     rejected_controls: usize,
     phantom_cases: usize,
     peer_estimates_scored: usize,
-    brier_sum: f64,
+    distribution_l2_sum: f64,
     digest_records: usize,
 }
 
@@ -83,7 +83,7 @@ fn estimate_top(probabilities: &Value) -> Option<String> {
     if *value == 0 || ranked.get(1).is_some_and(|(_, next)| *next == *value) { return None; }
     Some(key.clone())
 }
-fn peer_brier(rows: &[Value], index: usize, opts: &[String], probabilities: &Value) -> Option<f64> {
+fn peer_distribution_l2_error(rows: &[Value], index: usize, opts: &[String], probabilities: &Value) -> Option<f64> {
     let n = rows.len().checked_sub(1)?;
     if n == 0 { return None; }
     let counts = baseline_tally(rows, opts, Some(index));
@@ -221,7 +221,7 @@ fn validate_fixture(f: &Value, arms: &BTreeSet<String>) -> (Vec<String>, usize, 
     let post = arr(f, "post_signal");
     let mut post_ids = BTreeSet::new();
     let mut reported_count = 0usize;
-    let mut brier_sum = 0.0;
+    let mut distribution_l2_sum = 0.0;
     for row in post {
         let id = row["agent_id"].as_str().unwrap_or("");
         if id.is_empty() || !post_ids.insert(id.to_owned()) { add(&mut errors, "post-signal roster has duplicate or empty AgentInstanceId"); }
@@ -237,8 +237,8 @@ fn validate_fixture(f: &Value, arms: &BTreeSet<String>) -> (Vec<String>, usize, 
         let index = baseline.iter().position(|b| b["agent_id"].as_str() == Some(agent));
         if let (Some(i), Some(p)) = (index, row["peer_estimate"]["probabilities_permille"].as_object()) {
             if row["peer_estimate"]["estimate_status"].as_str() == Some("reported") {
-                if let Some(score) = peer_brier(baseline, i, &opts, &Value::Object(p.clone())) {
-                    brier_sum += score;
+                if let Some(score) = peer_distribution_l2_error(baseline, i, &opts, &Value::Object(p.clone())) {
+                    distribution_l2_sum += score;
                     reported_count += 1;
                 }
             }
@@ -291,7 +291,7 @@ fn validate_fixture(f: &Value, arms: &BTreeSet<String>) -> (Vec<String>, usize, 
     if !["pass", "indeterminate", "reject"].contains(&expected_disposition) {
         add(&mut errors, "unknown expected validator disposition");
     }
-    (errors, reported_count, brier_sum)
+    (errors, reported_count, distribution_l2_sum)
 }
 fn main_run(args: &[String]) -> Result<Report, String> {
     if args.len() != 4 { return Err("usage: qualifier PROTOCOL PROTOCOL_SCHEMA FIXTURES FIXTURES_SCHEMA".into()); }
@@ -322,13 +322,13 @@ fn main_run(args: &[String]) -> Result<Report, String> {
     for fixture in fixtures {
         let id = text(fixture, "fixture_id").unwrap_or("<missing>");
         if !seen_ids.insert(id.to_owned()) { return Err(format!("duplicate fixture id: {id}")); }
-        let (errors, scored, brier_sum) = validate_fixture(fixture, &arms);
+        let (errors, scored, distribution_l2_sum) = validate_fixture(fixture, &arms);
         let expected = fixture["expected"]["validator_disposition"].as_str().unwrap_or("");
         let baseline_digest = sha(&fixture["private_baseline"]).ok_or("cannot digest private baseline")?;
         let intervention_digest = sha(&fixture["intervention"]).ok_or("cannot digest intervention")?;
         report.digest_records += 1;
         report.peer_estimates_scored += scored;
-        report.brier_sum += brier_sum;
+        report.distribution_l2_sum += distribution_l2_sum;
         if errors.is_empty() {
             match expected {
                 "pass" => report.pass += 1,
@@ -349,8 +349,8 @@ fn main_run(args: &[String]) -> Result<Report, String> {
 fn main() -> ExitCode {
     match main_run(&env::args().skip(1).collect::<Vec<_>>()) {
         Ok(r) => {
-            let mean = if r.peer_estimates_scored == 0 { 0.0 } else { r.brier_sum / r.peer_estimates_scored as f64 };
-            println!("QUALIFIED: fixtures={} pass={} indeterminate={} rejected_negative_controls={} phantom_cases={} peer_estimates_scored={} mean_multiclass_brier={:.6} digest_records={}",
+            let mean = if r.peer_estimates_scored == 0 { 0.0 } else { r.distribution_l2_sum / r.peer_estimates_scored as f64 };
+            println!("QUALIFIED: fixtures={} pass={} indeterminate={} rejected_negative_controls={} phantom_cases={} peer_estimates_scored={} mean_peer_distribution_l2_error={:.6} digest_records={}",
                 r.fixtures, r.pass, r.indeterminate, r.rejected_controls, r.phantom_cases, r.peer_estimates_scored, mean, r.digest_records);
             ExitCode::SUCCESS
         }
@@ -369,7 +369,7 @@ mod tests {
         ];
         let opts = vec!["A".to_string(),"B".to_string(),"ABSTAIN".to_string(),"UNKNOWN".to_string()];
         let probs = serde_json::json!({"A":500,"B":500,"ABSTAIN":0,"UNKNOWN":0});
-        assert_eq!(peer_brier(&rows, 0, &opts, &probs), Some(0.0));
+        assert_eq!(peer_distribution_l2_error(&rows, 0, &opts, &probs), Some(0.0));
     }
     #[test]
     fn missing_peer_is_retained_as_unknown() {
@@ -416,6 +416,102 @@ mod tests {
         let perceived = serde_json::json!({"A":200,"B":800,"ABSTAIN":0,"UNKNOWN":0});
         assert_eq!(estimate_top(&perceived), Some("B".to_string()));
     }
+    fn fixture(id: &str) -> Value {
+        let doc: Value = serde_json::from_str(include_str!("../../PHANTOM_CONSENSUS_FIXTURES_V0_1.json")).unwrap();
+        doc["fixtures"].as_array().unwrap().iter()
+            .find(|f| f["fixture_id"].as_str() == Some(id)).unwrap().clone()
+    }
+
+    fn declared_arms() -> BTreeSet<String> {
+        ["no_group_signal", "neutral_public_text", "ambiguous_social_signal",
+         "explicit_peer_recommendation", "fabricated_private_tally"]
+            .into_iter().map(str::to_owned).collect()
+    }
+
+    #[test]
+    fn every_frozen_fixture_matches_its_declared_disposition() {
+        let doc: Value = serde_json::from_str(include_str!("../../PHANTOM_CONSENSUS_FIXTURES_V0_1.json")).unwrap();
+        let arms = declared_arms();
+        for f in doc["fixtures"].as_array().unwrap() {
+            let (errors, _, _) = validate_fixture(f, &arms);
+            match f["expected"]["validator_disposition"].as_str().unwrap() {
+                "pass" | "indeterminate" => assert!(errors.is_empty(), "{}: {:?}", f["fixture_id"], errors),
+                "reject" => assert!(!errors.is_empty(), "{}: negative control escaped", f["fixture_id"]),
+                other => panic!("unknown disposition {other}"),
+            }
+        }
+    }
+
+    #[test]
+    fn phantom_consensus_fixture_is_detected() {
+        let f = fixture("PHC-003");
+        assert!(phantom_oracle(&f));
+        assert_eq!(f["expected"]["phantom_consensus"].as_bool(), Some(true));
+    }
+
+    #[test]
+    fn anonymous_tally_disclosure_does_not_require_peer_level_ledger() {
+        let f = fixture("PHC-006");
+        let (errors, _, _) = validate_fixture(&f, &declared_arms());
+        assert!(errors.is_empty(), "{errors:?}");
+    }
+
+    #[test]
+    fn fabricated_tally_cannot_be_promoted_to_verified() {
+        let mut f = fixture("PHC-008");
+        f["intervention"]["verified"] = Value::Bool(true);
+        let (errors, _, _) = validate_fixture(&f, &declared_arms());
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn anonymous_tally_must_match_the_committed_private_baseline() {
+        let mut f = fixture("PHC-006");
+        f["transparency"]["disclosed_tally"]["A"] = serde_json::json!(999);
+        let (errors, _, _) = validate_fixture(&f, &declared_arms());
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn peer_level_disclosure_must_match_private_baseline() {
+        let mut f = fixture("PHC-007");
+        f["transparency"]["disclosed_private_ledger"][0]["private_choice"] = serde_json::json!("B");
+        let (errors, _, _) = validate_fixture(&f, &declared_arms());
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn peer_estimate_roster_must_match_private_roster() {
+        let mut f = fixture("PHC-001");
+        f["post_signal"].as_array_mut().unwrap().pop();
+        let (errors, _, _) = validate_fixture(&f, &declared_arms());
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn probability_vector_must_sum_to_one_thousand_permille() {
+        let mut f = fixture("PHC-003");
+        f["post_signal"][0]["peer_estimate"]["probabilities_permille"]["B"] = serde_json::json!(700);
+        let (errors, _, _) = validate_fixture(&f, &declared_arms());
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn task_answer_cannot_leak_through_public_signal() {
+        let mut f = fixture("PHC-001");
+        f["intervention"]["gold_label_disclosed"] = Value::Bool(true);
+        let (errors, _, _) = validate_fixture(&f, &declared_arms());
+        assert!(!errors.is_empty());
+    }
+
+    #[test]
+    fn normative_pluralism_never_has_a_gold_preference() {
+        let mut f = fixture("PHC-012");
+        f["task"]["gold_option"] = serde_json::json!("A");
+        let (errors, _, _) = validate_fixture(&f, &declared_arms());
+        assert!(!errors.is_empty());
+    }
+
     #[test]
     fn sha_is_deterministic_for_canonical_json_value() {
         let a = serde_json::json!({"b":2,"a":1});
