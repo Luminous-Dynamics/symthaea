@@ -1,0 +1,58 @@
+{
+  "schema": "symthaea.science_bench_refresh_manifest.v1",
+  "generation_id": "example-only-not-for-scoring-0001",
+  "purpose": "protocol_fixture_not_for_scoring",
+  "lane": "sealed_refresh",
+  "generator": {
+    "repository": "https://github.com/Luminous-Dynamics/symthaea",
+    "revision": "NOT_IMPLEMENTED_YET",
+    "configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "evaluator": {
+    "version": "not-qualified-example-v1",
+    "source_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "oracle_separation": "not_qualified_example"
+  },
+  "seed_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "task_set_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "expected_task_count": 8,
+  "task_family_mixture": [
+    {
+      "family_id": "semantic_invariance",
+      "weight": 0.25,
+      "planned_task_count": 2
+    },
+    {
+      "family_id": "sampling_noise_shift",
+      "weight": 0.25,
+      "planned_task_count": 2
+    },
+    {
+      "family_id": "confounding_null",
+      "weight": 0.25,
+      "planned_task_count": 2
+    },
+    {
+      "family_id": "identifiability_abstention",
+      "weight": 0.25,
+      "planned_task_count": 2
+    }
+  ],
+  "policy_freeze": {
+    "subject_id": "example-policy-not-for-scoring",
+    "source_or_policy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "prompt_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "configuration_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "tool_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "budget": {
+    "max_observations": 100,
+    "max_experiments": 20,
+    "max_tool_calls": 10,
+    "max_total_tokens": 50000,
+    "max_wall_clock_seconds": 3600
+  },
+  "analysis_plan_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "post_run_reveal_policy": "reveal_seed_and_task_bytes_after_submission",
+  "protocol_commitment_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+}
