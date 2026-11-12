@@ -81,3 +81,16 @@ The drive consumer requires both `map_id` and `map_digest`, in addition to the s
 
 
 The consumer validates that all four interpolation weights are finite, each lies in [0, 1], and their sum is 1 within 1e-12. It preserves the selected torque/speed cell indices and weights in the resulting drive envelope. This checks the shape of the interpolation evidence but does not independently recompute the interpolation; the exact map-content digest and upstream map implementation version identify the artifact/algorithm that produced it.
+
+
+## Motor-shaft coordinate-bound demand envelope (v0.6)
+
+The additive v0.6 API, `evaluate_motor_shaft_coordinate_envelope`, consumes a rectangular motor-shaft torque/RPM bound set together with the lower/nominal/upper efficiency envelope produced by the coordinate-aware map oracle. It derives motor-shaft mechanical power at the lower, nominal and upper coordinate combinations, then calculates minimum, nominal and upper DC-bus demand.
+
+The source boundary is important: the input is already measured at the **motor-shaft output**. Transmission efficiency is deliberately absent from `MotorShaftDemandConfig`; applying gearbox efficiency a second time would double-count that conversion. The method accounts for motor and inverter losses only. Rotor-side/gearbox demand remains owned by the existing drive-chain API.
+
+The minimum demand pairs lower shaft power with upper motor efficiency. The upper demand pairs upper shaft power with lower motor efficiency. This independent endpoint product is sound in ordinary interval reasoning but can be conservative when torque, RPM and efficiency co-vary. The implementation reports all three scenarios separately, including typed DC-bus power/current-limit failures, so a nominal pass cannot hide an upper-bound failure.
+
+The returned bounds are deterministic absolute-set bounds, not probabilities or confidence intervals. They assume a fixed supplied inverter efficiency and bus voltage over the represented substep; inverter-map uncertainty, voltage sag, transmission uncertainty, battery limits and thermal behaviour remain separate owners. The implementation reuses IEEE-754 f64 arithmetic and is not yet a formally directed-rounded interval-arithmetic proof.
+
+Synthetic coverage includes closed-form torque/RPM power endpoints, the three demand scenarios, a nominal-pass / upper-bound-fail case, wrong-context rejection, invalid coordinate bounds and missing map identity. It does not establish physical motor calibration, aircraft performance, hardware limits, safety or airworthiness.
