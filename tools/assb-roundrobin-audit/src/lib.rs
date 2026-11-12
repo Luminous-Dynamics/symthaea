@@ -165,7 +165,9 @@ fn digest(value: &str, name: &str) -> Result<(), AuditError> {
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
     {
-        return Err(AuditError(format!("{name} must be a lowercase SHA-256 digest")));
+        return Err(AuditError(format!(
+            "{name} must be a lowercase SHA-256 digest"
+        )));
     }
     Ok(())
 }
@@ -184,10 +186,7 @@ fn finite_positive(value: f64, name: &str) -> Result<(), AuditError> {
     Ok(())
 }
 
-fn unique<'a>(
-    values: impl IntoIterator<Item = &'a str>,
-    name: &str,
-) -> Result<(), AuditError> {
+fn unique<'a>(values: impl IntoIterator<Item = &'a str>, name: &str) -> Result<(), AuditError> {
     let mut found = BTreeSet::new();
     for value in values {
         nonempty(value, name)?;
@@ -198,10 +197,11 @@ fn unique<'a>(
     Ok(())
 }
 
-fn evidence_map(
-    records: &[EvidenceRecord],
-) -> Result<BTreeMap<&str, &EvidenceRecord>, AuditError> {
-    unique(records.iter().map(|r| r.evidence_id.as_str()), "evidence ID")?;
+fn evidence_map(records: &[EvidenceRecord]) -> Result<BTreeMap<&str, &EvidenceRecord>, AuditError> {
+    unique(
+        records.iter().map(|r| r.evidence_id.as_str()),
+        "evidence ID",
+    )?;
     if records.is_empty() {
         return Err(AuditError("evidence registry must not be empty".into()));
     }
@@ -248,18 +248,24 @@ fn validate_outcome(
     match observation.outcome_status {
         OutcomeStatus::ObservedEol => {
             if evidence.evidence_class == EvidenceClass::Synthetic {
-                return Err(AuditError("synthetic evidence cannot report physical EOL".into()));
+                return Err(AuditError(
+                    "synthetic evidence cannot report physical EOL".into(),
+                ));
             }
             let cycle = observation
                 .event_cycle
                 .ok_or_else(|| AuditError("observed EOL requires event cycle".into()))?;
             if cycle == 0 || cycle > observation.exposure_cycles {
-                return Err(AuditError("EOL event cycle outside observed exposure".into()));
+                return Err(AuditError(
+                    "EOL event cycle outside observed exposure".into(),
+                ));
             }
         }
         OutcomeStatus::RightCensored => {
             if evidence.evidence_class == EvidenceClass::Synthetic {
-                return Err(AuditError("synthetic evidence cannot report physical censoring".into()));
+                return Err(AuditError(
+                    "synthetic evidence cannot report physical censoring".into(),
+                ));
             }
             if observation.exposure_cycles == 0 || observation.event_cycle.is_some() {
                 return Err(AuditError(
@@ -304,7 +310,10 @@ fn group_comparability(
 
     for row in rows {
         let cell = cells.get(row.cell_id.as_str()).copied().ok_or_else(|| {
-            AuditError(format!("group {group_id} references missing cell {}", row.cell_id))
+            AuditError(format!(
+                "group {group_id} references missing cell {}",
+                row.cell_id
+            ))
         })?;
         if !per_group_cells.insert(row.cell_id.as_str()) {
             return Err(AuditError(format!(
@@ -317,9 +326,7 @@ fn group_comparability(
             .or_default()
             .insert(cell.cell_id.as_str());
         if row.protocol_mode != mode {
-            return Err(AuditError(format!(
-                "group {group_id} mixes protocol modes"
-            )));
+            return Err(AuditError(format!("group {group_id} mixes protocol modes")));
         }
     }
 
@@ -395,9 +402,15 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         return Err(AuditError("manifest requires observations".into()));
     }
     let evidence = evidence_map(&manifest.evidence)?;
-    unique(manifest.laboratories.iter().map(|l| l.lab_id.as_str()), "lab ID")?;
     unique(
-        manifest.laboratories.iter().map(|l| l.blinded_lab_code.as_str()),
+        manifest.laboratories.iter().map(|l| l.lab_id.as_str()),
+        "lab ID",
+    )?;
+    unique(
+        manifest
+            .laboratories
+            .iter()
+            .map(|l| l.blinded_lab_code.as_str()),
         "blinded lab code",
     )?;
     unique(
@@ -406,11 +419,17 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
     )?;
     unique(manifest.cells.iter().map(|c| c.cell_id.as_str()), "cell ID")?;
     unique(
-        manifest.cells.iter().map(|c| c.blinded_sample_code.as_str()),
+        manifest
+            .cells
+            .iter()
+            .map(|c| c.blinded_sample_code.as_str()),
         "blinded sample code",
     )?;
     unique(
-        manifest.observations.iter().map(|o| o.observation_id.as_str()),
+        manifest
+            .observations
+            .iter()
+            .map(|o| o.observation_id.as_str()),
         "observation ID",
     )?;
 
@@ -434,13 +453,24 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         finite_nonnegative(fixture.pressure_range_min_mpa, "fixture pressure minimum")?;
         finite_positive(fixture.pressure_range_max_mpa, "fixture pressure maximum")?;
         if fixture.pressure_range_min_mpa >= fixture.pressure_range_max_mpa {
-            return Err(AuditError("fixture pressure range must have max > min".into()));
+            return Err(AuditError(
+                "fixture pressure range must have max > min".into(),
+            ));
         }
         for (value, name) in [
-            (fixture.pressure_uncertainty_mpa, "fixture pressure uncertainty"),
+            (
+                fixture.pressure_uncertainty_mpa,
+                "fixture pressure uncertainty",
+            ),
             (fixture.pressure_homogeneity_percent, "pressure homogeneity"),
-            (fixture.setpoint_accuracy_mape_percent, "setpoint accuracy MAPE"),
-            (fixture.repeatability_cv_percent, "pressure repeatability CV"),
+            (
+                fixture.setpoint_accuracy_mape_percent,
+                "setpoint accuracy MAPE",
+            ),
+            (
+                fixture.repeatability_cv_percent,
+                "pressure repeatability CV",
+            ),
         ] {
             finite_nonnegative(value, name)?;
         }
@@ -691,7 +721,11 @@ mod tests {
                 let cell_id = format!("{lab_id}-CELL-{n}");
                 let obs_id = format!("{lab_id}-OBS-{n}");
                 let evidence_id = format!("SYNTHETIC-EVIDENCE-{}-{n}", &lab_id[4..]);
-                evidence.push(ev(&evidence_id, char::from_digit((n + 3) as u32, 10).unwrap(), EvidenceClass::Synthetic));
+                evidence.push(ev(
+                    &evidence_id,
+                    char::from_digit((n + 3) as u32, 10).unwrap(),
+                    EvidenceClass::Synthetic,
+                ));
                 cells.push(cell(&cell_id, &format!("{lab_id}-BLIND-{n}")));
                 observations.push(observation(
                     &obs_id,
@@ -809,7 +843,9 @@ mod tests {
     fn right_censoring_remains_distinct() {
         let mut manifest = fixture_manifest();
         manifest.laboratories.retain(|lab| lab.lab_id == "LAB-A");
-        manifest.fixtures.retain(|fixture| fixture.fixture_id == "FIX-A");
+        manifest
+            .fixtures
+            .retain(|fixture| fixture.fixture_id == "FIX-A");
         manifest.cells.retain(|cell| cell.cell_id == "LAB-A-CELL-1");
         manifest
             .observations
