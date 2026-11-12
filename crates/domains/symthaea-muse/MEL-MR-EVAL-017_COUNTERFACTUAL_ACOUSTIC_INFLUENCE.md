@@ -1,6 +1,6 @@
 # MEL-MR-EVAL-017 — Counterfactual Performed-Event Acoustic Influence
 
-**Status:** first deterministic measurement primitive authored on 12 November 2026. It is not yet integrated with live FluidSynth/NativeMuse render orchestration, and its eight unit tests are authored but not reported as executed.
+**Status:** first deterministic measurement primitive authored on 12 November 2026. It is not yet integrated with live FluidSynth/NativeMuse render orchestration, and its nine unit tests are authored but not reported as executed.
 
 **Parent issue:** [#9093 — Build counterfactual performed-event acoustic influence maps](https://github.com/Luminous-Dynamics/symthaea/issues/9093)
 
@@ -29,7 +29,7 @@ This is a conditional intervention effect in one exact context. It is **not** ex
 The new src/counterfactual_acoustic_influence.rs module provides:
 
 - Typed interventions: remove, transpose, shift onset, change duration and change velocity. Zero-delta edits reject.
-- Exact context commitments: source Score, source event ID, baseline/counterfactual schedule, renderer profile, baseline/repeat/counterfactual render receipt digests.
+- Exact context commitments: source Score, source event ID, typed intervention, digest of an independently replay-verified symbolic transformation receipt, baseline/counterfactual schedule, renderer profile, baseline/repeat/counterfactual render receipt digests.
 - Mandatory same-schedule repeat renders. Missing repeat audio or mismatched repeat-receipt counts reject.
 - Strict audio preflight: finite samples, nonzero sample rate/channels, matching format and frame count, and bounded analysis-window sizes.
 - Per-channel paired measurements over overlapping windows:
@@ -48,7 +48,7 @@ The lower-level fixture API binds caller-provided renderer receipt digests but d
 - baseline, repeat and counterfactual receipts have distinct receipt digests;
 - the renderer-profile digest is derived from those independently replay-verified receipt fields rather than accepted as an unchecked caller claim.
 
-This still does not attest a malicious host or prove that an untrusted process loaded the claimed pages. It does remove the avoidable gap where the influence estimator could be handed a valid-looking receipt digest alongside different WAV bytes. The caller must still establish that repeat renders are independent executions and that their seed/effects policy is suitable for the experiment.
+This still does not attest a malicious host or prove that an untrusted process loaded the claimed pages. It does remove the avoidable gap where the influence estimator could be handed a valid-looking receipt digest alongside different WAV bytes. The verified entry point also requires a digest for the operation-specific symbolic transformation evidence. It binds that digest into the report, but the caller must independently replay and validate that evidence under the operation-specific contract (tracked separately by #9355). The estimator does not itself prove that `Remove`, `Transpose`, `ShiftOnset`, `ChangeDuration`, or `ChangeVelocity` was the only symbolic change. The caller must still establish that repeat renders are independent executions and that their seed/effects policy is suitable for the experiment.
 
 ## Explicit non-claims and limits
 
@@ -61,7 +61,7 @@ This still does not attest a malicious host or prove that an untrusted process l
 
 ## Initial deterministic tests
 
-Eight tests are authored:
+Nine tests are authored:
 
 1. A source-event removal with a decaying release tail is detected against a same-schedule repeat.
 2. A counterfactual deviation that matches repeat-render noise is not falsely classified as an intervention effect.
@@ -71,6 +71,7 @@ Eight tests are authored:
 6. Empty event IDs and zero-delta interventions reject.
 7. Baseline, repeat and counterfactual NativeMuse fixtures are independently replay-verified before PCM influence analysis.
 8. Replacing WAV bytes without changing the corresponding renderer receipt rejects.
+9. An unchanged baseline/counterfactual schedule digest rejects even when a non-no-op intervention is declared.
 
 These tests have not yet been run by the pinned Rust workflow. No empirical accuracy, false-attribution rate, calibration quality or SOTA result is claimed.
 
