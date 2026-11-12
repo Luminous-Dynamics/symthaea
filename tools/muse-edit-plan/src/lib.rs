@@ -327,6 +327,7 @@ pub struct PlanNode {
     pub depends_on: Vec<String>,
     pub stage_id: Option<String>,
     pub profile: Option<ProfileIdentity>,
+    pub profile_independence_group: Option<String>,
     pub input_artifact_types: Vec<String>,
     pub output_artifact_type: Option<String>,
     pub evidence_metric: Option<String>,
@@ -398,12 +399,13 @@ impl CompiledPlan {
             let postconditions = join_atoms(&node.postconditions.iter().cloned().collect::<Vec<_>>());
             let receipts = join_atoms(&node.receipt_obligations.iter().cloned().collect::<Vec<_>>());
             lines.push(format!(
-                "node\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
+                "node\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
                 atom(&node.node_id),
                 node.kind.label(),
                 join_atoms(&node.depends_on),
                 stage,
                 profile,
+                node.profile_independence_group.as_deref().map(atom).unwrap_or_default(),
                 input_types,
                 output,
                 metric,
@@ -555,7 +557,14 @@ fn validate_registry(registry: &CapabilityRegistry) -> Result<(), CompileError> 
             "registry version must be a non-empty identifier".to_string(),
         ));
     }
+    let mut operator_identities = BTreeSet::new();
     for profile in &registry.operators {
+        if !operator_identities.insert(profile.identity.clone()) {
+            return Err(CompileError::InvalidRequest(format!(
+                "duplicate operator profile identity {}",
+                profile.identity.stable_key()
+            )));
+        }
         if !valid_identifier(&profile.identity.id)
             || !valid_identifier(&profile.identity.version)
             || !valid_sha256(&profile.identity.artifact_sha256)
@@ -572,7 +581,14 @@ fn validate_registry(registry: &CapabilityRegistry) -> Result<(), CompileError> 
             validate_numeric_range(&control.control_id, control.minimum, control.maximum, &control.unit)?;
         }
     }
+    let mut observer_identities = BTreeSet::new();
     for profile in &registry.observers {
+        if !observer_identities.insert(profile.identity.clone()) {
+            return Err(CompileError::InvalidRequest(format!(
+                "duplicate observer profile identity {}",
+                profile.identity.stable_key()
+            )));
+        }
         if !valid_identifier(&profile.identity.id)
             || !valid_identifier(&profile.identity.version)
             || !valid_sha256(&profile.identity.artifact_sha256)
@@ -596,10 +612,10 @@ fn validate_stage_graph(
         .cloned()
         .map(|stage| (stage.stage_id.clone(), stage))
         .collect();
-    let source_types: BTreeMap<String, String> = request
+    let sources: BTreeMap<String, &ArtifactRef> = request
         .sources
         .iter()
-        .map(|source| (source.id.clone(), source.artifact_type.clone()))
+        .map(|source| (source.id.clone(), source))
         .collect();
 
     let mut indegree: BTreeMap<String, usize> =
@@ -609,13 +625,16 @@ fn validate_stage_graph(
     for stage in stage_map.values() {
         let mut dependencies = BTreeSet::new();
         for input in &stage.inputs {
-            let actual_type = match &input.origin {
-                InputOrigin::SourceArtifact(source_id) => source_types.get(source_id).ok_or_else(|| {
-                    CompileError::InvalidRequest(format!(
-                        "stage {} references unknown source {}",
-                        stage.stage_id, source_id
-                    ))
-                })?.clone(),
+            let (actual_type, actual_modality) = match &input.origin {
+                InputOrigin::SourceArtifact(source_id) => {
+                    let source = sources.get(source_id).ok_or_else(|| {
+                        CompileError::InvalidRequest(format!(
+                            "stage {} references unknown source {}",
+                            stage.stage_id, source_id
+                        ))
+                    })?;
+                    (source.artifact_type.clone(), source.modality)
+                }
                 InputOrigin::StageOutput(parent_id) => {
                     let parent = stage_map.get(parent_id).ok_or_else(|| {
                         CompileError::InvalidRequest(format!(
@@ -629,9 +648,15 @@ fn validate_stage_graph(
                         });
                     }
                     dependencies.insert(parent_id.clone());
-                    parent.output_artifact_type.clone()
+                    (parent.output_artifact_type.clone(), parent.modality)
                 }
             };
+            if actual_modality != stage.modality {
+                return Err(CompileError::InvalidRequest(format!(
+                    "stage {} modality {:?} does not match input {} modality {:?}",
+                    stage.stage_id, stage.modality, input.input_id, actual_modality
+                )));
+            }
             if actual_type != input.expected_artifact_type {
                 return Err(CompileError::TypeMismatch {
                     stage_id: stage.stage_id.clone(),
@@ -1000,6 +1025,7 @@ pub fn compile_plan(
             depends_on: Vec::new(),
             stage_id: None,
             profile: None,
+            profile_independence_group: None,
             input_artifact_types: vec![source.artifact_type.clone()],
             output_artifact_type: Some("verified_artifact_reference".to_string()),
             evidence_metric: None,
@@ -1049,6 +1075,7 @@ pub fn compile_plan(
             depends_on: dependencies.into_iter().collect(),
             stage_id: Some(stage_id.clone()),
             profile: Some(operator.identity.clone()),
+            profile_independence_group: Some(operator.independence_group.clone()),
             input_artifact_types: input_types,
             output_artifact_type: Some(stage.output_artifact_type.clone()),
             evidence_metric: None,
@@ -1062,11 +1089,12 @@ pub fn compile_plan(
 
         for (observer, metric_id) in selected_observers.get(stage_id).expect("observers selected") {
             let observer_node_id = format!(
-                "observe:{}:{}:{}:{}",
+                "observe:{}:{}:{}:{}:{}",
                 atom(stage_id),
                 atom(metric_id),
                 atom(&observer.identity.id),
-                atom(&observer.identity.version)
+                atom(&observer.identity.version),
+                atom(&observer.identity.artifact_sha256)
             );
             observer_selections.push(ObserverSelection {
                 stage_id: stage_id.clone(),
@@ -1082,6 +1110,7 @@ pub fn compile_plan(
                 depends_on: vec![node_id.clone()],
                 stage_id: Some(stage_id.clone()),
                 profile: Some(observer.identity.clone()),
+                profile_independence_group: Some(observer.independence_group.clone()),
                 input_artifact_types: vec![stage.output_artifact_type.clone()],
                 output_artifact_type: Some("independent_observation".to_string()),
                 evidence_metric: Some(metric_id.clone()),
@@ -1106,6 +1135,7 @@ pub fn compile_plan(
         depends_on: final_dependencies.into_iter().collect(),
         stage_id: None,
         profile: None,
+        profile_independence_group: None,
         input_artifact_types: vec!["candidate_artifact_and_evidence_set".to_string()],
         output_artifact_type: Some("qualified_candidate_proposal".to_string()),
         evidence_metric: None,
