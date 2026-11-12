@@ -67,7 +67,8 @@
     "charge_symmetry": "U(1) excitation-number conservation for equal-gap qubits; each local gate is block diagonal on pair excitation sectors 0, 1, 2",
     "emission_semantics": "After the boundary-pair unitary, one active tensor factor is appended to radiation and excluded from all later gates",
     "complementarity": "For the closed globally pure register, calculate S(R) and S(B) independently at every nontrivial cut and report their absolute difference",
-    "energy_ledger": "For equal-gap qubits with H = hbar*omega*N, record N_R and N_B separately and verify N = N_R + N_B at every emission step; report per-emission occupation expectation."
+    "energy_ledger": "For equal-gap qubits with H = hbar*omega*N, record N_R and N_B separately and verify N = N_R + N_B at every emission step; report per-emission occupation expectation.",
+    "symmetry_resolved_page_reference": "For a U(1)-conserving fixed-total-excitation model compare only with the exact Haar average inside that same charge sector; the unconstrained Page formula is an invalid equilibrium comparator unless symmetry breaking is explicitly part of the model."
   },
   "benchmark_ladder": [
     {
@@ -176,7 +177,9 @@
         "radiation_excitation_expectation_by_emission_step",
         "remaining_register_excitation_expectation_by_emission_step",
         "emitted_qubit_occupation_expectation",
-        "excitation_ledger_residual"
+        "excitation_ledger_residual",
+        "symmetry_resolved_page_equilibrium_entropy",
+        "finite_depth_gap_to_symmetry_sector_equilibrium"
       ],
       "acceptance": {
         "global_unitarity_and_state_norm_drift_reported_per_step": true,
@@ -191,12 +194,19 @@
         "emitted_qubit_occupation_range": [
           0,
           1
-        ]
+        ],
+        "symmetry_resolved_equilibrium_comparison": "required_for_U1_conserving_ensembles",
+        "finite_depth_equilibrium_claim_requires_depth_and_seed_convergence": true
       },
-      "implementation_status": "closed-register scramblers plus U(1)-conserving sequential factor-transfer source authored; Rust execution pending",
+      "implementation_status": "closed-register scramblers, U(1)-conserving sequential factor transfer, and exact fixed-charge Page entropy oracle authored; Rust execution pending",
       "source_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/random_circuit_scrambling_v1.json",
-      "claim_ceiling": "A closed finite-register U(1)-conserving sequential tensor-factor transfer toy model. It is not Hawking emission, gravitational backreaction, an island/QES calculation, or a four-dimensional black-hole evaporation derivation.",
-      "sequential_evaporation_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/sequential_evaporation_u1_v1.json"
+      "claim_ceiling": "Finite-dimensional unitary circuits with exact excitation conservation and a symmetry-sector Haar reference. This is not Hawking emission, gravitational backreaction, an island/QES calculation, or a four-dimensional black-hole evaporation derivation.",
+      "sequential_evaporation_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/sequential_evaporation_u1_v1.json",
+      "equilibrium_reference": {
+        "model": "Haar-random pure state restricted to the exact total-excitation sector",
+        "oracle": "symmetry_resolved_page_average_entropy_nats(N,K,|A|)",
+        "caveat": "The oracle is a kinematic equilibrium reference. The chosen local or boundary-emission circuit must independently demonstrate mixing toward it; no convergence is presumed."
+      }
     },
     {
       "id": "QI-4",
@@ -315,7 +325,9 @@
     "emitted_register_reinteracted_after_emission",
     "initial_state_outside_declared_microcanonical_sector",
     "radiation_black_hole_entropy_complementarity_failure",
-    "energy_partition_ledger_mismatch"
+    "energy_partition_ledger_mismatch",
+    "unconstrained_Haar_Page_reference_used_for_fixed_charge_ensemble",
+    "fixed_charge_equilibrium_claim_without_depth_and_seed_convergence"
   ],
   "competitive_baselines": [
     {
@@ -455,7 +467,8 @@
       "QI-2_seeded_haar_random_state_sampler_and_ensemble_statistics": "authored_not_executed",
       "QI-3_seeded_local_and_all_to_all_random_two_qubit_scramblers": "partial_source_authored_not_executed",
       "QI_3_U1_conserving_sequential_register_transfer": "source_authored_not_executed",
-      "QI_3_sequential_emission_energy_ledger": "source_authored_not_executed"
+      "QI_3_sequential_emission_energy_ledger": "source_authored_not_executed",
+      "QI_3_symmetry_resolved_Page_equilibrium_oracle": "source_authored_not_executed"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
