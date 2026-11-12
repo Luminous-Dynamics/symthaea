@@ -384,6 +384,14 @@ fn parse_part(
                         .map_err(|_| MusicXmlMeasureAdapterError::ArithmeticOverflow)?;
                     maximum_cursor = max_exact(maximum_cursor, cursor);
                 }
+            } else if element.has_tag_name("barline") {
+                // V1 MeasureMap represents outer measure boundaries only.
+                // A MusicXML middle barline is a separate notational event;
+                // returning Unknown prevents silently flattening it away.
+                let location = element.attribute("location").unwrap_or("right");
+                if location == "middle" || !matches!(location, "left" | "right") {
+                    return Ok(None);
+                }
             } else if element.has_tag_name("forward") || element.has_tag_name("backup") {
                 let duration_node = element
                     .children()
@@ -707,4 +715,30 @@ mod tests {
         assert_eq!(global.status, MeasureMapStatus::Supported);
         assert_eq!(global.measures[0].end, RationalBeat::new(4, 1).unwrap());
     }
+
+    #[test]
+    fn middle_barline_is_not_silently_collapsed_into_measure_span() {
+        let xml = r#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+                <note><rest/><duration>8</duration></note>
+                <barline location="middle"><bar-style>dashed</bar-style></barline>
+                <note><rest/><duration>8</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let global = parse(xml);
+        assert!(matches!(global.status, MeasureMapStatus::Unknown { .. }));
+        assert!(global.measures.is_empty());
+
+        let parts = parse_musicxml_part_measure_maps(
+            xml.as_bytes(),
+            "sha256:internal-barline",
+            "score-clock-1",
+        )
+        .unwrap();
+        assert_eq!(parts.len(), 1);
+        assert!(matches!(parts[0].map.status, MeasureMapStatus::Unknown { .. }));
+        assert!(parts[0].map.measures.is_empty());
+    }
+
 }
