@@ -33,6 +33,7 @@ pub enum QuantumInformationError {
     InvalidPageEntropy(f64),
     InvalidEnsembleSampleCount(usize),
     InvalidCircuitTopology,
+    InvalidSubsystemSize { requested: usize, maximum: usize },
     InvalidExcitationSector { excitations: usize, number_of_qubits: usize },
     EvaporationRegisterLimit { requested: usize, maximum: usize },
     UnitaryConstructionFailure,
@@ -60,6 +61,7 @@ impl fmt::Display for QuantumInformationError {
             Self::InvalidPageEntropy(value) => write!(f, "Page reference entropy is invalid: {value}"),
             Self::InvalidEnsembleSampleCount(count) => write!(f, "Haar ensemble needs at least two samples, got {count}"),
             Self::InvalidCircuitTopology => write!(f, "circuit topology requires at least two qubits"),
+            Self::InvalidSubsystemSize { requested, maximum } => write!(f, "subsystem size {requested} exceeds total register size {maximum}"),
             Self::InvalidExcitationSector { excitations, number_of_qubits } => write!(f, "excitation sector {excitations} is invalid for {number_of_qubits} qubits"),
             Self::EvaporationRegisterLimit { requested, maximum } => write!(f, "sequential evaporation register has {requested} qubits; dense complementary diagnostics support at most {maximum}"),
             Self::UnitaryConstructionFailure => write!(f, "failed to construct a numerically independent Haar unitary basis"),
@@ -320,6 +322,116 @@ pub fn page_average_entropy_nats(
     } else {
         Err(QuantumInformationError::InvalidPageEntropy(entropy))
     }
+}
+
+/// Exact Haar-average entropy for a pure state uniformly sampled inside a
+/// fixed total-excitation (U(1) charge) sector.
+///
+/// For N qubits, total excitation K, and a subsystem of A qubits, the
+/// fixed-charge Hilbert space decomposes into blocks
+/// H_A(q) tensor H_B(K-q), with dimensions
+/// m_q = C(A,q), n_q = C(N-A,K-q). The reduced state is block diagonal;
+/// its block weights follow a Dirichlet distribution with parameters
+/// d_q = m_q*n_q. Thus
+///
+/// E[S_A] = H_D - sum_q (d_q/D) H_(d_q)
+///          + sum_q (d_q/D) Page(m_q,n_q),
+///
+/// where D=C(N,K), H_j is the j-th harmonic number, and Page(m,n) is the
+/// finite-dimensional complex-Haar Page average. This is the symmetry-sector
+/// equilibrium oracle, not the unconstrained Page theorem and not a claim
+/// that a particular local circuit has mixed to that equilibrium.
+pub fn symmetry_resolved_page_average_entropy_nats(
+    number_of_qubits: usize,
+    total_excitations: usize,
+    subsystem_a_qubits: usize,
+) -> Result<f64, QuantumInformationError> {
+    if number_of_qubits > MAX_DENSE_STATE_QUBITS {
+        return Err(QuantumInformationError::DenseStateQubitLimit {
+            requested: number_of_qubits,
+            maximum: MAX_DENSE_STATE_QUBITS,
+        });
+    }
+    if subsystem_a_qubits > number_of_qubits {
+        return Err(QuantumInformationError::InvalidSubsystemSize {
+            requested: subsystem_a_qubits,
+            maximum: number_of_qubits,
+        });
+    }
+    if total_excitations > number_of_qubits {
+        return Err(QuantumInformationError::InvalidExcitationSector {
+            excitations: total_excitations,
+            number_of_qubits,
+        });
+    }
+
+    let subsystem_b_qubits = number_of_qubits - subsystem_a_qubits;
+    let total_dimension = binomial_dimension(number_of_qubits, total_excitations)?;
+    if total_dimension > MAX_PAGE_REFERENCE_TOTAL_DIMENSION {
+        return Err(QuantumInformationError::PageReferenceDimensionLimit {
+            requested: total_dimension,
+            maximum: MAX_PAGE_REFERENCE_TOTAL_DIMENSION,
+        });
+    }
+
+    let minimum_a_charge = total_excitations.saturating_sub(subsystem_b_qubits);
+    let maximum_a_charge = total_excitations.min(subsystem_a_qubits);
+    let mut block_dimension_sum = 0usize;
+    let mut weighted_block_harmonic = 0.0;
+    let mut weighted_page_entropy = 0.0;
+
+    for a_charge in minimum_a_charge..=maximum_a_charge {
+        let dimension_a = binomial_dimension(subsystem_a_qubits, a_charge)?;
+        let dimension_b = binomial_dimension(
+            subsystem_b_qubits,
+            total_excitations - a_charge,
+        )?;
+        let block_dimension = dimension_a
+            .checked_mul(dimension_b)
+            .ok_or(QuantumInformationError::DimensionOverflow)?;
+        block_dimension_sum = block_dimension_sum
+            .checked_add(block_dimension)
+            .ok_or(QuantumInformationError::DimensionOverflow)?;
+        let weight = block_dimension as f64 / total_dimension as f64;
+        weighted_block_harmonic += weight * harmonic_number(block_dimension);
+        weighted_page_entropy += weight
+            * page_average_entropy_nats(dimension_a, dimension_b)?;
+    }
+
+    if block_dimension_sum != total_dimension {
+        return Err(QuantumInformationError::DimensionMismatch {
+            expected: total_dimension,
+            actual: block_dimension_sum,
+        });
+    }
+
+    let entropy = harmonic_number(total_dimension)
+        - weighted_block_harmonic
+        + weighted_page_entropy;
+    if entropy.is_finite() && entropy >= 0.0 {
+        Ok(entropy)
+    } else {
+        Err(QuantumInformationError::InvalidPageEntropy(entropy))
+    }
+}
+
+/// Exact integer binomial coefficient with checked intermediate arithmetic.
+fn binomial_dimension(n: usize, k: usize) -> Result<usize, QuantumInformationError> {
+    if k > n {
+        return Err(QuantumInformationError::InvalidExcitationSector {
+            excitations: k,
+            number_of_qubits: n,
+        });
+    }
+    let k = k.min(n - k);
+    let mut value = 1usize;
+    for index in 1..=k {
+        value = value
+            .checked_mul(n - k + index)
+            .ok_or(QuantumInformationError::DimensionOverflow)?
+            / index;
+    }
+    Ok(value)
 }
 
 /// Topology for finite-depth random two-qubit scrambling circuits.
@@ -1468,3 +1580,57 @@ mod sequential_evaporation_tests {
         assert_eq!(first, repeated);
     }
 }
+
+#[cfg(test)]
+mod symmetry_resolved_page_tests {
+    use super::*;
+
+    #[test]
+    fn fixed_charge_page_reference_has_exact_small_sector_answers() {
+        assert!((symmetry_resolved_page_average_entropy_nats(2, 1, 1).unwrap()
+            - 0.5).abs() < 1e-14);
+        assert!((symmetry_resolved_page_average_entropy_nats(4, 1, 2).unwrap()
+            - 7.0 / 12.0).abs() < 1e-14);
+        assert!((symmetry_resolved_page_average_entropy_nats(4, 2, 2).unwrap()
+            - 0.95).abs() < 1e-13);
+    }
+
+    #[test]
+    fn fixed_charge_page_reference_is_complement_symmetric() {
+        for (number_of_qubits, total_excitations, subsystem) in [
+            (8, 4, 1), (8, 4, 3), (10, 5, 4), (12, 6, 5),
+        ] {
+            let left = symmetry_resolved_page_average_entropy_nats(
+                number_of_qubits, total_excitations, subsystem,
+            ).unwrap();
+            let right = symmetry_resolved_page_average_entropy_nats(
+                number_of_qubits, total_excitations, number_of_qubits - subsystem,
+            ).unwrap();
+            assert!((left - right).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn fixed_charge_page_reference_vanishes_for_trivial_sectors_and_cuts() {
+        for (number_of_qubits, total_excitations, subsystem) in [
+            (8, 0, 4), (8, 8, 4), (8, 4, 0), (8, 4, 8),
+        ] {
+            assert!(symmetry_resolved_page_average_entropy_nats(
+                number_of_qubits, total_excitations, subsystem,
+            ).unwrap().abs() < 1e-13);
+        }
+    }
+
+    #[test]
+    fn fixed_charge_page_reference_rejects_invalid_domain_inputs() {
+        assert!(matches!(
+            symmetry_resolved_page_average_entropy_nats(8, 9, 4),
+            Err(QuantumInformationError::InvalidExcitationSector { .. })
+        ));
+        assert!(matches!(
+            symmetry_resolved_page_average_entropy_nats(8, 4, 9),
+            Err(QuantumInformationError::InvalidSubsystemSize { .. })
+        ));
+    }
+}
+
