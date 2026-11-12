@@ -1275,6 +1275,52 @@
         "Per-cell ignition/quenched status must not be treated as proof of an independently validated process outcome."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "PLASMA-PORTABLE-MOBIPLAS-ARGON-2024",
+      "lane": "LOW_TEMPERATURE_PLASMA_MINIATURIZATION",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "authors": "Bansemer et al.",
+        "title": "On the Development and Characterization of the Novel Portable Plasma Device MobiPlas",
+        "publisher": "Plasma Medicine",
+        "publication_date": "2024",
+        "volume": 14,
+        "issue": 4,
+        "pages": "39-51",
+        "doi": "10.1615/PlasmaMed.2025057641",
+        "url": "https://doi.org/10.1615/PlasmaMed.2025057641",
+        "full_text": "https://www.dl.begellhouse.com/download/article/46f5a11a2aff6c76/PMED-57641.pdf",
+        "institutional_profile": "https://www.inptdat.de/mobiplas"
+      },
+      "device_profile": {
+        "plasma_regime": "ATMOSPHERIC_PRESSURE_NONTHERMAL_ARGON_APPJ",
+        "portability_architecture": "INTEGRATED_REFILLABLE_STEEL_ARGON_TANK_AND_MOBILE_POWERBANK",
+        "controller": "RASPBERRY_PI_PICO",
+        "frequency_kHz": 800,
+        "pressure_bar": 1,
+        "reported_gas_temperature_C": [
+          25,
+          40
+        ],
+        "continuous_operation_per_gas_fill_min": 10,
+        "max_patient_leakage_current_uA": 11,
+        "leakage_current_stability": "paper reports occasional fluctuation due heating in high-voltage generator current-limitation circuit",
+        "tip_temperature_C": 40,
+        "ozone_claim": "below EU threshold at distances greater than 20 cm under source test conditions",
+        "catalogue_assigned_TRL": 4,
+        "catalogue_TRL_source": "INPTDAT Leibniz Institute for Plasma Science and Technology profile; not an independent qualification accepted by Luminous"
+      },
+      "source_conclusion": "A portable argon APPJ with integrated refillable gas supply and a mobile powerbank is characterized for medical research. A gas filling supports approximately 10 minutes of operation; the source reports target temperature and patient leakage-current observations, including occasional current instability in the first prototype.",
+      "comparison_status": "PORTABLE_INDEPENDENT_OPERATION_DEMONSTRATION_WITH_SHORT_GAS_AUTONOMY_AND_EARLY_PROTOTYPE_DRIFT",
+      "blockers": [
+        "Approximately ten minutes of operation per gas fill is a source-specific autonomy result, not continuous-duty or lifecycle qualification.",
+        "The paper reports occasional patient leakage-current fluctuation caused by heating in a supply current-limitation circuit; the observed safety/current behavior must not be reduced to a single maximum number.",
+        "The institutional profile's TRL 4 is catalog metadata, not a third-party qualification or regulatory approval.",
+        "Medical application context does not establish clinical efficacy, safety certification, or market authorization for a new device.",
+        "The complete powerbank energy, gas inventory, recharge/refill time, consumable cost and service boundary must be measured for matched portable-system comparison."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -1417,6 +1463,11 @@
       "control_id": "NC-FIVE-CELL-RF-ARRAY-IS-HUNDRED-CELL-QUALIFICATION",
       "condition": "Promote the demonstrated five-cell individually ignited RF array and authors' proposed tens/hundreds scale-out into a qualified hundred-cell production array.",
       "expected_disposition": "REJECT_SCALE_OUT_EXTRAPOLATION"
+    },
+    {
+      "control_id": "NC-MOBIPLAS-TEN-MINUTE-AUTONOMY-IS-LIFETIME-QUALIFICATION",
+      "condition": "Promote approximately 10 minutes of operation per argon gas fill and a single prototype leakage-current maximum into continuous-duty, lifecycle, medical safety or regulatory qualification.",
+      "expected_disposition": "REJECT_AUTONOMY_AND_REGULATORY_EVIDENCE_INCOMPLETE"
     }
   ],
   "derived_reference_checks": [
