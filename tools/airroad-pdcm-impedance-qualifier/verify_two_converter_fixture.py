@@ -151,7 +151,9 @@ def main() -> None:
     expected_closed = [q(value) for value in
                        data["frequency_domain"]["closed_loop_characteristic_polynomial_coefficients_descending"]]
     assert closed_loop == expected_closed == [Fraction(1), Fraction(7, 2), Fraction(-1, 2)]
-    assert closed_loop == [coefficients[1], coefficients[2], coefficients[3]]  # common-mode factor
+    common_trace = common[0][0] + common[1][1]
+    common_characteristic = [Fraction(1), -common_trace, common_det]
+    assert closed_loop == common_characteristic  # excludes stable differential mode
 
     print("PASS exact equilibrium and power closure")
     print("PASS both isolated converter branches have stable local poles")
