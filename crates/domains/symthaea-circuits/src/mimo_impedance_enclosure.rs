@@ -199,7 +199,7 @@ pub fn enclose_mimo_impedance_matrix_at_exact_frequency(
     let nominal = matrix_at_exact_frequency(sweep, angular_frequency_rad_s)
         .map_err(MatrixEnclosureError::Passport)?;
 
-    build_matrix_enclosure(sweep, frequency_index, slice, &nominal, method_reference)
+    build_matrix_enclosure(sweep, frequency_index, slice, &nominal, &method_reference)
 }
 
 /// Enclose every recorded frequency knot. No interpolation or extrapolation
