@@ -1321,6 +1321,263 @@
         "The complete powerbank energy, gas inventory, recharge/refill time, consumable cost and service boundary must be measured for matched portable-system comparison."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "PLASMA-AIR-DBD-GAPS-2026",
+      "lane": "LOW_TEMPERATURE_PLASMA_AIR_TREATMENT",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "authors": "Scaltriti et al.",
+        "title": "Efficacy and Efficiency of an Atmospheric Pressure Dielectric Barrier Discharge Reactor (GAPS) for Air Disinfection",
+        "publisher": "Plasma Processes and Polymers",
+        "publication_date": "2026-08-04",
+        "volume": 23,
+        "issue": 8,
+        "article_number": "e70226",
+        "doi": "10.1002/ppap.70226",
+        "url": "https://doi.org/10.1002/ppap.70226",
+        "full_text": "https://onlinelibrary.wiley.com/doi/full/10.1002/ppap.70226"
+      },
+      "device_profile": {
+        "plasma_regime": "ATMOSPHERIC_PRESSURE_NONTHERMAL_AIR_DBD",
+        "architecture": "GRID_ELECTRODE_SURFACE_DBD_WITH_SERPENTINE_FORCED_AIR_PATH",
+        "electrode": "STAINLESS_STEEL_GRID_ELECTRODES",
+        "dielectric": "RILSAN_ES_COATING_150_MICROMETRES_PER_SIDE",
+        "mesh_pitch_mm": 2,
+        "wire_spacing_mm": 0.42,
+        "intended_process": "SINGLE_PASS_BIOAEROSOL_INACTIVATION"
+      },
+      "reported_conditions": {
+        "compressed_air_flow_L_min": 12.5,
+        "average_discharge_power_W": 0.65,
+        "power_basis": "DISCHARGE_POWER_ONLY_POWER_SUPPLY_LOSSES_EXCLUDED_FROM_EEO",
+        "ozone_outlet_ppm": 9,
+        "ozone_measurement": "PRELIMINARY_QUALITATIVE_FTIR_ASSESSMENT",
+        "partial_discharge_area_result_log_reduction": 2,
+        "full_discharge_area_result_log_reduction": ">4"
+      },
+      "reported_outcomes": [
+        {
+          "metric": "E_coli_MG1655_bioaerosol_log10_reduction",
+          "value": 4.5,
+          "unit": "log10",
+          "qualifier": "up_to_single_pass_source_specific"
+        },
+        {
+          "metric": "electrical_energy_per_order",
+          "value": 0.0002,
+          "unit": "kWh_per_m3_per_order",
+          "qualifier": "uses_discharge_power_and_excludes_power_supply_losses"
+        },
+        {
+          "metric": "residual_ozone_at_reactor_outlet",
+          "value": 9,
+          "unit": "ppm",
+          "qualifier": "preliminary_measurement_not_occupied_room_exposure"
+        }
+      ],
+      "source_conclusion": "The grid-like ambient-air DBD reactor reports up to 4.5-log single-pass E. coli MG1655 bioaerosol reduction at 12.5 L/min. Its EEO calculation uses discharge power rather than full grid-side input, and preliminary outlet ozone of approximately 9 ppm motivates integrated abatement and realistic safety assessment.",
+      "comparison_status": "PROMISING_LOW_POWER_DISCHARGE_RESULT_SYSTEM_LEVEL_EFFICIENCY_AND_OCCUPIED_AIR_SAFETY_NOT_ESTABLISHED",
+      "blockers": [
+        "The reported EEO omits power-supply losses and is not a wall-plug clean-air-delivery metric.",
+        "Preliminary outlet ozone is approximately 9 ppm; the authors state that direct release to occupied air requires downstream ozone abatement and a dedicated safety assessment.",
+        "The SARS-CoV-2 observations are preliminary and do not establish infection-risk reduction in occupied environments.",
+        "The 50% active-area condition yielded about 2-log reduction versus over 4-log at full area, so active coverage and bypass cannot be ignored.",
+        "A single E. coli strain and laboratory bioaerosol configuration do not establish universal performance across aerosol sizes, humidity or organisms."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "PLASMA-COMPACT-AIR-SURFACE-DBD-CPPR-2024",
+      "lane": "LOW_TEMPERATURE_PLASMA_MINIATURIZATION",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "authors": "Choudhury et al.",
+        "title": "Inactivation of SARS-CoV-2 on Porous and Nonporous Surfaces by Compact Portable Plasma Reactor",
+        "publisher": "Frontiers in Bioengineering and Biotechnology",
+        "publication_date": "2024",
+        "doi": "10.3389/fbioe.2024.1325336",
+        "url": "https://doi.org/10.3389/fbioe.2024.1325336",
+        "full_text": "https://www.frontiersin.org/journals/bioengineering-and-biotechnology/articles/10.3389/fbioe.2024.1325336/full"
+      },
+      "device_profile": {
+        "plasma_regime": "AMBIENT_AIR_SURFACE_DIELECTRIC_BARRIER_DISCHARGE",
+        "architecture": "COMPACT_PORTABLE_SURFACE_DBD_PANEL_WITH_INTEGRATED_INVERTER",
+        "reported_volume_cm3": 48,
+        "reported_mass_g": 55,
+        "feed_gas": "SURROUNDING_ATMOSPHERIC_AIR",
+        "separate_process_gas_supply_required": false,
+        "electrode_material": "COPPER",
+        "dielectric_material": "HYDROCARBON_CERAMIC_COMPOSITE"
+      },
+      "reported_conditions": {
+        "copper_electrode_thickness_um": 35,
+        "dielectric_thickness_mm": 0.76,
+        "use_case": "SURFACE_TREATMENT_OF_POROUS_AND_NONPOROUS_COUPONS"
+      },
+      "source_conclusion": "The paper describes a compact approximately 48 cm3, 55 g surface-DBD module using surrounding atmospheric air without a separate process-gas supply. It is a compact ambient-air architecture reference, not a comparable flowing-air CADR measurement.",
+      "comparison_status": "COMPACT_AMBIENT_AIR_SURFACE_DBD_ARCHITECTURE_AIRFLOW_SERVICE_AND_FULL_SYSTEM_PERFORMANCE_NOT_ESTABLISHED",
+      "blockers": [
+        "A surface-treatment reactor is not an air-cleaning reactor and does not establish clean-air delivery rate.",
+        "The reported reactor volume and mass do not include all installation, post-treatment, controls or lifecycle boundaries.",
+        "Surface coupon efficacy must not be transferred to airborne microorganism reduction or occupied-space efficacy.",
+        "Ambient-air operation removes the need for a separate process-gas cylinder but does not eliminate electrical, thermal or by-product characterization."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "PLASMA-WATER-FLEXIBLE-COPLANAR-DBD-2026",
+      "lane": "LOW_TEMPERATURE_PLASMA_WATER_TREATMENT",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "authors": "Zhong et al.",
+        "title": "High-Efficiency Bacterial Inactivation of a Plasma Water Treatment System Using Flexible Coplanar Dielectric Barrier Discharge",
+        "publisher": "Plasma Processes and Polymers",
+        "publication_date": "2026-04-28",
+        "correction_date": "2026-09-15",
+        "volume": 23,
+        "issue": 4,
+        "article_number": "e70174",
+        "doi": "10.1002/ppap.70174",
+        "url": "https://doi.org/10.1002/ppap.70174",
+        "full_text": "https://onlinelibrary.wiley.com/doi/full/10.1002/ppap.70174"
+      },
+      "device_profile": {
+        "plasma_regime": "ATMOSPHERIC_PRESSURE_FLEXIBLE_COPLANAR_DBD",
+        "architecture": "FLEXIBLE_COPLANAR_DBD_WITH_BIPOLAR_NANOSECOND_PULSE_GENERATOR",
+        "plasma_liquid_transfer": "REACTIVE_SPECIES_TRANSPORTED_INTO_WATER_AS_MICROBUBBLES"
+      },
+      "reported_conditions": {
+        "water_volume_mL": 800,
+        "treatment_time_min": 5,
+        "data_availability": "AVAILABLE_FROM_CORRESPONDING_AUTHOR_UPON_REASONABLE_REQUEST"
+      },
+      "reported_outcomes": [
+        {
+          "metric": "E_coli_bacterial_log10_reduction",
+          "value": 5,
+          "unit": "log10",
+          "qualifier": "greater_than_source_specific"
+        },
+        {
+          "metric": "bacterial_inactivation_energy_efficiency",
+          "value": 3640000,
+          "unit": "CFU_per_J",
+          "qualifier": "source_defined_BIEE_not_equivalent_to_EEO"
+        }
+      ],
+      "source_conclusion": "A flexible coplanar DBD and bipolar nanosecond pulse generator produced more than 5-log E. coli reduction in 800 mL within 5 minutes, with a source-defined BIEE of 3.64×10^6 CFU/J.",
+      "comparison_status": "BATCH_BACTERIAL_INACTIVATION_RESULT_NOT_DRINKING_WATER_QUALITY_OR_CONTAMINANT_MINERALIZATION",
+      "blockers": [
+        "CFU/J is not interchangeable with energy per order or complete-system kWh/m3.",
+        "A bacterial inactivation result does not establish removal/mineralization of chemical contaminants or by-product safety.",
+        "The source data are available upon reasonable request, so independent raw-data reconstruction is not yet admitted.",
+        "The batch volume and treatment duration do not establish continuous-flow throughput, lifecycle or field economics."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "PLASMA-WATER-LIQUID-CATALYSIS-REVIEW-2026",
+      "lane": "LOW_TEMPERATURE_PLASMA_WATER_TREATMENT",
+      "evidence_class": "PUBLISHED_REVIEW_OR_DATA_SYNTHESIS",
+      "source": {
+        "authors": "Yuan et al.",
+        "title": "Liquid-phase plasma catalysis for sustainable water purification",
+        "publisher": "Journal of Water Process Engineering",
+        "publication_date": "2026-10",
+        "article_number": "110831",
+        "doi": "10.1016/j.jwpe.2026.110831",
+        "url": "https://doi.org/10.1016/j.jwpe.2026.110831"
+      },
+      "reviewed_scope": {
+        "mechanisms": [
+          "PLASMA_LIQUID_INTERFACIAL_PHYSICS",
+          "RONS_DIAGNOSTICS",
+          "CATALYST_PATHWAYS",
+          "REACTOR_ENGINEERING"
+        ],
+        "concerns": [
+          "INCOMPLETE_MINERALIZATION",
+          "TRANSFORMATION_PRODUCT_TOXICITY",
+          "CATALYST_DEACTIVATION",
+          "CATALYST_LEACHING",
+          "MATRIX_EFFECTS",
+          "ENERGY_EFFICIENCY",
+          "REACTOR_SCALE_UP"
+        ]
+      },
+      "source_conclusion": "The review argues that plasma-liquid catalysis must move beyond empirical parent-compound removal toward mechanistically validated, matrix-resilient and sustainable treatment with transformation-product, toxicity, catalyst-stability and full-energy accounting.",
+      "comparison_status": "REVIEW_CONTEXT_FOR_WATER_PROCESS_QUALIFICATION_NOT_A_DEVICE_PERFORMANCE_RESULT",
+      "blockers": [
+        "Review-level findings are not primary device measurements.",
+        "Parent-compound disappearance does not establish mineralization or absence of toxic transformation products.",
+        "Catalyst-only, adsorption-only and hydrodynamic controls are needed before claiming plasma-catalyst synergy."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "PLASMA-WATER-MULTIPHASE-INTENSIFICATION-REVIEW-2026",
+      "lane": "LOW_TEMPERATURE_PLASMA_WATER_TREATMENT",
+      "evidence_class": "PUBLISHED_REVIEW_OR_DATA_SYNTHESIS",
+      "source": {
+        "authors": "Chen et al.",
+        "title": "Review on Process Intensification of Non-Thermal Plasma Oxidation in Multiphase Reactor for Wastewater Treatment: Mass Transfer Enhancement and Waste Energy-Driven Conversion",
+        "publisher": "Water",
+        "publication_date": "2026-03-10",
+        "volume": 18,
+        "issue": 6,
+        "article_number": "649",
+        "doi": "10.3390/w18060649",
+        "url": "https://doi.org/10.3390/w18060649"
+      },
+      "reviewed_scope": {
+        "process_intensification": [
+          "MICROBUBBLE_ASSISTED_PLASMA",
+          "HYDRAULIC_CAVITATION",
+          "PIEZOELECTRIC_COUPLING",
+          "PLASMA_FENTON_COUPLING"
+        ],
+        "bottlenecks": [
+          "SHORT_LIVED_SPECIES_GAS_LIQUID_MASS_TRANSFER",
+          "HIGH_SPECIFIC_ENERGY",
+          "HYDRODYNAMIC_SCALE_UP",
+          "FOULING",
+          "BYPRODUCT_TOXICITY",
+          "LONG_TERM_RELIABILITY"
+        ]
+      },
+      "source_conclusion": "The review identifies high specific energy and inefficient gas-liquid transfer of short-lived reactive species as practical constraints, and surveys several multiphase intensification routes.",
+      "comparison_status": "REVIEW_CONTEXT_NOT_A_MATCHED_EXPERIMENTAL_COMPARISON",
+      "blockers": [
+        "The review does not demonstrate that any one intensification route is net-energy-positive after added pumping and auxiliary loads.",
+        "Hydraulic, catalytic and plasma energy boundaries must be separately metered and reconciled.",
+        "Review-level synthesis must not be presented as independent device qualification."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "PLASMA-WATER-AOP-EEO-CROSSSTUDY-REVIEW-2026",
+      "lane": "LOW_TEMPERATURE_PLASMA_WATER_TREATMENT",
+      "evidence_class": "PUBLISHED_REVIEW_OR_DATA_SYNTHESIS",
+      "source": {
+        "title": "Advanced oxidation processes (AOPs) for drinking water treatment: a state-of-the-art review on applications, efficacy, and implementation challenges",
+        "publisher": "RSC Advances",
+        "publication_date": "2026",
+        "url": "https://pubs.rsc.org/en/content/articlehtml/2026/ra/d6ra00697c"
+      },
+      "reported_cross_study_medians": {
+        "plasma_EEO_kWh_m3_order": 3.3,
+        "ozonation_EEO_kWh_m3_order": 0.15,
+        "UV_H2O2_EEO_kWh_m3_order": 0.7
+      },
+      "source_conclusion": "The review reports cross-study median EEO values of approximately 3.3 kWh m−3 order−1 for plasma, 0.15 for ozonation and 0.7 for UV/H2O2. These figures are a screening signal that plasma water treatment must justify its energy and application-specific advantage, not a matched head-to-head ranking.",
+      "comparison_status": "CROSS_STUDY_REVIEW_MEDIANS_NOT_MATCHED_BENCHMARK_RESULTS",
+      "blockers": [
+        "The medians aggregate different contaminants, reactor designs and operating conditions and cannot establish a fair device-to-device ranking.",
+        "The comparison must be reconstructed to consistent contaminants, water matrices, target removal and full-system energy boundaries before drawing quantitative superiority conclusions.",
+        "Missing source-specific values are unknown, not zero."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -1468,6 +1725,41 @@
       "control_id": "NC-MOBIPLAS-TEN-MINUTE-AUTONOMY-IS-LIFETIME-QUALIFICATION",
       "condition": "Promote approximately 10 minutes of operation per argon gas fill and a single prototype leakage-current maximum into continuous-duty, lifecycle, medical safety or regulatory qualification.",
       "expected_disposition": "REJECT_AUTONOMY_AND_REGULATORY_EVIDENCE_INCOMPLETE"
+    },
+    {
+      "control_id": "NC-GAPS-DISCHARGE-POWER-AS-WALLPLUG",
+      "condition": "Use the GAPS 2×10^-4 kWh m^-3 order^-1 EEO as a complete-system metric even though the source calculation explicitly excludes power-supply losses.",
+      "expected_disposition": "REJECT_SYSTEM_ENERGY_BOUNDARY_INCOMPLETE"
+    },
+    {
+      "control_id": "NC-GAPS-OZONE-AS-BENEFIT",
+      "condition": "Treat approximately 9 ppm preliminary outlet ozone as an unqualified benefit or discharge treated air into occupied space without downstream abatement and a dedicated safety assessment.",
+      "expected_disposition": "BLOCK_SAFETY_AND_BYPRODUCT_QUALIFICATION"
+    },
+    {
+      "control_id": "NC-GAPS-SINGLE-STRAIN-AS-UNIVERSAL-CADR",
+      "condition": "Promote up to 4.5-log single-pass E. coli MG1655 reduction into universal airborne pathogen performance or occupied-space clean-air delivery.",
+      "expected_disposition": "REJECT_APPLICATION_AND_ENDPOINT_EXTRAPOLATION"
+    },
+    {
+      "control_id": "NC-CPPR-COMPACT-SURFACE-DBD-AS-AIR-CADR",
+      "condition": "Promote a 48 cm3, 55 g ambient-air surface DBD device into an air-cleaning CADR result without airflow, aerosol and bypass measurements.",
+      "expected_disposition": "REJECT_SERVICE_METRIC_MISMATCH"
+    },
+    {
+      "control_id": "NC-WATER-CFU-PER-J-AS-DRINKING-WATER-EEO",
+      "condition": "Treat a >5-log E. coli reduction and 3.64×10^6 CFU/J BIEE as proof of drinking-water compliance, organic contaminant mineralization or EEO performance.",
+      "expected_disposition": "REJECT_ENDPOINT_AND_METRIC_MISMATCH"
+    },
+    {
+      "control_id": "NC-WATER-PARENT-DISAPPEARANCE-AS-MINERALIZATION",
+      "condition": "Claim plasma-catalytic destruction from parent-compound disappearance without carbon balance, transformation-product identification, toxicity and catalyst-leaching measurements.",
+      "expected_disposition": "REJECT_MECHANISTIC_AND_TOXICOLOGY_EVIDENCE_INCOMPLETE"
+    },
+    {
+      "control_id": "NC-WATER-CROSSSTUDY-EEO-AS-MATCHED-TRIAL",
+      "condition": "Use review-level cross-study median EEO values to declare plasma inferior/superior without matching contaminant, matrix, quality target and full-system energy boundary.",
+      "expected_disposition": "NOT_COMPARABLE_UNTIL_BOUNDARIES_MATCH"
     }
   ],
   "derived_reference_checks": [
