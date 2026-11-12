@@ -39,10 +39,7 @@ pub enum MarkovError {
     /// A supplied state distribution is invalid.
     InvalidDistribution(DistributionError),
     /// A distribution has a different state count from the chain.
-    DistributionDimensionMismatch {
-        actual: usize,
-        expected: usize,
-    },
+    DistributionDimensionMismatch { actual: usize, expected: usize },
 }
 
 impl fmt::Display for MarkovError {
@@ -60,11 +57,7 @@ impl fmt::Display for MarkovError {
                 f,
                 "transition row {row} has {actual} entries; expected {expected}"
             ),
-            Self::InvalidTransitionProbability {
-                row,
-                column,
-                value,
-            } => write!(
+            Self::InvalidTransitionProbability { row, column, value } => write!(
                 f,
                 "transition probability at ({row}, {column}) is invalid: {value}"
             ),
@@ -120,10 +113,7 @@ impl MarkovChain {
     }
 
     /// Construct with an explicit absolute row-sum tolerance.
-    pub fn try_new_with_tolerance(
-        p: Vec<Vec<f64>>,
-        tolerance: f64,
-    ) -> Result<Self, MarkovError> {
+    pub fn try_new_with_tolerance(p: Vec<Vec<f64>>, tolerance: f64) -> Result<Self, MarkovError> {
         if !tolerance.is_finite() || !(0.0..1.0).contains(&tolerance) {
             return Err(MarkovError::InvalidTolerance { tolerance });
         }
@@ -208,10 +198,8 @@ impl MarkovChain {
 
     /// Fallible one-step propagation from a raw slice.
     pub fn try_step(&self, distribution: &[f64]) -> Result<Vec<f64>, MarkovError> {
-        let distribution = FiniteDistribution::new(
-            distribution.to_vec(),
-            DEFAULT_PROBABILITY_TOLERANCE,
-        )?;
+        let distribution =
+            FiniteDistribution::new(distribution.to_vec(), DEFAULT_PROBABILITY_TOLERANCE)?;
         Ok(self.step_distribution(&distribution)?.into_vec())
     }
 
@@ -230,10 +218,8 @@ impl MarkovChain {
         initial: &[f64],
         steps: usize,
     ) -> Result<FiniteDistribution, MarkovError> {
-        let mut distribution = FiniteDistribution::new(
-            initial.to_vec(),
-            DEFAULT_PROBABILITY_TOLERANCE,
-        )?;
+        let mut distribution =
+            FiniteDistribution::new(initial.to_vec(), DEFAULT_PROBABILITY_TOLERANCE)?;
         if distribution.len() != self.n {
             return Err(MarkovError::DistributionDimensionMismatch {
                 actual: distribution.len(),
