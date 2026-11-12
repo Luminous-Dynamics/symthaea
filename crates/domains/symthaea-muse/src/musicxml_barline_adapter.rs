@@ -24,12 +24,16 @@ pub enum MusicXmlMeasureAdapterError {
     InvalidDivisions { value: i64 },
     InvalidDuration { value: i64 },
     ArithmeticOverflow,
+    MissingPartId,
+    UnsupportedRoot { root: String },
+    NoParts,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct ParsedMeasure {
     duration: RationalBeat,
     kind: MeasureKind,
+    non_controlling: bool,
 }
 
 /// Parse explicit MusicXML partwise measures into a common score-clock map.
@@ -108,6 +112,13 @@ pub fn parse_musicxml_measure_map(
 
     let reference = &normalized_parts[0];
     for (part_index, measures) in normalized_parts.iter().enumerate().skip(1) {
+        if measures.iter().any(|measure| measure.non_controlling) {
+            return Ok(unknown_map(
+                source_id,
+                score_clock_id,
+                "a part declares non-controlling measures; use per-part measure maps",
+            ));
+        }
         if measures.len() != reference.len() {
             return Ok(unknown_map(
                 source_id,
@@ -162,6 +173,115 @@ pub fn parse_musicxml_measure_map(
     })
 }
 
+
+/// One part's independent notated measure lattice.
+///
+/// `non_controlling_measure_indices` records the zero-based measure indices
+/// whose left barline MusicXML explicitly declares non-coincident with other
+/// parts. The contained score-clock ID is part-qualified so a consumer cannot
+/// accidentally evaluate one part against another part's barline sequence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MusicXmlPartMeasureMapV1 {
+    pub part_id: String,
+    pub non_controlling_measure_indices: Vec<usize>,
+    pub map: MeasureMap,
+}
+
+/// Parse every MusicXML score-partwise part into its own exact measure map.
+///
+/// Unlike parse_musicxml_measure_map, this API preserves polymetric structure
+/// instead of trying to collapse all part barlines into one global lattice.
+/// A part with unresolved measure extents is returned with Unknown status;
+/// valid sibling maps are retained for independent evaluation.
+pub fn parse_musicxml_part_measure_maps(
+    bytes: &[u8],
+    source_id: &str,
+    score_clock_id: &str,
+) -> Result<Vec<MusicXmlPartMeasureMapV1>, MusicXmlMeasureAdapterError> {
+    if source_id.trim().is_empty() {
+        return Err(MusicXmlMeasureAdapterError::EmptySourceId);
+    }
+    if score_clock_id.trim().is_empty() {
+        return Err(MusicXmlMeasureAdapterError::EmptyScoreClockId);
+    }
+    let text =
+        std::str::from_utf8(bytes).map_err(|_| MusicXmlMeasureAdapterError::InvalidUtf8)?;
+    let document = roxmltree::Document::parse(text)
+        .map_err(|error| MusicXmlMeasureAdapterError::MalformedXml(error.to_string()))?;
+    let root = document.root_element();
+    if !root.has_tag_name("score-partwise") {
+        return Err(MusicXmlMeasureAdapterError::UnsupportedRoot {
+            root: root.tag_name().name().to_string(),
+        });
+    }
+
+    let parts: Vec<_> = root
+        .children()
+        .filter(|node| node.has_tag_name("part"))
+        .collect();
+    if parts.is_empty() {
+        return Err(MusicXmlMeasureAdapterError::NoParts);
+    }
+
+    let mut output = Vec::with_capacity(parts.len());
+    for part in parts {
+        let part_id = part
+            .attribute("id")
+            .filter(|value| !value.trim().is_empty())
+            .ok_or(MusicXmlMeasureAdapterError::MissingPartId)?;
+        let parsed = parse_part(part)?;
+        let (status, measures, non_controlling_indices) = match parsed {
+            Some(parsed) if !parsed.is_empty() => {
+                let mut start = RationalBeat::new(0, 1)
+                    .map_err(|_| MusicXmlMeasureAdapterError::ArithmeticOverflow)?;
+                let mut spans = Vec::with_capacity(parsed.len());
+                let mut indices = Vec::new();
+                for (index, measure) in parsed.iter().enumerate() {
+                    let end = start
+                        .checked_add(measure.duration)
+                        .map_err(|_| MusicXmlMeasureAdapterError::ArithmeticOverflow)?;
+                    spans.push(MeasureSpan {
+                        start,
+                        end,
+                        kind: measure.kind,
+                    });
+                    if measure.non_controlling {
+                        indices.push(index);
+                    }
+                    start = end;
+                }
+                (MeasureMapStatus::Supported, spans, indices)
+            }
+            Some(_) => (
+                MeasureMapStatus::Unknown {
+                    reason: "part contains no explicit measure containers".into(),
+                },
+                Vec::new(),
+                Vec::new(),
+            ),
+            None => (
+                MeasureMapStatus::Unknown {
+                    reason: "part contains a measure whose score-beat extent is unresolved".into(),
+                },
+                Vec::new(),
+                Vec::new(),
+            ),
+        };
+        output.push(MusicXmlPartMeasureMapV1 {
+            part_id: part_id.to_string(),
+            non_controlling_measure_indices: non_controlling_indices,
+            map: MeasureMap {
+                source_id: format!("{source_id}#part={part_id}"),
+                score_clock_id: format!("{score_clock_id}#part={part_id}"),
+                canonicalization_version: MUSICXML_BARLINE_CANONICALIZATION_V1.into(),
+                status,
+                measures,
+            },
+        });
+    }
+    Ok(output)
+}
+
 fn unavailable_map(
     source_id: &str,
     score_clock_id: &str,
@@ -203,6 +323,9 @@ fn parse_part(
     for (measure_index, measure) in measure_nodes.iter().enumerate() {
         let implicit = measure
             .attribute("implicit")
+            .is_some_and(|value| matches!(value, "yes" | "true" | "1"));
+        let non_controlling = measure
+            .attribute("non-controlling")
             .is_some_and(|value| matches!(value, "yes" | "true" | "1"));
         let mut cursor = RationalBeat::new(0, 1)
             .map_err(|_| MusicXmlMeasureAdapterError::ArithmeticOverflow)?;
@@ -324,6 +447,7 @@ fn parse_part(
         measures.push(ParsedMeasure {
             duration: measure_duration,
             kind,
+            non_controlling,
         });
     }
     Ok(Some(measures))
@@ -510,5 +634,73 @@ mod tests {
         let map = parse(xml);
         assert!(matches!(map.status, MeasureMapStatus::Unknown { .. }));
         assert!(map.measures.is_empty());
+    }
+
+    #[test]
+    fn polymetric_musicxml_preserves_independent_part_measure_lattices() {
+        let xml = r#"<score-partwise>
+            <part id="P1">
+                <measure number="1"><attributes><divisions>4</divisions><time><beats>3</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>12</duration></note></measure>
+                <measure number="2"><note><rest/><duration>12</duration></note></measure>
+            </part>
+            <part id="P2">
+                <measure number="1"><attributes><divisions>4</divisions><time><beats>2</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>8</duration></note></measure>
+                <measure number="2" non-controlling="yes"><note><rest/><duration>8</duration></note></measure>
+                <measure number="3" non-controlling="yes"><note><rest/><duration>8</duration></note></measure>
+            </part>
+        </score-partwise>"#;
+
+        let maps = parse_musicxml_part_measure_maps(
+            xml.as_bytes(),
+            "sha256:polymeter",
+            "score-clock-1",
+        )
+        .unwrap();
+        assert_eq!(maps.len(), 2);
+        assert_eq!(maps[0].part_id, "P1");
+        assert_eq!(maps[1].part_id, "P2");
+        assert_eq!(maps[0].map.measures.len(), 2);
+        assert_eq!(maps[1].map.measures.len(), 3);
+        assert_eq!(maps[0].map.measures[1].start, RationalBeat::new(3, 1).unwrap());
+        assert_eq!(maps[1].map.measures[1].start, RationalBeat::new(2, 1).unwrap());
+        assert_eq!(maps[1].non_controlling_measure_indices, vec![1, 2]);
+        assert_ne!(
+            maps[0].map.score_clock_id,
+            maps[1].map.score_clock_id,
+            "part-qualified clock identity prevents cross-part barline comparison"
+        );
+    }
+
+    #[test]
+    fn global_map_withholds_non_controlling_musicxml_bar_lines() {
+        let xml = r#"<score-partwise>
+            <part id="P1">
+                <measure number="1"><attributes><divisions>4</divisions><time><beats>3</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>12</duration></note></measure>
+                <measure number="2"><note><rest/><duration>12</duration></note></measure>
+            </part>
+            <part id="P2">
+                <measure number="1"><attributes><divisions>4</divisions><time><beats>2</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>8</duration></note></measure>
+                <measure number="2" non-controlling="yes"><note><rest/><duration>8</duration></note></measure>
+                <measure number="3" non-controlling="yes"><note><rest/><duration>8</duration></note></measure>
+            </part>
+        </score-partwise>"#;
+        let global = parse(xml);
+        assert!(matches!(global.status, MeasureMapStatus::Unknown { .. }));
+        assert!(global.measures.is_empty());
+    }
+
+    #[test]
+    fn ordinary_aligned_parts_remain_globally_reconcilable() {
+        let xml = r#"<score-partwise>
+            <part id="P1">
+                <measure number="1"><attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>16</duration></note></measure>
+            </part>
+            <part id="P2">
+                <measure number="1"><attributes><divisions>8</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes><note><rest/><duration>32</duration></note></measure>
+            </part>
+        </score-partwise>"#;
+        let global = parse(xml);
+        assert_eq!(global.status, MeasureMapStatus::Supported);
+        assert_eq!(global.measures[0].end, RationalBeat::new(4, 1).unwrap());
     }
 }
