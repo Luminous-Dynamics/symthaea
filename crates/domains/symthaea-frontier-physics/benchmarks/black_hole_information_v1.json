@@ -57,7 +57,8 @@
       "unsupported_subsystem",
       "unresolved",
       "invalid_mutual_information",
-      "information_identity_error"
+      "information_identity_error",
+      "invalid_squared_commutator"
     ],
     "forbidden_behaviors": [
       "diagonal-only von Neumann entropy for non-diagonal density matrices",
@@ -682,7 +683,8 @@
       "QI_3T_U1_domain_wall_transport": "source_authored_not_executed",
       "QI_4A_single_emission_decoupling": "source_authored_not_executed",
       "QI_4A_information_error_taxonomy": "source_authored_not_executed",
-      "QI_3O_U1_operator_spreading": "source_authored_not_executed"
+      "QI_3O_U1_operator_spreading": "source_authored_not_executed",
+      "QI_3O_operator_error_taxonomy": "source_authored_not_executed"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
