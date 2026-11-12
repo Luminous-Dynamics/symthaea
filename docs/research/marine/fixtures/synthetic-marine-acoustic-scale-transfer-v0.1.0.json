@@ -37,7 +37,7 @@
           {
             "band_id": "bpf-fundamental",
             "center_frequency_hz": 200,
-            "total_spl_db": 110,
+            "total_spl_db": 109.9,
             "background_spl_db": 100,
             "facility_transfer_function_db": 20,
             "total_u95_db": 0.2,
@@ -69,7 +69,7 @@
           {
             "band_id": "bpf-fundamental",
             "center_frequency_hz": 10,
-            "source_level_db": 115.56302500767288,
+            "source_level_db": 115.45177041730598,
             "source_level_u95_db": 0.5
           }
         ],
@@ -94,7 +94,7 @@
           {
             "band_id": "bpf-fundamental",
             "center_frequency_hz": 220,
-            "total_spl_db": 111,
+            "total_spl_db": 110.9,
             "background_spl_db": 101,
             "facility_transfer_function_db": 20,
             "total_u95_db": 0.2,
@@ -126,7 +126,7 @@
           {
             "band_id": "bpf-fundamental",
             "center_frequency_hz": 11,
-            "source_level_db": 116.56302500767288,
+            "source_level_db": 116.45177041730598,
             "source_level_u95_db": 0.5
           }
         ],
