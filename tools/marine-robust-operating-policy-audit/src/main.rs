@@ -823,10 +823,12 @@ mod tests {
     fn pareto_objectives_use_conservative_upper_bounds() {
         let input = case();
         let objectives = robust_objectives(&input.candidates[0]);
-        assert_eq!(
-            objectives.iter().find(|x| x.objective_id == "primary_energy_kwh_per_tonne_nm").unwrap().conservative_value,
-            0.141
-        );
+        let robust_energy = objectives
+            .iter()
+            .find(|x| x.objective_id == "primary_energy_kwh_per_tonne_nm")
+            .unwrap()
+            .conservative_value;
+        assert!((robust_energy - 0.141).abs() < 1.0e-12);
         assert!(objectives.iter().any(|x| x.objective_id == "source_level_db_re_1upa_at_1m:one-third-octave-1000hz"));
     }
 
