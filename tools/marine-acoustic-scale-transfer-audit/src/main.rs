@@ -49,8 +49,6 @@ enum RightsStatus {
 #[serde(deny_unknown_fields)]
 struct ScalingSelection {
     method_id: String,
-    frequency_regime: FrequencyRegime,
-    frequency_regime_basis: String,
     bandwidth: Bandwidth,
     representation: SpectrumRepresentation,
 }
@@ -137,6 +135,8 @@ struct ModelRun {
 struct ModelBand {
     band_id: String,
     center_frequency_hz: f64,
+    frequency_regime: FrequencyRegime,
+    frequency_regime_basis: String,
     total_spl_db: f64,
     background_spl_db: f64,
     facility_transfer_function_db: f64,
@@ -288,9 +288,6 @@ fn validate_case(case: &Case) -> Vec<String> {
     if case.scaling.method_id != ITTC_METHOD {
         errors.push(format!("method_id must be {}", ITTC_METHOD));
     }
-    if case.scaling.frequency_regime_basis.trim().is_empty() {
-        errors.push("frequency_regime_basis is required".to_string());
-    }
     if !case.frequency_match_tolerance_fraction.is_finite()
         || case.frequency_match_tolerance_fraction <= 0.0
         || case.frequency_match_tolerance_fraction >= 1.0
@@ -337,9 +334,12 @@ fn validate_case(case: &Case) -> Vec<String> {
         }
         let reference_distance_delta =
             (pair.model.source_reference_distance_m - pair.full_scale.source_reference_distance_m).abs();
-        if reference_distance_delta > 1e-6 * pair.model.source_reference_distance_m.max(1.0) {
+        if reference_distance_delta > 1e-6
+            || (pair.model.source_reference_distance_m - 1.0).abs() > 1e-6
+            || (pair.full_scale.source_reference_distance_m - 1.0).abs() > 1e-6
+        {
             errors.push(format!(
-                "{}: model and full-scale source levels must use the same reference distance",
+                "{}: source levels must share the 1 m reference distance",
                 pair.pair_id
             ));
         }
@@ -368,6 +368,9 @@ fn validate_case(case: &Case) -> Vec<String> {
             }
             if !finite_positive(band.center_frequency_hz) {
                 errors.push(format!("{} / {}: model band frequency must be positive", pair.pair_id, band.band_id));
+            }
+            if band.frequency_regime_basis.trim().is_empty() {
+                errors.push(format!("{} / {}: frequency_regime_basis is required", pair.pair_id, band.band_id));
             }
             if !band.total_spl_db.is_finite()
                 || !band.background_spl_db.is_finite()
@@ -463,7 +466,7 @@ fn audit(case: &Case) -> AuditReport {
     if case.similarity.reynolds_scale_review != ReviewState::Reviewed {
         reasons.push("Reynolds-scale effects have not been reviewed".to_string());
     }
-    match case.similarity.facility_transfer_function {
+    match &case.similarity.facility_transfer_function {
         FacilityTransferState::MeasuredAndApplied => {}
         FacilityTransferState::Unknown => reasons.push("facility transfer function is unknown".to_string()),
         FacilityTransferState::Rejected => reasons.push("facility transfer function was rejected".to_string()),
@@ -478,17 +481,17 @@ fn audit(case: &Case) -> AuditReport {
     let mut any_frequency_mismatch = false;
 
     for pair in &case.pairs {
-        let delta_db = spl_scale_delta_db(
-            &pair.model,
-            &pair.full_scale,
-            &case.scaling.frequency_regime,
-            &case.scaling.bandwidth,
-        );
         let frequency_factor = (pair.full_scale.rpm_hz / pair.model.rpm_hz)
             * (pair.full_scale.cavitation_number_n_d / pair.model.cavitation_number_n_d).sqrt();
         let mut band_reports = Vec::new();
 
         for model_band in &pair.model.bands {
+            let delta_db = spl_scale_delta_db(
+                &pair.model,
+                &pair.full_scale,
+                &model_band.frequency_regime,
+                &case.scaling.bandwidth,
+            );
             let corrected = background_corrected_spl(
                 model_band.total_spl_db,
                 model_band.background_spl_db,
@@ -621,6 +624,9 @@ fn audit(case: &Case) -> AuditReport {
     if any_prediction_only {
         reasons.push("one or more model-scale bands have no corresponding full-scale observation".to_string());
     }
+    if any_disjoint_band {
+        reasons.push("one or more measured full-scale bands are outside the propagated prediction interval".to_string());
+    }
 
     let disposition = if has_dissimilarity
         || case.similarity.facility_transfer_function == FacilityTransferState::Rejected
@@ -735,6 +741,8 @@ mod tests {
                     bands: vec![ModelBand {
                         band_id: "bpf-fundamental".to_string(),
                         center_frequency_hz: model_frequency,
+                        frequency_regime: FrequencyRegime::LowFrequency,
+                        frequency_regime_basis: "Synthetic known-answer selection".to_string(),
                         total_spl_db: total,
                         background_spl_db: background,
                         facility_transfer_function_db: 20.0,
@@ -774,8 +782,6 @@ mod tests {
             },
             scaling: ScalingSelection {
                 method_id: ITTC_METHOD.to_string(),
-                frequency_regime: FrequencyRegime::LowFrequency,
-                frequency_regime_basis: "Synthetic test selection only".to_string(),
                 bandwidth: Bandwidth::Proportional,
                 representation: SpectrumRepresentation::PowerSpectrum,
             },
