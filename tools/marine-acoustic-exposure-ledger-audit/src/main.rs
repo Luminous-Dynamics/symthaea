@@ -71,6 +71,7 @@ struct SourceLevelBand {
     center_frequency_hz: f64,
     source_level_db: f64,
     expanded_uncertainty_db: f64,
+    uncertainty_confidence_level: f64,
 }
 
 #[derive(Debug, Deserialize)]
@@ -100,6 +101,8 @@ struct AcousticContribution {
     range_tolerance_m: f64,
     transmission_loss_db: f64,
     transmission_loss_expanded_uncertainty_db: f64,
+    transmission_loss_uncertainty_confidence_level: f64,
+    source_to_propagation_sync_receipt_sha256: String,
     propagation_model_id: String,
     propagation_model_version: String,
     propagation_validation_sha256: String,
@@ -204,8 +207,11 @@ struct ContributionReport {
     source_level_calibration_sha256: String,
     source_level_db: f64,
     source_level_expanded_uncertainty_db: f64,
+    source_level_uncertainty_confidence_level: f64,
     transmission_loss_db: f64,
     transmission_loss_expanded_uncertainty_db: f64,
+    transmission_loss_uncertainty_confidence_level: f64,
+    source_to_propagation_sync_receipt_sha256: String,
     received_level_db: f64,
     received_level_lower_db: f64,
     received_level_upper_db: f64,
@@ -357,6 +363,9 @@ fn validate_case(case: &Case) -> Vec<String> {
                 || !finite_positive(band.center_frequency_hz)
                 || !band.source_level_db.is_finite()
                 || !finite_positive(band.expanded_uncertainty_db)
+                || !band.uncertainty_confidence_level.is_finite()
+                || band.uncertainty_confidence_level <= 0.0
+                || band.uncertainty_confidence_level >= 1.0
                 || !(band.source_level_db - band.expanded_uncertainty_db).is_finite()
                 || !(band.source_level_db + band.expanded_uncertainty_db).is_finite()
             {
@@ -430,12 +439,16 @@ fn validate_case(case: &Case) -> Vec<String> {
         }
         if !contribution.transmission_loss_db.is_finite()
             || !finite_positive(contribution.transmission_loss_expanded_uncertainty_db)
+            || !contribution.transmission_loss_uncertainty_confidence_level.is_finite()
+            || contribution.transmission_loss_uncertainty_confidence_level <= 0.0
+            || contribution.transmission_loss_uncertainty_confidence_level >= 1.0
             || contribution.propagation_model_id.trim().is_empty()
             || contribution.propagation_model_version.trim().is_empty()
         {
             errors.push(format!("contribution {} has invalid transmission loss or propagation model identity", contribution.contribution_id));
         }
         for (label,digest) in [
+            ("source/propagation synchronization receipt",&contribution.source_to_propagation_sync_receipt_sha256),
             ("propagation validation",&contribution.propagation_validation_sha256),
             ("bathymetry",&contribution.bathymetry_sha256),
             ("sound-speed profile",&contribution.sound_speed_profile_sha256),
@@ -446,6 +459,9 @@ fn validate_case(case: &Case) -> Vec<String> {
         }
         let source_band = event.source_levels.iter().find(|band| band.band_id == contribution.band_id);
         if let Some(band) = source_band {
+            if (band.uncertainty_confidence_level - contribution.transmission_loss_uncertainty_confidence_level).abs() > 1.0e-12 {
+                errors.push(format!("contribution {} source-level and transmission-loss uncertainty confidence levels differ", contribution.contribution_id));
+            }
             let combined_u = band.expanded_uncertainty_db + contribution.transmission_loss_expanded_uncertainty_db;
             let received = band.source_level_db - contribution.transmission_loss_db;
             if !combined_u.is_finite() || !(received-combined_u).is_finite() || !(received+combined_u).is_finite() {
@@ -542,6 +558,8 @@ struct CalculatedContribution<'a> {
     receiver: &'a Receiver,
     source_level_db: f64,
     source_level_uncertainty_db: f64,
+    source_level_confidence_level: f64,
+    transmission_loss_confidence_level: f64,
     received_level_db: f64,
     received_level_lower_db: f64,
     received_level_upper_db: f64,
@@ -556,6 +574,9 @@ fn calculate_contribution<'a>(
     receiver: &'a Receiver,
 ) -> Option<CalculatedContribution<'a>> {
     let band = event.source_levels.iter().find(|band| band.band_id == contribution.band_id)?;
+    if (band.uncertainty_confidence_level - contribution.transmission_loss_uncertainty_confidence_level).abs() > 1.0e-12 {
+        return None;
+    }
     let uncertainty = band.expanded_uncertainty_db
         + contribution.transmission_loss_expanded_uncertainty_db;
     let received = band.source_level_db - contribution.transmission_loss_db;
@@ -574,6 +595,8 @@ fn calculate_contribution<'a>(
         receiver,
         source_level_db: band.source_level_db,
         source_level_uncertainty_db: band.expanded_uncertainty_db,
+        source_level_confidence_level: band.uncertainty_confidence_level,
+        transmission_loss_confidence_level: contribution.transmission_loss_uncertainty_confidence_level,
         received_level_db: received,
         received_level_lower_db: lower,
         received_level_upper_db: upper,
@@ -665,8 +688,11 @@ fn audit(case:&Case)->AuditReport {
             source_level_calibration_sha256:item.source_event.source_level_calibration_sha256.clone(),
             source_level_db:item.source_level_db,
             source_level_expanded_uncertainty_db:item.source_level_uncertainty_db,
+            source_level_uncertainty_confidence_level:item.source_level_confidence_level,
             transmission_loss_db:item.input.transmission_loss_db,
             transmission_loss_expanded_uncertainty_db:item.input.transmission_loss_expanded_uncertainty_db,
+            transmission_loss_uncertainty_confidence_level:item.transmission_loss_confidence_level,
+            source_to_propagation_sync_receipt_sha256:item.input.source_to_propagation_sync_receipt_sha256.clone(),
             received_level_db:item.received_level_db,
             received_level_lower_db:item.received_level_lower_db,
             received_level_upper_db:item.received_level_upper_db,
@@ -860,6 +886,7 @@ mod tests {
                 center_frequency_hz:125.0,
                 source_level_db:level,
                 expanded_uncertainty_db:uncertainty,
+                uncertainty_confidence_level:0.95,
             }],
         }
     }
@@ -890,6 +917,8 @@ mod tests {
             range_tolerance_m:2.0,
             transmission_loss_db:tl,
             transmission_loss_expanded_uncertainty_db:tl_u,
+            transmission_loss_uncertainty_confidence_level:0.95,
+            source_to_propagation_sync_receipt_sha256:digest('6'),
             propagation_model_id:"bellhop".to_string(),
             propagation_model_version:"test-v1".to_string(),
             propagation_validation_sha256:digest('a'),
@@ -949,6 +978,22 @@ mod tests {
                 requirement_reference:"scenario-limit:receiver-1-125hz".to_string(),
             }],
         }
+    }
+
+    #[test]
+    fn uncertainty_confidence_level_mismatch_is_invalid() {
+        let mut input=case();
+        input.contributions[0].transmission_loss_uncertainty_confidence_level=0.99;
+        assert_eq!(audit(&input).disposition,"INVALID");
+    }
+
+    #[test]
+    fn source_to_propagation_synchronization_receipt_is_retained() {
+        let report=audit(&case());
+        assert_eq!(
+            report.partitions[0].contribution_reports[0].source_to_propagation_sync_receipt_sha256,
+            digest('6')
+        );
     }
 
     #[test]
