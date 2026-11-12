@@ -364,7 +364,7 @@ fn parse_i64(value: Option<&str>) -> Option<i64> {
 }
 
 fn max_exact(left: RationalBeat, right: RationalBeat) -> RationalBeat {
-    if left.as_beats() >= right.as_beats() {
+    if left.compare_exact(right) != std::cmp::Ordering::Less {
         left
     } else {
         right
