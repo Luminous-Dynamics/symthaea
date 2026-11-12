@@ -134,7 +134,7 @@ fn cavitation_pattern_name(value: &CavitationPattern) -> &'static str {
     }
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 enum CavitationPattern {
     Sheet,
@@ -145,7 +145,7 @@ enum CavitationPattern {
     Unknown,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 enum PatternComparability {
     Matched,
