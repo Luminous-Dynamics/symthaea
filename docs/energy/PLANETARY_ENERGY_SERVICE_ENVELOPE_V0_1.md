@@ -356,6 +356,19 @@ Sources:
 - https://doi.org/10.1016/j.rser.2025.115697
 - https://doi.org/10.2172/3020423
 
+### Perovskite manufacturing and autonomous closed-loop SOTA
+
+Perovskite PV is already beyond a simple materials-screening contest. An April 2026 *Nature* study integrated ML-guided materials discovery with automated fabrication and reported a certified 27.18% MPPT efficiency for a 0.05 cm² cell and 23.49% efficiency for a 21.4 cm² mini-module. These are research-cell and mini-module results, not evidence of a bankable large-area, radiation-qualified or lunar-manufactured product.
+
+A 19 October 2026 *Nature Reviews Materials* review reports perovskite-cell efficiencies above 27% but estimates current manufacturing cost around US$0.3–0.6/W versus roughly US$0.1/W for mature crystalline silicon in its assessed context. It identifies manufacturing yield, material reliability, process tolerance, material cost and recycling as key levers.
+
+The benchmark implication is important: Symthaea should not merely rediscover active learning or optimize a small-cell PCE. It should compose materials/process search with the exact manufacturing recipe, lot yield, scale-up, durability, recycling, imported inputs and the downstream mission service. The best design may be a lower-efficiency product with superior production yield, service life and repairability.
+
+Sources:
+- https://www.nature.com/articles/s41586-026-10482-y
+- https://www.nature.com/articles/s41578-026-00973-9
+- https://www.nature.com/articles/s44359-026-00173-2
+
 ### Lunar power and ISRU
 
 NASA's September 2026 NextSTEP-3 lunar enabling infrastructure call explicitly includes vertical solar arrays with generation, management, distribution and storage; radioisotope Stirling power; regolith oxygen production; advanced manufacturing and nanomaterial production. These are strong indicators that mission architecture must integrate energy with manufacturing and local resource conversion.
