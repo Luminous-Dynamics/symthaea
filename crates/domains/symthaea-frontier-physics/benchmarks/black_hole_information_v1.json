@@ -74,7 +74,8 @@
     "symmetry_sector_reference": "A fixed-charge pure-state ensemble has a symmetry-resolved Page average; do not substitute the unconstrained Haar Page formula.",
     "domain_wall_transport": "Measure site occupations and oriented bond currents at every nearest-neighbour brickwork layer. Enforce delta n_i = j_(i-1->i) - j_(i->i+1) and independently verify that integrated central-cut current equals the loss of charge from the left half. Entropy growth alone is not a transport diagnostic.",
     "recoverability": "Separate reference-black-hole decoupling, information availability in accessible radiation, existence of a recovery map, and an efficient operational decoder. A small I(Q:B') is only a decoupling diagnostic; it does not by itself demonstrate a decoder or its cost.",
-    "decoder_evidence": "Any operational recovery claim requires the decoder's access set, channel convention, fidelity/error metric, success probability and resource cost. Decoupling is a necessary diagnostic in relevant models, not an implemented decoder."
+    "decoder_evidence": "Any operational recovery claim requires the decoder's access set, channel convention, fidelity/error metric, success probability and resource cost. Decoupling is a necessary diagnostic in relevant models, not an implemented decoder.",
+    "operator_spreading": "Track operator evolution separately from state entanglement and conserved-charge transport. Use normalized Hilbert-Schmidt squared commutators with explicit operator and probe conventions; preserve norm and report finite-size/seed uncertainty."
   },
   "benchmark_ladder": [
     {
@@ -317,6 +318,38 @@
       "claim_ceiling": "A finite closed U(1)-conserving qubit-chain transport/scrambling benchmark. Not a black-hole evaporation model, a gravitational Page curve, a QES/island calculation or a recovery decoder."
     },
     {
+      "id": "QI-3O",
+      "name": "U(1)-conserving operator spreading and squared commutators",
+      "status": "source_authored_not_executed",
+      "model": "Local X operator evolved by O <- U O U^dagger under seeded nearest-neighbour U(1) brickwork gates; measure normalized squared commutators against local X and Z probes.",
+      "observables": [
+        "squared_commutator_profile_C_Z_by_site",
+        "squared_commutator_profile_C_X_by_site",
+        "operator_Hilbert_Schmidt_norm",
+        "operator_spread_front",
+        "seed_and_depth",
+        "gate_count"
+      ],
+      "acceptance": {
+        "normalized_squared_commutator_range": [
+          0,
+          2
+        ],
+        "operator_Hilbert_Schmidt_norm_drift": 1e-10,
+        "depth_zero_Pauli_reference": "C_Z(source)=2; C_Z(other sites)=0; C_X(all sites)=0",
+        "independent_full_matrix_comparator_error": 1e-8,
+        "multi_seed_statistics_required_for_front_velocity": true,
+        "claim_ceiling": "Operator influence for the declared finite-depth circuit; not a recovery decoder, Page curve, or proof of thermalization."
+      },
+      "implementation": {
+        "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
+        "api": "simulate_u1_operator_spreading",
+        "dense_limit_qubits": 8,
+        "status": "source_authored_and_independent_numpy_matrix_check; Rust execution pending"
+      },
+      "claim_ceiling": "Finite-dimensional operator spreading under U(1)-conserving random circuits. No decoder or gravitational black-hole claim."
+    },
+    {
       "id": "QI-4A",
       "name": "one-step Hayden-Preskill decoupling diagnostic",
       "status": "source_authored_not_executed",
@@ -498,7 +531,10 @@
     "allow recovery decoder to inspect the remaining black-hole register",
     "declare efficient recovery from the existence of a Petz map without evaluating its implementation cost",
     "evaluate a decoder on the same scrambler seeds used for training without held-out evaluation",
-    "claim a charge-preserving recovery while silently allowing sector leakage"
+    "claim a charge-preserving recovery while silently allowing sector leakage",
+    "infer message recovery from a large squared commutator or OTOC alone",
+    "compare normalized squared commutators with different operator conventions without conversion",
+    "infer asymptotic operator-front velocity from one system size or one random seed"
   ],
   "competitive_baselines": [
     {
@@ -645,7 +681,8 @@
       "QI_3_U1_finite_depth_scrambling": "source_authored_not_executed",
       "QI_3T_U1_domain_wall_transport": "source_authored_not_executed",
       "QI_4A_single_emission_decoupling": "source_authored_not_executed",
-      "QI_4A_information_error_taxonomy": "source_authored_not_executed"
+      "QI_4A_information_error_taxonomy": "source_authored_not_executed",
+      "QI_3O_U1_operator_spreading": "source_authored_not_executed"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
