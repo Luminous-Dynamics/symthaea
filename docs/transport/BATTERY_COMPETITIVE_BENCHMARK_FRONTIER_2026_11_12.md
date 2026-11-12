@@ -130,7 +130,7 @@ Research basis:
 
 The benchmark should compare an unstructured document binder, exact-version matching, one-axis configuration matching and a six-domain typed equivalence audit. Report false-green inheritance, detection of changed/unknown domains, result-state preservation, missing metrology/criteria, source-digest completeness and deterministic replay. The software's strongest positive disposition is only **candidate for competent human/authority review**. It cannot determine safety, predict propagation, certify a standard or authorize destructive testing.
 
-Draft PR #4881 adds the Rust/schema/fixture audit. Exact branch head `0a7ac498281d6f1839f16a275bbff4d7fa9996fb` passed its push-triggered focused workflow: schema/fixture validation, locked metadata, formatting, 21/21 tests and strict Clippy (https://github.com/Luminous-Dynamics/symtropy/actions/runs/43257362118). The PR-triggered job remains skipped while the PR is draft. Fixture evidence is synthetic.
+Draft PR #4881 adds the Rust/schema/fixture audit. Exact current branch head `84c70844f7eb3910f110f2ed7e0dfd44163203ff` passed its push-triggered focused workflow: Draft 2020-12 schema/fixture validation, locked metadata, formatting, 21/21 tests and strict Clippy (https://github.com/Luminous-Dynamics/symtropy/actions/runs/43258445101). The PR-triggered job remains skipped while the PR is draft. Fixture evidence is synthetic.
 
 ## Industry scorecard and benchmark targets
 
