@@ -618,15 +618,13 @@ pub fn verify_split_extension<const N: usize>(
     }
 
     let mut representation_compatibility_checks = 0usize;
-    for (state, inverse_index) in representations.state_matrices.iter().zip(inverses.iter()) {
+    for ((state, inverse_index), adjoint) in representations
+        .state_matrices
+        .iter()
+        .zip(inverses.iter())
+        .zip(representations.adjoint_matrices.iter())
+    {
         let inverse_state = &representations.state_matrices[*inverse_index];
-        let adjoint = &representations.adjoint_matrices[
-            representations
-                .state_matrices
-                .iter()
-                .position(|candidate| std::ptr::eq(candidate, state))
-                .ok_or(QualificationErrorV1::RepresentationCountMismatch)?
-        ];
         let adjoint_columns: Vec<Vec<i64>> = (0..lie_dimension)
             .map(|column| adjoint.iter().map(|row| row[column]).collect())
             .collect();
