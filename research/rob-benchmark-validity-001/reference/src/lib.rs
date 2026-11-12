@@ -778,7 +778,7 @@ mod tests {
 
     #[test]
     fn episodes_and_control_ticks_do_not_inflate_independent_n() {
-        let mut clusters = vec![cluster(0, 50, 80); 8];
+        let mut clusters = vec![cluster(0, 5, 8); 8];
         for cluster in &mut clusters {
             cluster.baseline = tally(1000, 500, 0, 0);
             cluster.candidate = tally(1000, 800, 0, 0);
@@ -861,9 +861,9 @@ mod tests {
     #[test]
     fn repeated_confirmatory_comparisons_receive_bonferroni_alpha() {
         let mut spec = comparison((0..8).map(|id| cluster(id, 5, 9)).collect());
-        spec.scope.confirmatory_comparison_count = 10;
+        spec.scope.confirmatory_comparison_count = 13;
         let report = compare_paired_clusters(&spec).unwrap();
-        assert_eq!(report.sign_test.adjusted_alpha_ppm, 5_000);
+        assert_eq!(report.sign_test.adjusted_alpha_ppm, 3_846);
         assert_eq!(
             report.disposition,
             ComparisonDisposition::NoStatisticallyDemonstratedDirectionalImprovement
@@ -916,6 +916,7 @@ mod tests {
     fn paired_arms_must_share_episode_denominator() {
         let mut clusters = (0..8).map(|id| cluster(id, 5, 9)).collect::<Vec<_>>();
         clusters[0].candidate.episodes = 9;
+        clusters[0].candidate.task_failures = 0;
         assert!(matches!(
             compare_paired_clusters(&comparison(clusters)),
             Err(ComparisonError::PairedEpisodeCountMismatch(_))
