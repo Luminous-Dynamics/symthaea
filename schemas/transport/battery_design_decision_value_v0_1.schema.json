@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/transport/battery_design_decision_value_v0_1.schema.json",
+  "title": "Battery design decision-value benchmark manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "case_id", "decision_loss_unit", "alternatives", "worlds", "probability_basis", "evidence", "experiments"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "case_id": { "type": "string", "minLength": 1 },
+    "decision_loss_unit": { "type": "string", "minLength": 1 },
+    "alternatives": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["alternative_id"],
+        "properties": { "alternative_id": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "worlds": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["world_id", "prior_probability", "losses"],
+        "properties": {
+          "world_id": { "type": "string", "minLength": 1 },
+          "prior_probability": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+          "losses": {
+            "type": "array", "minItems": 1,
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["alternative_id", "loss", "feasible"],
+              "properties": {
+                "alternative_id": { "type": "string", "minLength": 1 },
+                "loss": { "type": "number", "minimum": 0 },
+                "feasible": { "type": "boolean" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "probability_basis": {
+      "type": ["object", "null"], "additionalProperties": false,
+      "required": ["model_id", "calibration_evidence_id", "validity_domain", "calibration_profile"],
+      "properties": {
+        "model_id": { "type": "string", "minLength": 1 },
+        "calibration_evidence_id": { "type": "string", "minLength": 1 },
+        "validity_domain": { "type": "string", "minLength": 1 },
+        "calibration_profile": { "type": "string", "minLength": 1 }
+      }
+    },
+    "evidence": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["evidence_id", "source_digest", "evidence_class", "admission", "claim_scope", "validity_domain"],
+        "properties": {
+          "evidence_id": { "type": "string", "minLength": 1 },
+          "source_digest": { "$ref": "#/$defs/digest" },
+          "evidence_class": { "enum": ["synthetic_known_truth", "calibration_receipt", "physical_measurement", "independent_laboratory", "simulation", "surrogate", "literature_reported", "vendor_claim"] },
+          "admission": { "enum": ["candidate", "admitted_for_research", "admitted_for_evaluation", "blocked", "unknown"] },
+          "claim_scope": { "type": "string", "minLength": 1 },
+          "validity_domain": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "experiments": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["experiment_id", "evidence_id", "decision_loss_cost", "cost_usd", "duration_hours", "material_grams", "risk_class", "outcomes_by_world"],
+        "properties": {
+          "experiment_id": { "type": "string", "minLength": 1 },
+          "evidence_id": { "type": "string", "minLength": 1 },
+          "decision_loss_cost": { "type": "number", "minimum": 0 },
+          "cost_usd": { "type": "number", "minimum": 0 },
+          "duration_hours": { "type": "number", "minimum": 0 },
+          "material_grams": { "type": "number", "minimum": 0 },
+          "risk_class": { "enum": ["low", "moderate", "high", "unknown", "prohibited"] },
+          "outcomes_by_world": {
+            "type": "array", "minItems": 1,
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["world_id", "outcomes"],
+              "properties": {
+                "world_id": { "type": "string", "minLength": 1 },
+                "outcomes": {
+                  "type": "array", "minItems": 1,
+                  "items": {
+                    "type": "object", "additionalProperties": false,
+                    "required": ["outcome_id", "probability", "disposition"],
+                    "properties": {
+                      "outcome_id": { "type": "string", "minLength": 1 },
+                      "probability": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+                      "disposition": { "enum": ["observed", "failed", "censored", "invalid", "missing"] }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}
