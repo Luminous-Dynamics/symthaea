@@ -207,6 +207,9 @@ struct ComponentMetric {
     mean_absolute_error: Option<f64>,
     rmse: Option<f64>,
     p95_absolute_error: Option<f64>,
+    unweighted_p95_absolute_error: Option<f64>,
+    p95_conservative_absolute_residual_lower: Option<f64>,
+    p95_conservative_absolute_residual_upper: Option<f64>,
     maximum_absolute_error: Option<f64>,
     tolerance: f64,
     area_weight_sum: f64,
@@ -701,7 +704,11 @@ fn summarize_component(
     }
     let n = acc.residuals.len();
     let mut absolute = acc.residuals.iter().map(|x| x.abs()).collect::<Vec<_>>();
+    let mut lower_absolute = acc.lower_abs.clone();
+    let mut upper_absolute = acc.upper_abs.clone();
     absolute.sort_by(f64::total_cmp);
+    lower_absolute.sort_by(f64::total_cmp);
+    upper_absolute.sort_by(f64::total_cmp);
     let unweighted_rmse = if n == 0 { None } else { Some((acc.residuals.iter().map(|x| x*x).sum::<f64>() / n as f64).sqrt()) };
     let metric = ComponentMetric {
         component: component_name(index),
@@ -710,6 +717,9 @@ fn summarize_component(
         mean_absolute_error: if acc.weight_sum > 0.0 { Some(acc.weighted_absolute_sum / acc.weight_sum) } else { None },
         rmse: if acc.weight_sum > 0.0 { Some((acc.weighted_square_sum / acc.weight_sum).sqrt()) } else { None },
         p95_absolute_error: weighted_quantile(&acc.weighted_values, 0.95),
+        unweighted_p95_absolute_error: empirical_quantile(&absolute, 0.95),
+        p95_conservative_absolute_residual_lower: empirical_quantile(&lower_absolute, 0.95),
+        p95_conservative_absolute_residual_upper: empirical_quantile(&upper_absolute, 0.95),
         maximum_absolute_error: absolute.last().copied(),
         tolerance,
         area_weight_sum: acc.weight_sum,
@@ -819,8 +829,6 @@ fn fourier_metrics(
     radii.sort_by(f64::total_cmp);
     radii.dedup_by(|a,b| (*a-*b).abs() <= GRID_TOLERANCE);
     let mut output = Vec::new();
-    let tmap = grid_index(target);
-    let rmap = grid_index(realized);
     for radius in radii {
         let mut target_ring = target.points.iter().filter(|p| (p.r_over_r-radius).abs()<=GRID_TOLERANCE).collect::<Vec<_>>();
         let mut realized_ring = realized.points.iter().filter(|p| (p.r_over_r-radius).abs()<=GRID_TOLERANCE).collect::<Vec<_>>();
