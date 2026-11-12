@@ -813,7 +813,6 @@ mod tests {
                     lower_bound: values[1] + offset - 10.0,
                     upper_bound: values[1] + offset + 10.0,
                     evidence_id: "SYNTH-EVIDENCE".into(),
-                    evidence_class: EvidenceClass::SyntheticFixture,
                 },
                 MetricObservation {
                     objective_id: "cost".into(),
@@ -980,7 +979,7 @@ mod tests {
         item.hard_gates
             .retain(|gate| gate.gate_id != "physical_safety");
 
-        let result = audit_design_portfolio(&scenarios(), &objectives(), &[item])
+        let result = audit_design_portfolio(&scenarios(), &objectives(), &evidence(), &[item])
             .expect("valid finite portfolio");
         let score = result.scores.first().expect("one score");
 
