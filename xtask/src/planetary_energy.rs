@@ -1045,3 +1045,139 @@ pub fn run_service_audit(input: &Path, output: Option<&Path>) -> Result<()> {
     }
     Ok(())
 }
+
+
+#[cfg(test)]
+mod service_tests {
+    use super::*;
+
+    const FIXTURE: &str =
+        include_str!("../../benchmarks/planetary-energy-service/v0.1/service-envelope-cases.json");
+
+    fn value_from_fixture() -> serde_json::Value {
+        serde_json::from_str(FIXTURE).expect("checked-in service fixture must parse")
+    }
+
+    fn scenario<'a>(report: &'a ServiceAuditReport, id: &str) -> &'a ServiceScenarioResult {
+        report
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == id)
+            .expect("scenario exists")
+    }
+
+    #[test]
+    fn checked_in_service_fixture_matches_all_expected_dispositions() {
+        let report = audit_service_corpus(FIXTURE.as_bytes()).expect("service corpus parses");
+        assert_eq!(report.status, "PASS");
+        assert_eq!(report.scenario_count, 5);
+        assert_eq!(report.passed_count, 1);
+        assert_eq!(report.infeasible_count, 2);
+        assert_eq!(report.blocked_unknown_count, 2);
+        assert_eq!(report.invalid_count, 0);
+        assert_eq!(report.expectation_mismatch_count, 0);
+    }
+
+    #[test]
+    fn every_interval_must_meet_energy_and_peak_power_after_reserve() {
+        let report = audit_service_corpus(FIXTURE.as_bytes()).expect("service corpus parses");
+        let moon = scenario(&report, "moon-long-darkness-reserve-shortfall");
+        assert_eq!(moon.actual_disposition, "INFEASIBLE");
+        assert!(moon
+            .findings
+            .iter()
+            .any(|finding| finding.code == "SERVICE_CAPACITY_SHORTFALL"));
+    }
+
+    #[test]
+    fn unknown_source_capability_is_not_interpreted_as_zero_or_as_pass() {
+        let report = audit_service_corpus(FIXTURE.as_bytes()).expect("service corpus parses");
+        let mars = scenario(&report, "mars-dust-storm-unknown-generation");
+        assert_eq!(mars.actual_disposition, "BLOCKED_UNKNOWN");
+        assert!(mars.findings.iter().any(|finding| {
+            finding.code == "UNKNOWN_SERVICE_CAPABILITY"
+        }));
+    }
+
+    #[test]
+    fn thermal_service_requires_the_requested_temperature_grade() {
+        let report = audit_service_corpus(FIXTURE.as_bytes()).expect("service corpus parses");
+        let belt = scenario(&report, "main-belt-thermal-grade-shortfall");
+        assert_eq!(belt.actual_disposition, "INFEASIBLE");
+        assert!(belt.findings.iter().any(|finding| {
+            finding.code == "THERMAL_TEMPERATURE_SHORTFALL"
+        }));
+    }
+
+    #[test]
+    fn missing_time_buckets_block_service_continuity() {
+        let report = audit_service_corpus(FIXTURE.as_bytes()).expect("service corpus parses");
+        let outer = scenario(&report, "outer-system-incomplete-time-coverage");
+        assert_eq!(outer.actual_disposition, "BLOCKED_UNKNOWN");
+        assert!(outer.findings.iter().any(|finding| {
+            finding.code == "INCOMPLETE_TIME_COVERAGE"
+        }));
+    }
+
+    #[test]
+    fn changed_expected_disposition_blocks_the_fixture_audit() {
+        let mut value = value_from_fixture();
+        value["scenarios"][1]["expected_disposition"] =
+            serde_json::json!("PASS_SYNTHETIC_SERVICE");
+        let bytes = serde_json::to_vec(&value).expect("fixture serializes");
+        let report = audit_service_corpus(&bytes).expect("service corpus parses");
+        assert_eq!(report.status, "BLOCKED");
+        assert_eq!(report.expectation_mismatch_count, 1);
+        assert!(scenario(&report, "moon-long-darkness-reserve-shortfall")
+            .findings
+            .iter()
+            .any(|finding| finding.code == "EXPECTED_DISPOSITION_MISMATCH"));
+    }
+
+    #[test]
+    fn overlapping_intervals_are_invalid_not_silently_merged() {
+        let mut value = value_from_fixture();
+        value["scenarios"][0]["intervals"][1]["start_hour"] = serde_json::json!(11.0);
+        value["scenarios"][0]["expected_disposition"] = serde_json::json!("INVALID");
+        let bytes = serde_json::to_vec(&value).expect("fixture serializes");
+        let report = audit_service_corpus(&bytes).expect("service corpus parses");
+        assert_eq!(report.status, "PASS");
+        assert_eq!(
+            scenario(&report, "earth-clear-day-night-service").actual_disposition,
+            "INVALID"
+        );
+    }
+
+    #[test]
+    fn changing_interval_input_order_does_not_change_dispositions() {
+        let original = audit_service_corpus(FIXTURE.as_bytes()).expect("service corpus parses");
+        let mut value = value_from_fixture();
+        value["scenarios"][0]["intervals"]
+            .as_array_mut()
+            .expect("interval array")
+            .reverse();
+        let bytes = serde_json::to_vec(&value).expect("fixture serializes");
+        let permuted = audit_service_corpus(&bytes).expect("service corpus parses");
+        assert_eq!(original.status, permuted.status);
+        assert_eq!(original.scenarios, permuted.scenarios);
+    }
+
+    #[test]
+    fn physical_evidence_class_cannot_be_fabricated_by_synthetic_fixture() {
+        let mut value = value_from_fixture();
+        value["scenarios"][0]["evidence_class"] =
+            serde_json::json!("physical_measurement");
+        value["scenarios"][0]["expected_disposition"] = serde_json::json!("INVALID");
+        let bytes = serde_json::to_vec(&value).expect("fixture serializes");
+        let report = audit_service_corpus(&bytes).expect("service corpus parses");
+        assert_eq!(report.status, "PASS");
+        assert_eq!(
+            scenario(&report, "earth-clear-day-night-service").actual_disposition,
+            "INVALID"
+        );
+        assert!(scenario(&report, "earth-clear-day-night-service")
+            .findings
+            .iter()
+            .any(|finding| finding.code == "SERVICE_EVIDENCE_CLASS"));
+    }
+}
