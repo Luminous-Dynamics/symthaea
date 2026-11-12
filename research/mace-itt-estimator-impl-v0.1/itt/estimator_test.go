@@ -135,3 +135,23 @@ func TestMixedStrataAndInvalidArmOrderReject(t *testing.T) {
 func TestSmallBootstrapCountRejected(t *testing.T) {
 	if _, err := EstimateITT([]Pair{testPair("p1", "t1", "d", "1", TaskPass, TaskFail, false)}, Config{BootstrapReplicates: 20}); err == nil { t.Fatal("too few resamples accepted") }
 }
+
+func TestCompletePairCountDoesNotDiscardCompleteSeeds(t *testing.T) {
+	p1 := testPair("p1", "t1", "code", "1", TaskPass, TaskFail, false)
+	p2 := testPair("p2", "t1", "code", "2", TaskIndeterminate, TaskFail, false)
+	r, err := EstimateITT([]Pair{p1, p2}, testConfig())
+	if err != nil { t.Fatal(err) }
+	e := r.Primary.TaskSuccess
+	if e.PairCount != 2 || e.CompletePairs != 1 || e.IndeterminateArms != 1 {
+		t.Fatalf("complete/unknown pair accounting: %#v", e)
+	}
+}
+
+func TestBonferroniComponentIntervalsUse97Point5PercentTails(t *testing.T) {
+	values := make([]float64, 100)
+	for i := range values { values[i] = float64(i) }
+	got := percentileInterval(values)
+	if math.Abs(got.Low-1.2375) > 1e-12 || math.Abs(got.High-97.7625) > 1e-12 {
+		t.Fatalf("got %#v; want 97.5%% component interval", got)
+	}
+}
