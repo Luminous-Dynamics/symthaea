@@ -22,6 +22,7 @@ The synthetic fixture must return INCOMPLETE as physical evidence. Exit codes:
 - Target/realized fields carry their own coordinate frame, angular origin, positive azimuth and axial-positive convention. Any mismatch is INCOMPARABLE.
 - Target/realized polar grid, area-weight method and per-cell weights must match exactly within declared numeric tolerances. No interpolation or silent azimuth rotation.
 - Each field carries instrument/solver ID, calibration/validation digest, raw data digest, and separate area-quadrature method/evidence.
+- Each target/realized field binds a separate SHA-256 reference to the #11649 propeller operating-point reduction receipt. Both receipt IDs are preserved in the summary, allowing exact joins to the RPM, advance-ratio, loading, cavitation-number-reference and measurement-window evidence without retyping those values. V0 validates the reference format; it does not resolve or authenticate the external receipt contents.
 - Component bias, MAE, RMSE and P95 are area-weighted on the polar grid; unweighted diagnostics are retained. Cell-level residuals use conservative sums of expanded uncertainties.
 - Axial nominal wake fraction is area-integrated using explicitly declared normalized polar weights. It is not an unweighted average of arbitrary sample points.
 - Fourier amplitude/phase diagnostics are produced only for complete uniform azimuth rings with adequate anti-aliasing coverage. Phase difference is circular; harmonic metrics are descriptive and are not currently a standalone acceptance gate.
