@@ -500,3 +500,29 @@ Compare exact MILP/constraint programming where tractable, EDD/setup-aware heuri
 A lower carbon or energy objective cannot compensate for unsafe workload, unqualified process windows, a missed hard delivery commitment, off-spec output or missing environmental evidence. Published case-study savings must not be stitched across different papers into a single SOTA number.
 
 The machine-readable benchmark register has been extended to 18 sources at revision `2026-11-12-r3`; it records scheduling literature separately from cloth physics, material sensing, inverse design and robotic sewing.
+
+
+## 20. Executable apparel fixture qualification
+
+A standalone Rust harness has now been added:
+
+- `tools/apparel-benchmark-harness/Cargo.toml`
+- `tools/apparel-benchmark-harness/src/main.rs`
+- `.github/workflows/apparel-engineering-fixtures.yml`
+
+It uses a focused workspace so it does not depend on the broader Symthaea workspace manifest glob. The `jsonschema` crate is pinned to `0.59.0` with default features disabled. The auditor:
+1. requires the Draft 2020-12 dialect;
+2. rejects all `$ref`, `$dynamicRef` and `$recursiveRef` to keep validation self-contained and prevent external reference reads;
+3. validates the schema document against the Draft 2020-12 meta-schema;
+4. validates the synthetic apparel example using the Draft 2020-12 validator;
+5. checks cross-field invariants such as unique object IDs, BOM-to-material references, measured-test evidence, design-revision freshness, claim/evidence binding and the synthetic-not-physically-qualified boundary;
+6. checks the 30-case semantic-intent corpus and 18-source benchmark register for internal consistency;
+7. emits an exact-head, content-hashed JSON receipt with an explicit claim ceiling.
+
+The focused test suite contains structural negative controls (unknown property and missing pattern-piece ID) and semantic negative controls (unknown BOM material, modelled drape promoted to physical claim, measured test without an evidence artifact, stale geometry projection and synthetic fixture promoted to physical qualification).
+
+**Important execution boundary:** the 30 semantic cases remain expected outcomes and descriptions, not 30 executable mutation tests. The harness executes selected adversarial mutations directly in unit tests and checks the remaining case corpus structurally. The receipt records `intent-corpus-validated-not-executed` for that distinction. A follow-on should convert the highest-risk remaining cases into typed mutation operations and executable golden fixtures.
+
+The GitHub workflow is triggered by relevant research/harness paths, checks the exact commit, uses pinned Rust 1.96.0, generates a separate lockfile for the isolated harness, runs tests, Clippy and formatting, then writes/uploads a content-addressed receipt. No hosted-runner result is claimed until the workflow has executed on the exact PR head.
+
+Even a passing receipt validates the declared schema and synthetic contract only. It does not validate dataset rights, scientific predictions, physical textile properties, fit, quality, manufacturing yield, recycling yield, safety or regulatory compliance.
