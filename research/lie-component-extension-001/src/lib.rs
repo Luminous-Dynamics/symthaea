@@ -296,7 +296,7 @@ fn validate_group(group: &FiniteGroupV1) -> Result<(Vec<usize>, usize), Qualific
     }
 
     let mut inverses = vec![usize::MAX; order];
-    for element in 0..order {
+    for (element, inverse_slot) in inverses.iter_mut().enumerate() {
         let inverse = (0..order).find(|candidate| {
             group.multiplication[element][*candidate] == group.identity
                 && group.multiplication[*candidate][element] == group.identity
@@ -304,7 +304,7 @@ fn validate_group(group: &FiniteGroupV1) -> Result<(Vec<usize>, usize), Qualific
         let Some(inverse) = inverse else {
             return Err(QualificationErrorV1::MissingInverse);
         };
-        inverses[element] = inverse;
+        *inverse_slot = inverse;
         checks = checks
             .checked_add(order)
             .ok_or(QualificationErrorV1::ArithmeticOverflow)?;
@@ -577,12 +577,15 @@ pub fn verify_split_extension<const N: usize>(
             for j in 0..lie_dimension {
                 for output in 0..lie_dimension {
                     let mut transformed_original = 0_i128;
-                    for input in 0..lie_dimension {
+                    for (action_coefficient, structure_coefficient) in adjoint[output]
+                        .iter()
+                        .zip(extension.lie_algebra.structure_constants[i][j].iter())
+                    {
                         transformed_original = checked_add(
                             transformed_original,
                             checked_mul(
-                                i128::from(adjoint[output][input]),
-                                i128::from(extension.lie_algebra.structure_constants[i][j][input]),
+                                i128::from(*action_coefficient),
+                                i128::from(*structure_coefficient),
                             )?,
                         )?;
                     }
@@ -615,19 +618,26 @@ pub fn verify_split_extension<const N: usize>(
     }
 
     let mut representation_compatibility_checks = 0usize;
-    for element in 0..group_order {
-        let state = &representations.state_matrices[element];
-        let inverse_state = &representations.state_matrices[inverses[element]];
-        let adjoint = &representations.adjoint_matrices[element];
-        for generator_index in 0..lie_dimension {
-            let conjugated = matrix_product(
-                &matrix_product(state, &extension.lie_algebra.generators[generator_index])?,
-                inverse_state,
-            )?;
-            let coefficients: Vec<i64> = (0..lie_dimension)
-                .map(|output| adjoint[output][generator_index])
-                .collect();
-            let expected = linear_combination(&extension.lie_algebra.generators, &coefficients)?;
+    for (state, inverse_index) in representations.state_matrices.iter().zip(inverses.iter()) {
+        let inverse_state = &representations.state_matrices[*inverse_index];
+        let adjoint = &representations.adjoint_matrices[
+            representations
+                .state_matrices
+                .iter()
+                .position(|candidate| std::ptr::eq(candidate, state))
+                .ok_or(QualificationErrorV1::RepresentationCountMismatch)?
+        ];
+        let adjoint_columns: Vec<Vec<i64>> = (0..lie_dimension)
+            .map(|column| adjoint.iter().map(|row| row[column]).collect())
+            .collect();
+        for (generator, coefficients) in extension
+            .lie_algebra
+            .generators
+            .iter()
+            .zip(adjoint_columns.iter())
+        {
+            let conjugated = matrix_product(&matrix_product(state, generator)?, inverse_state)?;
+            let expected = linear_combination(&extension.lie_algebra.generators, coefficients)?;
             representation_compatibility_checks += 1;
             if conjugated != expected {
                 return Err(QualificationErrorV1::RepresentationCompatibilityViolation);
