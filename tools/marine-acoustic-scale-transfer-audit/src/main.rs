@@ -1149,6 +1149,21 @@ mod tests {
             .unwrap()
             .iter()
             .any(|value| value == "background_trace_sha256"));
+        assert!(schema["$defs"]["modelRun"]["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value == "calibration_certificate_sha256"));
+        assert!(schema["$defs"]["fullScaleRun"]["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value == "calibration_certificate_sha256"));
+        assert!(schema["properties"]["pairs"]["items"]["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|value| value == "cavitation_pattern_comparability"));
     }
 
     #[test]
@@ -1216,6 +1231,11 @@ mod tests {
         assert_eq!(report.disposition, "incomplete");
         assert!(report.reasons.iter().any(|reason| reason.contains("Reynolds-scale noise correction")));
         case.pairs[0].cavitation_pattern = CavitationPattern::Mixed;
+        assert_eq!(audit(&case).disposition, "incomplete");
+        case.pairs[0].cavitation_pattern = CavitationPattern::Unknown;
+        assert_eq!(audit(&case).disposition, "incomplete");
+        case.pairs[0].cavitation_pattern = CavitationPattern::Sheet;
+        case.pairs[0].cavitation_pattern_comparability = PatternComparability::Unknown;
         assert_eq!(audit(&case).disposition, "incomplete");
     }
 
