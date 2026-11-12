@@ -15,8 +15,8 @@
 //! runs whose net outcome is already established -- not a fresh, potentially non-comparable setup.
 //!
 //! No new production code. `OrganismTick` already exposes everything needed per-tick:
-//! `bits_processed` (Shannon-entropy resolution cost), `physical_cost` (the Landauer/Prigogine
-//! energy actually debited for that cost, in the same units as `energy` -- directly comparable to
+//! `bits_processed` (Shannon-entropy resolution proxy), `physical_cost` (the legacy-named
+//! dimensionless model cost debited in the same ALife units as `energy` -- directly comparable to
 //! the overall energy gap), and `action` (what the organism actually did).
 //!
 //! The one new technique, built entirely from existing public API (`ActiveInferenceAgent: Clone`,
@@ -128,7 +128,7 @@ fn manipulation_check_fine_processes_more_bits_and_pays_more_physical_cost() {
         );
         assert!(
             fine.total_physical_cost > coarse.total_physical_cost,
-            "seed={seed}: expected fine to pay more physical (Landauer/Prigogine) cost than \
+            "seed={seed}: expected fine to pay more dimensionless resolution-model cost than \
              coarse, fine={:.6} coarse={:.6}",
             fine.total_physical_cost,
             coarse.total_physical_cost
@@ -176,7 +176,7 @@ fn decompose_coarse_wins_gap_into_resolution_cost_and_decision_quality() {
          gap={:.4}\n\
          bits_processed:    fine={fine_bits_mean:.2} coarse={coarse_bits_mean:.2} \
          gap={:.2}\n\
-         physical_cost:     fine={fine_cost_mean:.6} coarse={coarse_cost_mean:.6} \
+         model_cost:        fine={fine_cost_mean:.6} coarse={coarse_cost_mean:.6} \
          gap={:.6}\n\
          decision_correct%: fine={:.4} coarse={:.4} gap={:.4}\n\
          fine_energy_per_seed={fine_energy:?}\n\
@@ -193,7 +193,7 @@ fn decompose_coarse_wins_gap_into_resolution_cost_and_decision_quality() {
 
     // Sanity bounds only -- report, don't assume a direction on decision quality. The resolution
     // gap (fine costs more) is the only pre-committed direction, since that's a structural
-    // property of `perceptual_grain`'s Landauer tax, not an open empirical question.
+    // property of `perceptual_grain`'s configured resolution-cost policy, not a physical Landauer bound.
     assert!(
         fine_bits_mean > coarse_bits_mean,
         "resolution-cost component: fine should process more bits than coarse, \

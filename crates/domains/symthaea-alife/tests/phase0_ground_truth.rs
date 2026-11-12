@@ -85,13 +85,13 @@ fn perceiving_organism_tracks_resource_better_than_constant_baseline() {
     let baseline_mae = baseline_mae_sum / SEEDS.len() as f64;
 
     // The real, structural effect measured during Phase 0 development was a consistent ~13-14%
-    // reduction. Phase 3's real Landauer/Prigogine energy drain (organism.rs) has a genuine,
-    // honest side effect on this specific number: it raises average homeostatic deficit
+    // reduction. Phase 3's dimensionless Landauer/Prigogine-inspired model-cost policy
+    // (organism.rs) has a reproducible side effect on this specific number: it raises average homeostatic deficit
     // slightly, which (via BoundaryModulators::from_energy_deficit) closes blanket permeability
     // slightly, which reduces how much of the true resource signal reaches perceive() through
     // gate_observation -- re-measured at ~7% after Phase 3 landed. Rather than keep shrinking
-    // the physics constants to preserve the old ~14% number (which would erode Phase 3's own
-    // claim to being a *real*, measurable cost), the threshold below was moved to match what's
+    // the model-cost parameters to preserve the old ~14% number (which would disguise the
+    // configured cost policy), the threshold below was moved to match what's
     // actually true now: still a real, non-trivial, consistent improvement (if perceive() were
     // theater, this ratio would be ~1.0, not comfortably under it), just a smaller one.
     assert!(
