@@ -923,9 +923,16 @@ mod tests {
         input.evidence_kind = EvidenceKind::MeasuredFullScale;
         input.rights_status = RightsStatus::PublicOrPermitted;
         input.candidates[0].evidence_kind = EvidenceKind::MeasuredFullScale;
-        input.candidates[1] = input.candidates[0].clone();
-        input.candidates[1].candidate_id = "A-copy".to_string();
-        input.candidates[1].operating_point_id = "op-A-copy".to_string();
+        input.candidates[1] = candidate(
+            "A-copy",
+            EvidenceKind::MeasuredFullScale,
+            0.14,
+            0.06,
+            100.0,
+            0.04,
+            120.0,
+            0.001,
+        );
         let report = audit(&input);
         assert!(report.feasible_pareto_frontier_candidate_ids.contains(&"A".to_string()));
         assert!(report.feasible_pareto_frontier_candidate_ids.contains(&"A-copy".to_string()));
