@@ -28,8 +28,12 @@ jobs:
           toolchain: 1.96.0
           components: rustfmt, clippy
 
-      - name: Check formatting
-        run: cargo fmt --manifest-path crates/bridges/symthaea-camera-driving-bridge/Cargo.toml -- --check
+      - name: Check formatting for the exact bridge source set
+        run: |
+          rustfmt --edition 2024 --check \
+            crates/bridges/symthaea-camera-driving-bridge/src/lib.rs \
+            crates/bridges/symthaea-camera-driving-bridge/src/bin/camera_driving_bridge.rs \
+            crates/bridges/symthaea-camera-driving-bridge/examples/write_fixture_configs.rs
 
       - name: Run known-answer and adversarial tests
         run: cargo test --locked --manifest-path crates/bridges/symthaea-camera-driving-bridge/Cargo.toml
