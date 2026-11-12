@@ -255,7 +255,9 @@ fn finite_positive(value: f64, name: &str) -> Result<(), AuditError> {
 
 fn validate_digest(value: &str, name: &str) -> Result<(), AuditError> {
     if value.len() != 64
-        || !value.bytes().all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        || !value
+            .bytes()
+            .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
     {
         return Err(AuditError(format!(
             "{name} must be lowercase 64-character SHA-256"
@@ -284,7 +286,10 @@ fn evidence_registry<'a>(
     if records.is_empty() {
         return Err(AuditError("evidence registry must not be empty".into()));
     }
-    validate_unique(records.iter().map(|r| r.evidence_id.as_str()), "evidence ID")?;
+    validate_unique(
+        records.iter().map(|r| r.evidence_id.as_str()),
+        "evidence ID",
+    )?;
     let mut map = BTreeMap::new();
     for record in records {
         validate_digest(&record.source_digest, "evidence source digest")?;
@@ -368,7 +373,10 @@ fn validate_mass(m: &MassInventory) -> Result<(), AuditError> {
         (m.anode_inactive_mg, "anode inactive mass"),
         (m.electrolyte_mg, "electrolyte mass"),
         (m.separator_or_support_mg, "separator/support mass"),
-        (m.current_collectors_and_tabs_mg, "current collector/tab mass"),
+        (
+            m.current_collectors_and_tabs_mg,
+            "current collector/tab mass",
+        ),
         (m.casing_and_seals_mg, "casing/seal mass"),
     ] {
         finite_nonnegative(v, n)?;
@@ -380,7 +388,10 @@ fn validate_mass(m: &MassInventory) -> Result<(), AuditError> {
         m.declared_full_cell_volume_cm3,
         "declared full-cell external volume",
     )?;
-    validate_digest(&m.volume_boundary_digest, "complete-cell volume boundary digest")?;
+    validate_digest(
+        &m.volume_boundary_digest,
+        "complete-cell volume boundary digest",
+    )?;
     let delta = (m.component_sum_mg() - m.declared_full_cell_mass_mg).abs();
     if delta > m.closure_tolerance_mg {
         return Err(AuditError(format!(
@@ -403,10 +414,15 @@ fn validate_status(o: &CellObservation, e: &EvidenceRecord) -> Result<(), AuditE
                 )));
             }
             let cycle = o.event_cycle.ok_or_else(|| {
-                AuditError(format!("observed EOL for {} requires event cycle", o.observation_id))
+                AuditError(format!(
+                    "observed EOL for {} requires event cycle",
+                    o.observation_id
+                ))
             })?;
             if cycle == 0 || cycle > o.cycles_observed {
-                return Err(AuditError("EOL event cycle outside observed exposure".into()));
+                return Err(AuditError(
+                    "EOL event cycle outside observed exposure".into(),
+                ));
             }
         }
         OutcomeStatus::RightCensored => {
@@ -441,16 +457,22 @@ fn validate_status(o: &CellObservation, e: &EvidenceRecord) -> Result<(), AuditE
                 )));
             }
             if o.cycles_observed == 0 {
-                return Err(AuditError("synthetic observation needs nonzero exposure".into()));
+                return Err(AuditError(
+                    "synthetic observation needs nonzero exposure".into(),
+                ));
             }
-            if o.event_cycle.is_some_and(|c| c == 0 || c > o.cycles_observed) {
+            if o.event_cycle
+                .is_some_and(|c| c == 0 || c > o.cycles_observed)
+            {
                 return Err(AuditError("synthetic event cycle outside exposure".into()));
             }
         }
     }
     if let Some(v) = o.capacity_retention_permille {
         if v > 1000 {
-            return Err(AuditError("capacity retention must be <=1000 permille".into()));
+            return Err(AuditError(
+                "capacity retention must be <=1000 permille".into(),
+            ));
         }
     }
     Ok(())
@@ -465,11 +487,19 @@ fn axis_matches(a: &DesignDescriptor, b: &DesignDescriptor, axis: MatchedAxis) -
         MatchedAxis::AnodeConfiguration => a.anode_configuration == b.anode_configuration,
         MatchedAxis::CellFormat => a.cell_format == b.cell_format,
         MatchedAxis::TestLevel => a.test_level == b.test_level,
-        MatchedAxis::ArealCapacity => (a.areal_capacity_mah_cm2 - b.areal_capacity_mah_cm2).abs() <= 1e-9,
-        MatchedAxis::CathodeLoading => (a.cathode_loading_mg_cm2 - b.cathode_loading_mg_cm2).abs() <= 1e-9,
-        MatchedAxis::ElectrolyteThickness => (a.electrolyte_thickness_um - b.electrolyte_thickness_um).abs() <= 1e-9,
+        MatchedAxis::ArealCapacity => {
+            (a.areal_capacity_mah_cm2 - b.areal_capacity_mah_cm2).abs() <= 1e-9
+        }
+        MatchedAxis::CathodeLoading => {
+            (a.cathode_loading_mg_cm2 - b.cathode_loading_mg_cm2).abs() <= 1e-9
+        }
+        MatchedAxis::ElectrolyteThickness => {
+            (a.electrolyte_thickness_um - b.electrolyte_thickness_um).abs() <= 1e-9
+        }
         MatchedAxis::Temperature => (a.temperature_c - b.temperature_c).abs() <= 1e-9,
-        MatchedAxis::CurrentDensity => (a.current_density_ma_cm2 - b.current_density_ma_cm2).abs() <= 1e-9,
+        MatchedAxis::CurrentDensity => {
+            (a.current_density_ma_cm2 - b.current_density_ma_cm2).abs() <= 1e-9
+        }
         MatchedAxis::VoltageWindow => a.voltage_window == b.voltage_window,
         MatchedAxis::CycleProtocol => a.cycle_protocol == b.cycle_protocol,
     }
@@ -486,11 +516,17 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
     }
     let registry = evidence_registry(&manifest.evidence)?;
     validate_unique(
-        manifest.observations.iter().map(|o| o.observation_id.as_str()),
+        manifest
+            .observations
+            .iter()
+            .map(|o| o.observation_id.as_str()),
         "observation ID",
     )?;
     validate_unique(
-        manifest.comparisons.iter().map(|c| c.comparison_id.as_str()),
+        manifest
+            .comparisons
+            .iter()
+            .map(|c| c.comparison_id.as_str()),
         "comparison ID",
     )?;
 
@@ -520,7 +556,10 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         match o.design.test_level {
             TestLevel::FullCell => {
                 let inventory = o.mass_inventory.as_ref().ok_or_else(|| {
-                    AuditError(format!("full-cell observation {} requires mass inventory", o.observation_id))
+                    AuditError(format!(
+                        "full-cell observation {} requires mass inventory",
+                        o.observation_id
+                    ))
                 })?;
                 validate_mass(inventory)?;
                 full_cell_count += 1;
@@ -561,13 +600,29 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
     let mut reports = Vec::new();
     for comparison in &manifest.comparisons {
         require_nonempty(&comparison.comparison_id, "comparison ID")?;
-        let baseline = observation_map.get(comparison.baseline_observation_id.as_str()).copied()
-            .ok_or_else(|| AuditError(format!("comparison {} references missing baseline", comparison.comparison_id)))?;
-        let candidate = observation_map.get(comparison.candidate_observation_id.as_str()).copied()
-            .ok_or_else(|| AuditError(format!("comparison {} references missing candidate", comparison.comparison_id)))?;
+        let baseline = observation_map
+            .get(comparison.baseline_observation_id.as_str())
+            .copied()
+            .ok_or_else(|| {
+                AuditError(format!(
+                    "comparison {} references missing baseline",
+                    comparison.comparison_id
+                ))
+            })?;
+        let candidate = observation_map
+            .get(comparison.candidate_observation_id.as_str())
+            .copied()
+            .ok_or_else(|| {
+                AuditError(format!(
+                    "comparison {} references missing candidate",
+                    comparison.comparison_id
+                ))
+            })?;
 
         if comparison.baseline_observation_id == comparison.candidate_observation_id {
-            return Err(AuditError("comparison must use distinct observations".into()));
+            return Err(AuditError(
+                "comparison must use distinct observations".into(),
+            ));
         }
         if baseline.design.technology_lane != candidate.design.technology_lane {
             return Err(AuditError(format!(
@@ -604,8 +659,9 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
                 comparison.comparison_id
             )));
         }
-        let fabrication_pressure_delta =
-            (candidate.pressure.fabrication_pressure_mpa - baseline.pressure.fabrication_pressure_mpa).abs();
+        let fabrication_pressure_delta = (candidate.pressure.fabrication_pressure_mpa
+            - baseline.pressure.fabrication_pressure_mpa)
+            .abs();
         let fabrication_pressure_tolerance =
             baseline.pressure.uncertainty_mpa + candidate.pressure.uncertainty_mpa;
         if fabrication_pressure_delta > fabrication_pressure_tolerance {
@@ -616,7 +672,9 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
                 fabrication_pressure_tolerance
             )));
         }
-        if baseline.pressure.operating_pressure_mpa.to_bits() == candidate.pressure.operating_pressure_mpa.to_bits() {
+        if baseline.pressure.operating_pressure_mpa.to_bits()
+            == candidate.pressure.operating_pressure_mpa.to_bits()
+        {
             return Err(AuditError(format!(
                 "comparison {} must vary operating pressure to qualify a pressure comparison",
                 comparison.comparison_id
@@ -712,124 +770,195 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
 mod tests {
     use super::*;
 
-    fn digest(ch: char) -> String { std::iter::repeat_n(ch,64).collect() }
+    fn digest(ch: char) -> String {
+        std::iter::repeat_n(ch, 64).collect()
+    }
 
-    fn evidence(id:&str,ch:char)->EvidenceRecord{
-        EvidenceRecord{
-            evidence_id:id.into(),source_digest:digest(ch),evidence_class:EvidenceClass::Synthetic,
-            admission:Admission::AdmittedForEvaluation,claim_scope:"synthetic fixture".into(),
-            rights_ref:"SYNTHETIC-ONLY-NO-PRODUCTION-DATA".into(),metrology_ref:None
+    fn evidence(id: &str, ch: char) -> EvidenceRecord {
+        EvidenceRecord {
+            evidence_id: id.into(),
+            source_digest: digest(ch),
+            evidence_class: EvidenceClass::Synthetic,
+            admission: Admission::AdmittedForEvaluation,
+            claim_scope: "synthetic fixture".into(),
+            rights_ref: "SYNTHETIC-ONLY-NO-PRODUCTION-DATA".into(),
+            metrology_ref: None,
         }
     }
 
-    fn design(id:&str,level:TestLevel)->DesignDescriptor{
-        DesignDescriptor{
-            design_id:id.into(),revision:"r1".into(),technology_lane:TechnologyLane::SulfideLithiumMetal,
-            chemistry_family:"Li-metal|NMC811".into(),electrolyte_family:"sulfide-composite".into(),
-            cathode_family:"NMC811".into(),anode_configuration:"lithium-metal|porous-carbon-current-collector".into(),
-            cell_format:"pouch".into(),test_level:level,areal_capacity_mah_cm2:2.4,
-            cathode_loading_mg_cm2:20.0,electrolyte_thickness_um:35.0,temperature_c:25.0,
-            current_density_ma_cm2:0.24,voltage_window:"2.8-4.3V".into(),cycle_protocol:"0.1C-charge-discharge-r1".into()
+    fn design(id: &str, level: TestLevel) -> DesignDescriptor {
+        DesignDescriptor {
+            design_id: id.into(),
+            revision: "r1".into(),
+            technology_lane: TechnologyLane::SulfideLithiumMetal,
+            chemistry_family: "Li-metal|NMC811".into(),
+            electrolyte_family: "sulfide-composite".into(),
+            cathode_family: "NMC811".into(),
+            anode_configuration: "lithium-metal|porous-carbon-current-collector".into(),
+            cell_format: "pouch".into(),
+            test_level: level,
+            areal_capacity_mah_cm2: 2.4,
+            cathode_loading_mg_cm2: 20.0,
+            electrolyte_thickness_um: 35.0,
+            temperature_c: 25.0,
+            current_density_ma_cm2: 0.24,
+            voltage_window: "2.8-4.3V".into(),
+            cycle_protocol: "0.1C-charge-discharge-r1".into(),
         }
     }
 
-    fn mass()->MassInventory{
-        MassInventory{
-            cathode_active_mg:100.0,cathode_inactive_mg:20.0,
-            anode_active_mg:10.0,anode_inactive_mg:2.0,electrolyte_mg:35.0,
-            separator_or_support_mg:8.0,current_collectors_and_tabs_mg:18.0,casing_and_seals_mg:27.0,
-            declared_full_cell_mass_mg:220.0,closure_tolerance_mg:0.1,boundary_digest:digest('9'),
-            declared_full_cell_volume_cm3:1.2,volume_boundary_digest:digest('8')
+    fn mass() -> MassInventory {
+        MassInventory {
+            cathode_active_mg: 100.0,
+            cathode_inactive_mg: 20.0,
+            anode_active_mg: 10.0,
+            anode_inactive_mg: 2.0,
+            electrolyte_mg: 35.0,
+            separator_or_support_mg: 8.0,
+            current_collectors_and_tabs_mg: 18.0,
+            casing_and_seals_mg: 27.0,
+            declared_full_cell_mass_mg: 220.0,
+            closure_tolerance_mg: 0.1,
+            boundary_digest: digest('9'),
+            declared_full_cell_volume_cm3: 1.2,
+            volume_boundary_digest: digest('8'),
         }
     }
 
-    fn observation(id:&str,d:DesignDescriptor,op:f64,eid:&str)->CellObservation{
-        let full=d.test_level==TestLevel::FullCell;
-        CellObservation{
-            observation_id:id.into(),cell_id:format!("CELL-{id}"),batch_id:"BATCH-001".into(),
-            manufacturing_line:"PILOT-LINE-01".into(),process_revision:"PROCESS-R1".into(),
-            design:d,pressure:PressureEvidence{
-                fabrication_pressure_mpa:100.0,operating_pressure_mpa:op,
-                measurement_method:"calibrated load-cell fixture".into(),instrument_ref:"PRESSURE-MET-01".into(),uncertainty_mpa:0.05
+    fn observation(id: &str, d: DesignDescriptor, op: f64, eid: &str) -> CellObservation {
+        let full = d.test_level == TestLevel::FullCell;
+        CellObservation {
+            observation_id: id.into(),
+            cell_id: format!("CELL-{id}"),
+            batch_id: "BATCH-001".into(),
+            manufacturing_line: "PILOT-LINE-01".into(),
+            process_revision: "PROCESS-R1".into(),
+            design: d,
+            pressure: PressureEvidence {
+                fabrication_pressure_mpa: 100.0,
+                operating_pressure_mpa: op,
+                measurement_method: "calibrated load-cell fixture".into(),
+                instrument_ref: "PRESSURE-MET-01".into(),
+                uncertainty_mpa: 0.05,
             },
-            mass_inventory:if full{Some(mass())}else{None},
-            cycles_observed:100,outcome_status:OutcomeStatus::SyntheticOutcome,event_cycle:Some(90),
-            capacity_retention_permille:Some(950),impedance_growth_permille:Some(120),evidence_id:eid.into()
+            mass_inventory: if full { Some(mass()) } else { None },
+            cycles_observed: 100,
+            outcome_status: OutcomeStatus::SyntheticOutcome,
+            event_cycle: Some(90),
+            capacity_retention_permille: Some(950),
+            impedance_growth_permille: Some(120),
+            evidence_id: eid.into(),
         }
     }
 
-    fn axes()->Vec<MatchedAxis>{MatchedAxis::REQUIRED.to_vec()}
+    fn axes() -> Vec<MatchedAxis> {
+        MatchedAxis::REQUIRED.to_vec()
+    }
 
-    fn fixture()->Manifest{
-        Manifest{
-            campaign_id:"ASSB-LOW-PRESSURE-001".into(),
-            evidence:vec![evidence("E-HIGH",'a'),evidence("E-LOW",'b'),evidence("E-SYM",'c')],
-            observations:vec![
-                observation("HIGH-P",design("ASSB-SULFIDE-DESIGN-A",TestLevel::FullCell),5.0,"E-HIGH"),
-                observation("LOW-P",design("ASSB-SULFIDE-DESIGN-A",TestLevel::FullCell),0.3,"E-LOW"),
-                observation("SYM",design("ASSB-SULFIDE-SYM",TestLevel::SymmetricCell),5.0,"E-SYM")
+    fn fixture() -> Manifest {
+        Manifest {
+            campaign_id: "ASSB-LOW-PRESSURE-001".into(),
+            evidence: vec![
+                evidence("E-HIGH", 'a'),
+                evidence("E-LOW", 'b'),
+                evidence("E-SYM", 'c'),
             ],
-            comparisons:vec![PressureComparison{
-                comparison_id:"HIGH-VS-LOW-P".into(),baseline_observation_id:"HIGH-P".into(),
-                candidate_observation_id:"LOW-P".into(),matched_axes:axes()
-            }]
+            observations: vec![
+                observation(
+                    "HIGH-P",
+                    design("ASSB-SULFIDE-DESIGN-A", TestLevel::FullCell),
+                    5.0,
+                    "E-HIGH",
+                ),
+                observation(
+                    "LOW-P",
+                    design("ASSB-SULFIDE-DESIGN-A", TestLevel::FullCell),
+                    0.3,
+                    "E-LOW",
+                ),
+                observation(
+                    "SYM",
+                    design("ASSB-SULFIDE-SYM", TestLevel::SymmetricCell),
+                    5.0,
+                    "E-SYM",
+                ),
+            ],
+            comparisons: vec![PressureComparison {
+                comparison_id: "HIGH-VS-LOW-P".into(),
+                baseline_observation_id: "HIGH-P".into(),
+                candidate_observation_id: "LOW-P".into(),
+                matched_axes: axes(),
+            }],
         }
     }
 
     #[test]
-    fn matched_pressure_fixture_audits_with_pressure_separate_from_fabrication(){
-        let r=audit_manifest(&fixture()).expect("fixture valid");
-        assert_eq!(r.full_cell_count,2);
-        assert_eq!(r.symmetric_cell_count,1);
-        assert_eq!(r.comparison_count,1);
-        assert_eq!(r.comparisons[0].baseline_operating_pressure_milli_mpa,5000);
-        assert_eq!(r.comparisons[0].candidate_operating_pressure_milli_mpa,300);
-        assert_eq!(r.comparisons[0].baseline_fabrication_pressure_milli_mpa,100000);
-        assert_eq!(r.comparisons[0].candidate_fabrication_pressure_milli_mpa,100000);
-        assert_eq!(r.comparisons[0].fabrication_pressure_delta_milli_mpa,0);
-        assert_eq!(r.comparisons[0].pressure_measurement_method,"calibrated load-cell fixture");
-        assert_eq!(r.comparisons[0].pressure_delta_milli_mpa,-4700);
+    fn matched_pressure_fixture_audits_with_pressure_separate_from_fabrication() {
+        let r = audit_manifest(&fixture()).expect("fixture valid");
+        assert_eq!(r.full_cell_count, 2);
+        assert_eq!(r.symmetric_cell_count, 1);
+        assert_eq!(r.comparison_count, 1);
+        assert_eq!(r.comparisons[0].baseline_operating_pressure_milli_mpa, 5000);
+        assert_eq!(r.comparisons[0].candidate_operating_pressure_milli_mpa, 300);
+        assert_eq!(
+            r.comparisons[0].baseline_fabrication_pressure_milli_mpa,
+            100000
+        );
+        assert_eq!(
+            r.comparisons[0].candidate_fabrication_pressure_milli_mpa,
+            100000
+        );
+        assert_eq!(r.comparisons[0].fabrication_pressure_delta_milli_mpa, 0);
+        assert_eq!(
+            r.comparisons[0].pressure_measurement_method,
+            "calibrated load-cell fixture"
+        );
+        assert_eq!(r.comparisons[0].pressure_delta_milli_mpa, -4700);
     }
 
     #[test]
-    fn full_cell_mass_must_close(){
+    fn full_cell_mass_must_close() {
         let mut m = fixture();
-        m.observations[0].mass_inventory.as_mut().unwrap().declared_full_cell_mass_mg=250.0;
+        m.observations[0]
+            .mass_inventory
+            .as_mut()
+            .unwrap()
+            .declared_full_cell_mass_mg = 250.0;
         assert!(audit_manifest(&m).is_err());
     }
 
     #[test]
-    fn full_cell_requires_mass_inventory(){
-        let mut m=fixture();
-        m.observations[0].mass_inventory=None;
+    fn full_cell_requires_mass_inventory() {
+        let mut m = fixture();
+        m.observations[0].mass_inventory = None;
         assert!(audit_manifest(&m).is_err());
     }
 
     #[test]
-    fn symmetric_cell_cannot_claim_full_cell_mass(){
-        let mut m=fixture();
-        m.observations[2].mass_inventory=Some(mass());
+    fn symmetric_cell_cannot_claim_full_cell_mass() {
+        let mut m = fixture();
+        m.observations[2].mass_inventory = Some(mass());
         assert!(audit_manifest(&m).is_err());
     }
 
     #[test]
-    fn missing_pressure_measurement_method_is_rejected(){
-        let mut m=fixture();
+    fn missing_pressure_measurement_method_is_rejected() {
+        let mut m = fixture();
         m.observations[0].pressure.measurement_method.clear();
         assert!(audit_manifest(&m).is_err());
     }
 
     #[test]
-    fn nonfinite_pressure_is_rejected(){
-        let mut m=fixture();
-        m.observations[0].pressure.operating_pressure_mpa=f64::NAN;
+    fn nonfinite_pressure_is_rejected() {
+        let mut m = fixture();
+        m.observations[0].pressure.operating_pressure_mpa = f64::NAN;
         assert!(audit_manifest(&m).is_err());
     }
 
     #[test]
-    fn zero_fabrication_pressure_remains_a_declared_measurement(){
-        let mut m=fixture();
-        m.observations[0].pressure.fabrication_pressure_mpa=0.0;
+    fn zero_fabrication_pressure_remains_a_declared_measurement() {
+        let mut m = fixture();
+        m.observations[0].pressure.fabrication_pressure_mpa = 0.0;
         assert!(audit_manifest(&m).is_ok());
         // Zero fabrication pressure is allowed; it is a real declared measurement,
         // not a missing value. Operating pressure remains independently required.
@@ -872,10 +1001,18 @@ mod tests {
     #[test]
     fn complete_cell_volume_must_be_positive_and_bound() {
         let mut m = fixture();
-        m.observations[0].mass_inventory.as_mut().unwrap().declared_full_cell_volume_cm3 = 0.0;
+        m.observations[0]
+            .mass_inventory
+            .as_mut()
+            .unwrap()
+            .declared_full_cell_volume_cm3 = 0.0;
         assert!(audit_manifest(&m).is_err());
         let mut m = fixture();
-        m.observations[0].mass_inventory.as_mut().unwrap().volume_boundary_digest = "bad".into();
+        m.observations[0]
+            .mass_inventory
+            .as_mut()
+            .unwrap()
+            .volume_boundary_digest = "bad".into();
         assert!(audit_manifest(&m).is_err());
     }
 
@@ -890,44 +1027,44 @@ mod tests {
     }
 
     #[test]
-    fn comparison_must_change_operating_pressure(){
-        let mut m=fixture();
-        m.observations[1].pressure.operating_pressure_mpa=5.0;
+    fn comparison_must_change_operating_pressure() {
+        let mut m = fixture();
+        m.observations[1].pressure.operating_pressure_mpa = 5.0;
         assert!(audit_manifest(&m).is_err());
     }
 
     #[test]
-    fn technology_lanes_cannot_be_pooled(){
-        let mut m=fixture();
-        m.observations[1].design.technology_lane=TechnologyLane::Halide;
+    fn technology_lanes_cannot_be_pooled() {
+        let mut m = fixture();
+        m.observations[1].design.technology_lane = TechnologyLane::Halide;
         assert!(audit_manifest(&m).is_err());
     }
 
     #[test]
-    fn symmetric_and_full_cell_levels_cannot_be_pooled(){
-        let mut m=fixture();
-        m.observations[1].design.test_level=TestLevel::SymmetricCell;
-        m.observations[1].mass_inventory=None;
+    fn symmetric_and_full_cell_levels_cannot_be_pooled() {
+        let mut m = fixture();
+        m.observations[1].design.test_level = TestLevel::SymmetricCell;
+        m.observations[1].mass_inventory = None;
         assert!(audit_manifest(&m).is_err());
     }
 
     #[test]
     fn false_matched_axis_is_rejected() {
-        let mut m=fixture();
+        let mut m = fixture();
         m.observations[1].design.temperature_c = 45.0;
         assert!(audit_manifest(&m).is_err());
     }
 
     #[test]
     fn missing_matched_axis_is_rejected() {
-        let mut m=fixture();
+        let mut m = fixture();
         m.comparisons[0].matched_axes.pop();
         assert!(audit_manifest(&m).is_err());
     }
 
     #[test]
     fn right_censoring_remains_distinct() {
-        let mut m=fixture();
+        let mut m = fixture();
         m.observations[0].outcome_status = OutcomeStatus::RightCensored;
         m.observations[0].event_cycle = None;
         let r = audit_manifest(&m).expect("right censor valid");
@@ -936,7 +1073,7 @@ mod tests {
 
     #[test]
     fn synthetic_result_cannot_be_promoted_to_physical_eol() {
-        let mut m=fixture();
+        let mut m = fixture();
         m.observations[0].outcome_status = OutcomeStatus::ObservedEol;
         m.observations[0].event_cycle = Some(90);
         assert!(audit_manifest(&m).is_err());
@@ -944,7 +1081,7 @@ mod tests {
 
     #[test]
     fn missing_evidence_admission_is_rejected() {
-        let mut m=fixture();
+        let mut m = fixture();
         m.evidence[0].admission = Admission::Unknown;
         assert!(audit_manifest(&m).is_err());
     }
