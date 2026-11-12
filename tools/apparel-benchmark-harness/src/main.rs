@@ -159,15 +159,13 @@ fn validate_semantics(instance: &Value) -> Result<(), Vec<String>> {
 
     for (index, material) in materials.iter().enumerate() {
         let properties = array(material, "properties");
-        let composition_is_measured =
-            get_str(material, "composition_state") == Some("measured");
+        let composition_is_measured = get_str(material, "composition_state") == Some("measured");
         let measured_composition_has_evidence = properties.iter().any(|property| {
             get_str(property, "property_id") == Some("composition")
                 && get_str(property, "status") == Some("measured")
                 && property.get("value").is_some_and(|value| !value.is_null())
                 && get_str(property, "unit").is_some_and(|value| !value.trim().is_empty())
-                && get_str(property, "evidence_ref")
-                    .is_some_and(|value| !value.trim().is_empty())
+                && get_str(property, "evidence_ref").is_some_and(|value| !value.trim().is_empty())
         });
         if composition_is_measured && !measured_composition_has_evidence {
             errors.push(format!(
@@ -178,8 +176,7 @@ fn validate_semantics(instance: &Value) -> Result<(), Vec<String>> {
             if get_str(property, "status") == Some("measured") {
                 if property.get("value").is_none_or(Value::is_null)
                     || get_str(property, "unit").is_none_or(|value| value.trim().is_empty())
-                    || get_str(property, "evidence_ref")
-                        .is_none_or(|value| value.trim().is_empty())
+                    || get_str(property, "evidence_ref").is_none_or(|value| value.trim().is_empty())
                 {
                     errors.push(format!(
                         "materials[{index}].properties[{property_index}]: measured property requires value, unit and evidence_ref"
@@ -403,11 +400,15 @@ fn validate_semantic_corpus(corpus: &Value) -> Result<(usize, usize), Vec<String
         };
         for item in items {
             let Some(id) = item.as_str() else {
-                errors.push(format!("execution_coverage.{field} entries must be strings"));
+                errors.push(format!(
+                    "execution_coverage.{field} entries must be strings"
+                ));
                 continue;
             };
             if !ids.contains(id) {
-                errors.push(format!("execution_coverage.{field} contains unknown case {id}"));
+                errors.push(format!(
+                    "execution_coverage.{field} contains unknown case {id}"
+                ));
             }
             if !declared_coverage.insert(id.to_owned()) {
                 errors.push(format!("execution_coverage duplicates case {id}"));
@@ -750,13 +751,16 @@ mod tests {
         );
     }
 
-
     #[test]
     fn semantic_validator_rejects_duplicate_pattern_piece_ids() {
         let (_, mut instance, _, _) = example_inputs();
         instance["pattern"]["pieces"][1]["piece_id"] = json!("FRONT-L");
         let errors = validate_semantics(&instance).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("duplicate piece_id")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("duplicate piece_id"))
+        );
     }
 
     #[test]
@@ -764,7 +768,11 @@ mod tests {
         let (_, mut instance, _, _) = example_inputs();
         instance["operations"][1]["sequence"] = json!(10);
         let errors = validate_semantics(&instance).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("duplicate operation sequence")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("duplicate operation sequence"))
+        );
     }
 
     #[test]
@@ -772,7 +780,11 @@ mod tests {
         let (_, mut instance, _, _) = example_inputs();
         instance["pattern"]["revision"] = json!("B");
         let errors = validate_semantics(&instance).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("pattern revision")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("pattern revision"))
+        );
     }
 
     #[test]
@@ -782,7 +794,11 @@ mod tests {
         instance["materials"][0]["properties"][0]["value"] = json!(180.0);
         instance["materials"][0]["properties"][0]["unit"] = json!("g/m2");
         let errors = validate_semantics(&instance).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("measured property requires")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("measured property requires"))
+        );
     }
 
     #[test]
@@ -790,7 +806,11 @@ mod tests {
         let (_, mut instance, _, _) = example_inputs();
         instance["materials"][0]["composition_state"] = json!("measured");
         let errors = validate_semantics(&instance).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("measured composition requires")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("measured composition requires"))
+        );
     }
 
     #[test]
@@ -798,7 +818,11 @@ mod tests {
         let (_, mut instance, _, _) = example_inputs();
         instance["claims"][0]["evidence_refs"] = json!(["DOES-NOT-EXIST"]);
         let errors = validate_semantics(&instance).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("unresolved evidence reference")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("unresolved evidence reference"))
+        );
     }
 
     #[test]
@@ -806,7 +830,11 @@ mod tests {
         let (_, mut instance, _, _) = example_inputs();
         instance["bom"][0]["lot_binding"] = json!("bound");
         let errors = validate_semantics(&instance).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("bound lot requires")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("bound lot requires"))
+        );
     }
 
     #[test]
@@ -826,7 +854,11 @@ mod tests {
         instance["claims"][1]["evidence_refs"] = json!(["PROJ-DRAPE-001"]);
         instance["claims"][1]["disposition"] = json!("supported_within_scope");
         let errors = validate_semantics(&instance).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("physical_test claim")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("physical_test claim"))
+        );
     }
 
     #[test]
@@ -836,7 +868,11 @@ mod tests {
             json!("This process is qualified for all sizes and production batches.");
         instance["claims"][0]["disposition"] = json!("supported_within_scope");
         let errors = validate_semantics(&instance).unwrap_err();
-        assert!(errors.iter().any(|error| error.contains("production-wide capability")));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.contains("production-wide capability"))
+        );
     }
 
     #[test]
