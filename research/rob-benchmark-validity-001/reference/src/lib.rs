@@ -253,7 +253,6 @@ pub struct ClusterResult {
     pub critical_safety_regression: bool,
 }
 
-
 /// Exact distribution-free order-statistic interval for the median paired effect.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExactMedianEffectInterval {
@@ -399,7 +398,6 @@ pub fn exact_sign_test(
         significant: left <= right,
     })
 }
-
 
 /// Build a two-sided, distribution-free order-statistic interval for the population median.
 ///
@@ -850,10 +848,7 @@ mod tests {
     #[test]
     fn multiplicity_adjustment_also_widens_or_removes_median_interval() {
         let effects = vec![10, 20, 30, 40, 50, 60, 70, 80];
-        assert_eq!(
-            exact_median_effect_interval(&effects, 3_846).unwrap(),
-            None
-        );
+        assert_eq!(exact_median_effect_interval(&effects, 3_846).unwrap(), None);
     }
 
     #[test]
