@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::{env, fs, process};
 
 const SCHEMA_VERSION: &str = "0.1.0";
@@ -680,16 +680,16 @@ mod tests {
         std::iter::repeat_n(c, 64).collect()
     }
 
-    fn candidate(
-        id: &str,
-        kind: EvidenceKind,
+    struct CandidateTestValues {
         energy: f64,
         ghg: f64,
         duration: f64,
         cost: f64,
         noise_1k: f64,
         uncertainty: f64,
-    ) -> Candidate {
+    }
+
+    fn candidate(id: &str, kind: EvidenceKind, values: CandidateTestValues) -> Candidate {
         Candidate {
             candidate_id: id.to_string(),
             policy_label: format!("policy-{id}"),
@@ -706,19 +706,19 @@ mod tests {
             metrics: CandidateMetrics {
                 delivered_service_tonne_nm: 100_000.0,
                 delivered_service_u95_tonne_nm: 100.0,
-                voyage_duration_hours: duration,
+                voyage_duration_hours: values.duration,
                 voyage_duration_u95_hours: 0.2,
-                primary_energy_kwh_per_tonne_nm: energy,
-                primary_energy_u95_kwh_per_tonne_nm: uncertainty,
-                well_to_wake_ghg_gco2e_per_tonne_nm: ghg,
-                well_to_wake_ghg_u95_gco2e_per_tonne_nm: uncertainty,
-                lifecycle_cost_usd_per_tonne_nm: cost,
-                lifecycle_cost_u95_usd_per_tonne_nm: uncertainty,
+                primary_energy_kwh_per_tonne_nm: values.energy,
+                primary_energy_u95_kwh_per_tonne_nm: values.uncertainty,
+                well_to_wake_ghg_gco2e_per_tonne_nm: values.ghg,
+                well_to_wake_ghg_u95_gco2e_per_tonne_nm: values.uncertainty,
+                lifecycle_cost_usd_per_tonne_nm: values.cost,
+                lifecycle_cost_u95_usd_per_tonne_nm: values.uncertainty,
                 source_levels: vec![
                     SourceLevel {
                         band_id: "one-third-octave-1000hz".to_string(),
                         quantity_id: SOURCE_LEVEL_QUANTITY.to_string(),
-                        source_level_db: noise_1k,
+                        source_level_db: values.noise_1k,
                         expanded_uncertainty_db: 0.2,
                         method_id: "independent-source-level-method".to_string(),
                         evidence_sha256: digest('6'),
@@ -726,7 +726,7 @@ mod tests {
                     SourceLevel {
                         band_id: "one-third-octave-2000hz".to_string(),
                         quantity_id: SOURCE_LEVEL_QUANTITY.to_string(),
-                        source_level_db: noise_1k - 2.0,
+                        source_level_db: values.noise_1k - 2.0,
                         expanded_uncertainty_db: 0.2,
                         method_id: "independent-source-level-method".to_string(),
                         evidence_sha256: digest('7'),
@@ -784,9 +784,15 @@ mod tests {
                 ],
             },
             candidates: vec![
-                candidate("A", EvidenceKind::Synthetic, 0.14, 0.06, 100.0, 0.04, 120.0, 0.001),
-                candidate("B", EvidenceKind::Synthetic, 0.16, 0.05, 105.0, 0.045, 118.0, 0.001),
-                candidate("C", EvidenceKind::Synthetic, 0.18, 0.07, 110.0, 0.048, 125.0, 0.001),
+                candidate("A", EvidenceKind::Synthetic, CandidateTestValues {
+                    energy: 0.14, ghg: 0.06, duration: 100.0, cost: 0.04, noise_1k: 120.0, uncertainty: 0.001,
+                }),
+                candidate("B", EvidenceKind::Synthetic, CandidateTestValues {
+                    energy: 0.16, ghg: 0.05, duration: 105.0, cost: 0.045, noise_1k: 118.0, uncertainty: 0.001,
+                }),
+                candidate("C", EvidenceKind::Synthetic, CandidateTestValues {
+                    energy: 0.18, ghg: 0.07, duration: 110.0, cost: 0.048, noise_1k: 125.0, uncertainty: 0.001,
+                }),
             ],
         }
     }
@@ -959,12 +965,9 @@ mod tests {
         input.candidates[1] = candidate(
             "A-copy",
             EvidenceKind::MeasuredFullScale,
-            0.14,
-            0.06,
-            100.0,
-            0.04,
-            120.0,
-            0.001,
+            CandidateTestValues {
+                energy: 0.14, ghg: 0.06, duration: 100.0, cost: 0.04, noise_1k: 120.0, uncertainty: 0.001,
+            },
         );
         let report = audit(&input);
         assert!(report.feasible_pareto_frontier_candidate_ids.contains(&"A".to_string()));
