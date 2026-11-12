@@ -492,3 +492,65 @@ The machine-readable corpus now spans:
 5. Helion's 2026 manufacturer-described pulsed-inductive recovery architecture.
 
 The source corpus separately includes a derived TMX net-power check (67 W, approximately 48.55% of the rounded 138 W incident figure). This validates arithmetic against the source values only; it does not turn the paper into a modern plant benchmark or independent reproduction.
+
+
+## 9.11 Plasma high-temperature processing and electrified thermal-storage SOTA
+
+### Electrified thermal energy storage review (2026)
+
+Huang et al., *Electrified thermal energy storage*, Nature Reviews Clean Technology 2, 89–106, published 9 January 2026.
+
+- DOI: https://doi.org/10.1038/s44359-025-00131-4
+- The review states that commercially available ETES uses resistive heating with sensible or latent storage; it describes market viability around USD 50/kW but notes low energy density and thermal losses limit many systems to short durations (days/weeks).
+- Emerging non-contact/volumetric microwave and inductive heating are described as faster and capable of very high temperatures (up to 3,000°C in reviewed systems). These are not necessarily plasma technologies.
+- Thermochemical storage may increase duration/energy density but remains lower TRL.
+
+This changes our baseline selection: compare plasma not only with resistance but with microwave and induction heating as independent alternatives. Do not relabel the review's microwave/induction temperature range as a plasma capability.
+
+### Plasma scale-up roadmap (2026)
+
+Attri et al., *Large-Scale Applications of Plasma Technologies: Progresses and Challenges*, High Voltage 11(5), published 30 September 2026.
+
+- DOI: https://doi.org/10.1049/hve2.70241
+- The review identifies four cross-domain deployment constraints: controllability of plasma parameters and discharge modes during scale-up; **grid-to-outcome** system energy efficiency; long-term reliability/maintainability; and outcome-relevant diagnostics/harmonized benchmarking.
+- It specifically warns that high plasma-to-chemistry or plasma-to-heat efficiency does not guarantee grid-to-outcome efficiency once power conversion, coupling, cooling, feed, separation and other auxiliaries are included.
+
+This is a useful top-level comparator for the Luminous evidence architecture: every plasma lane should measure from grid input to the actual industrial outcome, rather than stop at reactor or torch terminals.
+
+### Microwave-plasma pilot furnace for MgO refractories (2025)
+
+Oppelt et al., *Thermal treatment of MgO refractories in a pilot furnace heated with microwave plasma burner*, Journal of the European Ceramic Society, May 2025.
+
+- DOI: https://doi.org/10.1016/j.jeurceramsoc.2024.117146
+- A microwave plasma burner heats air as a process gas, which is then blown into a pilot furnace and transfers energy to MgO refractory specimens.
+- The study compares MWP treatment with a conventional electric resistance furnace and combinations of the two.
+- It reports no adverse effects on density, microstructure or flexural strength and no phase-composition change in the specimens studied.
+
+This is a physical pilot-process reference for plasma-assisted refractory treatment. It is not a thermal battery efficiency result. Its value for our programme is the possibility of plasma as a high-temperature gas/heat-transfer process in an existing furnace architecture; its missing wall-plug and furnace heat balance is part of the benchmark opportunity.
+
+### Microwave-induced plasma firing versus resistance and gas firing (2026)
+
+Schneider et al., *Comparative effects of microwave-induced plasma and conventional firing on the properties of silicate ceramics: A statistical and validated study*, Ceramics International, available online 30 July 2026.
+
+- DOI: https://doi.org/10.1016/j.ceramint.2026.07.435
+- The study uses a 2.45 GHz / 6 kW microwave-induced plasma burner at 1,000°C and compares natural gas, electric resistance and plasma firing with a two-factor design (dried or pre-fired specimens).
+- For dried samples, reported MWP results are comparable to resistance for water absorption (21.21% vs 21.25%), Young's modulus (20.05 vs 21.34 GPa) and biaxial strength (30.38 vs 32.94 MPa); the study reports higher modulus and strength for gas/reference firing in this specimen condition.
+- For pre-fired specimens, MWP has the highest reported biaxial strength of the compared pre-fired groups (36.73 MPa).
+
+This is a useful controlled material-quality comparison, but it does **not** establish wall-plug energy efficiency, throughput superiority or storage performance. Specimen history, firing atmosphere and thermal profile must remain matched/stratified; material properties cannot stand in for an energy balance.
+
+### Benchmark implication
+
+The first physical thermal-store/heat-treatment comparison should include at least:
+- resistance/Joule heating;
+- microwave heating without plasma where applicable;
+- induction heating where the store/material supports it;
+- microwave-plasma burner heating.
+
+Freeze material batch, geometry, mass, moisture/pre-firing history, target temperature profile, hold/discharge duty, atmosphere and outlet service. Meter grid-side electricity, generator/rectifier/magnetron and matching losses, auxiliaries, process-gas heating, cooling, fan/pump loads, furnace/store energy change, hold loss and useful delivered heat. Include material quality and lifetime as separate outcome axes.
+
+The new source cases are in the machine-readable register as:
+- HTTES-ELECTRIFIED-TES-REVIEW-2026;
+- PLASMA-SCALEUP-ROADMAP-2026;
+- PLASMA-MW-MGO-REFRACTORY-PILOT-2025;
+- PLASMA-MW-CERAMIC-FIRING-2026.
