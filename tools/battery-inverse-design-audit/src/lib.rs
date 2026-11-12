@@ -21,7 +21,7 @@ pub struct Scenario {
     pub id: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EvidenceClass {
     SyntheticFixture,
     Assumption,
@@ -40,6 +40,24 @@ impl EvidenceClass {
             Self::PhysicalMeasurement | Self::IndependentLaboratory
         )
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum EvidenceAdmission {
+    Candidate,
+    AdmittedForResearch,
+    AdmittedForEvaluation,
+    Blocked,
+    Unknown,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EvidenceRecord {
+    pub evidence_id: String,
+    pub source_sha256: String,
+    pub claim_scope: String,
+    pub validity_domain: String,
+    pub admission: EvidenceAdmission,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -66,7 +84,6 @@ pub struct HardGate {
     pub gate_id: String,
     pub disposition: GateDisposition,
     pub evidence_id: String,
-    pub evidence_class: EvidenceClass,
     pub requires_physical_evidence: bool,
 }
 
@@ -84,6 +101,8 @@ pub enum RejectionReason {
     GateFailed(String),
     GateUnknown(String),
     GateEvidenceNotPhysical(String),
+    GateEvidenceNotAdmitted(String),
+    MetricEvidenceNotAdmitted(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -138,11 +157,61 @@ fn validate_unique_nonempty<'a>(
     Ok(())
 }
 
+fn validate_sha256(value: &str, label: &str) -> Result<(), AuditError> {
+    if value.len() != 64
+        || !value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    {
+        return Err(AuditError(format!(
+            "{label} must be a lowercase 64-character SHA-256 digest"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_evidence_registry(
+    evidence: &[EvidenceRecord],
+) -> Result<BTreeMap<&str, &EvidenceRecord>, AuditError> {
+    if evidence.is_empty() {
+        return Err(AuditError("at least one evidence record is required".into()));
+    }
+
+    validate_unique_nonempty(
+        evidence.iter().map(|record| record.evidence_id.as_str()),
+        "evidence ID",
+    )?;
+
+    let mut records = BTreeMap::new();
+    for record in evidence {
+        validate_sha256(&record.source_sha256, "evidence source digest")?;
+        if record.claim_scope.trim().is_empty() || record.validity_domain.trim().is_empty() {
+            return Err(AuditError(format!(
+                "evidence {} has an empty claim scope or validity domain",
+                record.evidence_id
+            )));
+        }
+        records.insert(record.evidence_id.as_str(), record);
+    }
+    Ok(records)
+}
+
+fn require_evidence<'a>(
+    records: &'a BTreeMap<&str, &'a EvidenceRecord>,
+    evidence_id: &str,
+    owner: &str,
+) -> Result<&'a EvidenceRecord, AuditError> {
+    records.get(evidence_id).copied().ok_or_else(|| {
+        AuditError(format!("{owner} references unknown evidence ID {evidence_id}"))
+    })
+}
+
 fn validate_manifest(
     scenarios: &[Scenario],
     objectives: &[Objective],
+    evidence: &[EvidenceRecord],
     candidates: &[Candidate],
-) -> Result<(), AuditError> {
+) -> Result<BTreeMap<&str, &EvidenceRecord>, AuditError> {
     if scenarios.is_empty() {
         return Err(AuditError("at least one scenario is required".into()));
     }
@@ -167,6 +236,8 @@ fn validate_manifest(
         candidates.iter().map(|candidate| candidate.id.as_str()),
         "candidate ID",
     )?;
+
+    let evidence_by_id = validate_evidence_registry(evidence)?;
 
     for objective in objectives {
         if objective.unit.trim().is_empty() || objective.boundary.trim().is_empty() {
@@ -274,30 +345,44 @@ fn validate_manifest(
                     )));
                 }
 
-                if observation.evidence_id.trim().is_empty() {
-                    return Err(AuditError(format!(
-                        "candidate {} objective {} has no evidence reference",
-                        candidate.id, objective.id
-                    )));
-                }
+                require_evidence(
+                    &evidence_by_id,
+                    &observation.evidence_id,
+                    &format!("candidate {} objective {}", candidate.id, objective.id),
+                )?;
             }
         }
 
         for gate in &candidate.hard_gates {
-            if gate.evidence_id.trim().is_empty() {
-                return Err(AuditError(format!(
-                    "candidate {} gate {} has no evidence reference",
-                    candidate.id, gate.gate_id
-                )));
-            }
+            require_evidence(
+                &evidence_by_id,
+                &gate.evidence_id,
+                &format!("candidate {} gate {}", candidate.id, gate.gate_id),
+            )?;
         }
     }
 
-    Ok(())
+    Ok(evidence_by_id)
 }
 
-fn rejection_reasons(candidate: &Candidate) -> Vec<RejectionReason> {
+fn rejection_reasons(
+    candidate: &Candidate,
+    evidence_by_id: &BTreeMap<&str, &EvidenceRecord>,
+) -> Vec<RejectionReason> {
     let mut reasons = Vec::new();
+
+    for observations in candidate.scenario_metrics.values() {
+        for observation in observations {
+            let record = evidence_by_id
+                .get(observation.evidence_id.as_str())
+                .expect("validated evidence references remain present");
+            if record.admission != EvidenceAdmission::AdmittedForEvaluation {
+                reasons.push(RejectionReason::MetricEvidenceNotAdmitted(
+                    observation.objective_id.clone(),
+                ));
+            }
+        }
+    }
 
     if candidate.hard_gates.is_empty() {
         reasons.push(RejectionReason::MissingHardGates);
@@ -315,7 +400,15 @@ fn rejection_reasons(candidate: &Candidate) -> Vec<RejectionReason> {
             }
         }
 
-        if gate.requires_physical_evidence && !gate.evidence_class.is_physical() {
+        let record = evidence_by_id
+            .get(gate.evidence_id.as_str())
+            .expect("validated gate evidence references remain present");
+        if record.admission != EvidenceAdmission::AdmittedForEvaluation {
+            reasons.push(RejectionReason::GateEvidenceNotAdmitted(
+                gate.gate_id.clone(),
+            ));
+        }
+        if gate.requires_physical_evidence && !record.evidence_class.is_physical() {
             reasons.push(RejectionReason::GateEvidenceNotPhysical(
                 gate.gate_id.clone(),
             ));
@@ -421,16 +514,17 @@ fn dominates(
 pub fn audit_design_portfolio(
     scenarios: &[Scenario],
     objectives: &[Objective],
+    evidence: &[EvidenceRecord],
     candidates: &[Candidate],
 ) -> Result<AuditReport, AuditError> {
-    validate_manifest(scenarios, objectives, candidates)?;
+    let evidence_by_id = validate_manifest(scenarios, objectives, evidence, candidates)?;
 
     let mut eligible_candidate_ids = Vec::new();
     let mut rejected = Vec::new();
     let mut scores = Vec::new();
 
     for candidate in candidates {
-        let reasons = rejection_reasons(candidate);
+        let reasons = rejection_reasons(candidate, &evidence_by_id);
 
         if !reasons.is_empty() {
             rejected.push(CandidateRejection {
@@ -535,6 +629,7 @@ fn risk_is_admissible(candidate: &RiskClass, maximum: &RiskClass) -> bool {
 /// ranking. It is not a Bayesian VOI estimate and must not be represented as one.
 pub fn select_experiment(
     options: &[ExperimentOption],
+    evidence: &[EvidenceRecord],
     budget: &ExperimentBudget,
 ) -> Result<ExperimentSelection, AuditError> {
     for (label, value) in [
@@ -551,6 +646,7 @@ pub fn select_experiment(
         options.iter().map(|option| option.id.as_str()),
         "experiment ID",
     )?;
+    let evidence_by_id = validate_evidence_registry(evidence)?;
 
     let mut eligible: Vec<(f64, &ExperimentOption)> = Vec::new();
 
@@ -567,11 +663,13 @@ pub fn select_experiment(
             )));
         }
 
-        if option.estimate_evidence_id.trim().is_empty() {
-            return Err(AuditError(format!(
-                "experiment {} has no estimate evidence reference",
-                option.id
-            )));
+        let estimate_record = require_evidence(
+            &evidence_by_id,
+            &option.estimate_evidence_id,
+            &format!("experiment {} estimate", option.id),
+        )?;
+        if estimate_record.admission != EvidenceAdmission::AdmittedForEvaluation {
+            continue;
         }
 
         if option.estimated_cost > budget.max_cost
