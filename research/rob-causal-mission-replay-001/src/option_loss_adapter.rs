@@ -719,6 +719,8 @@ mod tests {
     fn missing_physical_transition_remains_unknown() {
         let mut mission = trace();
         mission.physical_transitions.clear();
+        mission.terminal.as_mut().unwrap().reserve_state_digest =
+            mission.scope.initial_reserve_state_digest.clone();
         assert_eq!(
             replay_option_loss_receipt(&mission, &receipt()).disposition,
             OptionLedgerReplayDisposition::Unknown
