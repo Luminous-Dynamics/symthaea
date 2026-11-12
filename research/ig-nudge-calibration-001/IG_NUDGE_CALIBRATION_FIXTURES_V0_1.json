@@ -433,7 +433,7 @@
         "policy_class": "require_verification",
         "action": "REQUIRE_VERIFICATION",
         "baseline_regret": 4,
-        "decision_regret": 0
+        "decision_regret": null
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -865,7 +865,7 @@
         "policy_class": "require_verification",
         "action": "REQUIRE_VERIFICATION",
         "baseline_regret": 4,
-        "decision_regret": 0
+        "decision_regret": null
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -1297,7 +1297,7 @@
         "policy_class": "require_verification",
         "action": "REQUIRE_VERIFICATION",
         "baseline_regret": 0,
-        "decision_regret": 0
+        "decision_regret": null
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -1729,7 +1729,7 @@
         "policy_class": "require_verification",
         "action": "REQUIRE_VERIFICATION",
         "baseline_regret": 0,
-        "decision_regret": 0
+        "decision_regret": null
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -2161,7 +2161,7 @@
         "policy_class": "require_verification",
         "action": "REQUIRE_VERIFICATION",
         "baseline_regret": 0,
-        "decision_regret": 0
+        "decision_regret": null
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     },
@@ -2593,7 +2593,7 @@
         "policy_class": "require_verification",
         "action": "REQUIRE_VERIFICATION",
         "baseline_regret": 6,
-        "decision_regret": 0
+        "decision_regret": null
       },
       "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
     }
