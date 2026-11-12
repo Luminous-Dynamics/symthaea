@@ -19,6 +19,15 @@ The synthetic fixture is intentionally rejected as measured validation. Exit cod
 - 4: measured full-scale comparison falls outside the propagated uncertainty interval;
 - 64: invocation, file or JSON decoding failure.
 
+## Measurement qualification
+
+Background handling follows ITTC Rev.03 §2.5.3 per spectral band:
+- below 3 dB signal/background margin: background-dominated; do not scale the band;
+- 3 dB through 10 dB inclusive: subtract background in the linear-energy domain;
+- above 10 dB: no background correction is required.
+
+Each model-scale run declares a background measurement method (bare hub or pressure-suppressed) and a separate background raw-trace digest. Unknown methods and malformed trace provenance block comparison. Uncertainty endpoint propagation reapplies these thresholds; when the lower signal/background margin becomes unusable, the predicted interval remains unresolved instead of silently treating that band as valid.
+
 ## Implemented arithmetic
 
 - ITTC 7.5-02-03-03.9 (2024, Revision 03), Eq. 15: frequency mapping.
