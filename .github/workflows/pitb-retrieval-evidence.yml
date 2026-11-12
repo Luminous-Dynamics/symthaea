@@ -6,7 +6,6 @@ on:
     paths:
       - "tools/pitb-retrieval-evidence/**"
       - "tools/pitb-graph-evidence/**"
-      - ".github/workflows/pitb-retrieval-evidence.yml"
   workflow_dispatch:
 
 permissions:
