@@ -139,6 +139,8 @@ pub struct RotorDeclaration {
     pub rotation_direction: RotationDirection,
     pub phase_channel_id: String,
     pub speed_channel_id: String,
+    pub thrust_channel_id: String,
+    pub torque_channel_id: String,
 }
 
 /// Synchronized aerodynamic operating point for one declared rotor.
@@ -154,7 +156,7 @@ pub struct RotorOperatingPoint {
 }
 
 /// Measured environmental conditions associated with this run.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct AcousticEnvironment {
     pub air_density_kg_m3: f64,
     pub static_pressure_pa: f64,
@@ -162,6 +164,7 @@ pub struct AcousticEnvironment {
     pub relative_humidity_fraction: f64,
     pub free_stream_speed_m_s: f64,
     pub turbulence_intensity_fraction: f64,
+    pub evidence_digest: String,
 }
 
 /// Complete metadata bundle for one acoustic measurement run.
@@ -189,6 +192,7 @@ pub enum AcousticValidationError {
     DuplicateRotorOperatingPoint,
     MissingChannels,
     MissingMicrophoneArray,
+    MissingRotors,
     MicrophoneArrayTooSmall(String),
     MissingMicrophonePosition(String),
     UnexpectedMicrophonePosition(String),
@@ -230,7 +234,7 @@ pub fn validate_bundle(
 ) -> Result<AcousticValidationSummary, Vec<AcousticValidationError>> {
     let mut errors = Vec::new();
     validate_manifest(&bundle.manifest, &mut errors);
-    validate_environment(bundle.environment, &mut errors);
+    validate_environment(&bundle.environment, &mut errors);
 
     if bundle.channels.is_empty() {
         errors.push(AcousticValidationError::MissingChannels);
@@ -251,7 +255,7 @@ pub fn validate_bundle(
 
         validate_channel(channel, &bundle.manifest, &mut errors);
 
-        if matches!(channel.kind, ChannelKind::Microphone { .. }) {
+        if matches!(&channel.kind, ChannelKind::Microphone { .. }) {
             microphone_channel_ids.insert(channel.channel_id.as_str());
         }
     }
@@ -327,6 +331,10 @@ pub fn validate_bundle(
         }
     }
 
+    if bundle.rotors.is_empty() {
+        errors.push(AcousticValidationError::MissingRotors);
+    }
+
     validate_rotors(
         bundle,
         &channels_by_id,
@@ -334,12 +342,15 @@ pub fn validate_bundle(
     );
 
     if errors.is_empty() {
-        let duration = bundle
+        let duration = match bundle
             .manifest
             .analysis_end_time_ns
             .checked_sub(bundle.manifest.analysis_start_time_ns)
             .and_then(|value| u64::try_from(value).ok())
-            .unwrap_or(0);
+        {
+            Some(value) => value,
+            None => return Err(vec![AcousticValidationError::InvalidAnalysisWindow]),
+        };
 
         Ok(AcousticValidationSummary {
             model_version: MODEL_VERSION,
@@ -384,7 +395,12 @@ fn validate_manifest(
         }
     }
 
-    if manifest.analysis_start_time_ns >= manifest.analysis_end_time_ns {
+    if manifest.analysis_start_time_ns >= manifest.analysis_end_time_ns
+        || manifest
+            .analysis_end_time_ns
+            .checked_sub(manifest.analysis_start_time_ns)
+            .is_none()
+    {
         errors.push(AcousticValidationError::InvalidAnalysisWindow);
     }
     if manifest.maximum_clock_uncertainty_ns == 0
@@ -433,8 +449,8 @@ fn validate_channel(
     let clock_budget = channel
         .clock_offset_to_reference_ns
         .unsigned_abs()
-        .saturating_add(channel.clock_uncertainty_ns);
-    if clock_budget > manifest.maximum_channel_skew_ns {
+        .checked_add(channel.clock_uncertainty_ns);
+    if clock_budget.is_none_or(|value| value > manifest.maximum_channel_skew_ns) {
         errors.push(AcousticValidationError::ChannelSkewExceeded(
             channel.channel_id.clone(),
         ));
@@ -632,9 +648,14 @@ fn valid_rotor_operating_point(point: &RotorOperatingPoint) -> bool {
 }
 
 fn validate_environment(
-    environment: AcousticEnvironment,
+    environment: &AcousticEnvironment,
     errors: &mut Vec<AcousticValidationError>,
 ) {
+    if !is_sha256_digest(&environment.evidence_digest) {
+        errors.push(AcousticValidationError::InvalidSha256Digest(
+            "environment evidence_digest",
+        ));
+    }
     if !environment.air_density_kg_m3.is_finite()
         || environment.air_density_kg_m3 <= 0.0
     {
@@ -748,6 +769,40 @@ mod tests {
                     sample_count: 10_001,
                 },
                 AcousticChannel {
+                    channel_id: "rotor-thrust-01".to_owned(),
+                    kind: ChannelKind::RotorThrust {
+                        rotor_id: "rotor-01".to_owned(),
+                    },
+                    unit: ChannelUnit::Newton,
+                    calibration_id: "thrust-cal-01".to_owned(),
+                    calibration_certificate_digest: digest('a'),
+                    raw_data_digest: digest('b'),
+                    clock_source_id: "clock-tai-01".to_owned(),
+                    clock_offset_to_reference_ns: 0,
+                    clock_uncertainty_ns: 50,
+                    start_time_ns: 0,
+                    end_time_ns: 1_000_000_000,
+                    sample_rate_hz: 1_000.0,
+                    sample_count: 1_001,
+                },
+                AcousticChannel {
+                    channel_id: "rotor-torque-01".to_owned(),
+                    kind: ChannelKind::RotorTorque {
+                        rotor_id: "rotor-01".to_owned(),
+                    },
+                    unit: ChannelUnit::NewtonMetre,
+                    calibration_id: "torque-cal-01".to_owned(),
+                    calibration_certificate_digest: digest('c'),
+                    raw_data_digest: digest('d'),
+                    clock_source_id: "clock-tai-01".to_owned(),
+                    clock_offset_to_reference_ns: 0,
+                    clock_uncertainty_ns: 50,
+                    start_time_ns: 0,
+                    end_time_ns: 1_000_000_000,
+                    sample_rate_hz: 1_000.0,
+                    sample_count: 1_001,
+                },
+                AcousticChannel {
                     channel_id: "rotor-speed-01".to_owned(),
                     kind: ChannelKind::RotorSpeed {
                         rotor_id: "rotor-01".to_owned(),
@@ -801,6 +856,8 @@ mod tests {
                 rotation_direction: RotationDirection::Clockwise,
                 phase_channel_id: "rotor-phase-01".to_owned(),
                 speed_channel_id: "rotor-speed-01".to_owned(),
+                thrust_channel_id: "rotor-thrust-01".to_owned(),
+                torque_channel_id: "rotor-torque-01".to_owned(),
             }],
             rotor_operating_points: vec![RotorOperatingPoint {
                 rotor_id: "rotor-01".to_owned(),
@@ -817,6 +874,7 @@ mod tests {
                 relative_humidity_fraction: 0.45,
                 free_stream_speed_m_s: 0.0,
                 turbulence_intensity_fraction: 0.01,
+                evidence_digest: digest('e'),
             },
         }
     }
@@ -824,7 +882,7 @@ mod tests {
     #[test]
     fn complete_synthetic_bundle_validates_and_reports_counts() {
         let summary = validate_bundle(&bundle()).unwrap();
-        assert_eq!(summary.channel_count, 4);
+        assert_eq!(summary.channel_count, 6);
         assert_eq!(summary.microphone_count, 2);
         assert_eq!(summary.microphone_array_count, 1);
         assert_eq!(summary.rotor_count, 1);
