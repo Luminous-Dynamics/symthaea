@@ -10,7 +10,6 @@
     "independently_reviewed": false
   },
   "operating_condition_id": "synthetic-J0.8-sigma-nD1",
-  "operating_condition_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
   "environment_fingerprint_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
   "hydrophone_instrument_id": "synthetic-hydrophone-H1",
   "calibration_certificate_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
@@ -233,5 +232,6 @@
         }
       ]
     }
-  ]
+  ],
+  "service_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
 }
