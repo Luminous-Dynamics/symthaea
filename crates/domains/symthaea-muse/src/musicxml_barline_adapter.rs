@@ -338,7 +338,10 @@ pub struct MusicXmlSignpostV1 {
 pub struct MusicXmlRepeatV1 {
     pub direction: Option<String>,
     pub times: Option<String>,
+    pub after_jump: Option<String>,
     pub winged: Option<String>,
+    /// Attributes introduced by a future MusicXML version or extension.
+    pub unrecognized_attributes: Vec<(String, String)>,
 }
 
 /// Explicit numbered-ending semantics retained from a MusicXML barline.
@@ -401,12 +404,30 @@ pub struct MusicXmlBarlineAnnotationV1 {
     pub text: Option<String>,
 }
 
+/// Source playback directive retained separately from notation barlines.
+///
+/// V1 records MusicXML sound and time-only controls but does not interpret
+/// DC/DS/coda/volta routing. Consumers must not infer that a captured control
+/// has already been applied to an expanded traversal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MusicXmlPlaybackControlV1 {
+    pub source_order: usize,
+    pub measure_index: usize,
+    pub source_measure_number: String,
+    pub element: String,
+    pub source_id: Option<String>,
+    pub attributes: Vec<(String, String)>,
+    pub text: Option<String>,
+}
+
+/// Complete measure map, typed barline events and playback controls for a part.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlPartNotationGraphV1 {
     pub part_id: String,
     pub map: MeasureMap,
     pub non_controlling_measure_indices: Vec<usize>,
     pub barline_events: Vec<MusicXmlPartBarlineEventV1>,
+    pub playback_controls: Vec<MusicXmlPlaybackControlV1>,
 }
 
 /// Parse score-partwise into exact per-part measure maps plus typed barline
@@ -476,6 +497,8 @@ pub fn parse_musicxml_part_notation_graph(
                     &measures,
                     &spans,
                 )?;
+                let playback_controls =
+                    parse_playback_controls_for_part(part, part_id);
                 let map = MeasureMap {
                     source_id: format!("{source_id}#part={part_id}"),
                     score_clock_id: score_clock_id.to_string(),
@@ -493,6 +516,7 @@ pub fn parse_musicxml_part_notation_graph(
                     map,
                     non_controlling_measure_indices,
                     barline_events,
+                    playback_controls,
                 });
             }
             Some(_) => output.push(MusicXmlPartNotationGraphV1 {
@@ -508,6 +532,7 @@ pub fn parse_musicxml_part_notation_graph(
                 },
                 non_controlling_measure_indices: Vec::new(),
                 barline_events: Vec::new(),
+                playback_controls: Vec::new(),
             }),
             None => output.push(MusicXmlPartNotationGraphV1 {
                 part_id: part_id.to_string(),
@@ -522,6 +547,7 @@ pub fn parse_musicxml_part_notation_graph(
                 },
                 non_controlling_measure_indices: Vec::new(),
                 barline_events: Vec::new(),
+                playback_controls: Vec::new(),
             }),
         }
     }
@@ -551,6 +577,86 @@ pub fn validate_musicxml_notation_graph_replay(
 ) -> Result<bool, MusicXmlMeasureAdapterError> {
     let replayed = parse_musicxml_part_notation_graph(bytes, source_id, score_clock_id)?;
     Ok(replayed == supplied)
+}
+
+
+/// Preserve score-level playback directives that are not barline events.
+///
+/// This includes <sound> controls (including implicit forward repeats and
+/// D.C./D.S./coda/fine routing) and selective time-only attributes on notes,
+/// lyrics, ties and other MusicXML descendants. The traversal engine decides
+/// which of these it can interpret; the parser never silently drops them.
+fn parse_playback_controls_for_part(
+    part: roxmltree::Node<'_, '_>,
+    _part_id: &str,
+) -> Vec<MusicXmlPlaybackControlV1> {
+    const PLAYBACK_ATTRIBUTES: [&str; 8] = [
+        "dacapo",
+        "dalsegno",
+        "segno",
+        "coda",
+        "tocoda",
+        "forward-repeat",
+        "fine",
+        "time-only",
+    ];
+
+    let measure_nodes: Vec<_> = part
+        .children()
+        .filter(|node| node.has_tag_name("measure"))
+        .collect();
+    let mut controls = Vec::new();
+    let mut source_order = 0usize;
+    for (measure_index, measure) in measure_nodes.iter().enumerate() {
+        for node in measure.descendants().filter(|node| node.is_element()) {
+            let is_sound = node.has_tag_name("sound");
+            let has_playback_attribute = node
+                .attributes()
+                .any(|attribute| PLAYBACK_ATTRIBUTES.contains(&attribute.name()));
+            if !is_sound && !has_playback_attribute {
+                continue;
+            }
+
+            let mut path = Vec::new();
+            let mut current = Some(node);
+            while let Some(ancestor) = current {
+                if ancestor == *measure {
+                    path.push("measure".to_string());
+                    break;
+                }
+                if ancestor.is_element() {
+                    path.push(ancestor.tag_name().name().to_string());
+                }
+                current = ancestor.parent();
+            }
+            path.reverse();
+            let element = if path.is_empty() {
+                node.tag_name().name().to_string()
+            } else {
+                path.join("/")
+            };
+            controls.push(MusicXmlPlaybackControlV1 {
+                source_order,
+                measure_index,
+                source_measure_number: measure.attribute("number").unwrap_or("").to_string(),
+                element,
+                source_id: node.attribute("id").map(str::to_string),
+                attributes: node
+                    .attributes()
+                    .map(|attribute| (
+                        attribute.name().to_string(),
+                        attribute.value().to_string(),
+                    ))
+                    .collect(),
+                text: node
+                    .text()
+                    .map(|value| value.trim().to_string())
+                    .filter(|value| !value.is_empty()),
+            });
+            source_order = source_order.saturating_add(1);
+        }
+    }
+    controls
 }
 
 fn parse_barline_events_for_part(
@@ -653,10 +759,22 @@ fn parse_barline_events_for_part(
                     .checked_add(measure_offset)
                     .map_err(|_| MusicXmlMeasureAdapterError::ArithmeticOverflow)?;
                 let repeat_node = element.children().find(|node| node.has_tag_name("repeat"));
-                let repeat = repeat_node.map(|node| MusicXmlRepeatV1 {
-                    direction: node.attribute("direction").map(str::to_string),
-                    times: node.attribute("times").map(str::to_string),
-                    winged: node.attribute("winged").map(str::to_string),
+                let repeat = repeat_node.map(|node| {
+                    let known_attributes = ["direction", "times", "after-jump", "winged"];
+                    MusicXmlRepeatV1 {
+                        direction: node.attribute("direction").map(str::to_string),
+                        times: node.attribute("times").map(str::to_string),
+                        after_jump: node.attribute("after-jump").map(str::to_string),
+                        winged: node.attribute("winged").map(str::to_string),
+                        unrecognized_attributes: node
+                            .attributes()
+                            .filter(|attribute| !known_attributes.contains(&attribute.name()))
+                            .map(|attribute| (
+                                attribute.name().to_string(),
+                                attribute.value().to_string(),
+                            ))
+                            .collect(),
+                    }
                 });
                 let ending_node = element.children().find(|node| node.has_tag_name("ending"));
                 let ending = ending_node.map(|node| MusicXmlEndingV1 {
@@ -1682,6 +1800,49 @@ mod tests {
         assert!(event.coda.is_some());
         assert_eq!(event.segno.as_ref().unwrap().identifier, None);
         assert_eq!(event.coda.as_ref().unwrap().identifier, None);
+    }
+
+
+    #[test]
+    fn repeat_after_jump_and_unknown_repeat_attributes_are_preserved() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><rest/><duration>16</duration></note>
+            <barline location="right">
+                <repeat direction="backward" times="2" after-jump="yes" future-mode="x"/>
+            </barline>
+        </measure></part></score-partwise>"#;
+        let graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "sha256:after-jump", "score-clock"
+        ).unwrap();
+        let repeat = graph[0].barline_events[0].repeat.as_ref().unwrap();
+        assert_eq!(repeat.after_jump.as_deref(), Some("yes"));
+        assert_eq!(
+            repeat.unrecognized_attributes,
+            vec![("future-mode".into(), "x".into())]
+        );
+    }
+
+    #[test]
+    fn score_level_sound_and_time_only_navigation_controls_are_preserved() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <direction><sound dacapo="yes" segno="S1" time-only="1"/></direction>
+            <note time-only="2"><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration>
+                <lyric time-only="1"><syllabic>single</syllabic><text>la</text></lyric>
+            </note>
+        </measure></part></score-partwise>"#;
+        let graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "sha256:sound-controls", "score-clock"
+        ).unwrap();
+        assert_eq!(graph[0].playback_controls.len(), 4);
+        assert_eq!(graph[0].playback_controls[0].element, "measure/direction/sound");
+        assert!(graph[0].playback_controls[0].attributes.iter().any(
+            |(name, value)| name == "dacapo" && value == "yes"
+        ));
+        assert_eq!(graph[0].playback_controls[1].element, "measure/direction/sound");
+        assert_eq!(graph[0].playback_controls[2].element, "measure/note");
+        assert_eq!(graph[0].playback_controls[3].element, "measure/note/lyric");
     }
 
 }
