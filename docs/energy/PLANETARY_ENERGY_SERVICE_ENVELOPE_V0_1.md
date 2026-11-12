@@ -393,9 +393,11 @@ The most defensible path beyond the current field is not to claim a universal pa
 
 A candidate is competitive only when it beats strong baselines on held-out scenarios and retains the hard physical/evidence constraints. A synthetic fixture or a source audit cannot establish these outcomes.
 
-## 14. Runner-independent audit command
+## 14. Runner-independent audit commands
 
-The first executable slice audits the inverse-square orbit-reference corpus only:
+### 14.1 Orbit reference audit
+
+The orbit command checks the analytic inverse-square screening corpus:
 
 ```bash
 cargo run -p xtask -- planetary-energy-audit
@@ -409,10 +411,40 @@ cargo run -p xtask -- planetary-energy-audit \
   --out reports/planetary-energy/orbit-reference-audit.json
 ```
 
+It refuses malformed schemas, unknown fields, invalid distances/units, duplicate identities, evidence-class promotion and values outside the declared rounding tolerance.
+
+### 14.2 Time-indexed service-envelope audit
+
+The service command evaluates synthetic upstream capability receipts against a frozen mission contract:
+
+```bash
+cargo run -p xtask -- planetary-service-audit
+```
+
+To write its machine-readable report:
+
+```bash
+cargo run -p xtask -- planetary-service-audit \
+  --input benchmarks/planetary-energy-service/v0.1/service-envelope-cases.json \
+  --out reports/planetary-energy/service-envelope-audit.json
+```
+
+The service evaluator checks complete time coverage, interval identity, electric energy after protected reserve, peak electric power, useful thermal energy, peak thermal power and required delivery temperature. It distinguishes:
+- `PASS_SYNTHETIC_SERVICE`: all declared interval services meet the synthetic contract;
+- `INFEASIBLE`: at least one known delivery quantity is insufficient;
+- `BLOCKED_UNKNOWN`: required capability or time coverage is missing;
+- `INVALID`: malformed identity, time, value or evidence classification.
+
+It checks declared upstream capability receipts; it does not validate the upstream generation/storage/thermal models or derive their values. This is a join/eligibility checker, not an energy dispatch or thermal solver.
+
+### Tests and claim ceiling
+
 Focused tests are authored under `xtask/src/planetary_energy.rs` and can be run with:
 
 ```bash
 cargo test -p xtask
 ```
 
-The command uses the existing `serde`, `serde_json`, `sha2` and `anyhow` dependencies. It refuses malformed schemas, unknown fields, invalid distances/units, duplicate identities, evidence-class promotion and values outside the declared rounding tolerance. PASS means only that the source corpus is internally consistent with the stated analytic relation. It is not a power-system, solar-array, thermal, storage, site or ISRU validation.
+The orbit and service commands use the existing `serde`, `serde_json`, `sha2` and `anyhow` dependencies. A corpus-level PASS means its expected synthetic/reference dispositions were reproduced; it does not mean all included candidates are feasible. Neither command validates a solar array, power system, battery, radiator, site, material process or ISRU plant.
+
+The service receipt values in the synthetic fixture are deliberately synthetic. Production use must first bind exact source model, configuration, timebase, evidence class, units, uncertainty and capability receipt identity from the upstream owner. A reference to a capability receipt is not proof that the receipt itself is qualified.
