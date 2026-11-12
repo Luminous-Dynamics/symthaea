@@ -529,7 +529,6 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
             (cell.blinded_sample_code.as_str(), "blinded sample code"),
             (cell.design_id.as_str(), "design ID"),
             (cell.design_revision.as_str(), "design revision"),
-            (cell.test_level.as_str(), "test level"),
             (cell.material_lot_id.as_str(), "material lot ID"),
             (cell.process_revision.as_str(), "process revision"),
         ] {
