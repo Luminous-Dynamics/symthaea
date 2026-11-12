@@ -1,0 +1,396 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-robust-operating-policy-v0.1.0.schema.json",
+  "title": "Marine robust propulsion operating policy audit v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "source",
+    "evidence_kind",
+    "rights_status",
+    "independently_reviewed",
+    "scenario",
+    "limits",
+    "candidates"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source": {
+      "$ref": "#/$defs/datasetEvidence"
+    },
+    "evidence_kind": {
+      "enum": [
+        "synthetic",
+        "prediction_only",
+        "measured_full_scale",
+        "independently_validated_transfer"
+      ]
+    },
+    "rights_status": {
+      "enum": [
+        "public_or_permitted",
+        "unknown",
+        "restricted"
+      ]
+    },
+    "independently_reviewed": {
+      "type": "boolean"
+    },
+    "scenario": {
+      "$ref": "#/$defs/serviceScenario"
+    },
+    "limits": {
+      "$ref": "#/$defs/policyLimits"
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "datasetEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "citation",
+        "raw_data_sha256",
+        "rights_decision_reference"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "rights_decision_reference": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "serviceScenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vessel_id",
+        "vessel_configuration_sha256",
+        "scenario_fingerprint_sha256",
+        "propeller_design_id",
+        "propeller_revision",
+        "service_fingerprint_sha256",
+        "environment_fingerprint_sha256",
+        "hull_state_sha256",
+        "route_id",
+        "draft_m",
+        "cargo_mass_tonnes",
+        "delivered_service_tonne_nm",
+        "maximum_delivery_window_hours"
+      ],
+      "properties": {
+        "vessel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vessel_configuration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "scenario_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "propeller_design_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propeller_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "service_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "hull_state_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "route_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "draft_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cargo_mass_tonnes": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "delivered_service_tonne_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maximum_delivery_window_hours": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "policyLimits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_delivered_service_tonne_nm",
+        "maximum_voyage_duration_hours",
+        "maximum_primary_energy_kwh_per_tonne_nm",
+        "maximum_well_to_wake_ghg_gco2e_per_tonne_nm",
+        "maximum_lifecycle_cost_usd_per_tonne_nm",
+        "source_level_limits"
+      ],
+      "properties": {
+        "minimum_delivered_service_tonne_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maximum_voyage_duration_hours": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maximum_primary_energy_kwh_per_tonne_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maximum_well_to_wake_ghg_gco2e_per_tonne_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maximum_lifecycle_cost_usd_per_tonne_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "source_level_limits": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sourceLevelLimit"
+          }
+        }
+      }
+    },
+    "sourceLevelLimit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "band_id",
+        "quantity_id",
+        "maximum_source_level_db"
+      ],
+      "properties": {
+        "band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quantity_id": {
+          "const": "source_level_db_re_1upa_at_1m"
+        },
+        "maximum_source_level_db": {
+          "type": "number"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "policy_label",
+        "operating_point_id",
+        "scenario_fingerprint_sha256",
+        "evidence_kind",
+        "independently_reviewed",
+        "evidence_review_receipt_sha256",
+        "operating_point_receipt_sha256",
+        "raw_measurement_or_validation_sha256",
+        "method_id",
+        "propeller_rpm",
+        "vessel_speed_knots",
+        "metrics"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_point_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "evidence_kind": {
+          "enum": [
+            "synthetic",
+            "prediction_only",
+            "measured_full_scale",
+            "independently_validated_transfer"
+          ]
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        },
+        "evidence_review_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "operating_point_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "raw_measurement_or_validation_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propeller_rpm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "vessel_speed_knots": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "metrics": {
+          "$ref": "#/$defs/candidateMetrics"
+        }
+      }
+    },
+    "candidateMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "delivered_service_tonne_nm",
+        "delivered_service_u95_tonne_nm",
+        "voyage_duration_hours",
+        "voyage_duration_u95_hours",
+        "primary_energy_kwh_per_tonne_nm",
+        "primary_energy_u95_kwh_per_tonne_nm",
+        "well_to_wake_ghg_gco2e_per_tonne_nm",
+        "well_to_wake_ghg_u95_gco2e_per_tonne_nm",
+        "lifecycle_cost_usd_per_tonne_nm",
+        "lifecycle_cost_u95_usd_per_tonne_nm",
+        "source_levels"
+      ],
+      "properties": {
+        "delivered_service_tonne_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "delivered_service_u95_tonne_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "voyage_duration_hours": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "voyage_duration_u95_hours": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "primary_energy_kwh_per_tonne_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "primary_energy_u95_kwh_per_tonne_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "well_to_wake_ghg_gco2e_per_tonne_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "well_to_wake_ghg_u95_gco2e_per_tonne_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "lifecycle_cost_usd_per_tonne_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "lifecycle_cost_u95_usd_per_tonne_nm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "source_levels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/sourceLevel"
+          }
+        }
+      }
+    },
+    "sourceLevel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "band_id",
+        "quantity_id",
+        "source_level_db",
+        "expanded_uncertainty_db",
+        "method_id",
+        "evidence_sha256"
+      ],
+      "properties": {
+        "band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quantity_id": {
+          "const": "source_level_db_re_1upa_at_1m"
+        },
+        "source_level_db": {
+          "type": "number"
+        },
+        "expanded_uncertainty_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  }
+}
