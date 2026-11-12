@@ -337,6 +337,7 @@ fn evaluate_scenario(scenario: &ThermalScenario) -> ScenarioResult {
     let mut total_input_j = 0_u64;
     let mut primary_input_j = 0_u64;
     let mut auxiliary_input_j = 0_u64;
+    let mut auxiliary_meter_count = 0_usize;
     let mut total_meter_count = 0_usize;
 
     for input in &scenario.wall_plug_inputs {
@@ -365,6 +366,7 @@ fn evaluate_scenario(scenario: &ThermalScenario) -> ScenarioResult {
                 primary_input_j = next;
             }
             InputRole::Auxiliary => {
+                auxiliary_meter_count += 1;
                 let Some(next) = auxiliary_input_j.checked_add(energy_j) else {
                     return reject("auxiliary input sum overflow");
                 };
@@ -386,6 +388,11 @@ fn evaluate_scenario(scenario: &ThermalScenario) -> ScenarioResult {
         MeteringMode::NonOverlappingBranchMeters => {
             if total_meter_count != 0 || primary_input_j == 0 {
                 return reject("branch-meter mode requires primary input and forbids TOTAL meters");
+            }
+            if auxiliary_meter_count == 0 {
+                return blocked(
+                    "no auxiliary meter was supplied; absence is not evidence of zero auxiliary energy",
+                );
             }
         }
     }
@@ -787,6 +794,18 @@ mod tests {
         assert_eq!(
             evaluate_comparison(&pair, &scenarios, &results).disposition,
             ComparisonDisposition::NotComparable
+        );
+    }
+
+    #[test]
+    fn absent_auxiliary_meter_is_blocked_even_when_ledger_arithmetic_closes() {
+        let mut scenario = base_scenario();
+        scenario.wall_plug_inputs.retain(|input| input.role != InputRole::Auxiliary);
+        scenario.charge.auxiliary_dissipation_j = 0;
+        scenario.wall_plug_inputs[0].energy_j = Some(3_600_000_000);
+        assert_eq!(
+            evaluate_scenario(&scenario).disposition,
+            ScenarioDisposition::Blocked
         );
     }
 
