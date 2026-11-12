@@ -952,7 +952,7 @@ mod tests {
         let predicted_times = [0.1, 0.6, 5.0, 5.5, 6.0];
         let report = evaluate_beat_grid_v1(
             &prediction(&predicted_times, &[]),
-            &[reference("a", None, &reference, &[])],
+            &[reference("a", None, &reference_times, &[])],
             BeatGridEvaluationConfigV1 {
                 minimum_evaluation_time_ms: Some(5_000),
                 ..Default::default()
