@@ -40,9 +40,9 @@ The source audit requires:
 - a source URL using HTTP(S);
 - an explicit `luminous_reproduction=false` field on every case;
 - an expected disposition for each negative control;
-- every `FUSION_DIRECT_ENERGY_CONVERSION` case has `particle_energy_origin`, `fusion_born_output_observed=false`, and `comparison_status`.
+- every `FUSION_DIRECT_ENERGY_CONVERSION` case has `particle_energy_origin`, `fusion_born_output_demonstrated=false`, and `comparison_status`.
 
-This is metadata integrity only. The DEC-specific gate prevents externally heated plasma recovery or a laboratory fundamental-unit experiment being silently promoted to fusion-born energy recovery. It does not independently check paper contents, reproduce reported values, or establish that a source supports every interpretation in its case description.
+This is metadata integrity only. The DEC-specific gate records that fusion-born electrical output was not demonstrated/attributed in the source case. This does not assert that a physical fusion-born contribution was exactly zero; unknown contributions remain unquantified. It prevents externally heated plasma recovery or a laboratory fundamental-unit experiment being silently promoted to demonstrated fusion-born energy recovery. It does not independently check paper contents, reproduce reported values, or establish that a source supports every interpretation in its case description.
 
 Current frozen input:
 - plasma-energy register: 19 cases / 20 controls, including five direct-energy-conversion cases;
