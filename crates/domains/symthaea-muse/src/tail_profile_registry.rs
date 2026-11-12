@@ -1184,7 +1184,10 @@ mod tests {
     fn calibration_and_qualification_lineage_overlap_rejects() {
         let topology = verify_tail_topology_evidence(&topology(true), &TestSignatureVerifier).unwrap();
         let (cal, mut qual) = splits(&topology, 20);
+        // Replace both Score-event rows so the overlapping lineage remains a
+        // complete Score rather than failing the earlier event-coverage gate.
         qual[0] = cal[0].clone();
+        qual[1] = cal[1].clone();
         assert_eq!(
             build_tail_profile(&cal, &qual, &config()).unwrap_err(),
             TailProfileError::CalibrationQualificationOverlap
