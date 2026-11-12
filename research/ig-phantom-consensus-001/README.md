@@ -50,3 +50,35 @@ The qualifier checks a bounded schema header and explicit structural invariants.
 ## Claim ceiling
 
 A successful synthetic qualification establishes only that these 12 fixture contracts and bounded oracles behave as declared. No LLM agents were executed by this corpus. No PHANTOM-Bench reproduction, human effect, democratic legitimacy, public-opinion simulation or deployment claim is made. Model evaluation requires exact artifact/method review, matched baselines, pinned prompts/models, randomized treatment blocks, multiple seeds, held-out tasks and independent analysis.
+
+## Industry and research crosswalk
+
+This benchmark should be evaluated as an **assurance and measurement layer**, not as a replacement deliberation interface.
+
+- **PHANTOM-Bench (arXiv:2611.08971, 6 November 2026)** is the direct method comparator: isolated private judgments, ambiguous public signals, elicited peer-private estimates, transparency recovery, neutral-text and explicit-vote controls. First reproduce its method and controls where artifacts permit; do not inherit its reported numbers as our baseline.
+- **Misalignment Contagion (COLM 2026)** is the adjacent comparator for persistent public/private stance shifts and communication topology. Compose its causal design through Symthaea #11320 rather than duplicate it.
+- **Polis** is a large-scale opinion-mapping workflow: participants submit short statements and vote agree/disagree/pass; opinion groups are inferred from voting patterns. CivOS should complement such workflows with independent evidence, exposure, authority and outcome records rather than recreate opinion clustering.
+- **Decidim** provides participatory spaces and components including proposals, amendments, votes, meetings, results and an accountability component that links proposals to manually managed implementation results, milestones and progress. CivOS's opportunity is machine-verifiable, bitemporal evidence and independent execution/appeal receipts that can interoperate with these records.
+- **Loomio** provides discussion, polls and proposal templates (sense-check, advice, consent and consensus), with published outcomes and review dates. It is a workflow competitor, not a substitute for the independent qualification layer.
+- **Stanford's Online Deliberation Platform** supplies structured small-group video discussions, speaker queues/time limits, agenda management and abuse prevention; Stanford describes operation across more than 40 languages and 40+ countries as of fall 2026. This is a meaningful participation/facilitation comparator. CivOS should evaluate whether facilitation preserves private voice and epistemic accuracy, not just whether turns are distributed.
+
+Primary product/method references:
+- PHANTOM-Bench: https://arxiv.org/abs/2611.08971
+- Polis overview: https://knowledge-for-policy.ec.europa.eu/participatory-deliberative-democracy/ldi/polis_en
+- Decidim accountability: https://docs.decidim.org/en/develop/admin/components/accountability.html
+- Decidim components: https://docs.decidim.org/en/develop/features/components.html
+- Loomio proposals and polls: https://www.loomio.com/docs/en/user_manual/polls/intro_to_decisions
+- Stanford Online Deliberation Platform: https://deliberation.stanford.edu/tools-resources/online-deliberation-platform
+
+## What "better than SOTA" should mean here
+
+Do not claim superiority from synthetic fixtures or a lower aggregate agreement error. The confirmatory comparison should include:
+
+1. **Exact reproduction:** recreate PHANTOM-Bench's task, signals, stages, prompts, models and scoring wherever the source artifacts and terms permit; publish artifact gaps and any deviations.
+2. **Matched extensions:** add peer-roster integrity, explicit UNKNOWN/ABSTAIN handling, communication-topology and centrality contrasts, evidence-bearing corrections, and separate normative-pluralism tasks.
+3. **Intervention efficacy:** test whether anonymous tally or peer-ledger disclosure repairs peer-belief estimates without exposing the answer key; distinguish improved social inference from answer leakage.
+4. **Safety non-regression:** verify improved social-belief calibration does not reduce warranted evidence updates, increase stubbornness, erase minority positions, or distort confidence calibration.
+5. **Robustness and cost:** report model-family × task × signal × topology strata, multiple seeds, confidence intervals, worst-condition outcomes, token/latency/compute budgets and abstention coverage.
+
+A defensible improvement is a better calibrated estimate of peers' recorded private positions and reduced ambiguity-induced decision degradation **at matched task coverage and compute**, with no loss of evidence responsiveness or normative pluralism. Set numeric effect-size targets only after reproducing the reference and conducting power analysis.
+
