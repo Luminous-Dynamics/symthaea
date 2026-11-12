@@ -51,6 +51,10 @@ pub enum QuantumInformationError {
         value: f64,
         tolerance: f64,
     },
+    InvalidTraceDistance {
+        value: f64,
+        tolerance: f64,
+    },
     InformationIdentityError {
         residual: f64,
         tolerance: f64,
@@ -135,6 +139,10 @@ impl fmt::Display for QuantumInformationError {
             Self::InvalidSquaredCommutator { value, tolerance } => write!(
                 f,
                 "normalized squared commutator {value} is outside [0,2] beyond tolerance {tolerance}"
+            ),
+            Self::InvalidTraceDistance { value, tolerance } => write!(
+                f,
+                "trace distance {value} is outside [0,1] beyond tolerance {tolerance}"
             ),
             Self::InformationIdentityError {
                 residual,
@@ -1900,6 +1908,11 @@ pub struct HaydenPreskillDecouplingSample {
     pub accessible_radiation_entropy_nats: f64,
     pub reference_accessible_radiation_joint_entropy_nats: f64,
     pub reference_accessible_radiation_mutual_information_nats: f64,
+    /// Trace distance 1/2 ||rho_QB' - rho_Q tensor rho_B'||_1, in [0,1].
+    pub decoupling_trace_distance_q_bprime: f64,
+    /// Quantum Pinsker bound sqrt(I(Q:B')/2), with information in nats.
+    pub quantum_pinsker_upper_bound: f64,
+    pub quantum_pinsker_slack: f64,
     /// For a pure Q B' A state, I(Q:B') + I(Q:A) = 2 S(Q).
     pub information_complementarity_residual_nats: f64,
 }
@@ -1966,6 +1979,58 @@ pub fn simulate_small_hayden_preskill_decoupling(
     let reference_accessible_radiation_mutual_information = reference_entropy
         + accessible_radiation_entropy
         - reference_accessible_radiation_joint_entropy;
+    // Measure decoupling directly: D_tr(rho_QB', rho_Q tensor rho_B').
+    // Mutual information is only a relative-entropy diagnostic; this computes
+    // the trace distance from the signed Hermitian spectrum of the difference.
+    let rho_q = DensityMatrix::from_pure_state(&amplitudes, NUMBER_OF_QUBITS, &[0], tolerance)?;
+    let rho_b = DensityMatrix::from_pure_state(&amplitudes, NUMBER_OF_QUBITS, &[2], tolerance)?;
+    let rho_qb = DensityMatrix::from_pure_state(&amplitudes, NUMBER_OF_QUBITS, &[0, 2], tolerance)?;
+    let mut delta_entries = vec![Complex64::new(0.0, 0.0); 16];
+    for q_row in 0..2 {
+        for b_row in 0..2 {
+            for q_column in 0..2 {
+                for b_column in 0..2 {
+                    let row = (q_row << 1) | b_row;
+                    let column = (q_column << 1) | b_column;
+                    let product_entry = rho_q.entries[q_row * 2 + q_column]
+                        * rho_b.entries[b_row * 2 + b_column];
+                    delta_entries[row * 4 + column] =
+                        rho_qb.entries[row * 4 + column] - product_entry;
+                }
+            }
+        }
+    }
+    let delta = DensityMatrix::from_entries(4, delta_entries)?;
+    let delta_hermiticity_residual = delta.hermiticity_residual();
+    if delta_hermiticity_residual > tolerance * 10.0 {
+        return Err(QuantumInformationError::NonHermitian {
+            residual: delta_hermiticity_residual,
+            tolerance: tolerance * 10.0,
+        });
+    }
+    let delta_eigenvalues = hermitian_eigenvalues(&delta, (tolerance * 0.1).max(1e-14))?;
+    let decoupling_trace_distance_q_bprime =
+        0.5 * delta_eigenvalues.iter().map(|value| value.abs()).sum::<f64>();
+    if !decoupling_trace_distance_q_bprime.is_finite()
+        || decoupling_trace_distance_q_bprime < -tolerance
+        || decoupling_trace_distance_q_bprime > 1.0 + tolerance
+    {
+        return Err(QuantumInformationError::InvalidTraceDistance {
+            value: decoupling_trace_distance_q_bprime,
+            tolerance,
+        });
+    }
+    let quantum_pinsker_upper_bound =
+        (0.5 * reference_black_hole_mutual_information.max(0.0)).sqrt();
+    let quantum_pinsker_slack =
+        quantum_pinsker_upper_bound - decoupling_trace_distance_q_bprime;
+    if quantum_pinsker_slack < -tolerance * 10.0 {
+        return Err(QuantumInformationError::InformationIdentityError {
+            residual: -quantum_pinsker_slack,
+            tolerance: tolerance * 10.0,
+        });
+    }
+
     let information_complementarity_residual = (reference_black_hole_mutual_information
         + reference_accessible_radiation_mutual_information
         - 2.0 * reference_entropy)
@@ -1999,6 +2064,9 @@ pub fn simulate_small_hayden_preskill_decoupling(
             reference_accessible_radiation_joint_entropy,
         reference_accessible_radiation_mutual_information_nats:
             reference_accessible_radiation_mutual_information.max(0.0),
+        decoupling_trace_distance_q_bprime,
+        quantum_pinsker_upper_bound,
+        quantum_pinsker_slack,
         information_complementarity_residual_nats: information_complementarity_residual,
     })
 }
@@ -2012,6 +2080,9 @@ pub struct HaydenPreskillDecouplingSummary {
     pub standard_error_reference_black_hole_mutual_information_nats: f64,
     pub mean_reference_accessible_radiation_mutual_information_nats: f64,
     pub standard_error_reference_accessible_radiation_mutual_information_nats: f64,
+    pub mean_decoupling_trace_distance_q_bprime: f64,
+    pub standard_error_decoupling_trace_distance_q_bprime: f64,
+    pub maximum_quantum_pinsker_violation: f64,
     pub maximum_information_complementarity_residual_nats: f64,
 }
 
@@ -2030,6 +2101,9 @@ pub fn sample_small_hayden_preskill_decoupling_ensemble(
     let mut m2_qb = 0.0;
     let mut mean_qa = 0.0;
     let mut m2_qa = 0.0;
+    let mut mean_trace_distance = 0.0;
+    let mut m2_trace_distance = 0.0;
+    let mut maximum_pinsker_violation: f64 = 0.0;
     let mut maximum_complementarity_residual: f64 = 0.0;
     for sample_index in 0..sample_count {
         let sample = simulate_small_hayden_preskill_decoupling(
@@ -2045,6 +2119,13 @@ pub fn sample_small_hayden_preskill_decoupling_ensemble(
         mean_qa += delta_qa / count;
         m2_qa +=
             delta_qa * (sample.reference_accessible_radiation_mutual_information_nats - mean_qa);
+        let delta_trace_distance =
+            sample.decoupling_trace_distance_q_bprime - mean_trace_distance;
+        mean_trace_distance += delta_trace_distance / count;
+        m2_trace_distance += delta_trace_distance
+            * (sample.decoupling_trace_distance_q_bprime - mean_trace_distance);
+        maximum_pinsker_violation = maximum_pinsker_violation
+            .max((-sample.quantum_pinsker_slack).max(0.0));
         maximum_complementarity_residual =
             maximum_complementarity_residual.max(sample.information_complementarity_residual_nats);
     }
@@ -2062,6 +2143,12 @@ pub fn sample_small_hayden_preskill_decoupling_ensemble(
             / denominator
             / sample_count as f64)
             .sqrt(),
+        mean_decoupling_trace_distance_q_bprime: mean_trace_distance,
+        standard_error_decoupling_trace_distance_q_bprime: (m2_trace_distance
+            / denominator
+            / sample_count as f64)
+            .sqrt(),
+        maximum_quantum_pinsker_violation: maximum_pinsker_violation,
         maximum_information_complementarity_residual_nats: maximum_complementarity_residual,
     })
 }
@@ -2105,6 +2192,24 @@ mod hayden_preskill_decoupling_tests {
             summary.standard_error_reference_accessible_radiation_mutual_information_nats >= 0.0
         );
         assert!(summary.maximum_information_complementarity_residual_nats < TOLERANCE);
+        assert!(summary.mean_decoupling_trace_distance_q_bprime >= 0.0);
+        assert!(summary.standard_error_decoupling_trace_distance_q_bprime >= 0.0);
+        assert!(summary.maximum_quantum_pinsker_violation < TOLERANCE * 10.0);
+    }
+
+    #[test]
+    fn one_step_decoupling_trace_distance_satisfies_quantum_pinsker() {
+        for seed in 0..24 {
+            let sample = simulate_small_hayden_preskill_decoupling(
+                0xD3C0 + seed,
+                TOLERANCE,
+            ).unwrap();
+            assert!((0.0..=1.0 + TOLERANCE)
+                .contains(&sample.decoupling_trace_distance_q_bprime));
+            assert!(sample.quantum_pinsker_slack >= -TOLERANCE * 10.0);
+            assert!(sample.quantum_pinsker_upper_bound + TOLERANCE
+                >= sample.decoupling_trace_distance_q_bprime);
+        }
     }
 
     #[test]
