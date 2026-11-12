@@ -1084,6 +1084,30 @@ mod tests {
     }
 
     #[test]
+    fn committed_schema_and_synthetic_fixture_deserialize_with_claim_ceiling() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/marine-wake-fidelity-v0.1.0.schema.json"
+        )).expect("schema JSON parses");
+        assert_eq!(schema["$schema"], "https://json-schema.org/draft/2020-12/schema");
+        for required in [
+            "coordinate_frame", "angular_origin", "positive_azimuth",
+            "axial_positive_direction", "area_weight_method_id",
+            "area_weight_evidence_sha256"
+        ] {
+            assert!(schema["$defs"]["wakeField"]["required"]
+                .as_array().unwrap().iter().any(|value| value == required));
+        }
+        let fixture: Case = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/fixtures/synthetic-marine-wake-fidelity-v0.1.0.json"
+        )).expect("synthetic fixture deserializes");
+        let report = audit(&fixture);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(report.component_metrics.len(), 3);
+        assert_eq!(report.cell_comparisons.len(), 72);
+        assert_eq!(report.blockage.below_ittc_twenty_percent_recommendation, true);
+    }
+
+    #[test]
     fn analytic_wake_fields_are_full_vector_comparable_arithmetically(){
         let mut input=case();input.evidence_kind=EvidenceKind::Measured;
         let report=audit(&input);
