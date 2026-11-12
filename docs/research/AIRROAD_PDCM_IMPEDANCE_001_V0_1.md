@@ -171,6 +171,11 @@ The implementation target is not a replacement for mature circuit and power-elec
 
 Accordingly, a synthetic Rust model or a successful PLECS/ngspice comparison is not evidence that Luminous has matched these facilities. The realistic sequence is analytical fixtures, independent software-tool comparison, guarded low-energy laboratory work, PHIL with a qualified partner, then higher-power test infrastructure where authorized.
 
+Two adjacent 2026 eVTOL research results should shape our matched benchmarks:
+
+- Jiang et al. (8 June 2026) use the actual motor-to-battery topology and nullspace control allocation to reduce maximum motor and battery current without changing the commanded primary wrench. Their Lift+Cruise simulations report lower settled current, including 360 A to 268 A motor current and 230 A to 192 A battery current in the studied yaw case. Critically, the authors also report that the maneuver-onset peak is not substantially reduced because the Attainable Moment Set boundary constrains nullspace authority and the update has finite bandwidth. Thus #11737 must measure transient peak, duration above limit, (I^2t)/thermal exposure, voltage nadir, settled current and wrench residual separately; the paper's numbers are study-specific simulation comparators, not targets transferable to another aircraft. [Paper](https://doi.org/10.1007/s42401-026-00499-6).
+- Krug et al. (28 April 2026) report a 37.5% DC-link capacitor volume reduction for one specified 3L T-type fault-tolerant inverter, mission profile, technology and lifetime goal. The paper's detailed motivation includes frequency- and temperature-dependent ESR, ripple and fault-tolerant modulation. Therefore #11738 should reproduce the paper's assumptions before using that percentage as a comparator; it is not a universal reduction target. [Paper](https://doi.org/10.1007/s42401-026-00477-y).
+
 The potential product differentiation is the **evidence and decision layer around the solver**:
 
 1. Exact as-built aircraft power-tree, port directions, motor-to-battery mapping and configuration revision.
