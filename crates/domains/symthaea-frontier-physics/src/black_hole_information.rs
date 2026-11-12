@@ -698,6 +698,313 @@ pub fn sample_random_circuit_entropy_ensemble(
     })
 }
 
+/// One sample of a finite-depth U(1)-conserving circuit started from a
+/// fixed-charge computational-basis product state.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1RandomCircuitEntropySample {
+    pub number_of_qubits: usize,
+    pub total_excitations: usize,
+    pub subsystem_a_qubits: usize,
+    pub depth: usize,
+    pub seed: u64,
+    pub topology: RandomCircuitTopology,
+    pub two_qubit_gate_count: usize,
+    pub state_norm_squared: f64,
+    pub total_excitation_expectation: f64,
+    pub total_excitation_variance: f64,
+    pub subsystem_entropy_nats: f64,
+    pub subsystem_purity: f64,
+    pub symmetry_resolved_page_mean_nats: f64,
+    /// Positive means the finite-depth sample is below its symmetry-sector
+    /// Haar equilibrium mean; this is not a mixing-time estimate by itself.
+    pub entropy_gap_to_equilibrium_nats: f64,
+}
+
+/// Independent-seed statistics for one fixed U(1)-conserving circuit depth.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1RandomCircuitEntropySummary {
+    pub number_of_qubits: usize,
+    pub total_excitations: usize,
+    pub subsystem_a_qubits: usize,
+    pub depth: usize,
+    pub topology: RandomCircuitTopology,
+    pub sample_count: usize,
+    pub first_seed: u64,
+    pub mean_entropy_nats: f64,
+    pub sample_variance_nats_squared: f64,
+    pub standard_error_nats: f64,
+    pub symmetry_resolved_page_mean_nats: f64,
+    pub mean_entropy_gap_to_equilibrium_nats: f64,
+}
+
+/// Evolve a low-entanglement product state with a finite-depth random circuit
+/// whose two-qubit gates exactly preserve the equal-gap excitation number.
+///
+/// The initial state is the computational-basis state with the first K qubits
+/// occupied and the rest empty. Each gate is Haar-random in U(1) x U(2) x U(1),
+/// embedded block-diagonally in {|00>,|01>,|10>,|11>}. Brickwork uses alternating
+/// nearest-neighbour bonds; all-to-all uses a fresh random disjoint matching per
+/// layer. The equilibrium reference is the exact Haar average restricted to
+/// the same (N,K) sector, not the unconstrained Page theorem.
+///
+/// This is a unitary scrambling benchmark, not a sequential-emission protocol,
+/// Hawking radiation model, or gravitational evaporation calculation.
+pub fn simulate_u1_conserving_random_circuit_entropy(
+    number_of_qubits: usize,
+    total_excitations: usize,
+    depth: usize,
+    topology: RandomCircuitTopology,
+    retained_qubits: &[usize],
+    seed: u64,
+    tolerance: f64,
+) -> Result<U1RandomCircuitEntropySample, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    if number_of_qubits < 2 {
+        return Err(QuantumInformationError::InvalidCircuitTopology);
+    }
+    if number_of_qubits > MAX_DENSE_STATE_QUBITS {
+        return Err(QuantumInformationError::DenseStateQubitLimit {
+            requested: number_of_qubits,
+            maximum: MAX_DENSE_STATE_QUBITS,
+        });
+    }
+    if total_excitations > number_of_qubits {
+        return Err(QuantumInformationError::InvalidExcitationSector {
+            excitations: total_excitations,
+            number_of_qubits,
+        });
+    }
+
+    let state_dimension = 1usize << number_of_qubits;
+    let mut amplitudes = vec![Complex64::new(0.0, 0.0); state_dimension];
+    let mut initial_basis = 0usize;
+    for qubit in 0..total_excitations {
+        initial_basis |= 1usize << (number_of_qubits - 1 - qubit);
+    }
+    amplitudes[initial_basis] = Complex64::new(1.0, 0.0);
+
+    let mut rng = ChaCha20Rng::seed_from_u64(seed);
+    let mut gate_count = 0usize;
+    for layer in 0..depth {
+        let pairs = match topology {
+            RandomCircuitTopology::Brickwork1D => {
+                let parity = layer % 2;
+                (parity..(number_of_qubits - 1))
+                    .step_by(2)
+                    .map(|first| (first, first + 1))
+                    .collect::<Vec<_>>()
+            }
+            RandomCircuitTopology::AllToAllMatching => {
+                let mut qubits = (0..number_of_qubits).collect::<Vec<_>>();
+                qubits.shuffle(&mut rng);
+                qubits
+                    .chunks_exact(2)
+                    .map(|pair| (pair[0], pair[1]))
+                    .collect::<Vec<_>>()
+            }
+        };
+        for (first, second) in pairs {
+            let unitary = u1_conserving_unitary_4(&mut rng)?;
+            apply_two_qubit_unitary(
+                &mut amplitudes,
+                number_of_qubits,
+                first,
+                second,
+                &unitary,
+            )?;
+            gate_count += 1;
+        }
+    }
+
+    let norm_squared: f64 =
+        amplitudes.iter().map(|amplitude| amplitude.norm_sqr()).sum();
+    if !norm_squared.is_finite() {
+        return Err(QuantumInformationError::NonFiniteState {
+            index: state_dimension,
+        });
+    }
+    if (norm_squared - 1.0).abs() > tolerance {
+        return Err(QuantumInformationError::NormalizationError {
+            norm_squared,
+            tolerance,
+        });
+    }
+    let (charge_expectation, charge_variance) =
+        total_excitation_moments(&amplitudes);
+    if (charge_expectation - total_excitations as f64).abs() > tolerance
+        || charge_variance > tolerance
+    {
+        return Err(QuantumInformationError::NormalizationError {
+            norm_squared: charge_expectation,
+            tolerance,
+        });
+    }
+
+    let reduced = DensityMatrix::from_pure_state(
+        &amplitudes,
+        number_of_qubits,
+        retained_qubits,
+        tolerance,
+    )?;
+    let entropy = reduced.von_neumann_entropy(tolerance)?;
+    let purity = reduced.diagnostics(tolerance)?.purity;
+    let page_mean = symmetry_resolved_page_average_entropy_nats(
+        number_of_qubits,
+        total_excitations,
+        retained_qubits.len(),
+    )?;
+    Ok(U1RandomCircuitEntropySample {
+        number_of_qubits,
+        total_excitations,
+        subsystem_a_qubits: retained_qubits.len(),
+        depth,
+        seed,
+        topology,
+        two_qubit_gate_count: gate_count,
+        state_norm_squared: norm_squared,
+        total_excitation_expectation: charge_expectation,
+        total_excitation_variance: charge_variance,
+        subsystem_entropy_nats: entropy,
+        subsystem_purity: purity,
+        symmetry_resolved_page_mean_nats: page_mean,
+        entropy_gap_to_equilibrium_nats: page_mean - entropy,
+    })
+}
+
+/// Run independent fixed-charge circuit realizations at one declared depth.
+pub fn sample_u1_conserving_random_circuit_entropy_ensemble(
+    number_of_qubits: usize,
+    total_excitations: usize,
+    depth: usize,
+    topology: RandomCircuitTopology,
+    retained_qubits: &[usize],
+    sample_count: usize,
+    first_seed: u64,
+    tolerance: f64,
+) -> Result<U1RandomCircuitEntropySummary, QuantumInformationError> {
+    if sample_count < 2 {
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+    }
+    let mut mean = 0.0;
+    let mut sum_squared_deviations = 0.0;
+    let mut page_mean = None;
+    for sample_index in 0..sample_count {
+        let seed = first_seed.wrapping_add(sample_index as u64);
+        let sample = simulate_u1_conserving_random_circuit_entropy(
+            number_of_qubits,
+            total_excitations,
+            depth,
+            topology,
+            retained_qubits,
+            seed,
+            tolerance,
+        )?;
+        let delta = sample.subsystem_entropy_nats - mean;
+        mean += delta / (sample_index + 1) as f64;
+        sum_squared_deviations += delta * (sample.subsystem_entropy_nats - mean);
+        page_mean = Some(sample.symmetry_resolved_page_mean_nats);
+    }
+    let variance = sum_squared_deviations / (sample_count - 1) as f64;
+    let page_mean = page_mean.unwrap_or(0.0);
+    Ok(U1RandomCircuitEntropySummary {
+        number_of_qubits,
+        total_excitations,
+        subsystem_a_qubits: retained_qubits.len(),
+        depth,
+        topology,
+        sample_count,
+        first_seed,
+        mean_entropy_nats: mean,
+        sample_variance_nats_squared: variance,
+        standard_error_nats: (variance / sample_count as f64).sqrt(),
+        symmetry_resolved_page_mean_nats: page_mean,
+        mean_entropy_gap_to_equilibrium_nats: page_mean - mean,
+    })
+}
+
+#[cfg(test)]
+mod u1_random_circuit_tests {
+    use super::*;
+
+    const TOLERANCE: f64 = 1e-10;
+
+    #[test]
+    fn depth_zero_product_state_has_zero_entropy_and_declared_charge() {
+        let sample = simulate_u1_conserving_random_circuit_entropy(
+            8, 4, 0, RandomCircuitTopology::Brickwork1D, &[0, 1, 2, 3],
+            0xD3F7, TOLERANCE,
+        ).unwrap();
+        assert_eq!(sample.two_qubit_gate_count, 0);
+        assert!(sample.subsystem_entropy_nats.abs() < TOLERANCE);
+        assert!((sample.total_excitation_expectation - 4.0).abs() < TOLERANCE);
+        assert!(sample.total_excitation_variance < TOLERANCE);
+        assert!((sample.state_norm_squared - 1.0).abs() < TOLERANCE);
+    }
+
+    #[test]
+    fn fixed_charge_brickwork_and_all_to_all_preserve_charge_and_norm() {
+        for topology in [
+            RandomCircuitTopology::Brickwork1D,
+            RandomCircuitTopology::AllToAllMatching,
+        ] {
+            let sample = simulate_u1_conserving_random_circuit_entropy(
+                8, 4, 12, topology, &[0, 1, 2, 3], 0xB1A5 + topology as u64,
+                TOLERANCE,
+            ).unwrap();
+            assert!((sample.state_norm_squared - 1.0).abs() < TOLERANCE);
+            assert!((sample.total_excitation_expectation - 4.0).abs() < TOLERANCE);
+            assert!(sample.total_excitation_variance < TOLERANCE);
+            assert!(sample.subsystem_entropy_nats >= -TOLERANCE);
+            assert!(sample.subsystem_entropy_nats
+                <= sample.symmetry_resolved_page_mean_nats + 1e-9);
+        }
+    }
+
+    #[test]
+    fn fixed_charge_circuit_sample_is_reproducible() {
+        let first = simulate_u1_conserving_random_circuit_entropy(
+            8, 4, 8, RandomCircuitTopology::AllToAllMatching,
+            &[0, 1, 2, 3], 0xA110, TOLERANCE,
+        ).unwrap();
+        let repeated = simulate_u1_conserving_random_circuit_entropy(
+            8, 4, 8, RandomCircuitTopology::AllToAllMatching,
+            &[0, 1, 2, 3], 0xA110, TOLERANCE,
+        ).unwrap();
+        assert_eq!(first, repeated);
+    }
+
+    #[test]
+    fn fixed_charge_circuit_ensemble_reports_uncertainty_and_correct_equilibrium() {
+        let summary = sample_u1_conserving_random_circuit_entropy_ensemble(
+            8, 4, 8, RandomCircuitTopology::Brickwork1D, &[0, 1, 2, 3],
+            12, 0xC1AC, TOLERANCE,
+        ).unwrap();
+        assert_eq!(summary.sample_count, 12);
+        assert!(summary.sample_variance_nats_squared >= 0.0);
+        assert!(summary.standard_error_nats >= 0.0);
+        assert!((summary.mean_entropy_gap_to_equilibrium_nats
+            - (summary.symmetry_resolved_page_mean_nats - summary.mean_entropy_nats)).abs()
+            < TOLERANCE);
+    }
+
+    #[test]
+    fn fixed_charge_circuit_rejects_invalid_sector_and_empty_subsystem_overflow() {
+        assert!(matches!(
+            simulate_u1_conserving_random_circuit_entropy(
+                8, 9, 2, RandomCircuitTopology::Brickwork1D, &[0, 1], 1, TOLERANCE,
+            ),
+            Err(QuantumInformationError::InvalidExcitationSector { .. })
+        ));
+        assert!(matches!(
+            simulate_u1_conserving_random_circuit_entropy(
+                8, 4, 2, RandomCircuitTopology::Brickwork1D, &[0, 1, 2, 3, 4, 5, 6], 1,
+                TOLERANCE,
+            ),
+            Err(QuantumInformationError::DenseDimensionLimit { .. })
+        ));
+    }
+}
+
 /// Summary of a seeded Haar-random pure-state Page-entropy ensemble.
 #[derive(Debug, Clone, PartialEq)]
 pub struct HaarPageEnsembleSummary {
