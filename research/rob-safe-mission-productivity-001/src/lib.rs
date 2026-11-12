@@ -1297,6 +1297,49 @@ mod tests {
         assert_eq!(score.causal_closure.closure_ppm, Some(990_099));
     }
 
+
+    #[test]
+    fn invalid_energy_is_reported_separately_from_unknown_energy() {
+        let mut input = trial("p1", "r1", "candidate");
+        input.energy_evidence = EvidenceState::Invalid;
+        input.measured_energy_joules = None;
+        let score = evaluate_fleet("candidate", &[input], contract()).unwrap();
+        let class = &score.task_classes["delivery"];
+        assert_eq!(class.energy_unknown_missions, 0);
+        assert_eq!(class.energy_invalid_missions, 1);
+        assert_eq!(class.energy_qualified_missions, 0);
+    }
+
+    #[test]
+    fn invalid_thermal_and_recovery_receipts_are_not_counted_as_unknown() {
+        let mut input = trial("p1", "r1", "candidate");
+        input.thermal_evidence = EvidenceState::Invalid;
+        input.recovery_evidence = EvidenceState::Invalid;
+        let score = evaluate_fleet("candidate", &[input], contract()).unwrap();
+        let class = &score.task_classes["delivery"];
+        assert_eq!(class.thermal_unknown_missions, 0);
+        assert_eq!(class.thermal_invalid_missions, 1);
+        assert_eq!(class.recovery_unknown_missions, 0);
+        assert_eq!(class.recovery_invalid_missions, 1);
+        assert_eq!(score.evidence_qualified_safe_successes, 0);
+    }
+
+    #[test]
+    fn one_task_class_cannot_mix_incomparable_work_units() {
+        let mut other = trial("p2", "r2", "candidate");
+        other.identity.work_unit_id = "inspection-metre-v1".to_owned();
+        assert_eq!(
+            evaluate_fleet(
+                "candidate",
+                &[trial("p1", "r1", "candidate"), other],
+                contract(),
+            ),
+            Err(EvaluationError::PairIdentityMismatch(
+                "incomparable work units within task class delivery".to_owned()
+            ))
+        );
+    }
+
     #[test]
     fn comparison_rejects_missing_causal_closure_measurement() {
         let mut baseline = trial("p1", "r1", "baseline");
