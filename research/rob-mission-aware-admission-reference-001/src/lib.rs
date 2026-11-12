@@ -104,13 +104,9 @@ impl ResourceUse {
             .ok_or(ReferenceError::ResourceArithmeticOverflow)?;
         self.kv_cache_growth_tokens = self
             .kv_cache_growth_tokens
-            .checked_add(
-                request
-                    .kv_cache_growth_tokens
-                    .ok_or(ReferenceError::UnknownKvCacheDemand(
-                        request.request_id.clone(),
-                    ))?,
-            )
+            .checked_add(request.kv_cache_growth_tokens.ok_or(
+                ReferenceError::UnknownKvCacheDemand(request.request_id.clone()),
+            )?)
             .ok_or(ReferenceError::ResourceArithmeticOverflow)?;
         Ok(())
     }
@@ -313,7 +309,9 @@ fn eligibility(request: &InferenceRequest) -> Result<(), RejectReason> {
         return Err(RejectReason::UnknownKvCacheDemand);
     }
 
-    let evsi = request.evsi_units.ok_or(RejectReason::UnknownDecisionValue)?;
+    let evsi = request
+        .evsi_units
+        .ok_or(RejectReason::UnknownDecisionValue)?;
     if request
         .loss_scale_id
         .as_ref()
@@ -346,7 +344,10 @@ fn compare_request(
 ) -> std::cmp::Ordering {
     use std::cmp::Ordering;
     match policy {
-        SchedulerPolicy::RoundRobin => a.robot_id.cmp(&b.robot_id).then(a.request_id.cmp(&b.request_id)),
+        SchedulerPolicy::RoundRobin => a
+            .robot_id
+            .cmp(&b.robot_id)
+            .then(a.request_id.cmp(&b.request_id)),
         SchedulerPolicy::EarliestDeadlineFirst => slack(a)
             .cmp(&slack(b))
             .then(a.request_id.cmp(&b.request_id)),
@@ -389,10 +390,7 @@ fn compare_request(
                 return risk_order;
             }
 
-            if a.loss_scale_id == b.loss_scale_id
-                && a.gpu_micros > 0
-                && b.gpu_micros > 0
-            {
+            if a.loss_scale_id == b.loss_scale_id && a.gpu_micros > 0 && b.gpu_micros > 0 {
                 let density = ratio_cmp(
                     b.evsi_units.unwrap_or(0),
                     b.gpu_micros,
@@ -404,7 +402,9 @@ fn compare_request(
                 }
             }
 
-            a.robot_id.cmp(&b.robot_id).then(a.request_id.cmp(&b.request_id))
+            a.robot_id
+                .cmp(&b.robot_id)
+                .then(a.request_id.cmp(&b.request_id))
         }
     }
 }
@@ -462,7 +462,10 @@ pub fn admit_batch(
         match eligibility(request) {
             Ok(()) => eligible.push(request),
             Err(reason) => {
-                outcomes.insert(request.request_id.clone(), RequestDisposition::Rejected(reason));
+                outcomes.insert(
+                    request.request_id.clone(),
+                    RequestDisposition::Rejected(reason),
+                );
             }
         }
     }
@@ -634,8 +637,7 @@ mod tests {
     fn zero_evsi_is_declined_even_when_fresh() {
         let mut q = request("q1", "r1");
         q.evsi_units = Some(0);
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
         assert!(report.admitted_request_ids.is_empty());
         assert_eq!(
             report.requests[0].disposition,
@@ -647,8 +649,7 @@ mod tests {
     fn unknown_age_fails_closed() {
         let mut q = request("q1", "r1");
         q.actuation_aoi_upper_ticks = None;
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
         assert_eq!(
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::UnknownActuationAge)
@@ -659,8 +660,7 @@ mod tests {
     fn stale_age_is_rejected() {
         let mut q = request("q1", "r1");
         q.actuation_aoi_upper_ticks = Some(6);
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
         assert_eq!(
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::StaleActuationAge)
@@ -671,8 +671,7 @@ mod tests {
     fn unknown_timing_is_rejected() {
         let mut q = request("q1", "r1");
         q.p99_return_ticks = None;
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
         assert_eq!(
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::UnknownTimingBound)
@@ -684,8 +683,7 @@ mod tests {
         let mut q = request("q1", "r1");
         q.p99_return_ticks = Some(11);
         q.action_buffer_slack_ticks = Some(10);
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
         assert_eq!(
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::ResultReturnsTooLate)
@@ -699,8 +697,7 @@ mod tests {
         q.action_buffer_slack_ticks = Some(10);
         q.deadline_slack_ticks = Some(12);
         q.local_projection_dispatch_guard_ticks = 3;
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
         assert_eq!(
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::ResultReturnsTooLate)
@@ -714,8 +711,7 @@ mod tests {
         q.action_buffer_slack_ticks = Some(10);
         q.deadline_slack_ticks = Some(12);
         q.local_projection_dispatch_guard_ticks = 2;
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
         assert_eq!(report.admitted_request_ids, vec!["q1"]);
     }
 
@@ -723,8 +719,7 @@ mod tests {
     fn excessive_poma_is_rejected() {
         let mut q = request("q1", "r1");
         q.poma_upper_ppm = Some(80_000);
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
         assert_eq!(
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::MissRiskTooHigh)
@@ -735,8 +730,7 @@ mod tests {
     fn safety_work_cannot_be_displaced() {
         let mut q = request("q1", "r1");
         q.local_hard_safety_preserved = false;
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
         assert_eq!(
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::LocalSafetyWouldBeDisplaced)
@@ -747,8 +741,7 @@ mod tests {
     fn local_fallback_is_mandatory() {
         let mut q = request("q1", "r1");
         q.local_fallback_ready = false;
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
         assert_eq!(
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::NoLocalFallback)
@@ -759,8 +752,7 @@ mod tests {
     fn privacy_denial_is_mandatory() {
         let mut q = request("q1", "r1");
         q.privacy_policy_allows_remote_data = false;
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
         assert_eq!(
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::PrivacyPolicyDenied)
@@ -798,8 +790,7 @@ mod tests {
         q.service_floor_due = true;
         q.starvation_ticks = 12;
         q.max_starvation_ticks = 10;
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
         assert_eq!(report.admitted_request_ids, vec!["q_due"]);
         assert!(report.service_floor_violations.is_empty());
         assert_eq!(report.preexisting_starvation_breaches, vec!["r1"]);
@@ -810,8 +801,7 @@ mod tests {
     fn zero_starvation_limit_is_invalid_evidence() {
         let mut q = request("q_due", "r1");
         q.max_starvation_ticks = 0;
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
         assert_eq!(
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::StarvationEvidenceInvalid)
@@ -822,13 +812,18 @@ mod tests {
     fn service_floor_miss_is_reported_not_hidden_by_throughput() {
         let mut floor = request("q_floor", "r1");
         floor.service_floor_due = true;
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), ResourceBudget {
+        let report = admit_batch(
+            SchedulerPolicy::Luminous,
+            &cursor(),
+            ResourceBudget {
                 gpu_micros: 0,
                 memory_bandwidth_units: 0,
                 network_bytes: 0,
                 kv_cache_growth_tokens: 0,
-            }, &[floor]).unwrap();
+            },
+            &[floor],
+        )
+        .unwrap();
         assert!(!report.service_floors_met);
         assert_eq!(report.service_floor_violations, vec!["r1"]);
     }
@@ -837,8 +832,7 @@ mod tests {
     fn unknown_kv_cache_growth_is_rejected() {
         let mut q = request("q1", "r1");
         q.kv_cache_growth_tokens = None;
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[q]).unwrap();
         assert_eq!(
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::UnknownKvCacheDemand)
@@ -857,13 +851,7 @@ mod tests {
             network_bytes: 100,
             kv_cache_growth_tokens: 100,
         };
-        let report = admit_batch(
-            SchedulerPolicy::RoundRobin,
-            &cursor(),
-            tight,
-            &[q1, q2],
-        )
-        .unwrap();
+        let report = admit_batch(SchedulerPolicy::RoundRobin, &cursor(), tight, &[q1, q2]).unwrap();
         assert_eq!(report.admitted_request_ids.len(), 1);
         assert_eq!(report.resource_use.kv_cache_growth_tokens, 60);
     }
@@ -880,13 +868,7 @@ mod tests {
             network_bytes: 100,
             kv_cache_growth_tokens: 100,
         };
-        let report = admit_batch(
-            SchedulerPolicy::RoundRobin,
-            &cursor(),
-            tight,
-            &[q1, q2],
-        )
-        .unwrap();
+        let report = admit_batch(SchedulerPolicy::RoundRobin, &cursor(), tight, &[q1, q2]).unwrap();
         assert_eq!(report.admitted_request_ids.len(), 1);
         assert!(report.resource_use.memory_bandwidth_units <= 100);
     }
@@ -921,13 +903,8 @@ mod tests {
             network_bytes: 20,
             kv_cache_growth_tokens: 10,
         };
-        let report = admit_batch(
-            SchedulerPolicy::EvsiPerCompute,
-            &cursor(),
-            tight,
-            &[a, b],
-        )
-        .unwrap();
+        let report =
+            admit_batch(SchedulerPolicy::EvsiPerCompute, &cursor(), tight, &[a, b]).unwrap();
         assert_eq!(report.admitted_request_ids, vec!["q2"]);
     }
 
@@ -983,12 +960,7 @@ mod tests {
         let a = request("same", "r1");
         let b = request("same", "r2");
         assert_eq!(
-            admit_batch(
-                SchedulerPolicy::Luminous,
-                &cursor(),
-                budget(),
-                &[a, b],
-            ),
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[a, b],),
             Err(ReferenceError::DuplicateRequestId("same".to_owned()))
         );
     }
@@ -1010,21 +982,12 @@ mod tests {
         )
         .unwrap();
         assert!(report.admitted_request_ids.is_empty());
-        assert_eq!(
-            report.next_cursor_robot_id.as_deref(),
-            Some("robot-m")
-        );
+        assert_eq!(report.next_cursor_robot_id.as_deref(), Some("robot-m"));
     }
 
     #[test]
     fn empty_batch_is_a_valid_noop() {
-        let report = admit_batch(
-            SchedulerPolicy::Luminous,
-            &cursor(),
-            budget(),
-            &[],
-        )
-        .unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[]).unwrap();
         assert!(report.admitted_request_ids.is_empty());
         assert!(report.service_floors_met);
         assert!(!report.actuation_authorized);
