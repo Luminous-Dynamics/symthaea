@@ -1,0 +1,522 @@
+{
+  "schema_version": "0.1.0",
+  "programme": "PLASMA-ENERGY-001",
+  "generated_date": "2026-11-12",
+  "claim_ceiling": "SOURCE_REGISTER_ONLY_NO_LUMINOUS_REPRODUCTION_OR_PHYSICAL_RESULT",
+  "rules": {
+    "missing_auxiliary_energy_is_zero": false,
+    "cross_case_ranking_allowed": false,
+    "vendor_claims_are_measurements": false,
+    "solver_convergence_is_physical_validation": false,
+    "thermal_round_trip_is_electrical_round_trip": false,
+    "unit_normalization_requires_explicit_basis": true,
+    "all_values_require_source_and_evidence_class": true
+  },
+  "evidence_classes": [
+    "PUBLISHED_LAB_EXPERIMENT",
+    "PUBLISHED_TECHNO_ECONOMIC_ANALYSIS",
+    "PUBLISHED_REVIEW_OR_DATA_SYNTHESIS",
+    "PUBLISHED_NUMERICAL_STUDY",
+    "MANUFACTURER_REPORTED_OPERATIONAL_CLAIM",
+    "MANUFACTURER_PRODUCT_CLAIM",
+    "GOVERNMENT_RESEARCH_FACILITY_DESCRIPTION",
+    "GOVERNMENT_ROADMAP"
+  ],
+  "cases": [
+    {
+      "case_id": "NH3-CRACK-MW-ATM-2025",
+      "lane": "AMMONIA_CRACKING",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Hydrogen production from ammonia using a microwave plasma torch at atmospheric pressure",
+        "publisher": "International Journal of Hydrogen Energy",
+        "publication_date": "2025-09-22",
+        "doi": "10.1016/j.ijhydene.2025.151121",
+        "url": "https://doi.org/10.1016/j.ijhydene.2025.151121"
+      },
+      "observations": [
+        {
+          "metric": "ammonia_conversion",
+          "value": 0.98,
+          "qualifier": "at the reported minimum-energy 90 vol.% NH3-in-N2 condition; 1.75 kW net microwave power",
+          "unit": "fraction"
+        },
+        {
+          "metric": "specific_energy",
+          "value": 25,
+          "qualifier": "reported lowest energy cost at the stated 90 vol.% NH3-in-N2 condition",
+          "unit": "kWh/kg_H2"
+        },
+        {
+          "metric": "hydrogen_outlet_concentration",
+          "value": 69,
+          "qualifier": "approximately, at the reported minimum-energy condition",
+          "unit": "vol_percent"
+        },
+        {
+          "metric": "ammonia_conversion",
+          "value": 0.99,
+          "qualifier": "above 99% reported for selected 50-80 vol.% feed cases; not the same exact condition as the minimum-energy point",
+          "unit": "fraction"
+        }
+      ],
+      "comparison_status": "SOURCE_SPECIFIC_NOT_MATCHED",
+      "blockers": [
+        "Reactor and gas mixture differ from reduced-pressure cracking studies.",
+        "Reported net microwave power is not established as the complete wall-plug-to-purified-hydrogen boundary.",
+        "Separation, compression, cooling, auxiliary and lifetime loads require explicit extraction."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-CRACK-TEA-LBNL-2023",
+      "lane": "AMMONIA_CRACKING",
+      "evidence_class": "PUBLISHED_TECHNO_ECONOMIC_ANALYSIS",
+      "source": {
+        "title": "Benchmarking plasma and electrolysis decomposition technologies for ammonia to power generation",
+        "publisher": "Energy Conversion and Management / Lawrence Berkeley National Laboratory",
+        "publication_date": "2023-07",
+        "doi": "10.1016/j.enconman.2023.117166",
+        "url": "https://doi.org/10.1016/j.enconman.2023.117166"
+      },
+      "observations": [
+        {
+          "metric": "economic_parity_energy_threshold",
+          "value": 10,
+          "qualifier": "study-specific modeled estimate for plasma ammonia decomposition to reach cost parity with assessed thermal-chemical cracking technologies",
+          "unit": "kWh/kg_H2",
+          "relation": "less_than_or_equal"
+        }
+      ],
+      "comparison_status": "TEA_THRESHOLD_NOT_EXPERIMENT",
+      "blockers": [
+        "This value is a model-derived economic threshold, not an experimentally achieved plasma performance.",
+        "Study-specific prices, plant scale, energy boundary and assumptions must be preserved.",
+        "Cannot be directly ranked against a laboratory reactor figure until boundaries are matched."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-CRACK-MW-REDUCED-PRESSURE-2025",
+      "lane": "AMMONIA_CRACKING",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Ammonia cracking by microwave plasma under reduced pressure",
+        "publisher": "International Journal of Hydrogen Energy",
+        "publication_date": "2025-04-15",
+        "doi": "10.1016/j.ijhydene.2025.03.118",
+        "url": "https://doi.org/10.1016/j.ijhydene.2025.03.118"
+      },
+      "observations": [
+        {
+          "metric": "specific_energy",
+          "value": 33,
+          "qualifier": "lowest reported energy cost at 28% dissociation",
+          "unit": "kWh/kg_H2"
+        },
+        {
+          "metric": "dissociation_fraction",
+          "value": 0.28,
+          "qualifier": "condition associated with the 33 kWh/kg H2 result",
+          "unit": "fraction"
+        },
+        {
+          "metric": "reported_energy_efficiency",
+          "value": 0.13,
+          "qualifier": "reported at the 28% dissociation operating point",
+          "unit": "fraction"
+        },
+        {
+          "metric": "specific_energy",
+          "value": 50,
+          "qualifier": "reported energy cost for full dissociation",
+          "unit": "kWh/kg_H2"
+        }
+      ],
+      "comparison_status": "SOURCE_SPECIFIC_NOT_MATCHED",
+      "blockers": [
+        "Reduced-pressure reactor and pure-ammonia feed differ from the atmospheric mixed-feed torch.",
+        "Dissociation conversion differs between reported energy points.",
+        "Complete downstream product separation and wall-plug boundary must be checked."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-KINETIC-DBD-2026",
+      "lane": "AMMONIA_CRACKING_MODEL",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Experimental and kinetic study of non-equilibrium plasma driven NH3 decomposition",
+        "publisher": "Fuel",
+        "publication_date": "2026-02-01",
+        "doi": "10.1016/j.fuel.2025.136427",
+        "url": "https://doi.org/10.1016/j.fuel.2025.136427"
+      },
+      "observations": [
+        {
+          "metric": "model_prediction_improvement",
+          "value": 53.4,
+          "qualifier": "paper-reported improvement for the stated low-temperature prediction task after adding excited-Ar pathways; exact metric/baseline must be extracted before reuse",
+          "unit": "percent"
+        }
+      ],
+      "comparison_status": "MODEL_REPRODUCTION_REQUIRED",
+      "blockers": [
+        "The reported prediction improvement is task-specific and cannot be treated as a general accuracy gain.",
+        "Exact baseline, metric, data split and diagnostics must be reconstructed from the paper."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-PLASMA-ELECTROCATALYSIS-JACS-2026",
+      "lane": "AMMONIA_SYNTHESIS",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Plasma-Electrocatalytic Nitrogen Reduction for Ammonia Synthesis",
+        "publisher": "Journal of the American Chemical Society",
+        "publication_date": "2026",
+        "doi": "10.1021/jacs.6c04148",
+        "url": "https://doi.org/10.1021/jacs.6c04148"
+      },
+      "observations": [
+        {
+          "metric": "ammonia_area_production_rate",
+          "value": 7.7,
+          "uncertainty": 0.8,
+          "qualifier": "Ag catalyst; reported selected conditions",
+          "unit": "nmol/s/cm2"
+        },
+        {
+          "metric": "electrochemical_faradaic_efficiency",
+          "value": 86,
+          "uncertainty": 14,
+          "qualifier": "percent; reported selected conditions",
+          "unit": "percent"
+        }
+      ],
+      "comparison_status": "REACTOR_LEVEL_NOT_FULL_CHAIN",
+      "blockers": [
+        "Area-normalized product rate and Faradaic efficiency are not full-chain kWh/kg NH3.",
+        "Upstream plasma electricity, NOx/intermediate transport, water/electrolyte, separation and durability require accounting.",
+        "The reported 15N2 controls support nitrogen-source attribution but do not establish plant-scale economics."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "METHANE-PYROLYSIS-HEATING-REVIEW-2026",
+      "lane": "METHANE_PYROLYSIS",
+      "evidence_class": "PUBLISHED_REVIEW_OR_DATA_SYNTHESIS",
+      "source": {
+        "title": "A comprehensive review of direct-heating modalities for low-emission hydrogen production via methane pyrolysis",
+        "publisher": "Journal of Analytical and Applied Pyrolysis",
+        "publication_date": "2026-06",
+        "doi": "10.1016/j.jaap.2026.107776",
+        "url": "https://doi.org/10.1016/j.jaap.2026.107776"
+      },
+      "observations": [
+        {
+          "metric": "curated_experimental_datasets",
+          "value": 156,
+          "unit": "count"
+        },
+        {
+          "metric": "peer_reviewed_sources",
+          "value": 26,
+          "unit": "count"
+        },
+        {
+          "metric": "shock_wave_methane_conversion",
+          "value": 92,
+          "qualifier": "approximately; review-reported Pareto point under cost/conversion weighting",
+          "unit": "percent"
+        },
+        {
+          "metric": "shock_wave_levelized_hydrogen_cost",
+          "value": 0.7,
+          "qualifier": "approximately; study-specific modeled Pareto point",
+          "unit": "USD/kg_H2"
+        },
+        {
+          "metric": "microwave_methane_conversion",
+          "value": 91,
+          "qualifier": "approximately; review-reported Pareto point with selectivity included",
+          "unit": "percent"
+        },
+        {
+          "metric": "microwave_hydrogen_selectivity",
+          "value": 99,
+          "qualifier": "approximately; review-reported Pareto point with selectivity included",
+          "unit": "percent"
+        },
+        {
+          "metric": "microwave_levelized_hydrogen_cost",
+          "value": 1.09,
+          "qualifier": "approximately; study-specific modeled Pareto point",
+          "unit": "USD/kg_H2"
+        }
+      ],
+      "source_conclusion": "Plasma and resistive/combustion configurations are reported outside the Pareto front in the analyzed data and weighting scenarios.",
+      "comparison_status": "REVIEW_LEVEL_MODELLED_PARETO_NOT_LUMINOUS_REPRODUCTION",
+      "blockers": [
+        "Underlying source datasets and curation decisions must be admitted and rebuilt before use.",
+        "Pareto rankings depend on objective weighting and study-defined process boundaries.",
+        "No universal plasma inferiority claim follows from this review."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "HTTES-PACKED-BED-EXPERIMENT-2026",
+      "lane": "HIGH_TEMPERATURE_THERMAL_STORAGE",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Experimental investigation of electrical energy conversion to industrial heat and storage in a packed bed with air preheating",
+        "publisher": "Journal of Energy Storage",
+        "publication_date": "2026-07-30",
+        "doi": "10.1016/j.est.2026.122533",
+        "url": "https://doi.org/10.1016/j.est.2026.122533"
+      },
+      "observations": [
+        {
+          "metric": "investigated_store_temperature_min",
+          "value": 25,
+          "unit": "degC"
+        },
+        {
+          "metric": "investigated_store_temperature_max",
+          "value": 700,
+          "unit": "degC"
+        }
+      ],
+      "comparison_status": "SOURCE_FIXTURE_CANDIDATE",
+      "blockers": [
+        "Raw time-series, measurement uncertainty, sensor locations and complete electrical/thermal system boundary must be admitted.",
+        "No plasma-heater result is reported by this experiment.",
+        "Cannot infer thermal round-trip efficiency from temperature range alone."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "HTTES-RONDO-100MWH-2025",
+      "lane": "HIGH_TEMPERATURE_THERMAL_STORAGE",
+      "evidence_class": "MANUFACTURER_REPORTED_OPERATIONAL_CLAIM",
+      "source": {
+        "title": "Rondo Powers Up World's Largest Industrial Heat Battery",
+        "publisher": "Rondo Energy",
+        "publication_date": "2025-10-16",
+        "url": "https://www.rondo.com/news-press/rondo-powers-up-worlds-largest-industrial-heat-battery"
+      },
+      "observations": [
+        {
+          "metric": "installed_thermal_storage_capacity",
+          "value": 100,
+          "unit": "MWh_thermal",
+          "evidence_subclass": "manufacturer_reported"
+        },
+        {
+          "metric": "reported_round_trip_thermal_efficiency",
+          "value": 97,
+          "qualifier": "greater than 97%; manufacturer-reported after initial 10-week operation; exact boundary requires source/test data",
+          "unit": "percent",
+          "relation": "greater_than"
+        },
+        {
+          "metric": "reported_storage_temperature",
+          "value": 1000,
+          "qualifier": "above 1000 C; manufacturer-reported",
+          "unit": "degC",
+          "relation": "greater_than"
+        }
+      ],
+      "comparison_status": "INDUSTRIAL_REFERENCE_VENDOR_CLAIM_NOT_INDEPENDENTLY_AUDITED",
+      "blockers": [
+        "No public full operational time series is attached to this source.",
+        "Exact electrical meter, auxiliary inclusions, storage duration and useful-heat boundary must be established.",
+        "Thermal round-trip efficiency is not electricity-to-electricity round-trip efficiency."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "HTTES-SANDIA-PARTICLE-6MWH",
+      "lane": "HIGH_TEMPERATURE_THERMAL_STORAGE",
+      "evidence_class": "GOVERNMENT_RESEARCH_FACILITY_DESCRIPTION",
+      "source": {
+        "title": "Thermal Energy Storage — Sandia National Laboratories",
+        "publisher": "Sandia National Laboratories",
+        "url": "https://energy.sandia.gov/programs/renewable-energy/concentrating-solar-thermal-technologies/thermal-energy-storage-tes/"
+      },
+      "observations": [
+        {
+          "metric": "particle_store_capacity",
+          "value": 6,
+          "qualifier": "facility capability",
+          "unit": "MWh_thermal"
+        },
+        {
+          "metric": "particle_store_max_temperature",
+          "value": 800,
+          "qualifier": "facility capability",
+          "unit": "degC"
+        }
+      ],
+      "comparison_status": "FACILITY_CAPABILITY_NOT_PERFORMANCE_RESULT",
+      "blockers": [
+        "Facility description is not a performance dataset or efficiency result.",
+        "Specific test campaign, configuration and measured output must be identified before comparison."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "HTTES-ANTORA-CARBON-2400",
+      "lane": "HIGH_TEMPERATURE_THERMAL_STORAGE",
+      "evidence_class": "MANUFACTURER_PRODUCT_CLAIM",
+      "source": {
+        "title": "Antora Technology",
+        "publisher": "Antora Energy",
+        "url": "https://www.antora.com/technology"
+      },
+      "observations": [
+        {
+          "metric": "manufacturer_reported_storage_temperature_max",
+          "value": 2400,
+          "unit": "degC"
+        }
+      ],
+      "source_conclusion": "Manufacturer describes resistively heated solid-carbon thermal storage and describes integrated TPV electricity conversion as future product development.",
+      "comparison_status": "PRODUCT_CLAIM_NOT_INDEPENDENTLY_QUALIFIED",
+      "blockers": [
+        "Current deployed heat product and future heat-to-electricity conversion must remain separate.",
+        "Temperature ceiling alone does not establish energy density, efficiency, availability or economics."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "FUSION-MHD-SAM-NEKRS-2026",
+      "lane": "FUSION_BLANKET_MHD",
+      "evidence_class": "PUBLISHED_NUMERICAL_STUDY",
+      "source": {
+        "title": "MHD capabilities in SAM and NekRS for fusion liquid metal blanket applications",
+        "publisher": "Fusion Engineering and Design",
+        "publication_date": "2026-09",
+        "doi": "10.1016/j.fusengdes.2026.115888",
+        "url": "https://doi.org/10.1016/j.fusengdes.2026.115888"
+      },
+      "observations": [],
+      "source_conclusion": "Study reports reduced-order MHD modelling in SAM, high-fidelity modelling in NekRS, analytical/cross-code comparisons, and validation against historical ALEX experimental data.",
+      "comparison_status": "SOURCE_REPRODUCTION_REQUIRED",
+      "blockers": [
+        "Exact case configurations, data access, source commits and per-case metrics must be extracted.",
+        "Paper-level validation does not validate a new Luminous implementation.",
+        "Reduced-order and high-fidelity results remain separate model evidence classes."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "FUSION-MHD-WCLL-MOCKUP-2025",
+      "lane": "FUSION_BLANKET_MHD",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Characterization of MHD pressure losses in a mock-up of the WCLL Test Blanket Module",
+        "publisher": "Fusion Engineering and Design",
+        "publication_date": "2025-10",
+        "doi": "10.1016/j.fusengdes.2025.115216",
+        "url": "https://doi.org/10.1016/j.fusengdes.2025.115216"
+      },
+      "observations": [],
+      "source_conclusion": "Scaled WCLL mock-up with pressure measurements at multiple locations under varied liquid-metal flow rates and magnetic fields; component-resolved and total pressure-loss correlation reported.",
+      "comparison_status": "SOURCE_REPRODUCTION_REQUIRED",
+      "blockers": [
+        "Data are reported as available on request; rights/access and exact uncertainty must be admitted.",
+        "Scaled mock-up is not a full blanket qualification."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "FUSION-MHD-OPENFOAM-MANIFOLD-2026",
+      "lane": "FUSION_BLANKET_MHD",
+      "evidence_class": "PUBLISHED_NUMERICAL_STUDY",
+      "source": {
+        "title": "Numerical investigation of 3D MHD pressure drop in a prototypical fusion blanket manifold using OpenFOAM",
+        "publisher": "Fusion Engineering and Design",
+        "publication_date": "2026-03",
+        "doi": "10.1016/j.fusengdes.2025.115592",
+        "url": "https://doi.org/10.1016/j.fusengdes.2025.115592"
+      },
+      "observations": [
+        {
+          "metric": "source_reported_simulations",
+          "value": 45,
+          "unit": "count"
+        },
+        {
+          "metric": "source_reported_correlation_fit_r_squared",
+          "value": 0.9914,
+          "qualifier": "source-reported correlation fit; not an independent predictive validation metric",
+          "unit": "dimensionless"
+        }
+      ],
+      "comparison_status": "SOURCE_REPRODUCTION_REQUIRED",
+      "blockers": [
+        "Correlation fit is not an out-of-sample error estimate.",
+        "Exact geometry, case data, OpenFOAM version and validation split must be extracted."
+      ],
+      "luminous_reproduction": false
+    }
+  ],
+  "negative_controls": [
+    {
+      "control_id": "NC-001",
+      "condition": "Compare 25 kWh/kg H2 and 33 kWh/kg H2 without matching pressure, feed, conversion and energy boundaries.",
+      "expected_disposition": "NOT_COMPARABLE"
+    },
+    {
+      "control_id": "NC-002",
+      "condition": "Promote LBNL 10 kWh/kg H2 techno-economic threshold to measured plasma performance.",
+      "expected_disposition": "REJECT_EVIDENCE_CLASS_MISMATCH"
+    },
+    {
+      "control_id": "NC-003",
+      "condition": "Treat ammonia reactor conversion as hydrogen purity or recoverable delivered hydrogen.",
+      "expected_disposition": "REJECT_OUTPUT_SEMANTIC_MISMATCH"
+    },
+    {
+      "control_id": "NC-004",
+      "condition": "Treat Rondo manufacturer-reported >97% thermal round-trip efficiency as independently audited or electricity-to-electricity efficiency.",
+      "expected_disposition": "REJECT_EVIDENCE_OR_BOUNDARY_MISMATCH"
+    },
+    {
+      "control_id": "NC-005",
+      "condition": "Rank plasma methane pyrolysis above shock-wave/microwave based only on one reactor paper.",
+      "expected_disposition": "NOT_COMPARABLE_REVIEW_REPRODUCTION_REQUIRED"
+    },
+    {
+      "control_id": "NC-006",
+      "condition": "Infer thermal store efficiency from maximum temperature or capacity alone.",
+      "expected_disposition": "REJECT_INSUFFICIENT_METRICS"
+    },
+    {
+      "control_id": "NC-007",
+      "condition": "Use SAM reduced-order MHD output as a NekRS result or experimental observation.",
+      "expected_disposition": "REJECT_EVIDENCE_CLASS_MISMATCH"
+    },
+    {
+      "control_id": "NC-008",
+      "condition": "Use a straight-duct Hartmann solution as blanket-manifold validation.",
+      "expected_disposition": "REJECT_MODEL_APPLICABILITY_MISMATCH"
+    },
+    {
+      "control_id": "NC-009",
+      "condition": "Treat missing pumps, cooling, gas separation, compression or standby energy as zero.",
+      "expected_disposition": "REJECT_INCOMPLETE_BOUNDARY"
+    },
+    {
+      "control_id": "NC-010",
+      "condition": "Compare thermal round-trip efficiency with electricity-to-electricity round-trip efficiency.",
+      "expected_disposition": "REJECT_ENERGY_QUALITY_MISMATCH"
+    },
+    {
+      "control_id": "NC-011",
+      "condition": "Promote any source register entry into a Luminous reproduction or measured observation.",
+      "expected_disposition": "REJECT_CLAIM_CEILING_VIOLATION"
+    }
+  ]
+}
