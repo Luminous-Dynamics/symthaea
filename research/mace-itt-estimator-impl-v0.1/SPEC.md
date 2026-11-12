@@ -7,9 +7,9 @@ Every row represents one matched task × seed pair and contains:
 - one 64-character SHA-256 stratum_digest that binds model/harness/prompt/tool-policy/permissions/environment/evaluator configuration;
 - arm_order (with_skill_first or without_skill_first);
 - distinct run IDs for both arms;
-- task verdict, mandatory-control verdict, unauthorized-effect verdict and treatment-arm lifecycle diagnostics for both runs.
+- task verdict, mandatory-control verdict, unauthorized-effect verdict and treatment-arm six-stage lifecycle diagnostics for both runs.
 
-All records in one invocation must use the same experiment, configuration stratum, task revision per task and task domain per task. The estimator rejects duplicate pair IDs, run IDs and task/seed pairs. Stage flags must respect retrieved → selected → loaded → invoked → executed. The no-skill arm cannot claim the treatment skill's lifecycle.
+All records in one invocation must use the same experiment, configuration stratum, task revision per task and task domain per task. The estimator rejects duplicate pair IDs, run IDs and task/seed pairs. Stage flags must respect retrieved → selected → resolved → loaded → invoked → executed. The no-skill arm cannot claim the treatment skill's lifecycle.
 
 ## Endpoints
 
