@@ -83,7 +83,10 @@
         "test_cell_ids",
         "train_design_group_ids",
         "validation_design_group_ids",
-        "test_design_group_ids"
+        "test_design_group_ids",
+        "train_protocol_group_ids",
+        "validation_protocol_group_ids",
+        "test_protocol_group_ids"
       ],
       "properties": {
         "split_id": {
@@ -135,6 +138,27 @@
           "uniqueItems": true
         },
         "test_design_group_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "train_protocol_group_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "validation_protocol_group_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "test_protocol_group_ids": {
           "type": "array",
           "items": {
             "type": "string"
