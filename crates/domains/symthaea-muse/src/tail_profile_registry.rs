@@ -55,6 +55,11 @@ pub struct TailTopologyEvidence {
     pub output_chain_sha256: String,
     pub segmentation_policy_sha256: String,
     pub dataset_revision_sha256: String,
+    /// Frozen source-composition population/domain definition (style, meter,
+    /// instrumentation, density and other inclusion strata).
+    pub source_domain_profile_sha256: String,
+    /// Frozen lineage sampling method and inclusion/exclusion protocol.
+    pub sampling_protocol_sha256: String,
     pub profile_builder_artifact_sha256: String,
     pub operation_family: String,
     pub sample_rate_hz: u32,
@@ -255,6 +260,8 @@ pub fn verify_tail_topology_evidence(
         ("output_chain_sha256", &evidence.output_chain_sha256),
         ("segmentation_policy_sha256", &evidence.segmentation_policy_sha256),
         ("dataset_revision_sha256", &evidence.dataset_revision_sha256),
+        ("source_domain_profile_sha256", &evidence.source_domain_profile_sha256),
+        ("sampling_protocol_sha256", &evidence.sampling_protocol_sha256),
         ("profile_builder_artifact_sha256", &evidence.profile_builder_artifact_sha256),
     ] {
         validate_sha256(field, digest)?;
@@ -290,6 +297,8 @@ pub struct TailProfileTopology {
     pub output_chain_sha256: String,
     pub segmentation_policy_sha256: String,
     pub dataset_revision_sha256: String,
+    pub source_domain_profile_sha256: String,
+    pub sampling_protocol_sha256: String,
     pub profile_builder_artifact_sha256: String,
     pub operation_family: String,
     pub sample_rate_hz: u32,
@@ -310,6 +319,8 @@ fn topology_from_evidence(e: &TailTopologyEvidence) -> TailProfileTopology {
         output_chain_sha256: e.output_chain_sha256.clone(),
         segmentation_policy_sha256: e.segmentation_policy_sha256.clone(),
         dataset_revision_sha256: e.dataset_revision_sha256.clone(),
+        source_domain_profile_sha256: e.source_domain_profile_sha256.clone(),
+        sampling_protocol_sha256: e.sampling_protocol_sha256.clone(),
         profile_builder_artifact_sha256: e.profile_builder_artifact_sha256.clone(),
         operation_family: e.operation_family.clone(),
         sample_rate_hz: e.sample_rate_hz,
@@ -558,7 +569,8 @@ fn cluster_maxima(
     if observations.len() > MAX_LINEAGES * 64 { return Err(TailProfileError::TooManyLineages); }
     let mut event_receipts = BTreeSet::new();
     let mut lineage_maxima = BTreeMap::<String, u64>::new();
-    let mut score_coverage = BTreeMap::<(String, String), (usize, BTreeSet<usize>)>::new();
+    let mut score_coverage =
+        BTreeMap::<(String, String, String), (usize, BTreeSet<usize>)>::new();
     let mut receipts = Vec::with_capacity(observations.len());
     for verified in observations {
         let o = &verified.observation;
@@ -597,7 +609,11 @@ fn cluster_maxima(
         if !event_receipts.insert(o.observation_sha256.clone()) {
             return Err(TailProfileError::DuplicateEventReceipt);
         }
-        let score_key = (o.source_lineage_sha256.clone(), o.source_score_sha256.clone());
+        let score_key = (
+            o.source_lineage_sha256.clone(),
+            o.source_score_sha256.clone(),
+            o.baseline_renderer_receipt_sha256.clone(),
+        );
         let coverage = score_coverage.entry(score_key).or_insert_with(|| {
             (o.source_score_event_count, BTreeSet::new())
         });
@@ -1000,6 +1016,8 @@ mod tests {
             output_chain_sha256: digest("output-chain"),
             segmentation_policy_sha256: digest("segmentation-policy"),
             dataset_revision_sha256: digest("dataset-revision"),
+            source_domain_profile_sha256: digest("source-domain-profile"),
+            sampling_protocol_sha256: digest("lineage-sampling-protocol"),
             profile_builder_artifact_sha256: digest("profile-builder"),
             operation_family: "remove_event".to_owned(),
             sample_rate_hz: 48_000,
@@ -1057,7 +1075,7 @@ mod tests {
             measured_tail_frames: tail,
             output_frame_count: 10_000,
             segmented_influence_report_sha256: digest(&format!("segmented-{lineage}-{event}")),
-            baseline_renderer_receipt_sha256: digest(&format!("base-{lineage}-{event}")),
+            baseline_renderer_receipt_sha256: digest(&format!("base-render-{lineage}")),
             counterfactual_renderer_receipt_sha256: digest(&format!("counter-{lineage}-{event}")),
             repeatability_calibration_sha256: digest("repeatability"),
             topology_sha256: topology.topology_sha256().to_owned(),
@@ -1178,6 +1196,29 @@ mod tests {
             build_tail_profile(&duplicate, &qual, &config()).unwrap_err(),
             TailProfileError::DuplicateSourceEventObservation
         );
+    }
+
+
+    #[test]
+    fn multiple_complete_baseline_render_scenarios_still_count_as_one_lineage() {
+        let topology = verify_tail_topology_evidence(&topology(true), &TestSignatureVerifier).unwrap();
+        let (mut cal, qual) = splits(&topology, 20);
+        let original = cal.clone();
+        for row in original.iter().filter(|row| row.observation.source_lineage_sha256 == digest("cal-0")) {
+            let mut second_take = row.clone();
+            second_take.observation.baseline_renderer_receipt_sha256 =
+                digest("base-render-cal-0-take-2");
+            second_take.observation.counterfactual_renderer_receipt_sha256 =
+                digest(&format!("counter-take-2-{}", second_take.observation.source_event_index));
+            second_take.observation.segmented_influence_report_sha256 =
+                digest(&format!("segmented-take-2-{}", second_take.observation.source_event_index));
+            second_take.observation.observation_sha256 =
+                observation_digest(&second_take.observation).unwrap();
+            cal.push(second_take);
+        }
+        let profile = build_tail_profile(&cal, &qual, &config()).unwrap();
+        assert_eq!(profile.calibration_lineage_sha256s.len(), 59);
+        assert_eq!(profile.calibration_cluster_tail_frames.len(), 59);
     }
 
     #[test]
