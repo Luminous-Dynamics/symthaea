@@ -1,0 +1,40 @@
+name: IEEE-754 Enclosure Qualification Oracle
+
+on:
+  push:
+    paths:
+      - "tools/ieee754-enclosure-qualifier/**"
+      - ".github/workflows/ieee754-enclosure-qualification.yml"
+  pull_request:
+    paths:
+      - "tools/ieee754-enclosure-qualifier/**"
+      - ".github/workflows/ieee754-enclosure-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  exact-rational-qualification:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust 1.96
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Verify formatting
+        run: cargo fmt --manifest-path tools/ieee754-enclosure-qualifier/Cargo.toml -- --check
+      - name: Run Rust unit tests
+        run: cargo test --locked --manifest-path tools/ieee754-enclosure-qualifier/Cargo.toml
+      - name: Run Clippy
+        run: cargo clippy --locked --manifest-path tools/ieee754-enclosure-qualifier/Cargo.toml --all-targets -- -D warnings
+      - name: Emit raw-bit qualification vectors
+        run: cargo run --locked --release --manifest-path tools/ieee754-enclosure-qualifier/Cargo.toml --bin emit-vectors > /tmp/ieee754-vectors.txt
+      - name: Verify against independent exact rationals
+        run: python3 tools/ieee754-enclosure-qualifier/verify.py /tmp/ieee754-vectors.txt
+      - name: Report Rust toolchain and target
+        run: |
+          rustc --version --verbose
+          rustc -vV | grep '^host:'
