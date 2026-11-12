@@ -329,7 +329,10 @@
         "operator_Hilbert_Schmidt_norm",
         "operator_spread_front",
         "seed_and_depth",
-        "gate_count"
+        "gate_count",
+        "independent_seed_mean_squared_commutator_profile",
+        "per_site_commutator_standard_error",
+        "maximum_operator_norm_drift"
       ],
       "acceptance": {
         "normalized_squared_commutator_range": [
@@ -340,13 +343,15 @@
         "depth_zero_Pauli_reference": "C_Z(source)=2; C_Z(other sites)=0; C_X(all sites)=0",
         "independent_full_matrix_comparator_error": 1e-8,
         "multi_seed_statistics_required_for_front_velocity": true,
-        "claim_ceiling": "Operator influence for the declared finite-depth circuit; not a recovery decoder, Page curve, or proof of thermalization."
+        "claim_ceiling": "Operator influence for the declared finite-depth circuit; not a recovery decoder, Page curve, or proof of thermalization.",
+        "independent_seed_standard_error_required": true
       },
       "implementation": {
         "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
         "api": "simulate_u1_operator_spreading",
         "dense_limit_qubits": 8,
-        "status": "source_authored_and_independent_numpy_matrix_check; Rust execution pending"
+        "status": "single-seed and independent-seed operator-spreading APIs authored; Rust execution pending",
+        "ensemble_api": "sample_u1_operator_spreading_ensemble"
       },
       "claim_ceiling": "Finite-dimensional operator spreading under U(1)-conserving random circuits. No decoder or gravitational black-hole claim."
     },
