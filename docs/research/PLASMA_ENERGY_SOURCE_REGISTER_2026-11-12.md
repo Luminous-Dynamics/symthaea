@@ -401,3 +401,18 @@ Derived from those source-specific mixture values, charged-product energy share 
 A 2026 reactivity study reports a ballpark bremsstrahlung crossover temperature of 31 keV for D–³He versus 4.4 keV for D–T under equal-ion/electron-temperature assumptions; it explicitly describes the values as estimates and notes that colder electrons alter them. DOI https://doi.org/10.1088/1361-6587/ae3b71.
 
 The design question is now fuel × confinement × converter co-design: what fraction of each reaction-origin population is actually transported through the mirror/expander, captured, electrically recovered and conditioned, after plasma sustainment, magnet/cryogenic loads, neutron blanket heat and auxiliaries are included? Do not infer an all-charged primary reaction means all plant power is recoverable.
+
+
+### 9.9 Miniaturized and numbered-up low-temperature plasma devices
+
+Four new source cases were admitted to the machine-readable corpus under MICROPLASMA-001 (#11780):
+
+**Mini atmospheric-pressure helium plasma jet (Mao et al., 2026).** *Environmental Technology & Innovation* 42, 104852. DOI https://doi.org/10.1016/j.eti.2026.104852. The source reports a custom power supply approximately 100 g and 15 × 10 × 2 cm, a 54 mm glass tube, 2 L/min helium flow and total component cost below USD 45. Its in-vitro antimicrobial results are source-specific. The paper reports >20 h of power-supply operation before tests but does not quantify long-term electrode wear / treatment drift; a limited treatment area is a practical limitation. Full text: https://pmc.ncbi.nlm.nih.gov/articles/PMC13290277/.
+
+**Membrane-stabilized microfluidic DBD chip (Liu et al., 2025).** *Lab on a Chip* 25(12), 2807–2815. DOI https://doi.org/10.1039/D4LC00960F. A hydrophobic porous membrane passes plasma while blocking liquid, stabilizing the gas/liquid interface. Gold nanoparticle synthesis reports 7.31–11.32 nm particle sizes and 1.8 nm standard deviation. Throughput, complete grid-to-product energy, membrane life and industrial cost remain separate questions. PubMed: https://pubmed.ncbi.nlm.nih.gov/40406968/.
+
+**43-element LTCC cold atmospheric plasma array (Bhattacharya et al., published 30 December 2025; issue record 2026).** *IEEE Transactions on Plasma Science* 54(2), 496–502. DOI https://doi.org/10.1109/TPS.2025.3646554. The array provides a 10 × 10 cm treatment area from 43 linear discharge elements; the source reports a 91% CFU decrease for a specified *Pseudomonas fluorescens* biofilm coupon after 150 s at a 1.5 cm standoff. It is an application-specific array result, not universal antimicrobial performance. Full text: https://pmc.ncbi.nlm.nih.gov/articles/PMC12923079/.
+
+**Individually ignitable RF microplasma array (Martinet et al., 2023).** *Plasma Processes and Polymers* 20, e2200131. DOI https://doi.org/10.1002/ppap.202200131. Five cells are demonstrated with individual ignition and quenching. The authors discuss scaling to tens or hundreds of cells; this is a proposed direction, not a demonstrated large array.
+
+The key paradigm is **numbering-up**: preserve useful per-cell physics and replicate independently controlled modules, then prove flow/power distribution, cell-to-cell uniformity, cross-talk, cell-fault isolation, serviceability and full-system energy. Miniature cell success does not imply array success. A microfluidic reaction-volume advantage does not imply industrial throughput. Low source component cost does not imply low lifecycle cost.
