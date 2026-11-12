@@ -1,0 +1,74 @@
+name: Muse Locality Repair Planner
+
+on:
+  push:
+    branches:
+      - "research/mel-mr-eval-022-*"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse/src/locality_repair_planner.rs"
+      - "crates/domains/symthaea-muse/src/counterfactual_influence.rs"
+      - "crates/domains/symthaea-muse/src/counterfactual_interaction.rs"
+      - "crates/domains/symthaea-muse/src/interaction_probe_plan.rs"
+      - "crates/domains/symthaea-muse/src/edit_contract.rs"
+      - "crates/domains/symthaea-muse/src/symbolic_audio_binding.rs"
+      - ".github/workflows/muse-locality-repair-planner.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse/src/locality_repair_planner.rs"
+      - "crates/domains/symthaea-muse/src/counterfactual_influence.rs"
+      - "crates/domains/symthaea-muse/src/counterfactual_interaction.rs"
+      - "crates/domains/symthaea-muse/src/interaction_probe_plan.rs"
+      - "crates/domains/symthaea-muse/src/edit_contract.rs"
+      - "crates/domains/symthaea-muse/src/symbolic_audio_binding.rs"
+      - ".github/workflows/muse-locality-repair-planner.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-locality-repair-planner-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: exact-head-locality-repair-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'exact_head=%s\n' "$actual"
+
+      - name: Verify Cargo workspace metadata
+        run: cargo metadata --locked --no-deps --format-version 1 > /tmp/muse-workspace-metadata.json
+
+      - name: Format-check the new planner module
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-muse/src/locality_repair_planner.rs
+
+      - name: Run locality repair planner tests
+        run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib locality_repair_planner::tests
+
+      - name: Run Clippy for Muse theory library
+        run: cargo clippy --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib -- -D warnings
