@@ -1,0 +1,387 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/schemas/transport/assb_practical_translation_v0_1.schema.json",
+  "title": "ASSB practical-cell translation manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "campaign_id",
+    "evidence",
+    "observations",
+    "comparisons"
+  ],
+  "properties": {
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "evidence_id",
+          "source_digest",
+          "evidence_class",
+          "admission",
+          "claim_scope",
+          "metrology_ref"
+        ],
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_digest": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "evidence_class": {
+            "enum": [
+              "physical_measurement",
+              "independent_laboratory",
+              "literature",
+              "simulation",
+              "synthetic"
+            ]
+          },
+          "admission": {
+            "enum": [
+              "candidate",
+              "admitted_for_research",
+              "admitted_for_evaluation",
+              "blocked",
+              "unknown"
+            ]
+          },
+          "claim_scope": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metrology_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observation_id",
+          "design",
+          "pressure",
+          "mass_inventory",
+          "cycles_observed",
+          "outcome_status",
+          "event_cycle",
+          "capacity_retention_permille",
+          "impedance_growth_permille",
+          "evidence_id"
+        ],
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "design": {
+            "$ref": "#/$defs/design"
+          },
+          "pressure": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "fabrication_pressure_mpa",
+              "operating_pressure_mpa",
+              "measurement_method",
+              "instrument_ref",
+              "uncertainty_mpa"
+            ],
+            "properties": {
+              "fabrication_pressure_mpa": {
+                "type": "number",
+                "minimum": 0
+              },
+              "operating_pressure_mpa": {
+                "type": "number",
+                "minimum": 0
+              },
+              "measurement_method": {
+                "type": "string",
+                "minLength": 1
+              },
+              "instrument_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uncertainty_mpa": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          },
+          "mass_inventory": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/mass_inventory"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cycles_observed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "outcome_status": {
+            "enum": [
+              "observed_eol",
+              "right_censored",
+              "failed",
+              "invalid",
+              "incomplete",
+              "synthetic_outcome"
+            ]
+          },
+          "event_cycle": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
+          },
+          "capacity_retention_permille": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "impedance_growth_permille": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "evidence_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "comparisons": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "comparison_id",
+          "baseline_observation_id",
+          "candidate_observation_id",
+          "matched_axes"
+        ],
+        "properties": {
+          "comparison_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseline_observation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "candidate_observation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "matched_axes": {
+            "type": "array",
+            "minItems": 14,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "technology_lane",
+                "chemistry_family",
+                "electrolyte_family",
+                "cathode_family",
+                "anode_configuration",
+                "cell_format",
+                "test_level",
+                "areal_capacity",
+                "cathode_loading",
+                "electrolyte_thickness",
+                "temperature",
+                "current_density",
+                "voltage_window",
+                "cycle_protocol"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "design_id",
+        "revision",
+        "technology_lane",
+        "chemistry_family",
+        "electrolyte_family",
+        "cathode_family",
+        "anode_configuration",
+        "cell_format",
+        "test_level",
+        "areal_capacity_mah_cm2",
+        "cathode_loading_mg_cm2",
+        "electrolyte_thickness_um",
+        "temperature_c",
+        "current_density_ma_cm2",
+        "voltage_window",
+        "cycle_protocol"
+      ],
+      "properties": {
+        "design_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "technology_lane": {
+          "enum": [
+            "sulfide_lithium_metal",
+            "halide",
+            "oxide",
+            "polymer_composite",
+            "silicon_assb",
+            "hybrid_solid_liquid"
+          ]
+        },
+        "chemistry_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "electrolyte_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cathode_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "anode_configuration": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cell_format": {
+          "type": "string",
+          "minLength": 1
+        },
+        "test_level": {
+          "enum": [
+            "full_cell",
+            "symmetric_cell",
+            "half_cell"
+          ]
+        },
+        "areal_capacity_mah_cm2": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cathode_loading_mg_cm2": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "electrolyte_thickness_um": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "temperature_c": {
+          "type": "number",
+          "exclusiveMinimum": -273.15
+        },
+        "current_density_ma_cm2": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "voltage_window": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cycle_protocol": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "mass_inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cathode_active_mg",
+        "anode_active_mg",
+        "electrolyte_mg",
+        "separator_or_support_mg",
+        "current_collectors_and_tabs_mg",
+        "casing_and_seals_mg",
+        "declared_full_cell_mass_mg",
+        "closure_tolerance_mg",
+        "boundary_digest"
+      ],
+      "properties": {
+        "cathode_active_mg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "anode_active_mg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "electrolyte_mg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "separator_or_support_mg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "current_collectors_and_tabs_mg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "casing_and_seals_mg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "declared_full_cell_mass_mg": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "closure_tolerance_mg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "boundary_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}
