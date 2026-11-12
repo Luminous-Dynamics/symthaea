@@ -584,11 +584,7 @@ pub fn plan_retention(
 mod tests {
     use super::*;
 
-    fn context(
-        id: &str,
-        tokens: u64,
-        fixture: (u64, u64, bool, u32, u32, u64),
-    ) -> ContextEntry {
+    fn context(id: &str, tokens: u64, fixture: (u64, u64, bool, u32, u32, u64)) -> ContextEntry {
         let (last_access_tick, regret, recovery_critical, phase, reuse, prefill) = fixture;
         ContextEntry {
             context_id: id.to_owned(),
