@@ -270,6 +270,18 @@ https://doi.org/10.1002/anie.2890151
 
 The benchmark should therefore report a multi-axis vector—pressure, full-cell mass/volume, areal capacity, rate, life, electrolyte thickness, inactive fraction, batch yield and cost—rather than a single record number. The first near-ambient demonstrator should be a reproduction baseline; the USABC and ≥5 mAh/cm² / ≥2C goals are stretch targets.
 
+### New high-rate halide frontier: grain-boundary transport can dominate bulk conductivity
+
+The 4 November 2026 JACS paper **“Amorphous Halide Cathodes Enable 75C All-Solid-State Lithium Batteries”** reports that amorphous LiVCl4 lowers grain-boundary transport barriers even though bulk Li+ conductivity is lower. It reports a 90 wt% active cathode at 74.3 mAh/g and 5 mA/cm² versus 10.2 mAh/g for the crystalline counterpart; 84.2% capacity utilization at 53.4 mg/cm² loading; and, with amorphous LiTaOCl4, 102.1 mAh/g at 20 mA/cm² (~75C) with 82.3% retention after 16,000 cycles.
+
+Sources:
+- https://pubmed.ncbi.nlm.nih.gov/42984111/
+- https://doi.org/10.1021/jacs.6c16957
+
+Treat this as a **materials/electrode high-rate research comparator**, not an automotive complete-cell or Ah-class pouch result unless full-cell mass/volume boundaries, usable energy, pressure, current collection and exact test protocol support that claim. The 75C figure must stay bound to its specific cell/test definition.
+
+**Benchmark implication:** include a matched crystalline-vs-amorphous and grain-boundary/interphase ablation. Compare bulk conductivity against grain-boundary impedance, effective composite-electrode transport, active fraction, areal capacity and rate. Preserve electrolyte/catholyte mass, current collector and inactive components. A bulk-conductivity-only model should be tested as a deliberately limited baseline. The intended paradigm is optimization of the **effective transport network and interface distribution**, not maximization of a single bulk conductivity value. This is owned by SSE-001 #4993 + MAT-INTERFACE #6227 and feeds the practical-cell audit #11759; no new material or transport engine is needed.
+
 ### Interlaboratory reproducibility is a first-class research lane
 
 A separate programme, **ASSB-ROUNDROBIN-001 #11784** / draft [PR #11787](https://github.com/Luminous-Dynamics/symthaea/pull/11787), now has a first read-only data/audit slice on branch `research/assb-roundrobin-v0.1`. Exact head `57bcca2d2c8397e7ac54189247a390f1a9e4549d` passed schema/fixture validation, locked metadata, formatting, **16/16 Rust tests** and strict Clippy (https://github.com/Luminous-Dynamics/symthaea/actions/runs/43293053009). The synthetic 3-lab × 3-cell fixture is explicitly `KnownAnswerFixtureOnly`; no physical labs participated. The PR remains draft. It composes the ASSB translation audit rather than duplicating it.
