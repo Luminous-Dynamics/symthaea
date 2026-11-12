@@ -5316,8 +5316,6 @@ mod symmetry_resolved_page_tests {
     }
 }
 
-
-
 /// Per-layer width statistics for a domain-wall charge profile. Width squared
 /// is the second central moment of the absolute discrete density gradient.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -5378,7 +5376,9 @@ pub fn analyze_u1_domain_wall_dynamic_exponent(
 ) -> Result<U1DomainWallDynamicScalingResult, QuantumInformationError> {
     validate_tolerance(tolerance)?;
     if sample_count < 3 {
-        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(
+            sample_count,
+        ));
     }
     if fit_start_layer == 0
         || fit_end_layer <= fit_start_layer
