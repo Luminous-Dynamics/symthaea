@@ -133,6 +133,7 @@ struct AuditReport {
 #[derive(Debug, Serialize)]
 struct PairResult {
     pair_id: String,
+    background_measurement_method: String,
     frequency_scale_factor: Option<f64>,
     spl_correction_db: Option<f64>,
     combined_uncertainty_rule: String,
@@ -142,6 +143,8 @@ struct PairResult {
 #[derive(Debug, Serialize)]
 struct BandResult {
     band_id: String,
+    signal_to_background_margin_db: f64,
+    background_correction_applied: bool,
     predicted_full_scale_source_level_db: Option<f64>,
     observed_full_scale_source_level_db: f64,
     residual_db: Option<f64>,
@@ -470,6 +473,8 @@ fn audit(case: &Case) -> AuditReport {
 
             band_results.push(BandResult {
                 band_id: band.band_id.clone(),
+                signal_to_background_margin_db: band.signal_to_background_margin_db,
+                background_correction_applied: band.background_correction_applied,
                 predicted_full_scale_source_level_db: predicted,
                 observed_full_scale_source_level_db: band.observed_full_scale_source_level_db,
                 residual_db: residual,
@@ -483,6 +488,7 @@ fn audit(case: &Case) -> AuditReport {
 
         pair_results.push(PairResult {
             pair_id: pair.pair_id.clone(),
+            background_measurement_method: pair.background_measurement_method.clone(),
             frequency_scale_factor: Some(frequency_scale),
             spl_correction_db: delta_spl,
             combined_uncertainty_rule: if pair.bands.iter().all(|b| b.uncertainty.composition == "CONSERVATIVE_LINEAR") {
