@@ -953,6 +953,97 @@
         "Gas, resistance and plasma have different atmospheres and thermal histories; property differences are not a direct energy-efficiency ranking."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "FUSION-FUEL-DHE3-ARC-NEUTRON-PARTITION-2026",
+      "lane": "FUSION_FUEL_ENERGY_PARTITION",
+      "evidence_class": "PUBLISHED_NUMERICAL_STUDY",
+      "source": {
+        "authors": "Morandi, Pettinari and Zucchetti",
+        "title": "Activation analysis of a compact Tokamak using Deuterium–Helium3 fuel",
+        "publisher": "Fusion Engineering and Design",
+        "publication_date": "2026-01",
+        "volume": "222",
+        "article_number": "115491",
+        "doi": "10.1016/j.fusengdes.2025.115491",
+        "url": "https://doi.org/10.1016/j.fusengdes.2025.115491",
+        "full_text": "https://iris.polito.it/retrieve/b1db3ac5-9137-4109-92f1-fbf638e5050d/Activation%20analysis%20of%20a%20compact%20Tokamak%20using%20Deuterium%E2%80%93Helium3%20fuel.pdf"
+      },
+      "model_scope": {
+        "reactor_reference": "simplified ARC-class compact tokamak",
+        "d_he3_fuel_mixture": {
+          "deuterium_percent": 50,
+          "helium3_percent": 50
+        },
+        "comparison_fusion_power_MW": 525,
+        "included_channels": [
+          "D-He3",
+          "D-D branch 1",
+          "D-D branch 2",
+          "secondary D-T from tritium produced in D-D"
+        ],
+        "omitted_secondary_channels": [
+          "T-T",
+          "T-He3",
+          "He3-He3"
+        ],
+        "omission_reason": "paper states the omitted channels have significantly lower reactivity for its model"
+      },
+      "configurations": [
+        {
+          "configuration_id": "DT-REFERENCE",
+          "fuel": "deuterium-tritium",
+          "average_temperature_keV": 15.3,
+          "electron_density_cm3": 70000000000000,
+          "source_reported_average_energy_per_reaction_MeV": 17.5,
+          "source_reported_neutron_energy_fraction_percent": 80.06,
+          "derived_charged_energy_fraction_percent": 19.94
+        },
+        {
+          "configuration_id": "DHE3-50D-50HE3",
+          "fuel": "50% deuterium / 50% helium-3",
+          "average_temperature_keV": 69,
+          "electron_density_cm3": 130000000000000,
+          "source_reported_average_energy_per_reaction_MeV": 16.4,
+          "source_reported_neutron_energy_fraction_percent": 2.9,
+          "derived_charged_energy_fraction_percent": 97.1
+        }
+      ],
+      "primary_reaction_energy_partition": {
+        "d_he3": {
+          "reaction": "D + 3He -> alpha + proton",
+          "alpha_energy_MeV": 3.67,
+          "proton_energy_MeV": 14.68,
+          "total_MeV": 18.35,
+          "charged_product_energy_fraction_percent": 100,
+          "scope": "primary reaction only, before side reactions and any transport/collection losses"
+        },
+        "dt": {
+          "reaction": "D + T -> alpha + neutron",
+          "alpha_energy_MeV": 3.52,
+          "neutron_energy_MeV": 14.07,
+          "total_MeV": 17.59,
+          "charged_product_energy_fraction_percent": 20.0113700966,
+          "scope": "primary reaction only"
+        }
+      },
+      "derived_mixture_arithmetic": {
+        "d_he3_charged_energy_MeV_per_average_source_reported_reaction": 15.9244,
+        "dt_charged_energy_MeV_per_average_source_reported_reaction": 3.4895,
+        "charged_energy_ratio_dhe3_to_dt": 4.563,
+        "fractional_charged_energy_ratio_dhe3_to_dt": 4.8706
+      },
+      "source_conclusion": "Under its simplified 525 MW ARC-class model, the 50%D/50%3He case has much lower neutron energy share and at least an order-of-magnitude lower neutron flux in selected components than the DT case. The paper includes DD and secondary DT side reactions and does not model plasma stability or ignition.",
+      "comparison_status": "FUEL_MIXTURE_NUMERICAL_MODEL_NOT_DIRECT_CONVERSION_DEMONSTRATION",
+      "blockers": [
+        "The study is a simplified neutronics/activation model, not an electrostatic direct-conversion experiment.",
+        "The 69 keV D-He3 and 15.3 keV DT points are model conditions for a 525 MW comparison, not a measured ignition demonstration.",
+        "The model includes DD branches and secondary DT neutron production; D-He3 fuel must not be described as neutron-free or fully aneutronic.",
+        "Charged-product energy share is not captured energy: confinement, exhaust fraction, distribution, expander transport, converter collection/interception, power conditioning and auxiliaries remain unmeasured or unmodeled here.",
+        "The paper omits lower-reactivity secondary reaction channels and states that plasma stability/ignition physics are outside its scope.",
+        "The source's simplified geometry and reaction-rate assumptions must be preserved in any reproduction."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -1070,6 +1161,11 @@
       "control_id": "NC-HTTES-005",
       "condition": "Pool dried and pre-fired MWP ceramic specimens into one averaged outcome without stratifying specimen history.",
       "expected_disposition": "REJECT_EXPERIMENTAL_DESIGN_MISMATCH"
+    },
+    {
+      "control_id": "NC-DHE3-CHARGED-FRACTION-NOT-DEC-EFFICIENCY",
+      "condition": "Promote the source-model 97.1% charged-product energy share for a 50%D/50%3He fuel mixture into direct-converter efficiency or net plant electricity.",
+      "expected_disposition": "REJECT_OUTPUT_BOUNDARY_AND_EVIDENCE_CLASS_MISMATCH"
     }
   ],
   "derived_reference_checks": [
@@ -1124,6 +1220,28 @@
         "net_recovered_fraction_of_incident": 48.55072463768116
       },
       "interpretation": "Using the paper's rounded reported power values, suppressor-grid power is subtracted from gross recovered power. The derived net is 67 W and approximately 48.55% of 138 W, consistent with the paper's rounded 48% report. This is a check of the stated TMX test boundary, not a whole-plant or fusion-born energy efficiency.",
+      "luminous_measurement": false
+    },
+    {
+      "check_id": "DHE3-VS-DT-CHARGED-ENERGY-AVAILABILITY-001",
+      "source_case_id": "FUSION-FUEL-DHE3-ARC-NEUTRON-PARTITION-2026",
+      "evidence_class": "DERIVED_ARITHMETIC_FROM_PUBLISHED_NUMERICAL_FUEL_MIXTURE_MODEL",
+      "inputs": {
+        "dhe3_average_reaction_energy_MeV": 16.4,
+        "dhe3_neutron_energy_fraction_percent": 2.9,
+        "dt_average_reaction_energy_MeV": 17.5,
+        "dt_neutron_energy_fraction_percent": 80.06,
+        "dhe3_primary_reaction_charged_fraction_percent": 100
+      },
+      "derivation": {
+        "dhe3_model_mixture_charged_fraction_percent": 97.1,
+        "dt_model_mixture_charged_fraction_percent": 19.939999999999998,
+        "dhe3_charged_energy_MeV_per_average_reported_reaction": 15.924399999999999,
+        "dt_charged_energy_MeV_per_average_reported_reaction": 3.489499999999999,
+        "charged_fraction_ratio_dhe3_to_dt": 4.869608826479438,
+        "charged_energy_per_average_reaction_ratio_dhe3_to_dt": 4.563519128815017
+      },
+      "interpretation": "This derives charged-product energy share from the source's simplified fuel-mixture model. It is not a direct-conversion efficiency, particle collection fraction, fusion gain or net plant electricity. The model's higher D-He3 temperature/density, side reactions and omitted stability/ignition physics remain separate constraints.",
       "luminous_measurement": false
     }
   ]
