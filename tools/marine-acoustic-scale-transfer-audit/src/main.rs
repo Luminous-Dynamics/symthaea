@@ -51,7 +51,7 @@ struct ModelCampaign {
     wake_field_evidence_sha256: String,
     cavitation_state_evidence_sha256: String,
     water_quality_nuclei_evidence_sha256: String,
-    background_noise_corrected: bool,
+    background_measurement_per_condition_available: bool,
     facility_transfer_function_applied: bool,
 }
 
@@ -85,6 +85,8 @@ struct OperatingPointPair {
     cavitation_pattern_comparability: String,
     cavitation_pattern_evidence_sha256: String,
     model_raw_trace_sha256: String,
+    background_measurement_method: String,
+    background_raw_trace_sha256: String,
     bands: Vec<SpectralBand>,
 }
 
@@ -98,7 +100,8 @@ struct SpectralBand {
     full_scale_upper_hz: f64,
     model_source_level_db: f64,
     observed_full_scale_source_level_db: f64,
-    model_signal_above_background: bool,
+    signal_to_background_margin_db: f64,
+    background_correction_applied: bool,
     uncertainty: BandUncertainty,
 }
 
@@ -263,8 +266,8 @@ fn audit(case: &Case) -> AuditReport {
         }
     }
 
-    if !campaign.background_noise_corrected {
-        incomplete.push("model cavitation spectrum has not been declared background-noise corrected".to_string());
+    if !campaign.background_measurement_per_condition_available {
+        incomplete.push("background noise was not declared measured for every model test condition".to_string());
     }
     if !campaign.facility_transfer_function_applied {
         incomplete.push("model facility acoustic transfer-function correction is not declared as applied".to_string());
@@ -339,8 +342,14 @@ fn audit(case: &Case) -> AuditReport {
         if !is_sha256(&pair.operating_point_profile_sha256)
             || !is_sha256(&pair.cavitation_pattern_evidence_sha256)
             || !is_sha256(&pair.model_raw_trace_sha256)
+            || !is_sha256(&pair.background_raw_trace_sha256)
         {
-            incomplete.push(format!("pair {} lacks operating-point, cavitation-pattern or raw-trace evidence", pair.pair_id));
+            incomplete.push(format!("pair {} lacks operating-point, cavitation-pattern, model-trace or background-trace evidence", pair.pair_id));
+        }
+        if pair.background_measurement_method != "BARE_HUB"
+            && pair.background_measurement_method != "PRESSURE_SUPPRESSED"
+        {
+            blockers.push(format!("pair {} has unsupported background measurement method", pair.pair_id));
         }
 
         match pair.cavitation_pattern_comparability.as_str() {
@@ -405,8 +414,16 @@ fn audit(case: &Case) -> AuditReport {
                 blockers.push(format!("pair {} band {} is not an exact scaled-frequency match", pair.pair_id, band.band_id));
             }
 
-            if !band.model_signal_above_background {
-                incomplete.push(format!("pair {} band {} is background-dominated or unresolved", pair.pair_id, band.band_id));
+            if !band.signal_to_background_margin_db.is_finite()
+                || band.signal_to_background_margin_db < 0.0
+            {
+                blockers.push(format!("pair {} band {} has an invalid signal/background margin", pair.pair_id, band.band_id));
+            } else if band.signal_to_background_margin_db < 3.0 {
+                incomplete.push(format!("pair {} band {} is background-dominated (<3 dB) and cannot be used for scaling", pair.pair_id, band.band_id));
+            } else if band.signal_to_background_margin_db < 10.0
+                && !band.background_correction_applied
+            {
+                incomplete.push(format!("pair {} band {} requires ITTC background correction in the 3–10 dB margin range", pair.pair_id, band.band_id));
             }
 
             let u = &band.uncertainty;
@@ -659,9 +676,31 @@ mod tests {
     fn background_dominated_band_is_incomplete() {
         let mut case = synthetic_case();
         make_measured(&mut case);
-        case.operating_point_pairs[0].bands[0].model_signal_above_background = false;
+        case.operating_point_pairs[0].bands[0].signal_to_background_margin_db = 2.9;
         let report = audit(&case);
         assert_eq!(report.structural_disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn three_to_ten_db_background_margin_requires_correction() {
+        let mut case = synthetic_case();
+        make_measured(&mut case);
+        let band = &mut case.operating_point_pairs[0].bands[0];
+        band.signal_to_background_margin_db = 5.0;
+        band.background_correction_applied = false;
+        let report = audit(&case);
+        assert_eq!(report.structural_disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn corrected_three_to_ten_db_background_margin_is_eligible() {
+        let mut case = synthetic_case();
+        make_measured(&mut case);
+        let band = &mut case.operating_point_pairs[0].bands[0];
+        band.signal_to_background_margin_db = 5.0;
+        band.background_correction_applied = true;
+        let report = audit(&case);
+        assert_eq!(report.structural_disposition, "ELIGIBLE", "{:?}", report.incomplete_reasons);
     }
 
     #[test]
