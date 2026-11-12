@@ -140,7 +140,12 @@ pub fn run(
             }
         }
         fs::write(path, &rendered)
-            .with_context(|| format!("writing planetary-energy reference report {}", path.display()))?;
+            .with_context(|| {
+                format!(
+                    "writing planetary-energy reference report {}",
+                    path.display()
+                )
+            })?;
     }
     println!("{rendered}");
 
@@ -153,7 +158,10 @@ pub fn run(
     Ok(())
 }
 
-pub fn audit_ledgers(source_bytes: &[u8], competitive_bytes: &[u8]) -> Result<ReferenceAuditReport> {
+pub fn audit_ledgers(
+    source_bytes: &[u8],
+    competitive_bytes: &[u8],
+) -> Result<ReferenceAuditReport> {
     let source: SourceRegister =
         serde_json::from_slice(source_bytes).context("parsing planetary-energy source register")?;
     let competitive: CompetitiveSnapshot = serde_json::from_slice(competitive_bytes)
@@ -260,7 +268,10 @@ pub fn audit_ledgers(source_bytes: &[u8], competitive_bytes: &[u8]) -> Result<Re
             findings.push(reference_finding(
                 "SOURCE_CLAIM_BOUNDARY_INCOMPLETE",
                 subject,
-                "technology_scope, reported_facts, comparison_use and not_established must all be explicit",
+                concat!(
+                    "technology_scope, reported_facts, comparison_use and ",
+                    "not_established must all be explicit"
+                ),
             ));
         }
         if record
@@ -443,7 +454,9 @@ mod tests {
     const SOURCE_REGISTER: &str =
         include_str!("../../research/planetary-energy/source-register-v0.1.json");
     const COMPETITIVE_SNAPSHOT: &str =
-        include_str!("../../benchmarks/planetary-energy-service/v0.1/competitive-reference-snapshot.json");
+        include_str!(
+            "../../benchmarks/planetary-energy-service/v0.1/competitive-reference-snapshot.json"
+        );
 
     fn source_value() -> serde_json::Value {
         serde_json::from_str(SOURCE_REGISTER).expect("source register fixture parses")
