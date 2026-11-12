@@ -149,6 +149,8 @@ pub struct EditRequest {
     pub forbidden_side_effects: BTreeSet<Id>,
     pub budget: EditBudget,
     pub deterministic_required: bool,
+    /// Required when a deterministic request admits a seeded operator.
+    pub seed: Option<u64>,
     pub intent_ambiguous: bool,
     pub required_final_artifact_kind: ArtifactKind,
 }
@@ -158,6 +160,8 @@ pub struct OperatorProfile {
     pub id: Id,
     pub version: Id,
     pub artifact_sha256: String,
+    /// Declared common-cause/failure domain for independence checks.
+    pub failure_domain: Id,
     pub operations: BTreeSet<Id>,
     pub capabilities: BTreeSet<Id>,
     pub input_kinds: BTreeSet<ArtifactKind>,
@@ -179,6 +183,8 @@ pub struct ObserverProfile {
     pub id: Id,
     pub version: Id,
     pub artifact_sha256: String,
+    /// Must differ from the mutating operator's declared failure domain.
+    pub failure_domain: Id,
     pub observes_kinds: BTreeSet<ArtifactKind>,
     pub produces: BTreeSet<EvidenceKind>,
     pub risk: Risk,
@@ -242,6 +248,10 @@ pub struct PlanNode {
     pub kind: PlanNodeKind,
     pub stage_id: Id,
     pub profile_id: Id,
+    pub profile_version: Id,
+    pub profile_sha256: String,
+    pub failure_domain: Id,
+    pub determinism: Option<Determinism>,
     pub input_kind: ArtifactKind,
     pub output_kind: Option<ArtifactKind>,
     pub dependencies: BTreeSet<Id>,
@@ -324,6 +334,15 @@ pub fn compile_plan(
         ));
     }
     for profile in &registry.operators {
+        if profile.id.trim().is_empty() || profile.version.trim().is_empty()
+            || profile.failure_domain.trim().is_empty()
+        {
+            return Err(PlanError::new(
+                PlanErrorKind::InvalidOperatorDigest,
+                Some(&profile.id),
+                "operator ID, version and failure domain must be non-empty",
+            ));
+        }
         if !is_sha256(&profile.artifact_sha256) {
             return Err(PlanError::new(
                 PlanErrorKind::InvalidOperatorDigest,
@@ -333,6 +352,15 @@ pub fn compile_plan(
         }
     }
     for observer in &registry.observers {
+        if observer.id.trim().is_empty() || observer.version.trim().is_empty()
+            || observer.failure_domain.trim().is_empty()
+        {
+            return Err(PlanError::new(
+                PlanErrorKind::InvalidObserverDigest,
+                Some(&observer.id),
+                "observer ID, version and failure domain must be non-empty",
+            ));
+        }
         if !is_sha256(&observer.artifact_sha256) {
             return Err(PlanError::new(
                 PlanErrorKind::InvalidObserverDigest,
@@ -425,6 +453,8 @@ pub fn compile_plan(
                     observer.observes_kinds.contains(&stage.output_kind)
                         && observer.produces.contains(evidence)
                         && observer.risk <= request.budget.max_risk
+                        && observer.failure_domain != selected.failure_domain
+                        && observer.artifact_sha256 != selected.artifact_sha256
                         && is_sha256(&observer.artifact_sha256)
                 })
                 .collect();
@@ -493,6 +523,10 @@ pub fn compile_plan(
             kind: PlanNodeKind::MutatingOperator,
             stage_id: stage.id.clone(),
             profile_id: operator.id.clone(),
+            profile_version: operator.version.clone(),
+            profile_sha256: operator.artifact_sha256.clone(),
+            failure_domain: operator.failure_domain.clone(),
+            determinism: Some(operator.determinism),
             input_kind: stage.input_kind,
             output_kind: Some(stage.output_kind),
             dependencies,
@@ -512,6 +546,10 @@ pub fn compile_plan(
                 kind: PlanNodeKind::IndependentObserver,
                 stage_id: stage.id.clone(),
                 profile_id: observer.id.clone(),
+                profile_version: observer.version.clone(),
+                profile_sha256: observer.artifact_sha256.clone(),
+                failure_domain: observer.failure_domain.clone(),
+                determinism: None,
                 input_kind: stage.output_kind,
                 output_kind: None,
                 dependencies: BTreeSet::from([operation_node_id.clone()]),
@@ -528,9 +566,7 @@ pub fn compile_plan(
 
     let ordered_nodes = topological_node_order(nodes)?;
     let canonical_bytes = canonical_plan_bytes(
-        &request.request_id,
-        &request.source,
-        request.required_final_artifact_kind,
+        request,
         &ordered_nodes,
         total_cost,
         total_latency,
@@ -571,7 +607,11 @@ fn operator_compatible(
         .iter()
         .any(|property| request.protected_properties.contains(property));
     let determinism_ok = !request.deterministic_required
-        || profile.determinism != Determinism::Nondeterministic;
+        || match profile.determinism {
+            Determinism::Deterministic => true,
+            Determinism::Seeded => request.seed.is_some(),
+            Determinism::Nondeterministic => false,
+        };
 
     profile.operations.contains(&stage.operation)
         && stage.required_capabilities.is_subset(&profile.capabilities)
@@ -728,22 +768,70 @@ fn topological_node_order(nodes: Vec<PlanNode>) -> Result<Vec<PlanNode>, PlanErr
 }
 
 fn canonical_plan_bytes(
-    request_id: &str,
-    source: &ArtifactRef,
-    final_kind: ArtifactKind,
+    request: &EditRequest,
     nodes: &[PlanNode],
     total_cost: u64,
     total_latency: u64,
     maximum_risk: Risk,
 ) -> Vec<u8> {
     let mut out = String::from("MEL-EDIT-PLAN-V1\n");
-    field(&mut out, request_id);
-    field(&mut out, source.kind.as_str());
-    field(&mut out, &source.sha256);
-    field(&mut out, final_kind.as_str());
-    field(&mut out, &total_cost.to_string());
-    field(&mut out, &total_latency.to_string());
-    field(&mut out, maximum_risk.as_str());
+    field(&mut out, &request.request_id);
+    field(&mut out, request.source.kind.as_str());
+    field(&mut out, &request.source.sha256);
+    field(&mut out, request.required_final_artifact_kind.as_str());
+    field(&mut out, &request.budget.max_cost_units.to_string());
+    field(&mut out, &request.budget.max_latency_ms.to_string());
+    field(&mut out, request.budget.max_risk.as_str());
+    field(&mut out, if request.deterministic_required { "true" } else { "false" });
+    field(&mut out, &request.seed.map_or_else(|| "none".to_owned(), |seed| seed.to_string()));
+    for property in &request.protected_properties {
+        field(&mut out, property);
+    }
+    field(&mut out, "end-protected-properties");
+    for side_effect in &request.forbidden_side_effects {
+        field(&mut out, side_effect);
+    }
+    field(&mut out, "end-forbidden-side-effects");
+
+    let mut stages: Vec<&StageRequest> = request.stages.iter().collect();
+    stages.sort_by(|left, right| left.id.cmp(&right.id));
+    for stage in stages {
+        field(&mut out, &stage.id);
+        field(&mut out, &stage.operation);
+        field(&mut out, stage.input_kind.as_str());
+        field(&mut out, stage.output_kind.as_str());
+        field(&mut out, stage.scope.as_str());
+        for dependency in &stage.dependencies {
+            field(&mut out, dependency);
+        }
+        field(&mut out, "end-stage-dependencies");
+        for capability in &stage.required_capabilities {
+            field(&mut out, capability);
+        }
+        field(&mut out, "end-required-capabilities");
+        for property in &stage.changed_properties {
+            field(&mut out, property);
+        }
+        field(&mut out, "end-changed-properties");
+        for side_effect in &stage.forbidden_side_effects {
+            field(&mut out, side_effect);
+        }
+        field(&mut out, "end-stage-forbidden-side-effects");
+        for condition in &stage.required_preconditions {
+            field(&mut out, condition);
+        }
+        field(&mut out, "end-preconditions");
+        for condition in &stage.required_postconditions {
+            field(&mut out, condition);
+        }
+        field(&mut out, "end-postconditions");
+        for evidence in &stage.required_evidence {
+            field(&mut out, evidence.as_str());
+        }
+        field(&mut out, "end-stage-evidence");
+        field(&mut out, "end-stage");
+    }
+
     for node in nodes {
         field(&mut out, node.id.as_str());
         field(
@@ -755,6 +843,13 @@ fn canonical_plan_bytes(
         );
         field(&mut out, &node.stage_id);
         field(&mut out, &node.profile_id);
+        field(&mut out, &node.profile_version);
+        field(&mut out, &node.profile_sha256);
+        field(&mut out, &node.failure_domain);
+        field(
+            &mut out,
+            node.determinism.map_or("none", Determinism::as_str),
+        );
         field(&mut out, node.input_kind.as_str());
         field(
             &mut out,
@@ -763,10 +858,11 @@ fn canonical_plan_bytes(
         for dependency in &node.dependencies {
             field(&mut out, dependency);
         }
-        field(&mut out, "end-dependencies");
+        field(&mut out, "end-node-dependencies");
         for evidence in &node.required_evidence {
             field(&mut out, evidence.as_str());
         }
+        field(&mut out, "end-node-required-evidence");
         field(
             &mut out,
             node.provides_evidence.map_or("none", EvidenceKind::as_str),
@@ -776,6 +872,9 @@ fn canonical_plan_bytes(
         field(&mut out, &node.latency_ms.to_string());
         field(&mut out, "end-node");
     }
+    field(&mut out, &total_cost.to_string());
+    field(&mut out, &total_latency.to_string());
+    field(&mut out, maximum_risk.as_str());
     out.into_bytes()
 }
 
@@ -831,6 +930,7 @@ mod tests {
                 max_risk: Risk::High,
             },
             deterministic_required: false,
+            seed: None,
             intent_ambiguous: false,
             required_final_artifact_kind: ArtifactKind::Audio,
         }
@@ -841,6 +941,7 @@ mod tests {
             id: "sam-audio-large".into(),
             version: "2026.10".into(),
             artifact_sha256: DIGEST_B.into(),
+            failure_domain: "audio_generation".into(),
             operations: BTreeSet::from(["remove_vocal".into()]),
             capabilities: BTreeSet::from(["source_separation".into()]),
             input_kinds: BTreeSet::from([ArtifactKind::Audio]),
@@ -862,6 +963,7 @@ mod tests {
             id: id.into(),
             version: "v1".into(),
             artifact_sha256: DIGEST_C.into(),
+            failure_domain: format!("observer:{id}"),
             observes_kinds: BTreeSet::from([ArtifactKind::Audio]),
             produces: BTreeSet::from([kind]),
             risk: Risk::Low,
@@ -1027,6 +1129,31 @@ mod tests {
     }
 
     #[test]
+    fn seeded_operator_requires_an_explicit_seed_for_deterministic_request() {
+        let mut request = request();
+        request.deterministic_required = true;
+        let planless_registry = registry();
+        assert_eq!(
+            compile_plan(&request, &planless_registry).unwrap_err().kind,
+            PlanErrorKind::UnsupportedOperator
+        );
+        request.seed = Some(42);
+        assert!(compile_plan(&request, &planless_registry).is_ok());
+    }
+
+    #[test]
+    fn same_failure_domain_cannot_supply_independent_evidence() {
+        let mut registry = registry();
+        for observer in &mut registry.observers {
+            observer.failure_domain = "audio_generation".into();
+        }
+        assert_eq!(
+            compile_plan(&request(), &registry).unwrap_err().kind,
+            PlanErrorKind::MissingObserver
+        );
+    }
+
+    #[test]
     fn rejects_stale_source_digest() {
         let mut request = request();
         request.source.sha256 = "not-a-digest".into();
@@ -1122,6 +1249,7 @@ mod tests {
             id: "loudness-normalizer".into(),
             version: "v1".into(),
             artifact_sha256: DIGEST_C.into(),
+            failure_domain: "loudness_processor".into(),
             operations: BTreeSet::from(["loudness_normalize".into()]),
             capabilities: BTreeSet::from(["loudness_control".into()]),
             input_kinds: BTreeSet::from([ArtifactKind::Audio]),
