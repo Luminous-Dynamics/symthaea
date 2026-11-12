@@ -2379,8 +2379,9 @@ pub fn simulate_small_hayden_preskill_petz_optimality(
 /// General Petz optimality diagnostic based on Theorem 2 of Li et al. (PRL 134, 200602).
 ///
 /// Unlike the commuting-state commutator corollary above, this evaluates the
-/// full necessary-and-sufficient condition B = sqrt(M_sigma) (gamma tensor T)
-/// >= 0 for arbitrary full-rank sigma and PSD rho with supp(rho) subset supp(sigma).
+/// full necessary-and-sufficient condition that B = sqrt(M_sigma) (gamma tensor T)
+/// is positive semidefinite for arbitrary full-rank sigma and PSD rho with
+/// supp(rho) subset supp(sigma).
 /// The qubit sigma inverse square root is computed analytically; the QEC matrix
 /// square root uses the support-aware Hermitian eigensystem above.
 #[derive(Debug, Clone, PartialEq)]
