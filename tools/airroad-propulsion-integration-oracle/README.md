@@ -33,6 +33,13 @@ observed point. The map lookup is explicitly adapted into the drive oracle's
 map-evidence contract; map identity, cell, weights, configuration, context,
 and source-manifest identity are retained.
 
+The observation's absolute torque/RPM and shaft-power bounds remain available
+in the returned observation. **This version does not yet propagate those
+coordinate bounds through the motor map and drive model.** Its adverse,
+nominal, and favourable DC-demand scenarios vary the map-efficiency bound only.
+Do not interpret the resulting envelope as the complete metrology-to-bus
+uncertainty envelope.
+
 The adverse, nominal, and favourable efficiency cases are independently
 evaluated. The adverse case feeds a branch-meter ledger containing propulsion,
 thermal-management, auxiliary, and distribution loads. A separate loss ledger
