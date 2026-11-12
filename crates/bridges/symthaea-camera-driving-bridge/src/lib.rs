@@ -81,27 +81,45 @@ impl BridgeConfig {
             || self.max_width > MAX_FRAME_DIMENSION
             || self.max_height > MAX_FRAME_DIMENSION
         {
-            return Err(BridgeError::InvalidConfig("maximum frame dimensions must be in 1..=4096"));
+            return Err(BridgeError::InvalidConfig(
+                "maximum frame dimensions must be in 1..=4096",
+            ));
         }
         if self.max_frame_bytes == 0 || self.max_frame_bytes > MAX_FRAME_BYTES_HARD_LIMIT {
-            return Err(BridgeError::InvalidConfig("frame-byte bound must be in 1..=64 MiB"));
+            return Err(BridgeError::InvalidConfig(
+                "frame-byte bound must be in 1..=64 MiB",
+            ));
         }
         if self.initial_dt_us == 0 || self.maximum_frame_gap_us < self.initial_dt_us {
-            return Err(BridgeError::InvalidConfig("invalid initial timestep or maximum frame gap"));
+            return Err(BridgeError::InvalidConfig(
+                "invalid initial timestep or maximum frame gap",
+            ));
         }
         if self.maximum_observation_delivery_age_us == 0 {
-            return Err(BridgeError::InvalidConfig("maximum observation delivery age must be non-zero"));
+            return Err(BridgeError::InvalidConfig(
+                "maximum observation delivery age must be non-zero",
+            ));
         }
         if self.visual_weight_ppm > 1_000_000 {
-            return Err(BridgeError::InvalidConfig("visual weight must be <= 1,000,000 ppm"));
+            return Err(BridgeError::InvalidConfig(
+                "visual weight must be <= 1,000,000 ppm",
+            ));
         }
-        if self.expected_camera_calibration_sha256.as_deref().is_some_and(|digest| !is_sha256_hex(digest)) {
-            return Err(BridgeError::InvalidConfig("expected camera calibration digest must be lowercase SHA-256"));
+        if self
+            .expected_camera_calibration_sha256
+            .as_deref()
+            .is_some_and(|digest| !is_sha256_hex(digest))
+        {
+            return Err(BridgeError::InvalidConfig(
+                "expected camera calibration digest must be lowercase SHA-256",
+            ));
         }
         if self.vehicle_encoder_seed_phrase.trim().is_empty()
             || self.vehicle_encoder_seed_phrase.len() > 1_024
         {
-            return Err(BridgeError::InvalidConfig("invalid vehicle encoder seed phrase"));
+            return Err(BridgeError::InvalidConfig(
+                "invalid vehicle encoder seed phrase",
+            ));
         }
         Ok(())
     }
@@ -377,17 +395,17 @@ impl CameraDrivingBridge {
         if vision_config.enable_depth {
             return Err(BridgeError::DepthInputRequired);
         }
-        vision_config.validate().map_err(|_| BridgeError::InvalidConfig("invalid VisionConfig"))?;
+        vision_config
+            .validate()
+            .map_err(|_| BridgeError::InvalidConfig("invalid VisionConfig"))?;
         let vision_config_bytes = serde_json::to_vec(&vision_config)
             .map_err(|_| BridgeError::InvalidConfig("VisionConfig serialization failed"))?;
         let vision_config_sha256 = digest_bytes(&vision_config_bytes);
-        let vehicle_encoder_seed_sha256 = digest_bytes(config.vehicle_encoder_seed_phrase.as_bytes());
-        let mut vision = VisionManifold::try_new(
-            vision_config,
-            config.max_width,
-            config.max_height,
-        )
-        .map_err(|_| BridgeError::InvalidConfig("VisionManifold construction rejected"))?;
+        let vehicle_encoder_seed_sha256 =
+            digest_bytes(config.vehicle_encoder_seed_phrase.as_bytes());
+        let mut vision =
+            VisionManifold::try_new(vision_config, config.max_width, config.max_height)
+                .map_err(|_| BridgeError::InvalidConfig("VisionManifold construction rejected"))?;
         vision.freeze_learning(true);
         let seed = GenesisSeed::from_phrase(&config.vehicle_encoder_seed_phrase);
         let vehicle_encoder = VehicleHdcEncoder::new(&seed, MAX_VEHICLE_ENCODER_LEVELS);
@@ -453,7 +471,10 @@ impl CameraDrivingBridge {
         }
 
         let visual_state = self.vision.state().clone().normalize();
-        let proprioceptive_hv = self.vehicle_encoder.encode(observation.vehicle_state).normalize();
+        let proprioceptive_hv = self
+            .vehicle_encoder
+            .encode(observation.vehicle_state)
+            .normalize();
         let visual_weight = self.config.visual_weight_ppm as f32 / 1_000_000.0;
         let proprioceptive_weight = 1.0 - visual_weight;
         let policy_input = if self.config.visual_weight_ppm == 0 {
@@ -468,9 +489,18 @@ impl CameraDrivingBridge {
             .normalize()
         };
 
-        if !visual_state.as_slice().iter().all(|value| value.is_finite())
-            || !proprioceptive_hv.as_slice().iter().all(|value| value.is_finite())
-            || !policy_input.as_slice().iter().all(|value| value.is_finite())
+        if !visual_state
+            .as_slice()
+            .iter()
+            .all(|value| value.is_finite())
+            || !proprioceptive_hv
+                .as_slice()
+                .iter()
+                .all(|value| value.is_finite())
+            || !policy_input
+                .as_slice()
+                .iter()
+                .all(|value| value.is_finite())
         {
             self.faulted = true;
             return Err(BridgeError::NonFinitePerceptionOutput);
@@ -509,14 +539,28 @@ impl CameraDrivingBridge {
             upstream_clock_id: observation.upstream.clock_id.clone(),
             upstream_tick: observation.upstream.tick,
             upstream_agent_id: observation.upstream.agent_id.clone(),
-            upstream_camera_calibration_sha256: observation.upstream.camera_calibration_sha256.clone(),
+            upstream_camera_calibration_sha256: observation
+                .upstream
+                .camera_calibration_sha256
+                .clone(),
             upstream_renderer_revision: observation.upstream.renderer_revision.clone(),
             upstream_capture_timestamp_us: observation.upstream.capture_timestamp_us,
-            upstream_render_completed_timestamp_us: observation.upstream.render_completed_timestamp_us,
+            upstream_render_completed_timestamp_us: observation
+                .upstream
+                .render_completed_timestamp_us,
             upstream_delivered_timestamp_us: observation.upstream.delivered_timestamp_us,
-            upstream_applied_action_receipt_id: observation.upstream.applied_action_receipt_id.clone(),
-            upstream_applied_action_receipt_sha256: observation.upstream.applied_action_receipt_sha256.clone(),
-            upstream_applied_action_command_id: observation.upstream.applied_action_command_id.clone(),
+            upstream_applied_action_receipt_id: observation
+                .upstream
+                .applied_action_receipt_id
+                .clone(),
+            upstream_applied_action_receipt_sha256: observation
+                .upstream
+                .applied_action_receipt_sha256
+                .clone(),
+            upstream_applied_action_command_id: observation
+                .upstream
+                .applied_action_command_id
+                .clone(),
             upstream_applied_action_tick: observation.upstream.applied_action_tick,
             previous_receipt_sha256,
             raw_frame_sha256,
@@ -556,7 +600,8 @@ impl CameraDrivingBridge {
         if observation.width == 0 || observation.height == 0 {
             return Err(BridgeError::InvalidGeometry);
         }
-        if observation.width > self.config.max_width || observation.height > self.config.max_height {
+        if observation.width > self.config.max_width || observation.height > self.config.max_height
+        {
             return Err(BridgeError::FrameExceedsConfiguredCapacity);
         }
         if !matches!(observation.channels, 1 | 3 | 4) {
@@ -576,7 +621,10 @@ impl CameraDrivingBridge {
             return Err(BridgeError::FrameLengthMismatch);
         }
         self.validate_upstream_observation(observation)?;
-        if self.last_sequence.is_some_and(|last| observation.sequence <= last) {
+        if self
+            .last_sequence
+            .is_some_and(|last| observation.sequence <= last)
+        {
             return Err(BridgeError::SequenceRegression);
         }
         let dt_us = match self.last_timestamp_us {
@@ -596,7 +644,9 @@ impl CameraDrivingBridge {
         {
             return Err(BridgeError::VehicleTimestampRegression);
         }
-        if observation.timestamp_us.abs_diff(observation.vehicle_state_timestamp_us)
+        if observation
+            .timestamp_us
+            .abs_diff(observation.vehicle_state_timestamp_us)
             > self.config.maximum_sensor_clock_skew_us
         {
             return Err(BridgeError::SensorClockSkewExceeded);
@@ -774,8 +824,14 @@ fn digest_receipt(receipt: &DrivingObservationReceipt) -> String {
     hasher.update([u8::from(receipt.previous_vehicle_state_sha256.is_some())]);
     hasher.update([u8::from(receipt.previous_visual_state_sha256.is_some())]);
     hasher.update([u8::from(receipt.previous_receipt_sha256.is_some())]);
-    let previous_vehicle_state = receipt.previous_vehicle_state_sha256.as_deref().unwrap_or("");
-    let previous_visual_state = receipt.previous_visual_state_sha256.as_deref().unwrap_or("");
+    let previous_vehicle_state = receipt
+        .previous_vehicle_state_sha256
+        .as_deref()
+        .unwrap_or("");
+    let previous_visual_state = receipt
+        .previous_visual_state_sha256
+        .as_deref()
+        .unwrap_or("");
     let previous_receipt = receipt.previous_receipt_sha256.as_deref().unwrap_or("");
     for value in [
         receipt.identity.run_id.as_str(),
@@ -793,9 +849,18 @@ fn digest_receipt(receipt: &DrivingObservationReceipt) -> String {
         receipt.upstream_agent_id.as_str(),
         receipt.upstream_camera_calibration_sha256.as_str(),
         receipt.upstream_renderer_revision.as_str(),
-        receipt.upstream_applied_action_receipt_id.as_deref().unwrap_or(""),
-        receipt.upstream_applied_action_receipt_sha256.as_deref().unwrap_or(""),
-        receipt.upstream_applied_action_command_id.as_deref().unwrap_or(""),
+        receipt
+            .upstream_applied_action_receipt_id
+            .as_deref()
+            .unwrap_or(""),
+        receipt
+            .upstream_applied_action_receipt_sha256
+            .as_deref()
+            .unwrap_or(""),
+        receipt
+            .upstream_applied_action_command_id
+            .as_deref()
+            .unwrap_or(""),
         previous_receipt,
         receipt.raw_frame_sha256.as_str(),
         receipt.visual_state_sha256.as_str(),
@@ -1042,8 +1107,7 @@ mod tests {
     fn rejects_over_age_camera_delivery_before_advancing_temporal_state() {
         let mut config = config();
         config.maximum_observation_delivery_age_us = 1_000;
-        let mut bridge =
-            CameraDrivingBridge::try_new(config, VisionConfig::default()).unwrap();
+        let mut bridge = CameraDrivingBridge::try_new(config, VisionConfig::default()).unwrap();
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
         let mut item = observation(&pixels, 1, 10_000, &state);
@@ -1062,8 +1126,7 @@ mod tests {
     fn accepts_camera_delivery_at_the_declared_freshness_boundary() {
         let mut config = config();
         config.maximum_observation_delivery_age_us = 1_000;
-        let mut bridge =
-            CameraDrivingBridge::try_new(config, VisionConfig::default()).unwrap();
+        let mut bridge = CameraDrivingBridge::try_new(config, VisionConfig::default()).unwrap();
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
         let mut item = observation(&pixels, 1, 10_000, &state);
@@ -1098,7 +1161,9 @@ mod tests {
         let mut bridge = bridge();
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
-        let result = bridge.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
+        let result = bridge
+            .observe(observation(&pixels, 1, 10_000, &state))
+            .unwrap();
         assert_eq!(result.policy_input.dim(), HDC_DIMENSION);
         assert_eq!(result.receipt.schema_version, RECEIPT_SCHEMA_VERSION);
         assert_eq!(result.receipt.capture_sequence, 1);
@@ -1106,7 +1171,10 @@ mod tests {
         assert!(result.receipt.vision_learning_frozen);
         assert_eq!(result.receipt.vision_training_steps_before, 0);
         assert_eq!(result.receipt.vision_training_steps_after, 0);
-        assert_eq!(result.receipt.receipt_sha256, digest_receipt(&result.receipt));
+        assert_eq!(
+            result.receipt.receipt_sha256,
+            digest_receipt(&result.receipt)
+        );
     }
 
     #[test]
@@ -1115,8 +1183,12 @@ mod tests {
         let pixels = vec![64; 16 * 16 * 3];
         let mut first = bridge();
         let mut second = bridge();
-        let a = first.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
-        let b = second.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
+        let a = first
+            .observe(observation(&pixels, 1, 10_000, &state))
+            .unwrap();
+        let b = second
+            .observe(observation(&pixels, 1, 10_000, &state))
+            .unwrap();
         assert_eq!(a.receipt, b.receipt);
         assert!(a.policy_input.similarity(&b.policy_input) > 0.999_999);
     }
@@ -1128,11 +1200,18 @@ mod tests {
         let second_pixels = vec![11; 16 * 16 * 3];
         let mut first = bridge();
         let mut second = bridge();
-        let a = first.observe(observation(&first_pixels, 1, 10_000, &state)).unwrap();
-        let b = second.observe(observation(&second_pixels, 1, 10_000, &state)).unwrap();
+        let a = first
+            .observe(observation(&first_pixels, 1, 10_000, &state))
+            .unwrap();
+        let b = second
+            .observe(observation(&second_pixels, 1, 10_000, &state))
+            .unwrap();
         assert_ne!(a.receipt.raw_frame_sha256, b.receipt.raw_frame_sha256);
         assert_ne!(a.receipt.visual_state_sha256, b.receipt.visual_state_sha256);
-        assert_ne!(a.receipt.fused_policy_input_sha256, b.receipt.fused_policy_input_sha256);
+        assert_ne!(
+            a.receipt.fused_policy_input_sha256,
+            b.receipt.fused_policy_input_sha256
+        );
     }
 
     #[test]
@@ -1142,11 +1221,24 @@ mod tests {
         let state_b = VehicleState::cruising(15.0);
         let mut first = bridge();
         let mut second = bridge();
-        let a = first.observe(observation(&pixels, 1, 10_000, &state_a)).unwrap();
-        let b = second.observe(observation(&pixels, 1, 10_000, &state_b)).unwrap();
-        assert_ne!(a.receipt.vehicle_state_sha256, b.receipt.vehicle_state_sha256);
-        assert_ne!(a.receipt.proprioceptive_hv_sha256, b.receipt.proprioceptive_hv_sha256);
-        assert_ne!(a.receipt.fused_policy_input_sha256, b.receipt.fused_policy_input_sha256);
+        let a = first
+            .observe(observation(&pixels, 1, 10_000, &state_a))
+            .unwrap();
+        let b = second
+            .observe(observation(&pixels, 1, 10_000, &state_b))
+            .unwrap();
+        assert_ne!(
+            a.receipt.vehicle_state_sha256,
+            b.receipt.vehicle_state_sha256
+        );
+        assert_ne!(
+            a.receipt.proprioceptive_hv_sha256,
+            b.receipt.proprioceptive_hv_sha256
+        );
+        assert_ne!(
+            a.receipt.fused_policy_input_sha256,
+            b.receipt.fused_policy_input_sha256
+        );
     }
 
     #[test]
@@ -1156,13 +1248,28 @@ mod tests {
         let mut first_config = config();
         let mut second_config = config();
         second_config.vehicle_encoder_seed_phrase = "different-vehicle-seed".to_string();
-        let mut first = CameraDrivingBridge::try_new(first_config, VisionConfig::default()).unwrap();
-        let mut second = CameraDrivingBridge::try_new(second_config, VisionConfig::default()).unwrap();
-        let a = first.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
-        let b = second.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
-        assert_ne!(a.receipt.vehicle_encoder_seed_sha256, b.receipt.vehicle_encoder_seed_sha256);
-        assert_ne!(a.receipt.proprioceptive_hv_sha256, b.receipt.proprioceptive_hv_sha256);
-        assert_ne!(a.receipt.fused_policy_input_sha256, b.receipt.fused_policy_input_sha256);
+        let mut first =
+            CameraDrivingBridge::try_new(first_config, VisionConfig::default()).unwrap();
+        let mut second =
+            CameraDrivingBridge::try_new(second_config, VisionConfig::default()).unwrap();
+        let a = first
+            .observe(observation(&pixels, 1, 10_000, &state))
+            .unwrap();
+        let b = second
+            .observe(observation(&pixels, 1, 10_000, &state))
+            .unwrap();
+        assert_ne!(
+            a.receipt.vehicle_encoder_seed_sha256,
+            b.receipt.vehicle_encoder_seed_sha256
+        );
+        assert_ne!(
+            a.receipt.proprioceptive_hv_sha256,
+            b.receipt.proprioceptive_hv_sha256
+        );
+        assert_ne!(
+            a.receipt.fused_policy_input_sha256,
+            b.receipt.fused_policy_input_sha256
+        );
     }
 
     #[test]
@@ -1174,9 +1281,16 @@ mod tests {
         vision_b.seed += 1;
         let mut first = CameraDrivingBridge::try_new(config(), vision_a).unwrap();
         let mut second = CameraDrivingBridge::try_new(config(), vision_b).unwrap();
-        let a = first.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
-        let b = second.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
-        assert_ne!(a.receipt.vision_config_sha256, b.receipt.vision_config_sha256);
+        let a = first
+            .observe(observation(&pixels, 1, 10_000, &state))
+            .unwrap();
+        let b = second
+            .observe(observation(&pixels, 1, 10_000, &state))
+            .unwrap();
+        assert_ne!(
+            a.receipt.vision_config_sha256,
+            b.receipt.vision_config_sha256
+        );
         assert_ne!(a.receipt.visual_state_sha256, b.receipt.visual_state_sha256);
     }
 
@@ -1187,10 +1301,14 @@ mod tests {
         let state_b = VehicleState::cruising(11.0);
         let first_pixels = vec![20; 16 * 16 * 3];
         let second_pixels = vec![30; 16 * 16 * 3];
-        let first = bridge.observe(observation(&first_pixels, 1, 10_000, &state_a)).unwrap();
+        let first = bridge
+            .observe(observation(&first_pixels, 1, 10_000, &state_a))
+            .unwrap();
         assert_eq!(first.receipt.previous_vehicle_state_sha256, None);
         assert_eq!(first.receipt.previous_visual_state_sha256, None);
-        let second = bridge.observe(observation(&second_pixels, 2, 20_000, &state_b)).unwrap();
+        let second = bridge
+            .observe(observation(&second_pixels, 2, 20_000, &state_b))
+            .unwrap();
         assert_eq!(
             second.receipt.previous_vehicle_state_sha256.as_deref(),
             Some(first.receipt.vehicle_state_sha256.as_str())
@@ -1208,7 +1326,10 @@ mod tests {
             digest_bytes(b"observation-2")
         );
         assert_eq!(second.receipt.upstream_receipt_sha256, "c".repeat(64));
-        assert_eq!(second.receipt.receipt_sha256, digest_receipt(&second.receipt));
+        assert_eq!(
+            second.receipt.receipt_sha256,
+            digest_receipt(&second.receipt)
+        );
     }
 
     #[test]
@@ -1328,8 +1449,12 @@ mod tests {
         let mut bridge = bridge();
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
-        bridge.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
-        let result = bridge.observe(observation(&pixels, 2, 35_000, &state)).unwrap();
+        bridge
+            .observe(observation(&pixels, 1, 10_000, &state))
+            .unwrap();
+        let result = bridge
+            .observe(observation(&pixels, 2, 35_000, &state))
+            .unwrap();
         assert_eq!(result.receipt.derived_dt_us, 25_000);
     }
 
@@ -1338,12 +1463,16 @@ mod tests {
         let mut bridge = bridge();
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
-        bridge.observe(observation(&pixels, 4, 10_000, &state)).unwrap();
+        bridge
+            .observe(observation(&pixels, 4, 10_000, &state))
+            .unwrap();
         assert!(matches!(
             bridge.observe(observation(&pixels, 4, 20_000, &state)),
             Err(BridgeError::SequenceRegression)
         ));
-        let result = bridge.observe(observation(&pixels, 5, 20_000, &state)).unwrap();
+        let result = bridge
+            .observe(observation(&pixels, 5, 20_000, &state))
+            .unwrap();
         assert_eq!(result.receipt.derived_dt_us, 10_000);
         assert_eq!(bridge.frames_processed(), 2);
     }
@@ -1353,13 +1482,17 @@ mod tests {
         let mut bridge = bridge();
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
-        bridge.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
+        bridge
+            .observe(observation(&pixels, 1, 10_000, &state))
+            .unwrap();
         assert!(matches!(
             bridge.observe(observation(&pixels, 2, 9_000, &state)),
             Err(BridgeError::TimestampRegression)
         ));
         assert_eq!(bridge.frames_processed(), 1);
-        let result = bridge.observe(observation(&pixels, 2, 20_000, &state)).unwrap();
+        let result = bridge
+            .observe(observation(&pixels, 2, 20_000, &state))
+            .unwrap();
         assert_eq!(result.receipt.derived_dt_us, 10_000);
     }
 
@@ -1368,7 +1501,9 @@ mod tests {
         let mut bridge = bridge();
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
-        bridge.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
+        bridge
+            .observe(observation(&pixels, 1, 10_000, &state))
+            .unwrap();
         assert!(matches!(
             bridge.observe(observation(&pixels, 2, 200_001, &state)),
             Err(BridgeError::FrameGapTooLarge)
@@ -1393,7 +1528,9 @@ mod tests {
         let mut bridge = bridge();
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
-        bridge.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
+        bridge
+            .observe(observation(&pixels, 1, 10_000, &state))
+            .unwrap();
         let mut stale = observation(&pixels, 2, 20_000, &state);
         stale.vehicle_state_timestamp_us = 9_500;
         assert_eq!(
@@ -1467,7 +1604,9 @@ mod tests {
         invalid.visual_weight_ppm = 1_000_001;
         assert_eq!(
             CameraDrivingBridge::try_new(invalid, VisionConfig::default()).err(),
-            Some(BridgeError::InvalidConfig("visual weight must be <= 1,000,000 ppm"))
+            Some(BridgeError::InvalidConfig(
+                "visual weight must be <= 1,000,000 ppm"
+            ))
         );
     }
 
@@ -1478,7 +1617,9 @@ mod tests {
         let mut bridge = CameraDrivingBridge::try_new(cfg, VisionConfig::default()).unwrap();
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
-        let result = bridge.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
+        let result = bridge
+            .observe(observation(&pixels, 1, 10_000, &state))
+            .unwrap();
         assert_eq!(
             result.receipt.fused_policy_input_sha256,
             result.receipt.proprioceptive_hv_sha256
@@ -1492,7 +1633,9 @@ mod tests {
         let mut bridge = CameraDrivingBridge::try_new(cfg, VisionConfig::default()).unwrap();
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
-        let result = bridge.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
+        let result = bridge
+            .observe(observation(&pixels, 1, 10_000, &state))
+            .unwrap();
         assert_eq!(
             result.receipt.fused_policy_input_sha256,
             result.receipt.visual_state_sha256
@@ -1506,7 +1649,10 @@ mod tests {
         let pixels = vec![128; 16 * 16 * 2];
         let mut item = observation(&pixels, 1, 10_000, &state);
         item.channels = 2;
-        assert_eq!(bridge.observe(item).err(), Some(BridgeError::UnsupportedChannels));
+        assert_eq!(
+            bridge.observe(item).err(),
+            Some(BridgeError::UnsupportedChannels)
+        );
         assert_eq!(bridge.frames_processed(), 0);
     }
 
@@ -1518,7 +1664,9 @@ mod tests {
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
         assert_eq!(
-            bridge.observe(observation(&pixels, 1, 10_000, &state)).err(),
+            bridge
+                .observe(observation(&pixels, 1, 10_000, &state))
+                .err(),
             Some(BridgeError::FrameExceedsByteBound)
         );
         assert_eq!(bridge.frames_processed(), 0);
@@ -1530,7 +1678,9 @@ mod tests {
         cfg.max_width = u32::MAX;
         assert_eq!(
             CameraDrivingBridge::try_new(cfg, VisionConfig::default()).err(),
-            Some(BridgeError::InvalidConfig("maximum frame dimensions must be in 1..=4096"))
+            Some(BridgeError::InvalidConfig(
+                "maximum frame dimensions must be in 1..=4096"
+            ))
         );
     }
 
@@ -1549,7 +1699,9 @@ mod tests {
         let mut bridge = bridge();
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
-        let result = bridge.observe(observation(&pixels, 1, 10_000, &state)).unwrap();
+        let result = bridge
+            .observe(observation(&pixels, 1, 10_000, &state))
+            .unwrap();
         let json = serde_json::to_string(&result.receipt).unwrap();
         let decoded: DrivingObservationReceipt = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, result.receipt);
