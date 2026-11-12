@@ -56,7 +56,9 @@ pub struct RendererProcessObservation {
     pub stderr_preview: String,
     pub stdout_truncated: bool,
     pub stderr_truncated: bool,
-    pub exit_code: i32,
+    pub exit_code: Option<i32>,
+    pub spawn_error: Option<String>,
+    pub mastered_wav_sha256: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -255,10 +257,18 @@ fn validate_inputs(inputs: &RendererReceiptInputs<'_>) -> Result<(), RendererRec
             optional_digest_is_valid(Some(&process.environment_sha256), "process.environment_sha256")?;
             optional_digest_is_valid(Some(&process.stdout_sha256), "process.stdout_sha256")?;
             optional_digest_is_valid(Some(&process.stderr_sha256), "process.stderr_sha256")?;
-            let expected_midi_sha256 = sha256_hex(
-                inputs.input_midi_bytes.expect("FluidSynth MIDI presence checked above"),
-            );
-            if process.exit_code != 0
+            optional_digest_is_valid(
+                process.mastered_wav_sha256.as_deref(),
+                "process.mastered_wav_sha256",
+            )?;
+            let Some(midi_bytes) = inputs.input_midi_bytes else {
+                return Err(RendererReceiptError::InvalidInputArtifacts);
+            };
+            let expected_midi_sha256 = sha256_hex(midi_bytes);
+            let expected_output_sha256 = sha256_hex(inputs.output_wav_bytes);
+            if process.exit_code != Some(0)
+                || process.spawn_error.is_some()
+                || process.mastered_wav_sha256.as_deref() != Some(expected_output_sha256.as_str())
                 || process.executable_path.trim().is_empty()
                 || process.executable_path.len() > 4096
                 || process.soundfont_path.trim().is_empty()
@@ -479,7 +489,9 @@ mod tests {
             stderr_preview: String::new(),
             stdout_truncated: false,
             stderr_truncated: false,
-            exit_code: 0,
+            exit_code: Some(0),
+            spawn_error: None,
+            mastered_wav_sha256: Some(sha256_hex(wav)),
         };
         RendererReceiptInputs {
             render_id: "render-test-1",
