@@ -80,7 +80,9 @@
           2.1,
           2.2
         ]
-      }
+      },
+      "service_profile_id": "SYNTHETIC_PP_RIGID_ADHEREND_ADHESIVE_A_LAPSHEAR_V1",
+      "expected_disposition": "PASS"
     },
     {
       "arm_id": "corona_reference",
@@ -119,7 +121,9 @@
           5.1,
           5.3
         ]
-      }
+      },
+      "service_profile_id": "SYNTHETIC_PP_RIGID_ADHEREND_ADHESIVE_A_LAPSHEAR_V1",
+      "expected_disposition": "PASS"
     },
     {
       "arm_id": "modular_argon_candidate",
@@ -158,7 +162,9 @@
           6.3,
           6.7
         ]
-      }
+      },
+      "service_profile_id": "SYNTHETIC_PP_RIGID_ADHEREND_ADHESIVE_A_LAPSHEAR_V1",
+      "expected_disposition": "PASS"
     },
     {
       "arm_id": "nitrogen_low_angle_control",
@@ -197,7 +203,9 @@
           4.9,
           5.3
         ]
-      }
+      },
+      "service_profile_id": "SYNTHETIC_PP_RIGID_ADHEREND_ADHESIVE_A_LAPSHEAR_V1",
+      "expected_disposition": "PASS"
     },
     {
       "arm_id": "over_treatment_damage_control",
@@ -236,7 +244,9 @@
           4.1,
           4.6
         ]
-      }
+      },
+      "service_profile_id": "SYNTHETIC_PP_RIGID_ADHEREND_ADHESIVE_A_LAPSHEAR_V1",
+      "expected_disposition": "REJECTED"
     }
   ],
   "expected_contract_checks": {
@@ -253,5 +263,25 @@
     "expected_best_contact_angle_is_not_best_accepted_service": true,
     "synthetic_candidate_hypothesis": "modular_argon_candidate has lower synthetic full-system energy than corona_reference and clears synthetic bond and substrate-preservation thresholds at all declared delays.",
     "synthetic_negative_controls": "The nitrogen control has the lowest contact angle but is not the bondability winner; the over-treatment control has the lowest contact angle and fails the declared substrate-preservation and late bondability gates."
-  }
+  },
+  "comparisons": [
+    {
+      "comparison_id": "argon_vs_corona_reference",
+      "baseline_arm_id": "corona_reference",
+      "candidate_arm_id": "modular_argon_candidate",
+      "expected_disposition": "COMPARABLE"
+    },
+    {
+      "comparison_id": "argon_vs_nitrogen_control",
+      "baseline_arm_id": "nitrogen_low_angle_control",
+      "candidate_arm_id": "modular_argon_candidate",
+      "expected_disposition": "COMPARABLE"
+    },
+    {
+      "comparison_id": "argon_vs_over_treatment",
+      "baseline_arm_id": "corona_reference",
+      "candidate_arm_id": "over_treatment_damage_control",
+      "expected_disposition": "BLOCKED"
+    }
+  ]
 }
