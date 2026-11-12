@@ -121,7 +121,8 @@ impl EpisodeTally {
         if self.episodes == 0 {
             return Err(ComparisonError::EmptyEpisodeDenominator);
         }
-        let classified = self.task_successes
+        let classified = self
+            .task_successes
             .checked_add(self.task_failures)
             .and_then(|x| x.checked_add(self.unknown))
             .and_then(|x| x.checked_add(self.timed_out))
@@ -145,8 +146,7 @@ impl EpisodeTally {
     /// Conservative safe-success rate over every scheduled episode.
     #[must_use]
     pub fn safe_success_ppm(self) -> u32 {
-        ((u64::from(self.safe_successes) * u64::from(PPM_SCALE))
-            / u64::from(self.episodes)) as u32
+        ((u64::from(self.safe_successes) * u64::from(PPM_SCALE)) / u64::from(self.episodes)) as u32
     }
 
     /// Task successes that violated at least one active safety specification.
@@ -406,20 +406,50 @@ pub fn compare_paired_clusters(
     let scope = &comparison.scope;
     for (name, value) in [
         ("task_manifest_digest", scope.task_manifest_digest.as_str()),
-        ("scenario_manifest_digest", scope.scenario_manifest_digest.as_str()),
-        ("robot_configuration_digest", scope.robot_configuration_digest.as_str()),
-        ("initial_state_manifest_digest", scope.initial_state_manifest_digest.as_str()),
+        (
+            "scenario_manifest_digest",
+            scope.scenario_manifest_digest.as_str(),
+        ),
+        (
+            "robot_configuration_digest",
+            scope.robot_configuration_digest.as_str(),
+        ),
+        (
+            "initial_state_manifest_digest",
+            scope.initial_state_manifest_digest.as_str(),
+        ),
         ("evaluator_digest", scope.evaluator_digest.as_str()),
-        ("resource_budget_digest", scope.resource_budget_digest.as_str()),
+        (
+            "resource_budget_digest",
+            scope.resource_budget_digest.as_str(),
+        ),
         ("split_manifest_digest", scope.split_manifest_digest.as_str()),
         ("baseline_arm_id", comparison.baseline_arm.arm_id.as_str()),
-        ("baseline_model_digest", comparison.baseline_arm.model_digest.as_str()),
-        ("baseline_policy_digest", comparison.baseline_arm.policy_digest.as_str()),
-        ("baseline_harness_digest", comparison.baseline_arm.harness_digest.as_str()),
+        (
+            "baseline_model_digest",
+            comparison.baseline_arm.model_digest.as_str(),
+        ),
+        (
+            "baseline_policy_digest",
+            comparison.baseline_arm.policy_digest.as_str(),
+        ),
+        (
+            "baseline_harness_digest",
+            comparison.baseline_arm.harness_digest.as_str(),
+        ),
         ("candidate_arm_id", comparison.candidate_arm.arm_id.as_str()),
-        ("candidate_model_digest", comparison.candidate_arm.model_digest.as_str()),
-        ("candidate_policy_digest", comparison.candidate_arm.policy_digest.as_str()),
-        ("candidate_harness_digest", comparison.candidate_arm.harness_digest.as_str()),
+        (
+            "candidate_model_digest",
+            comparison.candidate_arm.model_digest.as_str(),
+        ),
+        (
+            "candidate_policy_digest",
+            comparison.candidate_arm.policy_digest.as_str(),
+        ),
+        (
+            "candidate_harness_digest",
+            comparison.candidate_arm.harness_digest.as_str(),
+        ),
     ] {
         require_nonempty(name, value)?;
     }
@@ -541,9 +571,8 @@ pub fn compare_paired_clusters(
             _ => {}
         }
 
-        let critical_safety_regression =
-            cluster.candidate.critical_safety_violations
-                > cluster.baseline.critical_safety_violations;
+        let critical_safety_regression = cluster.candidate.critical_safety_violations
+            > cluster.baseline.critical_safety_violations;
         if critical_safety_regression {
             safety_regressions += 1;
         }
@@ -561,10 +590,8 @@ pub fn compare_paired_clusters(
         candidate_unknown += u64::from(cluster.candidate.unknown);
         baseline_censored += u64::from(cluster.baseline.censored);
         candidate_censored += u64::from(cluster.candidate.censored);
-        baseline_critical_violations +=
-            u64::from(cluster.baseline.critical_safety_violations);
-        candidate_critical_violations +=
-            u64::from(cluster.candidate.critical_safety_violations);
+        baseline_critical_violations += u64::from(cluster.baseline.critical_safety_violations);
+        candidate_critical_violations += u64::from(cluster.candidate.critical_safety_violations);
 
         results.push(ClusterResult {
             cluster_id: cluster.cluster_id.clone(),
@@ -779,7 +806,10 @@ mod tests {
         let mut clusters = (0..8).map(|id| cluster(id, 5, 9)).collect::<Vec<_>>();
         clusters[3].candidate.critical_safety_violations = 1;
         let report = compare_paired_clusters(&comparison(clusters)).unwrap();
-        assert_eq!(report.disposition, ComparisonDisposition::SafetyRegressionDetected);
+        assert_eq!(
+            report.disposition,
+            ComparisonDisposition::SafetyRegressionDetected
+        );
         assert_eq!(report.critical_safety_regression_clusters, 1);
     }
 
