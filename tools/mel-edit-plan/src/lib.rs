@@ -84,16 +84,6 @@ pub enum Determinism {
     Nondeterministic,
 }
 
-impl Determinism {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Deterministic => "deterministic",
-            Self::Seeded => "seeded",
-            Self::Nondeterministic => "nondeterministic",
-        }
-    }
-}
-
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum EvidenceKind {
     EditExecution,
@@ -240,7 +230,7 @@ impl PlanError {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PlanNodeKind {
     MutatingOperator,
     IndependentObserver,
@@ -332,6 +322,24 @@ pub fn compile_plan(
             Some(&request.request_id),
             "at least one edit stage is required",
         ));
+    }
+    for profile in &registry.operators {
+        if !is_sha256(&profile.artifact_sha256) {
+            return Err(PlanError::new(
+                PlanErrorKind::InvalidOperatorDigest,
+                Some(&profile.id),
+                "operator artifact digest is not canonical SHA-256",
+            ));
+        }
+    }
+    for observer in &registry.observers {
+        if !is_sha256(&observer.artifact_sha256) {
+            return Err(PlanError::new(
+                PlanErrorKind::InvalidObserverDigest,
+                Some(&observer.id),
+                "observer artifact digest is not canonical SHA-256",
+            ));
+        }
     }
 
     let mut stages = BTreeMap::<Id, &StageRequest>::new();
@@ -550,10 +558,14 @@ fn operator_compatible(
         request.forbidden_side_effects.contains(effect)
             || stage.forbidden_side_effects.contains(effect)
     });
-    let writes_unrequested_property = stage
+    let requested_write_not_covered = stage
         .changed_properties
         .iter()
         .any(|property| !profile.writes_properties.contains(property));
+    let operator_write_not_authorized = profile
+        .writes_properties
+        .iter()
+        .any(|property| !stage.changed_properties.contains(property));
     let writes_protected_property = profile
         .writes_properties
         .iter()
@@ -572,7 +584,8 @@ fn operator_compatible(
         && is_sha256(&profile.artifact_sha256)
         && stage.required_preconditions.is_subset(&profile.preconditions)
         && stage.required_postconditions.is_subset(&profile.postconditions)
-        && !writes_unrequested_property
+        && !requested_write_not_covered
+        && !operator_write_not_authorized
         && !writes_protected_property
         && !has_forbidden_side_effect
         && determinism_ok
@@ -946,6 +959,38 @@ mod tests {
         assert_eq!(
             compile_plan(&request, &registry()).unwrap_err().kind,
             PlanErrorKind::ProtectedPropertyWrite
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_operator_digest_before_selection() {
+        let mut registry = registry();
+        registry.operators[0].artifact_sha256 = "bad".into();
+        assert_eq!(
+            compile_plan(&request(), &registry).unwrap_err().kind,
+            PlanErrorKind::InvalidOperatorDigest
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_observer_digest_before_selection() {
+        let mut registry = registry();
+        registry.observers[0].artifact_sha256 = "bad".into();
+        assert_eq!(
+            compile_plan(&request(), &registry).unwrap_err().kind,
+            PlanErrorKind::InvalidObserverDigest
+        );
+    }
+
+    #[test]
+    fn rejects_operator_that_declares_unrequested_writes() {
+        let mut registry = registry();
+        registry.operators[0]
+            .writes_properties
+            .insert("global_gain".into());
+        assert_eq!(
+            compile_plan(&request(), &registry).unwrap_err().kind,
+            PlanErrorKind::UnsupportedOperator
         );
     }
 
