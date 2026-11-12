@@ -1543,7 +1543,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn schema_and_fixture_require_explicit_reference_run() {
         let schema: serde_json::Value = serde_json::from_str(include_str!(
             "../../../docs/research/marine/marine-cavitation-intermittency-v0.1.0.schema.json"
@@ -1555,6 +1554,7 @@ mod tests {
         assert_eq!(fixture["reference_run_id"], fixture["runs"][0]["run_id"]);
     }
 
+    #[test]
     fn schema_and_fixture_require_water_condition_for_every_run() {
         let schema: serde_json::Value = serde_json::from_str(include_str!(
             "../../../docs/research/marine/marine-cavitation-intermittency-v0.1.0.schema.json"
