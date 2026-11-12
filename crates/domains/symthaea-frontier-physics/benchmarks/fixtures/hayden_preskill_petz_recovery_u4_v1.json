@@ -1,0 +1,97 @@
+{
+  "schema": "luminous.black_hole_information.hayden_preskill_petz_u4.v1",
+  "status": "source_authored_rust_execution_pending; independent_numpy_comparator_available",
+  "claim_ceiling": "A one-step Petz recovery baseline for a finite-dimensional four-qubit random-unitary channel. It is not a macroscopic black-hole decoder, efficient quantum circuit, gravitational evaporation model, or QES/island calculation.",
+  "channel": {
+    "register_order": "Q,M,B,R (MSB-first)",
+    "initial_state": "Bell(Q,M) tensor Bell(B,R)",
+    "scrambler": "U(4) applied to M tensor B",
+    "accessible_register": "A=E tensor R, dimension 4",
+    "inaccessible_environment": "B_prime, dimension 2; traced out as the channel environment and never passed to the decoder",
+    "channel_kraus": "K_bprime[(e,r),m] = U[(e,bprime),(m,r)]/sqrt(2)",
+    "channel_output": "N(rho_M) = sum_bprime K_bprime rho_M K_bprime^dagger"
+  },
+  "decoder": {
+    "name": "Petz recovery for maximally mixed qubit reference state",
+    "formula": "R_i = (1/sqrt(2)) K_i^dagger rho_A^(-1/2), where rho_A=N(I_M/2)",
+    "domain": "A=E tensor R only",
+    "codomain": "recovered message M_hat, dimension 2",
+    "kraus_count": 2,
+    "support_policy": "No eigenvalue flooring, PSD projection, or trace-preserving completion. The full-rank small-instance channel is checked directly; support loss/nonconvergence is a typed failure.",
+    "inverse_square_root": "Unregularized 4x4 complex Hermitian Newton-Schulz iteration; residual ||W rho_A W-I||_F is reported.",
+    "trace_preservation": "Check sum_i R_i^dagger R_i=I_A directly.",
+    "entanglement_fidelity": "F_e=(1/4) sum_(i,j) |Tr(R_i K_j)|^2",
+    "cost_boundary": "Dense classical linear-algebra work is reported separately from physical quantum gate count. No fault-tolerant decoder circuit synthesis is claimed."
+  },
+  "analytic_control": {
+    "id": "HP-PETZ-IDENTITY-001",
+    "scrambler": "U=I on M tensor B",
+    "expected_interpretation": "The outgoing E wire is the original M wire and R is a spectator; Petz recovery discards R and forwards E.",
+    "expected_entanglement_fidelity": 1,
+    "expected_trace_preservation_residual": 0,
+    "expected_inverse_square_root_residual": 0
+  },
+  "independent_numpy_comparator": {
+    "generator": "NumPy default_rng(0x4850); sequential independent complex-Gaussian QR/Gram-Schmidt Haar U(4) draws; direct channel-Kraus construction and eigendecomposition inverse square root",
+    "sample_count": 32,
+    "first_seed_hex": "0x4850",
+    "seed_schedule": "single frozen NumPy Generator stream; one Haar U(4) draw per sample",
+    "mean_petz_entanglement_fidelity": 0.8462017572477146,
+    "standard_error_entanglement_fidelity": 0.01375088764055696,
+    "minimum_petz_entanglement_fidelity": 0.6886169589701532,
+    "maximum_petz_entanglement_fidelity": 0.9778015392319153,
+    "mean_trace_preservation_frobenius_residual": 3.2407743705431887e-15,
+    "maximum_trace_preservation_frobenius_residual": 6.542902322657696e-15,
+    "mean_inverse_square_root_residual": 3.1314804853816707e-15,
+    "maximum_inverse_square_root_residual": 5.467096557702232e-15,
+    "minimum_rho_A_eigenvalue_observed": 0.01634767182530859,
+    "maximum_rho_A_eigenvalue_observed": 0.15883738637371506,
+    "note": "Independent NumPy eigendecomposition and PRNG path; not bitwise expected output for the Rust ChaCha20 implementation."
+  },
+  "rust_contract": {
+    "functions": [
+      "simulate_small_hayden_preskill_petz_recovery(seed,tolerance)",
+      "simulate_identity_hayden_preskill_petz_control(tolerance)"
+    ],
+    "proposed_acceptance": {
+      "entanglement_fidelity_range": [
+        0,
+        1
+      ],
+      "identity_channel_entanglement_fidelity_absolute_error": 1e-8,
+      "trace_preservation_residual": 1e-8,
+      "inverse_square_root_residual": 1e-8,
+      "seed_reproducibility": "exact deterministic equality"
+    },
+    "status": "source_authored_not_executed"
+  },
+  "next_baselines": [
+    "exact optimal recovery via small-instance SDP/channel optimization",
+    "rotated Petz recovery",
+    "charge-sector-resolved Petz recovery",
+    "held-out scrambler seeds and decoder calibration",
+    "noise sensitivity, message-size scaling and accessible-radiation fraction sweep"
+  ],
+  "negative_controls": [
+    "supply B_prime to the decoder at runtime",
+    "use the full four-qubit state vector as decoder input",
+    "floor small rho_A eigenvalues and conceal the regularization",
+    "silently repair a non-trace-preserving recovery map",
+    "report classical Petz arithmetic as physical quantum gate count",
+    "call one-step Petz recovery an efficient macroscopic black-hole decoder"
+  ],
+  "required_receipt_fields": [
+    "source_sha",
+    "seed",
+    "scrambler_convention",
+    "accessible_register",
+    "inaccessible_environment",
+    "rho_A_minimum_eigenvalue",
+    "inverse_square_root_residual",
+    "trace_preservation_residual",
+    "entanglement_fidelity",
+    "recovery_kraus_count",
+    "runtime",
+    "peak_memory"
+  ]
+}
