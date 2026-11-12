@@ -44,12 +44,15 @@ This is directly motivated by **GlobalTap** (arXiv submitted 8 November 2026): 2
 
 ## Tests authored
 
-Nineteen focused Rust tests cover:
+Twenty-two focused Rust tests cover:
 - exact beat and downbeat sequences;
 - inclusive 70 ms beat tolerance;
 - duplicate predictions as false positives;
 - missing beats lowering recall;
 - half-time strict-F1 failure and metric-level-tolerant Cemgil behavior;
+- exact and offbeat Cemgil metric-level semantics;
+- doubled-pulse diagnostic separation;
+- rejection immediately outside the strict 70 ms window;
 - CML/AML continuity scores for a broken sequence, half-time metric-level recovery and single-beat abstention;
 - beat correctness separated from downbeat correctness;
 - missing downbeat annotation remaining unknown;
