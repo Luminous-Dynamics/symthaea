@@ -55,6 +55,9 @@ pub enum QuantumInformationError {
         value: f64,
         tolerance: f64,
     },
+    InvalidHydrodynamicFit {
+        observable: &'static str,
+    },
     InformationIdentityError {
         residual: f64,
         tolerance: f64,
@@ -143,6 +146,10 @@ impl fmt::Display for QuantumInformationError {
             Self::InvalidTraceDistance { value, tolerance } => write!(
                 f,
                 "trace distance {value} is outside [0,1] beyond tolerance {tolerance}"
+            ),
+            Self::InvalidHydrodynamicFit { observable } => write!(
+                f,
+                "U(1) hydrodynamic/scrambling fit is undefined for observable {observable}"
             ),
             Self::InformationIdentityError {
                 residual,
@@ -2400,6 +2407,325 @@ pub struct U1OperatorSpreadingEnsembleSummary {
     pub mean_squared_commutator_x: Vec<f64>,
     pub standard_error_squared_commutator_x: Vec<f64>,
     pub maximum_operator_norm_drift: f64,
+}
+
+/// Frozen fit windows and threshold for the joint U(1) hydrodynamic/scrambling analysis.
+/// All intervals are inclusive and measured in brickwork layers.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1HydrodynamicAnalysisConfig {
+    pub diffusion_start_layer: usize,
+    pub diffusion_end_layer: usize,
+    pub entanglement_start_layer: usize,
+    pub entanglement_end_layer: usize,
+    pub operator_front_start_depth: usize,
+    pub operator_front_end_depth: usize,
+    /// Normalized squared commutator threshold; its physical range is [0,2].
+    pub operator_front_threshold: f64,
+}
+
+/// One right/left operator-front measurement at a declared circuit depth.
+/// Boundary-censored fronts are reported but excluded from linear velocity fits.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1OperatorFrontPosition {
+    pub depth: usize,
+    pub left_distance_from_source: f64,
+    pub right_distance_from_source: f64,
+    pub left_boundary_censored: bool,
+    pub right_boundary_censored: bool,
+}
+
+/// Least-squares line y = intercept + slope*x, with an R-squared diagnostic.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1LinearFit {
+    pub point_count: usize,
+    pub intercept: f64,
+    pub slope: f64,
+    pub r_squared: f64,
+}
+
+/// Joint charge-transport, operator-front and entanglement-growth analysis.
+/// The three output velocities are effective finite-size fit parameters, not
+/// thermodynamic-limit constants or universal inequalities.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1HydrodynamicScramblingAnalysis {
+    pub number_of_qubits: usize,
+    pub total_excitations: usize,
+    pub source_qubit: usize,
+    pub domain_wall_sample_count: usize,
+    pub operator_sample_count_per_depth: usize,
+    /// Effective D from Var(|gradient of mean density|) = 2 D t + b.
+    pub effective_charge_diffusion_coefficient_sites_squared_per_layer: f64,
+    pub charge_diffusion_width_fit: U1LinearFit,
+    /// Half-chain entropy slope divided by the exact symmetry-resolved
+    /// fixed-charge Haar mean entropy for the same N,K,A=N/2.
+    pub symmetry_resolved_page_half_chain_entropy_nats: f64,
+    pub entanglement_entropy_growth_rate_nats_per_layer: f64,
+    pub effective_entanglement_velocity_sites_per_layer: f64,
+    pub entanglement_growth_fit: U1LinearFit,
+    /// Left/right threshold-front speeds extracted from local-Z squared
+    /// commutators of an initially local-X operator.
+    pub left_operator_butterfly_velocity_sites_per_layer: f64,
+    pub right_operator_butterfly_velocity_sites_per_layer: f64,
+    pub left_operator_front_fit: U1LinearFit,
+    pub right_operator_front_fit: U1LinearFit,
+    pub operator_front_positions: Vec<U1OperatorFrontPosition>,
+    pub maximum_domain_wall_continuity_residual: f64,
+    pub maximum_domain_wall_norm_drift: f64,
+    pub maximum_domain_wall_charge_drift: f64,
+    pub maximum_operator_norm_drift: f64,
+}
+
+/// Analyze a shared U(1)-conserving circuit family in three complementary ways:
+///
+/// 1. Estimate charge diffusion from the second central moment of the absolute
+///    spatial density gradient. For a diffusing step profile, this gradient
+///    approaches a Gaussian whose variance grows as 2 D t.
+/// 2. Estimate left/right butterfly-front velocities from threshold crossings
+///    in the local-Z squared-commutator profile of an initially local-X operator.
+/// 3. Estimate the entanglement growth rate from a preregistered linear window,
+///    and normalize by the exact symmetry-resolved Page mean for the same
+///    finite (N,K,N/2) Hilbert-space partition.
+///
+/// Fit windows must be selected before looking at the resulting fit values.
+/// Boundary-censored OTOC fronts are retained in the receipt but excluded from
+/// the velocity fits. Poor R-squared values remain visible; they are not hidden
+/// by forcing a hydrodynamic interpretation.
+pub fn analyze_u1_hydrodynamic_scrambling(
+    domain_wall: &U1DomainWallTransportEnsembleSummary,
+    operator_depths: &[U1OperatorSpreadingEnsembleSummary],
+    config: &U1HydrodynamicAnalysisConfig,
+) -> Result<U1HydrodynamicScramblingAnalysis, QuantumInformationError> {
+    let number_of_qubits = domain_wall.number_of_qubits;
+    let total_excitations = domain_wall.initial_left_excitations;
+    let source_qubit = operator_depths.first()
+        .map(|sample| sample.source_qubit)
+        .ok_or(QuantumInformationError::InvalidHydrodynamicFit {
+            observable: "operator_depths",
+        })?;
+
+    if number_of_qubits < 4
+        || !number_of_qubits.is_multiple_of(2)
+        || total_excitations != number_of_qubits / 2
+        || domain_wall.layers.len() != domain_wall.depth + 1
+        || domain_wall.sample_count < 2
+    {
+        return Err(QuantumInformationError::InvalidHydrodynamicFit {
+            observable: "domain_wall_configuration",
+        });
+    }
+    if source_qubit == 0 || source_qubit + 1 >= number_of_qubits {
+        return Err(QuantumInformationError::InvalidHydrodynamicFit {
+            observable: "operator_source_must_be_interior",
+        });
+    }
+    if !config.operator_front_threshold.is_finite()
+        || config.operator_front_threshold <= 0.0
+        || config.operator_front_threshold > 2.0
+    {
+        return Err(QuantumInformationError::InvalidHydrodynamicFit {
+            observable: "operator_front_threshold",
+        });
+    }
+    if config.diffusion_start_layer < 1
+        || config.diffusion_start_layer >= config.diffusion_end_layer
+        || config.diffusion_end_layer > domain_wall.depth
+        || config.entanglement_start_layer >= config.entanglement_end_layer
+        || config.entanglement_end_layer > domain_wall.depth
+        || config.operator_front_start_depth >= config.operator_front_end_depth
+    {
+        return Err(QuantumInformationError::InvalidHydrodynamicFit {
+            observable: "fit_window",
+        });
+    }
+
+    let mut widths = Vec::new();
+    for layer in config.diffusion_start_layer..=config.diffusion_end_layer {
+        let profile = &domain_wall.layers[layer].mean_density_profile;
+        if profile.len() != number_of_qubits {
+            return Err(QuantumInformationError::DimensionMismatch {
+                expected: number_of_qubits,
+                actual: profile.len(),
+            });
+        }
+        let gradient_weights = profile.windows(2)
+            .map(|pair| (pair[1] - pair[0]).abs())
+            .collect::<Vec<_>>();
+        let total_weight: f64 = gradient_weights.iter().sum();
+        if !total_weight.is_finite() || total_weight <= 1e-14 {
+            return Err(QuantumInformationError::InvalidHydrodynamicFit {
+                observable: "density_gradient_variance",
+            });
+        }
+        let centroid = gradient_weights.iter().enumerate()
+            .map(|(bond, weight)| (bond as f64 + 0.5) * weight)
+            .sum::<f64>() / total_weight;
+        let variance = gradient_weights.iter().enumerate()
+            .map(|(bond, weight)| weight * ((bond as f64 + 0.5) - centroid).powi(2))
+            .sum::<f64>() / total_weight;
+        widths.push((layer as f64, variance));
+    }
+    let charge_diffusion_width_fit = fit_line(&widths, "charge_diffusion_width")?;
+    let diffusion_coefficient = charge_diffusion_width_fit.slope * 0.5;
+
+    let page_entropy = symmetry_resolved_page_average_entropy_nats(
+        number_of_qubits,
+        total_excitations,
+        number_of_qubits / 2,
+    )?;
+    if page_entropy <= 0.0 {
+        return Err(QuantumInformationError::InvalidHydrodynamicFit {
+            observable: "symmetry_resolved_Page_entropy",
+        });
+    }
+    let entropy_points = (config.entanglement_start_layer..=config.entanglement_end_layer)
+        .map(|layer| {
+            (
+                layer as f64,
+                domain_wall.layers[layer].mean_half_chain_entropy_nats,
+            )
+        })
+        .collect::<Vec<_>>();
+    let entanglement_growth_fit = fit_line(&entropy_points, "entanglement_growth")?;
+    let entanglement_velocity = entanglement_growth_fit.slope / page_entropy;
+
+    let mut ordered_operator = operator_depths.to_vec();
+    ordered_operator.sort_by_key(|sample| sample.depth);
+    let mut previous_depth = None;
+    let mut operator_front_positions = Vec::new();
+    let mut left_front_points = Vec::new();
+    let mut right_front_points = Vec::new();
+    let mut maximum_operator_norm_drift: f64 = 0.0;
+    let mut operator_sample_count = None;
+
+    for sample in ordered_operator.iter().filter(|sample| {
+        sample.depth >= config.operator_front_start_depth
+            && sample.depth <= config.operator_front_end_depth
+    }) {
+        if sample.number_of_qubits != number_of_qubits
+            || sample.source_qubit != source_qubit
+            || sample.mean_squared_commutator_z.len() != number_of_qubits
+            || sample.sample_count < 2
+            || !sample.maximum_operator_norm_drift.is_finite()
+        {
+            return Err(QuantumInformationError::InvalidHydrodynamicFit {
+                observable: "operator_spreading_ensemble_compatibility",
+            });
+        }
+        if previous_depth.is_some_and(|previous| sample.depth <= previous) {
+            return Err(QuantumInformationError::InvalidHydrodynamicFit {
+                observable: "operator_depth_order",
+            });
+        }
+        previous_depth = Some(sample.depth);
+        if operator_sample_count.replace(sample.sample_count).is_some_and(|count| {
+            count != sample.sample_count
+        }) {
+            return Err(QuantumInformationError::InvalidHydrodynamicFit {
+                observable: "operator_sample_count_consistency",
+            });
+        }
+        maximum_operator_norm_drift =
+            maximum_operator_norm_drift.max(sample.maximum_operator_norm_drift);
+
+        let profile = &sample.mean_squared_commutator_z;
+        let left_front = (0..=source_qubit)
+            .filter(|site| profile[*site] >= config.operator_front_threshold)
+            .min()
+            .unwrap_or(source_qubit);
+        let right_front = (source_qubit..number_of_qubits)
+            .filter(|site| profile[*site] >= config.operator_front_threshold)
+            .max()
+            .unwrap_or(source_qubit);
+        let left_boundary_censored = left_front == 0;
+        let right_boundary_censored = right_front + 1 == number_of_qubits;
+        let left_distance = (source_qubit - left_front) as f64;
+        let right_distance = (right_front - source_qubit) as f64;
+        operator_front_positions.push(U1OperatorFrontPosition {
+            depth: sample.depth,
+            left_distance_from_source: left_distance,
+            right_distance_from_source: right_distance,
+            left_boundary_censored,
+            right_boundary_censored,
+        });
+        if !left_boundary_censored {
+            left_front_points.push((sample.depth as f64, left_distance));
+        }
+        if !right_boundary_censored {
+            right_front_points.push((sample.depth as f64, right_distance));
+        }
+    }
+    let left_operator_front_fit = fit_line(&left_front_points, "left_operator_front")?;
+    let right_operator_front_fit = fit_line(&right_front_points, "right_operator_front")?;
+
+    Ok(U1HydrodynamicScramblingAnalysis {
+        number_of_qubits,
+        total_excitations,
+        source_qubit,
+        domain_wall_sample_count: domain_wall.sample_count,
+        operator_sample_count_per_depth: operator_sample_count.unwrap_or(0),
+        effective_charge_diffusion_coefficient_sites_squared_per_layer: diffusion_coefficient,
+        charge_diffusion_width_fit,
+        symmetry_resolved_page_half_chain_entropy_nats: page_entropy,
+        entanglement_entropy_growth_rate_nats_per_layer: entanglement_growth_fit.slope,
+        effective_entanglement_velocity_sites_per_layer: entanglement_velocity,
+        entanglement_growth_fit,
+        left_operator_butterfly_velocity_sites_per_layer: left_operator_front_fit.slope,
+        right_operator_butterfly_velocity_sites_per_layer: right_operator_front_fit.slope,
+        left_operator_front_fit,
+        right_operator_front_fit,
+        operator_front_positions,
+        maximum_domain_wall_continuity_residual: domain_wall.layers.iter()
+            .map(|layer| layer.maximum_continuity_residual)
+            .fold(0.0_f64, f64::max),
+        maximum_domain_wall_norm_drift: domain_wall.layers.iter()
+            .map(|layer| layer.maximum_norm_drift)
+            .fold(0.0_f64, f64::max),
+        maximum_domain_wall_charge_drift: domain_wall.layers.iter()
+            .map(|layer| layer.maximum_charge_drift)
+            .fold(0.0_f64, f64::max),
+        maximum_operator_norm_drift,
+    })
+}
+
+fn fit_line(
+    points: &[(f64, f64)],
+    observable: &'static str,
+) -> Result<U1LinearFit, QuantumInformationError> {
+    if points.len() < 2
+        || points.iter().any(|(x, y)| !x.is_finite() || !y.is_finite())
+    {
+        return Err(QuantumInformationError::InvalidHydrodynamicFit { observable });
+    }
+    let count = points.len() as f64;
+    let mean_x = points.iter().map(|point| point.0).sum::<f64>() / count;
+    let mean_y = points.iter().map(|point| point.1).sum::<f64>() / count;
+    let covariance = points.iter()
+        .map(|(x, y)| (x - mean_x) * (y - mean_y))
+        .sum::<f64>();
+    let variance_x = points.iter().map(|(x, _)| (x - mean_x).powi(2)).sum::<f64>();
+    if variance_x <= 0.0 {
+        return Err(QuantumInformationError::InvalidHydrodynamicFit { observable });
+    }
+    let slope = covariance / variance_x;
+    let intercept = mean_y - slope * mean_x;
+    let residual_sum = points.iter()
+        .map(|(x, y)| (y - (intercept + slope * x)).powi(2))
+        .sum::<f64>();
+    let total_sum = points.iter().map(|(_, y)| (y - mean_y).powi(2)).sum::<f64>();
+    let r_squared = if total_sum <= 1e-24 {
+        if residual_sum <= 1e-24 { 1.0 } else { 0.0 }
+    } else {
+        1.0 - residual_sum / total_sum
+    };
+    if !slope.is_finite() || !intercept.is_finite() || !r_squared.is_finite() {
+        return Err(QuantumInformationError::InvalidHydrodynamicFit { observable });
+    }
+    Ok(U1LinearFit {
+        point_count: points.len(),
+        intercept,
+        slope,
+        r_squared,
+    })
 }
 
 /// Sample independent operator-spreading circuits and report per-site
