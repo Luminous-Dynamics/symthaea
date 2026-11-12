@@ -355,6 +355,7 @@ pub fn evaluate_fleet(
     }
     let mut mission_ids = BTreeSet::new();
     let mut pair_ids = BTreeSet::new();
+    let mut task_work_units: BTreeMap<String, String> = BTreeMap::new();
 
     let mut total = FleetScorecard {
         arm_id: arm_id.to_owned(),
@@ -380,6 +381,19 @@ pub fn evaluate_fleet(
 
     for trial in trials {
         validate_trial(trial, arm_id, &mut mission_ids, &mut pair_ids)?;
+        if let Some(existing_unit) = task_work_units.get(&trial.identity.task_class) {
+            if existing_unit != &trial.identity.work_unit_id {
+                return Err(EvaluationError::PairIdentityMismatch(format!(
+                    "incomparable work units within task class {}",
+                    trial.identity.task_class
+                )));
+            }
+        } else {
+            task_work_units.insert(
+                trial.identity.task_class.clone(),
+                trial.identity.work_unit_id.clone(),
+            );
+        }
         let physical_safe = physical_safe_success(trial);
         let evidence_safe = evidence_qualified_safe_success(trial, contract);
         let slo = slo_qualified(trial, contract);
