@@ -52,7 +52,6 @@ struct ModelCampaign {
     cavitation_state_evidence_sha256: String,
     water_quality_nuclei_evidence_sha256: String,
     background_measurement_per_condition_available: bool,
-    facility_transfer_function_applied: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -101,8 +100,9 @@ struct SpectralBand {
     model_upper_hz: f64,
     full_scale_lower_hz: f64,
     full_scale_upper_hz: f64,
-    model_signal_plus_background_source_level_db: f64,
-    model_background_source_level_db: f64,
+    model_signal_plus_background_spl_db: f64,
+    model_background_spl_db: f64,
+    facility_transfer_function_db: f64,
     observed_full_scale_source_level_db: f64,
     signal_to_background_margin_db: f64,
     background_correction_applied: bool,
@@ -429,8 +429,9 @@ fn audit(case: &Case) -> AuditReport {
                 || !positive_finite(band.full_scale_upper_hz)
                 || band.model_lower_hz >= band.model_upper_hz
                 || band.full_scale_lower_hz >= band.full_scale_upper_hz
-                || !band.model_signal_plus_background_source_level_db.is_finite()
-                || !band.model_background_source_level_db.is_finite()
+                || !band.model_signal_plus_background_spl_db.is_finite()
+                || !band.model_background_spl_db.is_finite()
+                || !band.facility_transfer_function_db.is_finite()
                 || !band.observed_full_scale_source_level_db.is_finite()
             {
                 blockers.push(format!("pair {} band {} has invalid frequency bounds or level", pair.pair_id, band.band_id));
@@ -445,8 +446,8 @@ fn audit(case: &Case) -> AuditReport {
                 blockers.push(format!("pair {} band {} is not an exact scaled-frequency match", pair.pair_id, band.band_id));
             }
 
-            let calculated_margin = band.model_signal_plus_background_source_level_db
-                - band.model_background_source_level_db;
+            let calculated_margin = band.model_signal_plus_background_spl_db
+                - band.model_background_spl_db;
             if !band.signal_to_background_margin_db.is_finite()
                 || !calculated_margin.is_finite()
                 || band.signal_to_background_margin_db < 0.0
@@ -468,17 +469,19 @@ fn audit(case: &Case) -> AuditReport {
                         blockers.push(format!("pair {} band {} has a non-positive background-subtracted power", pair.pair_id, band.band_id));
                         None
                     } else {
-                        Some(band.model_signal_plus_background_source_level_db
-                            + 10.0 * correction_term.log10())
+                        Some(band.model_signal_plus_background_spl_db
+                            + 10.0 * correction_term.log10()
+                            - band.facility_transfer_function_db)
                     }
                 }
             } else if band.background_correction_applied {
                 let power_ratio = 10.0_f64.powf(-calculated_margin / 10.0);
                 let correction_term = 1.0 - power_ratio;
-                Some(band.model_signal_plus_background_source_level_db
-                    + 10.0 * correction_term.log10())
+                Some(band.model_signal_plus_background_spl_db
+                    + 10.0 * correction_term.log10()
+                    - band.facility_transfer_function_db)
             } else {
-                Some(band.model_signal_plus_background_source_level_db)
+                Some(band.model_signal_plus_background_spl_db - band.facility_transfer_function_db)
             };
 
             let u = &band.uncertainty;
@@ -751,8 +754,9 @@ mod tests {
         let mut case = synthetic_case();
         make_measured(&mut case);
         let band = &mut case.operating_point_pairs[0].bands[0];
-        band.model_signal_plus_background_source_level_db = 120.0;
-        band.model_background_source_level_db = 115.0;
+        band.model_signal_plus_background_spl_db = 120.0;
+        band.model_background_spl_db = 115.0;
+        band.facility_transfer_function_db = 0.0;
         band.signal_to_background_margin_db = 5.0;
         band.background_correction_applied = false;
         let report = audit(&case);
@@ -764,8 +768,9 @@ mod tests {
         let mut case = synthetic_case();
         make_measured(&mut case);
         let band = &mut case.operating_point_pairs[0].bands[0];
-        band.model_signal_plus_background_source_level_db = 120.0;
-        band.model_background_source_level_db = 115.0;
+        band.model_signal_plus_background_spl_db = 120.0;
+        band.model_background_spl_db = 115.0;
+        band.facility_transfer_function_db = 0.0;
         band.signal_to_background_margin_db = 5.0;
         band.background_correction_applied = true;
         let report = audit(&case);
