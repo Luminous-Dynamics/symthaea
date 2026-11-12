@@ -69,7 +69,14 @@
       "status": "synthetic_outcome",
       "event_cycle": 421,
       "failure_mode": null,
-      "outcome_evidence_id": "E-OUTCOME"
+      "outcome_evidence_id": "E-OUTCOME",
+      "feature_observations": [
+        {
+          "feature_id": "differential_voltage_first_cycles",
+          "available_cycle": 5,
+          "evidence_id": "E-FEATURE"
+        }
+      ]
     },
     {
       "cell_id": "CELL-002",
@@ -86,7 +93,14 @@
       "status": "synthetic_outcome",
       "event_cycle": 422,
       "failure_mode": null,
-      "outcome_evidence_id": "E-OUTCOME"
+      "outcome_evidence_id": "E-OUTCOME",
+      "feature_observations": [
+        {
+          "feature_id": "differential_voltage_first_cycles",
+          "available_cycle": 5,
+          "evidence_id": "E-FEATURE"
+        }
+      ]
     },
     {
       "cell_id": "CELL-003",
@@ -103,7 +117,14 @@
       "status": "synthetic_outcome",
       "event_cycle": 423,
       "failure_mode": null,
-      "outcome_evidence_id": "E-OUTCOME"
+      "outcome_evidence_id": "E-OUTCOME",
+      "feature_observations": [
+        {
+          "feature_id": "differential_voltage_first_cycles",
+          "available_cycle": 5,
+          "evidence_id": "E-FEATURE"
+        }
+      ]
     },
     {
       "cell_id": "CELL-004",
@@ -120,7 +141,14 @@
       "status": "synthetic_outcome",
       "event_cycle": 424,
       "failure_mode": null,
-      "outcome_evidence_id": "E-OUTCOME"
+      "outcome_evidence_id": "E-OUTCOME",
+      "feature_observations": [
+        {
+          "feature_id": "differential_voltage_first_cycles",
+          "available_cycle": 5,
+          "evidence_id": "E-FEATURE"
+        }
+      ]
     },
     {
       "cell_id": "CELL-005",
@@ -137,7 +165,14 @@
       "status": "synthetic_outcome",
       "event_cycle": 425,
       "failure_mode": null,
-      "outcome_evidence_id": "E-OUTCOME"
+      "outcome_evidence_id": "E-OUTCOME",
+      "feature_observations": [
+        {
+          "feature_id": "differential_voltage_first_cycles",
+          "available_cycle": 5,
+          "evidence_id": "E-FEATURE"
+        }
+      ]
     },
     {
       "cell_id": "CELL-006",
@@ -154,7 +189,14 @@
       "status": "synthetic_outcome",
       "event_cycle": 426,
       "failure_mode": null,
-      "outcome_evidence_id": "E-OUTCOME"
+      "outcome_evidence_id": "E-OUTCOME",
+      "feature_observations": [
+        {
+          "feature_id": "differential_voltage_first_cycles",
+          "available_cycle": 5,
+          "evidence_id": "E-FEATURE"
+        }
+      ]
     },
     {
       "cell_id": "CELL-007",
@@ -171,7 +213,14 @@
       "status": "synthetic_outcome",
       "event_cycle": 427,
       "failure_mode": null,
-      "outcome_evidence_id": "E-OUTCOME"
+      "outcome_evidence_id": "E-OUTCOME",
+      "feature_observations": [
+        {
+          "feature_id": "differential_voltage_first_cycles",
+          "available_cycle": 5,
+          "evidence_id": "E-FEATURE"
+        }
+      ]
     },
     {
       "cell_id": "CELL-008",
@@ -188,7 +237,14 @@
       "status": "synthetic_outcome",
       "event_cycle": 428,
       "failure_mode": null,
-      "outcome_evidence_id": "E-OUTCOME"
+      "outcome_evidence_id": "E-OUTCOME",
+      "feature_observations": [
+        {
+          "feature_id": "differential_voltage_first_cycles",
+          "available_cycle": 5,
+          "evidence_id": "E-FEATURE"
+        }
+      ]
     },
     {
       "cell_id": "CELL-009",
@@ -205,7 +261,14 @@
       "status": "synthetic_outcome",
       "event_cycle": 429,
       "failure_mode": null,
-      "outcome_evidence_id": "E-OUTCOME"
+      "outcome_evidence_id": "E-OUTCOME",
+      "feature_observations": [
+        {
+          "feature_id": "differential_voltage_first_cycles",
+          "available_cycle": 5,
+          "evidence_id": "E-FEATURE"
+        }
+      ]
     },
     {
       "cell_id": "CELL-010",
@@ -222,7 +285,14 @@
       "status": "synthetic_outcome",
       "event_cycle": 430,
       "failure_mode": null,
-      "outcome_evidence_id": "E-OUTCOME"
+      "outcome_evidence_id": "E-OUTCOME",
+      "feature_observations": [
+        {
+          "feature_id": "differential_voltage_first_cycles",
+          "available_cycle": 5,
+          "evidence_id": "E-FEATURE"
+        }
+      ]
     },
     {
       "cell_id": "CELL-011",
@@ -239,7 +309,14 @@
       "status": "synthetic_outcome",
       "event_cycle": 431,
       "failure_mode": null,
-      "outcome_evidence_id": "E-OUTCOME"
+      "outcome_evidence_id": "E-OUTCOME",
+      "feature_observations": [
+        {
+          "feature_id": "differential_voltage_first_cycles",
+          "available_cycle": 5,
+          "evidence_id": "E-FEATURE"
+        }
+      ]
     },
     {
       "cell_id": "CELL-012",
@@ -256,7 +333,14 @@
       "status": "synthetic_outcome",
       "event_cycle": 432,
       "failure_mode": null,
-      "outcome_evidence_id": "E-OUTCOME"
+      "outcome_evidence_id": "E-OUTCOME",
+      "feature_observations": [
+        {
+          "feature_id": "differential_voltage_first_cycles",
+          "available_cycle": 5,
+          "evidence_id": "E-FEATURE"
+        }
+      ]
     }
   ],
   "evidence": [
@@ -275,6 +359,15 @@
       "evidence_class": "synthetic_fixture",
       "admission": "admitted_for_evaluation",
       "claim_scope": "synthetic lifetime outcome observations",
+      "validity_domain": "fixture only",
+      "metrology_ref": null
+    },
+    {
+      "evidence_id": "E-FEATURE",
+      "source_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+      "evidence_class": "synthetic_fixture",
+      "admission": "admitted_for_evaluation",
+      "claim_scope": "synthetic early-window feature observations",
       "validity_domain": "fixture only",
       "metrology_ref": null
     }
