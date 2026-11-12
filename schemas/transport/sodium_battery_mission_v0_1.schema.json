@@ -14,7 +14,8 @@
     "measurements",
     "lifetime_outcomes",
     "evidence_registry",
-    "comparison_policy"
+    "comparison_policy",
+    "comparison_sets"
   ],
   "properties": {
     "schema_version": {
@@ -110,7 +111,8 @@
           "lane_id",
           "technology_lane",
           "maturity_class",
-          "allowed_comparator_lanes"
+          "allowed_comparator_lanes",
+          "frontier_group"
         ],
         "properties": {
           "lane_id": {
@@ -146,6 +148,12 @@
                 "nickel_manganese_cobalt"
               ]
             }
+          },
+          "frontier_group": {
+            "enum": [
+              "commercial_cell_comparison",
+              "post_lithium_research"
+            ]
           }
         }
       }
@@ -261,7 +269,8 @@
           "protocol_ref",
           "formation_ref",
           "calibration_ref",
-          "raw_data_digest"
+          "raw_data_digest",
+          "condition_profile_id"
         ],
         "properties": {
           "condition_id": {
@@ -312,6 +321,10 @@
           "raw_data_digest": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
+          },
+          "condition_profile_id": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
@@ -500,14 +513,14 @@
       "additionalProperties": false,
       "required": [
         "require_matched_conditions",
-        "forbid_lane_mixing",
+        "separate_frontier_groups",
         "allow_active_material_to_full_cell_extrapolation"
       ],
       "properties": {
         "require_matched_conditions": {
           "const": true
         },
-        "forbid_lane_mixing": {
+        "separate_frontier_groups": {
           "const": true
         },
         "allow_active_material_to_full_cell_extrapolation": {
@@ -516,6 +529,74 @@
         "minimum_independent_specimens_per_design": {
           "type": "integer",
           "minimum": 1
+        }
+      }
+    },
+    "comparison_sets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "comparison_set_id",
+          "frontier_group",
+          "mission_id",
+          "lane_ids",
+          "specimen_ids",
+          "condition_profile_ids",
+          "system_boundary"
+        ],
+        "properties": {
+          "comparison_set_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "frontier_group": {
+            "enum": [
+              "commercial_cell_comparison",
+              "post_lithium_research"
+            ]
+          },
+          "mission_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "lane_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "specimen_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "condition_profile_ids": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "system_boundary": {
+            "enum": [
+              "complete_cell",
+              "module",
+              "pack",
+              "installed_system"
+            ]
+          }
         }
       }
     }
