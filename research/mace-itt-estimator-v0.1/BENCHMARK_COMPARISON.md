@@ -57,3 +57,30 @@ No weighted score should allow utility to compensate for unauthorized effects or
 - SkillLifeBench: https://arxiv.org/abs/2610.35215
 - NIST initial design tenets: https://www.nist.gov/blogs/cybersecurity-insights/design-tenets-agent-identity-management-systems
 - NIST NCCoE feedback summary: https://pages.nist.gov/nccoe-ai-identity/summary-of-comments.html
+
+## 2026-11-13 update: repeated-run reliability is two-sided
+
+NVIDIA SkillEvaluator's current Tier 3 documentation supports `pass@k`: with `--n-attempts k`, a case passes when at least one of its k attempts clears the threshold, and per-arm case-level 95% Wilson intervals are reported. This is a useful baseline, but pass@k is an optimistic measure of finding one successful attempt. Princeton's agent-evaluation guidance and the recent *On Randomness in Agentic Evals* study recommend reporting a complementary all-runs-success measure (pass^k / pass∧k) and repeated trajectories rather than treating pass@k as reliability by itself.
+
+MACE's repeated-run report should therefore publish, for task-pass and clean-success separately:
+
+- **pass@k**: at least one of k sampled first-attempt runs succeeds;
+- **pass^k**: all k sampled first-attempt runs succeed;
+- per-arm rates and the paired ITT contrast;
+- task-clustered uncertainty and partial-identification bounds for unknown outcomes;
+- the number of tasks with enough preregistered seeds for each k, plus excluded/insufficient task counts.
+
+For n observed preregistered first attempts and c successes, the finite-sample subset estimates are:
+
+\[\mathrm{pass@k}=1-\frac{\binom{n-c}{k}}{\binom{n}{k}},\qquad
+\mathrm{pass^k}=\frac{\binom{c}{k}}{\binom{n}{k}}.\]
+
+This estimates the fraction of size-k subsets of the registered first-attempt runs that satisfy the respective event. It is not a guarantee of future deployment reliability. Retries/recovery attempts stay in the event ledger but do not count as independent seeds or increase k. Tasks with fewer than k preregistered seeds are explicitly marked insufficient, not treated as failures.
+
+Sources:
+- NVIDIA SkillEvaluator live evaluation and reports: https://docs.nvidia.com/skills/skillevaluator and https://docs.nvidia.com/skills/skillevaluator/reports
+- Princeton, *Emerging Trends in AI Agent Evaluation*: https://sage.cs.princeton.edu/trends/
+- Bjarnason et al., *On Randomness in Agentic Evals* (60,000 SWE-Bench-Verified trajectories): https://arxiv.org/abs/2602.07150
+- Current official SkillsBench v1.1 release export (87-task roster; current board): https://huggingface.co/datasets/benchflow/skillsbench-leaderboard
+
+This is a measurement-method update only. No external MACE benchmark reproduction or performance improvement is claimed.
