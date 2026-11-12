@@ -99,6 +99,22 @@ Reproduce each external study on its own exact cell, split, ageing conditions an
 
 The initial Rust contract PR #11735 validates full factorial coverage, immutable protocol identities, declared group-holdout isolation, feature cutoffs, event/censoring semantics and physical evidence/metrology gates. Its synthetic software PASS is not a physical interaction or battery-performance result.
 
+### Track E — decision-value experiment selection
+
+Owner: Symthaea [BATTERY-DESIGN-DECISION-VALUE-001 #11722](https://github.com/Luminous-Dynamics/symthaea/issues/11722) / draft [PR #11722](https://github.com/Luminous-Dynamics/symthaea/pull/11722). This consumes the generic decision-impact benchmark [SE-OPT-BENCH-001 #7803](https://github.com/Luminous-Dynamics/symthaea/issues/7803), not another generic VOI engine.
+
+The current inverse-design v0.1 selector is a transparent information-gain-per-normalized-resource heuristic, explicitly not calibrated EVSI. The next benchmark asks whether a selected observation changes the admissible engineering decision:
+
+- A high-entropy experiment can have zero decision value when every possible result selects the same design.
+- A low-variance measurement near a safety, manufacturability or mission-feasibility boundary can be decision-critical.
+- Expected value of sample information (EVSI) is used only when outcome probabilities come from a declared, admitted, calibrated probability model.
+- When only intervals or sets are justified, report distribution-free worst-case regret/robust-feasibility reduction; never turn interval endpoints into pseudo-probabilities.
+- Hard evidence, safety, rights and mission gates remain non-compensable. STOP / NO_EXPERIMENT is a valid optimal action.
+
+On identical finite design portfolios and total experiment budgets, compare random, DOE/space-filling, uncertainty sampling, the current information-gain heuristic, EIG when admissible, multi-objective BO/hypervolume improvement where relevant, decision-focused EVSI, distribution-free minimax regret, expert/DOE and STOP. Report normalized decision regret, false-feasible/missed-feasible rates, experiments/material/time/compute to first evidence-supported feasible design, policy sensitivity, failed/abstained-call accounting and top-K prospective enrichment separately.
+
+The initial Rust audit in PR #11722 passed its dedicated known-answer workflow on its original head, but the workflow-syntax policy required adding `ready_for_review` to its PR trigger. Treat the audit and workflow governance as separate qualifications until the new-head rerun completes. The fixture outcomes are synthetic; no selector is yet shown to improve real battery experiments or physical discovery.
+
 ## Additional materials frontier: sodium-ion and zero-excess sodium-metal
 
 A new bounded materials lane has been opened in Symthaea [SODIUM-BATTERY-MISSION-001 #11694](https://github.com/Luminous-Dynamics/symthaea/issues/11694) / draft [PR #11695](https://github.com/Luminous-Dynamics/symthaea/pull/11695).
