@@ -186,13 +186,13 @@ struct PairReport {
     model_run_id: String,
     full_scale_run_id: String,
     frequency_scale_factor: f64,
-    spl_scale_delta_db: f64,
     band_reports: Vec<BandReport>,
 }
 
 #[derive(Debug, Serialize)]
 struct BandReport {
     band_id: String,
+    spl_scale_delta_db: f64,
     model_source_level_db: f64,
     predicted_full_scale_source_level_db: f64,
     predicted_interval_lower_db: Option<f64>,
@@ -509,6 +509,7 @@ fn audit(case: &Case) -> AuditReport {
                 any_prediction_only = true;
                 band_reports.push(BandReport {
                     band_id: model_band.band_id.clone(),
+                    spl_scale_delta_db: delta_db,
                     model_source_level_db: model_source_level,
                     predicted_full_scale_source_level_db: predicted_full_scale,
                     predicted_interval_lower_db: None,
@@ -610,7 +611,6 @@ fn audit(case: &Case) -> AuditReport {
             model_run_id: pair.model.run_id.clone(),
             full_scale_run_id: pair.full_scale.run_id.clone(),
             frequency_scale_factor: frequency_factor,
-            spl_scale_delta_db: delta_db,
             band_reports,
         });
     }
@@ -810,7 +810,7 @@ mod tests {
         let delta = spl_scale_delta_db(
             &pair.model,
             &pair.full_scale,
-            &case.scaling.frequency_regime,
+            &pair.model.bands[0].frequency_regime,
             &case.scaling.bandwidth,
         );
         assert!((delta - 26.020599913279625).abs() < 1e-9);
