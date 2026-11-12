@@ -669,6 +669,8 @@ pub struct CounterfactualInfluenceReport {
     pub qualified_support_intervals: Vec<FrameInterval>,
     /// Channel-specific episodes retaining measured end and post-measurement tail.
     pub qualified_support_by_channel: Vec<ChannelSupportInterval>,
+    /// Complete ordered per-window/per-channel measurements and hysteresis trace.
+    pub measurements: Vec<InfluenceWindowMeasurement>,
     pub disposition: InfluenceDisposition,
     pub receipt_sha256: String,
 }
@@ -1710,6 +1712,7 @@ pub fn measure_counterfactual_influence(
         measured_influence_intervals: merge_intervals(raw_affected),
         qualified_support_intervals,
         qualified_support_by_channel,
+        measurements,
         disposition,
         receipt_sha256: String::new(),
     })
