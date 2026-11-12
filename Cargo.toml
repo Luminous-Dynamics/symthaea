@@ -35,6 +35,8 @@ exclude = [
     # Exclude them from workspace discovery until each has an owned Cargo.toml.
     "crates/core/symthaea",
     "crates/core/symthaea-observation-attestation",
+    # README-only REA verifier plan; the package manifest/implementation is not present yet.
+    "crates/domains/symthaea-rea-evidence-verifier",
 ]
 default-members = [
     "xtask",
