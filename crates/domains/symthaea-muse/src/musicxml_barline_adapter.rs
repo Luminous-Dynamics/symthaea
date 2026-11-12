@@ -5,8 +5,8 @@
 //! Only score-partwise measure containers are handled in V1. A measure span
 //! is normalized from its explicit content cursor and, where present, its
 //! own declared time signature. This is not a MIDI meter-to-barline inference
-//! path. Multi-part measure sequences must reconcile exactly after rational
-//! normalization; disagreement yields Unknown.
+//! path. The global-map helper requires part reconciliation; separate APIs
+//! preserve polymetric per-part maps and the complete typed barline graph.
 
 use crate::evidence_digest::canonical_json_sha256;
 use serde::{Deserialize, Serialize};
@@ -366,6 +366,7 @@ pub struct MusicXmlPartBarlineEventV1 {
     pub fermatas: Vec<MusicXmlFermataV1>,
     pub wavy_lines: Vec<MusicXmlWavyLineV1>,
     pub annotations: Vec<MusicXmlBarlineAnnotationV1>,
+    pub unrecognized_children: Vec<MusicXmlBarlineAnnotationV1>,
     pub unrecognized_attributes: Vec<(String, String)>,
     pub staff: Option<String>,
 }
@@ -704,6 +705,27 @@ fn parse_barline_events_for_part(
                             .filter(|value| !value.is_empty()),
                     })
                     .collect();
+                let known_barline_children = [
+                    "bar-style", "footnote", "level", "wavy-line", "segno", "coda",
+                    "fermata", "ending", "repeat",
+                ];
+                let unrecognized_children = element.children()
+                    .filter(|node| {
+                        node.is_element()
+                            && !known_barline_children.contains(&node.tag_name().name())
+                    })
+                    .map(|node| MusicXmlBarlineAnnotationV1 {
+                        element: node.tag_name().name().to_string(),
+                        attributes: node.attributes()
+                            .map(|attribute| (
+                                attribute.name().to_string(),
+                                attribute.value().to_string(),
+                            ))
+                            .collect(),
+                        text: node.text().map(|value| value.trim().to_string())
+                            .filter(|value| !value.is_empty()),
+                    })
+                    .collect();
                 let known_attributes = ["id", "location", "segno", "coda", "divisions", "staff"];
                 let unrecognized_attributes = element.attributes()
                     .filter(|attribute| !known_attributes.contains(&attribute.name()))
@@ -731,6 +753,7 @@ fn parse_barline_events_for_part(
                     fermatas,
                     wavy_lines,
                     annotations,
+                    unrecognized_children,
                     unrecognized_attributes,
                     staff: element.attribute("staff").map(str::to_string),
                 });
@@ -1438,7 +1461,7 @@ mod tests {
     fn repeat_ending_and_playback_signposts_are_not_silently_dropped() {
         let semantic_barline_fragments = [
             r#"<barline location="left"><bar-style>heavy-light</bar-style><repeat direction="forward"/></barline>"#,
-            r#"<barline location="right"><bar-style>light-heavy</bar-style><repeat direction="backward" times="2"/></barline>"#,
+            r#"<barline location="right"><bar-style>light-heavy</bar-style><repeat direction="backward" times="2"/><future-marker code="opaque">future payload</future-marker></barline>"#,
             r#"<barline location="right"><ending number="1" type="start">1.</ending></barline>"#,
             r#"<barline location="right"><ending number="1" type="stop"/></barline>"#,
             r#"<barline location="left"><segno/></barline>"#,
@@ -1514,6 +1537,9 @@ mod tests {
         assert_eq!(right.annotations[0].element, "footnote");
         assert_eq!(right.annotations[0].text.as_deref(), Some("closing note"));
         assert!(right.unrecognized_attributes.contains(&("custom".into(), "x".into())));
+        assert_eq!(right.unrecognized_children.len(), 1);
+        assert_eq!(right.unrecognized_children[0].element, "future-marker");
+        assert_eq!(right.unrecognized_children[0].text.as_deref(), Some("future payload"));
         let second_right = &graphs[0].barline_events[2];
         assert_eq!(second_right.score_offset, RationalBeat::new(5, 1).unwrap());
         assert_eq!(second_right.repeat.as_ref().and_then(|value| value.direction.as_deref()), Some("forward"));
