@@ -544,9 +544,10 @@
         "rotated_petz_modular_power_identity": "||rho_A^(-1/2-it/2) rho_A rho_A^(-1/2+it/2) - I|| <= 1e-8",
         "rotated_petz_trace_preservation_residual": 1e-8,
         "rotated_petz_t_zero_matches_ordinary_petz": "same scrambler seed; fidelity absolute difference <=1e-8",
-        "rotated_petz_interpretation": "Compare fidelity across preregistered t values and seeds; do not infer the optimal recovery from a small parameter grid."
+        "rotated_petz_interpretation": "Compare fidelity across preregistered t values and seeds; do not infer the optimal recovery from a small parameter grid.",
+        "rotated_petz_status": "Rust 1.96 exact-head crate test suite passed all 148 tests, including four new rotated-Petz tests."
       },
-      "implementation_status": "QI-4A direct decoupling, QI-4P ordinary Petz recovery, QI-4O optimality theorem diagnostics, and QI-4RP modularly rotated Petz family source-authored; exact-head Rust runner qualification pending",
+      "implementation_status": "QI-4A direct decoupling, QI-4P ordinary Petz recovery, QI-4O theorem diagnostics, and QI-4RP modularly rotated Petz recovery source-authored; Rust 1.96 exact-head crate tests pass",
       "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
       "fixtures": [
         "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
@@ -563,7 +564,14 @@
       ],
       "rotated_petz_api": "simulate_small_hayden_preskill_rotated_petz_recovery(seed,t,tolerance)",
       "rotated_petz_ensemble_api": "sample_small_hayden_preskill_rotated_petz_ensemble(sample_count,first_seed,t,tolerance)",
-      "rotated_petz_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_rotated_petz_v1.json"
+      "rotated_petz_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_rotated_petz_v1.json",
+      "rotated_petz_execution": {
+        "source_commit": "7b20deace5f7586c552d1d91bd7d91b3d7fc9615",
+        "tested_pr_head": "847bff5a6e27dc3de43c09f1dcba791b43aa9a8d",
+        "workflow_run_id": 43308906962,
+        "result": "148 passed; 0 failed",
+        "scope": "Includes t=0 equivalence against ordinary Petz, nonzero modular parameter CPTP/fidelity tests, ensemble reproducibility and invalid input controls."
+      }
     },
     {
       "id": "QI-5",
@@ -935,7 +943,7 @@
       "QI_4O_QEC_matrix_and_auxiliary_T": "source_authored_independent_numpy_crosscheck_runner_pending",
       "QI_4O_support_aware_QEC_square_root": "source_authored_not_executed",
       "QI_3T_seed_jackknife_dynamic_exponent": "source_authored_not_executed",
-      "QI_4RP_rotated_Petz_recovery": "source_authored_not_executed"
+      "QI_4RP_rotated_Petz_recovery": "Rust_source_and_tests_passed_exact_head_847bff5a"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
@@ -951,7 +959,7 @@
       "rotated_Petz_ensemble": "not implemented",
       "gate_level_quantum_decoder_cost": "not implemented",
       "QI_4O_general_noncommuting_optimality": "The code tests only the commuting rho=sigma=I/2 corollary. The general theorem's positive-semidefinite B criterion for noncommuting rho,sigma remains unimplemented.",
-      "rotated_Petz_optimality": "a finite t-grid is a decoder-family comparison, not an exact recovery optimum; rotated-Petz averaging and exact SDP recovery remain unimplemented"
+      "rotated_Petz_optimality": "the finite-t grid and Petz candidates are validated as CPTP recovery maps, but exact small-instance SDP/optimal recovery, optimal t selection and rotated-Petz averaging remain unimplemented"
     },
     "resource_limits": {
       "dense_state_qubits_max": 20,
