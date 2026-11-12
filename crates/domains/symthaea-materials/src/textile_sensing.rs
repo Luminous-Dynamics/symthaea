@@ -114,7 +114,7 @@ impl CompositionEstimate {
     pub fn contains_unknown_fraction(&self) -> bool {
         self.components
             .iter()
-            .any(|component| component.kind == FibreKind::Unknown && component.fraction_ppm > 0)
+            .any(|component| component.kind == FibreKind::Unknown && component.upper_bound_ppm > 0)
     }
 }
 
@@ -883,6 +883,29 @@ mod tests {
             Some(SpectralAssessmentReason::UnknownFibreFraction)
         );
         assert!(result.composition.is_some());
+    }
+
+    #[test]
+    fn uncertain_unknown_fraction_abstains_even_when_point_estimate_is_zero() {
+        let mut observation = valid_spectral();
+        let mut composition = valid_composition();
+        composition.components.push(FibreFraction {
+            kind: FibreKind::Unknown,
+            fraction_ppm: 0,
+            lower_bound_ppm: 0,
+            upper_bound_ppm: 50_000,
+        });
+        observation.composition = Some(composition);
+        let result = assess_spectral_observation(
+            &observation,
+            Some(&valid_profile()),
+            Some(&valid_calibration()),
+        );
+        assert_eq!(result.disposition, ObservationDisposition::Unknown);
+        assert_eq!(
+            result.reason,
+            Some(SpectralAssessmentReason::UnknownFibreFraction)
+        );
     }
 
     #[test]
