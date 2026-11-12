@@ -195,6 +195,8 @@ pub struct ComparisonReport {
     pub candidate_observation_id: String,
     pub matched_axis_count: usize,
     pub pressure_measurement_method: String,
+    pub pressure_instrument_ref: String,
+    pub combined_pressure_uncertainty_milli_mpa: u64,
     pub baseline_fabrication_pressure_milli_mpa: u64,
     pub candidate_fabrication_pressure_milli_mpa: u64,
     pub fabrication_pressure_delta_milli_mpa: i64,
@@ -652,17 +654,20 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
                 comparison.comparison_id
             )));
         }
-        if baseline.pressure.measurement_method != candidate.pressure.measurement_method {
+        if baseline.pressure.measurement_method != candidate.pressure.measurement_method
+            || baseline.pressure.instrument_ref != candidate.pressure.instrument_ref
+        {
             return Err(AuditError(format!(
-                "comparison {} uses incompatible pressure measurement methods",
+                "comparison {} uses incompatible pressure measurement methods or instrument/calibration identities",
                 comparison.comparison_id
             )));
         }
+        let combined_pressure_uncertainty =
+            baseline.pressure.uncertainty_mpa + candidate.pressure.uncertainty_mpa;
         let fabrication_pressure_delta = (candidate.pressure.fabrication_pressure_mpa
             - baseline.pressure.fabrication_pressure_mpa)
             .abs();
-        let fabrication_pressure_tolerance =
-            baseline.pressure.uncertainty_mpa + candidate.pressure.uncertainty_mpa;
+        let fabrication_pressure_tolerance = combined_pressure_uncertainty;
         if fabrication_pressure_delta > fabrication_pressure_tolerance {
             return Err(AuditError(format!(
                 "comparison {} confounds operating pressure with fabrication pressure (delta={} MPa exceeds combined uncertainty={} MPa)",
@@ -671,11 +676,12 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
                 fabrication_pressure_tolerance
             )));
         }
-        if baseline.pressure.operating_pressure_mpa.to_bits()
-            == candidate.pressure.operating_pressure_mpa.to_bits()
-        {
+        let operating_pressure_delta = (candidate.pressure.operating_pressure_mpa
+            - baseline.pressure.operating_pressure_mpa)
+            .abs();
+        if operating_pressure_delta <= combined_pressure_uncertainty {
             return Err(AuditError(format!(
-                "comparison {} must vary operating pressure to qualify a pressure comparison",
+                "comparison {} operating-pressure contrast ({operating_pressure_delta} MPa) must exceed combined measurement uncertainty ({combined_pressure_uncertainty} MPa)",
                 comparison.comparison_id
             )));
         }
@@ -731,6 +737,10 @@ pub fn audit_manifest(manifest: &Manifest) -> Result<AuditReport, AuditError> {
             candidate_observation_id: candidate.observation_id.clone(),
             matched_axis_count: comparison.matched_axes.len(),
             pressure_measurement_method: baseline.pressure.measurement_method.clone(),
+            pressure_instrument_ref: baseline.pressure.instrument_ref.clone(),
+            combined_pressure_uncertainty_milli_mpa: pressure_milli_mpa(
+                combined_pressure_uncertainty,
+            ),
             baseline_fabrication_pressure_milli_mpa: pressure_milli_mpa(
                 baseline.pressure.fabrication_pressure_mpa,
             ),
@@ -912,6 +922,14 @@ mod tests {
             r.comparisons[0].pressure_measurement_method,
             "calibrated load-cell fixture"
         );
+        assert_eq!(
+            r.comparisons[0].pressure_instrument_ref,
+            "PRESSURE-MET-01"
+        );
+        assert_eq!(
+            r.comparisons[0].combined_pressure_uncertainty_milli_mpa,
+            100
+        );
         assert_eq!(r.comparisons[0].pressure_delta_milli_mpa, -4700);
     }
 
@@ -979,9 +997,19 @@ mod tests {
     }
 
     #[test]
-    fn different_pressure_measurement_methods_are_rejected() {
+    fn different_pressure_measurement_methods_or_instruments_are_rejected() {
         let mut m = fixture();
         m.observations[1].pressure.measurement_method = "different fixture method".into();
+        assert!(audit_manifest(&m).is_err());
+        let mut m = fixture();
+        m.observations[1].pressure.instrument_ref = "PRESSURE-MET-02".into();
+        assert!(audit_manifest(&m).is_err());
+    }
+
+    #[test]
+    fn operating_pressure_contrast_must_exceed_combined_uncertainty() {
+        let mut m = fixture();
+        m.observations[1].pressure.operating_pressure_mpa = 4.95;
         assert!(audit_manifest(&m).is_err());
     }
 
