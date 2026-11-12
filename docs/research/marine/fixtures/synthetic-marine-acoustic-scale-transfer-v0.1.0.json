@@ -51,7 +51,10 @@
         "timebase_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "rpm_u95_hz": 0.01,
         "background_measurement_method": "bare_hub",
-        "background_trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        "background_trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hydrophone_instrument_id": "synthetic-model-hydrophone-1",
+        "calibration_certificate_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "facility_transfer_function_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
       },
       "full_scale": {
         "run_id": "full-1",
@@ -70,8 +73,12 @@
             "source_level_u95_db": 0.5
           }
         ],
-        "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-      }
+        "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "hydrophone_instrument_id": "synthetic-full-hydrophone-1",
+        "calibration_certificate_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "cavitation_pattern": "sheet",
+      "cavitation_pattern_comparability": "matched"
     },
     {
       "pair_id": "pair-2",
@@ -101,7 +108,10 @@
         "timebase_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
         "rpm_u95_hz": 0.01,
         "background_measurement_method": "bare_hub",
-        "background_trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        "background_trace_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "hydrophone_instrument_id": "synthetic-model-hydrophone-2",
+        "calibration_certificate_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "facility_transfer_function_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
       },
       "full_scale": {
         "run_id": "full-2",
@@ -120,8 +130,12 @@
             "source_level_u95_db": 0.5
           }
         ],
-        "timebase_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
-      }
+        "timebase_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "hydrophone_instrument_id": "synthetic-full-hydrophone-2",
+        "calibration_certificate_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+      },
+      "cavitation_pattern": "sheet",
+      "cavitation_pattern_comparability": "matched"
     }
   ]
 }
