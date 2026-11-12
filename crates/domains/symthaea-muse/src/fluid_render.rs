@@ -140,6 +140,8 @@ pub struct FluidSynthRenderObservation {
     /// None means the process could not be started or did not report an exit code.
     pub exit_code: Option<i32>,
     pub spawn_error: Option<String>,
+    /// Digest of the final mastered WAV when the complete render succeeded.
+    pub mastered_wav_sha256: Option<String>,
     /// Present only after exit 0, stable executable/assets and successful mastering.
     pub mastered_wav_bytes: Option<Vec<u8>>,
 }
@@ -434,11 +436,14 @@ fn render_midi_to_wav_observed_with_paths(
         && executable_sha256_before == executable_sha256_after
         && soundfont_sha256_before == soundfont_sha256_after
         && midi_sha256_before == midi_sha256_after;
-    let mastered_wav_bytes = if exit_code == Some(0) && artifacts_stable {
+    let mastered_wav_bytes = if exit_code == Some(0) && spawn_error.is_none() && artifacts_stable {
         master_wav(&out)
     } else {
         None
     };
+    let mastered_wav_sha256 = mastered_wav_bytes
+        .as_ref()
+        .map(|bytes| sha256_hex(bytes));
     let _ = std::fs::remove_file(&out);
 
     Some(FluidSynthRenderObservation {
@@ -461,6 +466,7 @@ fn render_midi_to_wav_observed_with_paths(
         stderr_truncated: stderr_capture.truncated,
         exit_code,
         spawn_error,
+        mastered_wav_sha256,
         mastered_wav_bytes,
     })
 }
