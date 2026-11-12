@@ -413,6 +413,19 @@ fn validate_case(case: &Case) -> Vec<String> {
         }
     }
 
+    let mut band_frequencies:BTreeMap<String,f64>=BTreeMap::new();
+    for event in &case.source_events {
+        for band in &event.source_levels {
+            if let Some(existing)=band_frequencies.get(&band.band_id) {
+                if (existing-band.center_frequency_hz).abs()>1.0e-9_f64.max(existing*1.0e-9) {
+                    errors.push(format!("band_id {} maps to different centre frequencies across source events",band.band_id));
+                }
+            } else {
+                band_frequencies.insert(band.band_id.clone(),band.center_frequency_hz);
+            }
+        }
+    }
+
     let mut receivers = BTreeSet::new();
     for receiver in &case.receivers {
         if receiver.receiver_id.trim().is_empty() || !receivers.insert(receiver.receiver_id.clone())
@@ -520,6 +533,8 @@ fn validate_case(case: &Case) -> Vec<String> {
             || observation.band_id.trim().is_empty()
             || observation.quantity_id != "received_spl_db_re_1upa"
             || !finite_positive(observation.center_frequency_hz)
+            || band_frequencies.get(&observation.band_id).is_none_or(|frequency|
+                (frequency-observation.center_frequency_hz).abs()>1.0e-9_f64.max(*frequency*1.0e-9))
             || !observation.ambient_only_basis.eq("independently_measured_ambient_reference")
             || observation.measurement_method_id.trim().is_empty()
             || observation.instrument_id.trim().is_empty()
@@ -553,6 +568,7 @@ fn validate_case(case: &Case) -> Vec<String> {
             || !receivers.contains(&limit.receiver_id)
             || limit.band_id.trim().is_empty()
             || limit.quantity_id != SEL_QUANTITY_ID
+            || !band_frequencies.contains_key(&limit.band_id)
             || !limit.upper_sel_threshold_db.is_finite()
             || limit.requirement_reference.trim().is_empty()
         {
@@ -1178,6 +1194,13 @@ mod tests {
         second.end_time_s=200.0;
         second.uncertainty_confidence_level=0.99;
         input.ambient_observations.push(second);
+        assert_eq!(audit(&input).disposition,"INVALID");
+    }
+
+    #[test]
+    fn same_band_id_cannot_mean_different_frequencies_between_source_events() {
+        let mut input=case();
+        input.source_events[1].source_levels[0].center_frequency_hz=250.0;
         assert_eq!(audit(&input).disposition,"INVALID");
     }
 
