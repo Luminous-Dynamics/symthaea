@@ -822,95 +822,106 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
         .iter()
         .map(|window| window.end_time_s - window.start_time_s)
         .sum();
+    // Cavitation occupancy/event statistics come from the independent,
+    // time-aligned cavitation observations across ALL acquired windows.
+    // Acoustic background eligibility controls SPL statistics only; using
+    // the usable-SPL subset here would bias occupancy toward loud/clean windows.
+    let aligned_annotations: Vec<&Window> = run.windows.iter().filter(|window| {
+        window.acoustic_cavitation_alignment_offset_s.abs()
+            + window.acoustic_cavitation_alignment_expanded_uncertainty_s
+            <= case.maximum_sync_alignment_uncertainty_s
+            && window.cavitation_present.is_some()
+    }).collect();
     let annotation_coverage = if run.windows.is_empty() {
         0.0
     } else {
-        run.windows.iter().filter(|window| {
-            window.acoustic_cavitation_alignment_offset_s.abs()
-                + window.acoustic_cavitation_alignment_expanded_uncertainty_s
-                <= case.maximum_sync_alignment_uncertainty_s
-                && window.cavitation_present.is_some()
-        }).count() as f64 / run.windows.len() as f64
+        aligned_annotations.len() as f64 / run.windows.len() as f64
     };
     let annotated_usable = usable
         .iter()
         .filter(|window| window.cavitation_present.is_some())
         .count();
 
-    let (
-        occupancy,
-        onsets,
-        onsets_per_hour,
-        left_censored,
-        right_censored,
-        on_mean,
-        off_mean,
-        conditioned_delta,
-    ) = if annotated_usable == usable.len() && !usable.is_empty() {
-        let present: Vec<f64> = usable
-            .iter()
-            .filter(|window| window.cavitation_present == Some(true))
-            .map(|window| window.corrected_spl_db)
-            .collect();
-        let absent: Vec<f64> = usable
-            .iter()
-            .filter(|window| window.cavitation_present == Some(false))
-            .map(|window| window.corrected_spl_db)
-            .collect();
-        let occupancy = present.len() as f64 / usable.len() as f64;
+    let (occupancy, onsets, onsets_per_hour, left_censored, right_censored) =
+        if aligned_annotations.len() == run.windows.len() && !aligned_annotations.is_empty() {
+            let annotated_duration_s: f64 = aligned_annotations
+                .iter()
+                .map(|window| window.end_time_s - window.start_time_s)
+                .sum();
+            let cavitating_duration_s: f64 = aligned_annotations
+                .iter()
+                .filter(|window| window.cavitation_present == Some(true))
+                .map(|window| window.end_time_s - window.start_time_s)
+                .sum();
+            let occupancy = cavitating_duration_s / annotated_duration_s;
 
-        let mut observed_onsets = 0usize;
-        let mut left_censored_segments = 0usize;
-        for index in 0..usable.len() {
-            if usable[index].cavitation_present != Some(true) {
-                continue;
+            let mut observed_onsets = 0usize;
+            let mut left_censored_segments = 0usize;
+            for index in 0..aligned_annotations.len() {
+                if aligned_annotations[index].cavitation_present != Some(true) {
+                    continue;
+                }
+                if index == 0 {
+                    // Acquisition begins while the active segment is already present.
+                    left_censored_segments += 1;
+                    continue;
+                }
+                let contiguous = (aligned_annotations[index].start_time_s
+                    - aligned_annotations[index - 1].end_time_s).abs()
+                    <= WINDOW_DURATION_TOLERANCE_S;
+                if !contiguous {
+                    // An acquisition/alignment gap hides the transition.
+                    left_censored_segments += 1;
+                } else if aligned_annotations[index - 1].cavitation_present == Some(false) {
+                    observed_onsets += 1;
+                }
             }
-            if index == 0 {
-                // Acquisition starts while this active segment is already present.
-                left_censored_segments += 1;
-                continue;
-            }
-            let contiguous = (usable[index].start_time_s - usable[index - 1].end_time_s).abs()
-                <= WINDOW_DURATION_TOLERANCE_S;
-            if !contiguous {
-                // A gap hides the transition into this active segment.
-                left_censored_segments += 1;
-            } else if usable[index - 1].cavitation_present == Some(false) {
-                observed_onsets += 1;
-            }
-        }
-        let right_censored_segments = if usable
-            .last()
-            .is_some_and(|window| window.cavitation_present == Some(true))
-        {
-            1
+            let right_censored_segments = if aligned_annotations
+                .last()
+                .is_some_and(|window| window.cavitation_present == Some(true))
+            {
+                1
+            } else {
+                0
+            };
+            let onsets_per_hour = if annotated_duration_s > 0.0 {
+                Some(observed_onsets as f64 * 3600.0 / annotated_duration_s)
+            } else {
+                None
+            };
+            (
+                Some(occupancy),
+                Some(observed_onsets),
+                onsets_per_hour,
+                Some(left_censored_segments),
+                Some(right_censored_segments),
+            )
         } else {
-            0
+            (None, None, None, None, None)
         };
-        let onsets_per_hour = if usable_duration_s > 0.0 {
-            Some(observed_onsets as f64 * 3600.0 / usable_duration_s)
+
+    // Cavitation-conditioned acoustic distributions still require eligible
+    // SPL windows with aligned cavitation annotations on every usable sample.
+    let (on_mean, off_mean, conditioned_delta) =
+        if annotated_usable == usable.len() && !usable.is_empty() {
+            let present: Vec<f64> = usable.iter()
+                .filter(|window| window.cavitation_present == Some(true))
+                .map(|window| window.corrected_spl_db)
+                .collect();
+            let absent: Vec<f64> = usable.iter()
+                .filter(|window| window.cavitation_present == Some(false))
+                .map(|window| window.corrected_spl_db)
+                .collect();
+            let on_mean = energy_mean_db(&present);
+            let off_mean = energy_mean_db(&absent);
+            let delta = match (on_mean, off_mean) {
+                (Some(on), Some(off)) => Some(on - off),
+                _ => None,
+            };
+            (on_mean, off_mean, delta)
         } else {
-            None
+            (None, None, None)
         };
-        let on_mean = energy_mean_db(&present);
-        let off_mean = energy_mean_db(&absent);
-        let delta = match (on_mean, off_mean) {
-            (Some(on), Some(off)) => Some(on - off),
-            _ => None,
-        };
-        (
-            Some(occupancy),
-            Some(observed_onsets),
-            onsets_per_hour,
-            Some(left_censored_segments),
-            Some(right_censored_segments),
-            on_mean,
-            off_mean,
-            delta,
-        )
-    } else {
-        (None, None, None, None, None, None, None, None)
-    };
 
     // Use the sum of observed window durations, not wall-clock span:
     // gaps between windows are not acquired data and must not inflate the
@@ -1763,6 +1774,31 @@ mod tests {
         input.runs[0].windows[7].cavitation_present = Some(true);
         let report = audit(&input);
         assert_eq!(report.run_reports[0].right_censored_active_segments, Some(1));
+    }
+
+    #[test]
+    fn cavitation_occupancy_uses_all_aligned_windows_not_only_usable_spl() {
+        let mut input = case();
+        input.runs[0].windows[0].total_spl_db = 92.0;
+        input.runs[0].windows[0].background_spl_db = 90.0;
+        let report = audit(&input);
+        let run = &report.run_reports[0];
+        assert_eq!(run.usable_windows, 7);
+        assert_eq!(run.excluded_background_dominated, 1);
+        // Four of eight independent cavitation observations are positive.
+        assert_eq!(run.cavitation_occupancy_fraction, Some(0.5));
+    }
+
+    #[test]
+    fn cavitation_onset_is_counted_even_when_preceding_spl_window_is_excluded() {
+        let mut input = case();
+        input.runs[0].windows[0].total_spl_db = 92.0;
+        input.runs[0].windows[0].background_spl_db = 90.0;
+        input.runs[0].windows[0].cavitation_present = Some(false);
+        input.runs[0].windows[1].cavitation_present = Some(true);
+        let report = audit(&input);
+        assert_eq!(report.run_reports[0].observed_cavitation_onsets, Some(4));
+        assert_eq!(report.run_reports[0].cavitation_occupancy_fraction, Some(0.5));
     }
 
     #[test]
