@@ -2610,13 +2610,18 @@ async fn import_music(
     .map(Json)
 }
 
+enum ImportedNotationArtifact {
+    MusicXmlGraph(Vec<u8>),
+    MidiMeasureMaps(Vec<u8>),
+}
+
 fn summarize_imported_notation_structure(
     source_sha256: &str,
     structure: symthaea_muse::symbolic_import::ImportedNotationStructureV1,
 ) -> Result<
     (
         symthaea_muse_protocol::ImportedNotationStructureSummary,
-        Option<Vec<u8>>,
+        Option<ImportedNotationArtifact>,
     ),
     (StatusCode, String),
 > {
@@ -2673,7 +2678,59 @@ fn summarize_imported_notation_structure(
                     unavailable_part_ids,
                     explanation,
                 },
-                Some(graph_json),
+                Some(ImportedNotationArtifact::MusicXmlGraph(graph_json)),
+            ))
+        }
+        symthaea_muse::symbolic_import::ImportedNotationStructureV1::MidiExplicitMeasureSidecar(
+            receipt,
+        ) => {
+            let part_count = receipt.part_maps.len();
+            let mut measure_count = 0usize;
+            let mut barline_event_count = 0usize;
+            let mut non_controlling_measure_count = 0usize;
+            let mut unavailable_part_ids = Vec::new();
+            let mut supported_part_count = 0usize;
+            for part in &receipt.part_maps {
+                match &part.map.status {
+                    symthaea_muse::barline_eval::MeasureMapStatus::Supported => {
+                        supported_part_count += 1;
+                    }
+                    _ => unavailable_part_ids.push(part.part_id.clone()),
+                }
+                measure_count += part.map.measures.len();
+                barline_event_count += part.map.measures.len().saturating_sub(1);
+                non_controlling_measure_count +=
+                    part.non_controlling_measure_indices.len();
+            }
+            let unknown_part_count = part_count.saturating_sub(supported_part_count);
+            let status = if unknown_part_count == 0 && part_count > 0 {
+                "supported"
+            } else if supported_part_count > 0 {
+                "partially_unknown"
+            } else {
+                "unknown"
+            };
+            let measure_map_sha256 =
+                symthaea_muse::midi_measure_sidecar::midi_measure_sidecar_commitment(&receipt)
+                    .map_err(internal)?;
+            let sidecar_json = serde_json::to_vec_pretty(&receipt).map_err(internal)?;
+            Ok((
+                ImportedNotationStructureSummary {
+                    schema: "muse-imported-notation-structure-v1".into(),
+                    status: status.into(),
+                    source_sha256: source_sha256.into(),
+                    graph_sha256: None,
+                    measure_map_sha256: Some(measure_map_sha256),
+                    part_count,
+                    supported_part_count,
+                    unknown_part_count,
+                    measure_count,
+                    barline_event_count,
+                    non_controlling_measure_count,
+                    unavailable_part_ids,
+                    explanation: None,
+                },
+                Some(ImportedNotationArtifact::MidiMeasureMaps(sidecar_json)),
             ))
         }
         symthaea_muse::symbolic_import::ImportedNotationStructureV1::Unknown {
@@ -2684,6 +2741,7 @@ fn summarize_imported_notation_structure(
                 status: "unknown".into(),
                 source_sha256: source_sha256.into(),
                 graph_sha256: None,
+                measure_map_sha256: None,
                 part_count: 0,
                 supported_part_count: 0,
                 unknown_part_count: 0,
@@ -2703,6 +2761,7 @@ fn summarize_imported_notation_structure(
                 status: "unsupported".into(),
                 source_sha256: source_sha256.into(),
                 graph_sha256: None,
+                measure_map_sha256: None,
                 part_count: 0,
                 supported_part_count: 0,
                 unknown_part_count: 0,
