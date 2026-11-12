@@ -2111,6 +2111,277 @@ pub struct HaydenPreskillDecouplingSummary {
     pub maximum_information_complementarity_residual_nats: f64,
 }
 
+
+/// Operational one-step Petz recovery result. The decoder acts only on the
+/// accessible A=E tensor R register (dimension four); B' is traced out as the
+/// channel environment and never supplied to the recovery map.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HaydenPreskillPetzRecoverySample {
+    pub seed: u64,
+    pub entanglement_fidelity: f64,
+    pub inverse_square_root_residual: f64,
+    pub trace_preservation_residual: f64,
+    pub accessible_input_dimension: usize,
+    pub recovered_message_dimension: usize,
+    pub recovery_kraus_count: usize,
+}
+
+/// Haar-random one-step Hayden-Preskill toy channel with a Petz recovery map.
+/// The input M and early radiation R are entangled with references Q and B;
+/// a seeded U(4) acts on M tensor B. The channel M -> A=E tensor R has two
+/// Kraus operators indexed by the inaccessible B' output. Petz recovery is
+/// constructed from those channel operators, but its runtime input is only A.
+///
+/// This is an operational recovery experiment, not a macroscopic black-hole
+/// or gravity model. It reports entanglement fidelity and trace preservation;
+/// it does not report a physical quantum gate count for the decoder.
+pub fn simulate_small_hayden_preskill_petz_recovery(
+    seed: u64,
+    tolerance: f64,
+) -> Result<HaydenPreskillPetzRecoverySample, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    let mut rng = ChaCha20Rng::seed_from_u64(seed);
+    let scrambler = haar_unitary_4(&mut rng)?;
+    petz_recovery_from_scrambler(&scrambler, seed, tolerance)
+}
+
+/// Analytic no-scrambling control: M is forwarded to E and the R register is
+/// a spectator. The Petz decoder should discard R and recover M with fidelity 1.
+pub fn simulate_identity_hayden_preskill_petz_control(
+    tolerance: f64,
+) -> Result<HaydenPreskillPetzRecoverySample, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    let mut identity = [[Complex64::new(0.0, 0.0); 4]; 4];
+    for index in 0..4 {
+        identity[index][index] = Complex64::new(1.0, 0.0);
+    }
+    petz_recovery_from_scrambler(&identity, 0, tolerance)
+}
+
+fn petz_recovery_from_scrambler(
+    scrambler: &[[Complex64; 4]; 4],
+    seed: u64,
+    tolerance: f64,
+) -> Result<HaydenPreskillPetzRecoverySample, QuantumInformationError> {
+    // Kraus operators K_b': M -> A=(E,R), with inaccessible B' as the
+    // environment. The initial B,R Bell pair supplies the 1/sqrt(2) factor.
+    let inverse_sqrt_two = 1.0 / 2.0_f64.sqrt();
+    let mut channel_kraus = [[Complex64::new(0.0, 0.0); 8]; 2];
+    for b_prime in 0..2 {
+        for e in 0..2 {
+            for r in 0..2 {
+                let accessible = (e << 1) | r;
+                for message in 0..2 {
+                    let input = (message << 1) | r;
+                    let output = (e << 1) | b_prime;
+                    channel_kraus[b_prime][accessible * 2 + message] =
+                        scrambler[output][input] * inverse_sqrt_two;
+                }
+            }
+        }
+    }
+
+    // rho_A = N(I_M/2) = 1/2 sum_b' K_b' K_b'^dagger.
+    let mut rho_a = [Complex64::new(0.0, 0.0); 16];
+    for kraus in &channel_kraus {
+        for row in 0..4 {
+            for column in 0..4 {
+                for message in 0..2 {
+                    rho_a[row * 4 + column] +=
+                        0.5 * kraus[row * 2 + message] * kraus[column * 2 + message].conj();
+                }
+            }
+        }
+    }
+    let (inverse_sqrt_rho_a, inverse_square_root_residual) =
+        complex_hermitian_inverse_sqrt_4(rho_a, tolerance)?;
+
+    // R_b' = 1/sqrt(2) K_b'^dagger rho_A^(-1/2). The Petz decoder accepts
+    // only a 4-dimensional A state and returns a 2-dimensional message state.
+    let mut recovery_kraus = [[Complex64::new(0.0, 0.0); 8]; 2];
+    for b_prime in 0..2 {
+        for message in 0..2 {
+            for accessible in 0..4 {
+                let mut value = Complex64::new(0.0, 0.0);
+                for intermediate in 0..4 {
+                    value += channel_kraus[b_prime][intermediate * 2 + message].conj()
+                        * inverse_sqrt_rho_a[intermediate * 4 + accessible];
+                }
+                recovery_kraus[b_prime][message * 4 + accessible] =
+                    value * inverse_sqrt_two;
+            }
+        }
+    }
+
+    // Check sum_i R_i^dagger R_i = I_A; no trace-preserving repair is applied.
+    let mut completeness = [Complex64::new(0.0, 0.0); 16];
+    for kraus in &recovery_kraus {
+        for row in 0..4 {
+            for column in 0..4 {
+                for message in 0..2 {
+                    completeness[row * 4 + column] +=
+                        kraus[message * 4 + row].conj() * kraus[message * 4 + column];
+                }
+            }
+        }
+    }
+    let mut trace_preservation_residual: f64 = 0.0;
+    for row in 0..4 {
+        for column in 0..4 {
+            let expected = if row == column { 1.0 } else { 0.0 };
+            trace_preservation_residual = trace_preservation_residual
+                .max((completeness[row * 4 + column] - expected).norm());
+        }
+    }
+    if trace_preservation_residual > tolerance * 100.0 {
+        return Err(QuantumInformationError::EigensolverNonconvergence {
+            sweeps: 80,
+            residual: trace_preservation_residual,
+        });
+    }
+
+    // Compose R o N. For a qubit channel with Kraus L_s,
+    // F_e(I/2, channel) = 1/4 sum_s |Tr L_s|^2.
+    let mut fidelity_sum = 0.0;
+    for recovery in &recovery_kraus {
+        for channel in &channel_kraus {
+            let mut trace = Complex64::new(0.0, 0.0);
+            for message_out in 0..2 {
+                for accessible in 0..4 {
+                    trace += recovery[message_out * 4 + accessible]
+                        * channel[accessible * 2 + message_out];
+                }
+            }
+            fidelity_sum += trace.norm_sqr();
+        }
+    }
+    let entanglement_fidelity = 0.25 * fidelity_sum;
+    if !entanglement_fidelity.is_finite()
+        || entanglement_fidelity < -tolerance
+        || entanglement_fidelity > 1.0 + tolerance
+    {
+        return Err(QuantumInformationError::InvalidPageEntropy(
+            entanglement_fidelity,
+        ));
+    }
+
+    Ok(HaydenPreskillPetzRecoverySample {
+        seed,
+        entanglement_fidelity,
+        inverse_square_root_residual,
+        trace_preservation_residual,
+        accessible_input_dimension: 4,
+        recovered_message_dimension: 2,
+        recovery_kraus_count: 2,
+    })
+}
+
+type ComplexMatrix4 = [Complex64; 16];
+
+fn complex_matrix4_identity() -> ComplexMatrix4 {
+    let mut identity = [Complex64::new(0.0, 0.0); 16];
+    for index in 0..4 {
+        identity[index * 4 + index] = Complex64::new(1.0, 0.0);
+    }
+    identity
+}
+
+fn complex_matrix4_multiply(left: &ComplexMatrix4, right: &ComplexMatrix4) -> ComplexMatrix4 {
+    let mut product = [Complex64::new(0.0, 0.0); 16];
+    for row in 0..4 {
+        for column in 0..4 {
+            for inner in 0..4 {
+                product[row * 4 + column] +=
+                    left[row * 4 + inner] * right[inner * 4 + column];
+            }
+        }
+    }
+    product
+}
+
+fn complex_matrix4_sub_identity_scaled(
+    matrix: &ComplexMatrix4,
+    scale: f64,
+) -> ComplexMatrix4 {
+    let mut result = *matrix;
+    for index in 0..4 {
+        result[index * 4 + index] =
+            Complex64::new(scale, 0.0) - result[index * 4 + index];
+    }
+    for row in 0..4 {
+        for column in 0..4 {
+            if row != column {
+                result[row * 4 + column] = -result[row * 4 + column];
+            }
+        }
+    }
+    result
+}
+
+fn complex_matrix4_scaled(matrix: &ComplexMatrix4, scale: f64) -> ComplexMatrix4 {
+    core::array::from_fn(|index| matrix[index] * scale)
+}
+
+fn complex_matrix4_residual_from_identity(matrix: &ComplexMatrix4) -> f64 {
+    let mut sum = 0.0;
+    for row in 0..4 {
+        for column in 0..4 {
+            let expected = if row == column { 1.0 } else { 0.0 };
+            sum += (matrix[row * 4 + column] - expected).norm_sqr();
+        }
+    }
+    sum.sqrt()
+}
+
+/// Newton-Schulz inverse square root for a positive-definite 4x4 Hermitian
+/// matrix. The input is not regularized: loss of support or non-convergence
+/// returns a typed numerical failure rather than a fabricated Petz channel.
+fn complex_hermitian_inverse_sqrt_4(
+    matrix: ComplexMatrix4,
+    tolerance: f64,
+) -> Result<(ComplexMatrix4, f64), QuantumInformationError> {
+    let mut hermitian_residual: f64 = 0.0;
+    let mut scale: f64 = 0.0;
+    for row in 0..4 {
+        for column in 0..4 {
+            hermitian_residual = hermitian_residual
+                .max((matrix[row * 4 + column] - matrix[column * 4 + row].conj()).norm());
+            scale = scale.max(matrix[row * 4 + column].norm());
+        }
+    }
+    if hermitian_residual > tolerance * 10.0 || !scale.is_finite() || scale <= 0.0 {
+        return Err(QuantumInformationError::NonHermitian {
+            residual: hermitian_residual,
+            tolerance: tolerance * 10.0,
+        });
+    }
+
+    // For a normalized density matrix, lambda_max <= 1, so the spectrum is
+    // inside the Newton-Schulz convergence interval (0,3). Start Y=A, Z=I;
+    // the iteration makes Z converge to A^(-1/2).
+    let mut y = complex_matrix4_scaled(&matrix, 1.0 / scale);
+    let mut z = complex_matrix4_identity();
+    let identity = complex_matrix4_identity();
+    let mut residual = f64::INFINITY;
+    for _iteration in 0..80 {
+        let zy = complex_matrix4_multiply(&z, &y);
+        let correction = complex_matrix4_sub_identity_scaled(&zy, 1.5);
+        let correction = complex_matrix4_scaled(&correction, -1.0);
+        y = complex_matrix4_multiply(&y, &correction);
+        z = complex_matrix4_multiply(&correction, &z);
+        let za = complex_matrix4_multiply(&z, &matrix);
+        let zaz = complex_matrix4_multiply(&za, &z);
+        residual = complex_matrix4_residual_from_identity(&zaz);
+        if residual <= tolerance * 10.0 {
+            return Ok((complex_matrix4_scaled(&z, 1.0 / scale.sqrt()), residual));
+        }
+    }
+    Err(QuantumInformationError::EigensolverNonconvergence {
+        sweeps: 80,
+        residual: residual.max(complex_matrix4_residual_from_identity(&identity)),
+    })
+}
+
 /// Sample independent two-qubit scramblers and preserve per-ensemble uncertainty.
 pub fn sample_small_hayden_preskill_decoupling_ensemble(
     sample_count: usize,
@@ -2232,6 +2503,33 @@ mod hayden_preskill_decoupling_tests {
                 sample.quantum_pinsker_upper_bound + TOLERANCE
                     >= sample.decoupling_trace_distance_q_bprime
             );
+        }
+    }
+
+    #[test]
+    fn identity_channel_petz_control_recovers_with_unit_entanglement_fidelity() {
+        let sample = simulate_identity_hayden_preskill_petz_control(TOLERANCE).unwrap();
+        assert!((sample.entanglement_fidelity - 1.0).abs() < 1e-8);
+        assert!(sample.inverse_square_root_residual < TOLERANCE * 100.0);
+        assert!(sample.trace_preservation_residual < TOLERANCE * 100.0);
+        assert_eq!(sample.accessible_input_dimension, 4);
+        assert_eq!(sample.recovered_message_dimension, 2);
+        assert_eq!(sample.recovery_kraus_count, 2);
+    }
+
+    #[test]
+    fn random_hayden_preskill_petz_decoder_uses_only_accessible_system_and_is_trace_preserving() {
+        for seed in 0..12 {
+            let sample = simulate_small_hayden_preskill_petz_recovery(
+                0x5045 + seed,
+                TOLERANCE,
+            ).unwrap();
+            assert!((0.0..=1.0 + TOLERANCE).contains(&sample.entanglement_fidelity));
+            assert!(sample.inverse_square_root_residual < TOLERANCE * 100.0);
+            assert!(sample.trace_preservation_residual < TOLERANCE * 100.0);
+            assert_eq!(sample.accessible_input_dimension, 4);
+            assert_eq!(sample.recovered_message_dimension, 2);
+            assert_eq!(sample.recovery_kraus_count, 2);
         }
     }
 
