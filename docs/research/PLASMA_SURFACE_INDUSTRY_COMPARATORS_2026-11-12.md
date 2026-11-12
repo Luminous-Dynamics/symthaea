@@ -165,3 +165,70 @@ The study used PET-G sheet (not an unspecified PET grade), and PP, HIPS, PVC and
 For our first reconstruction, use the exact substrate grade / adhesive pairing and ISO 4587:2003 method as published. If another standard or geometry is chosen for a production-specific qualification, start a separate protocol stratum rather than pooling the values.
 
 ISO status reference: https://www.iso.org/standard/34852.html (ISO 4587:2003 remains published/current on the ISO page; confirmed 2021; systematic review stage began 2026-07-15).
+
+
+## Additional industrial comparators — product architecture and utility boundary
+
+The industrial market is broader than Plasmatreat and DIENER. These vendor references should be treated as manufacturer or equipment-listing claims, not independent, matched performance data.
+
+### AcXys — application-matched production integration
+
+AcXys states that selected atmospheric plasma applications can exceed 100 m/min, and provides its own process examples:
+- automotive dashboard treatment before bonding: 750 parts/day, 40 s per cycle;
+- PP tube/vial treatment before screen printing: 2,000 parts/hour.
+
+Its FAQ identifies compressed air or nitrogen, 230/400 V mains, extraction, and controlled relative motion / torch standoff as context-dependent integration requirements. It explicitly notes that manual treatment is generally not recommended for industrial applications because treatment distance and processing speed need to remain controlled. It also states that plasma activation lifetime depends on material and storage conditions (dust, moisture, UV).
+
+Source: https://www.acxys.com/faq/
+
+**Competitive lesson:** process speed alone is not a transferable number. Part geometry, treatment track, activation delay, line takt, quality and storage must be captured. The storage-dependent activation lifetime reinforces the bondability-window metric.
+
+### Tantec SpinTEC — rotating atmospheric treatment
+
+Tantec describes the SpinTEC as a high-voltage DC atmospheric-air plasma system, suitable for robotic cells, standalone use or integration into production lines. It uses two inward-facing PlasmaTEC-X nozzles on a rotating head, with stated treatment area 40–150 mm, rotation up to 1,000 rpm and processing up to 10 m/min.
+
+Source: https://tantec.com/atmospheric-plasma-treater-spintec/
+
+**Competitive lesson:** rotating and multi-nozzle heads are already established ways to improve circumferential coverage. Luminous must benchmark spatial uniformity and accepted part throughput, not claim that multiple plasma cells or nozzles are novel by themselves.
+
+### Yamato PSA family — useful system-level power and gas reference
+
+The Yamato PSA-series brochure reports:
+- 900 W output per plasma head;
+- compressed air at 60 psi and 30 standard L/min per head;
+- treatment widths of 38–152 mm;
+- 208 V three-phase / 60 Hz / 20 A or 220 V three-phase / 50 Hz / 20 A mains options;
+- one- to four-head configurations (PSA110–PSA410);
+- total listed equipment mass from 160 to 265 lb across those configurations.
+
+Source: https://www.yamato-usa.com/web/content/52905
+
+These are vendor-listed specifications, not measured wall-plug energy per accepted bond. They provide a concrete reminder that multi-head capacity can bring substantial compressed-air, electrical and equipment-mass requirements.
+
+### relyon plasma plasmacell P300 — integrated but modular utilities
+
+The Relyon operating manual describes the plasmacell P300 workstation for atmospheric-pressure activation and cleaning. The base module includes plasma generator, nozzle, high-voltage controller, power source and XYZ portal. Integrated extraction and compressor are listed as optional modules; an appropriate extraction system must always be available.
+
+Source: https://www.relyon-plasma.com/wp-content/uploads/2021/03/F0354301_BA_PLASMACELL_EN_copyright-2021.pdf
+
+**Competitive lesson:** the product system is the cell + extraction + compressed-air + motion + controls + enclosure, not the plasma source alone. A Luminous modular design should expose these utility dependencies as replaceable, metered and independently serviceable modules.
+
+### Market implication
+
+The current industrial market already offers:
+- inline high-speed atmospheric plasma;
+- multi-head, rotating and robotic treatment;
+- compressed-air plasma;
+- modular generator/nozzle systems;
+- integrated workstations and extraction packages;
+- application-specific equipment for profiles, tubes, vials and complex three-dimensional parts.
+
+The defensible Luminous wedge is therefore not "first modular plasma tool". It is a **measured, outcome-qualified and serviceable process cell** for a narrow material / adhesive / geometry where the complete lifecycle and quality trade-off is demonstrably better. Plausible differentiators to test are:
+1. lower total cost per accepted bonded area on complex or high-mix parts;
+2. longer, more predictable bondability window after activation;
+3. reduced spatial variation and lower over-treatment damage;
+4. smaller/replaceable process cartridges and fast changeover;
+5. traceable calibration, run provenance and predictable maintenance;
+6. verified reduction of primer/solvent use while preserving bond durability and substrate function.
+
+Do not claim these advantages until each has passed a matched baseline and held-out verification.
