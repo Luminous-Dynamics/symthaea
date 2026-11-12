@@ -173,11 +173,50 @@ fn grouping_dimension_name(value: GroupingDimension) -> &'static str {
     }
 }
 
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum SplitProtocol {
+    LeaveOneModelFacilityOut,
+    LeaveOneFullScaleTrialSiteOut,
+    LeaveOneVesselOut,
+    LeaveOnePropellerDesignOut,
+    LeaveOnePropellerRevisionOut,
+    LeaveOneCampaignOut,
+    LeaveOneOperatingConditionFamilyOut,
+    NestedGroupHoldout,
+}
+
+fn split_protocol_name(value: &SplitProtocol) -> &'static str {
+    match value {
+        SplitProtocol::LeaveOneModelFacilityOut => "leave_one_model_facility_out",
+        SplitProtocol::LeaveOneFullScaleTrialSiteOut => "leave_one_full_scale_trial_site_out",
+        SplitProtocol::LeaveOneVesselOut => "leave_one_vessel_out",
+        SplitProtocol::LeaveOnePropellerDesignOut => "leave_one_propeller_design_out",
+        SplitProtocol::LeaveOnePropellerRevisionOut => "leave_one_propeller_revision_out",
+        SplitProtocol::LeaveOneCampaignOut => "leave_one_campaign_out",
+        SplitProtocol::LeaveOneOperatingConditionFamilyOut => "leave_one_operating_condition_family_out",
+        SplitProtocol::NestedGroupHoldout => "nested_group_holdout",
+    }
+}
+
+fn required_split_dimension(protocol: &SplitProtocol) -> Option<GroupingDimension> {
+    match protocol {
+        SplitProtocol::LeaveOneModelFacilityOut => Some(GroupingDimension::ModelFacilityId),
+        SplitProtocol::LeaveOneFullScaleTrialSiteOut => Some(GroupingDimension::FullScaleTrialSiteId),
+        SplitProtocol::LeaveOneVesselOut => Some(GroupingDimension::VesselId),
+        SplitProtocol::LeaveOnePropellerDesignOut => Some(GroupingDimension::PropellerDesignId),
+        SplitProtocol::LeaveOnePropellerRevisionOut => Some(GroupingDimension::PropellerRevision),
+        SplitProtocol::LeaveOneCampaignOut => Some(GroupingDimension::CampaignId),
+        SplitProtocol::LeaveOneOperatingConditionFamilyOut => Some(GroupingDimension::OperatingConditionFamilyId),
+        SplitProtocol::NestedGroupHoldout => None,
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ValidationSplit {
     split_manifest_sha256: String,
-    protocol_id: String,
+    protocol_id: SplitProtocol,
     grouping_dimensions: Vec<GroupingDimension>,
     groups: Vec<BenchmarkGroup>,
 }
@@ -561,9 +600,6 @@ fn validate_case(case: &Case) -> Vec<String> {
     if !is_sha256(&case.validation_split.split_manifest_sha256) {
         errors.push("validation split manifest digest must be 64 hexadecimal characters".to_string());
     }
-    if case.validation_split.protocol_id.trim().is_empty() {
-        errors.push("validation split protocol_id is required".to_string());
-    }
     if case.validation_split.grouping_dimensions.is_empty() {
         errors.push("at least one validation grouping dimension is required".to_string());
     }
@@ -572,6 +608,17 @@ fn validate_case(case: &Case) -> Vec<String> {
         if !selected_dimensions.insert(*dimension) {
             errors.push(format!("duplicate validation grouping dimension {}", grouping_dimension_name(*dimension)));
         }
+    }
+    if let Some(required_dimension) = required_split_dimension(&case.validation_split.protocol_id) {
+        if !selected_dimensions.contains(&required_dimension) {
+            errors.push(format!(
+                "split protocol {} requires grouping dimension {}",
+                split_protocol_name(&case.validation_split.protocol_id),
+                grouping_dimension_name(required_dimension)
+            ));
+        }
+    } else if case.validation_split.grouping_dimensions.len() < 2 {
+        errors.push("nested_group_holdout requires at least two grouping dimensions".to_string());
     }
 
     let mut group_map: BTreeMap<String, &BenchmarkGroup> = BTreeMap::new();
@@ -784,13 +831,23 @@ fn held_out_groups_count(split: &ValidationSplit) -> usize {
 }
 
 fn audit(case: &Case) -> AuditReport {
-    let validation_errors = validate_case(case);
+    let validation_errors = {
+        let mut errors = validate_case(case);
+        errors.sort();
+        errors.dedup();
+        errors
+    };
     let unique_model_rotation_rates = distinct_model_rotation_rate_count(&case.pairs);
     let has_unknown_background_method = case.pairs.iter().any(|pair| {
         pair.model.background_measurement_method == BackgroundMeasurementMethod::Unknown
     });
 
     if !validation_errors.is_empty() {
+        let mut grouping_dimensions: Vec<&'static str> = case.validation_split.grouping_dimensions
+            .iter()
+            .map(|dimension| grouping_dimension_name(*dimension))
+            .collect();
+        grouping_dimensions.sort_unstable();
         return AuditReport {
             schema_version: SCHEMA_VERSION,
             case_id: case.case_id.clone(),
@@ -805,10 +862,9 @@ fn audit(case: &Case) -> AuditReport {
             calibration_comparison_outcome: "not_evaluated",
             held_out_comparison_outcome: "not_evaluated",
             split_manifest_sha256: case.validation_split.split_manifest_sha256.clone(),
-            split_protocol_id: case.validation_split.protocol_id.clone(),
-            grouping_dimensions: case.validation_split.grouping_dimensions.iter()
-                .map(|dimension| grouping_dimension_name(*dimension))
-                .collect(),
+            split_protocol_id: split_protocol_name(&case.validation_split.protocol_id).to_string(),
+            grouping_dimensions,
+
             calibration_group_count: calibration_groups_count(&case.validation_split),
             held_out_group_count: held_out_groups_count(&case.validation_split),
             calibration_pair_count: 0,
@@ -1158,6 +1214,18 @@ fn audit(case: &Case) -> AuditReport {
         "computational_comparison_only"
     };
 
+    for pair_report in &mut pair_reports {
+        pair_report.band_reports.sort_by(|left, right| left.band_id.cmp(&right.band_id));
+    }
+    pair_reports.sort_by(|left, right| left.pair_id.cmp(&right.pair_id));
+    reasons.sort();
+    reasons.dedup();
+    let mut grouping_dimensions: Vec<&'static str> = case.validation_split.grouping_dimensions
+        .iter()
+        .map(|dimension| grouping_dimension_name(*dimension))
+        .collect();
+    grouping_dimensions.sort_unstable();
+
     let calibration_comparison_outcome = role_comparison_outcome(&pair_reports, SplitRole::Calibration);
     let held_out_comparison_outcome = role_comparison_outcome(&pair_reports, SplitRole::HeldOut);
     let calibration_pair_count = pair_reports.iter().filter(|pair| pair.split_role == "calibration").count();
@@ -1190,8 +1258,8 @@ fn audit(case: &Case) -> AuditReport {
         calibration_comparison_outcome,
         held_out_comparison_outcome,
         split_manifest_sha256: case.validation_split.split_manifest_sha256.clone(),
-        split_protocol_id: case.validation_split.protocol_id.clone(),
-        grouping_dimensions: case.validation_split.grouping_dimensions.iter().map(|dimension| grouping_dimension_name(*dimension)).collect(),
+        split_protocol_id: split_protocol_name(&case.validation_split.protocol_id).to_string(),
+        grouping_dimensions,
         calibration_group_count: calibration_groups_count(&case.validation_split),
         held_out_group_count: held_out_groups_count(&case.validation_split),
         calibration_pair_count,
@@ -1334,7 +1402,7 @@ mod tests {
             frequency_match_tolerance_fraction: 0.01,
             validation_split: ValidationSplit {
                 split_manifest_sha256: digest.to_string(),
-                protocol_id: "leave-one-facility-vessel-propeller-campaign-condition-out".to_string(),
+                protocol_id: SplitProtocol::NestedGroupHoldout,
                 grouping_dimensions: vec![
                     GroupingDimension::ModelFacilityId,
                     GroupingDimension::FullScaleTrialSiteId,
@@ -1371,6 +1439,32 @@ mod tests {
             },
             pairs,
         }
+    }
+
+    #[test]
+    fn permuting_pairs_groups_and_dimensions_preserves_canonical_report() {
+        let first = audit(&fixture_case());
+        let mut permuted_case = fixture_case();
+        permuted_case.pairs.reverse();
+        permuted_case.validation_split.groups.reverse();
+        permuted_case.validation_split.grouping_dimensions.reverse();
+        let second = audit(&permuted_case);
+        assert_eq!(
+            first.pair_reports.iter().map(|pair| pair.pair_id.as_str()).collect::<Vec<_>>(),
+            second.pair_reports.iter().map(|pair| pair.pair_id.as_str()).collect::<Vec<_>>()
+        );
+        assert_eq!(first.grouping_dimensions, second.grouping_dimensions);
+        assert_eq!(first.calibration_comparison_outcome, second.calibration_comparison_outcome);
+        assert_eq!(first.held_out_comparison_outcome, second.held_out_comparison_outcome);
+        assert_eq!(first.disposition, second.disposition);
+    }
+
+    #[test]
+    fn named_protocol_requires_its_declared_group_dimension() {
+        let mut case = fixture_case();
+        case.validation_split.protocol_id = SplitProtocol::LeaveOneVesselOut;
+        case.validation_split.grouping_dimensions = vec![GroupingDimension::ModelFacilityId];
+        assert_eq!(audit(&case).disposition, "invalid");
     }
 
     #[test]
@@ -1420,7 +1514,7 @@ mod tests {
         assert_eq!(report.held_out_pair_count, 1);
         assert_eq!(report.calibration_comparison_outcome, "all_declared_bands_overlap");
         assert_eq!(report.held_out_comparison_outcome, "all_declared_bands_overlap");
-        assert_eq!(report.split_protocol_id, "leave-one-facility-vessel-propeller-campaign-condition-out");
+        assert_eq!(report.split_protocol_id, "nested_group_holdout");
     }
 
     #[test]
