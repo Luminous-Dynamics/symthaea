@@ -29,7 +29,7 @@ use std::sync::Arc;
 /// Configuration for cetacean acoustic analysis
 #[derive(Debug, Clone)]
 pub struct CetaceanConfig {
-    /// Sample rate (Hz) - whale recordings typically 44.1kHz or 96kHz
+    /// Native analysis sample rate (Hz); the declared band must fit below Nyquist.
     pub sample_rate: u32,
     /// Frame duration for analysis (seconds)
     pub frame_duration: f32,
@@ -39,7 +39,7 @@ pub struct CetaceanConfig {
     pub n_fft: usize,
     /// Minimum frequency for analysis (Hz)
     pub f_min: f32,
-    /// Maximum frequency for analysis (Hz) - whales use wide range
+    /// Maximum frequency for analysis (Hz); keep strictly below the Nyquist limit.
     pub f_max: f32,
     /// Threshold for transient detection
     pub transient_threshold: f32,
@@ -57,11 +57,119 @@ impl Default for CetaceanConfig {
             hop_duration: 0.01,   // 10ms hop
             n_fft: 2048,          // High resolution for frequency tracking
             f_min: 100.0,         // Whale vocalizations start low
-            f_max: 20000.0,       // But can go quite high
+            f_max: 20000.0,       // Conservative low-band default; not ultrasonic-click capable
             transient_threshold: 0.5,
             harmonicity_threshold: 0.4,
             fm_slope_threshold: 500.0, // Hz/frame
         }
+    }
+}
+
+impl CetaceanConfig {
+    /// Experimental high-rate front-end profile for initial dolphin-audio
+    /// exploration. This makes the declared band/sample clock coherent; it
+    /// does not make this heuristic classifier a validated echolocation-click
+    /// detector or a whistle-contour tracker.
+    pub fn dolphin_high_rate_research() -> Self {
+        Self {
+            sample_rate: 512_000,
+            frame_duration: 0.002,
+            hop_duration: 0.001,
+            n_fft: 2048,
+            f_min: 1_000.0,
+            f_max: 150_000.0,
+            transient_threshold: 0.5,
+            harmonicity_threshold: 0.4,
+            fm_slope_threshold: 500.0,
+        }
+    }
+
+    /// Validate the declared analysis band and frame geometry.
+    ///
+    /// The legacy 44.1 kHz default is a low-band vocalization starting point,
+    /// not an ultrasonic dolphin-echolocation configuration.
+    pub fn validate(&self) -> Result<(), String> {
+        if self.sample_rate < 2 {
+            return Err("sample rate must be at least 2 Hz".into());
+        }
+        if !self.f_min.is_finite()
+            || !self.f_max.is_finite()
+            || self.f_min < 0.0
+            || self.f_max <= self.f_min
+        {
+            return Err("analysis band must be finite with 0 <= f_min < f_max".into());
+        }
+        let nyquist_hz = self.sample_rate as f64 / 2.0;
+        if self.f_max as f64 >= nyquist_hz {
+            return Err(format!(
+                "analysis upper bound {} Hz must be below Nyquist {} Hz",
+                self.f_max, nyquist_hz
+            ));
+        }
+        if !self.frame_duration.is_finite()
+            || !self.hop_duration.is_finite()
+            || self.frame_duration <= 0.0
+            || self.hop_duration <= 0.0
+            || self.hop_duration > self.frame_duration
+        {
+            return Err("frame/hop durations must be finite, positive, and hop <= frame".into());
+        }
+        let frame_samples_f64 = self.sample_rate as f64 * self.frame_duration as f64;
+        let hop_samples_f64 = self.sample_rate as f64 * self.hop_duration as f64;
+        if !frame_samples_f64.is_finite()
+            || frame_samples_f64 > usize::MAX as f64
+            || !hop_samples_f64.is_finite()
+            || hop_samples_f64 > usize::MAX as f64
+        {
+            return Err("frame/hop geometry exceeds the addressable sample range".into());
+        }
+        let frame_samples = frame_samples_f64 as usize;
+        let hop_samples = hop_samples_f64 as usize;
+        if frame_samples < 3 || hop_samples == 0 || hop_samples > frame_samples {
+            return Err("frame must contain >= 3 samples and hop must be 1..=frame samples".into());
+        }
+        if self.n_fft < frame_samples {
+            return Err("FFT size must be >= frame samples; shorter FFTs truncate the signal".into());
+        }
+        if !self.transient_threshold.is_finite()
+            || self.transient_threshold < 0.0
+            || !self.harmonicity_threshold.is_finite()
+            || !(0.0..=1.0).contains(&self.harmonicity_threshold)
+            || !self.fm_slope_threshold.is_finite()
+            || self.fm_slope_threshold < 0.0
+        {
+            return Err("classifier thresholds must be finite and within their valid ranges".into());
+        }
+        Ok(())
+    }
+
+    /// Validate the source clock before any resampling.
+    ///
+    /// Downsampling is rejected because this classifier currently only has a
+    /// linear interpolator, not an anti-alias low-pass resampler. For cetacean
+    /// recordings this could alias high-frequency clicks into the analysis band.
+    pub fn validate_source_sample_rate(&self, source_rate_hz: u32) -> Result<(), String> {
+        self.validate()?;
+        if source_rate_hz < 2 {
+            return Err("source sample rate must be at least 2 Hz".into());
+        }
+        if self.f_max as f64 >= source_rate_hz as f64 / 2.0 {
+            return Err(format!(
+                "analysis upper bound {} Hz is not below source Nyquist {} Hz",
+                self.f_max,
+                source_rate_hz as f64 / 2.0
+            ));
+        }
+        if source_rate_hz > self.sample_rate {
+            return Err(format!(
+                concat!(
+                    "refusing non-antialiased downsampling from {source_rate_hz} Hz to {} Hz; ",
+                    "configure analysis at the native rate or prefilter with a verified anti-aliasing resampler"
+                ),
+                self.sample_rate
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -113,7 +221,15 @@ pub struct CetaceanClassifier {
 }
 
 impl CetaceanClassifier {
-    /// Create a new cetacean classifier
+    /// Create a new classifier after validating its sample-rate/frequency contract.
+    pub fn try_new(config: CetaceanConfig) -> Result<Self, String> {
+        config.validate()?;
+        Ok(Self::new(config))
+    }
+
+    /// Create a classifier without eager validation for backwards compatibility.
+    /// Prefer `try_new` for new code; file/audio classification entry points
+    /// with explicit source rates validate the config before processing.
     pub fn new(config: CetaceanConfig) -> Self {
         // CfC backbone: 6 features → 32 hidden
         let cfc_config = LtcConfig {
@@ -161,7 +277,37 @@ impl CetaceanClassifier {
         self.position = 0;
     }
 
-    /// Process audio and return classified CAU sequence
+    /// Safely classify audio with its source sample rate declared.
+    ///
+    /// Native-rate high-frequency recordings are never silently downsampled.
+    /// Lower-rate recordings may be upsampled only when their source Nyquist
+    /// still covers the configured analysis band. Non-finite samples abstain.
+    pub fn try_classify_audio(
+        &mut self,
+        samples: &[f32],
+        source_sample_rate_hz: u32,
+    ) -> Result<Vec<(f32, CetaceanUnit)>, String> {
+        self.config.validate_source_sample_rate(source_sample_rate_hz)?;
+        if samples.is_empty() {
+            return Err("cetacean classification requires non-empty audio".into());
+        }
+        if samples.iter().any(|sample| !sample.is_finite()) {
+            return Err("cetacean audio contains non-finite samples".into());
+        }
+        let normalized = if source_sample_rate_hz == self.config.sample_rate {
+            samples.to_vec()
+        } else {
+            self.resample(samples, source_sample_rate_hz, self.config.sample_rate)
+        };
+        if normalized.is_empty() {
+            return Err("resampling produced an empty audio sequence".into());
+        }
+        Ok(self.classify_audio(&normalized))
+    }
+
+    /// Process audio already sampled at `config.sample_rate` and return a CAU sequence.
+    /// This compatibility API cannot verify a rate because no rate is passed;
+    /// prefer `try_classify_audio` when the source rate is known.
     pub fn classify_audio(&mut self, samples: &[f32]) -> Vec<(f32, CetaceanUnit)> {
         self.reset();
 
@@ -390,15 +536,8 @@ impl CetaceanClassifier {
         path: P,
     ) -> std::io::Result<Vec<(f32, CetaceanUnit)>> {
         let (samples, sample_rate) = AudioFrontend::load_audio(path)?;
-
-        // Resample if needed (simple linear for now)
-        let samples = if sample_rate != self.config.sample_rate {
-            self.resample(&samples, sample_rate, self.config.sample_rate)
-        } else {
-            samples
-        };
-
-        Ok(self.classify_audio(&samples))
+        self.try_classify_audio(&samples, sample_rate)
+            .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))
     }
 
     /// Simple linear resampling
@@ -460,6 +599,76 @@ mod tests {
     fn test_classifier_creation() {
         let classifier = CetaceanClassifier::new(CetaceanConfig::default());
         assert_eq!(classifier.config.sample_rate, 44100);
+    }
+
+    #[test]
+    fn config_validates_default_low_band_profile() {
+        assert!(CetaceanConfig::default().validate().is_ok());
+    }
+
+    #[test]
+    fn dolphin_high_rate_research_profile_is_bandwidth_consistent() {
+        let config = CetaceanConfig::dolphin_high_rate_research();
+        assert!(config.validate().is_ok());
+        assert!(config.validate_source_sample_rate(512_000).is_ok());
+        assert!(config.validate_source_sample_rate(44100).is_err());
+        assert!(config.f_max < config.sample_rate as f32 / 2.0);
+    }
+
+    #[test]
+    fn config_rejects_analysis_band_at_or_above_nyquist() {
+        let mut config = CetaceanConfig::default();
+        config.f_max = 22050.0;
+        assert!(config.validate().is_err());
+
+        config.sample_rate = 384000;
+        config.n_fft = 8192;
+        config.f_max = 150000.0;
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn config_rejects_invalid_frame_fft_and_threshold_values() {
+        let mut config = CetaceanConfig::default();
+        config.n_fft = 512; // shorter than the 882-sample frame at 44.1 kHz
+        assert!(config.validate().is_err());
+
+        let mut config = CetaceanConfig::default();
+        config.hop_duration = f32::NAN;
+        assert!(config.validate().is_err());
+
+        let mut config = CetaceanConfig::default();
+        config.harmonicity_threshold = 1.1;
+        assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn source_rate_guard_rejects_unsafe_downsampling_and_missing_bandwidth() {
+        let config = CetaceanConfig::default();
+        assert!(config.validate_source_sample_rate(48000).is_err());
+        assert!(config.validate_source_sample_rate(32000).is_err());
+        assert!(config.validate_source_sample_rate(16000).is_err());
+        assert!(config.validate_source_sample_rate(44100).is_ok());
+        assert!(config.validate_source_sample_rate(22050).is_err());
+    }
+
+    #[test]
+    fn try_new_rejects_configuration_that_would_truncate_or_alias() {
+        let mut config = CetaceanConfig::default();
+        config.f_max = 25000.0;
+        assert!(CetaceanClassifier::try_new(config).is_err());
+    }
+
+    #[test]
+    fn try_classify_audio_rejects_non_finite_or_empty_input() {
+        let mut classifier = CetaceanClassifier::try_new(CetaceanConfig::default()).unwrap();
+        assert!(classifier.try_classify_audio(&[], 44100).is_err());
+        assert!(classifier.try_classify_audio(&[0.0; 1000], 44100).is_ok());
+        assert!(
+            classifier
+                .try_classify_audio(&[0.0, f32::NAN, 0.0], 44100)
+                .is_err()
+        );
     }
 
     #[test]

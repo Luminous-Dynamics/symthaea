@@ -18,6 +18,16 @@ liquid-HDC, unified-neuron). None reached usable word accuracy. For transcriptio
 Symthaea delegates to Whisper via the `symthaea-communication` provider contract
 (`communication/worker/whisper_worker.py`; measured en WER 4.8% normalized on FLEURS).
 
+## Cetacean acoustic analysis: important limit
+
+Dolphin and whale support remains research-only. `whale.rs` handles sperm-whale coda timing/ICI patterns; `cetacean_classifier.rs` extracts frame-level transient, tonal and modulation features. Neither currently establishes the meaning of a vocalization.
+
+The legacy classifier defaults to 44.1 kHz and a 20 kHz analysis upper bound. That is not an ultrasonic dolphin-echolocation configuration. Use the guarded `CetaceanConfig::validate`, `CetaceanClassifier::try_new` and `try_classify_audio` APIs with an explicit source sample rate. The checked file path refuses downsampling through the current linear interpolator. The guarded `WhaleConfig::validate` / `WhaleSentinel::try_with_config` / `try_process_buffer` APIs also require the source clock to match the configured rate.
+
+The `symthaea-communication::bioacoustic_corpus` crate now provides a metadata-only manifest validator for rights references, stable recording hashes, source lineage, annotations and leakage controls. See [the avian research contract](../../../docs/research/AVIAN_COMMUNICATION_RESEARCH_CONTRACT_V1.md) and [the cetacean research contract](../../../docs/research/CETACEAN_COMMUNICATION_RESEARCH_CONTRACT_V1.md) for corpus-specific admission rules. These checks validate declared metadata, not the underlying audio bytes or legal correctness of a rights decision.
+
+See the cetacean research contract for datasets, licensing caveats, per-task benchmarks and evidence boundaries. The new guard tests are authored but must still be run on a pinned Rust toolchain.
+
 ## What this crate is actually for
 
 The niches where it is real and useful — everything Whisper *discards*:

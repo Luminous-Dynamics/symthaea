@@ -1,7 +1,11 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
-//! Real-World Whale Validation v3
+//! Exploratory cetacean acoustic diagnostics v3 — not a validated benchmark.
+//!
+//! Evidence limits: the train/holdout split is made by file-list position, and
+//! species labels for the secondary comparison are inferred from filenames.
+//! Outputs are diagnostics only, not evidence of independent generalization.
 //!
 //! Adaptive event detection with:
 //! - Signal-adaptive thresholds (computed from recording statistics)
@@ -494,9 +498,10 @@ fn enhanced_cetacean_config() -> DomainConfig {
 }
 
 fn main() -> std::io::Result<()> {
-    header("WHALE BRIDGE v3: ADAPTIVE DETECTION");
+    header("EXPLORATORY DIAGNOSTIC v3 — NOT A VALIDATION");
 
-    println!("  Improvements over v2:");
+    println!("  Evidence limit: split is by file-list position, not verified source lineage.");
+    println!("  Improvements over v2 (feature list only):");
     println!("    - Signal-adaptive thresholds (computed per recording)");
     println!("    - Crest factor for transient detection");
     println!("    - Bandwidth ratio for tonal vs. broadband");
@@ -611,7 +616,7 @@ fn main() -> std::io::Result<()> {
             for _ in 0..15 {
                 grammar.train_sequence(events);
             }
-            println!("    Trained: {} ({} events)", filename, events.len());
+            println!("    Adapted on first partition: {} ({} events)", filename, events.len());
         }
     }
 
@@ -627,7 +632,7 @@ fn main() -> std::io::Result<()> {
     let mut train_scores = Vec::new();
     let mut test_scores = Vec::new();
 
-    println!("    Training set:");
+    println!("    First list partition (used for adaptation):");
     for (filename, events) in train_set {
         if events.len() >= 3 {
             let score = grammar.score_sequence(events);
@@ -636,7 +641,7 @@ fn main() -> std::io::Result<()> {
         }
     }
 
-    println!("\n    Test set:");
+    println!("\n    Second list partition (not a verified independent holdout):");
     for (filename, events) in test_set {
         if events.len() >= 3 {
             let score = grammar.score_sequence(events);
@@ -670,6 +675,7 @@ fn main() -> std::io::Result<()> {
                 let events = extract_events_v3(&audio, sample_rate as f32, 2048);
                 if events.len() >= 2 {
                     let score = grammar.score_sequence(&events);
+                    // Exploratory grouping only: filename tokens are not independent ground-truth labels.
                     let label = if filename.contains("whale") {
                         "WHALE"
                     } else if filename.contains("dolphin") {
@@ -690,29 +696,29 @@ fn main() -> std::io::Result<()> {
     }
 
     // Summary
-    header("RESULTS");
+    header("EXPLORATORY DIAGNOSTIC RESULTS");
 
-    println!("    Training average:     {:.4}", train_avg);
-    println!("    Test average:         {:.4}", test_avg);
-    println!("    Generalization gap:   {:+.4}", train_avg - test_avg);
+    println!("    First list-partition mean:     {:.4}", train_avg);
+    println!("    Second list-partition mean (not independent holdout):         {:.4}", test_avg);
+    println!("    Train-minus-holdout diagnostic difference (not a generalization estimate):   {:+.4}", train_avg - test_avg);
     println!("    Grammar density:      {:.3}", stats.grammar_density);
     println!("    Event diversity:      {:.0}%", diversity);
     println!();
 
     if diversity > 50.0 {
-        println!("  [SUCCESS] Diverse event detection achieved!");
+        println!("  [DIAGNOSTIC ONLY] Event-type distribution is descriptive, not detection validation.");
     } else if diversity > 30.0 {
-        println!("  [PARTIAL] Moderate event diversity.");
+        println!("  [DIAGNOSTIC ONLY] Event-type distribution is descriptive, not detection validation.");
     } else {
-        println!("  [INFO] Low diversity - may need more varied recordings.");
+        println!("  [DIAGNOSTIC ONLY] Low event-type diversity may reflect the extractor, corpus or thresholds.");
     }
 
     if train_avg > test_avg && train_avg > 0.1 {
-        println!("  [SUCCESS] Grammar learned whale-specific patterns!");
+        println!("  [NOT QUALIFIED] File-position scores do not establish whale-specific patterns.");
     }
 
     if stats.grammar_density < 0.5 {
-        println!("  [SUCCESS] Sparse HDC prevented saturation!");
+        println!("  [DIAGNOSTIC ONLY] Low measured grammar density does not alone establish capacity or saturation safety.");
     }
 
     separator('=', 70);
