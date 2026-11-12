@@ -921,9 +921,22 @@ fn audit(case: &Case) -> AuditReport {
                 cell_comparisons.extend(cells);
             }
         }
+        let axial_only = coverage[0]
+            && !coverage[1]
+            && !coverage[2]
+            && case.target.points.iter().all(|point| {
+                point.vx_over_vref.is_some()
+                    && point.vr_over_vref.is_none()
+                    && point.vt_over_vref.is_none()
+            })
+            && case.realized.points.iter().all(|point| {
+                point.vx_over_vref.is_some()
+                    && point.vr_over_vref.is_none()
+                    && point.vt_over_vref.is_none()
+            });
         if !coverage[1] || !coverage[2] {
             reasons.push("one or more wake velocity components are missing; axial-only results cannot qualify full-vector wake similarity".to_string());
-            unresolved = true;
+            unresolved |= !axial_only;
         }
         let t = &target_summary;
         let r = &realized_summary;
@@ -958,8 +971,6 @@ fn audit(case: &Case) -> AuditReport {
     }
     let full_vector=case.target.points.iter().all(|p|p.vx_over_vref.is_some()&&p.vr_over_vref.is_some()&&p.vt_over_vref.is_some())
         &&case.realized.points.iter().all(|p|p.vx_over_vref.is_some()&&p.vr_over_vref.is_some()&&p.vt_over_vref.is_some());
-    let axial_only=case.target.points.iter().all(|p|p.vx_over_vref.is_some()&&p.vr_over_vref.is_none()&&p.vt_over_vref.is_none())
-        &&case.realized.points.iter().all(|p|p.vx_over_vref.is_some()&&p.vr_over_vref.is_none()&&p.vt_over_vref.is_none());
     let disposition = if !errors.is_empty() {
         "INVALID"
     } else if has_definite_failure
@@ -1181,6 +1192,15 @@ mod tests {
         assert_eq!(report.disposition,"AXIAL_ONLY_DESCRIPTIVE");
         assert!(report.component_metrics.iter().any(|m|m.component=="axial"));
         assert!(!report.component_metrics.iter().any(|m|m.component=="radial"));
+    }
+
+    #[test]
+    fn synthetic_axial_only_field_remains_incomplete_not_descriptive_measurement() {
+        let mut input = case();
+        input.target = field("target", VelocityMethod::FiveHolePitot, 0.0, true);
+        input.realized = field("realized", VelocityMethod::WireScreenDerived, 0.0, true);
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
     }
 
     #[test]
