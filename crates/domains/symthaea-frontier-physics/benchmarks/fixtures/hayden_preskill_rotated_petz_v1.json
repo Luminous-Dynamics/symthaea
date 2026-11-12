@@ -1,7 +1,7 @@
 {
   "schema": "luminous.black_hole_information.hayden_preskill_rotated_petz.v1",
-  "status": "Rust_source_authored; exact-head_Rust_execution_pending; independent_NumPy_comparator_available",
-  "claim_ceiling": "One-step four-qubit classical rotated-Petz recovery family for the declared M -> A=E tensor R channel. It is not an exact optimal decoder, circuit synthesis, a hardware experiment, or a macroscopic black-hole information recovery result.",
+  "status": "Rust rotated-Petz source and tests passed in exact-head Rust 1.96 suite",
+  "claim_ceiling": "The tested Rust source implements and validates finite-dimensional classical rotated-Petz recovery channels for the declared four-qubit channel. It does not establish exact optimality, gate-level circuit complexity, hardware performance or macroscopic black-hole information recovery.",
   "channel": {
     "input": "message qubit M",
     "reference": "Q maximally entangled with M",
@@ -124,5 +124,17 @@
     "entanglement_fidelity",
     "runtime",
     "peak_memory"
-  ]
+  ],
+  "rust_validation": {
+    "tested_pr_head": "847bff5a6e27dc3de43c09f1dcba791b43aa9a8d",
+    "workflow_run_id": 43308906962,
+    "crate_test_result": "148 passed; 0 failed",
+    "black_hole_information_module_test_count": 84,
+    "test_coverage": [
+      "t=0 equivalence with ordinary Petz over fixed seeds",
+      "nonzero modular parameters preserve CPTP and fidelity bounds",
+      "seeded ensemble reproducibility and uncertainty",
+      "non-finite parameter and insufficient sample rejection"
+    ]
+  }
 }
