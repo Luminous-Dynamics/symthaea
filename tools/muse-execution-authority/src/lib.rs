@@ -161,9 +161,7 @@ pub enum OperatorOutcome {
         rejection_receipt_sha256: Digest,
     },
     /// The operator has proved that no mutation occurred.
-    DefiniteNoMutationFailure {
-        failure_receipt_sha256: Digest,
-    },
+    DefiniteNoMutationFailure { failure_receipt_sha256: Digest },
     /// The host cannot prove whether the operator produced or committed output.
     /// No later mutation may be authorized until reconciliation.
     Unknown {
@@ -358,10 +356,7 @@ impl LedgerState {
                 grant_id,
                 withdrawal_receipt_sha256,
             } => {
-                validate_sha256(
-                    "withdrawal_receipt_sha256",
-                    withdrawal_receipt_sha256,
-                )?;
+                validate_sha256("withdrawal_receipt_sha256", withdrawal_receipt_sha256)?;
                 let active = self
                     .active_attempt
                     .as_ref()
@@ -411,11 +406,7 @@ impl LedgerState {
                 {
                     return Err(RuntimeError::InvalidTransition);
                 }
-                validate_observer_evidence(
-                    &active.mutation,
-                    output_sha256,
-                    observer_evidence,
-                )?;
+                validate_observer_evidence(&active.mutation, output_sha256, observer_evidence)?;
                 self.current_output_sha256 = output_sha256.clone();
                 self.active_attempt = None;
             }
@@ -720,11 +711,7 @@ impl RuntimeLedger {
             } => {
                 validate_sha256("output_sha256", &output_sha256)?;
                 validate_sha256("execution_receipt_sha256", &execution_receipt_sha256)?;
-                validate_observer_evidence(
-                    &active.mutation,
-                    &output_sha256,
-                    &observer_evidence,
-                )?;
+                validate_observer_evidence(&active.mutation, &output_sha256, &observer_evidence)?;
                 RuntimeEvent::MutationCommitted {
                     attempt_id: permit.attempt_id,
                     output_sha256,
@@ -851,7 +838,10 @@ fn validate_prepared_mutation(mutation: &PreparedMutation) -> Result<(), Runtime
         ("session_ledger_sha256", &mutation.session_ledger_sha256),
         ("parent_output_sha256", &mutation.parent_output_sha256),
         ("action_sha256", &mutation.action_sha256),
-        ("operator_artifact_sha256", &mutation.operator_artifact_sha256),
+        (
+            "operator_artifact_sha256",
+            &mutation.operator_artifact_sha256,
+        ),
     ] {
         validate_sha256(field, digest)?;
     }
@@ -1040,19 +1030,13 @@ fn validate_sha256(field: &'static str, value: &str) -> Result<(), RuntimeError>
 }
 
 fn validate_identifier(field: &'static str, value: &str) -> Result<(), RuntimeError> {
-    if value.trim().is_empty()
-        || value.len() > 256
-        || value.chars().any(char::is_control)
-    {
+    if value.trim().is_empty() || value.len() > 256 || value.chars().any(char::is_control) {
         return Err(RuntimeError::InvalidIdentifier(field));
     }
     Ok(())
 }
 
-fn ensure_unique_strings(
-    values: &[String],
-    field: &'static str,
-) -> Result<(), RuntimeError> {
+fn ensure_unique_strings(values: &[String], field: &'static str) -> Result<(), RuntimeError> {
     let mut seen = BTreeSet::new();
     for value in values {
         validate_identifier(field, value)?;
@@ -1067,7 +1051,9 @@ fn ensure_unique_scopes(scopes: &[EditScope]) -> Result<(), RuntimeError> {
     let mut seen = BTreeSet::new();
     for scope in scopes {
         if !seen.insert(*scope) {
-            return Err(RuntimeError::DuplicateIdentifier("operator_supported_scopes"));
+            return Err(RuntimeError::DuplicateIdentifier(
+                "operator_supported_scopes",
+            ));
         }
     }
     Ok(())
@@ -1207,12 +1193,7 @@ mod tests {
         let mut stale = snapshot(&ledger);
         stale.current_output_sha256 = digest(N);
         assert_eq!(
-            ledger.prepare_authorization(
-                &stale,
-                mutation.clone(),
-                approval(&mutation),
-                digest(K)
-            ),
+            ledger.prepare_authorization(&stale, mutation.clone(), approval(&mutation), digest(K)),
             Err(RuntimeError::StaleParent)
         );
     }
@@ -1279,12 +1260,7 @@ mod tests {
         let mut approval = approval(&mutation);
         approval.scope = EditScope::Global;
         assert_eq!(
-            ledger.prepare_authorization(
-                &snapshot(&ledger),
-                mutation,
-                approval,
-                digest(K)
-            ),
+            ledger.prepare_authorization(&snapshot(&ledger), mutation, approval, digest(K)),
             Err(RuntimeError::InvalidApproval)
         );
     }
@@ -1350,9 +1326,7 @@ mod tests {
             ),
             (
                 vec![observer(&digest(N))],
-                RuntimeError::InvalidMutation(
-                    "observer receipt is detached from the exact output",
-                ),
+                RuntimeError::InvalidMutation("observer receipt is detached from the exact output"),
             ),
         ];
         for (evidence, expected) in cases {
@@ -1380,12 +1354,7 @@ mod tests {
         let mut budget = snapshot(&ledger);
         budget.remaining_budget_units = 2;
         assert_eq!(
-            ledger.prepare_authorization(
-                &budget,
-                mutation.clone(),
-                approval(&mutation),
-                digest(K)
-            ),
+            ledger.prepare_authorization(&budget, mutation.clone(), approval(&mutation), digest(K)),
             Err(RuntimeError::BudgetExceeded)
         );
     }
@@ -1606,9 +1575,7 @@ mod tests {
             )
             .unwrap();
         ledger.append(auth).unwrap();
-        let withdrawal = ledger
-            .prepare_withdrawal(grant, digest(J))
-            .unwrap();
+        let withdrawal = ledger.prepare_withdrawal(grant, digest(J)).unwrap();
         ledger.append(withdrawal).unwrap();
 
         let retry = mutation("attempt-021");
@@ -1653,7 +1620,11 @@ mod tests {
         );
         let _ = grant;
         assert_eq!(
-            LedgerState::replay(ledger.events()).unwrap().active_attempt.unwrap().status,
+            LedgerState::replay(ledger.events())
+                .unwrap()
+                .active_attempt
+                .unwrap()
+                .status,
             InternalAttemptStatus::Authorized
         );
     }
@@ -1674,9 +1645,9 @@ mod tests {
         );
 
         let mut duplicate = mutation("attempt-024");
-        duplicate.precondition_evidence.push(
-            duplicate.precondition_evidence[0].clone(),
-        );
+        duplicate
+            .precondition_evidence
+            .push(duplicate.precondition_evidence[0].clone());
         assert_eq!(
             ledger.prepare_authorization(
                 &snapshot(&ledger),
@@ -1703,9 +1674,7 @@ mod tests {
         ledger.append(auth).unwrap();
         // A second ledger event changes the revision and consumes/withdraws
         // the grant. The old grant can no longer dispatch.
-        let withdrawal = ledger
-            .prepare_withdrawal(grant, digest(J))
-            .unwrap();
+        let withdrawal = ledger.prepare_withdrawal(grant, digest(J)).unwrap();
         ledger.append(withdrawal).unwrap();
         assert!(ledger.current_output_digest().is_ok());
     }
