@@ -1,0 +1,105 @@
+{
+  "schema": "luminous.black_hole_information.hayden_preskill_petz_optimality_u4.v1",
+  "status": "Rust source and five tests authored; exact-head focused Rust execution pending; independent NumPy theorem-criterion comparator executed",
+  "claim_ceiling": "The result concerns one-qubit message/reference, one-qubit black-hole/early-radiation, and a single Haar U(4) scrambler. It establishes Petz optimality for this specific maximally-mixed finite-dimensional channel family when the commutator criterion is numerically satisfied. It is not a large-N decoder result, a gate-efficient implementation, gravitational evaporation, or a QES/island calculation.",
+  "reference": {
+    "paper": "Bikun Li, Zhaoyou Wang, Guo Zheng, Yat Wong, Liang Jiang, Optimality Condition for the Petz Map",
+    "publication": "Physical Review Letters 134, 200602 (published 19 May 2025)",
+    "doi": "https://doi.org/10.1103/PhysRevLett.134.200602",
+    "theorem": "For logical input rho and Petz reference sigma, when [rho,sigma]=0, Petz recovery is entanglement-fidelity optimal iff [M_sigma, gamma tensor T]=0, with gamma=sigma^(-1/2)rho and T=Tr_L[(gamma^dagger tensor I_K)sqrt(M_sigma)].",
+    "general_theorem": "The paper's general necessary-and-sufficient condition is B=sqrt(M_sigma)(gamma tensor T) >= 0. The commutator test is the commuting-rho/sigma specialization used here."
+  },
+  "channel": {
+    "initial_state": "Bell(Q,M) tensor Bell(B,R)",
+    "scrambler": "Haar U(4) acting on M tensor B",
+    "channel": "N:M -> A=E tensor R, with Bprime as the inaccessible channel environment",
+    "input_state": "rho_M=I_2/2",
+    "petz_reference": "sigma_M=I_2/2",
+    "gamma": "sigma^(-1/2)rho=I_2/sqrt(2)",
+    "channel_kraus": "K_bprime[(e,r),m]=U[(e,bprime),(m,r)]/sqrt(2)"
+  },
+  "qec_matrix": {
+    "definition": "M_sigma[(i,k),(j,l)] = <i|sqrt(sigma) K_k^dagger K_l sqrt(sigma)|j>",
+    "maximally_mixed_simplification": "M_sigma[(i,k),(j,l)] = (1/2) * sum_a conj(K_k[a,i])*K_l[a,j]",
+    "dimension": 4,
+    "trace_expected": 1,
+    "partial_trace_checks": "Tr_K M_sigma=I_L/2 by channel trace preservation; Tr_L M_sigma=I_K/2 for this unitary/Bell-pair channel construction."
+  },
+  "optimality_test": {
+    "auxiliary_operator": "T = Tr_L[(gamma^dagger tensor I) sqrt(M_sigma)]",
+    "commutator": "C = [M_sigma, gamma tensor T]",
+    "numerical_metric": "Frobenius norm ||C||_F",
+    "interpretation": "For rho=sigma=I/2, a numerically vanishing commutator is the theorem's necessary-and-sufficient criterion for Petz entanglement-fidelity optimality in this channel.",
+    "inverse_square_root": "The Rust implementation computes sqrt(M)=M*M^(-1/2) using the existing unregularized complex-Hermitian Newton-Schulz inverse-square-root routine; non-convergence is a typed failure.",
+    "no_silent_repair": true
+  },
+  "independent_numpy_comparator": {
+    "generator": "Independent NumPy PRNG; complex Gaussian Haar U(4) via QR; direct Kraus/QEC-matrix construction; numpy.linalg.eigh for sqrt(M_sigma); explicit partial trace and commutator.",
+    "sample_count": 32,
+    "first_seed": 18961,
+    "seed_schedule": "seed=0x4A11 + sample_index; indices 0..31",
+    "mean_commutator_frobenius": 6.896349957031914e-17,
+    "standard_error_commutator_frobenius": 7.492e-18,
+    "maximum_commutator_frobenius": 1.6708292827365478e-16,
+    "maximum_qec_matrix_trace_residual": 6.661657497567537e-16,
+    "maximum_qec_matrix_hermiticity_residual": 6.07052542728798e-17,
+    "maximum_auxiliary_t_hermiticity_residual": 8.777083671441752e-17,
+    "minimum_qec_matrix_eigenvalue": 0.0034265148327852165,
+    "maximum_qec_matrix_eigenvalue": 0.7256956126235807,
+    "maximum_hermitian_square_root_residual": 1.5354897517253734e-15,
+    "caveat": "Independent NumPy PRNG and eigendecomposition; not bitwise ChaCha20 Rust output or a Rust execution receipt."
+  },
+  "rust_contract": {
+    "APIs": [
+      "simulate_small_hayden_preskill_petz_optimality(seed,tolerance)",
+      "sample_small_hayden_preskill_petz_optimality_ensemble(sample_count,first_seed,tolerance)"
+    ],
+    "observables": [
+      "QEC matrix trace and Hermiticity residuals",
+      "Newton-Schulz inverse-square-root residual",
+      "auxiliary T Hermiticity residual",
+      "Frobenius norm of [M_sigma,gamma tensor T]",
+      "per-sample Petz-optimality classification",
+      "ensemble mean, standard error, maximum commutator and all-samples-optimal flag"
+    ],
+    "tests": [
+      "identity channel satisfies the optimality commutator criterion",
+      "32 frozen-seed Haar scramblers satisfy the commutator criterion",
+      "same seed reproduces exactly",
+      "ensemble reports uncertainty and maximum residual",
+      "sample count one is rejected"
+    ],
+    "status": "five Rust tests authored; exact-head validation pending"
+  },
+  "limitations": [
+    "The theorem applies to a fixed channel and stated input/reference states; this test does not generalize to non-maximally-mixed inputs.",
+    "A vanishing commutator says the Petz map is optimal for entanglement fidelity in this finite channel; it does not measure gate count or hardware cost.",
+    "No exact SDP is needed when the theorem criterion is satisfied, but an independent SDP or certified bound remains required for future cases where the criterion fails.",
+    "The 2-dimensional logical/environment setting is too small to infer large-N Hayden-Preskill scaling."
+  ],
+  "negative_controls": [
+    "claim theorem applicability when rho and sigma do not commute without using the general B>=0 criterion",
+    "replace the QEC matrix M_sigma by the channel output state sigma_A",
+    "swap the logical and environment tensor-factor index order",
+    "omit gamma from gamma tensor T",
+    "report high Petz fidelity as proof of optimality without the necessary-and-sufficient criterion",
+    "claim large-N or efficient decoder behaviour from the two-dimensional channel"
+  ],
+  "required_receipt_fields": [
+    "source_sha",
+    "seed",
+    "channel_scrambler_digest",
+    "rho_digest",
+    "sigma_digest",
+    "QEC_matrix_digest",
+    "QEC_matrix_trace_residual",
+    "QEC_matrix_hermiticity_residual",
+    "inverse_sqrt_residual",
+    "auxiliary_T_hermiticity_residual",
+    "optimality_commutator_frobenius",
+    "optimality_threshold",
+    "petz_optimality_classification",
+    "runtime",
+    "peak_memory"
+  ]
+}
