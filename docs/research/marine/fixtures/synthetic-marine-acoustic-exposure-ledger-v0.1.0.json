@@ -1,0 +1,173 @@
+{
+  "schema_version": "0.1.0",
+  "case_id": "synthetic-marine-exposure-ledger-001",
+  "period": {
+    "period_id": "synthetic-one-hour",
+    "mission_id": "mission-1",
+    "route_id": "route-1",
+    "source_energy_sum_basis": "incoherent_or_phase_averaged",
+    "start_time_s": 0,
+    "end_time_s": 3600,
+    "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "source_events": [
+    {
+      "event_id": "event-a",
+      "evidence_kind": "synthetic",
+      "dataset_id": "synthetic-event-a",
+      "citation": "Synthetic known-answer fixture only",
+      "rights_status": "unknown",
+      "independently_reviewed": false,
+      "vessel_id": "vessel-event-a",
+      "vessel_revision": "hull-r1",
+      "propeller_revision": "prop-r1",
+      "source_state_id": "propeller-state-event-a",
+      "mission_id": "mission-1",
+      "route_id": "route-1",
+      "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "source_track_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_level_method_id": "synthetic-known-answer-source-level",
+      "source_level_calibration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_level_raw_trace_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "source_level_timebase_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "operating_point_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "source_levels": [
+        {
+          "band_id": "one-third-octave-125Hz",
+          "quantity_id": "source_level_db_re_1upa_at_1m",
+          "center_frequency_hz": 125,
+          "source_level_db": 120,
+          "expanded_uncertainty_db": 0.5,
+          "uncertainty_confidence_level": 0.95
+        }
+      ]
+    },
+    {
+      "event_id": "event-b",
+      "evidence_kind": "synthetic",
+      "dataset_id": "synthetic-event-b",
+      "citation": "Synthetic known-answer fixture only",
+      "rights_status": "unknown",
+      "independently_reviewed": false,
+      "vessel_id": "vessel-event-b",
+      "vessel_revision": "hull-r1",
+      "propeller_revision": "prop-r1",
+      "source_state_id": "propeller-state-event-b",
+      "mission_id": "mission-1",
+      "route_id": "route-1",
+      "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "source_track_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "source_level_method_id": "synthetic-known-answer-source-level",
+      "source_level_calibration_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "source_level_raw_trace_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "source_level_timebase_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "operating_point_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "source_levels": [
+        {
+          "band_id": "one-third-octave-125Hz",
+          "quantity_id": "source_level_db_re_1upa_at_1m",
+          "center_frequency_hz": 125,
+          "source_level_db": 119,
+          "expanded_uncertainty_db": 0.5,
+          "uncertainty_confidence_level": 0.95
+        }
+      ]
+    }
+  ],
+  "receivers": [
+    {
+      "receiver_id": "receiver-1",
+      "latitude_deg": 0,
+      "longitude_deg": 0.001,
+      "depth_m": 20,
+      "location_evidence_sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+    }
+  ],
+  "contributions": [
+    {
+      "contribution_id": "contrib-a",
+      "event_id": "event-a",
+      "receiver_id": "receiver-1",
+      "band_id": "one-third-octave-125Hz",
+      "start_time_s": 0,
+      "end_time_s": 10,
+      "duration_s": 10,
+      "source_latitude_deg": 0,
+      "source_longitude_deg": 0,
+      "source_depth_m": 10,
+      "range_m": 111.64,
+      "range_tolerance_m": 2,
+      "transmission_loss_db": 60,
+      "transmission_loss_expanded_uncertainty_db": 0.5,
+      "transmission_loss_uncertainty_confidence_level": 0.95,
+      "source_to_propagation_sync_receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "propagation_model_id": "bellhop-synthetic",
+      "propagation_model_version": "fixture-v1",
+      "propagation_validation_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bathymetry_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sound_speed_profile_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "seabed_model_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "timebase_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    },
+    {
+      "contribution_id": "contrib-b",
+      "event_id": "event-b",
+      "receiver_id": "receiver-1",
+      "band_id": "one-third-octave-125Hz",
+      "start_time_s": 0,
+      "end_time_s": 10,
+      "duration_s": 10,
+      "source_latitude_deg": 0,
+      "source_longitude_deg": 0,
+      "source_depth_m": 10,
+      "range_m": 111.64,
+      "range_tolerance_m": 2,
+      "transmission_loss_db": 60,
+      "transmission_loss_expanded_uncertainty_db": 0.5,
+      "transmission_loss_uncertainty_confidence_level": 0.95,
+      "source_to_propagation_sync_receipt_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+      "propagation_model_id": "bellhop-synthetic",
+      "propagation_model_version": "fixture-v1",
+      "propagation_validation_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bathymetry_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "sound_speed_profile_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "seabed_model_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "timebase_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    }
+  ],
+  "ambient_observations": [
+    {
+      "observation_id": "ambient-1",
+      "evidence_kind": "synthetic",
+      "rights_status": "unknown",
+      "independently_reviewed": false,
+      "receiver_id": "receiver-1",
+      "band_id": "one-third-octave-125Hz",
+      "start_time_s": 0,
+      "end_time_s": 100,
+      "duration_s": 100,
+      "ambient_spl_db": 50,
+      "expanded_uncertainty_db": 1,
+      "measurement_method_id": "synthetic-ambient-monitor",
+      "instrument_id": "synthetic-hydrophone",
+      "calibration_certificate_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "raw_trace_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+      "timebase_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+      "ambient_only_basis": "independently_measured_ambient_reference"
+    }
+  ],
+  "exposure_limits": [
+    {
+      "limit_id": "receiver-125hz-sel-limit",
+      "receiver_id": "receiver-1",
+      "band_id": "one-third-octave-125Hz",
+      "upper_sel_threshold_db": 80,
+      "requirement_reference": "synthetic-test-threshold-not-regulatory"
+    }
+  ]
+}
