@@ -124,6 +124,41 @@
       "url": "https://doi.org/10.1016/j.device.2025.100747",
       "source_class": "peer_reviewed_experimental_and_modelled_study",
       "published_year": 2025
+    },
+    {
+      "reference_id": "nasa-gsfc-stray-light-standard",
+      "source": "GSFC-STD-1000H §5.15 Stray Light Modeling and Mitigation",
+      "url": "https://standards.nasa.gov/sites/default/files/standards/GSFC/H/0/GSFC-STD-1000RevH_Approved.pdf",
+      "source_class": "government_engineering_standard",
+      "published_year": 2023
+    },
+    {
+      "reference_id": "iau-cps-reflected-light",
+      "source": "IAU CPS Consolidated Recommendations on reflected sunlight and glints",
+      "url": "https://cps.iau.org/documents/44/Consolidated-CPS-Recommendations.pdf",
+      "source_class": "astronomy_environmental_recommendations",
+      "published_year": 2025
+    },
+    {
+      "reference_id": "nasa-thermal-control-soa",
+      "source": "NASA SmallSat State of the Art: Thermal Control",
+      "url": "https://www.nasa.gov/smallsat-institute/sst-soa/thermal-control/",
+      "source_class": "government_technical_guidance",
+      "published_year": 2026
+    },
+    {
+      "reference_id": "wvo2-meta-osr-2026",
+      "source": "Smart and Flexible Optical Solar Reflectors for Passive Radiative Cooling Regulation in Space Using a W:VO2 Metasurface",
+      "url": "https://doi.org/10.1002/nap2.70011",
+      "source_class": "peer_reviewed_materials_experiment_and_environmental_test",
+      "published_year": 2026
+    },
+    {
+      "reference_id": "vo2-metasurface-radiator-2026",
+      "source": "2D-Network VO2 Metasurface-Integrated Adaptive Radiative Thermal Device With Ultra-Low Solar Absorptance for Spacecraft Thermal Control",
+      "url": "https://doi.org/10.1002/lpor.71614",
+      "source_class": "peer_reviewed_materials_experiment_and_model",
+      "published_year": 2026
     }
   ],
   "metrics": [
@@ -550,6 +585,109 @@
       "caveats": [
         "This is a launched-mass boundary estimate, not measured module/array W/kg or complete installed plant specific power.",
         "The estimate depends on local regolith processing and imported precursor assumptions; do not compare directly with spacecraft-array W/kg without matching boundaries."
+      ]
+    },
+    {
+      "metric_id": "gsfc-end-to-end-stray-light-campaign",
+      "metric": "end_to_end_stray_light_model_and_test_required",
+      "unit": "qualitative_requirement",
+      "value": true,
+      "boundary": "NASA GSFC-STD-1000H §5.15 for applicable optical systems; system-level lifecycle model/test including as-built hardware",
+      "evidence_class": "government_engineering_standard",
+      "reference_id": "nasa-gsfc-stray-light-standard",
+      "caveats": [
+        "Standard requirement is project applicability-specific; this is not a universal numeric glare threshold."
+      ]
+    },
+    {
+      "metric_id": "iau-reflected-sunlight-brightness-limit-leo",
+      "metric": "reflected_sunlight_brightness_limit",
+      "unit": "Johnson_V_magnitude",
+      "value": {
+        "fainter_than": 7,
+        "reference_altitude_km": 550
+      },
+      "boundary": "IAU CPS recommendation for relevant satellite orbits up to 550 km; altitude-dependent expression applies above 550 km",
+      "evidence_class": "astronomy_environmental_recommendation",
+      "reference_id": "iau-cps-reflected-light",
+      "caveats": [
+        "Satellite-orbit astronomy reference only; not a lunar-surface energy installation limit or universal detector/biological safety threshold."
+      ]
+    },
+    {
+      "metric_id": "iau-high_amplitude_glint_definition",
+      "metric": "glint_brightness_amplitude_ratio",
+      "unit": "times_baseline",
+      "value": 2,
+      "boundary": "IAU CPS description of a high-amplitude flare as at least 2x baseline during a telescope-field traversal of at least 0.5 arcsec",
+      "evidence_class": "astronomy_environmental_recommendation",
+      "reference_id": "iau-cps-reflected-light",
+      "caveats": [
+        "Definition for satellite streak observations; do not apply as a universal optical hazard threshold."
+      ]
+    },
+    {
+      "metric_id": "wvo2-meta-osr-solar-absorptance",
+      "metric": "solar_absorptance",
+      "unit": "dimensionless",
+      "value": 0.22,
+      "boundary": "W:VO2 flexible meta-OSR demonstrator, reported solar-band absorptance",
+      "evidence_class": "peer_reviewed_materials_experiment",
+      "reference_id": "wvo2-meta-osr-2026",
+      "caveats": [
+        "Coupon-level material result; wavelength/angle/test details must be matched before direct comparison."
+      ]
+    },
+    {
+      "metric_id": "wvo2-meta-osr-hot-ir-emissivity",
+      "metric": "hot_state_infrared_emissivity",
+      "unit": "dimensionless",
+      "value": 0.8,
+      "boundary": "W:VO2 flexible meta-OSR demonstrator, hot-state IR emissivity",
+      "evidence_class": "peer_reviewed_materials_experiment",
+      "reference_id": "wvo2-meta-osr-2026",
+      "caveats": [
+        "Not a visible reflectance or BRDF metric; this supports thermal rejection rather than optical concealment."
+      ]
+    },
+    {
+      "metric_id": "wvo2-meta-osr-emissivity-contrast",
+      "metric": "infrared_emissivity_contrast",
+      "unit": "dimensionless",
+      "value": 0.33,
+      "boundary": "W:VO2 flexible meta-OSR demonstrator, temperature-adaptive emissivity contrast",
+      "evidence_class": "peer_reviewed_materials_experiment",
+      "reference_id": "wvo2-meta-osr-2026",
+      "caveats": [
+        "Coupon and tested temperature interval are source-specific; not lunar flight qualification."
+      ]
+    },
+    {
+      "metric_id": "vo2-metasurface-radiator-solar-absorptance",
+      "metric": "solar_absorptance",
+      "unit": "dimensionless",
+      "value": 0.26,
+      "boundary": "2D-network VO2 metasurface intelligent radiator material study",
+      "evidence_class": "peer_reviewed_materials_experiment",
+      "reference_id": "vo2-metasurface-radiator-2026",
+      "caveats": [
+        "Material study result; no visible BRDF, lunar site glare, or full radiator performance is established by this value."
+      ]
+    },
+    {
+      "metric_id": "vo2-metasurface-radiator-emissivity-range",
+      "metric": "adaptive_thermal_emissivity",
+      "unit": "dimensionless",
+      "value": {
+        "low": 0.28,
+        "high": 0.92,
+        "contrast": 0.64
+      },
+      "boundary": "2D-network VO2 metasurface intelligent radiator reported emissivity switching range",
+      "evidence_class": "peer_reviewed_materials_experiment_and_model",
+      "reference_id": "vo2-metasurface-radiator-2026",
+      "caveats": [
+        "Study combines material measurement, orbital thermal modelling and terrestrial experiments; not a lunar radiator flight test."
       ]
     }
   ]
