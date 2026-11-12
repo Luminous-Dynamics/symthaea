@@ -262,7 +262,7 @@
     "best_contact_angle_arm": "over_treatment_damage_control",
     "expected_best_contact_angle_is_not_best_accepted_service": true,
     "synthetic_candidate_hypothesis": "modular_argon_candidate has lower synthetic full-system energy than corona_reference and clears synthetic bond and substrate-preservation thresholds at all declared delays.",
-    "synthetic_negative_controls": "The nitrogen control has the lowest contact angle but is not the bondability winner; the over-treatment control has the lowest contact angle and fails the declared substrate-preservation and late bondability gates."
+    "synthetic_negative_controls": "The nitrogen control has a lower contact angle than the argon candidate, but its bond-strength samples are lower in this synthetic fixture; contact angle alone does not determine disposition. The over-treatment control has the lowest contact angle and fails the substrate-preservation gate and later bond-acceptance point."
   },
   "comparisons": [
     {
