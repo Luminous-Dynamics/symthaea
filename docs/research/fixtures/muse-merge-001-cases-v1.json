@@ -1,7 +1,7 @@
 {
   "schema": "https://luminousdynamics.io/schemas/muse-merge-001-cases-v1.schema.json",
   "schema_version": "1.0.0",
-  "status": "synthetic_known_answer_fixture_manifest_not_executed",
+  "status": "reference_evaluator_fixture_manifest_v1",
   "created": "2026-11-11",
   "case_count": 15,
   "expected_outcomes": [
@@ -33,7 +33,12 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_articulation"
+        "description": "set_articulation",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "patch_b": {
         "operation": "set_velocity",
@@ -50,12 +55,20 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_velocity"
+        "description": "set_velocity",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "expected_outcome": "SafeAutomaticMerge",
       "reason": "No shared identity, time, musical constraint or authority dependency.",
       "requires_human_decision": false,
-      "requires_render_revalidation": true
+      "requires_render_revalidation": true,
+      "base_matches": true,
+      "commit_state": "Prepared",
+      "revalidation_available": false
     },
     {
       "id": "M02",
@@ -75,7 +88,12 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_pitch"
+        "description": "set_pitch",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "patch_b": {
         "operation": "set_pitch",
@@ -91,12 +109,20 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_pitch"
+        "description": "set_pitch",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "expected_outcome": "Conflict",
       "reason": "Both branches write incompatible values to the same stable event property.",
       "requires_human_decision": true,
-      "requires_render_revalidation": true
+      "requires_render_revalidation": true,
+      "base_matches": true,
+      "commit_state": "Prepared",
+      "revalidation_available": false
     },
     {
       "id": "M03",
@@ -117,7 +143,12 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_pitch"
+        "description": "set_pitch",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": true,
+        "requires_revalidation": false
       },
       "patch_b": {
         "operation": "set_articulation",
@@ -134,12 +165,20 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_articulation"
+        "description": "set_articulation",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": true,
+        "requires_revalidation": false
       },
       "expected_outcome": "Unknown",
       "reason": "Different properties do not establish semantic independence; operation dependency semantics are not yet qualified.",
       "requires_human_decision": false,
-      "requires_render_revalidation": true
+      "requires_render_revalidation": true,
+      "base_matches": true,
+      "commit_state": "Prepared",
+      "revalidation_available": false
     },
     {
       "id": "M04",
@@ -160,7 +199,12 @@
         "time_domain": "beat_and_seconds",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "change_tempo_segment"
+        "description": "change_tempo_segment",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "patch_b": {
         "operation": "set_absolute_onset",
@@ -177,12 +221,20 @@
         "time_domain": "absolute_seconds",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_absolute_onset"
+        "description": "set_absolute_onset",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "expected_outcome": "Conflict",
       "reason": "The tempo edit changes the mapping used by the absolute-time onset operation.",
       "requires_human_decision": true,
-      "requires_render_revalidation": true
+      "requires_render_revalidation": true,
+      "base_matches": true,
+      "commit_state": "Prepared",
+      "revalidation_available": false
     },
     {
       "id": "M05",
@@ -204,7 +256,14 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "change_chord_function"
+        "description": "change_chord_function",
+        "musical_dependencies": [
+          "harmony:bar:4"
+        ],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "patch_b": {
         "operation": "set_pitch",
@@ -221,12 +280,22 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_pitch"
+        "description": "set_pitch",
+        "musical_dependencies": [
+          "harmony:bar:4"
+        ],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": false,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "expected_outcome": "Conflict",
       "reason": "Different parts share a declared harmonic obligation and the selected values violate it.",
       "requires_human_decision": true,
-      "requires_render_revalidation": true
+      "requires_render_revalidation": true,
+      "base_matches": true,
+      "commit_state": "Prepared",
+      "revalidation_available": false
     },
     {
       "id": "M06",
@@ -247,7 +316,14 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "replace_motif_occurrence"
+        "description": "replace_motif_occurrence",
+        "musical_dependencies": [
+          "motif:P1:recurrence"
+        ],
+        "intent_mode": "alternative",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "patch_b": {
         "operation": "replace_motif_occurrence",
@@ -264,12 +340,22 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "replace_motif_occurrence"
+        "description": "replace_motif_occurrence",
+        "musical_dependencies": [
+          "motif:P1:recurrence"
+        ],
+        "intent_mode": "alternative",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "expected_outcome": "HumanDecisionRequired",
       "reason": "Both branches express distinct valid transformations of a repeated motif; preserving both or selecting a variant is an aesthetic decision.",
       "requires_human_decision": true,
-      "requires_render_revalidation": true
+      "requires_render_revalidation": true,
+      "base_matches": true,
+      "commit_state": "Prepared",
+      "revalidation_available": false
     },
     {
       "id": "M07",
@@ -291,7 +377,12 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "change_meter"
+        "description": "change_meter",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": true
       },
       "patch_b": {
         "operation": "set_beat_position",
@@ -300,7 +391,8 @@
         ],
         "reads": [
           "event:E22.beat_position",
-          "meter:section:S2"
+          "meter:section:S2",
+          "beat_grid:S2"
         ],
         "writes": [
           "event:E22.beat_position"
@@ -308,12 +400,20 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_beat_position"
+        "description": "set_beat_position",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "expected_outcome": "MergeWithRevalidation",
       "reason": "The operations may be jointly applied only after recomputing beat/frame projections and checking the resulting meter constraints.",
       "requires_human_decision": false,
-      "requires_render_revalidation": true
+      "requires_render_revalidation": true,
+      "base_matches": true,
+      "commit_state": "Prepared",
+      "revalidation_available": true
     },
     {
       "id": "M08",
@@ -333,7 +433,12 @@
         "time_domain": "beat",
         "authorization": "missing_scope",
         "artifact_integrity": "verified",
-        "description": "replace_motif"
+        "description": "replace_motif",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "patch_b": {
         "operation": "set_velocity",
@@ -349,12 +454,20 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_velocity"
+        "description": "set_velocity",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "expected_outcome": "Rejected",
       "reason": "The actor lacks authority to modify the protected motif; the otherwise independent patch cannot authorize it.",
       "requires_human_decision": false,
-      "requires_render_revalidation": false
+      "requires_render_revalidation": false,
+      "base_matches": true,
+      "commit_state": "Prepared",
+      "revalidation_available": false
     },
     {
       "id": "M09",
@@ -374,7 +487,12 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_pitch"
+        "description": "set_pitch",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "patch_b": {
         "operation": "set_articulation",
@@ -390,12 +508,20 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_articulation"
+        "description": "set_articulation",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "expected_outcome": "Rejected",
       "reason": "At least one patch base digest no longer matches the expected branch head.",
       "requires_human_decision": false,
-      "requires_render_revalidation": false
+      "requires_render_revalidation": false,
+      "base_matches": false,
+      "commit_state": "Prepared",
+      "revalidation_available": false
     },
     {
       "id": "M10",
@@ -415,7 +541,12 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_velocity"
+        "description": "set_velocity",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "patch_b": {
         "operation": "set_articulation",
@@ -431,12 +562,20 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_articulation"
+        "description": "set_articulation",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "expected_outcome": "SafeAutomaticMerge",
       "reason": "The same prepared merge and idempotency key are replayed; the second attempt must return the existing result without duplicating ancestry or events.",
       "requires_human_decision": false,
-      "requires_render_revalidation": true
+      "requires_render_revalidation": true,
+      "base_matches": true,
+      "commit_state": "AlreadyCommittedSameKey",
+      "revalidation_available": false
     },
     {
       "id": "M11",
@@ -457,7 +596,14 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "reharmonize_section"
+        "description": "reharmonize_section",
+        "musical_dependencies": [
+          "harmony:S3"
+        ],
+        "intent_mode": "alternative",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "patch_b": {
         "operation": "reharmonize_section",
@@ -474,12 +620,22 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "reharmonize_section"
+        "description": "reharmonize_section",
+        "musical_dependencies": [
+          "harmony:S3"
+        ],
+        "intent_mode": "alternative",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "expected_outcome": "HumanDecisionRequired",
       "reason": "Both candidate harmonizations satisfy hard constraints but represent different creative directions.",
       "requires_human_decision": true,
-      "requires_render_revalidation": true
+      "requires_render_revalidation": true,
+      "base_matches": true,
+      "commit_state": "Prepared",
+      "revalidation_available": false
     },
     {
       "id": "M12",
@@ -499,7 +655,12 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_pitch"
+        "description": "set_pitch",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "patch_b": {
         "operation": "set_articulation",
@@ -515,12 +676,20 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "renderer_receipt_stale",
-        "description": "set_articulation"
+        "description": "set_articulation",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": true
       },
       "expected_outcome": "MergeWithRevalidation",
       "reason": "The symbolic candidate is compatible, but the existing renderer/performance evidence is stale for the candidate version.",
       "requires_human_decision": false,
-      "requires_render_revalidation": true
+      "requires_render_revalidation": true,
+      "base_matches": true,
+      "commit_state": "Prepared",
+      "revalidation_available": false
     },
     {
       "id": "M13",
@@ -540,7 +709,12 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_pitch"
+        "description": "set_pitch",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "patch_b": {
         "operation": "set_velocity",
@@ -556,12 +730,20 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_velocity"
+        "description": "set_velocity",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "expected_outcome": "InDoubt",
       "reason": "The durable commit may have occurred but acknowledgement is unavailable; reconcile authoritative state before retry.",
       "requires_human_decision": false,
-      "requires_render_revalidation": false
+      "requires_render_revalidation": false,
+      "base_matches": true,
+      "commit_state": "AcknowledgementLost",
+      "revalidation_available": false
     },
     {
       "id": "M14",
@@ -581,7 +763,12 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "digest_mismatch",
-        "description": "set_pitch"
+        "description": "set_pitch",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "patch_b": {
         "operation": "set_velocity",
@@ -597,12 +784,20 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_velocity"
+        "description": "set_velocity",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "expected_outcome": "Unknown",
       "reason": "The retrieved bytes do not match the referenced parent identity; the merge must not trust the branch contents.",
       "requires_human_decision": false,
-      "requires_render_revalidation": false
+      "requires_render_revalidation": false,
+      "base_matches": true,
+      "commit_state": "Prepared",
+      "revalidation_available": false
     },
     {
       "id": "M15",
@@ -622,7 +817,12 @@
         "time_domain": "beat",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "set_velocity"
+        "description": "set_velocity",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "patch_b": {
         "operation": "add_non_isochronous_event",
@@ -640,12 +840,20 @@
         "time_domain": "native_rhythm_and_tuning",
         "authorization": "authorized",
         "artifact_integrity": "verified",
-        "description": "add_non_isochronous_event"
+        "description": "add_non_isochronous_event",
+        "musical_dependencies": [],
+        "intent_mode": "direct",
+        "hard_constraints_satisfied": true,
+        "unknown_dependencies": false,
+        "requires_revalidation": false
       },
       "expected_outcome": "SafeAutomaticMerge",
       "reason": "An unrelated edit must preserve source rhythmic and pitch representations without coercion to a Western beat grid or equal temperament.",
       "requires_human_decision": false,
-      "requires_render_revalidation": true
+      "requires_render_revalidation": true,
+      "base_matches": true,
+      "commit_state": "Prepared",
+      "revalidation_available": false
     }
   ]
 }
