@@ -30,11 +30,12 @@ The audit requires distinct model-RPM strata, revision identity, positive scale 
 
 Version 0.1 accepts exact frequency-bound scaling only. It does not interpolate or re-bin spectra. A band is eligible only when its model signal is above background.
 
-The model-scale and full-scale comparison must use source levels. Received levels or unlike radiated-noise quantities are not interchangeable. The synthetic fixture remains incomplete even when every reference resolves.
+The model-scale and full-scale comparison must use source levels normalized to the same 1 m reference distance. The model value must already include the applicable facility transfer-function or distance normalization; the full-scale value must already have propagation separated and be reduced to source level. Accordingly, v0.1 asserts both Eq. 16 reference distances are 1 m (so r_m/r_s = 1) and refuses raw hydrophone SPL/received-level inputs. This avoids applying a second, inconsistent range correction. Received levels or unlike radiated-noise quantities are not interchangeable. The synthetic fixture remains incomplete even when every reference resolves.
 
 ## Limitations
 
-- The executable audits a declared transfer calculation; it does not prove the physical truth of the declared evidence or authenticate certificates.
+- The executable audits a declared transfer calculation; it does not prove the physical truth of the declared evidence or authenticate certificates. Evidence digests are format-checked identifiers, not certificate-chain verification or raw-trace verification.
+- v0.1 consumes evidence digests and explicit correction declarations; it does not yet resolve the calibration/timebase registries or the shared acoustic/propulsion timebase receipt from #11641. That integration is a prerequisite before the audit is used in a real campaign.
 - The ITTC 4.2–7.1 dB full-scale prediction uncertainty reported in Revision 03 is based on questionnaire estimates, not a universal per-project acceptance tolerance. This tool does not hard-code it.
 - Cavitation-pattern similarity, Reynolds effects, wake fidelity, nuclei/gas content, facility reverberation, background subtraction and transfer-function characterization require independent engineering review and experimental evidence.
 - No CFD solver, ecological impact model, vessel certification or causal improvement claim is implemented.
