@@ -154,6 +154,10 @@ pub enum PortMatrixError {
         frequency_index: usize,
         driven_port_id: String,
     },
+    ExcitationUncertaintyCoversZero {
+        frequency_index: usize,
+        driven_port_id: String,
+    },
     InvalidUncertaintyBound {
         frequency_index: usize,
         driven_port_id: String,
@@ -304,6 +308,24 @@ pub fn validate_mimo_impedance_sweep(
                     frequency_index,
                     driven_port_id: column.driven_port_id.clone(),
                     observed_port_id: None,
+                });
+            }
+            let injected_current_magnitude = column
+                .injected_current_a
+                .real
+                .hypot(column.injected_current_a.imag);
+            if !injected_current_magnitude.is_finite() {
+                return Err(PortMatrixError::InvalidExcitation {
+                    frequency_index,
+                    driven_port_id: column.driven_port_id.clone(),
+                });
+            }
+            // A circular absolute-error disk with radius >= |I| can include
+            // zero current, making any hard-bound V/I impedance unbounded.
+            if column.absolute_error_bound_a >= injected_current_magnitude {
+                return Err(PortMatrixError::ExcitationUncertaintyCoversZero {
+                    frequency_index,
+                    driven_port_id: column.driven_port_id.clone(),
                 });
             }
 
@@ -683,6 +705,16 @@ mod tests {
             validate_mimo_impedance_sweep(&sweep),
             Err(PortMatrixError::EmptyIdentity("operating_point_digest"))
         );
+    }
+
+    #[test]
+    fn current_uncertainty_must_not_include_zero() {
+        let mut sweep = fixture();
+        sweep.frequency_slices[0].columns[0].absolute_error_bound_a = 2.0;
+        assert!(matches!(
+            validate_mimo_impedance_sweep(&sweep),
+            Err(PortMatrixError::ExcitationUncertaintyCoversZero { .. })
+        ));
     }
 
     #[test]
