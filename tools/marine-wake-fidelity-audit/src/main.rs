@@ -213,6 +213,10 @@ struct ComponentMetric {
     unweighted_bias: Option<f64>,
     unweighted_mean_absolute_error: Option<f64>,
     unweighted_rmse: Option<f64>,
+    area_weight_sum: f64,
+    unweighted_bias: Option<f64>,
+    unweighted_mean_absolute_error: Option<f64>,
+    unweighted_rmse: Option<f64>,
     definitely_outside_cells: usize,
     unresolved_cells: usize,
     within_tolerance_cells: usize,
@@ -588,6 +592,29 @@ fn empirical_quantile(sorted: &[f64], probability: f64) -> Option<f64> {
     Some(sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower as f64))
 }
 
+fn weighted_quantile(values: &[(f64, f64)], probability: f64) -> Option<f64> {
+    if values.is_empty() || !(0.0..=1.0).contains(&probability) {
+        return None;
+    }
+    let mut sorted = values.to_vec();
+    sorted.sort_by(|left, right| left.0.total_cmp(&right.0));
+    let total_weight: f64 = sorted.iter().map(|(_, weight)| *weight).sum();
+    if !finite_positive(total_weight)
+        || sorted.iter().any(|(value, weight)| !value.is_finite() || !finite_positive(*weight))
+    {
+        return None;
+    }
+    let target_weight = probability * total_weight;
+    let mut accumulated = 0.0;
+    for (value, weight) in sorted {
+        accumulated += weight;
+        if accumulated >= target_weight {
+            return Some(value);
+        }
+    }
+    None
+}
+
 fn compute_field_summary(field: &WakeField) -> FieldSummary {
     let total = field.points.len() as f64;
     let axial = field.points.iter().filter(|p| p.vx_over_vref.is_some()).count() as f64 / total;
@@ -632,7 +659,7 @@ fn summarize_component(
         let (Some(t), Some(r)) = (component(tp, index), component(rp, index)) else { continue; };
         let delta = r.value - t.value;
         let uncertainty = t.expanded_uncertainty + r.expanded_uncertainty;
-        let disposition = acc.push(delta, uncertainty, tolerance);
+        let disposition = acc.push(delta, uncertainty, tolerance, tp.area_weight);
         let lower = (delta.abs() - uncertainty).max(0.0);
         let upper = delta.abs() + uncertainty;
         comparisons.push(CellComparison {
@@ -651,16 +678,20 @@ fn summarize_component(
     let n = acc.residuals.len();
     let mut absolute = acc.residuals.iter().map(|x| x.abs()).collect::<Vec<_>>();
     absolute.sort_by(f64::total_cmp);
-    let rmse = if n == 0 { None } else { Some((acc.residuals.iter().map(|x| x*x).sum::<f64>() / n as f64).sqrt()) };
+    let unweighted_rmse = if n == 0 { None } else { Some((acc.residuals.iter().map(|x| x*x).sum::<f64>() / n as f64).sqrt()) };
     let metric = ComponentMetric {
         component: component_name(index),
         point_count: n,
-        bias: if n == 0 { None } else { Some(acc.bias_sum / n as f64) },
-        mean_absolute_error: if n == 0 { None } else { Some(absolute.iter().sum::<f64>() / n as f64) },
-        rmse,
-        p95_absolute_error: empirical_quantile(&absolute, 0.95),
+        bias: if acc.weight_sum > 0.0 { Some(acc.weighted_residual_sum / acc.weight_sum) } else { None },
+        mean_absolute_error: if acc.weight_sum > 0.0 { Some(acc.weighted_absolute_sum / acc.weight_sum) } else { None },
+        rmse: if acc.weight_sum > 0.0 { Some((acc.weighted_square_sum / acc.weight_sum).sqrt()) } else { None },
+        p95_absolute_error: weighted_quantile(&acc.weighted_values, 0.95),
         maximum_absolute_error: absolute.last().copied(),
         tolerance,
+        area_weight_sum: acc.weight_sum,
+        unweighted_bias: if n == 0 { None } else { Some(acc.bias_sum / n as f64) },
+        unweighted_mean_absolute_error: if n == 0 { None } else { Some(absolute.iter().sum::<f64>() / n as f64) },
+        unweighted_rmse,
         definitely_outside_cells: acc.outside,
         unresolved_cells: acc.unresolved,
         within_tolerance_cells: acc.within,
