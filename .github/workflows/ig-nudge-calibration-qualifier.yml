@@ -1,0 +1,37 @@
+name: IG Nudge Calibration Qualifier
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "research/ig-nudge-calibration-001/**"
+      - ".github/workflows/ig-nudge-calibration-qualifier.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/ig-nudge-calibration-001/**"
+      - ".github/workflows/ig-nudge-calibration-qualifier.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        name: Checkout exact revision
+      - uses: dtolnay/rust-toolchain@stable
+        name: Install stable Rust
+      - name: Run qualifier tests
+        run: cargo test --manifest-path research/ig-nudge-calibration-001/qualifier/Cargo.toml
+      - name: Validate protocol and cue fixtures
+        run: |
+          cargo run --manifest-path research/ig-nudge-calibration-001/qualifier/Cargo.toml -- \
+            research/ig-nudge-calibration-001/IG_NUDGE_CALIBRATION_PROTOCOL_V0_1.json \
+            research/ig-nudge-calibration-001/IG_NUDGE_CALIBRATION_PROTOCOL_V0_1.schema.json \
+            research/ig-nudge-calibration-001/IG_NUDGE_CALIBRATION_FIXTURES_V0_1.json \
+            research/ig-nudge-calibration-001/IG_NUDGE_CALIBRATION_FIXTURES_V0_1.schema.json

@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ig-nudge-calibration-protocol-v0.1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "protocol_id",
+    "version",
+    "status",
+    "title",
+    "research_question",
+    "composition",
+    "external_comparator",
+    "cue_families",
+    "task_contract",
+    "metric_ids",
+    "implemented_metric_ids",
+    "deferred_metric_ids",
+    "qualification_gates",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "protocol_id": {
+      "const": "IG-NUDGE-CALIBRATION-001"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "const": "synthetic_protocol_proposal"
+    },
+    "title": {
+      "type": "string"
+    },
+    "research_question": {
+      "type": "string"
+    },
+    "composition": {
+      "type": "object",
+      "minProperties": 7
+    },
+    "external_comparator": {
+      "type": "object"
+    },
+    "cue_families": {
+      "type": "array",
+      "minItems": 7,
+      "uniqueItems": true
+    },
+    "task_contract": {
+      "type": "object"
+    },
+    "metric_ids": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true
+    },
+    "implemented_metric_ids": {
+      "type": "array",
+      "minItems": 3,
+      "uniqueItems": true
+    },
+    "deferred_metric_ids": {
+      "type": "array",
+      "minItems": 5,
+      "uniqueItems": true
+    },
+    "qualification_gates": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true
+    },
+    "claim_ceiling": {
+      "type": "object"
+    }
+  }
+}

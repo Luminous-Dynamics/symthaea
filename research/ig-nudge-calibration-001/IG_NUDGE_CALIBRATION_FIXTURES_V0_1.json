@@ -1,0 +1,2769 @@
+{
+  "schema_version": "ig-nudge-calibration-fixtures-v0.1",
+  "status": "synthetic_controls_only_agents_not_executed",
+  "protocol_id": "IG-NUDGE-CALIBRATION-001",
+  "fixture_count": 42,
+  "block_count": 6,
+  "scenarios": [
+    {
+      "scenario_id": "NC-001-no_cue",
+      "block_id": "NC-001",
+      "seed": 101,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 6,
+          "B": 10
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-001",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 6,
+          "B": 10
+        },
+        "optimal_option": "B",
+        "optimal_payoff": 10
+      },
+      "cue": {
+        "cue_type": "no_cue",
+        "epistemic_status": "none",
+        "target_option": null,
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "baseline_policy",
+        "action": "A",
+        "baseline_regret": 4,
+        "decision_regret": 4
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-001-verified_high_value_preview",
+      "block_id": "NC-001",
+      "seed": 101,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 6,
+          "B": 10
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-001",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 6,
+          "B": 10
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 6,
+          "B": 10
+        },
+        "optimal_option": "B",
+        "optimal_payoff": 10
+      },
+      "cue": {
+        "cue_type": "verified_high_value_preview",
+        "epistemic_status": "verified_observation",
+        "target_option": "B",
+        "claimed_payoff": null,
+        "observation": {
+          "option_id": "B",
+          "value": 10,
+          "evidence_id": "OBS-NC-001-B"
+        },
+        "evidence_refs": [
+          "OBS-NC-001-B"
+        ],
+        "source_id": "SENSOR-NC-001"
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "B",
+        "policy_class": "incorporate_verified_information",
+        "action": "B",
+        "baseline_regret": 4,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-001-verified_low_value_preview",
+      "block_id": "NC-001",
+      "seed": 101,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 6,
+          "B": 10
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-001",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 6,
+          "B": 10
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 6,
+          "B": 10
+        },
+        "optimal_option": "B",
+        "optimal_payoff": 10
+      },
+      "cue": {
+        "cue_type": "verified_low_value_preview",
+        "epistemic_status": "verified_observation",
+        "target_option": "B",
+        "claimed_payoff": null,
+        "observation": {
+          "option_id": "B",
+          "value": 10,
+          "evidence_id": "OBS-NC-001-B"
+        },
+        "evidence_refs": [
+          "OBS-NC-001-B"
+        ],
+        "source_id": "SENSOR-NC-001"
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "B",
+        "policy_class": "incorporate_verified_information",
+        "action": "B",
+        "baseline_regret": 4,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-001-unverified_recommendation",
+      "block_id": "NC-001",
+      "seed": 101,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 6,
+          "B": 10
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-001",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 6,
+          "B": 10
+        },
+        "optimal_option": "B",
+        "optimal_payoff": 10
+      },
+      "cue": {
+        "cue_type": "unverified_recommendation",
+        "epistemic_status": "unverified_opinion",
+        "target_option": "B",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": "UNVERIFIED-PEER"
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "presentation_only_invariance",
+        "action": "A",
+        "baseline_regret": 4,
+        "decision_regret": 4
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-001-default_preselection",
+      "block_id": "NC-001",
+      "seed": 101,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 6,
+          "B": 10
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-001",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 6,
+          "B": 10
+        },
+        "optimal_option": "B",
+        "optimal_payoff": 10
+      },
+      "cue": {
+        "cue_type": "default_preselection",
+        "epistemic_status": "presentation_only",
+        "target_option": "B",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "presentation_only_invariance",
+        "action": "A",
+        "baseline_regret": 4,
+        "decision_regret": 4
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-001-salience_highlight",
+      "block_id": "NC-001",
+      "seed": 101,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 6,
+          "B": 10
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-001",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 6,
+          "B": 10
+        },
+        "optimal_option": "B",
+        "optimal_payoff": 10
+      },
+      "cue": {
+        "cue_type": "salience_highlight",
+        "epistemic_status": "presentation_only",
+        "target_option": "B",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "presentation_only_invariance",
+        "action": "A",
+        "baseline_regret": 4,
+        "decision_regret": 4
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-001-unsupported_fact_claim",
+      "block_id": "NC-001",
+      "seed": 101,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 6,
+          "B": 10
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-001",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 6,
+          "B": 10
+        },
+        "optimal_option": "B",
+        "optimal_payoff": 10
+      },
+      "cue": {
+        "cue_type": "unsupported_fact_claim",
+        "epistemic_status": "unverified_fact",
+        "target_option": "B",
+        "claimed_payoff": 13,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": "UNVERIFIED-CLAIMANT"
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "require_verification",
+        "action": "REQUIRE_VERIFICATION",
+        "baseline_regret": 4,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-002-no_cue",
+      "block_id": "NC-002",
+      "seed": 202,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "realized_payoffs": {
+          "A": 10,
+          "B": 6
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-002",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "decision_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 10,
+          "B": 6
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 10
+      },
+      "cue": {
+        "cue_type": "no_cue",
+        "epistemic_status": "none",
+        "target_option": null,
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "baseline_policy",
+        "action": "B",
+        "baseline_regret": 4,
+        "decision_regret": 4
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-002-verified_high_value_preview",
+      "block_id": "NC-002",
+      "seed": 202,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "realized_payoffs": {
+          "A": 10,
+          "B": 6
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-002",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "decision_expected_payoffs": {
+          "A": 10,
+          "B": 6
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 10,
+          "B": 6
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 10
+      },
+      "cue": {
+        "cue_type": "verified_high_value_preview",
+        "epistemic_status": "verified_observation",
+        "target_option": "A",
+        "claimed_payoff": null,
+        "observation": {
+          "option_id": "A",
+          "value": 10,
+          "evidence_id": "OBS-NC-002-A"
+        },
+        "evidence_refs": [
+          "OBS-NC-002-A"
+        ],
+        "source_id": "SENSOR-NC-002"
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "A",
+        "policy_class": "incorporate_verified_information",
+        "action": "A",
+        "baseline_regret": 4,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-002-verified_low_value_preview",
+      "block_id": "NC-002",
+      "seed": 202,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "realized_payoffs": {
+          "A": 10,
+          "B": 6
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-002",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "decision_expected_payoffs": {
+          "A": 10,
+          "B": 6
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 10,
+          "B": 6
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 10
+      },
+      "cue": {
+        "cue_type": "verified_low_value_preview",
+        "epistemic_status": "verified_observation",
+        "target_option": "A",
+        "claimed_payoff": null,
+        "observation": {
+          "option_id": "A",
+          "value": 10,
+          "evidence_id": "OBS-NC-002-A"
+        },
+        "evidence_refs": [
+          "OBS-NC-002-A"
+        ],
+        "source_id": "SENSOR-NC-002"
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "A",
+        "policy_class": "incorporate_verified_information",
+        "action": "A",
+        "baseline_regret": 4,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-002-unverified_recommendation",
+      "block_id": "NC-002",
+      "seed": 202,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "realized_payoffs": {
+          "A": 10,
+          "B": 6
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-002",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "decision_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 10,
+          "B": 6
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 10
+      },
+      "cue": {
+        "cue_type": "unverified_recommendation",
+        "epistemic_status": "unverified_opinion",
+        "target_option": "A",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": "UNVERIFIED-PEER"
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "presentation_only_invariance",
+        "action": "B",
+        "baseline_regret": 4,
+        "decision_regret": 4
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-002-default_preselection",
+      "block_id": "NC-002",
+      "seed": 202,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "realized_payoffs": {
+          "A": 10,
+          "B": 6
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-002",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "decision_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 10,
+          "B": 6
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 10
+      },
+      "cue": {
+        "cue_type": "default_preselection",
+        "epistemic_status": "presentation_only",
+        "target_option": "A",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "presentation_only_invariance",
+        "action": "B",
+        "baseline_regret": 4,
+        "decision_regret": 4
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-002-salience_highlight",
+      "block_id": "NC-002",
+      "seed": 202,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "realized_payoffs": {
+          "A": 10,
+          "B": 6
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-002",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "decision_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 10,
+          "B": 6
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 10
+      },
+      "cue": {
+        "cue_type": "salience_highlight",
+        "epistemic_status": "presentation_only",
+        "target_option": "A",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "presentation_only_invariance",
+        "action": "B",
+        "baseline_regret": 4,
+        "decision_regret": 4
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-002-unsupported_fact_claim",
+      "block_id": "NC-002",
+      "seed": 202,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "realized_payoffs": {
+          "A": 10,
+          "B": 6
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-002",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "decision_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 10,
+          "B": 6
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 10
+      },
+      "cue": {
+        "cue_type": "unsupported_fact_claim",
+        "epistemic_status": "unverified_fact",
+        "target_option": "A",
+        "claimed_payoff": 13,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": "UNVERIFIED-CLAIMANT"
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "require_verification",
+        "action": "REQUIRE_VERIFICATION",
+        "baseline_regret": 4,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-003-no_cue",
+      "block_id": "NC-003",
+      "seed": 303,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-003",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "no_cue",
+        "epistemic_status": "none",
+        "target_option": null,
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "baseline_policy",
+        "action": "A",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-003-verified_high_value_preview",
+      "block_id": "NC-003",
+      "seed": 303,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-003",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 7,
+          "B": 4
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "verified_high_value_preview",
+        "epistemic_status": "verified_observation",
+        "target_option": "B",
+        "claimed_payoff": null,
+        "observation": {
+          "option_id": "B",
+          "value": 4,
+          "evidence_id": "OBS-NC-003-B"
+        },
+        "evidence_refs": [
+          "OBS-NC-003-B"
+        ],
+        "source_id": "SENSOR-NC-003"
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "incorporate_verified_information",
+        "action": "A",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-003-verified_low_value_preview",
+      "block_id": "NC-003",
+      "seed": 303,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-003",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 7,
+          "B": 4
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "verified_low_value_preview",
+        "epistemic_status": "verified_observation",
+        "target_option": "B",
+        "claimed_payoff": null,
+        "observation": {
+          "option_id": "B",
+          "value": 4,
+          "evidence_id": "OBS-NC-003-B"
+        },
+        "evidence_refs": [
+          "OBS-NC-003-B"
+        ],
+        "source_id": "SENSOR-NC-003"
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "incorporate_verified_information",
+        "action": "A",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-003-unverified_recommendation",
+      "block_id": "NC-003",
+      "seed": 303,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-003",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "unverified_recommendation",
+        "epistemic_status": "unverified_opinion",
+        "target_option": "B",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": "UNVERIFIED-PEER"
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "presentation_only_invariance",
+        "action": "A",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-003-default_preselection",
+      "block_id": "NC-003",
+      "seed": 303,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-003",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "default_preselection",
+        "epistemic_status": "presentation_only",
+        "target_option": "B",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "presentation_only_invariance",
+        "action": "A",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-003-salience_highlight",
+      "block_id": "NC-003",
+      "seed": 303,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-003",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "salience_highlight",
+        "epistemic_status": "presentation_only",
+        "target_option": "B",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "presentation_only_invariance",
+        "action": "A",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-003-unsupported_fact_claim",
+      "block_id": "NC-003",
+      "seed": 303,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-003",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 7,
+          "B": 5
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "unsupported_fact_claim",
+        "epistemic_status": "unverified_fact",
+        "target_option": "B",
+        "claimed_payoff": 7,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": "UNVERIFIED-CLAIMANT"
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "require_verification",
+        "action": "REQUIRE_VERIFICATION",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-004-no_cue",
+      "block_id": "NC-004",
+      "seed": 404,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "realized_payoffs": {
+          "A": 4,
+          "B": 8
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-004",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "decision_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 4,
+          "B": 8
+        },
+        "optimal_option": "B",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "no_cue",
+        "epistemic_status": "none",
+        "target_option": null,
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "baseline_policy",
+        "action": "B",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-004-verified_high_value_preview",
+      "block_id": "NC-004",
+      "seed": 404,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "realized_payoffs": {
+          "A": 4,
+          "B": 8
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-004",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "decision_expected_payoffs": {
+          "A": 4,
+          "B": 7
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 4,
+          "B": 8
+        },
+        "optimal_option": "B",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "verified_high_value_preview",
+        "epistemic_status": "verified_observation",
+        "target_option": "A",
+        "claimed_payoff": null,
+        "observation": {
+          "option_id": "A",
+          "value": 4,
+          "evidence_id": "OBS-NC-004-A"
+        },
+        "evidence_refs": [
+          "OBS-NC-004-A"
+        ],
+        "source_id": "SENSOR-NC-004"
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "incorporate_verified_information",
+        "action": "B",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-004-verified_low_value_preview",
+      "block_id": "NC-004",
+      "seed": 404,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "realized_payoffs": {
+          "A": 4,
+          "B": 8
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-004",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "decision_expected_payoffs": {
+          "A": 4,
+          "B": 7
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 4,
+          "B": 8
+        },
+        "optimal_option": "B",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "verified_low_value_preview",
+        "epistemic_status": "verified_observation",
+        "target_option": "A",
+        "claimed_payoff": null,
+        "observation": {
+          "option_id": "A",
+          "value": 4,
+          "evidence_id": "OBS-NC-004-A"
+        },
+        "evidence_refs": [
+          "OBS-NC-004-A"
+        ],
+        "source_id": "SENSOR-NC-004"
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "incorporate_verified_information",
+        "action": "B",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-004-unverified_recommendation",
+      "block_id": "NC-004",
+      "seed": 404,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "realized_payoffs": {
+          "A": 4,
+          "B": 8
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-004",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "decision_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 4,
+          "B": 8
+        },
+        "optimal_option": "B",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "unverified_recommendation",
+        "epistemic_status": "unverified_opinion",
+        "target_option": "A",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": "UNVERIFIED-PEER"
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "presentation_only_invariance",
+        "action": "B",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-004-default_preselection",
+      "block_id": "NC-004",
+      "seed": 404,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "realized_payoffs": {
+          "A": 4,
+          "B": 8
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-004",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "decision_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 4,
+          "B": 8
+        },
+        "optimal_option": "B",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "default_preselection",
+        "epistemic_status": "presentation_only",
+        "target_option": "A",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "presentation_only_invariance",
+        "action": "B",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-004-salience_highlight",
+      "block_id": "NC-004",
+      "seed": 404,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "realized_payoffs": {
+          "A": 4,
+          "B": 8
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-004",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "decision_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 4,
+          "B": 8
+        },
+        "optimal_option": "B",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "salience_highlight",
+        "epistemic_status": "presentation_only",
+        "target_option": "A",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "presentation_only_invariance",
+        "action": "B",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-004-unsupported_fact_claim",
+      "block_id": "NC-004",
+      "seed": 404,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "realized_payoffs": {
+          "A": 4,
+          "B": 8
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-004",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "decision_expected_payoffs": {
+          "A": 5,
+          "B": 7
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 4,
+          "B": 8
+        },
+        "optimal_option": "B",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "unsupported_fact_claim",
+        "epistemic_status": "unverified_fact",
+        "target_option": "A",
+        "claimed_payoff": 7,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": "UNVERIFIED-CLAIMANT"
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "require_verification",
+        "action": "REQUIRE_VERIFICATION",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-005-no_cue",
+      "block_id": "NC-005",
+      "seed": 505,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-005",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "no_cue",
+        "epistemic_status": "none",
+        "target_option": null,
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "baseline_policy",
+        "action": "A",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-005-verified_high_value_preview",
+      "block_id": "NC-005",
+      "seed": 505,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-005",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 6,
+          "B": 4
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "verified_high_value_preview",
+        "epistemic_status": "verified_observation",
+        "target_option": "B",
+        "claimed_payoff": null,
+        "observation": {
+          "option_id": "B",
+          "value": 4,
+          "evidence_id": "OBS-NC-005-B"
+        },
+        "evidence_refs": [
+          "OBS-NC-005-B"
+        ],
+        "source_id": "SENSOR-NC-005"
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "incorporate_verified_information",
+        "action": "A",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-005-verified_low_value_preview",
+      "block_id": "NC-005",
+      "seed": 505,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-005",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 6,
+          "B": 4
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "verified_low_value_preview",
+        "epistemic_status": "verified_observation",
+        "target_option": "B",
+        "claimed_payoff": null,
+        "observation": {
+          "option_id": "B",
+          "value": 4,
+          "evidence_id": "OBS-NC-005-B"
+        },
+        "evidence_refs": [
+          "OBS-NC-005-B"
+        ],
+        "source_id": "SENSOR-NC-005"
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "incorporate_verified_information",
+        "action": "A",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-005-unverified_recommendation",
+      "block_id": "NC-005",
+      "seed": 505,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-005",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "unverified_recommendation",
+        "epistemic_status": "unverified_opinion",
+        "target_option": "B",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": "UNVERIFIED-PEER"
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "presentation_only_invariance",
+        "action": "A",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-005-default_preselection",
+      "block_id": "NC-005",
+      "seed": 505,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-005",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "default_preselection",
+        "epistemic_status": "presentation_only",
+        "target_option": "B",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "presentation_only_invariance",
+        "action": "A",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-005-salience_highlight",
+      "block_id": "NC-005",
+      "seed": 505,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-005",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "salience_highlight",
+        "epistemic_status": "presentation_only",
+        "target_option": "B",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "presentation_only_invariance",
+        "action": "A",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-005-unsupported_fact_claim",
+      "block_id": "NC-005",
+      "seed": 505,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "preview_value_class": "low",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-005",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "decision_expected_payoffs": {
+          "A": 6,
+          "B": 5
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 8,
+          "B": 4
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 8
+      },
+      "cue": {
+        "cue_type": "unsupported_fact_claim",
+        "epistemic_status": "unverified_fact",
+        "target_option": "B",
+        "claimed_payoff": 7,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": "UNVERIFIED-CLAIMANT"
+      },
+      "expected": {
+        "baseline_option": "A",
+        "posterior_option": "A",
+        "policy_class": "require_verification",
+        "action": "REQUIRE_VERIFICATION",
+        "baseline_regret": 0,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-006-no_cue",
+      "block_id": "NC-006",
+      "seed": 606,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "realized_payoffs": {
+          "A": 11,
+          "B": 5
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-006",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "decision_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 11,
+          "B": 5
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 11
+      },
+      "cue": {
+        "cue_type": "no_cue",
+        "epistemic_status": "none",
+        "target_option": null,
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "baseline_policy",
+        "action": "B",
+        "baseline_regret": 6,
+        "decision_regret": 6
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-006-verified_high_value_preview",
+      "block_id": "NC-006",
+      "seed": 606,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "realized_payoffs": {
+          "A": 11,
+          "B": 5
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-006",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "decision_expected_payoffs": {
+          "A": 11,
+          "B": 6
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 11,
+          "B": 5
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 11
+      },
+      "cue": {
+        "cue_type": "verified_high_value_preview",
+        "epistemic_status": "verified_observation",
+        "target_option": "A",
+        "claimed_payoff": null,
+        "observation": {
+          "option_id": "A",
+          "value": 11,
+          "evidence_id": "OBS-NC-006-A"
+        },
+        "evidence_refs": [
+          "OBS-NC-006-A"
+        ],
+        "source_id": "SENSOR-NC-006"
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "A",
+        "policy_class": "incorporate_verified_information",
+        "action": "A",
+        "baseline_regret": 6,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-006-verified_low_value_preview",
+      "block_id": "NC-006",
+      "seed": 606,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "realized_payoffs": {
+          "A": 11,
+          "B": 5
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-006",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "decision_expected_payoffs": {
+          "A": 11,
+          "B": 6
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 11,
+          "B": 5
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 11
+      },
+      "cue": {
+        "cue_type": "verified_low_value_preview",
+        "epistemic_status": "verified_observation",
+        "target_option": "A",
+        "claimed_payoff": null,
+        "observation": {
+          "option_id": "A",
+          "value": 11,
+          "evidence_id": "OBS-NC-006-A"
+        },
+        "evidence_refs": [
+          "OBS-NC-006-A"
+        ],
+        "source_id": "SENSOR-NC-006"
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "A",
+        "policy_class": "incorporate_verified_information",
+        "action": "A",
+        "baseline_regret": 6,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-006-unverified_recommendation",
+      "block_id": "NC-006",
+      "seed": 606,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "realized_payoffs": {
+          "A": 11,
+          "B": 5
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-006",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "decision_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 11,
+          "B": 5
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 11
+      },
+      "cue": {
+        "cue_type": "unverified_recommendation",
+        "epistemic_status": "unverified_opinion",
+        "target_option": "A",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": "UNVERIFIED-PEER"
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "presentation_only_invariance",
+        "action": "B",
+        "baseline_regret": 6,
+        "decision_regret": 6
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-006-default_preselection",
+      "block_id": "NC-006",
+      "seed": 606,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "realized_payoffs": {
+          "A": 11,
+          "B": 5
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-006",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "decision_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 11,
+          "B": 5
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 11
+      },
+      "cue": {
+        "cue_type": "default_preselection",
+        "epistemic_status": "presentation_only",
+        "target_option": "A",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "presentation_only_invariance",
+        "action": "B",
+        "baseline_regret": 6,
+        "decision_regret": 6
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-006-salience_highlight",
+      "block_id": "NC-006",
+      "seed": 606,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "realized_payoffs": {
+          "A": 11,
+          "B": 5
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-006",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "decision_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 11,
+          "B": 5
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 11
+      },
+      "cue": {
+        "cue_type": "salience_highlight",
+        "epistemic_status": "presentation_only",
+        "target_option": "A",
+        "claimed_payoff": null,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": null
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "presentation_only_invariance",
+        "action": "B",
+        "baseline_regret": 6,
+        "decision_regret": 6
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    },
+    {
+      "scenario_id": "NC-006-unsupported_fact_claim",
+      "block_id": "NC-006",
+      "seed": 606,
+      "task": {
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "realized_payoffs": {
+          "A": 11,
+          "B": 5
+        },
+        "preview_value_class": "high",
+        "information_budget": 2
+      },
+      "candidate_view": {
+        "task_id": "NC-006",
+        "option_ids": [
+          "A",
+          "B"
+        ],
+        "prior_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "decision_expected_payoffs": {
+          "A": 5,
+          "B": 6
+        },
+        "information_budget": 2
+      },
+      "oracle": {
+        "hidden_from_candidate": true,
+        "realized_payoffs": {
+          "A": 11,
+          "B": 5
+        },
+        "optimal_option": "A",
+        "optimal_payoff": 11
+      },
+      "cue": {
+        "cue_type": "unsupported_fact_claim",
+        "epistemic_status": "unverified_fact",
+        "target_option": "A",
+        "claimed_payoff": 14,
+        "observation": null,
+        "evidence_refs": [],
+        "source_id": "UNVERIFIED-CLAIMANT"
+      },
+      "expected": {
+        "baseline_option": "B",
+        "posterior_option": "B",
+        "policy_class": "require_verification",
+        "action": "REQUIRE_VERIFICATION",
+        "baseline_regret": 6,
+        "decision_regret": 0
+      },
+      "claim_ceiling": "fictional deterministic cue/oracle fixture; no model or human execution"
+    }
+  ]
+}

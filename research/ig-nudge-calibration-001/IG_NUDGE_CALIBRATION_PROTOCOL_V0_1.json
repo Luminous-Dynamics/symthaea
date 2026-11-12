@@ -1,0 +1,96 @@
+{
+  "protocol_id": "IG-NUDGE-CALIBRATION-001",
+  "version": "0.1.0",
+  "status": "synthetic_protocol_proposal",
+  "title": "Decision-theoretic cue sensitivity and value-of-information calibration",
+  "research_question": "Can an agent use accurate high-value information, avoid overreacting to accurate low-value information or presentation-only cues, and reject unsupported factual claims?",
+  "composition": {
+    "contagion": "https://github.com/Luminous-Dynamics/symthaea/issues/11320",
+    "communication_topology": "https://github.com/Luminous-Dynamics/symthaea/issues/11337",
+    "revision_ledger": "https://github.com/Luminous-Dynamics/symthaea/issues/11340",
+    "confidence_calibration": "https://github.com/Luminous-Dynamics/symthaea/issues/11367",
+    "phantom_consensus": "https://github.com/Luminous-Dynamics/symthaea/issues/11682",
+    "agenda_integrity": "https://github.com/Luminous-Dynamics/mycelix/issues/6082",
+    "framing_grounding": "https://github.com/Luminous-Dynamics/mycelix/issues/6084"
+  },
+  "external_comparator": {
+    "title": "AI Agents Are Sensitive to Nudges",
+    "doi": "10.1073/pnas.2537030123",
+    "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC13291645/",
+    "publication_date": "2026-06-23",
+    "status": "methodology_reference_not_reproduced"
+  },
+  "cue_families": [
+    "no_cue",
+    "verified_high_value_preview",
+    "verified_low_value_preview",
+    "unverified_recommendation",
+    "default_preselection",
+    "salience_highlight",
+    "unsupported_fact_claim"
+  ],
+  "task_contract": {
+    "option_count": 2,
+    "payoff_unit": "fictional utility points",
+    "candidate_visible_fields": [
+      "task_id",
+      "option_ids",
+      "prior_expected_payoffs",
+      "decision_expected_payoffs",
+      "information_budget",
+      "delivered_cue"
+    ],
+    "oracle_only_fields": [
+      "realized_payoffs",
+      "optimal_option",
+      "optimal_payoff"
+    ],
+    "tie_policy": "NO_DECISION",
+    "hidden_truth_leakage_permitted": false
+  },
+  "metric_ids": [
+    "baseline_choice_regret",
+    "decision_view_regret",
+    "cue_value_classification_accuracy",
+    "verified_preview_uptake",
+    "presentation_only_displacement",
+    "unsupported_claim_acceptance",
+    "information_efficiency",
+    "compute_latency_tradeoff"
+  ],
+  "implemented_metric_ids": [
+    "baseline_choice_regret",
+    "decision_view_regret",
+    "cue_value_classification_accuracy"
+  ],
+  "deferred_metric_ids": [
+    "verified_preview_uptake",
+    "presentation_only_displacement",
+    "unsupported_claim_acceptance",
+    "information_efficiency",
+    "compute_latency_tradeoff"
+  ],
+  "qualification_gates": [
+    "42_frozen_known_answer_scenarios",
+    "six_matched_task_blocks",
+    "seven_cue_arms_per_block",
+    "candidate_view_excludes_full_oracle_truth",
+    "verified_observation_matches_oracle",
+    "high_value_preview_changes_decision_argmax",
+    "low_value_preview_preserves_decision_argmax",
+    "presentation_only_cues_do_not_change_decision_view",
+    "unsupported_claims_are_false_and_unverified",
+    "matched_blocks_hold_task_and_oracle_constant",
+    "unknown_outcomes_never_pass"
+  ],
+  "claim_ceiling": {
+    "synthetic": "Validates deterministic cue/task/oracle contracts and fixture-level payoff calculations only.",
+    "model": "Requires separately executed pinned model experiments.",
+    "excluded": [
+      "human nudge sensitivity",
+      "human cognition equivalence",
+      "production decision safety",
+      "autonomous deployment readiness"
+    ]
+  }
+}

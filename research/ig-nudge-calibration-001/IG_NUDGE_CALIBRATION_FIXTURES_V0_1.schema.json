@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ig-nudge-calibration-fixtures-v0.1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "protocol_id",
+    "fixture_count",
+    "block_count",
+    "scenarios"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ig-nudge-calibration-fixtures-v0.1"
+    },
+    "status": {
+      "const": "synthetic_controls_only_agents_not_executed"
+    },
+    "protocol_id": {
+      "const": "IG-NUDGE-CALIBRATION-001"
+    },
+    "fixture_count": {
+      "const": 42
+    },
+    "block_count": {
+      "const": 6
+    },
+    "scenarios": {
+      "type": "array",
+      "minItems": 42,
+      "maxItems": 42,
+      "items": {
+        "type": "object"
+      }
+    }
+  }
+}
