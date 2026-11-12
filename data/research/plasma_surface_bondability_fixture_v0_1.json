@@ -27,8 +27,7 @@
         "unit": "fraction_of_untreated_control",
         "minimum": 0.95
       }
-    ],
-    "test_method_source_note": "The 2026 literature comparator used ISO 4587:2003. Synthetic test values do not reproduce the study."
+    ]
   },
   "energy_boundary": {
     "energy_boundary_contract_id": "SYNTHETIC_GRID_TO_ACCEPTED_BONDED_AREA_V1",
