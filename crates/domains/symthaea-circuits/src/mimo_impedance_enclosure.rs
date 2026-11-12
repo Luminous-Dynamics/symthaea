@@ -359,8 +359,7 @@ fn build_matrix_enclosure(
         sweep_digest: sweep.sweep_digest.clone(),
         evidence_class: nominal.evidence_class,
         hard_bound_method_reference: method_reference.to_string(),
-        dependence_assumption:
-            UncertaintyDependenceAssumption::IndependentDiscsOuterEnclosure,
+        dependence_assumption: UncertaintyDependenceAssumption::IndependentDiscsOuterEnclosure,
         algorithm_version: ENCLOSURE_ALGORITHM_VERSION.to_string(),
     })
 }
