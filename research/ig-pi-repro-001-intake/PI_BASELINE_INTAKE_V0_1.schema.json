@@ -1,0 +1,469 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/ig-pi-repro-intake-v0.1.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "intake_id",
+    "version",
+    "status",
+    "captured_at",
+    "upstream",
+    "reported_protocol",
+    "seed_audit",
+    "scorer_audit",
+    "validation_audit",
+    "dataset_audit",
+    "custody",
+    "disposition"
+  ],
+  "properties": {
+    "intake_id": {
+      "const": "IG-PLURALISTIC-IGNORANCE-REPRO-001"
+    },
+    "version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "const": "metadata_only_blocked"
+    },
+    "captured_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit",
+        "paper",
+        "repository_metadata",
+        "artifacts"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "format": "uri"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "paper": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "title",
+            "arxiv_id",
+            "url",
+            "first_submitted",
+            "reported_venue",
+            "paper_license",
+            "paper_license_scope"
+          ],
+          "properties": {
+            "title": {
+              "type": "string"
+            },
+            "arxiv_id": {
+              "const": "2608.02758"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "first_submitted": {
+              "type": "string",
+              "format": "date"
+            },
+            "reported_venue": {
+              "type": "string"
+            },
+            "paper_license": {
+              "type": "string"
+            },
+            "paper_license_scope": {
+              "type": "string"
+            }
+          }
+        },
+        "repository_metadata": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "readme_license_claim",
+            "root_license_file_present",
+            "repository_api_detected_license",
+            "code_reuse_status"
+          ],
+          "properties": {
+            "readme_license_claim": {
+              "type": "string"
+            },
+            "root_license_file_present": {
+              "type": "boolean"
+            },
+            "repository_api_detected_license": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "code_reuse_status": {
+              "enum": [
+                "blocked_unresolved",
+                "admitted"
+              ]
+            }
+          }
+        },
+        "artifacts": {
+          "type": "array",
+          "minItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "blob_sha",
+              "bytes",
+              "role"
+            ],
+            "properties": {
+              "path": {
+                "type": "string"
+              },
+              "blob_sha": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "bytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "role": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "reported_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_count",
+        "domain_count",
+        "authority_level_count",
+        "generation_method",
+        "population_size",
+        "assigned_private_dissenters",
+        "assigned_private_supporters",
+        "baseline_discussion_rounds",
+        "baseline_speakers_per_round",
+        "post_intervention_discussion_rounds",
+        "post_intervention_speakers_per_round",
+        "model_count",
+        "reported_run_count",
+        "private_state_semantics"
+      ],
+      "properties": {
+        "scenario_count": {
+          "type": "integer"
+        },
+        "domain_count": {
+          "type": "integer"
+        },
+        "authority_level_count": {
+          "type": "integer"
+        },
+        "generation_method": {
+          "type": "string"
+        },
+        "population_size": {
+          "type": "integer"
+        },
+        "assigned_private_dissenters": {
+          "type": "integer"
+        },
+        "assigned_private_supporters": {
+          "type": "integer"
+        },
+        "baseline_discussion_rounds": {
+          "type": "integer"
+        },
+        "baseline_speakers_per_round": {
+          "type": "integer"
+        },
+        "post_intervention_discussion_rounds": {
+          "type": "integer"
+        },
+        "post_intervention_speakers_per_round": {
+          "type": "integer"
+        },
+        "model_count": {
+          "type": "integer"
+        },
+        "reported_run_count": {
+          "type": "integer"
+        },
+        "private_state_semantics": {
+          "type": "string"
+        }
+      }
+    },
+    "seed_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_expression",
+        "python_builtin_string_hash_used",
+        "python_string_hash_process_salted",
+        "explicit_pythonhashseed_documented",
+        "deterministic_speaker_order_across_fresh_processes_guaranteed",
+        "qualification_status"
+      ],
+      "properties": {
+        "source_expression": {
+          "type": "string"
+        },
+        "python_builtin_string_hash_used": {
+          "type": "boolean"
+        },
+        "python_string_hash_process_salted": {
+          "type": "boolean"
+        },
+        "explicit_pythonhashseed_documented": {
+          "type": "boolean"
+        },
+        "deterministic_speaker_order_across_fresh_processes_guaranteed": {
+          "type": "boolean"
+        },
+        "qualification_status": {
+          "type": "string"
+        }
+      }
+    },
+    "scorer_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "implementation",
+        "unmatched_text_score",
+        "conformity_threshold",
+        "neutral_or_unmatched_counted_as_conformity",
+        "error_or_missing_response_can_become_unmatched_neutral",
+        "required_dispositions",
+        "qualification_status"
+      ],
+      "properties": {
+        "implementation": {
+          "type": "string"
+        },
+        "unmatched_text_score": {
+          "type": "number"
+        },
+        "conformity_threshold": {
+          "type": "number"
+        },
+        "neutral_or_unmatched_counted_as_conformity": {
+          "type": "boolean"
+        },
+        "error_or_missing_response_can_become_unmatched_neutral": {
+          "type": "boolean"
+        },
+        "required_dispositions": {
+          "type": "array",
+          "minItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "qualification_status": {
+          "type": "string"
+        }
+      }
+    },
+    "validation_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paper_reported_human_validation",
+        "committed_artifact_validation",
+        "reconciliation_status",
+        "admission_rule"
+      ],
+      "properties": {
+        "paper_reported_human_validation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sample_size",
+            "agreement_rate",
+            "description"
+          ],
+          "properties": {
+            "sample_size": {
+              "type": "integer"
+            },
+            "agreement_rate": {
+              "type": "number"
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        },
+        "committed_artifact_validation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "sample_size",
+            "agreement_rate",
+            "description"
+          ],
+          "properties": {
+            "sample_size": {
+              "type": "integer"
+            },
+            "agreement_rate": {
+              "type": "number"
+            },
+            "description": {
+              "type": "string"
+            }
+          }
+        },
+        "reconciliation_status": {
+          "type": "string"
+        },
+        "admission_rule": {
+          "type": "string"
+        }
+      }
+    },
+    "dataset_audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "huggingface_dataset",
+        "displayed_license_metadata",
+        "viewer_status",
+        "viewer_error_new_columns",
+        "viewer_error_missing_columns",
+        "likely_intake_boundary",
+        "dataset_admission_status"
+      ],
+      "properties": {
+        "huggingface_dataset": {
+          "type": "string",
+          "format": "uri"
+        },
+        "displayed_license_metadata": {
+          "type": "string"
+        },
+        "viewer_status": {
+          "type": "string"
+        },
+        "viewer_error_new_columns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "viewer_error_missing_columns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "likely_intake_boundary": {
+          "type": "string"
+        },
+        "dataset_admission_status": {
+          "type": "string"
+        }
+      }
+    },
+    "custody": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_payload_downloaded",
+        "result_payloads_downloaded",
+        "model_payloads_downloaded",
+        "participant_level_data_observed",
+        "model_execution_performed",
+        "upstream_files_mirrored",
+        "rights_admission",
+        "data_use_status"
+      ],
+      "properties": {
+        "scenario_payload_downloaded": {
+          "const": false
+        },
+        "result_payloads_downloaded": {
+          "const": false
+        },
+        "model_payloads_downloaded": {
+          "const": false
+        },
+        "participant_level_data_observed": {
+          "const": false
+        },
+        "model_execution_performed": {
+          "const": false
+        },
+        "upstream_files_mirrored": {
+          "const": false
+        },
+        "rights_admission": {
+          "enum": [
+            "blocked_unresolved",
+            "admitted"
+          ]
+        },
+        "data_use_status": {
+          "enum": [
+            "metadata_only",
+            "admitted"
+          ]
+        }
+      }
+    },
+    "disposition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "overall",
+        "issues",
+        "not_qualified_claims"
+      ],
+      "properties": {
+        "overall": {
+          "enum": [
+            "metadata_only_blocked",
+            "admitted_for_reproduction"
+          ]
+        },
+        "issues": {
+          "type": "array",
+          "minItems": 6,
+          "items": {
+            "type": "string"
+          }
+        },
+        "not_qualified_claims": {
+          "type": "array",
+          "minItems": 6,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

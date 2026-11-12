@@ -1,0 +1,171 @@
+{
+  "intake_id": "IG-PLURALISTIC-IGNORANCE-REPRO-001",
+  "version": "0.1.0",
+  "status": "metadata_only_blocked",
+  "captured_at": "2026-11-12",
+  "upstream": {
+    "repository": "https://github.com/YashwanthYS/pluralistic-ignorance",
+    "commit": "b4d79c8229eb5d7bedfea824a9988115cfe53ef6",
+    "paper": {
+      "title": "Everyone Conforms, No One Believes: Pluralistic Ignorance in LLM Agent Populations",
+      "arxiv_id": "2608.02758",
+      "url": "https://arxiv.org/abs/2608.02758",
+      "first_submitted": "2026-08-03",
+      "reported_venue": "Second Workshop on Social Simulation with LLMs (SocialSim) at COLM 2026",
+      "paper_license": "CC BY 4.0",
+      "paper_license_scope": "paper text only; does not establish upstream code or dataset rights"
+    },
+    "repository_metadata": {
+      "readme_license_claim": "MIT",
+      "root_license_file_present": false,
+      "repository_api_detected_license": null,
+      "code_reuse_status": "blocked_unresolved"
+    },
+    "artifacts": [
+      {
+        "path": "README.md",
+        "blob_sha": "498a3ce7c513a7798dd87bccda945dbcd0edc16b",
+        "bytes": 3518,
+        "role": "method-and-license-claim"
+      },
+      {
+        "path": "data/scenarios_100.json",
+        "blob_sha": "20431c55914da2062b772ceb238a167d75bb8ad5",
+        "bytes": 191287,
+        "role": "scenario-input-corpus"
+      },
+      {
+        "path": "src/measurement.py",
+        "blob_sha": "212b954a4fff1eab98eb1edd6859dab4001c4d1e",
+        "bytes": 6070,
+        "role": "keyword-measurement-implementation"
+      },
+      {
+        "path": "src/run_parallel.py",
+        "blob_sha": "28631c29202e20e0666a3e33df49d028cd792c12",
+        "bytes": 11982,
+        "role": "main-experiment-runner"
+      },
+      {
+        "path": "src/run_ablation_repeated_seeds.py",
+        "blob_sha": "23723f400c8e2b45ed0d35564ca0f8822a731b26",
+        "bytes": 10594,
+        "role": "repeated-seed-ablation-runner"
+      },
+      {
+        "path": "results/evaluation_validation.json",
+        "blob_sha": "64064806026c29afcace34a2d2d2f52171fb8c58",
+        "bytes": 7335,
+        "role": "committed-keyword-versus-judge-validation-artifact"
+      }
+    ]
+  },
+  "reported_protocol": {
+    "scenario_count": 100,
+    "domain_count": 10,
+    "authority_level_count": 5,
+    "generation_method": "one manually authored seed per domain; GPT-5.4 expanded 90 further scenarios; programmatic validation and 20 percent manual review reported in paper",
+    "population_size": 20,
+    "assigned_private_dissenters": 16,
+    "assigned_private_supporters": 4,
+    "baseline_discussion_rounds": 2,
+    "baseline_speakers_per_round": 8,
+    "post_intervention_discussion_rounds": 2,
+    "post_intervention_speakers_per_round": 10,
+    "model_count": 8,
+    "reported_run_count": 800,
+    "private_state_semantics": "prompt-assigned stance plus separate private elicitation output; not privileged access to latent model state or a human population prior"
+  },
+  "seed_audit": {
+    "source_expression": "random.seed(config.seed + hash(scenario[\"id\"]))",
+    "python_builtin_string_hash_used": true,
+    "python_string_hash_process_salted": true,
+    "explicit_pythonhashseed_documented": false,
+    "deterministic_speaker_order_across_fresh_processes_guaranteed": false,
+    "qualification_status": "blocked_until_replicated_with_stable_seed_derivation"
+  },
+  "scorer_audit": {
+    "implementation": "keyword heuristic in src/measurement.py",
+    "unmatched_text_score": 0,
+    "conformity_threshold": 0,
+    "neutral_or_unmatched_counted_as_conformity": true,
+    "error_or_missing_response_can_become_unmatched_neutral": true,
+    "required_dispositions": [
+      "OPPOSE",
+      "SUPPORT",
+      "NEUTRAL_EXPLICIT",
+      "AMBIGUOUS",
+      "UNCLASSIFIABLE",
+      "ERROR_OR_MISSING"
+    ],
+    "qualification_status": "blocked_until_unknown_and_error_are_separated_from_neutral"
+  },
+  "validation_audit": {
+    "paper_reported_human_validation": {
+      "sample_size": 100,
+      "agreement_rate": 0.82,
+      "description": "paper reports 82 percent keyword-scorer agreement against human evaluation"
+    },
+    "committed_artifact_validation": {
+      "sample_size": 36,
+      "agreement_rate": 0.5555555556,
+      "description": "evaluation_validation.json reports keyword_label versus judge_label agreement"
+    },
+    "reconciliation_status": "unresolved_distinct_estimands_or_snapshots_not_yet_reconciled",
+    "admission_rule": "do not substitute either value for the other or import a scorer-quality claim until sampling, annotator, label and scorer revisions are reconciled"
+  },
+  "dataset_audit": {
+    "huggingface_dataset": "https://huggingface.co/datasets/yashwanthys/pluralistic-ignorance",
+    "displayed_license_metadata": "MIT",
+    "viewer_status": "DatasetGenerationCastError",
+    "viewer_error_new_columns": [
+      "metrics",
+      "scenario_id",
+      "conversation_log",
+      "elicitation_results",
+      "model"
+    ],
+    "viewer_error_missing_columns": [
+      "private_oppose_belief",
+      "discussion_context",
+      "false_consensus",
+      "topic",
+      "policy",
+      "authority_level",
+      "private_support_belief",
+      "id",
+      "authority"
+    ],
+    "likely_intake_boundary": "scenario inputs and experiment-result JSON files require separate schemas/configurations; do not auto-cast all JSON files into one record type",
+    "dataset_admission_status": "blocked_schema_and_rights_review"
+  },
+  "custody": {
+    "scenario_payload_downloaded": false,
+    "result_payloads_downloaded": false,
+    "model_payloads_downloaded": false,
+    "participant_level_data_observed": false,
+    "model_execution_performed": false,
+    "upstream_files_mirrored": false,
+    "rights_admission": "blocked_unresolved",
+    "data_use_status": "metadata_only"
+  },
+  "disposition": {
+    "overall": "metadata_only_blocked",
+    "issues": [
+      "missing-root-license-file-despite-readme-MIT-claim",
+      "process-salted-python-hash-seed-derivation",
+      "neutral-and-unmatched-text-counted-as-conformity",
+      "published-and-committed-scorer-validation-artifacts-unreconciled",
+      "huggingface-mixed-json-schema-viewer-error",
+      "fixed-80-20-assigned-private-stance-is-a-stress-condition-not-a-population-prior"
+    ],
+    "not_qualified_claims": [
+      "faithful reproduction",
+      "scorer validity",
+      "human population prevalence",
+      "real-world social prediction",
+      "democratic legitimacy",
+      "permission to redistribute or train on upstream artifacts"
+    ]
+  }
+}
