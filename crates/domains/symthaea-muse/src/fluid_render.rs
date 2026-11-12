@@ -849,15 +849,14 @@ mod tests {
             path
         }
 
-        fn fake_inputs() -> (PathBuf, PathBuf, PathBuf, PathBuf) {
+        fn fake_inputs() -> (PathBuf, PathBuf, PathBuf) {
             let midi = unique_path("mid");
             let soundfont = unique_path("sf2");
             let output_fixture = unique_path("wav");
             std::fs::write(&midi, b"MThd-fixture-midi").unwrap();
             std::fs::write(&soundfont, b"fake-soundfont-bytes").unwrap();
             write_test_wav(&output_fixture);
-            let script = write_fake_executable("");
-            (midi, soundfont, output_fixture, script)
+            (midi, soundfont, output_fixture)
         }
 
         fn cleanup(paths: &[&Path]) {
@@ -868,7 +867,7 @@ mod tests {
 
         #[test]
         fn successful_process_records_arguments_environment_and_both_streams() {
-            let (midi, soundfont, fixture_wav, _) = fake_inputs();
+            let (midi, soundfont, fixture_wav) = fake_inputs();
             let body = format!(
                 "output=''\nprevious=''\nfor arg in \"$@\"; do\n  if [ \"$previous\" = '-F' ]; then output=\"$arg\"; fi\n  previous=\"$arg\"\ndone\nprintf 'fake renderer stdout\\\\n'\nprintf 'fake renderer stderr\\\\n' >&2\n/bin/cp {} \"$output\"",
                 shell_quote(&fixture_wav)
