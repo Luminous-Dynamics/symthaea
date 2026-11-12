@@ -53,6 +53,8 @@ The receipt preserves model/full-scale hydrophone instrument IDs, calibration-ce
 
 Each model/full-scale pair binds to a declared benchmark group. The frozen split manifest records a digest, protocol ID, calibration/held-out role, and identities for model facility, full-scale trial site, vessel, propeller design/revision, campaign and operating-condition family. Selected grouping dimensions must have zero overlap across calibration and held-out groups; every pair must reference exactly one declared group and every group must be used.
 
+The protocol selector is typed rather than free text: `leave_one_model_facility_out`, `leave_one_full_scale_trial_site_out`, `leave_one_vessel_out`, `leave_one_propeller_design_out`, `leave_one_propeller_revision_out`, `leave_one_campaign_out`, `leave_one_operating_condition_family_out`, or `nested_group_holdout`. Each single-dimension protocol is rejected unless its required grouping dimension is selected; nested holdout requires at least two dimensions.
+
 The receipt and pair reports preserve split role and group ID. Calibration and held-out band outcomes are reported separately; the held-out outcome is computed only from held-out pairs. A calibration outlier cannot change the held-out result. The split audit proves only metadata-level leakage integrity; it does not prove that the source dataset is complete, rights-cleared, independent or physically representative. Dataset byte acquisition, rights and measurement-semantics admission remain the separate requirement in #8146.
 
 ## Interpretation and limitations
