@@ -1,0 +1,49 @@
+name: AIRROAD DC Bus Stability
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-circuits/src/dc_bus_stability.rs"
+      - "crates/domains/symthaea-circuits/src/lib.rs"
+      - "crates/domains/symthaea-circuits/Cargo.toml"
+      - "crates/domains/symthaea-circuits/README.md"
+      - ".github/workflows/airroad-dc-bus-stability.yml"
+  push:
+    branches:
+      - research/airroad-dc-dynamic-stability-v0.1
+    paths:
+      - "crates/domains/symthaea-circuits/src/dc_bus_stability.rs"
+      - "crates/domains/symthaea-circuits/src/lib.rs"
+      - ".github/workflows/airroad-dc-bus-stability.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-dc-bus-stability-\${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  qualify:
+    name: Focused format, test, and Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install repository Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check crate formatting
+        run: cargo fmt --package symthaea-circuits -- --check
+
+      - name: Run crate tests
+        run: cargo test --locked --package symthaea-circuits
+
+      - name: Run crate Clippy
+        run: cargo clippy --locked --package symthaea-circuits --all-targets -- -D warnings
