@@ -210,7 +210,7 @@ Safety/authority:
 
 ## 9. Next execution order
 
-1. Keep the four published references and their claim ceilings in the machine-readable plasma source corpus.
+1. Keep the five published references and their claim ceilings in the machine-readable plasma source corpus.
 2. Extract missing raw time-series, current/voltage waveforms, gas cost/flow and per-cell uniformity wherever source data are available.
 3. Build an offline synthetic schema/validator for cell identity, array topology, output uniformity, complete utility boundaries, failed-cell accounting and matched service.
 4. Reconstruct the 2026 miniature APPJ and 2025 microfluidic/array reference results only where raw inputs are available and rights permit.
@@ -247,3 +247,6 @@ The device integrates a refillable steel argon tank, mobile powerbank and Raspbe
 The comparison lesson is that a portable plasma device must be scored on **autonomous useful service per gas fill and battery charge**, refill/recharge downtime, drift over the duty cycle and thermal/electrical stability—not just mass or absence of mains connections.
 
 Sources: https://doi.org/10.1615/PlasmaMed.2025057641 and https://www.inptdat.de/mobiplas.
+
+
+The 2026 low-cost helium APPJ paper annotates 2 L/min helium use at approximately £0.2/min under its stated supply-cost basis—roughly £12 per operating hour if sustained. This figure is source-specific, not a universal gas price, but it demonstrates why a low component BOM does not mean a low-cost portable system. The scorecard therefore treats gas consumed per useful output and autonomous runtime as first-class metrics.
