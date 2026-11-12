@@ -173,15 +173,14 @@ fn validate_semantics(instance: &Value) -> Result<(), Vec<String>> {
             ));
         }
         for (property_index, property) in properties.iter().enumerate() {
-            if get_str(property, "status") == Some("measured") {
-                if property.get("value").is_none_or(Value::is_null)
+            if get_str(property, "status") == Some("measured")
+                && (property.get("value").is_none_or(Value::is_null)
                     || get_str(property, "unit").is_none_or(|value| value.trim().is_empty())
-                    || get_str(property, "evidence_ref").is_none_or(|value| value.trim().is_empty())
-                {
-                    errors.push(format!(
-                        "materials[{index}].properties[{property_index}]: measured property requires value, unit and evidence_ref"
-                    ));
-                }
+                    || get_str(property, "evidence_ref").is_none_or(|value| value.trim().is_empty()))
+            {
+                errors.push(format!(
+                    "materials[{index}].properties[{property_index}]: measured property requires value, unit and evidence_ref"
+                ));
             }
         }
     }
