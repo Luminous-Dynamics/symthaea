@@ -781,8 +781,7 @@ mod tests {
         extension.lie_algebra.generators = vec![[[1, 0], [0, 0]], [[0, 0], [0, 1]]];
         extension.lie_algebra.structure_constants =
             vec![vec![vec![0, 0], vec![0, 0]], vec![vec![0, 0], vec![0, 0]]];
-        extension.component_representation.adjoint_matrices[0] =
-            vec![vec![1, 0], vec![0, 1]];
+        extension.component_representation.adjoint_matrices[0] = vec![vec![1, 0], vec![0, 1]];
         extension.component_representation.adjoint_matrices[1] = vec![vec![1, 1], vec![0, 1]];
         assert_eq!(
             verify_split_extension(&extension, QualificationProfileV1::default()),
