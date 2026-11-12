@@ -489,7 +489,10 @@
         "Petz_QEC_positive_square_root_residual",
         "Petz_QEC_numerical_support_rank",
         "rank_deficient_QEC_positive_square_root_control",
-        "negative_spectrum_rejected_without_flooring"
+        "negative_spectrum_rejected_without_flooring",
+        "rotated_Petz_entanglement_fidelity_by_modular_parameter",
+        "rotated_Petz_inverse_modular_power_residual",
+        "rotated_Petz_trace_preservation_residual"
       ],
       "decoder_baselines": [
         "exact_small_dimension_optimal_recovery_via_SDP_or_channel_optimization",
@@ -537,9 +540,13 @@
         "petz_qec_square_root_residual": "Report ||S*S-M_sigma||_F/max(1,||M_sigma||_F) and numerical support rank; exact small PSD controls include rank one and rank two.",
         "petz_optimality_commutator": "The commuting-rho/sigma corollary checks [M_sigma,gamma tensor T]=0. The general theorem's condition is sqrt(M_sigma)(gamma tensor T) >= 0; do not infer general noncommuting optimality from the commutator test.",
         "petz_optimality_numerics": "QEC square root is derived from an 8x8 real-symmetric embedding eigensystem with complex Gram-Schmidt reconstruction; tiny negative eigenvalues within tolerance are treated as zero; eigenvalues are not raised to a floor; the reconstructed S*S residual is reported.",
-        "petz_optimality_support_rank": "Report the numerical support rank at the declared eigenvalue tolerance; include rank-one and rank-two PSD controls."
+        "petz_optimality_support_rank": "Report the numerical support rank at the declared eigenvalue tolerance; include rank-one and rank-two PSD controls.",
+        "rotated_petz_modular_power_identity": "||rho_A^(-1/2-it/2) rho_A rho_A^(-1/2+it/2) - I|| <= 1e-8",
+        "rotated_petz_trace_preservation_residual": 1e-8,
+        "rotated_petz_t_zero_matches_ordinary_petz": "same scrambler seed; fidelity absolute difference <=1e-8",
+        "rotated_petz_interpretation": "Compare fidelity across preregistered t values and seeds; do not infer the optimal recovery from a small parameter grid."
       },
-      "implementation_status": "QI-4A direct trace-distance/Pinsker; QI-4P accessible-register Petz channel; QI-4O commuting-state theorem diagnostic. QI-4O now uses a support-aware Hermitian PSD square root of the QEC matrix instead of a full-rank inverse-square-root identity. Source and two rank-deficient PSD regressions authored; exact-head Rust runner validation pending.",
+      "implementation_status": "QI-4A direct decoupling, QI-4P ordinary Petz recovery, QI-4O optimality theorem diagnostics, and QI-4RP modularly rotated Petz family source-authored; exact-head Rust runner qualification pending",
       "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
       "fixtures": [
         "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
@@ -549,7 +556,14 @@
       "references": [
         "https://arxiv.org/abs/2610.31501",
         "https://doi.org/10.1103/PhysRevLett.134.200602"
-      ]
+      ],
+      "baselines": [
+        "one_parameter_rotated_Petz_family_t_in_[-2,2]",
+        "ordinary_Petz_is_exact_t_equals_zero_control"
+      ],
+      "rotated_petz_api": "simulate_small_hayden_preskill_rotated_petz_recovery(seed,t,tolerance)",
+      "rotated_petz_ensemble_api": "sample_small_hayden_preskill_rotated_petz_ensemble(sample_count,first_seed,t,tolerance)",
+      "rotated_petz_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_rotated_petz_v1.json"
     },
     {
       "id": "QI-5",
@@ -734,7 +748,11 @@
     "assume linear width-squared growth and report diffusion before estimating the log-log dynamic exponent",
     "fit a time window selected after looking at z and call the result preregistered",
     "report one-size z as a thermodynamic-limit universality class",
-    "ignore finite-size saturation or seed uncertainty"
+    "ignore finite-size saturation or seed uncertainty",
+    "compare rotated-Petz fidelities at different scrambler seeds rather than matching each t to the same seed",
+    "infer exact optimality from the best t in a finite grid",
+    "repair a trace-preservation miss by eigenvalue flooring or Kraus renormalization",
+    "give rotated-Petz decoder access to B-prime or hidden simulator amplitudes"
   ],
   "competitive_baselines": [
     {
@@ -916,7 +934,8 @@
       "QI_4O_Petz_optimality_commutator_criterion": "source_authored_5_tests_added_runner_pending",
       "QI_4O_QEC_matrix_and_auxiliary_T": "source_authored_independent_numpy_crosscheck_runner_pending",
       "QI_4O_support_aware_QEC_square_root": "source_authored_not_executed",
-      "QI_3T_seed_jackknife_dynamic_exponent": "source_authored_not_executed"
+      "QI_3T_seed_jackknife_dynamic_exponent": "source_authored_not_executed",
+      "QI_4RP_rotated_Petz_recovery": "source_authored_not_executed"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
@@ -931,7 +950,8 @@
       "exact_optimal_recovery_SDP": "not implemented; use the theorem criterion for cases it covers, and a separately qualified SDP/certified bound where it does not",
       "rotated_Petz_ensemble": "not implemented",
       "gate_level_quantum_decoder_cost": "not implemented",
-      "QI_4O_general_noncommuting_optimality": "The code tests only the commuting rho=sigma=I/2 corollary. The general theorem's positive-semidefinite B criterion for noncommuting rho,sigma remains unimplemented."
+      "QI_4O_general_noncommuting_optimality": "The code tests only the commuting rho=sigma=I/2 corollary. The general theorem's positive-semidefinite B criterion for noncommuting rho,sigma remains unimplemented.",
+      "rotated_Petz_optimality": "a finite t-grid is a decoder-family comparison, not an exact recovery optimum; rotated-Petz averaging and exact SDP recovery remain unimplemented"
     },
     "resource_limits": {
       "dense_state_qubits_max": 20,
