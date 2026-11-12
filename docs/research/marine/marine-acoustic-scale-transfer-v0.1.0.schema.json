@@ -22,11 +22,9 @@
     },
     "scaling": {
       "type": "object", "additionalProperties": false,
-      "required": ["method_id", "frequency_regime", "frequency_regime_basis", "bandwidth", "representation"],
+      "required": ["method_id", "bandwidth", "representation"],
       "properties": {
         "method_id": {"const": "ITTC-7.5-02-03-03.9-2024-Rev03"},
-        "frequency_regime": {"enum": ["high_frequency", "low_frequency"]},
-        "frequency_regime_basis": {"type": "string", "minLength": 1},
         "bandwidth": {"enum": ["proportional", "constant"]},
         "representation": {"enum": ["power_spectrum", "power_spectral_density"]}
       }
@@ -76,10 +74,12 @@
     },
     "modelBand": {
       "type": "object", "additionalProperties": false,
-      "required": ["band_id", "center_frequency_hz", "total_spl_db", "background_spl_db", "facility_transfer_function_db", "total_u95_db", "background_u95_db", "facility_transfer_u95_db"],
+      "required": ["band_id", "center_frequency_hz", "frequency_regime", "frequency_regime_basis", "total_spl_db", "background_spl_db", "facility_transfer_function_db", "total_u95_db", "background_u95_db", "facility_transfer_u95_db"],
       "properties": {
         "band_id": {"type": "string", "minLength": 1},
         "center_frequency_hz": {"type": "number", "exclusiveMinimum": 0},
+        "frequency_regime": {"enum": ["high_frequency", "low_frequency"]},
+        "frequency_regime_basis": {"type": "string", "minLength": 1},
         "total_spl_db": {"type": "number"},
         "background_spl_db": {"type": "number"},
         "facility_transfer_function_db": {"type": "number"},
