@@ -1,0 +1,54 @@
+name: AIRROAD Post-Fault Supply Envelope
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-circuits/src/post_fault_supply_envelope.rs"
+      - "crates/domains/symthaea-circuits/src/lib.rs"
+      - "docs/research/AIRROAD_POST_FAULT_SUPPLY_001_V0_1.md"
+      - "docs/research/fixtures/airroad-post-fault-supply-v0.1.json"
+      - "tools/airroad-post-fault-supply-qualifier/verify_post_fault_supply.py"
+      - ".github/workflows/airroad-post-fault-supply.yml"
+  push:
+    branches:
+      - research/airroad-post-fault-supply-v0.1
+    paths:
+      - "crates/domains/symthaea-circuits/src/post_fault_supply_envelope.rs"
+      - "crates/domains/symthaea-circuits/src/lib.rs"
+      - "docs/research/AIRROAD_POST_FAULT_SUPPLY_001_V0_1.md"
+      - "docs/research/fixtures/airroad-post-fault-supply-v0.1.json"
+      - "tools/airroad-post-fault-supply-qualifier/verify_post_fault_supply.py"
+      - ".github/workflows/airroad-post-fault-supply.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-post-fault-supply-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-qualification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and verify independent integer oracle
+        run: |
+          python3 -m py_compile tools/airroad-post-fault-supply-qualifier/verify_post_fault_supply.py
+          python3 tools/airroad-post-fault-supply-qualifier/verify_post_fault_supply.py
+      - name: Check circuits formatting without workspace resolution
+        run: |
+          rustfmt --edition 2024 --check crates/domains/symthaea-circuits/src/lib.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-circuits/src/post_fault_supply_envelope.rs
+      - name: Compile and run zero-dependency circuits tests
+        run: |
+          rustc --test --edition=2024 crates/domains/symthaea-circuits/src/lib.rs -o /tmp/symthaea-circuits-tests
+          /tmp/symthaea-circuits-tests
+      - name: Run Clippy directly without workspace resolution
+        run: |
+          clippy-driver --edition=2024 --crate-name symthaea_circuits --crate-type lib crates/domains/symthaea-circuits/src/lib.rs -D warnings --emit=metadata -o /tmp/symthaea-circuits.rmeta
+          clippy-driver --edition=2024 --crate-name symthaea_circuits --test crates/domains/symthaea-circuits/src/lib.rs -D warnings --emit=metadata -o /tmp/symthaea-circuits-tests.rmeta
