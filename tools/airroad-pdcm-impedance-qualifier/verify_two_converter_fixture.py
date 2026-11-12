@@ -107,9 +107,57 @@ def main() -> None:
     assert coefficients == factorized
     assert 57 > 7 * 7  # sqrt(57) > 7; (-7 + sqrt(57))/4 is positive.
 
+    # Reconstruct the symmetric common-mode SISO source/load interconnection:
+    # Yi(s) = Gi*(Ci*s - hi)/(Ci*s + Gi - hi)
+    # Zs(s) = 1/(Gs + C0*s), L(s) = Zs(s)*(Y1(s) + Y2(s)).
+    h1, h2 = p1 / (v1 * v1), p2 / (v2 * v2)
+    branch_num_1 = [g1 * c1, -g1 * h1]
+    branch_den_1 = [c1, g1 - h1]
+    branch_num_2 = [g2 * c2, -g2 * h2]
+    branch_den_2 = [c2, g2 - h2]
+    expected_num_1 = [q(value) for value in
+                      data["frequency_domain"]["branch_admittance_numerator_coefficients_descending"]]
+    expected_den_1 = [q(value) for value in
+                      data["frequency_domain"]["branch_admittance_denominator_coefficients_descending"]]
+    assert branch_num_1 == branch_num_2 == expected_num_1
+    assert branch_den_1 == branch_den_2 == expected_den_1
+
+    source_den = [c0, gs]
+    expected_source_den = [q(value) for value in
+                           data["frequency_domain"]["source_impedance_denominator_coefficients_descending"]]
+    assert source_den == expected_source_den
+
+    # Identical branch admittances in parallel: 2*Yi(s).
+    # Multiply by Zs(s), and check its exact numerator/denominator coefficients.
+    return_num = [2 * value for value in branch_num_1]
+    return_den = [
+        source_den[0] * branch_den_1[0],
+        source_den[0] * branch_den_1[1] + source_den[1] * branch_den_1[0],
+        source_den[1] * branch_den_1[1],
+    ]
+    expected_return_num = [q(value) for value in
+                           data["frequency_domain"]["common_mode_return_ratio_numerator_coefficients_descending"]]
+    expected_return_den = [q(value) for value in
+                           data["frequency_domain"]["common_mode_return_ratio_denominator_coefficients_descending"]]
+    assert return_num == expected_return_num
+    assert return_den == expected_return_den
+
+    # 1 + L(s) = 0: add numerator to denominator after degree alignment.
+    closed_loop = [
+        return_den[0],
+        return_den[1] + return_num[0],
+        return_den[2] + return_num[1],
+    ]
+    expected_closed = [q(value) for value in
+                       data["frequency_domain"]["closed_loop_characteristic_polynomial_coefficients_descending"]]
+    assert closed_loop == expected_closed == [Fraction(1), Fraction(7, 2), Fraction(-1, 2)]
+    assert closed_loop == [coefficients[1], coefficients[2], coefficients[3]]  # common-mode factor
+
     print("PASS exact equilibrium and power closure")
     print("PASS both isolated converter branches have stable local poles")
     print("PASS exact coupled Jacobian and characteristic polynomial")
+    print("PASS source/load branch admittances and source impedance")
+    print("PASS common-mode return ratio and closed-loop characteristic polynomial")
     print("PASS shared-source common mode has one positive real pole")
     print("PASS per-converter stability does not imply network stability")
 
