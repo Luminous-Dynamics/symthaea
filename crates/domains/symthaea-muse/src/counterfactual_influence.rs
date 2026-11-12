@@ -1115,7 +1115,13 @@ fn expected_counterfactual_primary_pitches(
 ) -> Result<Vec<u8>, CounterfactualInfluenceError> {
     let mut expected = baseline.to_vec();
     match intervention {
-        EventIntervention::Remove => Ok(expected),
+        EventIntervention::Remove => {
+            if source_event_index >= expected.len() {
+                return Err(CounterfactualInfluenceError::InvalidEventId);
+            }
+            expected.remove(source_event_index);
+            Ok(expected)
+        }
         EventIntervention::Transpose { semitones } => {
             validate_intervention(intervention)?;
             let target = expected
@@ -1263,6 +1269,14 @@ fn validate_input(
     }
     let baseline_pitch_sha256 = sha256_hex(input.expected_primary_midi_by_score_index);
     let counterfactual_pitch_sha256 = sha256_hex(&counterfactual_primary_pitches);
+    // The Remove binding remains rooted in the original Score pitch inventory
+    // plus an explicit excluded source index. Transpose commits the transformed
+    // full-score inventory in its renderer binding.
+    let counterfactual_binding_pitch_sha256 = match &input.intervention {
+        EventIntervention::Remove => baseline_pitch_sha256.clone(),
+        EventIntervention::Transpose { .. } => counterfactual_pitch_sha256.clone(),
+        _ => return Err(CounterfactualInfluenceError::InvalidIntervention),
+    };
     if input.baseline_renderer_evidence.source_score_sha256 != sha256_hex(input.source_score_bytes)
         || input.counterfactual_renderer_evidence.source_score_sha256
             != sha256_hex(input.source_score_bytes)
@@ -1273,7 +1287,7 @@ fn validate_input(
         || input
             .counterfactual_renderer_evidence
             .expected_primary_pitches_sha256
-            != counterfactual_pitch_sha256
+            != counterfactual_binding_pitch_sha256
         || input.baseline_renderer_evidence.input_artifact_sha256
             != sha256_hex(input.baseline_schedule_bytes)
         || input.counterfactual_renderer_evidence.input_artifact_sha256
@@ -2294,6 +2308,10 @@ mod tests {
         assert_eq!(
             report.counterfactual_event_map_receipt_sha256,
             counterfactual.map.receipt_sha256
+        );
+        assert_eq!(
+            report.counterfactual_expected_primary_pitches_sha256,
+            sha256_hex(&[64])
         );
         assert!(verify_counterfactual_influence(&report, &experiment, &calibration).unwrap());
     }
