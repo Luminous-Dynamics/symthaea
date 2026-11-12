@@ -1943,12 +1943,15 @@ pub fn evaluate_midi_transcription_v1(
         .iter()
         .map(|track| track.part_id)
         .collect();
-    let measure_phase = parsed
-        .time_signature_points
-        .iter()
-        .find(|point| point.start_tick == 0)
+    // V1 has a single constant measure lattice with origin at tick zero.
+    // It must abstain on later meter changes until the piecewise barline map
+    // and bar-number alignment are implemented.
+    let measure_phase = (parsed.time_signature_points.len() == 1)
+        .then(|| parsed.time_signature_points.first())
+        .flatten()
         .filter(|point| {
-            point.numerator == reference.manifest.meter_numerator
+            point.start_tick == 0
+                && point.numerator == reference.manifest.meter_numerator
                 && point.denominator == u16::from(reference.manifest.meter_denominator)
         })
         .and_then(|point| {
@@ -2779,6 +2782,27 @@ mod tests {
         .unwrap();
         assert_eq!(report.meter_metadata.prediction_initial_matches_reference, Some(false));
         assert!(report.measure_phase.is_none());
+    }
+
+    #[test]
+    fn measure_phase_is_withheld_when_later_meter_changes_are_present() {
+        let reference = reference_artifact(&[(60, 0, 480)], 40);
+        let midi = build_midi(&[(60, 0, 480)], 40, &[(0, 500_000)]);
+        let mut parsed = parse_transcribed_midi_v1(&midi).unwrap();
+        parsed.time_signature_points.push(MidiTimeSignaturePointV1 {
+            start_tick: 1_920,
+            source_track_index: 0,
+            numerator: 3,
+            denominator_power: 2,
+            denominator: 4,
+            clocks_per_click: 24,
+            thirtyseconds_per_quarter: 8,
+        });
+        let summary = meter_metadata_summary_v1(&reference, &parsed);
+        assert_eq!(summary.prediction_meter_point_count, 2);
+        // The score-level phase diagnostic is deliberately unavailable when
+        // the measure lattice is piecewise and not modelled by V1.
+        assert_ne!(summary.prediction_meter_point_count, 1);
     }
 
     #[test]
