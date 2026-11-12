@@ -1,6 +1,6 @@
 # MEL-MR-EVAL-015 — Renderer Execution Receipt
 
-**Status:** partial live integration. Successful FluidSynth candidate renders now create a local artifact-bound receipt, store it with the candidate, and expose it at `/api/piece/{id}/render-receipt`. NativeMuse render receipts and acoustic timing/PCM preservation acceptance remain unimplemented. The receipt does not independently attest which executable/assets were actually loaded.  
+**Status:** partial live integration. FluidSynth candidate renders now retain both a local artifact-bound success receipt and a structured invocation observation, including failed/unavailable attempts. Both are attached to the candidate and exposed at `/api/piece/{id}/render-receipt` and `/api/piece/{id}/render-invocation`. NativeMuse render receipts and acoustic timing/PCM preservation acceptance remain unimplemented. These local observations do not attest which executable/assets the child actually loaded.  
 **Follow-up issue:** [#9044 — Bind performed-event lineage to actual renderer output](https://github.com/Luminous-Dynamics/symthaea/issues/9044)  
 **Preceding work:** [#9037 — Performed event map](https://github.com/Luminous-Dynamics/symthaea/pull/9037).
 
@@ -25,11 +25,16 @@ The new renderer_execution_receipt.rs module provides:
 - Studio exposes available receipts through the local endpoint `/api/piece/{id}/render-receipt`; candidates rendered with NativeMuse, or whose artifact hashing/parsing fails, currently have no receipt and return 404 for that endpoint.
 - A verified performed-event-map receipt digest is included only when MIDI lineage has complete Score coverage and exact primary-pitch agreement. When that check fails, the receipt remains available but omits the map digest; this is not a preservation pass.
 - Nine deterministic receipt/parser unit-test functions for acceptance and tamper/negative cases.
+- A versioned `FluidSynthInvocationObservationV1` records the actual program and OS argument vector (human-readable display plus raw OS-argument hex), an explicit runtime environment allowlist with value digests, before/after SHA-256 for the executable, SoundFont and MIDI input, child spawn/success/exit status, spawn/wait error, stdout/stderr full-stream digests and byte counts, bounded 8 KiB diagnostic previews, output-container digest before mastering, mastered-WAV digest, sample rate and elapsed timing.
+- Stdout and stderr are drained concurrently so verbose child processes cannot block on full pipes. Only bounded previews are retained; full output is represented by digest and byte count.
+- Studio exposes the invocation observation at `GET /api/piece/{id}/render-invocation`. Failed FluidSynth invocations and an unavailable renderer are retained alongside a native fallback candidate instead of being collapsed to an absent result.
+- Successful-render receipt creation now validates the invocation observation against exact MIDI, pre/post executable/SoundFont digests, zero exit status, and mastered WAV digest before accepting it as a successful FluidSynth receipt.
 - A Studio temp-MIDI path fix: concurrent candidate renders with the same seed no longer derive the same temp filename from process-ID plus seed alone; a per-process monotonic nonce is included. One focused regression test is authored.
+- Four Unix fake-child tests are authored for successful invocation/argument/allowlist/stream capture, non-zero exit diagnostics, MIDI substitution during child execution, and stderr draining beyond the preview limit. Three fixture tuple-shape mistakes found during source review have been corrected.
 
 ## Not implemented yet
 
-- The FluidSynth output receipt is recorded at the candidate adapter boundary, but the underlying runner still suppresses stdout/stderr and returns an optional mastered WAV rather than a full invocation object. The receipt records successful return as exit code zero; exact argv/environment/status diagnostics must be added inside the runner before this can be treated as strong execution evidence.
+- The compatibility FluidSynth API still returns `Option<Vec<u8>>` for legacy callers. Evidence-producing Muse candidate rendering now uses the structured API; non-Muse legacy call sites do not automatically persist invocation observations.
 - Executable/SoundFont digests are hashed from the resolved paths after the rendering call returns. This binds observed file contents locally but does not close a file-replacement race or attest which bytes a child process loaded.
 - Native Muse does not yet emit a canonical sidecar for the precise performed-note schedule submitted to its synthesizer, and the native Candidate has no receipt.
 - The parser from MEL-MR-EVAL-014 returns MIDI-scheduled frame projections, not measured acoustic onsets. Renderer latency, resampling and the output mix still require independent PCM timing checks.
@@ -38,7 +43,7 @@ The new renderer_execution_receipt.rs module provides:
 ## Integration contract for the live render boundary
 
 1. Freeze the serialized Score, instruction, preservation profile, seed/dialect and renderer configuration before rendering.
-2. FluidSynth adapter (partially integrated): retain the exact serialized MIDI bytes, hash the resolved executable and SoundFont paths, parse the output WAV and optionally bind the event-map receipt when Score coverage/pitches pass. Still expose the actual command arguments, diagnostics, exit code and relevant environment from inside the renderer runner.
+2. FluidSynth adapter (partially integrated): retain exact MIDI bytes; observe argv, allowlisted environment digests, child exit status and diagnostics; hash executable/SoundFont/MIDI before and after; parse output WAV; and optionally bind event-map evidence when Score coverage/pitches pass. This remains local wrapper evidence, not proof of the child-loaded bytes.
 3. Native adapter: derive a canonical performed-schedule manifest from the exact note events submitted to the native synth and bind its digest; do not use an independently recomputed schedule as if it proved the one rendered.
 4. Keep the receipt on the same candidate as the audio. Preserve the distinction between an absent receipt and a receipt with no verified performed-event map.
 5. Align the MIDI schedule to acoustic timing using renderer-specific calibration/latency measurement. Compute target/protected masks from that measured map and independently audit output PCM.
