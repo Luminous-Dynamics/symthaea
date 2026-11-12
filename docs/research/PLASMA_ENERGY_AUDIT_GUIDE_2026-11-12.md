@@ -39,12 +39,13 @@ The source audit requires:
 - every case's evidence class to appear in the declared set;
 - a source URL using HTTP(S);
 - an explicit `luminous_reproduction=false` field on every case;
-- an expected disposition for each negative control.
+- an expected disposition for each negative control;
+- every `FUSION_DIRECT_ENERGY_CONVERSION` case has `particle_energy_origin`, `fusion_born_output_observed=false`, and `comparison_status`.
 
-This is metadata integrity only. It does not independently check paper contents, reproduce reported values, or establish that a source supports every interpretation in its case description.
+This is metadata integrity only. The DEC-specific gate prevents externally heated plasma recovery or a laboratory fundamental-unit experiment being silently promoted to fusion-born energy recovery. It does not independently check paper contents, reproduce reported values, or establish that a source supports every interpretation in its case description.
 
 Current frozen input:
-- plasma-energy register: 13 cases / 11 controls;
+- plasma-energy register: 19 cases / 20 controls, including five direct-energy-conversion cases;
 - HTS fusion magnet register: 6 cases / 12 controls.
 
 ## 3. Synthetic thermal-store fixture
@@ -127,7 +128,7 @@ cargo test -p xtask plasma_energy_audit
 cargo clippy -p xtask --all-targets -- -D warnings
 ```
 
-The draft PR authors 16 Rust tests, including tests against the frozen source and thermal fixtures. At the time this guide was written, the available execution environment did not contain `cargo` or `rustc`; therefore no Rust test, format, compile or Clippy pass is claimed.
+The draft PR authors 19 Rust tests, including tests against the frozen source and thermal fixtures, duplicate-identity controls and DEC energy-origin refusal tests. At the time this guide was written, the available execution environment did not contain `cargo` or `rustc`; therefore no Rust test, format, compile or Clippy pass is claimed.
 
 The evaluator does not:
 - solve plasma, MHD, fusion, heat-transfer or electrochemical equations;
