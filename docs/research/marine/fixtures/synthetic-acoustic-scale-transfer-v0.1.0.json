@@ -30,8 +30,8 @@
     "wake_field_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
     "cavitation_state_evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
     "water_quality_nuclei_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
-    "background_noise_corrected": true,
-    "facility_transfer_function_applied": true
+    "facility_transfer_function_applied": true,
+    "background_measurement_per_condition_available": true
   },
   "full_scale_trial": {
     "trial_id": "synthetic-full-scale-trial-001",
@@ -66,7 +66,6 @@
           "full_scale_upper_hz": 196.7739820199815,
           "model_source_level_db": 120,
           "observed_full_scale_source_level_db": 150.5,
-          "model_signal_above_background": true,
           "uncertainty": {
             "model_measurement_db": 1,
             "scaling_model_db": 2,
@@ -74,11 +73,15 @@
             "confidence_level": 0.95,
             "composition": "CONSERVATIVE_LINEAR",
             "independence_evidence_ref": null
-          }
+          },
+          "signal_to_background_margin_db": 12,
+          "background_correction_applied": false
         }
       ],
       "model_source_level_reference_distance_m": 1,
-      "full_scale_source_level_reference_distance_m": 1
+      "full_scale_source_level_reference_distance_m": 1,
+      "background_measurement_method": "BARE_HUB",
+      "background_raw_trace_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
     },
     {
       "pair_id": "synthetic-pair-12rps",
@@ -101,7 +104,6 @@
           "full_scale_upper_hz": 393.547964039963,
           "model_source_level_db": 118.5,
           "observed_full_scale_source_level_db": 149,
-          "model_signal_above_background": true,
           "uncertainty": {
             "model_measurement_db": 1,
             "scaling_model_db": 2,
@@ -109,11 +111,15 @@
             "confidence_level": 0.95,
             "composition": "CONSERVATIVE_LINEAR",
             "independence_evidence_ref": null
-          }
+          },
+          "signal_to_background_margin_db": 12,
+          "background_correction_applied": false
         }
       ],
       "model_source_level_reference_distance_m": 1,
-      "full_scale_source_level_reference_distance_m": 1
+      "full_scale_source_level_reference_distance_m": 1,
+      "background_measurement_method": "BARE_HUB",
+      "background_raw_trace_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
     }
   ]
 }
