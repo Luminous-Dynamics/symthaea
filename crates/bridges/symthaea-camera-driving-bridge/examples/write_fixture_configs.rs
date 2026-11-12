@@ -15,7 +15,9 @@ use symthaea_vision_manifold::VisionConfig;
 fn run() -> Result<(), Box<dyn Error>> {
     let args = env::args().skip(1).collect::<Vec<_>>();
     if args.len() != 2 {
-        return Err("usage: write_fixture_configs <bridge-config.json> <vision-config.json>".into());
+        return Err(
+            "usage: write_fixture_configs <bridge-config.json> <vision-config.json>".into(),
+        );
     }
 
     let bridge_config = BridgeConfig {
@@ -44,7 +46,9 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let vision_config = VisionConfig::default();
     if vision_config.hdc_dim != 16_384 || vision_config.enable_depth {
-        return Err("default VisionConfig does not meet this fixture's 16,384D no-depth contract".into());
+        return Err(
+            "default VisionConfig does not meet this fixture's 16,384D no-depth contract".into(),
+        );
     }
     vision_config.validate()?;
 
