@@ -394,6 +394,13 @@ fn validate_manifest(manifest: &BenchmarkManifest) -> Result<(), AuditError> {
             .get(outcome.cell_id.as_str())
             .expect("outcome identity set matches cell identity set");
 
+        if outcome.observed_through_cycle < cell.prediction_cutoff_cycle {
+            return Err(AuditError(format!(
+                "cell {} outcome horizon ends before its prediction cutoff",
+                cell.cell_id
+            )));
+        }
+
         if let Some(event_cycle) = outcome.event_cycle {
             if event_cycle <= cell.prediction_cutoff_cycle {
                 return Err(AuditError(format!(
@@ -758,6 +765,16 @@ mod tests {
         let error =
             audit_design_lifetime_manifest(&manifest).expect_err("undeclared cutoff fails");
         assert!(error.0.contains("undeclared prediction cutoff"));
+    }
+
+    #[test]
+    fn rejects_outcome_horizon_before_prediction_cutoff() {
+        let mut manifest = valid_manifest();
+        manifest.outcomes[2].observed_through_cycle = 40;
+
+        let error =
+            audit_design_lifetime_manifest(&manifest).expect_err("short outcome horizon fails");
+        assert!(error.0.contains("outcome horizon ends before its prediction cutoff"));
     }
 
     #[test]
