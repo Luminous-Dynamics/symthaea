@@ -4,7 +4,8 @@
     "campaign_id": "FORMATION-CHARGE-CO-DESIGN-001",
     "mission_id": "EV-CITY-DELIVERY-DUTY-01",
     "holdout_axis": "lot",
-    "maximum_feature_cutoff_cycle": 50
+    "maximum_feature_cutoff_cycle": 50,
+    "blocking_axis": "lot"
   },
   "arms": [
     {
