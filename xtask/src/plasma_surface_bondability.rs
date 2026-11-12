@@ -117,6 +117,7 @@ pub struct DelayResult {
 #[derive(Debug, Clone, Serialize)]
 pub struct ArmResult {
     pub arm_id: String,
+    pub process_class: String,
     pub disposition: ArmDisposition,
     pub reason: String,
     pub complete_system_energy_kwh_per_m2: Option<f64>,
@@ -455,6 +456,7 @@ fn arm_result(
 ) -> ArmResult {
     ArmResult {
         arm_id: arm.arm_id.clone(),
+        process_class: arm.process_class.clone(),
         disposition,
         reason: reason.to_owned(),
         complete_system_energy_kwh_per_m2: Some(arm.complete_system_energy_kwh_per_m2),
