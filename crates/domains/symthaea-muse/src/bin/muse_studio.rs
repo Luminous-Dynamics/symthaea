@@ -2540,7 +2540,13 @@ async fn import_music(
         let analysis = symthaea_muse::symbolic_import::analyze(&score);
         let score_sha256 = serialized_sha256(&score)
             .map_err(|status| (status, "could not serialize the imported score".to_owned()))?;
-        let identity_material = format!("{source_sha256}\0{title}\0{contributor}");
+        let identity_material = match measure_sidecar.as_deref() {
+            Some(sidecar) => format!(
+                "{source_sha256}\0measure-sidecar:{}\0{title}\0{contributor}",
+                sha256_hex(sidecar)
+            ),
+            None => format!("{source_sha256}\0{title}\0{contributor}"),
+        };
         let work_id = ImportedWorkId(sha256_hex(identity_material.as_bytes()));
 
         let root = Path::new(IMPORT_ROOT);
