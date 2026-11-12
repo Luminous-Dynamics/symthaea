@@ -302,6 +302,12 @@ fn calibrated_detection_probability_requires_a_linked_reference_record() {
     assert!(errors.iter().any(|error| error.contains("calibration_evidence_id references missing")));
 
     candidate.evidence.push(measurement("calibration-001", EvidenceOutcome::SignalDetected));
+    let errors = candidate
+        .validate()
+        .expect_err("ordinary signal detection cannot certify calibration");
+    assert!(errors.iter().any(|error| error.contains("must reference CalibrationReference")));
+
+    candidate.evidence[1].outcome = EvidenceOutcome::CalibrationReference;
     assert!(candidate.validate().is_ok());
 }
 
