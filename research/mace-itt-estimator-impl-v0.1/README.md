@@ -1,6 +1,10 @@
 # MACE paired ITT estimator v0.1
 
-A standard-library-only Go reference for paired agent-evaluation studies. It estimates the effect of **skill availability** across every preregistered assignment. Retrieval, selection, loading, invocation and execution are reported as mechanism diagnostics; they never determine whether an assignment enters the primary estimates.
+A standard-library-only Go reference for paired agent-evaluation studies. It estimates the effect of **skill availability** across every preregistered assignment. Retrieval, selection, resolution, loading, invocation and execution are reported as mechanism diagnostics; they never determine whether an assignment enters the primary estimates.
+
+## Six-stage lifecycle diagnostics
+
+The observed skill lifecycle is retrieved → selected → resolved → loaded → invoked → executed. The estimator reports each stage independently and validates the monotone ordering. These stages never filter the ITT denominator.
 
 ## Four separate endpoints
 
@@ -13,7 +17,7 @@ These endpoints are not combined into one score.
 
 ## Primary estimand and post-treatment bias
 
-The primary estimand is the paired intention-to-treat (ITT) difference in task-macro outcomes, with-skill minus without-skill, over all assignments in the supplied roster. Retrieval and later stages occur after skill availability has been assigned. Conditioning the primary estimate on those stages can select a different subset. MACE retains them as diagnostics only.
+The primary estimand is the paired intention-to-treat (ITT) difference in task-macro outcomes, with-skill minus without-skill, over all assignments in the supplied roster. Retrieval, selection, resolution, loading, invocation and execution occur after skill availability has been assigned. Conditioning the primary estimate on those stages can select a different subset. MACE retains them as diagnostics only.
 
 Repeated seeds are averaged within task; task clusters then receive equal weight. Each estimator invocation accepts one experiment ID and one configuration-stratum SHA-256 digest, and rejects mixed strata. Each pair records task revision, seed/block, and arm execution order. These fields improve comparability; they do not prove randomization or equal internal randomness.
 
