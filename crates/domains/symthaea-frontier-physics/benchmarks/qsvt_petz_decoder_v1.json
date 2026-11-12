@@ -1,0 +1,271 @@
+{
+  "schema": "luminous.black_hole_information.qsvt_petz_decoder_benchmark.v1",
+  "programme": "BH-INFO-001",
+  "title": "Operational Hayden–Preskill recovery: polar/QSVT-Petz decoder qualification",
+  "created": "2026-11-13",
+  "status": "planned_only",
+  "execution_status": "not_implemented",
+  "repository": "Luminous-Dynamics/symthaea",
+  "owner": "symthaea-frontier-physics",
+  "depends_on": {
+    "pull_request": "https://github.com/Luminous-Dynamics/symthaea/pull/11632",
+    "exact_base_head": "8d9f742634d756ee1132947fded94753b03ff08f",
+    "existing_manifest": "crates/domains/symthaea-frontier-physics/benchmarks/black_hole_information_v1.json",
+    "existing_tensor_network_contract": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/tensor_network_qualification_v1.json"
+  },
+  "references": [
+    {
+      "name": "Petz Recovery through a Single Polar Transformation for Approximate Quantum Error Correction",
+      "kind": "2026 preprint",
+      "date": "2026-10-14",
+      "url": "https://arxiv.org/abs/2610.20515",
+      "role": "QSVT polar sign implementation, no-postselection extension, spectral loss and diamond-distance bound."
+    },
+    {
+      "name": "Optimality Condition for the Petz Map",
+      "kind": "Physical Review Letters 134, 200602",
+      "date": "2025-05-19",
+      "doi": "10.1103/PhysRevLett.134.200602",
+      "url": "https://doi.org/10.1103/PhysRevLett.134.200602",
+      "role": "Necessary-and-sufficient Petz entanglement-fidelity optimality condition, with commuting-input specialization."
+    },
+    {
+      "name": "Simulating Floquet scrambling circuits on trapped-ion quantum computers",
+      "kind": "Physical Review Research 7, 023032",
+      "date": "2025-04-10",
+      "doi": "10.1103/PhysRevResearch.7.023032",
+      "url": "https://doi.org/10.1103/PhysRevResearch.7.023032",
+      "role": "20-qubit experimental Hayden–Preskill and OTOC reference; hardware comparison only."
+    }
+  ],
+  "claim_ceiling": "Finite-dimensional channel and decoder-circuit qualification only. No macroscopic black-hole, gravitational, island/QES or quantum-advantage claim.",
+  "channel": {
+    "input": "message qubit M",
+    "reference": "Q purifies M",
+    "initial_bath_pair": "B,R Bell pair",
+    "scrambler": "seeded Haar U(4) on M tensor B",
+    "accessible_output": "A=E tensor R, dimension 4",
+    "inaccessible_environment": "B-prime, traced out",
+    "message_dimension": 2,
+    "channel_kraus": "K_bprime[(e,r),m] = U[(e,bprime),(m,r)] / sqrt(2)",
+    "decoder_access_policy": "A only",
+    "seed_policy": "frozen common seed schedule across all decoder families"
+  },
+  "decoder_families": [
+    {
+      "id": "ordinary_petz",
+      "status": "implemented_classical_channel_baseline",
+      "claim": "Channel-level recovery, no gate-level circuit cost."
+    },
+    {
+      "id": "rotated_petz",
+      "status": "implemented_classical_channel_baseline",
+      "parameters": {
+        "t_grid": [
+          -2,
+          -1,
+          -0.5,
+          0,
+          0.5,
+          1,
+          2
+        ]
+      },
+      "claim": "Candidate decoder family, not a global optimality claim."
+    },
+    {
+      "id": "exact_optimal",
+      "status": "planned_small_instance_oracle",
+      "method": "Independent SDP over recovery Choi matrices; use Petz-optimality theorem only when all hypotheses are satisfied."
+    },
+    {
+      "id": "qsvt_polar_petz",
+      "status": "planned",
+      "method": "Block-encode stacked Petz isometry operator; approximate its polar sign transform with an odd QSVT polynomial and extend to a recovery isometry without postselection."
+    }
+  ],
+  "qsvt_contract": {
+    "polynomial": "real odd p_theta(x) of degree at most 2k+1 approximates sign(x) on the declared nonzero scaled singular-value support",
+    "scaled_singular_values": "x_i = lambda_i / alpha",
+    "normalization": "alpha is the declared block-encoding normalization and must be included in every receipt",
+    "spectrum_weighted_loss": "I_theta = 1 - |sum_i lambda_i^2 p_theta(x_i)|^2 under the pinned reference convention",
+    "target_bound": "Delta_theta <= sqrt(||sigma^{-1}||_infinity * I_theta); verify theorem hypotheses and exact normalization against the pinned preprint before implementing",
+    "no_postselection_default": true,
+    "postselection_experiment": "Optional comparison only; report success probability and expected repetitions, and do not label the conditional branch deterministic or trace-preserving."
+  },
+  "ladder": [
+    {
+      "id": "QD-0",
+      "name": "frozen channel and access contract",
+      "required": [
+        "CPTP channel receipts",
+        "register ordering",
+        "channel digest",
+        "decoder access set",
+        "hidden-environment firewall"
+      ]
+    },
+    {
+      "id": "QD-1",
+      "name": "stacked Petz isometry and singular spectrum",
+      "required": [
+        "independent SVD",
+        "support rank",
+        "normalization alpha",
+        "minimum nonzero singular value",
+        "condition number"
+      ]
+    },
+    {
+      "id": "QD-2",
+      "name": "block encoding",
+      "required": [
+        "explicit block-encoding construction",
+        "controlled reflection count",
+        "ancilla count",
+        "oracle query model"
+      ]
+    },
+    {
+      "id": "QD-3",
+      "name": "QSVT phase sequence",
+      "required": [
+        "odd polynomial",
+        "parity and boundedness checks",
+        "phase-angle digest",
+        "degree 2k+1",
+        "response on each singular value"
+      ]
+    },
+    {
+      "id": "QD-4",
+      "name": "no-postselection recovery isometry",
+      "required": [
+        "isometry residual",
+        "complete channel construction",
+        "trace-preservation residual"
+      ]
+    },
+    {
+      "id": "QD-5",
+      "name": "recovery quality",
+      "required": [
+        "entanglement fidelity",
+        "Choi/process error",
+        "small-instance diamond distance or certified bounds",
+        "comparison to ideal Petz"
+      ]
+    },
+    {
+      "id": "QD-6",
+      "name": "decoder-family comparison",
+      "required": [
+        "ordinary Petz",
+        "rotated Petz",
+        "QSVT-Petz",
+        "exact optimum when independent oracle is available"
+      ]
+    },
+    {
+      "id": "QD-7",
+      "name": "resource qualification",
+      "required": [
+        "QSVT iterations",
+        "oracle calls",
+        "ancillas",
+        "logical one/two-qubit gates",
+        "depth",
+        "T count",
+        "runtime",
+        "peak memory"
+      ]
+    },
+    {
+      "id": "QD-8",
+      "name": "frozen ensemble scaling",
+      "required": [
+        "at least 64 common seeds where feasible",
+        "confidence intervals",
+        "spectrum stratification",
+        "all attempted samples"
+      ]
+    }
+  ],
+  "required_resources": [
+    "minimum_nonzero_singular_value",
+    "support_rank",
+    "condition_number",
+    "block_encoding_alpha",
+    "qsvt_iteration_count",
+    "polynomial_degree",
+    "phase_sequence_digest",
+    "block_encoding_oracle_calls",
+    "ancilla_count",
+    "controlled_reflection_count",
+    "logical_one_qubit_gate_count",
+    "logical_two_qubit_gate_count",
+    "logical_circuit_depth",
+    "t_count",
+    "runtime",
+    "peak_memory",
+    "physical_device_estimate_with_calibration_provenance"
+  ],
+  "proposed_targets": {
+    "small_channel_cptp_residual": 1e-10,
+    "qsvt_no_postselection_trace_preservation_residual": 1e-9,
+    "qsvt_diamond_distance_where_spectrum_allows": 0.001,
+    "exact_sdp_primal_dual_gap": 1e-8,
+    "frozen_common_seed_count": 64,
+    "comparisons": "Matched channel, seed, decoder access, accuracy and resource budget."
+  },
+  "negative_controls": [
+    "decoder_receives_inaccessible_Bprime",
+    "decoder_receives_global_state_amplitudes",
+    "decoder_receives_hidden_seed",
+    "postselected_output_reported_as_trace_preserving_without_success_probability",
+    "block_encoding_normalization_omitted_or_changed",
+    "mismatched_seed_schedule_across_decoder_families",
+    "finite_modular_grid_reported_as_exact_optimum",
+    "commuting_Petz_theorem_applied_outside_its_hypotheses",
+    "QSVT_iteration_count_reported_as_physical_gate_count",
+    "poorly_conditioned_samples_removed_without_attempted_work_record"
+  ],
+  "required_receipt_fields": [
+    "source_sha",
+    "manifest_sha256",
+    "channel_digest",
+    "scrambler_digest",
+    "seed",
+    "decoder_family",
+    "decoder_access_set",
+    "inaccessible_environment",
+    "sigma_digest",
+    "kraus_digest",
+    "singular_spectrum",
+    "support_rank",
+    "lambda_min_nonzero",
+    "block_encoding_alpha",
+    "qsvt_phase_sequence_digest",
+    "qsvt_iteration_count",
+    "polynomial_degree",
+    "spectrum_weighted_loss",
+    "diamond_distance_or_bound",
+    "entanglement_fidelity",
+    "trace_preservation_residual",
+    "ancilla_count",
+    "oracle_calls",
+    "logical_gate_counts",
+    "circuit_depth",
+    "t_count",
+    "runtime",
+    "peak_memory",
+    "qualification_status"
+  ],
+  "explicit_nonclaims": [
+    "not a physical trapped-ion or other hardware result",
+    "not a macroscopic black-hole evaporation simulation",
+    "not a proof that rotated Petz is universally optimal",
+    "not an efficient decoder claim until resources are implemented and measured",
+    "not an MPS/TEBD implementation"
+  ]
+}
