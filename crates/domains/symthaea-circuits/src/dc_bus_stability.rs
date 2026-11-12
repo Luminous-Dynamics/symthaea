@@ -478,6 +478,33 @@ mod tests {
     }
 
     #[test]
+    fn scaled_voltage_resistance_capacitance_case_preserves_analytic_scaling() {
+        let p = Parameters {
+            source_voltage_v: 400.0,
+            source_resistance_ohm: 0.02,
+            bus_capacitance_f: 0.005,
+            load_power_w: 1_500_000.0,
+        };
+        let analysis = analyze(p, 200.0).expect("scaled valid fixture");
+        assert_eq!(analysis.discriminant_v2, 40_000.0);
+        assert!((analysis.normalized_fold_margin - 0.25).abs() < 1e-15);
+
+        let EquilibriumResult::TwoEquilibria { lower, upper } = analysis.result else {
+            panic!("expected two equilibria");
+        };
+        assert!((lower.voltage_v - 100.0).abs() < 1e-12);
+        assert!((upper.voltage_v - 300.0).abs() < 1e-12);
+        assert!((lower.current_a - 15_000.0).abs() < 1e-9);
+        assert!((upper.current_a - 5_000.0).abs() < 1e-9);
+        assert!((lower.eigenvalue_per_s - 20_000.0).abs() < 1e-8);
+        assert!((upper.eigenvalue_per_s + (20_000.0 / 3.0)).abs() < 1e-8);
+        assert_eq!(
+            analysis.initial_voltage_basin,
+            Some(InitialVoltageBasin::BetweenEquilibriaTowardStableRoot)
+        );
+    }
+
+    #[test]
     fn overflowing_intermediates_are_rejected() {
         let p = Parameters {
             source_voltage_v: 1e200,
