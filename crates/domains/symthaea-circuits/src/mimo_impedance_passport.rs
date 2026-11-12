@@ -257,10 +257,10 @@ pub fn validate_mimo_impedance_sweep(
         if !frequency.is_finite() || frequency < 0.0 {
             return Err(PortMatrixError::InvalidFrequency(frequency_index));
         }
-        if let Some(previous) = previous_frequency {
-            if frequency <= previous {
-                return Err(PortMatrixError::FrequenciesNotStrictlyIncreasing);
-            }
+        if let Some(previous) = previous_frequency
+            && frequency <= previous
+        {
+            return Err(PortMatrixError::FrequenciesNotStrictlyIncreasing);
         }
         previous_frequency = Some(frequency);
 
