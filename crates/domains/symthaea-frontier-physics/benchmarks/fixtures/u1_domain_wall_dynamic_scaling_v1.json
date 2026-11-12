@@ -52,8 +52,9 @@
     "finite_positive_width_squared_at_every_fit_layer": true,
     "jackknife_standard_error_required": true,
     "report_r_squared_without_hiding_poor_fit": true,
-    "finite_size_stability": "Proposed target: max-min z across largest three sizes <= 0.2 with overlapping uncertainty intervals; otherwise report finite-size drift/unresolved.",
-    "universality_claim_requires": "A stable scaling window, multiple sizes, seed uncertainty, window sensitivity, and exclusion of ballistic/diffusive/KPZ reference alternatives by the declared uncertainty."
+    "finite_size_stability": "Proposed target: max-min z across largest three sizes <= 0.2 with overlapping uncertainty intervals and R-squared >= 0.90 at each size; otherwise report finite-size drift/unresolved.",
+    "universality_claim_requires": "A stable scaling window, multiple sizes, seed uncertainty, window sensitivity, and exclusion of ballistic/diffusive/KPZ reference alternatives by the declared uncertainty.",
+    "minimum_r_squared_for_regime_label": 0.9
   },
   "implementation": {
     "api": "analyze_u1_domain_wall_dynamic_exponent",
@@ -99,5 +100,45 @@
     "finite_size_depth_ratio",
     "runtime",
     "peak_memory"
-  ]
+  ],
+  "exploratory_numpy_pilot": {
+    "status": "exploratory_only_not_a_qualification_receipt",
+    "generator": "Independent Python/NumPy complex-Gaussian QR U(2) Haar blocks, independent NumPy PRNG; not Rust ChaCha20 stream.",
+    "sample_count_per_size": 8,
+    "seed_schedule": "0xB1A5 + size_index*100000 + sample_index, size_index follows [6,8,10,12], sample_index 0..7",
+    "depth": "2*N",
+    "fit_window": "N/2 through 2*N inclusive",
+    "results": [
+      {
+        "N": 6,
+        "alpha": 0.1326,
+        "z": 15.0837,
+        "jackknife_standard_error_z": 15.0875,
+        "r_squared": 0.1641
+      },
+      {
+        "N": 8,
+        "alpha": 0.3684,
+        "z": 5.4284,
+        "jackknife_standard_error_z": 1.4837,
+        "r_squared": 0.6918
+      },
+      {
+        "N": 10,
+        "alpha": 0.4703,
+        "z": 4.2526,
+        "jackknife_standard_error_z": 0.8671,
+        "r_squared": 0.7818
+      },
+      {
+        "N": 12,
+        "alpha": 0.5216,
+        "z": 3.8345,
+        "jackknife_standard_error_z": 0.6732,
+        "r_squared": 0.8941
+      }
+    ],
+    "interpretation": "All four sizes fail the proposed R-squared >= 0.90 universality-label gate; uncertainty is wide and z drifts strongly with N. This is a useful negative pilot showing that the tiny dense-system/time-window regime does not yet resolve a hydrodynamic exponent. Do not infer ballistic, diffusive, or KPZ-like universality from these values.",
+    "note": "This pilot does not reproduce the Rust ChaCha20 seeds and does not meet the preregistered 64-seed confirmatory design."
+  }
 }
