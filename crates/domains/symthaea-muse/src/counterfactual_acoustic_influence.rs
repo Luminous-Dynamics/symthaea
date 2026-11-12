@@ -211,25 +211,43 @@ impl std::fmt::Display for InfluenceInputError {
             Self::ZeroChannels => write!(f, "channel count must be non-zero"),
             Self::EmptyAudio => write!(f, "audio must contain at least one frame"),
             Self::InterleavedLengthNotDivisibleByChannels => {
-                write!(f, "interleaved sample count is not divisible by channel count")
+                write!(
+                    f,
+                    "interleaved sample count is not divisible by channel count"
+                )
             }
             Self::NonFiniteSample => write!(f, "audio contains NaN or infinite samples"),
             Self::FormatMismatch => write!(f, "paired render formats differ"),
             Self::LengthMismatch => write!(f, "paired render frame counts differ"),
-            Self::MissingRepeatRender => write!(f, "at least one same-schedule repeat render is required"),
+            Self::MissingRepeatRender => {
+                write!(f, "at least one same-schedule repeat render is required")
+            }
             Self::RepeatReceiptCountMismatch => {
                 write!(f, "repeat audio and repeat renderer receipt counts differ")
             }
             Self::UnchangedSchedule => {
-                write!(f, "counterfactual schedule digest must differ from the baseline schedule")
+                write!(
+                    f,
+                    "counterfactual schedule digest must differ from the baseline schedule"
+                )
             }
             Self::InvalidSha256(field) => write!(f, "invalid SHA-256 field: {field}"),
-            Self::InvalidEventId => write!(f, "source event identity is empty, too long or contains controls"),
-            Self::InvalidIntervention => write!(f, "intervention parameter is outside its valid range"),
-            Self::NoOpIntervention => write!(f, "intervention must declare a non-zero symbolic change"),
+            Self::InvalidEventId => write!(
+                f,
+                "source event identity is empty, too long or contains controls"
+            ),
+            Self::InvalidIntervention => {
+                write!(f, "intervention parameter is outside its valid range")
+            }
+            Self::NoOpIntervention => {
+                write!(f, "intervention must declare a non-zero symbolic change")
+            }
             Self::InvalidConfig(reason) => write!(f, "invalid influence config: {reason}"),
             Self::SerializationFailure => write!(f, "could not serialize influence report"),
-            Self::InvalidRendererReceipt => write!(f, "renderer receipt does not verify against exact output bytes"),
+            Self::InvalidRendererReceipt => write!(
+                f,
+                "renderer receipt does not verify against exact output bytes"
+            ),
         }
     }
 }
@@ -263,8 +281,7 @@ pub fn estimate_counterfactual_influence(
     }
     for repeat in baseline_repeats {
         validate_view(*repeat)?;
-        if repeat.sample_rate_hz != baseline.sample_rate_hz
-            || repeat.channels != baseline.channels
+        if repeat.sample_rate_hz != baseline.sample_rate_hz || repeat.channels != baseline.channels
         {
             return Err(InfluenceInputError::FormatMismatch);
         }
@@ -312,11 +329,11 @@ pub fn estimate_counterfactual_influence(
                 repeat_noise_spectral_floor = repeat_noise_spectral_floor.max(spectral_noise);
             }
 
-            let rms_detection_threshold = (repeat_noise_rms_floor * config.noise_multiplier)
-                .max(config.minimum_rms_delta);
-            let spectral_detection_threshold =
-                (repeat_noise_spectral_floor * config.noise_multiplier)
-                    .max(config.minimum_spectral_distance);
+            let rms_detection_threshold =
+                (repeat_noise_rms_floor * config.noise_multiplier).max(config.minimum_rms_delta);
+            let spectral_detection_threshold = (repeat_noise_spectral_floor
+                * config.noise_multiplier)
+                .max(config.minimum_spectral_distance);
             let detected = effect_rms_delta > rms_detection_threshold
                 || effect_spectral_distance > spectral_detection_threshold;
 
@@ -402,8 +419,7 @@ pub fn verify_counterfactual_influence_report(
     baseline_repeats: &[AudioView<'_>],
     counterfactual: AudioView<'_>,
 ) -> Result<bool, InfluenceInputError> {
-    if report.receipt_sha256.is_empty()
-        || compute_receipt_sha256(report)? != report.receipt_sha256
+    if report.receipt_sha256.is_empty() || compute_receipt_sha256(report)? != report.receipt_sha256
     {
         return Ok(false);
     }
@@ -449,11 +465,23 @@ fn validate_context(
     for (field, value) in [
         ("source_score_sha256", context.source_score_sha256),
         ("baseline_schedule_sha256", context.baseline_schedule_sha256),
-        ("counterfactual_schedule_sha256", context.counterfactual_schedule_sha256),
+        (
+            "counterfactual_schedule_sha256",
+            context.counterfactual_schedule_sha256,
+        ),
         ("renderer_profile_sha256", context.renderer_profile_sha256),
-        ("baseline_render_receipt_sha256", context.baseline_render_receipt_sha256),
-        ("counterfactual_render_receipt_sha256", context.counterfactual_render_receipt_sha256),
-        ("symbolic_intervention_receipt_sha256", context.symbolic_intervention_receipt_sha256),
+        (
+            "baseline_render_receipt_sha256",
+            context.baseline_render_receipt_sha256,
+        ),
+        (
+            "counterfactual_render_receipt_sha256",
+            context.counterfactual_render_receipt_sha256,
+        ),
+        (
+            "symbolic_intervention_receipt_sha256",
+            context.symbolic_intervention_receipt_sha256,
+        ),
     ] {
         validate_sha256(field, value)?;
     }
@@ -471,7 +499,9 @@ fn validate_context(
         source_score_sha256: context.source_score_sha256.to_owned(),
         source_event_id: context.source_event_id.to_owned(),
         intervention: context.intervention,
-        symbolic_intervention_receipt_sha256: context.symbolic_intervention_receipt_sha256.to_owned(),
+        symbolic_intervention_receipt_sha256: context
+            .symbolic_intervention_receipt_sha256
+            .to_owned(),
         baseline_schedule_sha256: context.baseline_schedule_sha256.to_owned(),
         counterfactual_schedule_sha256: context.counterfactual_schedule_sha256.to_owned(),
         renderer_profile_sha256: context.renderer_profile_sha256.to_owned(),
@@ -511,7 +541,11 @@ fn validate_view(view: AudioView<'_>) -> Result<(), InfluenceInputError> {
     if view.interleaved_samples.len() % view.channels != 0 {
         return Err(InfluenceInputError::InterleavedLengthNotDivisibleByChannels);
     }
-    if view.interleaved_samples.iter().any(|sample| !sample.is_finite()) {
+    if view
+        .interleaved_samples
+        .iter()
+        .any(|sample| !sample.is_finite())
+    {
         return Err(InfluenceInputError::NonFiniteSample);
     }
     Ok(())
@@ -604,19 +638,11 @@ fn channel_window(view: AudioView<'_>, start: usize, frames: usize, channel: usi
 
 fn hann_window(size: usize) -> Vec<f32> {
     (0..size)
-        .map(|index| {
-            0.5 - 0.5
-                * (std::f32::consts::TAU * index as f32 / (size - 1) as f32).cos()
-        })
+        .map(|index| 0.5 - 0.5 * (std::f32::consts::TAU * index as f32 / (size - 1) as f32).cos())
         .collect()
 }
 
-fn compare_windows(
-    left: &[f32],
-    right: &[f32],
-    window: &[f32],
-    fft: &dyn Fft<f32>,
-) -> (f32, f32) {
+fn compare_windows(left: &[f32], right: &[f32], window: &[f32], fft: &dyn Fft<f32>) -> (f32, f32) {
     let mean_square_delta = left
         .iter()
         .zip(right)
@@ -863,9 +889,7 @@ impl VerifiedPcm {
 fn verify_and_decode_render(
     evidence: RendererInfluenceEvidence<'_>,
 ) -> Result<VerifiedRender, InfluenceInputError> {
-    use crate::renderer_execution_receipt::{
-        DecodedSampleFormat, RendererBackend, summarize_wav,
-    };
+    use crate::renderer_execution_receipt::{DecodedSampleFormat, RendererBackend, summarize_wav};
 
     let receipt = evidence.receipt;
     let inputs = evidence.inputs;
@@ -891,8 +915,8 @@ fn verify_and_decode_render(
         .verify_artifacts(inputs)
         .map_err(|_| InfluenceInputError::InvalidRendererReceipt)?;
 
-    let summary = summarize_wav(wav_bytes)
-        .map_err(|_| InfluenceInputError::InvalidRendererReceipt)?;
+    let summary =
+        summarize_wav(wav_bytes).map_err(|_| InfluenceInputError::InvalidRendererReceipt)?;
     let mut reader = hound::WavReader::new(std::io::Cursor::new(wav_bytes))
         .map_err(|_| InfluenceInputError::InvalidRendererReceipt)?;
     let spec = reader.spec();
@@ -1032,9 +1056,7 @@ mod tests {
     fn sine(frames: usize, sample_rate_hz: u32, frequency_hz: f32) -> Vec<f32> {
         (0..frames)
             .map(|index| {
-                (std::f32::consts::TAU * frequency_hz * index as f32
-                    / sample_rate_hz as f32)
-                    .sin()
+                (std::f32::consts::TAU * frequency_hz * index as f32 / sample_rate_hz as f32).sin()
             })
             .collect()
     }
@@ -1100,16 +1122,21 @@ mod tests {
 
         assert_eq!(report.verdict, InfluenceVerdict::Detected);
         assert!(report.detected_channel_windows > 0);
-        assert!(report.support_intervals.iter().any(|interval| {
-            interval.start_frame <= 256 && interval.end_frame >= 512
-        }));
-        assert!(verify_counterfactual_influence_report(
-            &report,
-            view(&baseline),
-            &[view(&repeat)],
-            view(&counterfactual)
-        )
-        .expect("report replay"));
+        assert!(
+            report
+                .support_intervals
+                .iter()
+                .any(|interval| { interval.start_frame <= 256 && interval.end_frame >= 512 })
+        );
+        assert!(
+            verify_counterfactual_influence_report(
+                &report,
+                view(&baseline),
+                &[view(&repeat)],
+                view(&counterfactual)
+            )
+            .expect("report replay")
+        );
     }
 
     #[test]
@@ -1194,9 +1221,17 @@ mod tests {
         .expect("valid stereo counterfactual");
 
         assert!(
-            !report.support_intervals.iter().any(|interval| interval.channel == 0)
+            !report
+                .support_intervals
+                .iter()
+                .any(|interval| interval.channel == 0)
         );
-        assert!(report.support_intervals.iter().any(|interval| interval.channel == 1));
+        assert!(
+            report
+                .support_intervals
+                .iter()
+                .any(|interval| interval.channel == 1)
+        );
     }
 
     #[test]
@@ -1216,22 +1251,26 @@ mod tests {
         .unwrap();
         let mut changed = counterfactual.clone();
         changed[10] = 0.5;
-        assert!(!verify_counterfactual_influence_report(
-            &report,
-            view(&baseline),
-            &[view(&repeat)],
-            view(&changed)
-        )
-        .unwrap());
+        assert!(
+            !verify_counterfactual_influence_report(
+                &report,
+                view(&baseline),
+                &[view(&repeat)],
+                view(&changed)
+            )
+            .unwrap()
+        );
         let mut tampered = report.clone();
         tampered.identity.renderer_profile_sha256 = DIGEST_E.to_owned();
-        assert!(!verify_counterfactual_influence_report(
-            &tampered,
-            view(&baseline),
-            &[view(&repeat)],
-            view(&counterfactual)
-        )
-        .unwrap());
+        assert!(
+            !verify_counterfactual_influence_report(
+                &tampered,
+                view(&baseline),
+                &[view(&repeat)],
+                view(&counterfactual)
+            )
+            .unwrap()
+        );
     }
 
     fn native_wav(samples: &[f32]) -> Vec<u8> {
@@ -1245,7 +1284,9 @@ mod tests {
         {
             let mut writer = hound::WavWriter::new(&mut cursor, spec).unwrap();
             for sample in samples {
-                writer.write_sample((sample.clamp(-1.0, 1.0) * 32_767.0) as i16).unwrap();
+                writer
+                    .write_sample((sample.clamp(-1.0, 1.0) * 32_767.0) as i16)
+                    .unwrap();
             }
             writer.finalize().unwrap();
         }
@@ -1344,8 +1385,10 @@ mod tests {
         );
 
         let source_score_digest = crate::renderer_execution_receipt::sha256_hex(score);
-        let baseline_schedule_digest = crate::renderer_execution_receipt::sha256_hex(baseline_schedule);
-        let counterfactual_schedule_digest = crate::renderer_execution_receipt::sha256_hex(counterfactual_schedule);
+        let baseline_schedule_digest =
+            crate::renderer_execution_receipt::sha256_hex(baseline_schedule);
+        let counterfactual_schedule_digest =
+            crate::renderer_execution_receipt::sha256_hex(counterfactual_schedule);
         let report = estimate_from_verified_renderer_evidence(
             native_evidence(
                 &baseline_receipt,
@@ -1384,9 +1427,18 @@ mod tests {
         .expect("all renderer receipts replay and bind to paired schedules");
 
         assert_eq!(report.verdict, InfluenceVerdict::Detected);
-        assert_eq!(report.identity.baseline_render_receipt_sha256, baseline_receipt.receipt_sha256);
-        assert_eq!(report.identity.counterfactual_render_receipt_sha256, counterfactual_receipt.receipt_sha256);
-        assert_eq!(report.identity.baseline_repeat_receipt_sha256, vec![repeat_receipt.receipt_sha256]);
+        assert_eq!(
+            report.identity.baseline_render_receipt_sha256,
+            baseline_receipt.receipt_sha256
+        );
+        assert_eq!(
+            report.identity.counterfactual_render_receipt_sha256,
+            counterfactual_receipt.receipt_sha256
+        );
+        assert_eq!(
+            report.identity.baseline_repeat_receipt_sha256,
+            vec![repeat_receipt.receipt_sha256]
+        );
     }
 
     #[test]
@@ -1426,8 +1478,10 @@ mod tests {
         substituted_wav[48] ^= 0x01;
 
         let source_score_digest = crate::renderer_execution_receipt::sha256_hex(score);
-        let baseline_schedule_digest = crate::renderer_execution_receipt::sha256_hex(baseline_schedule);
-        let counterfactual_schedule_digest = crate::renderer_execution_receipt::sha256_hex(counterfactual_schedule);
+        let baseline_schedule_digest =
+            crate::renderer_execution_receipt::sha256_hex(baseline_schedule);
+        let counterfactual_schedule_digest =
+            crate::renderer_execution_receipt::sha256_hex(counterfactual_schedule);
         let error = estimate_from_verified_renderer_evidence(
             native_evidence(
                 &baseline_receipt,
