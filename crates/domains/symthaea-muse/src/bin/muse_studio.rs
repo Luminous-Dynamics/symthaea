@@ -2714,6 +2714,7 @@ fn summarize_imported_notation_structure(
                     status: status.into(),
                     source_sha256: source_sha256.into(),
                     graph_sha256: Some(graph_sha256),
+                    measure_map_sha256: None,
                     part_count,
                     supported_part_count,
                     unknown_part_count,
