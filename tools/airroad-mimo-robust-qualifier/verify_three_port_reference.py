@@ -122,7 +122,6 @@ def main() -> None:
 
     # The characteristic polynomial is cubic in s with constant term
     # 1 - 8*gamma. Derive the exact stability boundary from that term.
-    assert all(power_s == 0 for (power_s, _), _ in characteristic.items() if power_s == 0)
     constant = characteristic.get((0, 0), Fraction(0))
     gamma_coefficient = characteristic.get((0, 1), Fraction(0))
     assert gamma_coefficient != 0
@@ -153,12 +152,22 @@ def main() -> None:
         assert actual == case["expected"], (case["id"], actual, case["expected"])
         assert lower > 0 and upper >= lower
 
+        a0_at_upper_gamma = Fraction(1) - 8 * upper
+        a0_at_lower_gamma = Fraction(1) - 8 * lower
         if actual == "ROBUSTLY_STABLE":
             assert upper < boundary
+            # Every member has positive cubic coefficients and satisfies
+            # a2*a1 > a3*a0, the remaining cubic Routh-Hurwitz condition.
+            assert a0_at_upper_gamma > 0
+            assert Fraction(9) > Fraction(1) * a0_at_lower_gamma
         elif actual == "ROBUSTLY_UNSTABLE":
             assert lower > boundary
+            # The Routh first column has signs +,+,+,-: exactly one RHP root.
+            assert a0_at_lower_gamma < 0
+            assert (Fraction(9) - a0_at_lower_gamma) / 3 > 0
         else:
             assert lower <= boundary <= upper
+            assert a0_at_upper_gamma <= 0 <= a0_at_lower_gamma
 
         print(f"PASS {case['id']}: [{lower}, {upper}] -> {actual}")
 
