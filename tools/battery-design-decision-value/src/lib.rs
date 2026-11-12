@@ -324,13 +324,13 @@ fn validate_case(case: &BenchmarkCase) -> Result<BTreeMap<&str, &EvidenceRecord>
                 world.world_id
             )));
         }
-        if let Some(probability) = world.prior_probability {
-            if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
-                return Err(AuditError(format!(
-                    "world {} has an invalid prior probability",
-                    world.world_id
-                )));
-            }
+        if let Some(probability) = world.prior_probability
+            && (!probability.is_finite() || !(0.0..=1.0).contains(&probability))
+        {
+            return Err(AuditError(format!(
+                "world {} has an invalid prior probability",
+                world.world_id
+            )));
         }
     }
 
