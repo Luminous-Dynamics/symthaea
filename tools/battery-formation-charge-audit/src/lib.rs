@@ -79,6 +79,13 @@ pub struct ProtocolArm {
     pub is_reference: bool,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FeatureObservation {
+    pub feature_id: String,
+    pub available_cycle: u32,
+    pub evidence_id: String,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LifetimeStatus {
     ObservedEol,
@@ -101,6 +108,7 @@ pub struct CellObservation {
     pub line_identity_digest: String,
     pub split: DataSplit,
     pub feature_cutoff_cycle: u32,
+    pub feature_observations: Vec<FeatureObservation>,
     pub cycles_observed: u32,
     pub status: LifetimeStatus,
     pub event_cycle: Option<u32>,
@@ -566,6 +574,55 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         }
         maximum_observed_feature_cutoff_cycle =
             maximum_observed_feature_cutoff_cycle.max(cell.feature_cutoff_cycle);
+        if cell.feature_observations.is_empty() {
+            return Err(AuditError(format!(
+                "cell {} has no prediction-time feature observations",
+                cell.cell_id
+            )));
+        }
+        validate_unique(
+            cell.feature_observations
+                .iter()
+                .map(|feature| feature.feature_id.as_str()),
+            "cell feature ID",
+        )?;
+        for feature in &cell.feature_observations {
+            require_nonempty(&feature.feature_id, "feature ID")?;
+            if feature.available_cycle == 0
+                || feature.available_cycle > cell.feature_cutoff_cycle
+            {
+                return Err(AuditError(format!(
+                    "cell {} feature {} was not available by its declared prediction cutoff",
+                    cell.cell_id, feature.feature_id
+                )));
+            }
+            let feature_evidence = require_admitted(
+                &registry,
+                &feature.evidence_id,
+                &format!("cell {} feature {}", cell.cell_id, feature.feature_id),
+            )?;
+            match cell.status {
+                LifetimeStatus::SyntheticOutcome
+                    if feature_evidence.evidence_class != EvidenceClass::SyntheticFixture =>
+                {
+                    return Err(AuditError(format!(
+                        "synthetic feature {} for cell {} requires synthetic-fixture evidence",
+                        feature.feature_id, cell.cell_id
+                    )));
+                }
+                LifetimeStatus::ObservedEol
+                | LifetimeStatus::RightCensored
+                | LifetimeStatus::CompetingFailure
+                    if !feature_evidence.evidence_class.is_physical() =>
+                {
+                    return Err(AuditError(format!(
+                        "physical feature {} for cell {} requires physical evidence",
+                        feature.feature_id, cell.cell_id
+                    )));
+                }
+                _ => {}
+            }
+        }
 
         let arm = arms_by_id
             .get(cell.arm_id.as_str())
@@ -808,6 +865,11 @@ mod tests {
                     line_identity_digest: digest('4'),
                     split,
                     feature_cutoff_cycle: 20,
+                    feature_observations: vec![FeatureObservation {
+                        feature_id: "differential_voltage_first_cycles".into(),
+                        available_cycle: 5,
+                        evidence_id: "E-FEATURE".into(),
+                    }],
                     cycles_observed: 500,
                     status: LifetimeStatus::SyntheticOutcome,
                     event_cycle: Some(420 + suffix as u32),
@@ -829,6 +891,7 @@ mod tests {
             evidence: vec![
                 evidence("E-ARM", '5', EvidenceClass::SyntheticFixture, None),
                 evidence("E-OUTCOME", '6', EvidenceClass::SyntheticFixture, None),
+                evidence("E-FEATURE", '7', EvidenceClass::SyntheticFixture, None),
             ],
         }
     }
@@ -958,6 +1021,20 @@ mod tests {
     fn feature_cutoff_cannot_exceed_prediction_time_budget() {
         let mut value = fixture();
         value.cells[0].feature_cutoff_cycle = 51;
+        assert!(audit_campaign(&value).is_err());
+    }
+
+    #[test]
+    fn feature_available_after_cutoff_is_rejected() {
+        let mut value = fixture();
+        value.cells[0].feature_observations[0].available_cycle = 21;
+        assert!(audit_campaign(&value).is_err());
+    }
+
+    #[test]
+    fn feature_evidence_must_be_admitted() {
+        let mut value = fixture();
+        value.evidence[2].admission = EvidenceAdmission::Blocked;
         assert!(audit_campaign(&value).is_err());
     }
 
