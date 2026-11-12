@@ -420,11 +420,23 @@ pub struct MusicXmlPlaybackControlV1 {
     pub text: Option<String>,
 }
 
+/// Source-native identity and attributes for one notated measure.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MusicXmlMeasureLocatorV1 {
+    pub measure_index: usize,
+    pub number: Option<String>,
+    pub source_id: Option<String>,
+    pub display_text: Option<String>,
+    pub implicit: bool,
+    pub non_controlling: bool,
+}
+
 /// Complete measure map, typed barline events and playback controls for a part.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlPartNotationGraphV1 {
     pub part_id: String,
     pub map: MeasureMap,
+    pub measure_locators: Vec<MusicXmlMeasureLocatorV1>,
     pub non_controlling_measure_indices: Vec<usize>,
     pub barline_events: Vec<MusicXmlPartBarlineEventV1>,
     pub playback_controls: Vec<MusicXmlPlaybackControlV1>,
@@ -474,6 +486,7 @@ pub fn parse_musicxml_part_notation_graph(
                 id: part_id.to_string(),
             });
         }
+        let measure_locators = parse_measure_locators_for_part(part);
         let parsed = parse_part(part)?;
         match parsed {
             Some(measures) if !measures.is_empty() => {
@@ -514,6 +527,7 @@ pub fn parse_musicxml_part_notation_graph(
                 output.push(MusicXmlPartNotationGraphV1 {
                     part_id: part_id.to_string(),
                     map,
+                    measure_locators,
                     non_controlling_measure_indices,
                     barline_events,
                     playback_controls,
@@ -530,6 +544,7 @@ pub fn parse_musicxml_part_notation_graph(
                     },
                     measures: Vec::new(),
                 },
+                measure_locators,
                 non_controlling_measure_indices: Vec::new(),
                 barline_events: Vec::new(),
                 playback_controls: Vec::new(),
@@ -579,6 +594,30 @@ pub fn validate_musicxml_notation_graph_replay(
     Ok(replayed == supplied)
 }
 
+
+fn parse_measure_locators_for_part(
+    part: roxmltree::Node<'_, '_>,
+) -> Vec<MusicXmlMeasureLocatorV1> {
+    part.children()
+        .filter(|node| node.has_tag_name("measure"))
+        .enumerate()
+        .map(|(measure_index, measure)| {
+            let is_yes = |name: &str| {
+                measure
+                    .attribute(name)
+                    .is_some_and(|value| matches!(value, "yes" | "true" | "1"))
+            };
+            MusicXmlMeasureLocatorV1 {
+                measure_index,
+                number: measure.attribute("number").map(str::to_string),
+                source_id: measure.attribute("id").map(str::to_string),
+                display_text: measure.attribute("text").map(str::to_string),
+                implicit: is_yes("implicit"),
+                non_controlling: is_yes("non-controlling"),
+            }
+        })
+        .collect()
+}
 
 /// Preserve score-level playback directives that are not barline events.
 ///
@@ -1842,6 +1881,31 @@ mod tests {
         ));
         assert_eq!(graph[0].playback_controls[1].element, "measure/note");
         assert_eq!(graph[0].playback_controls[2].element, "measure/note/lyric");
+    }
+
+
+    #[test]
+    fn graph_preserves_source_measure_numbers_and_locator_attributes() {
+        let xml = r#"<score-partwise><part id="P1">
+            <measure number="0" id="pickup-id" implicit="yes" text="Pickup">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><rest/><duration>4</duration></note>
+            </measure>
+            <measure number="A" id="irregular-id" non-controlling="yes" text="A-section">
+                <note><rest/><duration>4</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "sha256:measure-locators", "score-clock"
+        ).unwrap();
+        assert_eq!(graph[0].measure_locators.len(), 2);
+        assert_eq!(graph[0].measure_locators[0].number.as_deref(), Some("0"));
+        assert_eq!(graph[0].measure_locators[0].source_id.as_deref(), Some("pickup-id"));
+        assert_eq!(graph[0].measure_locators[0].display_text.as_deref(), Some("Pickup"));
+        assert!(graph[0].measure_locators[0].implicit);
+        assert_eq!(graph[0].measure_locators[1].number.as_deref(), Some("A"));
+        assert_eq!(graph[0].measure_locators[1].source_id.as_deref(), Some("irregular-id"));
+        assert!(graph[0].measure_locators[1].non_controlling);
     }
 
 }
