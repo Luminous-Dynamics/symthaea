@@ -64,7 +64,23 @@ Sources:
 - NASA NTRS, Government Reference Design of the Vertical Solar Array Technology Demonstrator: https://ntrs.nasa.gov/citations/20240004914
 - NASA FY2025 SBIR solicitation (50-kW, >75 W/kg goal and South Pole environment): https://www.nasa.gov/wp-content/uploads/2024/01/2025-nasa-sbir-phase-i-solicitation-final-rev.pdf
 
-## 4. Lunar regolith-to-PV manufacturing reference
+## 4. Power delivery as a network architecture
+
+Generation need not be co-located with every load. NASA's 2024 lunar laser-power-beaming design study uses a VSAT-style solar source and describes a design requirement for 300 W continuous usable power at receivers up to 10 km away, a five-year design life and a total system landed-mass limit below 625 kg. It is an engineering design study, not an operational laser-power-beaming demonstration.
+
+This adds a meaningful distribution tournament:
+- local PV + local storage at each asset;
+- elevated/relocatable PV hub + DC cable / modular microgrid;
+- PV + cable trunk + local buffering;
+- PV/fission hub + laser power-beaming terminal for line-of-sight mobile or remote loads;
+- hybrid mesh with multiple local sources and relay/beaming nodes.
+
+Compare end-to-end delivered power, beam/receiver efficiency, pointing/availability, line-of-sight outages, exclusion/safety zones, receiver thermal loads, cable mass/loss, storage mass, maintenance, repair, relocation, and total landed/installed mass. Laser beaming is a distribution option, not an energy source; it cannot evade energy conservation or geometry. A receiver behind terrain still needs another node, cable, mobility or local generation.
+
+Reference:
+- NASA NTRS, Engineering Design Study of Laser Power Beaming for Applications on the Moon: https://ntrs.nasa.gov/citations/20240011011
+
+## 5. Lunar regolith-to-PV manufacturing reference
 
 NASA's public Lunar Surface Technology page describes Blue Origin's Blue Alchemist as an integrated autonomous technology set using regolith simulants and molten regolith electrolysis plus associated processes to produce silicon solar cells, aluminium wire, oxygen, iron and slag. NASA TechPort reports that the integrated system matured to TRL 6.
 
@@ -80,7 +96,7 @@ Sources:
 - NASA 2025 ISAM State of Play: https://ntrs.nasa.gov/citations/20250008988
 - TU Berlin / JPM Silicon SoMo: https://www.tu.berlin/en/raumfahrttechnik/research/current-projects/somo
 
-## 5. Perovskite and autonomous manufacturing frontier
+## 6. Perovskite and autonomous manufacturing frontier
 
 A 14 April 2026 Nature study integrates machine-learning materials discovery, automated fabrication, Bayesian optimization and symbolic regression in a closed loop. It reports:
 - 27.18% certified MPPT efficiency on a 0.05 cm² cell;
@@ -101,7 +117,7 @@ Sources:
 - Nature Reviews Materials 2026 industrial manufacturing review: https://www.nature.com/articles/s41578-026-00973-9
 - Nature Reviews Clean Technology 2026 product-commercialization perspective: https://www.nature.com/articles/s44359-026-00173-2
 
-## 6. Terrestrial PV durability baseline
+## 7. Terrestrial PV durability baseline
 
 The NLR PV Fleet Performance Data Initiative reports a median fleet performance-loss rate of 0.75%/year across 4,915 datapoints in its current published snapshot. This is a field fleet statistic, not a pure module-degradation rate. It includes plant-level factors and its specific data/analysis population.
 
@@ -117,7 +133,7 @@ PESE should use it as a terrestrial system-level diagnostic baseline, not as a t
 Source:
 - NLR PV Fleet Performance Data Initiative: https://www.nlr.gov/pv/fleet-performance-data-initiative
 
-## 7. Competitive benchmark ladder
+## 8. Competitive benchmark ladder
 
 | Benchmark | Baseline | Target that could differentiate Luminous | Evidence required |
 |---|---|---|---|
@@ -131,7 +147,7 @@ Source:
 
 The target column is a research programme, not present performance. Do not claim “SOTA surpassed” from a synthetic evaluator or a review document.
 
-## 8. Highest-value paradigm shifts
+## 9. Highest-value paradigm shifts
 
 1. **Terrain-aware vertical power infrastructure:** use Sol-Atlas/LOLA terrain/horizon evidence to co-design site placement, mast height, array azimuth, mutual shadowing, cables, mobility, retraction and repair. Optimize the complete site network, not each array in isolation.
 2. **Joint electric–thermal–manufacturing architecture:** process heat, storage, radiation cooling, radiator sight-lines, waste heat and factory schedules share one mission envelope; preserve the different service grades.
@@ -141,7 +157,7 @@ The target column is a research programme, not present performance. Do not claim
 6. **Robust service before average efficiency:** include long darkness, storms, missing sources, degradation, delayed maintenance, failed deployment, storage derating and common-cause outages. Measure worst-case unserved critical energy and recovery.
 7. **Repairability and reversibility:** modules, blankets, masts, radiators, power converters and process equipment must be replaceable, inspectable and recoverable with locally available tools/materials wherever demonstrated.
 
-## 9. Next benchmark work
+## 10. Next benchmark work
 
 1. Extract source-pinned component and mission data for NASA VSAT (10-kW baseline, 50-kW target), the actual manufacturer cell products in NASA SOA, Blue Alchemist, SoMo and 2026 perovskite process papers.
 2. Separate confirmed product values, programme goals, model outputs, author interpretations and unknown values.
@@ -151,7 +167,7 @@ The target column is a research programme, not present performance. Do not claim
 6. Build the synthetic evaluator and source register; then compare Symthaea candidate/experiment selection with random, space-filling, uncertainty-only, simple engineering and external-tool baselines.
 7. Establish one low-risk terrestrial bench and one regolith-simulant process coupon test only after facility/safety and independent material/product qualification.
 
-## 10. Machine-readable competitor ledger
+## 11. Machine-readable competitor ledger
 
 The source-defined numeric values and evidence boundaries summarized above are also recorded in:
 
@@ -175,6 +191,6 @@ cargo run -p xtask -- planetary-reference-audit
 
 It checks the presence and consistency of source, unit, evidence-class, boundary, caveat and identity metadata. It does not re-run the cited experiments or establish that a source claim is independently true.
 
-## 11. Claim ceiling
+## 12. Claim ceiling
 
 This document reports current source-defined SOTA, programme designs and research targets as of 12 November 2026. It does not establish that any Luminous design beats these values or is physically feasible. No simulator result, source audit, synthetic case or AI-generated architecture is physical validation or approval. Claims require exact configuration identity, comparable functional boundaries, independent measurement, held-out conditions and reproducible artifacts.
