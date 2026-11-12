@@ -14,7 +14,7 @@
 #![forbid(unsafe_code)]
 
 use electric_propulsion_map_oracle::{
-    EfficiencyMap2D, MapLookup, MapNode, MapQuery,
+    EfficiencyMap2D, MapCoordinateBounds, MapCoordinateEnvelope, MapLookup, MapNode, MapQuery,
 };
 use electric_propulsion_observation_oracle::{
     CalibrationStatus, MeasurementChannel, MeasurementQuantity, MeasurementSample,
@@ -22,9 +22,9 @@ use electric_propulsion_observation_oracle::{
     SignConvention, TimeDomain, derive_motor_map_operating_point, synchronize_at,
 };
 use electric_rotorcraft_drive_oracle::{
-    DriveConfig, DriveError, DriveInput, DriveMapEnvelope, DriveMapExpectedContext,
-    MotorEfficiencyEvidence, TransmissionKinematics, derive_motor_shaft_operating_point,
-    evaluate_drive_with_map_evidence,
+    DriveError, DriveInput, DriveMapExpectedContext, MotorShaftCoordinateMapEvidence,
+    MotorShaftDemandConfig, MotorShaftDemandEnvelope, TransmissionKinematics,
+    derive_motor_shaft_operating_point, evaluate_motor_shaft_coordinate_envelope,
 };
 use electric_thermal_loss_ledger_oracle::{
     ElectricalLoad, ElectricalLoadKind, ElectricalLoadReport, HeatAllocationReport,
@@ -48,7 +48,6 @@ pub enum IntegrationError {
     Map(MapError),
     Drive(DriveError),
     Ledger(LedgerError),
-    UncertaintyEnvelopeCrossesMapCell,
 }
 
 impl fmt::Display for IntegrationError {
@@ -88,7 +87,7 @@ impl From<LedgerError> for IntegrationError {
 pub struct IntegrationReport {
     pub motor_observation: MotorMapOperatingPoint,
     pub map_lookup: MapLookup,
-    pub drive_envelope: DriveMapEnvelope,
+    pub drive_envelope: MotorShaftDemandEnvelope,
     pub electrical_loads: ElectricalLoadReport,
     pub thermal_allocation: HeatAllocationReport,
 }
@@ -98,16 +97,21 @@ struct CoreResult {
     observation: MotorMapOperatingPoint,
     #[cfg(test)]
     map: EfficiencyMap2D,
+    #[cfg(test)]
+    coordinate_envelope: MapCoordinateEnvelope,
     map_lookup: MapLookup,
     #[cfg(test)]
-    evidence: MotorEfficiencyEvidence,
+    motor_shaft_evidence: MotorShaftCoordinateMapEvidence,
     #[cfg(test)]
-    drive_config: DriveConfig,
+    drive_config: MotorShaftDemandConfig,
     #[cfg(test)]
     drive_input: DriveInput,
     #[cfg(test)]
     transmission: TransmissionKinematics,
-    drive_envelope: DriveMapEnvelope,
+    rotor_shaft_power_w: f64,
+    transmission_loss_w: f64,
+    duration_s: f64,
+    drive_envelope: MotorShaftDemandEnvelope,
 }
 
 fn sample(sequence: u64, timestamp_ns: i64, value: f64, uncertainty: f64) -> MeasurementSample {
@@ -151,48 +155,21 @@ fn channel(
     }
 }
 
-/// Conservative map-efficiency bounds over the observed torque/RPM rectangle.
-///
-/// Within one bilinear map cell, the interpolated efficiency and linearly
-/// interpolated nodal uncertainty attain their rectangle extrema at corners.
-/// If any corner enters another cell, this adapter refuses to claim that the
-/// four-corner envelope is sufficient; the interval must first be partitioned
-/// at map grid lines.
-fn map_efficiency_bounds_over_observation_interval(
+/// Evaluate the complete rectangular metrology set through every
+/// intersected bilinear map cell. The map oracle owns OOD rejection and
+/// corner-extremum enumeration; this adapter does not duplicate that logic.
+fn map_efficiency_envelope_over_observation_interval(
     map: &EfficiencyMap2D,
     observation: &MotorMapOperatingPoint,
-    nominal: &MapLookup,
-) -> Result<(f64, f64), IntegrationError> {
-    let torque_bounds = [
-        observation.torque_value_nm - observation.torque_absolute_uncertainty_nm,
-        observation.torque_value_nm + observation.torque_absolute_uncertainty_nm,
-    ];
-    let speed_bounds = [
-        observation.speed_value_rpm - observation.speed_absolute_uncertainty_rpm,
-        observation.speed_value_rpm + observation.speed_absolute_uncertainty_rpm,
-    ];
-    let mut lower_bound = f64::INFINITY;
-    let mut upper_bound = f64::NEG_INFINITY;
-
-    for torque in torque_bounds {
-        for speed in speed_bounds {
-            let corner = map.lookup(MapQuery {
-                configuration_digest: &observation.configuration_digest,
-                context_digest: &observation.context_digest,
-                motor_torque_nm: torque,
-                motor_speed_rpm: speed,
-            })?;
-            if corner.torque_cell_lower_index != nominal.torque_cell_lower_index
-                || corner.speed_cell_lower_index != nominal.speed_cell_lower_index
-            {
-                return Err(IntegrationError::UncertaintyEnvelopeCrossesMapCell);
-            }
-            lower_bound = lower_bound.min(corner.efficiency_lower_bound);
-            upper_bound = upper_bound.max(corner.efficiency_upper_bound);
-        }
-    }
-
-    Ok((lower_bound, upper_bound))
+) -> Result<MapCoordinateEnvelope, IntegrationError> {
+    Ok(map.lookup_coordinate_bounds(MapCoordinateBounds {
+        configuration_digest: &observation.configuration_digest,
+        context_digest: &observation.context_digest,
+        nominal_motor_torque_nm: observation.torque_value_nm,
+        absolute_torque_bound_nm: observation.torque_absolute_uncertainty_nm,
+        nominal_motor_speed_rpm: observation.speed_value_rpm,
+        absolute_speed_bound_rpm: observation.speed_absolute_uncertainty_rpm,
+    })?)
 }
 
 fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationError> {
@@ -213,6 +190,30 @@ fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationErro
     // Derive the motor-shaft point once; the synthetic measurement samples use
     // these exact values so the later bit-exact evidence/operating-point join
     // is checking lineage rather than a rounded, hand-copied coordinate.
+    let expected_motor_point = derive_motor_shaft_operating_point(
+        drive_input,
+        transmission,
+        transmission_efficiency,
+    )?;
+
+    let manifest = RunManifest {
+        run_id: "synthetic-run-001".fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationError> {
+    // Frozen reference: 10 kW at the rotor shaft and 3,000 rotor RPM.
+    let rotor_speed_rpm = 3_000.0;
+    let rotor_angular_velocity_rad_s = rotor_speed_rpm * TAU / 60.0;
+    let drive_input = DriveInput {
+        rotor_shaft_torque_nm: 10_000.0 / rotor_angular_velocity_rad_s,
+        rotor_speed_rpm,
+        dc_bus_voltage_v: 400.0,
+        duration_s: 12.0,
+    };
+    let transmission = TransmissionKinematics {
+        motor_to_rotor_speed_ratio: 5.0,
+    };
+    let transmission_efficiency = 0.90;
+
+    // Derive the motor-side point once. The sensor channels use these exact
+    // coordinates so evidence joins are not based on hand-rounded values.
     let expected_motor_point = derive_motor_shaft_operating_point(
         drive_input,
         transmission,
@@ -289,66 +290,70 @@ fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationErro
         ],
         0.001,
     )?;
-    let map_lookup = map.lookup(MapQuery {
-        configuration_digest: &observation.configuration_digest,
-        context_digest: &observation.context_digest,
-        motor_torque_nm: torque,
-        motor_speed_rpm: speed,
-    })?;
-    let (efficiency_lower_bound, efficiency_upper_bound) =
-        map_efficiency_bounds_over_observation_interval(&map, &observation, &map_lookup)?;
+    let coordinate_envelope =
+        map_efficiency_envelope_over_observation_interval(&map, &observation)?;
+    let map_lookup = coordinate_envelope.nominal_lookup.clone();
 
-    // Explicit adapter between independently versioned map and drive oracles.
-    let evidence = MotorEfficiencyEvidence {
+    // Explicit hand-off between independently versioned map and drive oracles.
+    let motor_shaft_evidence = MotorShaftCoordinateMapEvidence {
         map_id: map_lookup.map_id.clone(),
         map_digest: map_lookup.map_digest.clone(),
         map_model_version: map_lookup.model_version.to_owned(),
-        torque_cell_lower_index: map_lookup.torque_cell_lower_index,
-        speed_cell_lower_index: map_lookup.speed_cell_lower_index,
-        interpolation_weights: map_lookup.interpolation_weights,
         configuration_digest: map_lookup.configuration_digest.clone(),
         context_digest: map_lookup.context_digest.clone(),
         evidence_manifest_digest: map_lookup.evidence_manifest_digest.clone(),
-        motor_torque_nm: map_lookup.motor_torque_nm,
-        motor_speed_rpm: map_lookup.motor_speed_rpm,
-        efficiency_lower_bound,
+        nominal_motor_torque_nm: observation.torque_value_nm,
+        torque_lower_bound_nm: coordinate_envelope.torque_lower_nm,
+        torque_upper_bound_nm: coordinate_envelope.torque_upper_nm,
+        nominal_motor_speed_rpm: observation.speed_value_rpm,
+        speed_lower_bound_rpm: coordinate_envelope.speed_lower_rpm,
+        speed_upper_bound_rpm: coordinate_envelope.speed_upper_rpm,
+        efficiency_lower_bound: coordinate_envelope.efficiency_lower_bound,
         efficiency_nominal: map_lookup.efficiency,
-        efficiency_upper_bound,
+        efficiency_upper_bound: coordinate_envelope.efficiency_upper_bound,
     };
-    let drive_config = DriveConfig {
-        transmission_efficiency,
-        motor_efficiency: map_lookup.efficiency,
+    let drive_config = MotorShaftDemandConfig {
         inverter_efficiency: 0.98,
+        dc_bus_voltage_v: drive_input.dc_bus_voltage_v,
+        duration_s: drive_input.duration_s,
         minimum_dc_bus_voltage_v: 350.0,
         maximum_dc_bus_current_a: 500.0,
         maximum_dc_bus_power_w,
         energy_balance_tolerance_j: 1.0e-5,
     };
-    let drive_envelope = evaluate_drive_with_map_evidence(
+    let drive_envelope = evaluate_motor_shaft_coordinate_envelope(
         &drive_config,
-        drive_input,
-        transmission,
         DriveMapExpectedContext {
             configuration_digest: &observation.configuration_digest,
             context_digest: &observation.context_digest,
         },
-        &evidence,
+        &motor_shaft_evidence,
     )?;
+
+    let rotor_shaft_power_w = drive_input.rotor_shaft_torque_nm
+        * (drive_input.rotor_speed_rpm * TAU / 60.0);
+    let transmission_loss_w = expected_motor_point.motor_shaft_output_power_w
+        - rotor_shaft_power_w;
 
     Ok(CoreResult {
         manifest,
         observation,
         #[cfg(test)]
         map,
+        #[cfg(test)]
+        coordinate_envelope,
         map_lookup,
         #[cfg(test)]
-        evidence,
+        motor_shaft_evidence,
         #[cfg(test)]
         drive_config,
         #[cfg(test)]
         drive_input,
         #[cfg(test)]
         transmission,
+        rotor_shaft_power_w,
+        transmission_loss_w,
+        duration_s: drive_input.duration_s,
         drive_envelope,
     })
 }
@@ -364,9 +369,9 @@ fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationErro
 /// allocated (or left explicitly unallocated) in the thermal ledger.
 pub fn run_synthetic_fixture() -> Result<IntegrationReport, IntegrationError> {
     let core = build_core(100_000.0)?;
-    let adverse_drive = *core
+    let upper_demand = *core
         .drive_envelope
-        .adverse_efficiency_scenario
+        .upper_demand_scenario
         .as_ref()
         .map_err(|error| IntegrationError::Drive(error.clone()))?;
 
@@ -377,7 +382,7 @@ pub fn run_synthetic_fixture() -> Result<IntegrationReport, IntegrationError> {
                 load_id: "synthetic-propulsion-dc".to_owned(),
                 meter_boundary_id: "synthetic-propulsion-dc-boundary".to_owned(),
                 kind: ElectricalLoadKind::PropulsionDcInput,
-                power_w: adverse_drive.dc_bus_input_power_w,
+                power_w: upper_demand.dc_bus_input_power_w,
                 evidence_manifest_digest: evidence_digest.clone(),
             },
             ElectricalLoad {
@@ -402,7 +407,7 @@ pub fn run_synthetic_fixture() -> Result<IntegrationReport, IntegrationError> {
                 evidence_manifest_digest: "synthetic-distribution-evidence-sha256".to_owned(),
             },
         ],
-        core.drive_input.duration_s,
+        core.duration_s,
     )?;
 
     let thermal_allocation = allocate_loss_heat(&[
@@ -410,7 +415,7 @@ pub fn run_synthetic_fixture() -> Result<IntegrationReport, IntegrationError> {
             source_id: "synthetic-transmission-loss".to_owned(),
             component_id: "synthetic-gearbox-01".to_owned(),
             kind: HeatLossKind::Transmission,
-            loss_power_w: adverse_drive.transmission_loss_w,
+            loss_power_w: core.transmission_loss_w,
             evidence_manifest_digest: evidence_digest.clone(),
             allocations: vec![ThermalNodeAllocation {
                 thermal_node_id: "gearbox-housing".to_owned(),
@@ -421,7 +426,7 @@ pub fn run_synthetic_fixture() -> Result<IntegrationReport, IntegrationError> {
             source_id: "synthetic-motor-loss".to_owned(),
             component_id: "synthetic-motor-01".to_owned(),
             kind: HeatLossKind::Motor,
-            loss_power_w: adverse_drive.motor_loss_w,
+            loss_power_w: upper_demand.motor_loss_w,
             evidence_manifest_digest: evidence_digest.clone(),
             allocations: vec![ThermalNodeAllocation {
                 thermal_node_id: "motor-case".to_owned(),
@@ -432,7 +437,7 @@ pub fn run_synthetic_fixture() -> Result<IntegrationReport, IntegrationError> {
             source_id: "synthetic-inverter-loss".to_owned(),
             component_id: "synthetic-inverter-01".to_owned(),
             kind: HeatLossKind::Inverter,
-            loss_power_w: adverse_drive.inverter_loss_w,
+            loss_power_w: upper_demand.inverter_loss_w,
             evidence_manifest_digest: evidence_digest,
             allocations: vec![ThermalNodeAllocation {
                 thermal_node_id: "inverter-baseplate".to_owned(),
@@ -458,36 +463,31 @@ mod tests {
     #[test]
     fn end_to_end_fixture_preserves_evidence_and_closes_both_ledgers() {
         let report = run_synthetic_fixture().unwrap();
-        let adverse = report
+        let minimum = report
             .drive_envelope
-            .adverse_efficiency_scenario
+            .minimum_demand_scenario
             .as_ref()
             .unwrap();
         let nominal = report
             .drive_envelope
-            .nominal_efficiency_scenario
+            .nominal_demand_scenario
             .as_ref()
             .unwrap();
-        let favourable = report
+        let upper = report
             .drive_envelope
-            .favourable_efficiency_scenario
+            .upper_demand_scenario
             .as_ref()
             .unwrap();
 
-        assert!((adverse.rotor_shaft_power_w - 10_000.0).abs() < 1.0e-8);
+        assert!((upper.motor_shaft_output_power_w - 10_000.0 / 0.90).abs() < 1.0e-8);
         assert!((report.motor_observation.shaft_power_w - 10_000.0 / 0.90).abs() < 1.0e-8);
-        assert!(
-            report.motor_observation.shaft_power_lower_bound_w
-                < report.motor_observation.shaft_power_w
-        );
-        assert!(
-            report.motor_observation.shaft_power_upper_bound_w
-                > report.motor_observation.shaft_power_w
-        );
-        assert!((report.drive_envelope.motor_operating_point.motor_speed_rpm - 15_000.0).abs()
-            < 1.0e-8);
-        assert!(adverse.dc_bus_input_power_w > nominal.dc_bus_input_power_w);
-        assert!(nominal.dc_bus_input_power_w > favourable.dc_bus_input_power_w);
+        assert!(report.motor_observation.shaft_power_lower_bound_w
+            < report.motor_observation.shaft_power_w);
+        assert!(report.motor_observation.shaft_power_upper_bound_w
+            > report.motor_observation.shaft_power_w);
+        assert!((upper.motor_speed_rpm - 15_000.0).abs() < 1.0e-8);
+        assert!(minimum.dc_bus_input_power_w < nominal.dc_bus_input_power_w);
+        assert!(nominal.dc_bus_input_power_w < upper.dc_bus_input_power_w);
 
         assert_eq!(
             report.motor_observation.configuration_digest,
@@ -511,15 +511,15 @@ mod tests {
             report.motor_observation.evidence_manifest_digest
         );
 
-        assert!((adverse.dc_bus_input_energy_j
-            - adverse.dc_bus_input_power_w * 12.0)
+        assert!((upper.dc_bus_input_energy_j
+            - upper.dc_bus_input_power_w * 12.0)
             .abs()
             < 1.0e-7);
-        assert!(adverse.energy_balance_residual_j.abs() < 1.0e-5);
+        assert!(upper.energy_balance_residual_j.abs() < 1.0e-5);
 
         assert_eq!(
             report.electrical_loads.propulsion_dc_input_power_w,
-            Some(adverse.dc_bus_input_power_w)
+            Some(upper.dc_bus_input_power_w)
         );
         assert_eq!(
             report.electrical_loads.thermal_management_power_w,
@@ -535,7 +535,7 @@ mod tests {
         );
         assert!(
             (report.electrical_loads.battery_terminal_power_w
-                - (adverse.dc_bus_input_power_w + 400.0))
+                - (upper.dc_bus_input_power_w + 400.0))
                 .abs()
                 < 1.0e-8
         );
@@ -546,9 +546,13 @@ mod tests {
                 < 1.0e-7
         );
 
+        let expected_declared_loss = report.motor_observation.shaft_power_w
+            - 10_000.0
+            + upper.motor_loss_w
+            + upper.inverter_loss_w;
         assert!(
             (report.thermal_allocation.total_declared_loss_power_w
-                - adverse.total_conversion_loss_w)
+                - expected_declared_loss)
                 .abs()
                 < 1.0e-8
         );
@@ -607,7 +611,7 @@ mod tests {
     }
 
     #[test]
-    fn uncertainty_rectangle_crossing_a_map_cell_fails_closed() {
+    fn uncertainty_rectangle_crossing_a_map_cell_is_fully_enumerated() {
         let core = build_core(100_000.0).unwrap();
         let torque = core.observation.torque_value_nm;
         let speed = core.observation.speed_value_rpm;
@@ -633,37 +637,32 @@ mod tests {
             0.0,
         )
         .unwrap();
-        let nominal = crossing_map
-            .lookup(MapQuery {
+
+        let envelope = crossing_map
+            .lookup_coordinate_bounds(MapCoordinateBounds {
                 configuration_digest: CONFIGURATION_DIGEST,
                 context_digest: CONTEXT_DIGEST,
-                motor_torque_nm: torque,
-                motor_speed_rpm: speed,
+                nominal_motor_torque_nm: torque,
+                absolute_torque_bound_nm: core.observation.torque_absolute_uncertainty_nm,
+                nominal_motor_speed_rpm: speed,
+                absolute_speed_bound_rpm: core.observation.speed_absolute_uncertainty_rpm,
             })
             .unwrap();
-
-        assert!(matches!(
-            map_efficiency_bounds_over_observation_interval(
-                &crossing_map,
-                &core.observation,
-                &nominal
-            ),
-            Err(IntegrationError::UncertaintyEnvelopeCrossesMapCell)
-        ));
+        assert_eq!(envelope.intersected_cells.len(), 2);
+        assert_eq!(envelope.efficiency_lower_bound, 0.949);
+        assert_eq!(envelope.efficiency_upper_bound, 0.951);
     }
 
     #[test]
     fn drive_consumer_rejects_mismatched_configuration_before_evaluation() {
         let core = build_core(100_000.0).unwrap();
-        let result = evaluate_drive_with_map_evidence(
+        let result = evaluate_motor_shaft_coordinate_envelope(
             &core.drive_config,
-            core.drive_input,
-            core.transmission,
             DriveMapExpectedContext {
                 configuration_digest: "different-aircraft-configuration",
                 context_digest: CONTEXT_DIGEST,
             },
-            &core.evidence,
+            &core.motor_shaft_evidence,
         );
         assert!(matches!(
             result,
@@ -672,15 +671,13 @@ mod tests {
     }
 
     #[test]
-    fn adverse_map_scenario_failure_is_not_hidden_by_nominal_feasibility() {
-        // The 0.5% absolute efficiency bound makes adverse demand exceed this
-        // limit while nominal and favourable demand remain below it.
+    fn upper_coordinate_demand_failure_is_not_hidden_by_nominal_feasibility() {
         let core = build_core(11_880.0).unwrap();
         assert!(matches!(
-            core.drive_envelope.adverse_efficiency_scenario,
+            core.drive_envelope.upper_demand_scenario,
             Err(DriveError::DcBusPowerLimitExceeded { .. })
         ));
-        assert!(core.drive_envelope.nominal_efficiency_scenario.is_ok());
-        assert!(core.drive_envelope.favourable_efficiency_scenario.is_ok());
+        assert!(core.drive_envelope.nominal_demand_scenario.is_ok());
+        assert!(core.drive_envelope.minimum_demand_scenario.is_ok());
     }
 }
