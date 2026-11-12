@@ -1,0 +1,147 @@
+name: Repair epistemic-types lockfile edge
+
+on:
+  push:
+    branches:
+      - fix/symthaea-epistemic-types-sha2-lock-v0.1
+
+permissions:
+  contents: write
+
+concurrency:
+  group: epistemic-types-lock-repair-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  regenerate-and-qualify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: true
+
+      - name: Install exact baseline Rust and Cargo 1.96.0
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: "1.96.0"
+          components: rustfmt, clippy
+
+      - name: Record source and lockfile identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "source_head=$(git rev-parse HEAD)" | tee -a "$GITHUB_STEP_SUMMARY"
+          rustc +1.96.0 -Vv | tee rustc-version.txt
+          cargo +1.96.0 -Vv | tee cargo-version.txt
+          grep -F 'rustc 1.96.0 ' rustc-version.txt
+          grep -F 'cargo 1.96.0 ' cargo-version.txt
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+          sha256sum Cargo.lock | tee "$RUNNER_TEMP/Cargo.lock.before.sha256"
+
+      - name: Regenerate lockfile with Cargo 1.96.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Intentionally unlocked only in this isolated repair branch.
+          # No dependency is added to Cargo.toml; Cargo resolves the existing
+          # manifest and writes the missing sha2 edge into Cargo.lock.
+          cargo +1.96.0 metadata --format-version 1 > /dev/null
+
+      - name: Assert exact one-edge lockfile delta
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import copy
+          import hashlib
+          import pathlib
+          import tomllib
+
+          before_bytes = pathlib.Path("/home/runner/work/_temp/Cargo.lock.before").read_bytes()
+          after_bytes = pathlib.Path("Cargo.lock").read_bytes()
+          before = tomllib.loads(before_bytes.decode("utf-8"))
+          after = tomllib.loads(after_bytes.decode("utf-8"))
+
+          target = ("symthaea-epistemic-types", "0.1.0")
+          def keyed(lock):
+              return {
+                  (p["name"], p["version"], p.get("source")): p
+                  for p in lock["package"]
+              }
+
+          old_packages = keyed(before)
+          new_packages = keyed(after)
+          assert old_packages.keys() == new_packages.keys(), (
+              "Cargo changed package membership or versions; refusing broad resolution"
+          )
+
+          old_target = [p for p in before["package"] if (p["name"], p["version"]) == target]
+          new_target = [p for p in after["package"] if (p["name"], p["version"]) == target]
+          assert len(old_target) == len(new_target) == 1, "target package must be unique"
+
+          old_deps = set(old_target[0].get("dependencies", []))
+          new_deps = set(new_target[0].get("dependencies", []))
+          added = new_deps - old_deps
+          removed = old_deps - new_deps
+          assert added == {"sha2 0.10.9"}, f"unexpected dependency additions: {sorted(added)}"
+          assert not removed, f"unexpected dependency removals: {sorted(removed)}"
+
+          for key, old_pkg in old_packages.items():
+              new_pkg = new_packages[key]
+              if key == (target[0], target[1], old_target[0].get("source")):
+                  normalized = copy.deepcopy(new_pkg)
+                  normalized_deps = set(normalized.get("dependencies", []))
+                  assert normalized_deps == old_deps | {"sha2 0.10.9"}
+                  normalized["dependencies"] = old_target[0].get("dependencies", []) + ["sha2 0.10.9"]
+                  # Only this dependency list may change.
+                  old_copy = copy.deepcopy(old_pkg)
+                  old_copy["dependencies"] = normalized["dependencies"]
+                  assert old_copy == normalized, "target package changed beyond the sha2 dependency edge"
+              else:
+                  assert old_pkg == new_pkg, f"unexpected lockfile change in {key}"
+
+          manifest = tomllib.loads(pathlib.Path(
+              "crates/domains/symthaea-epistemic-types/Cargo.toml"
+          ).read_text())
+          assert manifest["dependencies"]["sha2"] == "0.10", (
+              "Cargo.toml sha2 declaration changed; this repair no longer matches its source contract"
+          )
+
+          print("lockfile_delta=EXACTLY_ONE_EDGE")
+          print("package=symthaea-epistemic-types 0.1.0")
+          print("added_dependency=sha2 0.10.9")
+          print("before_sha256=" + hashlib.sha256(before_bytes).hexdigest())
+          print("after_sha256=" + hashlib.sha256(after_bytes).hexdigest())
+          PY
+
+          test "$(git diff --numstat -- Cargo.lock)" = $'1\t0\tCargo.lock'
+          test "$(git diff --name-only)" = "Cargo.lock"
+          git diff --check
+          git diff -- Cargo.lock
+
+      - name: Verify locked metadata after repair
+        run: cargo +1.96.0 metadata --locked --format-version 1 > /dev/null
+
+      - name: Compile the repaired package under the locked graph
+        run: cargo +1.96.0 check --locked -p symthaea-epistemic-types --lib
+
+      - name: Run the repaired package library tests under the locked graph
+        run: cargo +1.96.0 test --locked -p symthaea-epistemic-types --lib
+
+      - name: Recheck lockfile diff and commit the Cargo-generated repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git diff --numstat -- Cargo.lock)" = $'1\t0\tCargo.lock'
+          test "$(git diff --name-only)" = "Cargo.lock"
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock
+          git commit -m "fix(lockfile): record epistemic-types sha2 dependency"
+          git push origin "HEAD:refs/heads/${GITHUB_REF_NAME}"
+          echo "repair_commit=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          echo "lockfile_sha256=$(sha256sum Cargo.lock | awk '{print $1}')" >> "$GITHUB_STEP_SUMMARY"
