@@ -13,6 +13,10 @@ on:
       - "docs/research/fixtures/airroad-pdcm-mimo-hidden-dynamics-v0.1.json"
       - "tools/airroad-pdcm-impedance-qualifier/verify_mimo_hidden_dynamics.py"
       - "crates/domains/symthaea-circuits/src/dc_bus_mimo_reference.rs"
+      - "docs/research/AIRROAD_PDCM_MIMO_PASSPORT_001_V0_1.md"
+      - "docs/research/fixtures/airroad-pdcm-mimo-impedance-passport-v0.1.json"
+      - "tools/airroad-pdcm-impedance-qualifier/verify_mimo_impedance_passport.py"
+      - "crates/domains/symthaea-circuits/src/mimo_impedance_passport.rs"
       - ".github/workflows/airroad-pdcm-impedance-fixture.yml"
   push:
     branches:
@@ -55,10 +59,15 @@ jobs:
         run: |
           python3 -m py_compile tools/airroad-pdcm-impedance-qualifier/verify_mimo_hidden_dynamics.py
           python3 tools/airroad-pdcm-impedance-qualifier/verify_mimo_hidden_dynamics.py
+      - name: Compile and verify MIMO impedance passport fixture
+        run: |
+          python3 -m py_compile tools/airroad-pdcm-impedance-qualifier/verify_mimo_impedance_passport.py
+          python3 tools/airroad-pdcm-impedance-qualifier/verify_mimo_impedance_passport.py
       - name: Check circuits crate formatting without workspace resolution
         run: |
           rustfmt --edition 2024 --check crates/domains/symthaea-circuits/src/lib.rs
           rustfmt --edition 2024 --check crates/domains/symthaea-circuits/src/dc_bus_mimo_reference.rs
+          rustfmt --edition 2024 --check crates/domains/symthaea-circuits/src/mimo_impedance_passport.rs
       - name: Compile and run zero-dependency circuits tests
         run: |
           rustc --test --edition=2024 crates/domains/symthaea-circuits/src/lib.rs -o /tmp/symthaea-circuits-tests
