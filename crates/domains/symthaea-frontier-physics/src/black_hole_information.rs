@@ -13,6 +13,8 @@
 
 use core::fmt;
 use num_complex::Complex64;
+use rand::{Rng, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 
 pub const MAX_DENSE_REDUCED_DIMENSION: usize = 64;
 /// Match the existing state-vector circuit ceiling; larger states require a tensor-network backend.
@@ -29,6 +31,7 @@ pub enum QuantumInformationError {
     DenseStateQubitLimit { requested: usize, maximum: usize },
     PageReferenceDimensionLimit { requested: usize, maximum: usize },
     InvalidPageEntropy(f64),
+    InvalidEnsembleSampleCount(usize),
     InvalidTolerance(f64),
     NonFiniteState { index: usize },
     NonFiniteMatrix { row: usize, column: usize },
@@ -51,6 +54,7 @@ impl fmt::Display for QuantumInformationError {
             Self::DenseStateQubitLimit { requested, maximum } => write!(f, "dense state with {requested} qubits exceeds limit {maximum}"),
             Self::PageReferenceDimensionLimit { requested, maximum } => write!(f, "Page reference dimension product {requested} exceeds limit {maximum}"),
             Self::InvalidPageEntropy(value) => write!(f, "Page reference entropy is invalid: {value}"),
+            Self::InvalidEnsembleSampleCount(count) => write!(f, "Haar ensemble needs at least two samples, got {count}"),
             Self::InvalidTolerance(t) => write!(f, "invalid tolerance {t}"),
             Self::NonFiniteState { index } => write!(f, "non-finite state amplitude at index {index}"),
             Self::NonFiniteMatrix { row, column } => write!(f, "non-finite matrix entry ({row}, {column})"),
@@ -310,6 +314,135 @@ pub fn page_average_entropy_nats(
     }
 }
 
+/// Summary of a seeded Haar-random pure-state Page-entropy ensemble.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HaarPageEnsembleSummary {
+    pub subsystem_a_dimension: usize,
+    pub subsystem_b_dimension: usize,
+    pub sample_count: usize,
+    pub seed: u64,
+    pub mean_von_neumann_entropy_nats: f64,
+    pub sample_variance_nats_squared: f64,
+    pub standard_error_nats: f64,
+    /// Normal-approximation interval: mean plus/minus 1.96 standard errors.
+    pub confidence_95_approx_nats: [f64; 2],
+    pub page_theorem_mean_nats: f64,
+    pub normalized_mean_deviation: f64,
+}
+
+/// Sample Haar-distributed bipartite pure states using normalized iid complex
+/// Gaussian amplitudes and a seeded ChaCha20 stream, then measure S(rho_A).
+///
+/// The requested subsystem sizes are expressed as qubit counts, so dimensions
+/// are powers of two. Subsystem A must fit the dense reduced-state ceiling and
+/// the total must fit the existing 20-qubit state-vector ceiling. The reported
+/// interval is a normal approximation; it is not a theorem-level confidence
+/// guarantee for small sample counts.
+///
+/// This reproduces the finite-dimensional Haar/Page reference ensemble only.
+/// It does not implement local scramblers, sequential evaporation, JT gravity,
+/// replica wormholes or an island formula.
+pub fn sample_haar_page_entropy_ensemble(
+    subsystem_a_qubits: usize,
+    subsystem_b_qubits: usize,
+    sample_count: usize,
+    seed: u64,
+    tolerance: f64,
+) -> Result<HaarPageEnsembleSummary, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    if sample_count < 2 {
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+    }
+    let total_qubits = subsystem_a_qubits
+        .checked_add(subsystem_b_qubits)
+        .ok_or(QuantumInformationError::DimensionOverflow)?;
+    if total_qubits > MAX_DENSE_STATE_QUBITS {
+        return Err(QuantumInformationError::DenseStateQubitLimit {
+            requested: total_qubits,
+            maximum: MAX_DENSE_STATE_QUBITS,
+        });
+    }
+    if subsystem_a_qubits >= usize::BITS as usize
+        || subsystem_b_qubits >= usize::BITS as usize
+    {
+        return Err(QuantumInformationError::DimensionOverflow);
+    }
+    let dimension_a = 1usize << subsystem_a_qubits;
+    let dimension_b = 1usize << subsystem_b_qubits;
+    if dimension_a > MAX_DENSE_REDUCED_DIMENSION {
+        return Err(QuantumInformationError::DenseDimensionLimit {
+            requested: dimension_a,
+            maximum: MAX_DENSE_REDUCED_DIMENSION,
+        });
+    }
+    let state_dimension = 1usize << total_qubits;
+    let retained_qubits = (0..subsystem_a_qubits).collect::<Vec<_>>();
+    let mut rng = ChaCha20Rng::seed_from_u64(seed);
+    let mut mean = 0.0;
+    let mut sum_squared_deviations = 0.0;
+
+    for sample_index in 0..sample_count {
+        let mut amplitudes = Vec::with_capacity(state_dimension);
+        while amplitudes.len() < state_dimension {
+            // Box-Muller produces independent standard-normal real components;
+            // the resulting complex Gaussian is rotationally invariant.
+            let u1 = rng.gen_range(0.0_f64..1.0_f64).max(f64::MIN_POSITIVE);
+            let u2 = rng.gen_range(0.0_f64..1.0_f64);
+            let radius = (-2.0 * u1.ln()).sqrt();
+            let phase = core::f64::consts::TAU * u2;
+            amplitudes.push(Complex64::new(radius * phase.cos(), radius * phase.sin()));
+        }
+
+        // Normalization is part of Haar-state construction, not a repair of a
+        // user-supplied state or an evolved numerical trajectory.
+        let norm_squared: f64 = amplitudes.iter().map(|amplitude| amplitude.norm_sqr()).sum();
+        if !norm_squared.is_finite() || norm_squared <= 0.0 {
+            return Err(QuantumInformationError::NonFiniteState { index: sample_index });
+        }
+        let inverse_norm = norm_squared.sqrt().recip();
+        for amplitude in &mut amplitudes {
+            *amplitude *= inverse_norm;
+        }
+
+        let reduced = DensityMatrix::from_pure_state(
+            &amplitudes,
+            total_qubits,
+            &retained_qubits,
+            tolerance,
+        )?;
+        let entropy = reduced.von_neumann_entropy(tolerance)?;
+        let delta = entropy - mean;
+        mean += delta / (sample_index + 1) as f64;
+        sum_squared_deviations += delta * (entropy - mean);
+    }
+
+    let sample_variance = sum_squared_deviations / (sample_count - 1) as f64;
+    let standard_error = (sample_variance / sample_count as f64).sqrt();
+    let page_mean = page_average_entropy_nats(dimension_a, dimension_b)?;
+    let normalized_deviation = if standard_error > 0.0 {
+        (mean - page_mean) / standard_error
+    } else if mean == page_mean {
+        0.0
+    } else {
+        f64::INFINITY.copysign(mean - page_mean)
+    };
+    Ok(HaarPageEnsembleSummary {
+        subsystem_a_dimension: dimension_a,
+        subsystem_b_dimension: dimension_b,
+        sample_count,
+        seed,
+        mean_von_neumann_entropy_nats: mean,
+        sample_variance_nats_squared: sample_variance,
+        standard_error_nats: standard_error,
+        confidence_95_approx_nats: [
+            mean - 1.96 * standard_error,
+            mean + 1.96 * standard_error,
+        ],
+        page_theorem_mean_nats: page_mean,
+        normalized_mean_deviation: normalized_deviation,
+    })
+}
+
 /// Compensated harmonic sum H_n = sum_(k=1)^n 1/k.
 fn harmonic_number(n: usize) -> f64 {
     let mut sum = 0.0;
@@ -488,6 +621,40 @@ mod tests {
             assert!(forward <= (m.min(n) as f64).ln() + 1e-13);
             assert!(forward >= 0.0);
         }
+    }
+
+    #[test]
+    fn haar_page_ensemble_is_seed_reproducible_and_reports_uncertainty() {
+        let first = sample_haar_page_entropy_ensemble(1, 3, 256, 0x5eed, TOL).unwrap();
+        let repeated = sample_haar_page_entropy_ensemble(1, 3, 256, 0x5eed, TOL).unwrap();
+        assert_eq!(first, repeated);
+        assert_eq!(first.subsystem_a_dimension, 2);
+        assert_eq!(first.subsystem_b_dimension, 8);
+        assert!(first.sample_variance_nats_squared > 0.0);
+        assert!(first.standard_error_nats > 0.0);
+        assert!(first.confidence_95_approx_nats[0] < first.confidence_95_approx_nats[1]);
+        assert!((first.mean_von_neumann_entropy_nats - first.page_theorem_mean_nats).abs() < 0.10);
+        assert!(first.normalized_mean_deviation.abs() < 6.0);
+    }
+
+    #[test]
+    fn haar_ensemble_one_dimensional_subsystem_has_zero_entropy() {
+        let result = sample_haar_page_entropy_ensemble(0, 3, 32, 7, TOL).unwrap();
+        assert_eq!(result.page_theorem_mean_nats, 0.0);
+        assert!(result.mean_von_neumann_entropy_nats.abs() < 1e-12);
+        assert!(result.sample_variance_nats_squared.abs() < 1e-24);
+    }
+
+    #[test]
+    fn haar_ensemble_rejects_insufficient_samples_and_oversized_registers() {
+        assert!(matches!(
+            sample_haar_page_entropy_ensemble(1, 2, 1, 7, TOL),
+            Err(QuantumInformationError::InvalidEnsembleSampleCount(1))
+        ));
+        assert!(matches!(
+            sample_haar_page_entropy_ensemble(1, MAX_DENSE_STATE_QUBITS, 2, 7, TOL),
+            Err(QuantumInformationError::DenseStateQubitLimit { .. })
+        ));
     }
 
     #[test]
