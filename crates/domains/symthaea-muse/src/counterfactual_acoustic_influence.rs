@@ -1160,6 +1160,234 @@ mod tests {
         .unwrap());
     }
 
+    fn native_wav(samples: &[f32]) -> Vec<u8> {
+        let spec = hound::WavSpec {
+            channels: 1,
+            sample_rate: 16_000,
+            bits_per_sample: 16,
+            sample_format: hound::SampleFormat::Int,
+        };
+        let mut cursor = std::io::Cursor::new(Vec::new());
+        {
+            let mut writer = hound::WavWriter::new(&mut cursor, spec).unwrap();
+            for sample in samples {
+                writer.write_sample((sample.clamp(-1.0, 1.0) * 32_767.0) as i16).unwrap();
+            }
+            writer.finalize().unwrap();
+        }
+        cursor.into_inner()
+    }
+
+    fn native_receipt(
+        render_id: &str,
+        score: &[u8],
+        schedule: &[u8],
+        config: &[u8],
+        wav: &[u8],
+    ) -> crate::renderer_execution_receipt::RendererExecutionReceipt {
+        use crate::renderer_execution_receipt::{
+            RendererBackend, RendererExecutionReceipt, RendererReceiptInputs,
+        };
+        RendererExecutionReceipt::from_successful_render(RendererReceiptInputs {
+            render_id,
+            backend: RendererBackend::NativeMuse,
+            score_bytes: score,
+            render_config_bytes: config,
+            input_midi_bytes: None,
+            performed_schedule_bytes: Some(schedule),
+            renderer_executable_sha256: Some(DIGEST_D),
+            soundfont_sha256: None,
+            process_exit_code: None,
+            process_observation: None,
+            performed_event_map_sha256: None,
+            output_wav_bytes: wav,
+        })
+        .unwrap()
+    }
+
+    fn native_evidence<'a>(
+        receipt: &'a crate::renderer_execution_receipt::RendererExecutionReceipt,
+        render_id: &'a str,
+        score: &'a [u8],
+        schedule: &'a [u8],
+        config: &'a [u8],
+        wav: &'a [u8],
+    ) -> RendererInfluenceEvidence<'a> {
+        use crate::renderer_execution_receipt::{RendererBackend, RendererReceiptInputs};
+        RendererInfluenceEvidence {
+            receipt,
+            inputs: RendererReceiptInputs {
+                render_id,
+                backend: RendererBackend::NativeMuse,
+                score_bytes: score,
+                render_config_bytes: config,
+                input_midi_bytes: None,
+                performed_schedule_bytes: Some(schedule),
+                renderer_executable_sha256: Some(DIGEST_D),
+                soundfont_sha256: None,
+                process_exit_code: None,
+                process_observation: None,
+                performed_event_map_sha256: None,
+                output_wav_bytes: wav,
+            },
+        }
+    }
+
+    #[test]
+    fn verified_renderer_receipts_are_replayed_before_influence_analysis() {
+        let score = br#"{"score":"source"}"#;
+        let config = br#"{"renderer":"native-fixture-v1"}"#;
+        let baseline_schedule = b"native-schedule-baseline";
+        let counterfactual_schedule = b"native-schedule-remove-event-3";
+        let baseline_samples = sine(1024, 16_000, 440.0);
+        let repeat_samples = baseline_samples.clone();
+        let mut counterfactual_samples = baseline_samples.clone();
+        counterfactual_samples[256..384].fill(0.0);
+        let baseline_wav = native_wav(&baseline_samples);
+        let repeat_wav = native_wav(&repeat_samples);
+        let counterfactual_wav = native_wav(&counterfactual_samples);
+
+        let baseline_receipt = native_receipt(
+            "verified-baseline",
+            score,
+            baseline_schedule,
+            config,
+            &baseline_wav,
+        );
+        let repeat_receipt = native_receipt(
+            "verified-repeat",
+            score,
+            baseline_schedule,
+            config,
+            &repeat_wav,
+        );
+        let counterfactual_receipt = native_receipt(
+            "verified-counterfactual",
+            score,
+            counterfactual_schedule,
+            config,
+            &counterfactual_wav,
+        );
+
+        let report = estimate_from_verified_renderer_evidence(
+            native_evidence(
+                &baseline_receipt,
+                "verified-baseline",
+                score,
+                baseline_schedule,
+                config,
+                &baseline_wav,
+            ),
+            vec![native_evidence(
+                &repeat_receipt,
+                "verified-repeat",
+                score,
+                baseline_schedule,
+                config,
+                &repeat_wav,
+            )],
+            native_evidence(
+                &counterfactual_receipt,
+                "verified-counterfactual",
+                score,
+                counterfactual_schedule,
+                config,
+                &counterfactual_wav,
+            ),
+            VerifiedInfluenceRequest {
+                source_score_sha256: crate::renderer_execution_receipt::sha256_hex(score).leak(),
+                source_event_id: "score_event_index:3",
+                intervention: CounterfactualIntervention::Remove,
+                baseline_schedule_sha256: crate::renderer_execution_receipt::sha256_hex(baseline_schedule).leak(),
+                counterfactual_schedule_sha256: crate::renderer_execution_receipt::sha256_hex(counterfactual_schedule).leak(),
+                renderer_profile_sha256: DIGEST_A,
+            },
+            &calibrated_config(),
+        )
+        .expect("all renderer receipts replay and bind to paired schedules");
+
+        assert_eq!(report.verdict, InfluenceVerdict::Detected);
+        assert_eq!(report.identity.baseline_render_receipt_sha256, baseline_receipt.receipt_sha256);
+        assert_eq!(report.identity.counterfactual_render_receipt_sha256, counterfactual_receipt.receipt_sha256);
+        assert_eq!(report.identity.baseline_repeat_receipt_sha256, vec![repeat_receipt.receipt_sha256]);
+    }
+
+    #[test]
+    fn verified_entry_point_rejects_wav_bytes_not_bound_by_renderer_receipt() {
+        let score = br#"{"score":"source"}"#;
+        let config = br#"{"renderer":"native-fixture-v1"}"#;
+        let baseline_schedule = b"native-schedule-baseline";
+        let counterfactual_schedule = b"native-schedule-remove-event-3";
+        let baseline_samples = sine(1024, 16_000, 440.0);
+        let mut counterfactual_samples = baseline_samples.clone();
+        counterfactual_samples[256..384].fill(0.0);
+        let baseline_wav = native_wav(&baseline_samples);
+        let repeat_wav = baseline_wav.clone();
+        let counterfactual_wav = native_wav(&counterfactual_samples);
+        let baseline_receipt = native_receipt(
+            "verified-baseline",
+            score,
+            baseline_schedule,
+            config,
+            &baseline_wav,
+        );
+        let repeat_receipt = native_receipt(
+            "verified-repeat",
+            score,
+            baseline_schedule,
+            config,
+            &repeat_wav,
+        );
+        let counterfactual_receipt = native_receipt(
+            "verified-counterfactual",
+            score,
+            counterfactual_schedule,
+            config,
+            &counterfactual_wav,
+        );
+        let mut substituted_wav = counterfactual_wav.clone();
+        substituted_wav[48] ^= 0x01;
+
+        let error = estimate_from_verified_renderer_evidence(
+            native_evidence(
+                &baseline_receipt,
+                "verified-baseline",
+                score,
+                baseline_schedule,
+                config,
+                &baseline_wav,
+            ),
+            vec![native_evidence(
+                &repeat_receipt,
+                "verified-repeat",
+                score,
+                baseline_schedule,
+                config,
+                &repeat_wav,
+            )],
+            native_evidence(
+                &counterfactual_receipt,
+                "verified-counterfactual",
+                score,
+                counterfactual_schedule,
+                config,
+                &substituted_wav,
+            ),
+            VerifiedInfluenceRequest {
+                source_score_sha256: crate::renderer_execution_receipt::sha256_hex(score).leak(),
+                source_event_id: "score_event_index:3",
+                intervention: CounterfactualIntervention::Remove,
+                baseline_schedule_sha256: crate::renderer_execution_receipt::sha256_hex(baseline_schedule).leak(),
+                counterfactual_schedule_sha256: crate::renderer_execution_receipt::sha256_hex(counterfactual_schedule).leak(),
+                renderer_profile_sha256: DIGEST_A,
+            },
+            &calibrated_config(),
+        )
+        .unwrap_err();
+
+        assert_eq!(error, InfluenceInputError::InvalidRendererReceipt);
+    }
+
     #[test]
     fn malformed_context_and_no_op_interventions_reject() {
         let baseline = sine(1024, 16_000, 440.0);
