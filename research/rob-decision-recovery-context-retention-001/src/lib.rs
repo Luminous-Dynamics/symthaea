@@ -6,8 +6,8 @@
 
 #![forbid(unsafe_code)]
 
-use std::collections::BTreeSet;
 use std::cmp::Ordering;
+use std::collections::BTreeSet;
 
 /// Decision-impact evidence for losing a resident context.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -259,7 +259,9 @@ fn protection_reason(
     match policy {
         RetentionPolicy::Lru => {}
         RetentionPolicy::PhaseAffinity | RetentionPolicy::LuminousDecisionRecoveryAware => {
-            let phase_ok = context.phase_affinity_ppm.is_some_and(|value| value <= 1_000_000)
+            let phase_ok = context
+                .phase_affinity_ppm
+                .is_some_and(|value| value <= 1_000_000)
                 && context.phase_affinity_phase_id.as_deref()
                     == Some(request.next_phase_id.as_str())
                 && context.phase_manifest_digest.as_deref()
@@ -279,30 +281,37 @@ fn protection_reason(
     }
 
     if policy == RetentionPolicy::LuminousDecisionRecoveryAware
-        && (context.future_reuse_probability_ppm.is_none_or(|value| value > 1_000_000)
+        && (context
+            .future_reuse_probability_ppm
+            .is_none_or(|value| value > 1_000_000)
             || context.prefill_latency_ticks.is_none())
     {
-        return Ok(Some(if context.future_reuse_probability_ppm.is_none_or(|value| value > 1_000_000) {
-            ProtectionReason::TransitionReuseUnknown
-        } else {
-            ProtectionReason::PrefillCostUnknown
-        }));
+        return Ok(Some(
+            if context
+                .future_reuse_probability_ppm
+                .is_none_or(|value| value > 1_000_000)
+            {
+                ProtectionReason::TransitionReuseUnknown
+            } else {
+                ProtectionReason::PrefillCostUnknown
+            },
+        ));
     }
 
     Ok(None)
 }
 
-fn compare_victims(
-    policy: RetentionPolicy,
-    left: &ContextEntry,
-    right: &ContextEntry,
-) -> Ordering {
+fn compare_victims(policy: RetentionPolicy, left: &ContextEntry, right: &ContextEntry) -> Ordering {
     let left_impact = match &left.decision_impact {
-        DecisionImpact::Qualified { regret_upper_units, .. } => *regret_upper_units,
+        DecisionImpact::Qualified {
+            regret_upper_units, ..
+        } => *regret_upper_units,
         _ => u64::MAX,
     };
     let right_impact = match &right.decision_impact {
-        DecisionImpact::Qualified { regret_upper_units, .. } => *regret_upper_units,
+        DecisionImpact::Qualified {
+            regret_upper_units, ..
+        } => *regret_upper_units,
         _ => u64::MAX,
     };
     match policy {
@@ -326,15 +335,21 @@ fn compare_victims(
             .recovery_critical
             .cmp(&right.recovery_critical)
             .then_with(|| left_impact.cmp(&right_impact))
-            .then_with(|| left.phase_affinity_ppm.unwrap_or(u32::MAX).cmp(
-                &right.phase_affinity_ppm.unwrap_or(u32::MAX),
-            ))
-            .then_with(|| left.future_reuse_probability_ppm.unwrap_or(u32::MAX).cmp(
-                &right.future_reuse_probability_ppm.unwrap_or(u32::MAX),
-            ))
-            .then_with(|| left.prefill_latency_ticks.unwrap_or(u64::MAX).cmp(
-                &right.prefill_latency_ticks.unwrap_or(u64::MAX),
-            ))
+            .then_with(|| {
+                left.phase_affinity_ppm
+                    .unwrap_or(u32::MAX)
+                    .cmp(&right.phase_affinity_ppm.unwrap_or(u32::MAX))
+            })
+            .then_with(|| {
+                left.future_reuse_probability_ppm
+                    .unwrap_or(u32::MAX)
+                    .cmp(&right.future_reuse_probability_ppm.unwrap_or(u32::MAX))
+            })
+            .then_with(|| {
+                left.prefill_latency_ticks
+                    .unwrap_or(u64::MAX)
+                    .cmp(&right.prefill_latency_ticks.unwrap_or(u64::MAX))
+            })
             .then_with(|| left.last_access_tick.cmp(&right.last_access_tick))
             .then_with(|| left.context_id.cmp(&right.context_id)),
     }
@@ -349,19 +364,18 @@ pub fn plan_retention(
     request: &RetentionRequest,
     contexts: &[ContextEntry],
 ) -> Result<RetentionPlan, RetentionError> {
-    if request.next_phase_id.trim().is_empty()
-        || request.phase_manifest_digest.trim().is_empty()
-    {
+    if request.next_phase_id.trim().is_empty() || request.phase_manifest_digest.trim().is_empty() {
         return Err(RetentionError::EmptyPhaseScope);
     }
 
     let mut ids = BTreeSet::new();
     let mut used = 0_u64;
-    let mut qualified_scale: Option<&str> = if policy == RetentionPolicy::LuminousDecisionRecoveryAware {
-        request.required_loss_scale_id.as_deref()
-    } else {
-        None
-    };
+    let mut qualified_scale: Option<&str> =
+        if policy == RetentionPolicy::LuminousDecisionRecoveryAware {
+            request.required_loss_scale_id.as_deref()
+        } else {
+            None
+        };
     for context in contexts {
         if context.context_id.trim().is_empty() {
             return Err(RetentionError::EmptyContextId);
@@ -376,7 +390,10 @@ pub fn plan_retention(
                 context.context_id.clone(),
             ));
         }
-        if context.phase_affinity_ppm.is_some_and(|value| value > 1_000_000) {
+        if context
+            .phase_affinity_ppm
+            .is_some_and(|value| value > 1_000_000)
+        {
             return Err(RetentionError::InvalidProbability {
                 context_id: context.context_id.clone(),
                 field: "phase_affinity_ppm",
@@ -472,7 +489,11 @@ pub fn plan_retention(
 
     let protected_tokens = contexts
         .iter()
-        .filter(|context| protected_contexts.iter().any(|(id, _)| id == &context.context_id))
+        .filter(|context| {
+            protected_contexts
+                .iter()
+                .any(|(id, _)| id == &context.context_id)
+        })
         .try_fold(0_u64, |sum, context| {
             sum.checked_add(context.token_count)
                 .ok_or(RetentionError::TokenArithmeticOverflow)
@@ -642,16 +663,20 @@ mod tests {
         )
         .unwrap();
         assert_eq!(ids(&plan), vec!["normal"]);
-        assert!(plan.protected_contexts.iter().any(|(id, reason)|
-            id == "unknown" && *reason == ProtectionReason::DecisionImpactUnknown
-        ));
+        assert!(
+            plan.protected_contexts
+                .iter()
+                .any(|(id, reason)| id == "unknown"
+                    && *reason == ProtectionReason::DecisionImpactUnknown)
+        );
     }
 
     #[test]
     fn expired_decision_impact_is_protected() {
         let mut expired = context("expired", 40, 1, 0, false, 0, 0, 1);
-        if let DecisionImpact::Qualified { valid_through_tick, .. } =
-            &mut expired.decision_impact
+        if let DecisionImpact::Qualified {
+            valid_through_tick, ..
+        } = &mut expired.decision_impact
         {
             *valid_through_tick = 9;
         }
@@ -663,9 +688,12 @@ mod tests {
         )
         .unwrap();
         assert_eq!(ids(&plan), vec!["normal"]);
-        assert!(plan.protected_contexts.iter().any(|(id, reason)|
-            id == "expired" && *reason == ProtectionReason::DecisionImpactExpired
-        ));
+        assert!(
+            plan.protected_contexts
+                .iter()
+                .any(|(id, reason)| id == "expired"
+                    && *reason == ProtectionReason::DecisionImpactExpired)
+        );
     }
 
     #[test]
@@ -684,15 +712,18 @@ mod tests {
     #[test]
     fn lru_control_can_choose_different_victim_than_luminous() {
         let low_regret_recent = context("low-regret-recent", 40, 90, 1, false, 50, 200_000, 5);
-        let high_regret_old_recovery =
-            context("high-regret-old-recovery", 40, 1, 800, true, 900_000, 900_000, 500);
+        let high_regret_old_recovery = context(
+            "high-regret-old-recovery",
+            40,
+            1,
+            800,
+            true,
+            900_000,
+            900_000,
+            500,
+        );
         let contexts = vec![low_regret_recent, high_regret_old_recovery];
-        let lru = plan_retention(
-            RetentionPolicy::Lru,
-            &request(80, 40),
-            &contexts,
-        )
-        .unwrap();
+        let lru = plan_retention(RetentionPolicy::Lru, &request(80, 40), &contexts).unwrap();
         let luminous = plan_retention(
             RetentionPolicy::LuminousDecisionRecoveryAware,
             &request(80, 40),
@@ -767,8 +798,7 @@ mod tests {
         }
         let mut baseline_request = request(80, 40);
         baseline_request.required_loss_scale_id = None;
-        let plan =
-            plan_retention(RetentionPolicy::Lru, &baseline_request, &[a, b]).unwrap();
+        let plan = plan_retention(RetentionPolicy::Lru, &baseline_request, &[a, b]).unwrap();
         assert_eq!(plan.disposition, RetentionDisposition::Admitted);
         assert_eq!(plan.evictions.len(), 1);
     }
@@ -785,7 +815,10 @@ mod tests {
             &[hard, unknown],
         )
         .unwrap();
-        assert_eq!(plan.disposition, RetentionDisposition::DeferredProtectedCapacity);
+        assert_eq!(
+            plan.disposition,
+            RetentionDisposition::DeferredProtectedCapacity
+        );
         assert!(plan.evictions.is_empty());
         assert_eq!(plan.freed_tokens, 0);
     }
@@ -837,11 +870,7 @@ mod tests {
         let a = context("a", u64::MAX, 1, 1, false, 100, 100, 1);
         let b = context("b", 1, 2, 1, false, 100, 100, 1);
         assert_eq!(
-            plan_retention(
-                RetentionPolicy::Lru,
-                &request(u64::MAX, 1),
-                &[a, b],
-            ),
+            plan_retention(RetentionPolicy::Lru, &request(u64::MAX, 1), &[a, b],),
             Err(RetentionError::TokenArithmeticOverflow)
         );
     }
@@ -851,16 +880,14 @@ mod tests {
         let mut a = context("a", 40, 1, 1, false, 100, 100, 1);
         a.phase_affinity_ppm = None;
         let b = context("b", 40, 2, 2, false, 100, 100, 1);
-        let plan = plan_retention(
-            RetentionPolicy::PhaseAffinity,
-            &request(80, 40),
-            &[a, b],
-        )
-        .unwrap();
+        let plan =
+            plan_retention(RetentionPolicy::PhaseAffinity, &request(80, 40), &[a, b]).unwrap();
         assert_eq!(ids(&plan), vec!["b"]);
-        assert!(plan.protected_contexts.iter().any(|(id, reason)|
-            id == "a" && *reason == ProtectionReason::PhaseAffinityUnknown
-        ));
+        assert!(
+            plan.protected_contexts
+                .iter()
+                .any(|(id, reason)| id == "a" && *reason == ProtectionReason::PhaseAffinityUnknown)
+        );
     }
 
     #[test]
@@ -875,9 +902,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(ids(&plan), vec!["b"]);
-        assert!(plan.protected_contexts.iter().any(|(id, reason)|
-            id == "a" && *reason == ProtectionReason::PrefillCostUnknown
-        ));
+        assert!(
+            plan.protected_contexts
+                .iter()
+                .any(|(id, reason)| id == "a" && *reason == ProtectionReason::PrefillCostUnknown)
+        );
     }
 
     #[test]
@@ -906,9 +935,12 @@ mod tests {
         )
         .unwrap();
         assert_eq!(ids(&plan), vec!["b"]);
-        assert!(plan.protected_contexts.iter().any(|(id, reason)|
-            id == "a" && *reason == ProtectionReason::RecoveryEvidenceUnknown
-        ));
+        assert!(
+            plan.protected_contexts
+                .iter()
+                .any(|(id, reason)| id == "a"
+                    && *reason == ProtectionReason::RecoveryEvidenceUnknown)
+        );
     }
 
     #[test]
@@ -921,7 +953,10 @@ mod tests {
             &[a],
         )
         .unwrap();
-        assert_eq!(plan.disposition, RetentionDisposition::DeferredProtectedCapacity);
+        assert_eq!(
+            plan.disposition,
+            RetentionDisposition::DeferredProtectedCapacity
+        );
         assert!(plan.evictions.is_empty());
     }
 }
