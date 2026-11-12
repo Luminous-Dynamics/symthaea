@@ -1,0 +1,200 @@
+{
+  "schema_version": "0.1.0",
+  "case_id": "synthetic-marine-robust-pareto-001",
+  "source_register": {
+    "register_id": "synthetic-marine-register",
+    "citation": "Synthetic test register only",
+    "register_sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+  },
+  "service": {
+    "mission_id": "mission-01",
+    "vessel_id": "vessel-01",
+    "route_id": "route-01",
+    "measurement_window_id": "window-01",
+    "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "cargo_work_unit": "tonne_nautical_mile",
+    "reference_cargo_work": 1000000,
+    "reference_cargo_work_expanded_uncertainty": 100,
+    "cargo_work_equivalence_tolerance": 500
+  },
+  "objectives": [
+    {
+      "metric_id": "energy_per_cargo_work",
+      "direction": "minimize",
+      "unit": "kWh_per_1000_tonne_nm"
+    },
+    {
+      "metric_id": "acoustic_1khz",
+      "direction": "minimize",
+      "unit": "dB_re_1uPa_at_declared_reference"
+    },
+    {
+      "metric_id": "lifecycle_cost",
+      "direction": "minimize",
+      "unit": "USD_per_1000_tonne_nm"
+    }
+  ],
+  "hard_gates": [
+    {
+      "gate_id": "acoustic-maximum-1khz",
+      "gate_class": "underwater_noise",
+      "evaluation": "metric_upper_bound",
+      "metric_id": "acoustic_1khz",
+      "threshold": 105,
+      "unit": "dB_re_1uPa_at_declared_reference",
+      "required_audit_contract_id": null,
+      "requirement_reference": "operator-limit:acoustic-1khz",
+      "non_compensable": true
+    },
+    {
+      "gate_id": "biosecurity-release",
+      "gate_class": "biosecurity",
+      "evaluation": "external_audit_receipt",
+      "metric_id": null,
+      "threshold": null,
+      "unit": null,
+      "required_audit_contract_id": "marine-biofouling-evidence-audit-v0.1",
+      "requirement_reference": "permit:zero-uncontained-organism-release",
+      "non_compensable": true
+    }
+  ],
+  "candidates": [
+    {
+      "candidate_id": "A",
+      "evidence_kind": "synthetic",
+      "dataset_id": "synthetic-dataset-A",
+      "citation": "Synthetic known-answer fixture; not measured data",
+      "raw_data_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "rights_status": "public_or_permitted",
+      "independently_reviewed": false,
+      "mission_id": "mission-01",
+      "vessel_id": "vessel-01",
+      "route_id": "route-01",
+      "measurement_window_id": "window-01",
+      "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "vessel_revision": "hull-A",
+      "propeller_revision": "prop-A",
+      "cargo_work_value": 1000000,
+      "cargo_work_expanded_uncertainty": 100,
+      "cargo_work_unit": "tonne_nautical_mile",
+      "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "metrics": [
+        {
+          "metric_id": "energy_per_cargo_work",
+          "value": 90,
+          "expanded_uncertainty": 0.5,
+          "confidence_level": 0.95,
+          "unit": "kWh_per_1000_tonne_nm",
+          "method_id": "method-energy",
+          "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        },
+        {
+          "metric_id": "acoustic_1khz",
+          "value": 100,
+          "expanded_uncertainty": 0.5,
+          "confidence_level": 0.95,
+          "unit": "dB_re_1uPa_at_declared_reference",
+          "method_id": "method-acoustic",
+          "raw_data_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "calibration_or_validation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "timebase_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        },
+        {
+          "metric_id": "lifecycle_cost",
+          "value": 20,
+          "expanded_uncertainty": 0.5,
+          "confidence_level": 0.95,
+          "unit": "USD_per_1000_tonne_nm",
+          "method_id": "method-cost",
+          "raw_data_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+          "calibration_or_validation_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+          "timebase_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        }
+      ],
+      "gate_receipts": [
+        {
+          "gate_id": "biosecurity-release",
+          "status": "satisfied",
+          "audit_contract_id": "marine-biofouling-evidence-audit-v0.1",
+          "audit_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "requirement_reference": "permit:zero-uncontained-organism-release"
+        }
+      ]
+    },
+    {
+      "candidate_id": "B",
+      "evidence_kind": "synthetic",
+      "dataset_id": "synthetic-dataset-B",
+      "citation": "Synthetic known-answer fixture; not measured data",
+      "raw_data_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "rights_status": "public_or_permitted",
+      "independently_reviewed": false,
+      "mission_id": "mission-01",
+      "vessel_id": "vessel-01",
+      "route_id": "route-01",
+      "measurement_window_id": "window-01",
+      "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "vessel_revision": "hull-B",
+      "propeller_revision": "prop-B",
+      "cargo_work_value": 1000000,
+      "cargo_work_expanded_uncertainty": 100,
+      "cargo_work_unit": "tonne_nautical_mile",
+      "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+      "metrics": [
+        {
+          "metric_id": "energy_per_cargo_work",
+          "value": 100,
+          "expanded_uncertainty": 0.5,
+          "confidence_level": 0.95,
+          "unit": "kWh_per_1000_tonne_nm",
+          "method_id": "method-energy",
+          "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        {
+          "metric_id": "acoustic_1khz",
+          "value": 98,
+          "expanded_uncertainty": 0.5,
+          "confidence_level": 0.95,
+          "unit": "dB_re_1uPa_at_declared_reference",
+          "method_id": "method-acoustic",
+          "raw_data_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "calibration_or_validation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "timebase_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        {
+          "metric_id": "lifecycle_cost",
+          "value": 21,
+          "expanded_uncertainty": 0.5,
+          "confidence_level": 0.95,
+          "unit": "USD_per_1000_tonne_nm",
+          "method_id": "method-cost",
+          "raw_data_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
+          "calibration_or_validation_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
+          "timebase_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        }
+      ],
+      "gate_receipts": [
+        {
+          "gate_id": "biosecurity-release",
+          "status": "satisfied",
+          "audit_contract_id": "marine-biofouling-evidence-audit-v0.1",
+          "audit_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "requirement_reference": "permit:zero-uncontained-organism-release"
+        }
+      ]
+    }
+  ]
+}
