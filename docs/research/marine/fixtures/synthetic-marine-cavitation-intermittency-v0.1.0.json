@@ -177,7 +177,8 @@
               "number_concentration_per_ml": 50,
               "expanded_uncertainty_per_ml": 1
             }
-          ]
+          ],
+          "expanded_uncertainty_confidence_level": 0.95
         }
       },
       "operating_point_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -338,7 +339,8 @@
               "number_concentration_per_ml": 50,
               "expanded_uncertainty_per_ml": 1
             }
-          ]
+          ],
+          "expanded_uncertainty_confidence_level": 0.95
         }
       },
       "operating_point_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
