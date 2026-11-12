@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-cavitation-intermittency-v0.1.0.schema.json",
+  "title": "Marine cavitation intermittency audit v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "evidence_kind",
+    "source",
+    "operating_condition_id",
+    "operating_condition_fingerprint_sha256",
+    "environment_fingerprint_sha256",
+    "hydrophone_instrument_id",
+    "calibration_certificate_sha256",
+    "band",
+    "window_duration_s",
+    "minimum_usable_windows_per_run",
+    "minimum_runs",
+    "runs"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_kind": {
+      "enum": [
+        "synthetic",
+        "measured"
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/sourceEvidence"
+    },
+    "operating_condition_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operating_condition_fingerprint_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "environment_fingerprint_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "hydrophone_instrument_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "calibration_certificate_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "band": {
+      "$ref": "#/$defs/band"
+    },
+    "window_duration_s": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "minimum_usable_windows_per_run": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "minimum_runs": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "runs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/run"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "sourceEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "citation",
+        "raw_data_sha256",
+        "rights_status",
+        "independently_reviewed"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "rights_status": {
+          "enum": [
+            "public_or_permitted",
+            "unknown",
+            "restricted"
+          ]
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "band": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "band_id",
+        "quantity_id",
+        "center_frequency_hz"
+      ],
+      "properties": {
+        "band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "quantity_id": {
+          "const": "received_spl_db_re_1upa"
+        },
+        "center_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "timebase_receipt_sha256",
+        "service_fingerprint_sha256",
+        "background_method",
+        "background_trace_sha256",
+        "windows"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timebase_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "service_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "background_method": {
+          "enum": [
+            "bare_hub",
+            "pressure_suppressed",
+            "unknown"
+          ]
+        },
+        "background_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "windows": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/window"
+          }
+        }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "window_id",
+        "start_time_s",
+        "end_time_s",
+        "acoustic_trace_sha256",
+        "cavitation_observation_sha256",
+        "cavitation_present",
+        "total_spl_db",
+        "background_spl_db",
+        "total_expanded_uncertainty_db",
+        "background_expanded_uncertainty_db"
+      ],
+      "properties": {
+        "window_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "start_time_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "end_time_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "acoustic_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "cavitation_observation_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "cavitation_present": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "total_spl_db": {
+          "type": "number"
+        },
+        "background_spl_db": {
+          "type": "number"
+        },
+        "total_expanded_uncertainty_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "background_expanded_uncertainty_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    }
+  }
+}
