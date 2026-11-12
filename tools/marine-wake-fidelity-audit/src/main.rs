@@ -365,7 +365,7 @@ fn component_name(index: usize) -> &'static str {
     match index { 0 => "axial", 1 => "radial", _ => "tangential" }
 }
 
-fn component<'a>(point: &'a WakePoint, index: usize) -> Option<&'a VelocityComponent> {
+fn component(point: &WakePoint, index: usize) -> Option<&VelocityComponent> {
     match index { 0 => point.vx_over_vref.as_ref(), 1 => point.vr_over_vref.as_ref(), _ => point.vt_over_vref.as_ref() }
 }
 
@@ -409,10 +409,10 @@ fn calculate_blockage(case: &Case) -> Result<BlockageReport, String> {
     }
     let below_recommendation = ratio < ITTC_BLOCKAGE_RECOMMENDATION;
     let review_required = !below_recommendation;
-    if let Some(digest) = case.blockage.review_evidence_sha256.as_deref() {
-        if !is_sha256(digest) {
-            return Err("blockage review evidence digest is malformed".to_string());
-        }
+    if let Some(digest) = case.blockage.review_evidence_sha256.as_deref()
+        && !is_sha256(digest)
+    {
+        return Err("blockage review evidence digest is malformed".to_string());
     }
     Ok(BlockageReport {
         method: blockage_method_name(case.blockage.method),
@@ -478,10 +478,10 @@ fn validate_field(field: &WakeField, case: &Case, label: &str, errors: &mut Vec<
         }
         sum += point.area_weight;
         for (index, value) in [point.vx_over_vref.as_ref(), point.vr_over_vref.as_ref(), point.vt_over_vref.as_ref()].into_iter().enumerate() {
-            if let Some(value) = value {
-                if !value.value.is_finite() || !finite_positive(value.expanded_uncertainty) {
-                    errors.push(format!("{label}: {} component value/uncertainty invalid", component_name(index)));
-                }
+            if let Some(value) = value
+                && (!value.value.is_finite() || !finite_positive(value.expanded_uncertainty))
+            {
+                errors.push(format!("{label}: {} component value/uncertainty invalid", component_name(index)));
             }
         }
         if field.method == VelocityMethod::WireScreenDerived
@@ -769,7 +769,7 @@ fn nominal_wake_comparison(
     }
 }
 
-fn sorted_unique(values: &mut Vec<f64>) -> bool {
+fn sorted_unique(values: &mut [f64]) -> bool {
     values.sort_by(f64::total_cmp);
     if values.len() < 4 { return false; }
     for pair in values.windows(2) {
@@ -786,7 +786,7 @@ fn sorted_unique(values: &mut Vec<f64>) -> bool {
 fn harmonic_coefficients(points: &[&WakePoint], index: usize, max_harmonic: usize) -> Option<Vec<(f64, f64)>> {
     if points.is_empty() { return None; }
     let mut angles = points.iter().map(|point| point.azimuth_deg).collect::<Vec<_>>();
-    if !sorted_unique(&mut angles) || max_harmonic >= (angles.len() + 1) / 2 {
+    if !sorted_unique(&mut angles) || max_harmonic >= angles.len().div_ceil(2) {
         return None;
     }
     let map = points.iter().map(|point| (point_key(point), *point)).collect::<BTreeMap<_, _>>();
@@ -956,18 +956,23 @@ fn audit(case: &Case) -> AuditReport {
         &&case.realized.points.iter().all(|p|p.vx_over_vref.is_some()&&p.vr_over_vref.is_some()&&p.vt_over_vref.is_some());
     let axial_only=case.target.points.iter().all(|p|p.vx_over_vref.is_some()&&p.vr_over_vref.is_none()&&p.vt_over_vref.is_none())
         &&case.realized.points.iter().all(|p|p.vx_over_vref.is_some()&&p.vr_over_vref.is_none()&&p.vt_over_vref.is_none());
-    let disposition=if !errors.is_empty() {
+    let disposition = if !errors.is_empty() {
         "INVALID"
-    } else if has_definite_failure || coordinate_mismatch || scale_mismatch || quadrature_mismatch || !grid_matches {
+    } else if has_definite_failure
+        || coordinate_mismatch
+        || scale_mismatch
+        || quadrature_mismatch
+        || !grid_matches
+    {
         "INCOMPARABLE"
+    } else if case.evidence_kind == EvidenceKind::Synthetic || unresolved {
+        "INCOMPLETE"
+    } else if full_vector {
+        "FULL_VECTOR_COMPARABLE"
     } else if axial_only {
         "AXIAL_ONLY_DESCRIPTIVE"
-    } else if case.evidence_kind==EvidenceKind::Synthetic || unresolved {
-        "INCOMPLETE"
-    } else if !full_vector {
-        "INCOMPLETE"
     } else {
-        "FULL_VECTOR_COMPARABLE"
+        "INCOMPLETE"
     };
     let wake = nominal_wake_comparison(&target_summary,&realized_summary,case.tolerances.nominal_wake_fraction);
     AuditReport {
