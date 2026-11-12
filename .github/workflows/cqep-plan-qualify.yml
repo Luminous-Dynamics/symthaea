@@ -1,0 +1,52 @@
+name: CQEP Capability-Qualified Plan Compiler
+
+on:
+  pull_request:
+    branches:
+      - research/cqep-001-validation-base
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "tools/muse-edit-plan/**"
+      - ".github/workflows/cqep-plan-qualify.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cqep-plan-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: exact-head-plan-compiler
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'exact_head=%s\n' "$actual"
+
+      - name: Format check
+        run: cargo fmt --manifest-path tools/muse-edit-plan/Cargo.toml --all -- --check
+
+      - name: Deterministic compiler tests
+        run: cargo test --manifest-path tools/muse-edit-plan/Cargo.toml --locked
+
+      - name: Clippy
+        run: cargo clippy --manifest-path tools/muse-edit-plan/Cargo.toml --all-targets --locked -- -D warnings
