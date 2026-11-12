@@ -234,56 +234,6 @@ fn require_admitted<'a>(
     Ok(record)
 }
 
-fn validate_group_identity(
-    cells: &[CellObservation],
-) -> Result<(usize, usize), AuditError> {
-    let mut lot_to_digest = BTreeMap::<&str, &str>::new();
-    let mut digest_to_lot = BTreeMap::<&str, &str>::new();
-    let mut line_to_digest = BTreeMap::<&str, &str>::new();
-    let mut digest_to_line = BTreeMap::<&str, &str>::new();
-
-    for cell in cells {
-        let lot_id = cell.lot_id.as_str();
-        let lot_digest = cell.lot_lineage_digest.as_str();
-        let line_id = cell.line_id.as_str();
-        let line_digest = cell.line_identity_digest.as_str();
-
-        match lot_to_digest.insert(lot_id, lot_digest) {
-            Some(previous) if previous != lot_digest => {
-                return Err(AuditError(format!(
-                    "lot {lot_id} has conflicting lineage digests"
-                )));
-            }
-            _ => {}
-        }
-        match digest_to_lot.insert(lot_digest, lot_id) {
-            Some(previous) if previous != lot_id => {
-                return Err(AuditError(format!(
-                    "lot lineage digest is aliased by {previous} and {lot_id}"
-                )));
-            }
-            _ => {}
-        }
-        match line_to_digest.insert(line_id, line_digest) {
-            Some(previous) if previous != line_digest => {
-                return Err(AuditError(format!(
-                    "line {line_id} has conflicting identity digests"
-                )));
-            }
-            _ => {}
-        }
-        match digest_to_line.insert(line_digest, line_id) {
-            Some(previous) if previous != line_id => {
-                return Err(AuditError(format!(
-                    "line identity digest is aliased by {previous} and {line_id}"
-                )));
-            }
-            _ => {}
-        }
-    }
-    Ok((lot_to_digest.len(), line_to_digest.len()))
-}
-
 fn protocol_pair(arm: &ProtocolArm) -> String {
     format!(
         "{}@{}|{}@{}",
@@ -469,12 +419,11 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         ] {
             require_nonempty(value, label)?;
         }
-        let evidence = require_admitted(
+        require_admitted(
             &registry,
             &arm.protocol_evidence_id,
             &format!("arm {}", arm.arm_id),
         )?;
-        let _ = evidence;
         let design_key = (arm.design_id.clone(), arm.design_revision.clone());
         design_formations
             .entry(design_key.clone())
@@ -626,7 +575,7 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         used_holdout_groups.insert(group);
 
         match lot_digests.insert(cell.lot_id.as_str(), cell.lot_lineage_digest.as_str()) {
-            Some(previous) if previous != cell.lot_lineage_digest => {
+            Some(previous) if previous != cell.lot_lineage_digest.as_str() => {
                 return Err(AuditError(format!(
                     "lot {} has conflicting lineage digests",
                     cell.lot_id
@@ -635,7 +584,7 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
             _ => {}
         }
         match line_digests.insert(cell.line_id.as_str(), cell.line_identity_digest.as_str()) {
-            Some(previous) if previous != cell.line_identity_digest => {
+            Some(previous) if previous != cell.line_identity_digest.as_str() => {
                 return Err(AuditError(format!(
                     "line {} has conflicting identity digests",
                     cell.line_id
@@ -667,7 +616,7 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
     // Reverse-map digests to stable group identities to reject aliases.
     let mut lot_ids_by_digest = BTreeMap::<&str, &str>::new();
     for (lot_id, digest) in &lot_digests {
-        match lot_ids_by_digest.insert(digest, lot_id) {
+        match lot_ids_by_digest.insert(*digest, *lot_id) {
             Some(previous) if previous != *lot_id => {
                 return Err(AuditError(format!(
                     "lot lineage digest is aliased by {previous} and {lot_id}"
@@ -678,7 +627,7 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
     }
     let mut line_ids_by_digest = BTreeMap::<&str, &str>::new();
     for (line_id, digest) in &line_digests {
-        match line_ids_by_digest.insert(digest, line_id) {
+        match line_ids_by_digest.insert(*digest, *line_id) {
             Some(previous) if previous != *line_id => {
                 return Err(AuditError(format!(
                     "line identity digest is aliased by {previous} and {line_id}"
