@@ -633,7 +633,6 @@ fn median_range(values: &[i64]) -> Option<(i64, i64)> {
 
 fn summarize_probe(
     scope: &ProbeAuditScope,
-    candidate_manifest: &ArmManifest,
     candidate_clusters: &BTreeMap<String, &ClusterOutcome>,
     probe: &ProbeRun,
 ) -> Result<ProbeArmReport, ProbeAuditError> {
@@ -795,7 +794,6 @@ pub fn audit_probe_controls(
         }
         reports.push(summarize_probe(
             &input.scope,
-            &input.candidate_manifest,
             &candidate_clusters,
             probe,
         )?);
