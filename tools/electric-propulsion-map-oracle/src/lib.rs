@@ -357,7 +357,7 @@ impl EfficiencyMap2D {
             || bounds.absolute_speed_bound_rpm < 0.0
         {
             return Err(MapError::InvalidQuery(
-                "nominal coordinates and absolute bounds must be finite; bounds must be non-negative",
+                "coordinate bounds must be finite and non-negative",
             ));
         }
 
@@ -466,13 +466,17 @@ impl EfficiencyMap2D {
 
                     if lower_witness
                         .as_ref()
-                        .is_none_or(|current| {\n                            candidate_lower.efficiency_bound < current.efficiency_bound\n                        })
+                        .is_none_or(|current| {
+                            candidate_lower.efficiency_bound < current.efficiency_bound
+                        })
                     {
                         lower_witness = Some(candidate_lower);
                     }
                     if upper_witness
                         .as_ref()
-                        .is_none_or(|current| {\n                            candidate_upper.efficiency_bound > current.efficiency_bound\n                        })
+                        .is_none_or(|current| {
+                            candidate_upper.efficiency_bound > current.efficiency_bound
+                        })
                     {
                         upper_witness = Some(candidate_upper);
                     }
