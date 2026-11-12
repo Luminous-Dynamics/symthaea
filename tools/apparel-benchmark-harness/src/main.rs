@@ -199,10 +199,10 @@ fn validate_semantics(instance: &Value) -> Result<(), Vec<String>> {
     let mut known_evidence = projection_ids;
     known_evidence.extend(test_ids);
     for operation in operations {
-        if let Some(reference) = get_str(operation, "actual_event_ref") {
-            if !reference.trim().is_empty() {
-                known_evidence.insert(reference.to_owned());
-            }
+        if let Some(reference) = get_str(operation, "actual_event_ref")
+            && !reference.trim().is_empty()
+        {
+            known_evidence.insert(reference.to_owned());
         }
     }
     known_evidence.insert("FIXTURE-SELF-CHECK-001".into());
@@ -214,12 +214,12 @@ fn validate_semantics(instance: &Value) -> Result<(), Vec<String>> {
             .map(Vec::as_slice)
             .unwrap_or(&[]);
         for reference in references {
-            if let Some(reference) = reference.as_str() {
-                if !known_evidence.contains(reference) {
-                    errors.push(format!(
-                        "claims[{index}]: unresolved evidence reference {reference}"
-                    ));
-                }
+            if let Some(reference) = reference.as_str()
+                && !known_evidence.contains(reference)
+            {
+                errors.push(format!(
+                    "claims[{index}]: unresolved evidence reference {reference}"
+                ));
             }
         }
 
@@ -380,11 +380,11 @@ fn validate_source_manifest(manifest: &Value) -> Result<usize, Vec<String>> {
         let frames = texsort
             .pointer("/public_scope/annotated_frames")
             .and_then(Value::as_u64);
-        if let (Some(garments), Some(stages), Some(frames)) = (garments, stages, frames) {
-            if garments * stages != frames {
-                errors
-                    .push("TexSortML garment × stage count does not equal annotated_frames".into());
-            }
+        if let (Some(garments), Some(stages), Some(frames)) = (garments, stages, frames)
+            && garments * stages != frames
+        {
+            errors
+                .push("TexSortML garment × stage count does not equal annotated_frames".into());
         }
     }
 
