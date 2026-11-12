@@ -464,6 +464,24 @@ The service evaluator checks complete time coverage, interval identity, electric
 
 It checks that an upstream capability-receipt identifier is present and compares the declared values; it does not resolve, authenticate or verify the receipt, validate the upstream generation/storage/thermal models, or derive their values. Every interval must state its thermal-service list explicitly (an empty list means no thermal service is required). This is a synthetic join/eligibility checker, not an energy dispatch or thermal solver.
 
+### 14.3 Competitive reference snapshot audit
+
+The source-bound comparator ledger can be checked with:
+
+```bash
+cargo run -p xtask -- planetary-reference-audit
+```
+
+To write its machine-readable report:
+
+```bash
+cargo run -p xtask -- planetary-reference-audit \
+  --input benchmarks/planetary-energy-service/v0.1/competitive-reference-snapshot.json \
+  --out reports/planetary-energy/competitive-reference-audit.json
+```
+
+This checks unique source/metric identities, HTTPS source pointers, admitted evidence classes, source resolution, unit presence, value type, explicit system boundary and non-empty caveats. It does not retrieve or independently reproduce the source measurements, validate vendor/project claims, normalize cost-year assumptions or conclude that one technology is better. PASS means only that the snapshot is source-bound and its comparison metadata is complete enough for review.
+
 ### Tests and claim ceiling
 
 Focused tests are authored under `xtask/src/planetary_energy.rs` and can be run with:
@@ -472,7 +490,7 @@ Focused tests are authored under `xtask/src/planetary_energy.rs` and can be run 
 cargo test -p xtask
 ```
 
-The orbit and service commands use the existing `serde`, `serde_json`, `sha2` and `anyhow` dependencies. A corpus-level PASS means its expected synthetic/reference dispositions were reproduced; it does not mean all included candidates are feasible. Neither command validates a solar array, power system, battery, radiator, site, material process or ISRU plant.
+All three commands use the existing `serde`, `serde_json`, `sha2` and `anyhow` dependencies. A corpus-level PASS means its expected synthetic/reference dispositions were reproduced or that source/boundary metadata is present; it does not mean all included candidates are feasible or that the cited technology has been independently qualified. None of these commands validates a solar array, power system, battery, radiator, site, material process or ISRU plant.
 
 The service receipt values in the synthetic fixture are deliberately synthetic. Production use must first bind exact source model, configuration, timebase, evidence class, units, uncertainty and capability receipt identity from the upstream owner. A non-empty capability-receipt identifier is only a reference string; it is not proof that the receipt exists, is authentic, is current, or is qualified.
 
