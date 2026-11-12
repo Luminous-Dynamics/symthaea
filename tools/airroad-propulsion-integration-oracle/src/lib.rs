@@ -187,31 +187,6 @@ fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationErro
     };
     let transmission_efficiency = 0.90;
 
-    // Derive the motor-shaft point once; the synthetic measurement samples use
-    // these exact values so the later bit-exact evidence/operating-point join
-    // is checking lineage rather than a rounded, hand-copied coordinate.
-    let expected_motor_point = derive_motor_shaft_operating_point(
-        drive_input,
-        transmission,
-        transmission_efficiency,
-    )?;
-
-    let manifest = RunManifest {
-        run_id: "synthetic-run-001".fn build_core(maximum_dc_bus_power_w: f64) -> Result<CoreResult, IntegrationError> {
-    // Frozen reference: 10 kW at the rotor shaft and 3,000 rotor RPM.
-    let rotor_speed_rpm = 3_000.0;
-    let rotor_angular_velocity_rad_s = rotor_speed_rpm * TAU / 60.0;
-    let drive_input = DriveInput {
-        rotor_shaft_torque_nm: 10_000.0 / rotor_angular_velocity_rad_s,
-        rotor_speed_rpm,
-        dc_bus_voltage_v: 400.0,
-        duration_s: 12.0,
-    };
-    let transmission = TransmissionKinematics {
-        motor_to_rotor_speed_ratio: 5.0,
-    };
-    let transmission_efficiency = 0.90;
-
     // Derive the motor-side point once. The sensor channels use these exact
     // coordinates so evidence joins are not based on hand-rounded values.
     let expected_motor_point = derive_motor_shaft_operating_point(
@@ -618,7 +593,7 @@ mod tests {
         let torque_lower = torque - core.observation.torque_absolute_uncertainty_nm;
         let torque_upper = torque + core.observation.torque_absolute_uncertainty_nm;
         let speed_lower = speed - core.observation.speed_absolute_uncertainty_rpm;
-        let speed_upper = speed + core.observation.speed_absolute_uncertainty_rpm;
+        let speed_upper = speed + core.observation.speed_absolute_speed_bound_rpm;
         let crossing_map = EfficiencyMap2D::new(
             "synthetic-crossing-map",
             "synthetic-crossing-map-digest",
