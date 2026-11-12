@@ -1082,7 +1082,7 @@ mod tests {
         ch.to_string().repeat(64)
     }
 
-    fn mutation(attempt: &str) -> PreparedMutation {
+    fn make_mutation(attempt: &str) -> PreparedMutation {
         PreparedMutation {
             attempt_id: attempt.to_owned(),
             plan_sha256: digest(A),
@@ -1168,7 +1168,7 @@ mod tests {
     #[test]
     fn one_shot_authorization_commits_only_after_independent_observer_passes() {
         let mut ledger = ledger();
-        let mutation = mutation("attempt-001");
+        let mutation = make_mutation("attempt-001");
         let permit = authorize_and_dispatch(&mut ledger, mutation);
         let output = digest(L);
         let event = ledger
@@ -1189,7 +1189,7 @@ mod tests {
     #[test]
     fn authorization_rejects_a_stale_parent() {
         let ledger = ledger();
-        let mutation = mutation("attempt-002");
+        let mutation = make_mutation("attempt-002");
         let mut stale = snapshot(&ledger);
         stale.current_output_sha256 = digest(N);
         assert_eq!(
@@ -1201,7 +1201,7 @@ mod tests {
     #[test]
     fn authorization_rejects_a_stale_plan_registry_or_session() {
         let ledger = ledger();
-        let mutation = mutation("attempt-003");
+        let mutation = make_mutation("attempt-003");
         let mut stale_plan = snapshot(&ledger);
         stale_plan.current_plan_sha256 = digest(N);
         assert_eq!(
@@ -1240,7 +1240,7 @@ mod tests {
     #[test]
     fn global_scope_cannot_substitute_for_a_part_local_edit() {
         let ledger = ledger();
-        let mut mutation = mutation("attempt-004");
+        let mut mutation = make_mutation("attempt-004");
         mutation.operator_supported_scopes = vec![EditScope::Global];
         assert_eq!(
             ledger.prepare_authorization(
@@ -1256,7 +1256,7 @@ mod tests {
     #[test]
     fn approval_must_bind_exact_action_parent_and_scope() {
         let ledger = ledger();
-        let mutation = mutation("attempt-005");
+        let mutation = make_mutation("attempt-005");
         let mut approval = approval(&mutation);
         approval.scope = EditScope::Global;
         assert_eq!(
@@ -1268,7 +1268,7 @@ mod tests {
     #[test]
     fn missing_operator_capability_or_precondition_blocks_authorization() {
         let ledger = ledger();
-        let mut no_capability = mutation("attempt-006");
+        let mut no_capability = make_mutation("attempt-006");
         no_capability.operator_capabilities.clear();
         assert_eq!(
             ledger.prepare_authorization(
@@ -1279,7 +1279,7 @@ mod tests {
             ),
             Err(RuntimeError::MissingCapability)
         );
-        let mut no_precondition = mutation("attempt-007");
+        let mut no_precondition = make_mutation("attempt-007");
         no_precondition.precondition_evidence.clear();
         assert_eq!(
             ledger.prepare_authorization(
@@ -1295,7 +1295,7 @@ mod tests {
     #[test]
     fn operator_and_observer_artifacts_must_be_independent() {
         let mut ledger = ledger();
-        let mutation = mutation("attempt-008");
+        let mutation = make_mutation("attempt-008");
         let permit = authorize_and_dispatch(&mut ledger, mutation.clone());
         let output = digest(L);
         let mut same_artifact = observer(&output);
@@ -1331,7 +1331,7 @@ mod tests {
         ];
         for (evidence, expected) in cases {
             let mut ledger = ledger();
-            let mutation = mutation("attempt-009");
+            let mutation = make_mutation("attempt-009");
             let permit = authorize_and_dispatch(&mut ledger, mutation);
             assert_eq!(
                 ledger.prepare_outcome(
@@ -1350,7 +1350,7 @@ mod tests {
     #[test]
     fn budget_exhaustion_is_a_hard_rejection() {
         let ledger = ledger();
-        let mutation = mutation("attempt-010");
+        let mutation = make_mutation("attempt-010");
         let mut budget = snapshot(&ledger);
         budget.remaining_budget_units = 2;
         assert_eq!(
@@ -1362,7 +1362,7 @@ mod tests {
     #[test]
     fn dispatched_attempt_blocks_a_second_mutation() {
         let mut ledger = ledger();
-        let mutation = mutation("attempt-011");
+        let mutation = make_mutation("attempt-011");
         let (event, grant) = ledger
             .prepare_authorization(
                 &snapshot(&ledger),
@@ -1375,7 +1375,7 @@ mod tests {
         let (dispatch, _permit) = ledger.prepare_dispatch(grant).unwrap();
         ledger.append(dispatch).unwrap();
 
-        let next = mutation("attempt-012");
+        let next = make_mutation("attempt-012");
         assert_eq!(
             ledger.prepare_authorization(
                 &snapshot(&ledger),
@@ -1390,7 +1390,7 @@ mod tests {
     #[test]
     fn unknown_outcome_blocks_mutation_until_reconciled() {
         let mut ledger = ledger();
-        let permit = authorize_and_dispatch(&mut ledger, mutation("attempt-013"));
+        let permit = authorize_and_dispatch(&mut ledger, make_mutation("attempt-013"));
         let unknown = ledger
             .prepare_outcome(
                 permit,
@@ -1402,7 +1402,7 @@ mod tests {
             .unwrap();
         ledger.append(unknown).unwrap();
 
-        let next = mutation("attempt-014");
+        let next = make_mutation("attempt-014");
         assert_eq!(
             ledger.prepare_authorization(
                 &snapshot(&ledger),
@@ -1417,7 +1417,7 @@ mod tests {
     #[test]
     fn reconciliation_commit_advances_head_once_and_unblocks_mutation() {
         let mut ledger = ledger();
-        let mutation = mutation("attempt-015");
+        let mutation = make_mutation("attempt-015");
         let permit = authorize_and_dispatch(&mut ledger, mutation.clone());
         let unknown = ledger
             .prepare_outcome(
@@ -1447,7 +1447,7 @@ mod tests {
         ledger.append(reconciled).unwrap();
         assert_eq!(ledger.current_output_digest().unwrap(), digest(L));
 
-        let next = mutation("attempt-016");
+        let next = make_mutation("attempt-016");
         let (auth, _grant) = ledger
             .prepare_authorization(
                 &AuthoritySnapshot {
@@ -1469,7 +1469,7 @@ mod tests {
     #[test]
     fn reconciliation_rejects_wrong_attempt_or_wrong_output() {
         let mut ledger = ledger();
-        let mutation = mutation("attempt-017");
+        let mutation = make_mutation("attempt-017");
         let permit = authorize_and_dispatch(&mut ledger, mutation.clone());
         let unknown = ledger
             .prepare_outcome(
@@ -1520,7 +1520,7 @@ mod tests {
     #[test]
     fn reconciliation_no_mutation_resolves_unknown_without_advancing_head() {
         let mut ledger = ledger();
-        let mutation = mutation("attempt-018");
+        let mutation = make_mutation("attempt-018");
         let permit = authorize_and_dispatch(&mut ledger, mutation.clone());
         let unknown = ledger
             .prepare_outcome(
@@ -1553,7 +1553,7 @@ mod tests {
     #[test]
     fn definite_failure_and_withdrawal_allow_safe_retry() {
         let mut ledger = ledger();
-        let mutation = mutation("attempt-019");
+        let mutation = make_mutation("attempt-019");
         let permit = authorize_and_dispatch(&mut ledger, mutation);
         let failure = ledger
             .prepare_outcome(
@@ -1565,7 +1565,7 @@ mod tests {
             .unwrap();
         ledger.append(failure).unwrap();
 
-        let withdrawn_mutation = mutation("attempt-020");
+        let withdrawn_mutation = make_mutation("attempt-020");
         let (auth, grant) = ledger
             .prepare_authorization(
                 &snapshot(&ledger),
@@ -1578,7 +1578,7 @@ mod tests {
         let withdrawal = ledger.prepare_withdrawal(grant, digest(J)).unwrap();
         ledger.append(withdrawal).unwrap();
 
-        let retry = mutation("attempt-021");
+        let retry = make_mutation("attempt-021");
         let (auth_retry, _grant_retry) = ledger
             .prepare_authorization(
                 &snapshot(&ledger),
@@ -1596,7 +1596,7 @@ mod tests {
     #[test]
     fn replay_rejects_duplicate_grant_and_preserves_unknown_state() {
         let mut ledger = ledger();
-        let mutation = mutation("attempt-022");
+        let mutation = make_mutation("attempt-022");
         let (auth, grant) = ledger
             .prepare_authorization(
                 &snapshot(&ledger),
@@ -1632,7 +1632,7 @@ mod tests {
     #[test]
     fn invalid_digest_and_duplicate_evidence_reject() {
         let ledger = ledger();
-        let mut invalid = mutation("attempt-023");
+        let mut invalid = make_mutation("attempt-023");
         invalid.action_sha256 = "not-a-digest".to_owned();
         assert_eq!(
             ledger.prepare_authorization(
@@ -1644,7 +1644,7 @@ mod tests {
             Err(RuntimeError::InvalidDigest("action_sha256"))
         );
 
-        let mut duplicate = mutation("attempt-024");
+        let mut duplicate = make_mutation("attempt-024");
         duplicate
             .precondition_evidence
             .push(duplicate.precondition_evidence[0].clone());
@@ -1662,7 +1662,7 @@ mod tests {
     #[test]
     fn dispatch_grant_is_bound_to_exact_persisted_revision() {
         let mut ledger = ledger();
-        let mutation = mutation("attempt-025");
+        let mutation = make_mutation("attempt-025");
         let (auth, grant) = ledger
             .prepare_authorization(
                 &snapshot(&ledger),
