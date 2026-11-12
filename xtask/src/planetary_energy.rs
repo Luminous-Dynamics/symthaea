@@ -263,7 +263,14 @@ pub fn audit_corpus(bytes: &[u8]) -> Result<AuditReport> {
             None
         };
         let ideal_area_multiplier = distance_squared;
-        let reference_flux_fraction = distance_squared.map(|value| 1.0 / value);
+        let reference_flux_fraction = distance_squared.and_then(|value| {
+            let fraction = 1.0 / value;
+            if fraction.is_finite() && fraction > 0.0 {
+                Some(fraction)
+            } else {
+                None
+            }
+        });
         let computed = reference_flux_fraction.and_then(|fraction| {
             if model.solar_irradiance_at_1_au_w_m2.is_finite()
                 && model.solar_irradiance_at_1_au_w_m2 > 0.0
