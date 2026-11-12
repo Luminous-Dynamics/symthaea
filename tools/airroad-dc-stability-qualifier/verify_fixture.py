@@ -41,6 +41,10 @@ def require_equal(actual: Fraction, expected: Fraction, label: str) -> None:
 
 def verify_fixture(path: Path) -> int:
     fixture = json.loads(path.read_text(encoding="utf-8"))
+    if fixture.get("schema_version") != "0.1.0":
+        raise AssertionError("unsupported or missing fixture schema_version")
+    if fixture.get("evidence_class") != "synthetic_analytical_reference":
+        raise AssertionError("fixture evidence_class must remain synthetic")
     model = fixture["model"]["parameters"]
     source_voltage = rational(model["Vs"]["exact_rational"])
     source_resistance = rational(model["Rs"]["exact_rational"])
@@ -129,7 +133,34 @@ def verify_fixture(path: Path) -> int:
             if roots:
                 raise AssertionError(f"{case_id}: no-equilibrium case must have no roots")
 
-        print(f"PASS {case_id}: exact rational reference agrees")
+        # Check the scalar ODE's phase-line direction independently from
+        # the equilibrium labels and expected basin descriptions.
+        phase_probes = case.get("phase_line_probes", [])
+        if not phase_probes:
+            raise AssertionError(f"{case_id}: phase-line probe corpus is empty")
+        for probe in phase_probes:
+            voltage = Fraction(probe["voltage_v"])
+            if voltage <= 0:
+                raise AssertionError(f"{case_id}: phase-line probe must be positive")
+            derivative = (
+                (case_source_voltage - voltage) / case_source_resistance
+                - load_power / voltage
+            ) / case_capacitance
+            observed_sign = (
+                "increasing" if derivative > 0
+                else "decreasing" if derivative < 0
+                else "equilibrium"
+            )
+            if observed_sign != probe["expected_sign"]:
+                raise AssertionError(
+                    f"{case_id}: at V={voltage}, expected "
+                    f"{probe['expected_sign']}, observed {observed_sign}"
+                )
+
+        print(
+            f"PASS {case_id}: exact roots, eigenvalues, and "
+            f"{len(phase_probes)} phase-line probes agree"
+        )
 
     print(f"PASS {len(cases)} exact-rational cases; fixture={path}")
     return len(cases)
