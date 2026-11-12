@@ -448,10 +448,10 @@ pub fn admit_batch(
                 request.request_id.clone(),
             ));
         }
-        if let Some(poma) = request.poma_upper_ppm {
-            if poma > 1_000_000 {
-                return Err(ReferenceError::InvalidProbabilityBound(poma));
-            }
+        if let Some(poma) = request.poma_upper_ppm
+            && poma > 1_000_000
+        {
+            return Err(ReferenceError::InvalidProbabilityBound(poma));
         }
         if request.poma_limit_ppm > 1_000_000 {
             return Err(ReferenceError::InvalidProbabilityLimit(
