@@ -3857,9 +3857,7 @@ fn jacobi_eigendecomposition_symmetric(
         }
         if residual <= tol * scale {
             let mut order = (0..n).collect::<Vec<_>>();
-            order.sort_by(|left, right| {
-                a[*left * n + *left].total_cmp(&a[*right * n + *right])
-            });
+            order.sort_by(|left, right| a[*left * n + *left].total_cmp(&a[*right * n + *right]));
             let eigenvalues = order.iter().map(|index| a[*index * n + *index]).collect();
             let mut sorted_vectors = vec![0.0; n * n];
             for (new_column, old_column) in order.into_iter().enumerate() {
@@ -4042,7 +4040,11 @@ fn complex_hermitian_square_root_4(
         .map(|(left, right)| (*left - *right).norm_sqr())
         .sum::<f64>()
         .sqrt();
-    let matrix_norm = matrix.iter().map(|value| value.norm_sqr()).sum::<f64>().sqrt();
+    let matrix_norm = matrix
+        .iter()
+        .map(|value| value.norm_sqr())
+        .sum::<f64>()
+        .sqrt();
     let residual = difference_norm / matrix_norm.max(1.0);
     if !residual.is_finite() || residual > tolerance * 1000.0 {
         return Err(QuantumInformationError::EigensolverNonconvergence {
@@ -5135,14 +5137,22 @@ mod petz_semidefinite_square_root_tests {
     #[test]
     fn positive_semidefinite_square_root_handles_rank_one_and_rank_two_support() {
         let rank_one = [
-            Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
         ];
         let (root_one, residual_one, rank_one_support) =
             complex_hermitian_square_root_4(rank_one, TOLERANCE).unwrap();
@@ -5152,14 +5162,22 @@ mod petz_semidefinite_square_root_tests {
         assert!(root_one[1..].iter().all(|value| value.norm() < 1e-12));
 
         let rank_two = [
-            Complex64::new(0.25, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.75, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(0.25, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.75, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
         ];
         let (root_two, residual_two, rank_two_support) =
             complex_hermitian_square_root_4(rank_two, TOLERANCE).unwrap();
@@ -5168,21 +5186,33 @@ mod petz_semidefinite_square_root_tests {
         assert!((root_two[0].re - 0.5).abs() < 1e-12);
         assert!((root_two[5].re - 0.75_f64.sqrt()).abs() < 1e-12);
         assert!(root_two.iter().enumerate().all(|(index, value)| {
-            if index != 0 && index != 5 { value.norm() < 1e-12 } else { true }
+            if index != 0 && index != 5 {
+                value.norm() < 1e-12
+            } else {
+                true
+            }
         }));
     }
 
     #[test]
     fn positive_semidefinite_square_root_rejects_materially_negative_spectrum() {
         let negative = [
-            Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(-0.01, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
-            Complex64::new(0.0, 0.0), Complex64::new(0.0, 0.0),
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(-0.01, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
         ];
         assert!(matches!(
             complex_hermitian_square_root_4(negative, TOLERANCE),
@@ -5221,7 +5251,7 @@ mod hayden_preskill_petz_optimality_tests {
             assert!(sample.qec_matrix_trace_residual < TOLERANCE);
             assert!(sample.qec_matrix_hermiticity_residual < TOLERANCE);
             assert!(sample.qec_matrix_square_root_residual < TOLERANCE * 10.0);
-        assert!((1..=4).contains(&sample.qec_matrix_numerical_support_rank));
+            assert!((1..=4).contains(&sample.qec_matrix_numerical_support_rank));
             assert!(sample.auxiliary_t_hermiticity_residual < TOLERANCE * 10.0);
             assert!(sample.petz_optimality_commutator_frobenius < TOLERANCE * 100.0);
             assert!(sample.petz_is_entanglement_fidelity_optimal);
