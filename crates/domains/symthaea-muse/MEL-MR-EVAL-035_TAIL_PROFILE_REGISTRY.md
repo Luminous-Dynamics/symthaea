@@ -31,7 +31,8 @@ TailTopologyEvidence binds:
 - complete downstream route graph, including sends/returns, buses, plugins, master processing and output stage;
 - output chain and PCM format;
 - EVAL-034 segmentation-policy digest;
-- dataset revision and profile-builder artifact;
+- dataset revision, source-domain profile and lineage-sampling protocol;
+- profile-builder artifact;
 - operation family, sample rate, channel count and publisher key ID.
 
 The evidence is accepted only when all digests are valid, its domain-separated digest replays, a signature verifier accepts the publisher key, and routing_complete is true.
@@ -54,6 +55,8 @@ The EVAL-017 report and replay-verified renderer binding must agree with the obs
 
 This does not independently discover composition ancestry. The upstream lineage publisher and trusted-key registry remain explicit dependencies; a free-form caller string is not accepted as the independent-sample identity.
 
+The signed source-domain profile defines the target composition population (for example, instrument families, register, polyphony, rhythmic/meter families, duration and style strata); the sampling-protocol digest freezes how lineages enter calibration and qualification. A profile is not transferable to a different source-domain or sampling policy without new evidence.
+
 ### 3.3 Replay-verified event tail
 
 verify_tail_event_observation:
@@ -72,7 +75,9 @@ No-effect-above-noise-floor observations cannot silently contribute zero-length 
 
 ### 4.1 One independent value per composition
 
-For each source-composition lineage, the profile builder takes the maximum measured event tail over all admitted event observations. This is deliberately conservative and prevents pseudoreplication from compositions with many notes, windows, channels or repeats.
+For each source-composition lineage, the profile builder takes the maximum measured event tail over all admitted event observations. Every observed Score version must have complete, unique canonical event-index coverage for each exact baseline-render receipt. This permits multiple independent baseline takes/scenarios of the same Score while preventing an incomplete render scenario from silently omitting a long-tail event.
+
+All events, channels, windows, and multiple baseline render scenarios from one root composition are still collapsed to one maximum-tail value for that root lineage. This is deliberately conservative and prevents pseudoreplication from compositions with many notes, windows, channels or repeats.
 
 Calibration and qualification lineage sets must be digest-disjoint. The profile contains sorted lineage IDs, event-observation receipt digests and one maximum-tail value per lineage.
 
@@ -137,7 +142,7 @@ Added and exported src/tail_profile_registry.rs with:
 - signed topology-evidence contract and opaque verified topology token;
 - signed source-composition lineage contract and opaque verified lineage token;
 - EVAL-017 v0.2 replay adapter to event-specific tail observations;
-- per-composition maximum-tail clustering;
+- per-composition maximum-tail clustering across complete per-render Score-event maps;
 - exact binomial order-statistic quantile UCB;
 - one-sided Clopper-Pearson miss-rate upper bound;
 - replay-sealed profile and independent replay verifier;
