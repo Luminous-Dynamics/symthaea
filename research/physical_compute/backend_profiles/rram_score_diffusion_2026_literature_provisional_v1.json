@@ -1,0 +1,65 @@
+{
+  "schema_version": 1,
+  "profile_id": "rram-score-diffusion-2026-literature-v1",
+  "backend_family": "rram",
+  "profile_status": "provisional",
+  "evidence_class": "literature_reported",
+  "hardware_identity": {
+    "manufacturer": null,
+    "model": null,
+    "technology": "resistive-memory in-memory-computing macro",
+    "process_node_nm": 180,
+    "device_id": null,
+    "firmware": null,
+    "calibration_id": null
+  },
+  "capabilities": [
+    {
+      "primitive": "differential_equation",
+      "status": "provisional",
+      "maximum_dimension": null,
+      "supported_operations": [
+        "time_continuous_neural_score_dynamics",
+        "2d_latent_score_based_diffusion_demo"
+      ],
+      "evidence_refs": [
+        "https://www.nature.com/articles/s41467-026-72900-z",
+        "https://doi.org/10.1038/s41467-026-72900-z"
+      ],
+      "limitations": [
+        "The published demonstration uses a 2-D latent score-dynamics task; it does not establish general high-resolution image-generation capability.",
+        "The VAE encoder and decoder are outside the analog latent-dynamics macro.",
+        "Reported fully integrated latency and energy values include projected or analytical estimates; this profile does not treat them as measured full-system capability."
+      ]
+    }
+  ],
+  "noise_characterization": {
+    "status": "unknown",
+    "sources": ["unknown"],
+    "autocorrelation_status": "unknown",
+    "cross_channel_status": "unknown",
+    "stationarity_status": "unknown"
+  },
+  "fault_characterization": {
+    "status": "unknown",
+    "mechanisms": ["unknown"]
+  },
+  "peripheral_accounting": {
+    "measurement_boundary": "unknown",
+    "components": [],
+    "host_transfer_included": null,
+    "calibration_included": null,
+    "verification_included": null,
+    "recovery_included": null
+  },
+  "evidence_refs": [
+    "https://www.nature.com/articles/s41467-026-72900-z",
+    "https://doi.org/10.1038/s41467-026-72900-z"
+  ],
+  "limitations": [
+    "Literature-reported profile only. No Luminous physical hardware is identified or qualified.",
+    "Noise spectrum, autocorrelation, cross-channel covariance, fault topology and operating envelope remain unknown in this profile.",
+    "The paper's physical demonstration, projected integrated-system figures and analytical energy estimates are separate evidence classes.",
+    "No full application energy boundary including VAE encode/decode, control, calibration, verification and host movement is established here."
+  ]
+}

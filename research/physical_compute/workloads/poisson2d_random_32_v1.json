@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "workload_id": "poisson2d-random-32-v1",
+  "name": "2-D homogeneous Dirichlet Poisson, random known-solution RHS",
+  "problem": {
+    "family": "steady_pde",
+    "formulation": "linear_system",
+    "representation": "matrix_free_operator",
+    "spatial_dimension": 2,
+    "state_dimension": 1024,
+    "grid": {
+      "shape": [32, 32],
+      "spacing": [1.0, 1.0],
+      "boundary_conditions": ["homogeneous_dirichlet"]
+    },
+    "discretization": "finite_difference",
+    "coefficient_structure": "constant_isotropic",
+    "operator_properties": {
+      "symmetry": {
+        "status": "proven",
+        "value": true,
+        "method": "symmetric_five_point_dirichlet_stencil",
+        "evidence_ref": "poisson2d_operator_contract_v1"
+      },
+      "positive_definite": {
+        "status": "proven",
+        "value": true,
+        "method": "discrete_dirichlet_energy_identity",
+        "evidence_ref": "poisson2d_operator_contract_v1"
+      },
+      "condition_number_2": {
+        "status": "derived",
+        "value": 440.6885603836582,
+        "method": "exact_rectangular_discrete_spectrum"
+      }
+    },
+    "rhs_or_initial_state": {
+      "fixture_id": "poisson2d-random-rhs-32-seed-20261108",
+      "spectrum": "broadband_random",
+      "seed": 20261108,
+      "generator": "splitmix64_box_muller_known_solution_rhs_v1"
+    }
+  },
+  "task_contract": {
+    "objective": "solve",
+    "acceptance_metrics": [
+      {
+        "metric": "relative_true_residual",
+        "comparator": "<=",
+        "threshold": 1e-10
+      },
+      {
+        "metric": "relative_forward_error",
+        "comparator": "<=",
+        "threshold": 1e-8,
+        "notes": "Evaluator-only reference; never supplied to solver or compiler."
+      }
+    ],
+    "verification": {
+      "required": true,
+      "independent": true,
+      "evaluator_truth_visible_to_solver": false,
+      "method": "independent_matrix_free_operator_and_hidden_reference",
+      "failure_policy": "reject_or_fallback"
+    },
+    "deadline_ms": null,
+    "minimum_success_probability": 0.999
+  },
+  "resource_constraints": {
+    "energy_budget_j": null,
+    "memory_budget_bytes": 67108864,
+    "area_budget_mm2": null,
+    "max_physical_tiles": null
+  },
+  "provenance": {
+    "evidence_refs": ["poisson2d_operator_contract_v1"],
+    "notes": "Workload descriptor only. The evaluator's known solution remains external to this solver-visible IR."
+  },
+  "tags": ["poisson", "matrix-free", "mg-pcg", "synthetic"]
+}

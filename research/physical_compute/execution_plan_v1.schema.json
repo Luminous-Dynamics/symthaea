@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/physical_compute/execution_plan_v1.schema.json",
+  "title": "Symthaea Physical Compute Execution Plan v1",
+  "description": "Candidate set and deterministic compiler decision. Eligibility and cost evidence are explicit; schema validity does not prove backend capability.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "plan_id", "workload_id", "workload_sha256",
+    "decision", "candidates", "verification_policy", "compiler_provenance"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "plan_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,95}$" },
+    "workload_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,95}$" },
+    "workload_sha256": { "$ref": "#/$defs/digest" },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "selected_candidate_id", "objective", "reason_codes"],
+      "properties": {
+        "status": { "enum": ["selected", "abstained", "no_feasible_plan"] },
+        "selected_candidate_id": { "type": ["string", "null"], "maxLength": 96 },
+        "objective": {
+          "type": "string",
+          "enum": ["minimize_latency", "minimize_energy", "minimize_area", "minimize_memory", "pareto_set", "user_defined"]
+        },
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_]{1,63}$" },
+          "uniqueItems": true
+        },
+        "notes": { "type": "string", "maxLength": 2000 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "status": { "const": "selected" } }, "required": ["status"] },
+          "then": { "properties": { "selected_candidate_id": { "type": "string", "minLength": 1 } } }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["abstained", "no_feasible_plan"] } }, "required": ["status"] },
+          "then": { "properties": { "selected_candidate_id": { "type": "null" } } }
+        }
+      ]
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/candidate" }
+    },
+    "verification_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "independent", "evaluator_truth_visible_to_solver", "failure_policy"],
+      "properties": {
+        "required": { "const": true },
+        "independent": { "type": "boolean" },
+        "evaluator_truth_visible_to_solver": { "const": false },
+        "failure_policy": { "enum": ["reject", "fallback", "abstain", "reject_or_fallback"] },
+        "verifier_profile_id": { "type": ["string", "null"], "maxLength": 160 }
+      }
+    },
+    "compiler_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["compiler_revision", "rule_set_id", "evidence_class"],
+      "properties": {
+        "compiler_revision": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "rule_set_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "evidence_class": { "enum": ["synthetic", "software_observed", "hardware_measured", "mixed", "unknown"] },
+        "configuration_sha256": { "$ref": "#/$defs/digest" },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "quantity_estimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "unit", "evidence_class"],
+      "properties": {
+        "value": { "type": ["number", "null"], "minimum": 0 },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 24 },
+        "evidence_class": { "enum": ["measured", "derived", "modelled", "synthetic", "unknown"] },
+        "measurement_boundary": { "type": ["string", "null"], "maxLength": 240 },
+        "evidence_ref": { "type": ["string", "null"], "maxLength": 200 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "evidence_class": { "const": "unknown" } }, "required": ["evidence_class"] },
+          "then": { "properties": { "value": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "evidence_class": { "enum": ["measured", "derived"] } }, "required": ["evidence_class"] },
+          "then": {
+            "required": ["evidence_ref"],
+            "properties": {
+              "value": { "type": "number" },
+              "evidence_ref": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "evidence_class": { "enum": ["modelled", "synthetic"] } }, "required": ["evidence_class"] },
+          "then": { "properties": { "value": { "type": "number" } } }
+        }
+      ]
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id", "formulation", "algorithm", "backend",
+        "eligibility", "reason_codes", "estimated_cost", "evidence_refs"
+      ],
+      "properties": {
+        "candidate_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{1,95}$" },
+        "formulation": {
+          "enum": ["native_dynamics", "matrix_equation", "matrix_vector", "linear_solver", "multigrid", "hybrid_coarse_correction", "fault_adaptive_mapping"]
+        },
+        "algorithm": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "backend": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["family", "profile_status"],
+          "properties": {
+            "family": { "enum": ["cpu", "gpu", "fpga", "rram", "sram_analog", "cmos_analog", "photonic", "digital_custom", "unknown"] },
+            "backend_id": { "type": ["string", "null"], "maxLength": 160 },
+            "profile_status": { "enum": ["qualified", "provisional", "unqualified", "not_present"] },
+            "capability_profile_sha256": { "$ref": "#/$defs/digest" }
+          }
+        },
+        "eligibility": { "enum": ["eligible", "rejected", "unqualified"] },
+        "reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_]{1,63}$" },
+          "uniqueItems": true
+        },
+        "estimated_cost": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["latency_ms", "energy_j", "memory_bytes", "area_mm2"],
+          "properties": {
+            "latency_ms": { "$ref": "#/$defs/quantity_estimate" },
+            "energy_j": { "$ref": "#/$defs/quantity_estimate" },
+            "memory_bytes": { "$ref": "#/$defs/quantity_estimate" },
+            "area_mm2": { "$ref": "#/$defs/quantity_estimate" }
+          }
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "eligibility": { "const": "eligible" } }, "required": ["eligibility"] },
+          "then": {
+            "properties": {
+              "backend": {
+                "properties": { "profile_status": { "const": "qualified" } }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "backend": {
+                "properties": { "profile_status": { "const": "qualified" } },
+                "required": ["profile_status"]
+              }
+            },
+            "required": ["backend"]
+          },
+          "then": {
+            "properties": {
+              "backend": { "required": ["capability_profile_sha256"] }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

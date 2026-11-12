@@ -1,0 +1,247 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/physical_compute/backend_capability_profile_v1.schema.json",
+  "title": "Symthaea Physical Compute Backend Capability Profile v1",
+  "description": "Evidence-qualified description of one physical or digital backend. Literature reports, simulations and uncharacterized backends cannot be promoted to hardware-qualified capabilities.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "profile_id", "backend_family", "profile_status",
+    "evidence_class", "hardware_identity", "capabilities",
+    "noise_characterization", "fault_characterization",
+    "peripheral_accounting", "evidence_refs"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "profile_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{2,95}$" },
+    "backend_family": {
+      "enum": ["cpu", "gpu", "fpga", "rram", "sram_analog", "cmos_analog", "photonic", "spintronic", "reservoir", "other"]
+    },
+    "profile_status": { "enum": ["qualified", "provisional", "unqualified", "not_present"] },
+    "evidence_class": { "enum": ["hardware_measured", "literature_reported", "modelled", "synthetic", "unknown"] },
+    "hardware_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manufacturer", "model", "technology", "device_id", "firmware", "calibration_id"],
+      "properties": {
+        "manufacturer": { "type": ["string", "null"], "maxLength": 160 },
+        "model": { "type": ["string", "null"], "maxLength": 160 },
+        "technology": { "type": ["string", "null"], "maxLength": 160 },
+        "process_node_nm": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+        "device_id": { "type": ["string", "null"], "maxLength": 200 },
+        "package_id": { "type": ["string", "null"], "maxLength": 160 },
+        "firmware": { "type": ["string", "null"], "maxLength": 128 },
+        "calibration_id": { "type": ["string", "null"], "maxLength": 160 }
+      }
+    },
+    "capabilities": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/capability" }
+    },
+    "operating_envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "voltage_min_v": { "$ref": "#/$defs/quantity" },
+        "voltage_max_v": { "$ref": "#/$defs/quantity" },
+        "current_min_a": { "$ref": "#/$defs/quantity" },
+        "current_max_a": { "$ref": "#/$defs/quantity" },
+        "temperature_min_c": { "$ref": "#/$defs/quantity" },
+        "temperature_max_c": { "$ref": "#/$defs/quantity" },
+        "bandwidth_hz": { "$ref": "#/$defs/quantity" },
+        "settling_time_s": { "$ref": "#/$defs/quantity" },
+        "state_retention_s": { "$ref": "#/$defs/quantity" }
+      }
+    },
+    "noise_characterization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "sources", "autocorrelation_status", "cross_channel_status"],
+      "properties": {
+        "status": { "enum": ["measured", "partially_measured", "modelled", "literature_reported", "unknown"] },
+        "sources": {
+          "type": "array",
+          "items": {
+            "enum": ["white", "one_over_f", "thermal", "shot", "random_telegraph", "read_noise", "programming_variation", "drift", "quantization", "timing_jitter", "other", "unknown"]
+          },
+          "uniqueItems": true
+        },
+        "rms_noise": { "$ref": "#/$defs/quantity" },
+        "noise_power_spectral_density_ref": { "type": ["string", "null"], "maxLength": 200 },
+        "autocorrelation_status": { "enum": ["measured", "modelled", "not_measured", "unknown"] },
+        "autocorrelation_ref": { "type": ["string", "null"], "maxLength": 200 },
+        "correlation_time_s": { "$ref": "#/$defs/quantity" },
+        "cross_channel_status": { "enum": ["measured", "modelled", "not_measured", "unknown"] },
+        "cross_channel_covariance_ref": { "type": ["string", "null"], "maxLength": 200 },
+        "stationarity_status": { "enum": ["tested_stationary", "nonstationary", "not_tested", "unknown"] },
+        "measurement_conditions_ref": { "type": ["string", "null"], "maxLength": 200 }
+      }
+    },
+    "fault_characterization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "mechanisms"],
+      "properties": {
+        "status": { "enum": ["measured", "partially_measured", "modelled", "literature_reported", "unknown"] },
+        "mechanisms": {
+          "type": "array",
+          "items": {
+            "enum": ["stuck_at_on", "stuck_at_off", "row_loss", "column_loss", "clustered_fault", "shared_channel_loss", "drift", "retention_loss", "endurance_degradation", "temperature_dependence", "other", "unknown"]
+          },
+          "uniqueItems": true
+        },
+        "fault_map_ref": { "type": ["string", "null"], "maxLength": 200 },
+        "fault_rate": { "$ref": "#/$defs/quantity" },
+        "independent_fault_assumption": { "type": ["boolean", "null"] },
+        "common_cause_domains_ref": { "type": ["string", "null"], "maxLength": 200 }
+      }
+    },
+    "peripheral_accounting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["measurement_boundary", "components"],
+      "properties": {
+        "measurement_boundary": {
+          "enum": ["device_core", "device_module", "board_system", "full_application", "sensor_to_decision", "unknown"]
+        },
+        "components": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/peripheral" }
+        },
+        "host_transfer_included": { "type": ["boolean", "null"] },
+        "calibration_included": { "type": ["boolean", "null"] },
+        "verification_included": { "type": ["boolean", "null"] },
+        "recovery_included": { "type": ["boolean", "null"] },
+        "energy_measurement_ref": { "type": ["string", "null"], "maxLength": 200 },
+        "latency_measurement_ref": { "type": ["string", "null"], "maxLength": 200 }
+      }
+    },
+    "resource_capacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "array_rows": { "type": ["integer", "null"], "minimum": 1 },
+        "array_columns": { "type": ["integer", "null"], "minimum": 1 },
+        "array_count": { "type": ["integer", "null"], "minimum": 1 },
+        "usable_cells": { "type": ["integer", "null"], "minimum": 1 },
+        "digital_memory_bytes": { "type": ["integer", "null"], "minimum": 1 },
+        "controller_count": { "type": ["integer", "null"], "minimum": 1 },
+        "area_mm2": { "$ref": "#/$defs/quantity" }
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1, "maxLength": 200 },
+      "uniqueItems": true
+    },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 500 },
+      "uniqueItems": true
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "profile_status": { "const": "qualified" } },
+        "required": ["profile_status"]
+      },
+      "then": {
+        "properties": {
+          "evidence_class": { "const": "hardware_measured" },
+          "hardware_identity": {
+            "properties": {
+              "device_id": { "type": "string", "minLength": 1 },
+              "calibration_id": { "type": "string", "minLength": 1 }
+            }
+          },
+          "capabilities": {
+            "minItems": 1,
+            "items": {
+              "properties": { "status": { "const": "qualified" } }
+            }
+          },
+          "evidence_refs": { "minItems": 1 }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "unit", "evidence_class"],
+      "properties": {
+        "value": { "type": ["number", "null"] },
+        "unit": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "evidence_class": { "enum": ["measured", "derived", "modelled", "literature_reported", "synthetic", "unknown"] },
+        "evidence_ref": { "type": ["string", "null"], "maxLength": 200 },
+        "uncertainty": { "type": ["number", "null"], "minimum": 0 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "evidence_class": { "const": "unknown" } }, "required": ["evidence_class"] },
+          "then": { "properties": { "value": { "type": "null" } } }
+        },
+        {
+          "if": { "properties": { "evidence_class": { "enum": ["measured", "derived"] } }, "required": ["evidence_class"] },
+          "then": {
+            "required": ["evidence_ref"],
+            "properties": {
+              "value": { "type": "number" },
+              "evidence_ref": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      ]
+    },
+    "capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["primitive", "status", "evidence_refs"],
+      "properties": {
+        "primitive": {
+          "enum": ["analog_mvm", "matrix_equation", "differential_equation", "nonlinear_dynamics", "physical_reservoir", "digital_linear_solve", "digital_ode_solve", "digital_sde_solve", "other"]
+        },
+        "status": { "enum": ["qualified", "provisional", "unavailable", "unqualified"] },
+        "maximum_dimension": { "type": ["integer", "null"], "minimum": 1 },
+        "effective_bits": { "$ref": "#/$defs/quantity" },
+        "supported_operations": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 96 },
+          "uniqueItems": true
+        },
+        "time_constant_s": { "$ref": "#/$defs/quantity" },
+        "update_rate_hz": { "$ref": "#/$defs/quantity" },
+        "evidence_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "uniqueItems": true
+        },
+        "limitations": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "uniqueItems": true
+        }
+      }
+    },
+    "peripheral": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "present", "measured_energy_included"],
+      "properties": {
+        "component": {
+          "enum": ["adc", "dac", "tia", "op_amp", "integrator", "controller", "clock", "sram", "host_cpu", "host_gpu", "interconnect", "cooling", "calibration", "verification", "recovery", "other"]
+        },
+        "present": { "type": "boolean" },
+        "measured_energy_included": { "type": ["boolean", "null"] },
+        "energy_per_operation_j": { "$ref": "#/$defs/quantity" },
+        "latency_per_operation_s": { "$ref": "#/$defs/quantity" },
+        "evidence_ref": { "type": ["string", "null"], "maxLength": 200 }
+      }
+    }
+  }
+}
