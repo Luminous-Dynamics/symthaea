@@ -421,7 +421,8 @@
         "direct_decoupling_trace_distance_Q_Bprime",
         "Petz_recovery_entanglement_fidelity",
         "Petz_channel_trace_preservation_residual",
-        "Petz_inverse_square_root_residual"
+        "Petz_inverse_square_root_residual",
+        "Petz_recovery_ensemble_mean_standard_error_minimum_and_maximum_fidelity"
       ],
       "decoder_baselines": [
         "exact_small_dimension_optimal_recovery_via_SDP_or_channel_optimization",
@@ -456,9 +457,10 @@
         "petz_completeness": "Require sum_i R_i^dagger R_i = I_A within tolerance; do not silently add trace-preserving repair operators.",
         "petz_fidelity": "Report entanglement fidelity F_e = 1/4 sum_s |Tr L_s|^2 for composite Kraus L_s=R_i K_j.",
         "petz_numerics": "Inverse-square-root uses unregularized 4x4 Hermitian Newton-Schulz iteration; report ||rho_A^(-1/2) rho_A rho_A^(-1/2)-I||_F; reject nonconvergence rather than floor eigenvalues.",
-        "decoder_cost_boundary": "Report dense arithmetic cost and memory for this small classical channel simulation separately from physical quantum gate counts. This implementation does not synthesize a fault-tolerant decoder circuit."
+        "decoder_cost_boundary": "Report dense arithmetic cost and memory for this small classical channel simulation separately from physical quantum gate counts. This implementation does not synthesize a fault-tolerant decoder circuit.",
+        "petz_ensemble": "Report per-seed entanglement fidelity, Welford mean/standard error, min/max, maximum inverse-square-root residual and maximum trace-preservation residual; freeze seed schedule before evaluation."
       },
-      "implementation_status": "QI-4A computes direct trace-distance decoupling and Pinsker consistency; QI-4P constructs the one-step Petz recovery channel acting only on A=E tensor R and reports entanglement fidelity and trace-preservation residual. No exact SDP optimum, rotated-Petz baseline, charge-sector decoder, or efficient quantum circuit decoder yet.",
+      "implementation_status": "QI-4A direct decoupling trace-distance/Pinsker diagnostic; QI-4P one-step Petz decoder and independent-seed ensemble APIs; source authored, Rust runner validation pending. Exact SDP optimum, rotated-Petz, charge-sector-aware decoder, and circuit synthesis remain future work.",
       "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
       "fixtures": [
         "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
@@ -774,13 +776,15 @@
       "QI_4A_quantum_Pinsker_consistency": "source_authored_not_executed",
       "QI_3H_joint_U1_hydrodynamic_scrambling_analysis": "source_authored_tests_pending_rust_execution",
       "QI_4P_one_step_Petz_recovery": "source_authored_not_executed",
-      "QI_4P_unregularized_Hermitian_inverse_square_root": "source_authored_not_executed"
+      "QI_4P_unregularized_Hermitian_inverse_square_root": "source_authored_not_executed",
+      "QI_4P_Petz_recovery_ensemble_statistics": "source_authored_not_executed",
+      "QI_4P_identity_channel_analytic_control": "source_authored_not_executed"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
       "finite_depth_random_circuit_ensembles": "seeded_Haar_U4_brickwork_and_all_to_all_matching_source_authored_not_executed; sequential_evaporation_and_energy_conserving_variants_not_implemented",
       "sequential_unitary_evaporation_model": "U(1)-conserving sequential factor-transfer source uses a seeded low-entanglement product state in a fixed Hamming-weight sector; Rust execution pending",
-      "hayden_preskill_recovery_decoders": "A one-step Petz recovery baseline for a four-qubit Haar-U4 channel is source-authored; no exact SDP optimum, rotated-Petz benchmark, charge-sector-aware recovery, scalable decoder circuit, or noise model yet.",
+      "hayden_preskill_recovery_decoders": "A one-step Petz recovery baseline and ensemble statistics are now source-authored for the four-qubit Haar-U4 channel. No exact SDP optimum, rotated-Petz comparison, charge-sector-aware recovery, scalable decoder circuit, or noise model yet.",
       "mps_entropy_from_validated_schmidt_spectrum": "not_qualified",
       "island_or_qes_calculation": "not_implemented",
       "energy_conserving_circuits": "U(1)-conserving equal-gap qubit gate family and sequential factor-transfer toy model authored; Rust execution pending",
@@ -797,7 +801,7 @@
       "formatter": "pinned Rust 1.96 rustfmt normalization succeeded",
       "focused_rust_checks": "not yet rerun on formatter-normalized head",
       "test_inventory": {
-        "black_hole_information_authored_tests": 61
+        "black_hole_information_authored_tests": 62
       },
       "claim_ceiling": "No Rust build, Clippy pass, or Rust test pass is claimed at this head."
     }
