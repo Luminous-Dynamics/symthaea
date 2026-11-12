@@ -184,7 +184,6 @@ pub enum AcousticValidationError {
     EmptyIdentity(&'static str),
     InvalidSha256Digest(&'static str),
     InvalidAnalysisWindow,
-    InvalidClockLimit,
     DuplicateChannelId,
     DuplicateMicrophoneId,
     DuplicateMicrophoneChannel,
@@ -403,11 +402,6 @@ fn validate_manifest(
             .is_none()
     {
         errors.push(AcousticValidationError::InvalidAnalysisWindow);
-    }
-    if manifest.maximum_clock_uncertainty_ns == 0
-        || manifest.maximum_channel_skew_ns == 0
-    {
-        errors.push(AcousticValidationError::InvalidClockLimit);
     }
 }
 
@@ -1025,6 +1019,19 @@ mod tests {
         assert!(errors.contains(
             &AcousticValidationError::TransitionMissingTilt("rotor-01".to_owned())
         ));
+    }
+
+    #[test]
+    fn exact_shared_clock_is_valid_when_every_channel_has_zero_error() {
+        let mut input = bundle();
+        input.manifest.maximum_clock_uncertainty_ns = 0;
+        input.manifest.maximum_channel_skew_ns = 0;
+        for channel in &mut input.channels {
+            channel.clock_offset_to_reference_ns = 0;
+            channel.clock_uncertainty_ns = 0;
+        }
+
+        assert!(validate_bundle(&input).is_ok());
     }
 
     #[test]
