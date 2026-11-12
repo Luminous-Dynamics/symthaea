@@ -276,7 +276,7 @@
         "initial_state_is_not_Haar_equilibrium": true,
         "initial_charge_sector_exact": true
       },
-      "implementation_status": "closed-register scramblers, symmetry-resolved Haar/Page oracle and sampler, U(1)-conserving finite-depth product-state circuits, product-state sequential factor transfer, and domain-wall transport source plus ensemble statistics authored; Rust runner validation pending",
+      "implementation_status": "U(1)-conserving low-entanglement product-state circuits, sequential factor transfer, domain-wall transport and operator spreading are source-authored; exact-head Rust validation pending",
       "source_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/random_circuit_scrambling_v1.json",
       "claim_ceiling": "Finite-dimensional closed qubit-chain unitary circuits and tensor-factor transfer with exact excitation conservation and a symmetry-sector Haar reference. The sequential model starts from a low-entanglement product state. None of these are Hawking radiation, gravitational backreaction, a Page-island/QES calculation, or a four-dimensional black-hole evaporation derivation.",
       "sequential_evaporation_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/sequential_evaporation_u1_v1.json",
@@ -450,7 +450,7 @@
         "pinsker_reference": "For natural-log mutual information in nats, require D_trace <= sqrt(I(Q:Bprime)/2), with declared numerical tolerance.",
         "fixture": "hayden_preskill_decoupling_u4_v1.json records the Q,M,B,R register convention, accessible set A=E tensor R, direct trace-distance formula, and independent 32-seed NumPy comparator."
       },
-      "implementation_status": "QI-4A source-authored one-step four-qubit decoupling experiment measures I(Q:B'), I(Q:A), direct trace distance D_tr(rho_QB', rho_Q tensor rho_B'), Pinsker consistency and pure-state information complementarity; no recovery map or decoder implemented",
+      "implementation_status": "QI-4A direct trace-distance/Pinsker source and fixture authored; Rust validation pending; no recovery decoder implemented",
       "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json"
     },
     {
@@ -731,6 +731,15 @@
       "dense_reduced_dimension_max": 64,
       "page_harmonic_reference_total_dimension_max": 1048576,
       "max_sequential_evaporation_qubits": 12
+    },
+    "runner_status": {
+      "latest_formatter_head": "497ee59652a1948c1e0fdc918ca848f86736ab18",
+      "formatter": "pinned Rust 1.96 rustfmt normalization succeeded",
+      "focused_rust_checks": "not yet rerun on formatter-normalized head",
+      "test_inventory": {
+        "black_hole_information_authored_tests": 57
+      },
+      "claim_ceiling": "No Rust build, Clippy pass, or Rust test pass is claimed at this head."
     }
   }
 }
