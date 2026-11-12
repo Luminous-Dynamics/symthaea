@@ -208,6 +208,8 @@ pub mod midi_performance;
 #[cfg(feature = "theory")]
 pub mod transcription_eval;
 #[cfg(feature = "theory")]
+pub mod beat_grid_eval;
+#[cfg(feature = "theory")]
 pub mod theory_realize;
 pub mod training;
 pub mod training_pairs;
