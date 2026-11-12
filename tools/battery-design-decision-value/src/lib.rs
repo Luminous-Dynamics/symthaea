@@ -382,7 +382,8 @@ fn validate_experiment(
     validate_nonnegative(experiment.cost_usd, "experiment USD cost")?;
     validate_nonnegative(experiment.duration_hours, "experiment duration")?;
     validate_nonnegative(experiment.material_grams, "experiment material")?;
-    require_evidence(registry, &experiment.evidence_id, "experiment")?;
+    let experiment_evidence =
+        require_evidence(registry, &experiment.evidence_id, "experiment")?;
 
     validate_unique(
         experiment
@@ -426,6 +427,17 @@ fn validate_experiment(
     if is_probability_model != case.probability_basis.is_some() {
         return Err(AuditError(
             "probability-bearing outcomes require an explicit probability basis; set-valued outcomes do not".into(),
+        ));
+    }
+    if is_probability_model
+        && !matches!(
+            experiment_evidence.evidence_class,
+            EvidenceClass::SyntheticKnownTruth | EvidenceClass::CalibrationReceipt
+        )
+    {
+        return Err(AuditError(
+            "probability-bearing experiment likelihoods require known-truth or calibration evidence"
+                .into(),
         ));
     }
 
@@ -532,7 +544,7 @@ fn expected_decision(
                 .get(world.world_id.as_str())
                 .copied()
                 .unwrap_or(0.0);
-            if probability <= EPSILON {
+            if probability <= 0.0 {
                 continue;
             }
             let loss = loss_for(world, &alternative.alternative_id)?;
@@ -615,7 +627,7 @@ pub fn evaluate_evsi(
     let mut outcome_values = Vec::new();
     let mut expected_post_observation_loss = 0.0;
     for (outcome_id, predictive_probability) in &predictive_probabilities {
-        if *predictive_probability <= EPSILON {
+        if *predictive_probability <= 0.0 {
             continue;
         }
         let mut posterior = BTreeMap::<&str, f64>::new();
@@ -1189,6 +1201,40 @@ mod tests {
     }
 
     #[test]
+    fn probability_likelihood_requires_calibrated_or_known_truth_evidence() {
+        let mut case = base_case(true);
+        case.evidence[1].evidence_class = EvidenceClass::VendorClaim;
+        let item = experiment(
+            "VENDOR-LIKELIHOOD",
+            0.0,
+            RiskClass::Low,
+            [[0.9, 0.1], [0.1, 0.9]],
+        );
+        assert!(evaluate_evsi(&case, &item).is_err());
+    }
+
+    #[test]
+    fn tiny_positive_probability_still_preserves_a_hard_feasibility_gate() {
+        let mut case = base_case(true);
+        case.worlds[0].prior_probability = Some(1.0 - 1.0e-13);
+        case.worlds[1].prior_probability = Some(1.0e-13);
+        let loss = case.worlds[1]
+            .losses
+            .iter_mut()
+            .find(|loss| loss.alternative_id == "DESIGN-A")
+            .expect("design A loss");
+        loss.feasible = false;
+        let item = experiment(
+            "RARE-WORLD-CONSTRAINT",
+            0.0,
+            RiskClass::Low,
+            [[1.0, 0.0], [0.0, 1.0]],
+        );
+        let report = evaluate_evsi(&case, &item).expect("abstention remains feasible");
+        assert_eq!(report.baseline_choice.alternative_id, "ABSTAIN");
+    }
+
+    #[test]
     fn high_risk_or_over_budget_experiment_is_not_selected() {
         let case = base_case(true);
         let good = experiment("GOOD", 1.0, RiskClass::Low, [[0.9, 0.1], [0.1, 0.9]]);
@@ -1271,12 +1317,18 @@ mod tests {
     #[test]
     fn a_design_that_is_infeasible_in_any_supported_world_cannot_be_selected() {
         let mut case = base_case(true);
-        let loss = case.worlds[1]
+        let loss_a = case.worlds[1]
             .losses
             .iter_mut()
             .find(|loss| loss.alternative_id == "DESIGN-A")
             .expect("design A loss");
-        loss.feasible = false;
+        loss_a.feasible = false;
+        let loss_b = case.worlds[0]
+            .losses
+            .iter_mut()
+            .find(|loss| loss.alternative_id == "DESIGN-B")
+            .expect("design B loss");
+        loss_b.feasible = false;
         let item = experiment(
             "CONSTRAINT-CLIFF",
             0.0,
