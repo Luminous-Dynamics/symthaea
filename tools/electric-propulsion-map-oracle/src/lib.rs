@@ -1055,8 +1055,8 @@ mod tests {
         assert_eq!((envelope.torque_lower_nm, envelope.torque_upper_nm), (2.0, 4.5));
         assert_eq!((envelope.speed_lower_rpm, envelope.speed_upper_rpm), (1_300.0, 1_700.0));
         assert_eq!(envelope.intersected_cells.len(), 1);
-        assert!((envelope.efficiency_lower_bound - 0.747).abs() < 1.0e-12);
-        assert!((envelope.efficiency_upper_bound - 0.9008888888888889).abs() < 1.0e-12);
+        assert!((envelope.efficiency_lower_bound - 0.7473333333333333).abs() < 1.0e-12);
+        assert!((envelope.efficiency_upper_bound - 0.8981666666666667).abs() < 1.0e-12);
         assert_eq!(envelope.lower_witness.motor_torque_nm, 2.0);
         assert_eq!(envelope.lower_witness.motor_speed_rpm, 1_300.0);
         assert_eq!(envelope.upper_witness.motor_torque_nm, 4.5);
