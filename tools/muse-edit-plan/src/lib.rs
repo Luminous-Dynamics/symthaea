@@ -97,6 +97,9 @@ pub struct ArtifactRef {
     pub artifact_type: String,
     pub modality: Modality,
     pub sha256: String,
+    pub rights: RightsStatus,
+    /// Digest of the external licence/consent/authorization basis for this source.
+    pub rights_basis_sha256: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -182,6 +185,8 @@ pub struct OperatorProfile {
     pub identity: ProfileIdentity,
     pub qualification: QualificationStatus,
     pub rights: RightsStatus,
+    /// Digest of the externally verified rights/license basis for this operator package.
+    pub rights_basis_sha256: Option<String>,
     pub supported_operations: BTreeSet<String>,
     pub input_modalities: BTreeSet<Modality>,
     pub input_artifact_types: BTreeSet<String>,
@@ -205,6 +210,8 @@ pub struct ObserverProfile {
     pub identity: ProfileIdentity,
     pub qualification: QualificationStatus,
     pub rights: RightsStatus,
+    /// Digest of the externally verified rights/license basis for this observer package.
+    pub rights_basis_sha256: Option<String>,
     pub modalities: BTreeSet<Modality>,
     pub accepted_artifact_types: BTreeSet<String>,
     pub measured_metrics: BTreeSet<String>,
@@ -394,7 +401,9 @@ impl CompiledPlan {
                 atom(&source.id),
                 atom(&source.artifact_type),
                 source.modality.label(),
-                atom(&source.sha256)
+                atom(&source.sha256),
+                format!("{:?}", source.rights),
+                source.rights_basis_sha256.as_deref().map(atom).unwrap_or_default()
             ));
         }
 
@@ -489,10 +498,21 @@ fn validate_request(request: &EditRequest) -> Result<(), CompileError> {
     }
 
     let mut source_ids = BTreeSet::new();
+    if request.resource_budget.maximum_mutation_risk_score > 100 {
+        return Err(CompileError::InvalidRequest(
+            "maximum mutation risk score must be in 0..=100".to_string(),
+        ));
+    }
+
     for source in &request.sources {
         if !valid_identifier(&source.id)
             || !valid_identifier(&source.artifact_type)
             || !valid_sha256(&source.sha256)
+            || source.rights == RightsStatus::Restricted
+            || source.rights_basis_sha256.as_deref().is_some_and(|digest| !valid_sha256(digest))
+            || (request.policy.require_verified_rights
+                && (source.rights != RightsStatus::Verified
+                    || source.rights_basis_sha256.as_deref().is_none_or(|digest| !valid_sha256(digest))))
         {
             return Err(CompileError::InvalidRequest(format!(
                 "invalid source artifact {}",
@@ -530,6 +550,20 @@ fn validate_request(request: &EditRequest) -> Result<(), CompileError> {
                 stage.stage_id
             )));
         }
+        let identifier_sets = [
+            &stage.required_capabilities,
+            &stage.protected_properties,
+            &stage.required_receipts,
+            &stage.required_preconditions,
+            &stage.required_postconditions,
+        ];
+        if identifier_sets.iter().any(|set| set.iter().any(|value| !valid_identifier(value))) {
+            return Err(CompileError::InvalidRequest(format!(
+                "stage {} contains an invalid requirement identifier",
+                stage.stage_id
+            )));
+        }
+
         let mut input_ids = BTreeSet::new();
         for input in &stage.inputs {
             if !valid_identifier(&input.input_id) || !valid_identifier(&input.expected_artifact_type) {
@@ -548,10 +582,14 @@ fn validate_request(request: &EditRequest) -> Result<(), CompileError> {
         for control in &stage.controls {
             validate_numeric_range(&control.control_id, control.minimum, control.maximum, &control.unit)?;
         }
+        let mut observation_metric_ids = BTreeSet::new();
         for observation in &stage.observations {
-            if !valid_identifier(&observation.metric_id) || observation.minimum_observers == 0 {
+            if !valid_identifier(&observation.metric_id)
+                || observation.minimum_observers == 0
+                || !observation_metric_ids.insert(observation.metric_id.clone())
+            {
                 return Err(CompileError::InvalidRequest(format!(
-                    "invalid observation requirement in {}",
+                    "invalid or duplicate observation requirement in {}",
                     stage.stage_id
                 )));
             }
@@ -585,6 +623,15 @@ fn validate_registry(registry: &CapabilityRegistry) -> Result<(), CompileError> 
             || !valid_identifier(&profile.output_artifact_type)
             || !valid_identifier(&profile.independence_group)
             || profile.risk_score > 100
+            || profile.rights == RightsStatus::Restricted
+            || profile.rights_basis_sha256.as_deref().is_some_and(|digest| !valid_sha256(digest))
+            || profile.supported_operations.iter().any(|value| !valid_identifier(value))
+            || profile.input_artifact_types.iter().any(|value| !valid_identifier(value))
+            || profile.capabilities.iter().any(|value| !valid_identifier(value))
+            || profile.preservation_guarantees.iter().any(|value| !valid_identifier(value))
+            || profile.emitted_receipts.iter().any(|value| !valid_identifier(value))
+            || profile.supported_preconditions.iter().any(|value| !valid_identifier(value))
+            || profile.guaranteed_postconditions.iter().any(|value| !valid_identifier(value))
         {
             return Err(CompileError::InvalidRequest(format!(
                 "invalid operator profile {}",
@@ -607,6 +654,11 @@ fn validate_registry(registry: &CapabilityRegistry) -> Result<(), CompileError> 
             || !valid_identifier(&profile.identity.version)
             || !valid_sha256(&profile.identity.artifact_sha256)
             || !valid_identifier(&profile.independence_group)
+            || profile.rights == RightsStatus::Restricted
+            || profile.rights_basis_sha256.as_deref().is_some_and(|digest| !valid_sha256(digest))
+            || profile.accepted_artifact_types.iter().any(|value| !valid_identifier(value))
+            || profile.measured_metrics.iter().any(|value| !valid_identifier(value))
+            || profile.emitted_receipts.iter().any(|value| !valid_identifier(value))
         {
             return Err(CompileError::InvalidRequest(format!(
                 "invalid observer profile {}",
@@ -735,8 +787,13 @@ fn operator_compatibility_reasons(
     if profile.qualification != QualificationStatus::Qualified {
         reasons.push("profile is not Qualified".to_string());
     }
-    if request.policy.require_verified_rights && profile.rights != RightsStatus::Verified {
-        reasons.push("operator rights are not Verified".to_string());
+    if profile.rights == RightsStatus::Restricted {
+        reasons.push("operator rights are Restricted".to_string());
+    } else if request.policy.require_verified_rights
+        && (profile.rights != RightsStatus::Verified
+            || profile.rights_basis_sha256.as_deref().is_none_or(|digest| !valid_sha256(digest)))
+    {
+        reasons.push("operator rights basis is not Verified and digest-bound".to_string());
     }
     if !profile.supported_operations.contains(&stage.operation_id) {
         reasons.push("operation is not supported".to_string());
@@ -885,8 +942,10 @@ fn select_observers<'a>(
             .iter()
             .filter(|observer| {
                 observer.qualification == QualificationStatus::Qualified
+                    && observer.rights != RightsStatus::Restricted
                     && (!request.policy.require_verified_rights
-                        || observer.rights == RightsStatus::Verified)
+                        || (observer.rights == RightsStatus::Verified
+                            && observer.rights_basis_sha256.as_deref().is_some_and(valid_sha256)))
                     && observer.modalities.contains(&stage.modality)
                     && observer.accepted_artifact_types.contains(&stage.output_artifact_type)
                     && observer.measured_metrics.contains(&requirement.metric_id)
@@ -965,11 +1024,13 @@ fn canonical_request_contract(request: &EditRequest) -> String {
     sources.sort_by(|a, b| a.id.cmp(&b.id));
     for source in sources {
         lines.push(format!(
-            "source\t{}\t{}\t{}\t{}",
+            "source\t{}\t{}\t{}\t{}\t{}\t{}",
             atom(&source.id),
             atom(&source.artifact_type),
             source.modality.label(),
-            atom(&source.sha256)
+            atom(&source.sha256),
+            format!("{:?}", source.rights),
+            source.rights_basis_sha256.as_deref().map(atom).unwrap_or_default()
         ));
     }
 
@@ -1393,6 +1454,8 @@ mod tests {
         "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
     const OTHER_DIGEST: &str =
         "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+    const RIGHTS_DIGEST: &str =
+        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
     fn source(id: &str, artifact_type: &str) -> ArtifactRef {
         ArtifactRef {
@@ -1400,6 +1463,8 @@ mod tests {
             artifact_type: artifact_type.to_string(),
             modality: Modality::Music,
             sha256: SOURCE_DIGEST.to_string(),
+            rights: RightsStatus::Verified,
+            rights_basis_sha256: Some(RIGHTS_DIGEST.to_string()),
         }
     }
 
@@ -1412,6 +1477,7 @@ mod tests {
             },
             qualification: QualificationStatus::Qualified,
             rights: RightsStatus::Verified,
+            rights_basis_sha256: Some(RIGHTS_DIGEST.to_string()),
             supported_operations: BTreeSet::from(["remove_instrument".to_string()]),
             input_modalities: BTreeSet::from([Modality::Music]),
             input_artifact_types: BTreeSet::from(["audio/wav".to_string()]),
@@ -1445,6 +1511,7 @@ mod tests {
             },
             qualification: QualificationStatus::Qualified,
             rights: RightsStatus::Verified,
+            rights_basis_sha256: Some(RIGHTS_DIGEST.to_string()),
             modalities: BTreeSet::from([Modality::Music]),
             accepted_artifact_types: BTreeSet::from(["audio/wav".to_string()]),
             measured_metrics: BTreeSet::from(["target_stem_absence".to_string()]),
@@ -1831,6 +1898,50 @@ mod tests {
         let mut registry = registry();
         registry.registry_sha256 = "not-a-sha256".to_string();
         assert!(matches!(compile_plan(&request(), &registry), Err(CompileError::InvalidRequest(_))));
+    }
+
+    #[test]
+    fn verified_source_requires_a_digest_bound_rights_basis() {
+        let mut request = request();
+        request.sources[0].rights_basis_sha256 = None;
+        assert!(matches!(
+            compile_plan(&request, &registry()),
+            Err(CompileError::InvalidRequest(_))
+        ));
+        request.sources[0].rights_basis_sha256 = Some(RIGHTS_DIGEST.to_string());
+        assert!(compile_plan(&request, &registry()).is_ok());
+    }
+
+    #[test]
+    fn restricted_operator_rights_are_never_admitted_even_when_policy_is_relaxed() {
+        let mut request = request();
+        request.policy.require_verified_rights = false;
+        let mut registry = registry();
+        registry.operators[0].rights = RightsStatus::Restricted;
+        assert!(matches!(
+            compile_plan(&request, &registry),
+            Err(CompileError::Unsupported { .. })
+        ));
+    }
+
+    #[test]
+    fn duplicate_observation_metrics_are_rejected_before_dag_creation() {
+        let mut request = request();
+        request.stages[0].observations.push(request.stages[0].observations[0].clone());
+        assert!(matches!(
+            compile_plan(&request, &registry()),
+            Err(CompileError::InvalidRequest(_))
+        ));
+    }
+
+    #[test]
+    fn changed_source_rights_basis_changes_the_canonical_plan_manifest() {
+        let first = compile_plan(&request(), &registry()).unwrap();
+        let mut changed = request();
+        changed.sources[0].rights_basis_sha256 =
+            Some("ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_string());
+        let second = compile_plan(&changed, &registry()).unwrap();
+        assert_ne!(first.canonical_manifest(), second.canonical_manifest());
     }
 
     #[test]
