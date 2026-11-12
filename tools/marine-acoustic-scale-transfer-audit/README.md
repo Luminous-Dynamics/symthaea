@@ -9,9 +9,9 @@ cargo test --manifest-path tools/marine-acoustic-scale-transfer-audit/Cargo.toml
 cargo run --manifest-path tools/marine-acoustic-scale-transfer-audit/Cargo.toml --   docs/research/marine/fixtures/synthetic-acoustic-scale-transfer-v0.1.0.json
 ```
 
-Exit code 0 means the declared measured pair is within its stated uncertainty. Exit code 2 means incomplete, structurally invalid, or outside the declared uncertainty. Exit code 64 means invocation or input loading failed.
+Exit code 0 means the numerical comparison is complete and within the declared uncertainty, **but independent physical review is still required**. Exit code 2 means incomplete, structurally invalid, or outside the declared uncertainty. Exit code 64 means invocation or input loading failed.
 
-The committed fixture is synthetic and must return `INCOMPLETE`. It is a contract and arithmetic test vector, not model-test or sea-trial evidence.
+The committed fixture is synthetic and must return `INCOMPLETE` with `NOT_EVALUATED_SYNTHETIC` physical-validation status. It is a contract and arithmetic test vector, not model-test or sea-trial evidence.
 
 ## What v0.1 calculates
 
@@ -29,6 +29,13 @@ The four supported Eq. 16 profiles are fixed in code. The caller cannot replace 
 
 The audit requires distinct model-RPM strata, revision identity, positive scale inputs, calibration/facility-transfer evidence digests, per-condition background traces, wake/cavitation/water-quality evidence, declared model/full-scale similarity states, full-scale source-level basis, propagation separation, and explicit per-band uncertainty. The transfer function is supplied as a per-band dB value and applied by the audit after background subtraction.
 
+The output deliberately separates:
+- `structural_disposition`: whether declared inputs are complete enough to calculate;
+- `comparison_disposition`: whether the per-band residuals fall inside the declared combined uncertainty;
+- `physical_validation_disposition`: always `NOT_EVALUATED_SYNTHETIC` or `REQUIRES_INDEPENDENT_PHYSICAL_REVIEW`.
+
+The CLI never labels a physical campaign as validated. Evidence hashes are only syntactic digest identifiers; this executable does not authenticate certificates, verify raw trace bytes, or independently prove declared model/full-scale similarity.
+
 Background subtraction uses the paired signal-plus-background and background SPL values for each band:
 - below 3 dB margin: unusable for Eq. 16 scaling;
 - 3 dB to below 10 dB: energy-domain subtraction is required;
@@ -41,7 +48,7 @@ The model-scale and full-scale comparison must use source levels normalized to t
 
 ## Limitations
 
-- The executable audits a declared transfer calculation; it does not prove the physical truth of the declared evidence or authenticate certificates. Evidence digests are format-checked identifiers, not certificate-chain verification or raw-trace verification.
+- The executable audits a declared transfer calculation; it does not prove the physical truth of the declared evidence or authenticate certificates. Evidence digests are format-checked identifiers, not certificate-chain verification or raw-trace verification. Numerical agreement is not physical validation.
 - v0.1 consumes evidence digests and explicit correction declarations; it does not yet resolve the calibration/timebase registries or the shared acoustic/propulsion timebase receipt from #11641. That integration is a prerequisite before the audit is used in a real campaign.
 - The ITTC 4.2–7.1 dB full-scale prediction uncertainty reported in Revision 03 is based on questionnaire estimates, not a universal per-project acceptance tolerance. This tool does not hard-code it.
 - The audit checks declared similarity dispositions and digests; it does not establish similarity from the evidence itself. Cavitation-pattern similarity, Reynolds effects, wake fidelity, nuclei/gas content, facility reverberation, background subtraction and transfer-function characterization still require independent engineering review and experimental evidence.
