@@ -81,6 +81,25 @@ Report:
 
 Do not claim process causality from observational correlations alone. Controlled interventions or well-supported quasi-experimental designs are required for stronger causal claims.
 
+## Additional materials frontier: sodium-ion and zero-excess sodium-metal
+
+A new bounded materials lane has been opened in Symthaea [SODIUM-BATTERY-MISSION-001 #11694](https://github.com/Luminous-Dynamics/symthaea/issues/11694) / draft [PR #11695](https://github.com/Luminous-Dynamics/symthaea/pull/11695).
+
+Keep two technology frontiers separate:
+
+- **Commercial-near sodium-ion** (hard carbon + Prussian White/PBA, layered oxides or polyanionic cathodes) should be compared with LFP/NMC under matched cold-climate, stationary and industrial-fleet missions.
+- **Zero-excess sodium-metal** is an experimental post-lithium lane with finite sodium-inventory loss and plating/SEI failure mechanisms. Do not mix it into a commercial sodium-ion leaderboard.
+
+Useful source anchors: IEA's 2026 market/technology assessment; pilot-scale aqueous HC|Prussian White ≈1 Ah pouch cells at ≈120 Wh/kg practical complete-cell specific energy (Maddar et al., DOI 10.1002/aenm.202505344); PNNL's specific localized-high-concentration electrolyte study (HC||PB cell >1,000 cycles at 2C; pouch 82% after 500 cycles); and the 11 November 2026 zero-excess sodium-metal review (demonstrations >200 Wh/kg but demanding ≥99.98% average Coulombic efficiency for a 1,000-cycle/80%-retention challenge under practical conditions). None is a Luminous result or a matched commercial-market comparison.
+
+The sodium benchmark therefore adds **cold-temperature usable capacity including preheat energy**, matched full-cell mass/volume, areal loading, electrolyte-to-capacity ratio, temperature and C-rate, first-pass yield, and failure/censoring semantics. Active-material and cathode-only energy density cannot be promoted to complete-cell or pack claims.
+
+Sources:
+- https://www.iea.org/reports/global-ev-outlook-2026/electric-vehicle-batteries
+- https://doi.org/10.1002/aenm.202505344
+- https://www.pnnl.gov/publications/tailoring-electrolyte-solvation-structure-enhance-rate-capability-cycle-life-and
+- https://www.nature.com/articles/s44359-026-00234-6
+
 ## The paradigm shifts that should define our product
 
 ### 1. From chemistry ranking to mission-conditioned inverse design
