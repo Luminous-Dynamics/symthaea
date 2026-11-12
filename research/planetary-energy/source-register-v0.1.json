@@ -21,7 +21,7 @@
       "source_id": "NASA-VSAT-RFC-LUNAGRID-HARMONIA-2026",
       "title": "NASA Lunar Surface Technology — Surface Power",
       "publisher": "NASA",
-      "published_or_updated": "2026-11-12",
+      "published_or_updated": null,
       "source_url": "https://www.nasa.gov/lunar-surface-technology/",
       "evidence_class": "government_program_summary",
       "technology_scope": [
@@ -48,13 +48,14 @@
         "long-duration lunar RFC round-trip efficiency or life",
         "lunar grid installed-system loss",
         "completed lunar operational deployment"
-      ]
+      ],
+      "retrieved_on": "2026-11-12"
     },
     {
       "source_id": "NASA-NEXTSTEP3-LEIA-2026",
       "title": "NASA Calls for Proposals to Accelerate Lunar Surface Technologies",
       "publisher": "NASA",
-      "published_or_updated": "2026-09-28",
+      "published_or_updated": "2026-09-08",
       "source_url": "https://www.nasa.gov/news-release/nasa-calls-for-proposals-to-accelerate-lunar-surface-technologies/",
       "evidence_class": "government_solicitation",
       "technology_scope": [
@@ -78,13 +79,14 @@
         "awardee product performance",
         "flight qualification",
         "commercial readiness"
-      ]
+      ],
+      "updated_on": "2026-09-28"
     },
     {
       "source_id": "NASA-BLUE-ALCHEMIST",
-      "title": "NASA Lunar Surface Technology — ISRU-Based Power on the Moon",
+      "title": "NASA Lunar Surface Technology — ISRU-Based Power on the Moon (Blue Alchemist)",
       "publisher": "NASA",
-      "published_or_updated": "2026-11-12",
+      "published_or_updated": null,
       "source_url": "https://www.nasa.gov/lunar-surface-technology/",
       "evidence_class": "government_program_summary_of_industry_demonstration",
       "technology_scope": [
@@ -113,7 +115,8 @@
         "kWh_per_qualified_Wp manufacturing energy",
         "complete factory imported mass and closure",
         "lunar surface operation"
-      ]
+      ],
+      "retrieved_on": "2026-11-12"
     },
     {
       "source_id": "NASA-SMALLSAT-POWER-SOA-2026",
@@ -223,7 +226,7 @@
       "source_id": "NLR-PV-FLEET-DATA-INITIATIVE",
       "title": "PV Fleet Performance Data Initiative",
       "publisher": "National Laboratory of the Rockies (NLR), U.S. Department of Energy",
-      "published_or_updated": "2026-11-12",
+      "published_or_updated": null,
       "source_url": "https://nrel.sitefinity.cloud/pv/fleet-performance-data-initiative",
       "evidence_class": "field_data_programme_description",
       "technology_scope": [
@@ -244,13 +247,14 @@
         "lunar_or_mars_degradation",
         "product-specific module failure rates",
         "direct comparison with laboratory accelerated aging"
-      ]
+      ],
+      "retrieved_on": "2026-11-12"
     },
     {
       "source_id": "NASA-CARD-CARBOTHERMAL-2026",
       "title": "NASA Carbothermal Reduction Demonstration",
       "publisher": "NASA",
-      "published_or_updated": "2026-02",
+      "published_or_updated": null,
       "source_url": "https://www.nasa.gov/centers-and-facilities/johnson/sunlight-extracts-oxygen-from-regolith-using-solar-chemistry/",
       "evidence_class": "government_report_of_integrated_prototype_test",
       "technology_scope": [
@@ -271,7 +275,8 @@
         "commercial throughput",
         "full process energy efficiency",
         "lunar PV manufacturing"
-      ]
+      ],
+      "retrieved_on": "2026-02"
     }
   ]
 }
