@@ -32,17 +32,26 @@ func TestCompileProfileIsOrderDeterministic(t *testing.T){
 	if a.InventorySHA256!=b.InventorySHA256||a.Inventory.InventoryID!=b.Inventory.InventoryID{t.Fatal("selection order changed deterministic profile identity")}
 }
 func TestCompileProfileRejectsUnknownAndEmptyProfile(t *testing.T){
-	_,err:=CompileProfileInventory(SUTProfile{Layers:[]SUTLayer{"unreviewed"},Scenarios:[]AgentScenario{ScenarioToolUsing}},profileCatalogFixture())
-	if !errors.Is(err,ErrUnknownSUTLayer){t.Fatalf("got %v",err)}
-	_,err=CompileProfileInventory(SUTProfile{Layers:[]SUTLayer{LayerFoundationModel}},profileCatalogFixture())
-	if !errors.Is(err,ErrInvalidProfile){t.Fatalf("got %v",err)}
+	_,err:=CompileProfileInventory(SUTProfile{Layers:[]SUTLayer{"unreviewed"},Scenarios:[]AgentScenario{ScenarioToolUsing}},profileCatalogFixture());if !errors.Is(err,ErrUnknownSUTLayer){t.Fatalf("got %v",err)}
+	_,err=CompileProfileInventory(SUTProfile{Layers:[]SUTLayer{LayerFoundationModel}},profileCatalogFixture());if !errors.Is(err,ErrInvalidProfile){t.Fatalf("got %v",err)}
 }
 func TestCompileProfileRejectsUnscopedRows(t *testing.T){
 	c:=profileCatalogFixture();c.Obligations[0].Scenarios=nil
-	_,err:=CompileProfileInventory(SUTProfile{Layers:[]SUTLayer{LayerFoundationModel},Scenarios:[]AgentScenario{ScenarioToolUsing}},c)
-	if !errors.Is(err,ErrInvalidCatalog){t.Fatalf("got %v",err)}
+	_,err:=CompileProfileInventory(SUTProfile{Layers:[]SUTLayer{LayerFoundationModel},Scenarios:[]AgentScenario{ScenarioToolUsing}},c);if !errors.Is(err,ErrInvalidCatalog){t.Fatalf("got %v",err)}
 }
 func TestCompileProfileRejectsEmptySelection(t *testing.T){
-	_,err:=CompileProfileInventory(SUTProfile{Layers:[]SUTLayer{LayerFoundationModel},Scenarios:[]AgentScenario{ScenarioAutonomous}},profileCatalogFixture())
-	if !errors.Is(err,ErrNoProfileObligations){t.Fatalf("got %v",err)}
+	_,err:=CompileProfileInventory(SUTProfile{Layers:[]SUTLayer{LayerFoundationModel},Scenarios:[]AgentScenario{ScenarioAutonomous}},profileCatalogFixture());if !errors.Is(err,ErrNoProfileObligations){t.Fatalf("got %v",err)}
+}
+func TestCatalogEditChangesProfileInventoryDigest(t *testing.T){
+	p:=SUTProfile{Layers:[]SUTLayer{LayerFoundationModel},Scenarios:[]AgentScenario{ScenarioToolUsing}}
+	c:=profileCatalogFixture();a,err:=CompileProfileInventory(p,c);if err!=nil{t.Fatal(err)}
+	c.Obligations=append(c.Obligations,ProfileObligation{Criterion:ControlDefinition{ID:"unselected-but-catalogued",Mandatory:true},Layers:[]SUTLayer{LayerExecutionInfrastructure},Scenarios:[]AgentScenario{ScenarioEmbodied}})
+	b,err:=CompileProfileInventory(p,c);if err!=nil{t.Fatal(err)}
+	if a.CatalogSHA256==b.CatalogSHA256||a.InventorySHA256==b.InventorySHA256{t.Fatal("catalogue edit failed to change profile/inventory digest")}
+}
+func TestCatalogDigestIgnoresDeclarationOrder(t *testing.T){
+	c:=profileCatalogFixture();a,err:=ProfileCatalogDigest(c);if err!=nil{t.Fatal(err)}
+	for i,j:=0,len(c.Obligations)-1;i<j;i,j=i+1,j-1{c.Obligations[i],c.Obligations[j]=c.Obligations[j],c.Obligations[i]}
+	b,err:=ProfileCatalogDigest(c);if err!=nil{t.Fatal(err)}
+	if a!=b{t.Fatalf("order changed catalog digest %s != %s",a,b)}
 }
