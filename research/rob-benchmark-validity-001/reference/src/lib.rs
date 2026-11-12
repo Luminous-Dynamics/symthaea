@@ -427,7 +427,7 @@ pub fn exact_median_effect_interval(
         .checked_shl(n)
         .ok_or(ComparisonError::ExactArithmeticOverflow)?;
     let mut selected = None;
-    for rank in 1..=((n + 1) / 2) {
+    for rank in 1..=n.div_ceil(2) {
         let mut lower_tail = 0_u128;
         for k in 0..rank {
             lower_tail = lower_tail
