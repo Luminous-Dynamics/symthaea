@@ -2144,6 +2144,432 @@ pub fn simulate_small_hayden_preskill_petz_recovery(
     petz_recovery_from_scrambler(&scrambler, seed, tolerance)
 }
 
+
+/// Operational one-step rotated-Petz recovery result. The real parameter t
+/// selects the modular rotation rho_A^(-1/2 - i t/2); t=0 is the ordinary
+/// Petz recovery map. The decoder still receives only A=E tensor R.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HaydenPreskillRotatedPetzRecoverySample {
+    pub seed: u64,
+    pub modular_parameter: f64,
+    pub entanglement_fidelity: f64,
+    pub inverse_modular_power_residual: f64,
+    pub trace_preservation_residual: f64,
+    pub accessible_input_dimension: usize,
+    pub recovered_message_dimension: usize,
+    pub recovery_kraus_count: usize,
+}
+
+/// Construct a rotated Petz recovery candidate for a seeded four-qubit
+/// Hayden-Preskill channel. For sigma=I/2, the outer sigma modular factors
+/// contribute only a global phase which cancels, leaving
+///
+/// R_b(t) = (1/sqrt(2)) K_b^dagger rho_A^(-1/2 - i t/2).
+///
+/// The positive-definite matrix power is reconstructed from a complex
+/// Hermitian eigensystem, without spectral flooring. At t=0 the result must
+/// reproduce the existing Petz recovery channel. This is a decoder-family
+/// candidate, not a claim of optimality or an efficient physical circuit.
+pub fn simulate_small_hayden_preskill_rotated_petz_recovery(
+    seed: u64,
+    modular_parameter: f64,
+    tolerance: f64,
+) -> Result<HaydenPreskillRotatedPetzRecoverySample, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    if !modular_parameter.is_finite() {
+        return Err(QuantumInformationError::InvalidTolerance(modular_parameter));
+    }
+    let mut rng = ChaCha20Rng::seed_from_u64(seed);
+    let scrambler = haar_unitary_4(&mut rng)?;
+    rotated_petz_recovery_from_scrambler(&scrambler, seed, modular_parameter, tolerance)
+}
+
+/// Independent-seed ensemble statistics for a fixed rotated-Petz parameter.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HaydenPreskillRotatedPetzEnsembleSummary {
+    pub sample_count: usize,
+    pub first_seed: u64,
+    pub modular_parameter: f64,
+    pub mean_entanglement_fidelity: f64,
+    pub standard_error_entanglement_fidelity: f64,
+    pub minimum_entanglement_fidelity: f64,
+    pub maximum_entanglement_fidelity: f64,
+    pub maximum_inverse_modular_power_residual: f64,
+    pub maximum_trace_preservation_residual: f64,
+}
+
+/// Sample independent scramblers at one declared modular rotation t.
+pub fn sample_small_hayden_preskill_rotated_petz_ensemble(
+    sample_count: usize,
+    first_seed: u64,
+    modular_parameter: f64,
+    tolerance: f64,
+) -> Result<HaydenPreskillRotatedPetzEnsembleSummary, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    if sample_count < 2 {
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+    }
+    if !modular_parameter.is_finite() {
+        return Err(QuantumInformationError::InvalidTolerance(modular_parameter));
+    }
+    let mut mean = 0.0;
+    let mut m2 = 0.0;
+    let mut minimum = f64::INFINITY;
+    let mut maximum: f64 = 0.0;
+    let mut maximum_power_residual: f64 = 0.0;
+    let mut maximum_trace_residual: f64 = 0.0;
+    for sample_index in 0..sample_count {
+        let sample = simulate_small_hayden_preskill_rotated_petz_recovery(
+            first_seed.wrapping_add(sample_index as u64),
+            modular_parameter,
+            tolerance,
+        )?;
+        let count = (sample_index + 1) as f64;
+        let delta = sample.entanglement_fidelity - mean;
+        mean += delta / count;
+        m2 += delta * (sample.entanglement_fidelity - mean);
+        minimum = minimum.min(sample.entanglement_fidelity);
+        maximum = maximum.max(sample.entanglement_fidelity);
+        maximum_power_residual =
+            maximum_power_residual.max(sample.inverse_modular_power_residual);
+        maximum_trace_residual = maximum_trace_residual.max(sample.trace_preservation_residual);
+    }
+    Ok(HaydenPreskillRotatedPetzEnsembleSummary {
+        sample_count,
+        first_seed,
+        modular_parameter,
+        mean_entanglement_fidelity: mean,
+        standard_error_entanglement_fidelity: (m2
+            / (sample_count - 1) as f64
+            / sample_count as f64)
+            .sqrt(),
+        minimum_entanglement_fidelity: minimum,
+        maximum_entanglement_fidelity: maximum,
+        maximum_inverse_modular_power_residual: maximum_power_residual,
+        maximum_trace_preservation_residual: maximum_trace_residual,
+    })
+}
+
+fn rotated_petz_recovery_from_scrambler(
+    scrambler: &[[Complex64; 4]; 4],
+    seed: u64,
+    modular_parameter: f64,
+    tolerance: f64,
+) -> Result<HaydenPreskillRotatedPetzRecoverySample, QuantumInformationError> {
+    let inverse_sqrt_two = 1.0 / 2.0_f64.sqrt();
+    let mut channel_kraus = [[Complex64::new(0.0, 0.0); 8]; 2];
+    for (b_prime, kraus) in channel_kraus.iter_mut().enumerate() {
+        for emitted in 0..2 {
+            for early_radiation in 0..2 {
+                let accessible = (emitted << 1) | early_radiation;
+                for message in 0..2 {
+                    let input = (message << 1) | early_radiation;
+                    let output = (emitted << 1) | b_prime;
+                    kraus[accessible * 2 + message] =
+                        scrambler[output][input] * inverse_sqrt_two;
+                }
+            }
+        }
+    }
+
+    let mut rho_a = [Complex64::new(0.0, 0.0); 16];
+    for kraus in &channel_kraus {
+        for row in 0..4 {
+            for column in 0..4 {
+                for message in 0..2 {
+                    rho_a[row * 4 + column] +=
+                        0.5 * kraus[row * 2 + message] * kraus[column * 2 + message].conj();
+                }
+            }
+        }
+    }
+    let (modular_inverse_power, inverse_modular_power_residual) =
+        complex_hermitian_complex_power_4(
+            rho_a,
+            -0.5,
+            -0.5 * modular_parameter,
+            tolerance,
+        )?;
+
+    let mut recovery_kraus = [[Complex64::new(0.0, 0.0); 8]; 2];
+    for b_prime in 0..2 {
+        for message in 0..2 {
+            for accessible in 0..4 {
+                let mut value = Complex64::new(0.0, 0.0);
+                for intermediate in 0..4 {
+                    value += channel_kraus[b_prime][intermediate * 2 + message].conj()
+                        * modular_inverse_power[intermediate * 4 + accessible];
+                }
+                recovery_kraus[b_prime][message * 4 + accessible] = value * inverse_sqrt_two;
+            }
+        }
+    }
+
+    let mut completeness = [Complex64::new(0.0, 0.0); 16];
+    for kraus in &recovery_kraus {
+        for row in 0..4 {
+            for column in 0..4 {
+                for message in 0..2 {
+                    completeness[row * 4 + column] +=
+                        kraus[message * 4 + row].conj() * kraus[message * 4 + column];
+                }
+            }
+        }
+    }
+    let mut trace_preservation_residual: f64 = 0.0;
+    for row in 0..4 {
+        for column in 0..4 {
+            let expected = if row == column { 1.0 } else { 0.0 };
+            trace_preservation_residual =
+                trace_preservation_residual.max((completeness[row * 4 + column] - expected).norm());
+        }
+    }
+    if trace_preservation_residual > tolerance * 100.0 {
+        return Err(QuantumInformationError::EigensolverNonconvergence {
+            sweeps: 80,
+            residual: trace_preservation_residual,
+        });
+    }
+
+    let mut fidelity_sum = 0.0;
+    for recovery in &recovery_kraus {
+        for channel in &channel_kraus {
+            let mut trace = Complex64::new(0.0, 0.0);
+            for message_out in 0..2 {
+                for accessible in 0..4 {
+                    trace += recovery[message_out * 4 + accessible]
+                        * channel[accessible * 2 + message_out];
+                }
+            }
+            fidelity_sum += trace.norm_sqr();
+        }
+    }
+    let entanglement_fidelity = 0.25 * fidelity_sum;
+    if !entanglement_fidelity.is_finite()
+        || entanglement_fidelity < -tolerance
+        || entanglement_fidelity > 1.0 + tolerance
+    {
+        return Err(QuantumInformationError::InvalidPageEntropy(entanglement_fidelity));
+    }
+
+    Ok(HaydenPreskillRotatedPetzRecoverySample {
+        seed,
+        modular_parameter,
+        entanglement_fidelity,
+        inverse_modular_power_residual,
+        trace_preservation_residual,
+        accessible_input_dimension: 4,
+        recovered_message_dimension: 2,
+        recovery_kraus_count: 2,
+    })
+}
+
+/// Evaluate a positive-definite complex-Hermitian 4x4 matrix to a complex
+/// scalar power using the real-symmetric embedding and a reconstructed
+/// orthonormal complex eigensystem. No eigenvalue flooring is permitted.
+fn complex_hermitian_complex_power_4(
+    matrix: ComplexMatrix4,
+    exponent_real: f64,
+    exponent_imaginary: f64,
+    tolerance: f64,
+) -> Result<(ComplexMatrix4, f64), QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    if !exponent_real.is_finite() || !exponent_imaginary.is_finite() {
+        return Err(QuantumInformationError::InvalidTolerance(f64::NAN));
+    }
+    let mut hermiticity_residual: f64 = 0.0;
+    for row in 0..4 {
+        for column in 0..4 {
+            hermiticity_residual = hermiticity_residual
+                .max((matrix[row * 4 + column] - matrix[column * 4 + row].conj()).norm());
+        }
+    }
+    if !hermiticity_residual.is_finite() || hermiticity_residual > tolerance * 10.0 {
+        return Err(QuantumInformationError::NonHermitian {
+            residual: hermiticity_residual,
+            tolerance: tolerance * 10.0,
+        });
+    }
+
+    const N: usize = 8;
+    let mut real = vec![0.0; N * N];
+    for row in 0..4 {
+        for column in 0..4 {
+            let value = matrix[row * 4 + column];
+            real[row * N + column] = value.re;
+            real[row * N + 4 + column] = -value.im;
+            real[(4 + row) * N + column] = value.im;
+            real[(4 + row) * N + 4 + column] = value.re;
+        }
+    }
+    let (real_values, real_vectors) =
+        jacobi_eigendecomposition_symmetric(&mut real, N, tolerance.max(1e-14))?;
+    let spectral_scale = real_values
+        .iter()
+        .fold(1.0_f64, |scale, value| scale.max(value.abs()));
+    let minimum_eigenvalue = real_values.iter().copied().fold(f64::INFINITY, f64::min);
+    if !minimum_eigenvalue.is_finite() || minimum_eigenvalue <= tolerance * spectral_scale {
+        return Err(QuantumInformationError::NonPositive {
+            minimum_eigenvalue,
+            tolerance: tolerance * spectral_scale,
+        });
+    }
+
+    let mut basis: Vec<[Complex64; 4]> = Vec::with_capacity(4);
+    let mut eigenvalues: Vec<f64> = Vec::with_capacity(4);
+    for pair_start in (0..N).step_by(2) {
+        let eigenvalue = 0.5 * (real_values[pair_start] + real_values[pair_start + 1]);
+        for column in pair_start..pair_start + 2 {
+            let mut vector = core::array::from_fn(|row| {
+                Complex64::new(
+                    real_vectors[row * N + column],
+                    real_vectors[(4 + row) * N + column],
+                )
+            });
+            for accepted in &basis {
+                let overlap = accepted
+                    .iter()
+                    .zip(vector.iter())
+                    .map(|(left, right)| left.conj() * *right)
+                    .sum::<Complex64>();
+                for index in 0..4 {
+                    vector[index] -= accepted[index] * overlap;
+                }
+            }
+            let norm_squared = vector.iter().map(|value| value.norm_sqr()).sum::<f64>();
+            if norm_squared > 1e-16 {
+                let inverse_norm = norm_squared.sqrt().recip();
+                for value in &mut vector {
+                    *value *= inverse_norm;
+                }
+                basis.push(vector);
+                eigenvalues.push(eigenvalue);
+            }
+        }
+    }
+    if basis.len() != 4 || eigenvalues.len() != 4 {
+        return Err(QuantumInformationError::EigensolverNonconvergence {
+            sweeps: N,
+            residual: (4usize.saturating_sub(basis.len())) as f64,
+        });
+    }
+
+    let mut power = [Complex64::new(0.0, 0.0); 16];
+    for (eigenvalue, vector) in eigenvalues.iter().zip(basis.iter()) {
+        if !eigenvalue.is_finite() || *eigenvalue <= 0.0 {
+            return Err(QuantumInformationError::NonPositive {
+                minimum_eigenvalue: *eigenvalue,
+                tolerance,
+            });
+        }
+        let logarithm = eigenvalue.ln();
+        let magnitude = (exponent_real * logarithm).exp();
+        let phase = exponent_imaginary * logarithm;
+        let weight = Complex64::new(magnitude * phase.cos(), magnitude * phase.sin());
+        for row in 0..4 {
+            for column in 0..4 {
+                power[row * 4 + column] += weight * vector[row] * vector[column].conj();
+            }
+        }
+    }
+
+    // Verify A^(-1/2-it/2) A A^(-1/2+it/2) = I.
+    let mut residual: f64 = 0.0;
+    for row in 0..4 {
+        for column in 0..4 {
+            let mut value = Complex64::new(0.0, 0.0);
+            for left in 0..4 {
+                for right in 0..4 {
+                    value += power[row * 4 + left]
+                        * matrix[left * 4 + right]
+                        * power[column * 4 + right].conj();
+                }
+            }
+            let expected = if row == column { 1.0 } else { 0.0 };
+            residual = residual.max((value - Complex64::new(expected, 0.0)).norm());
+        }
+    }
+    if !residual.is_finite() || residual > tolerance * 1000.0 {
+        return Err(QuantumInformationError::EigensolverNonconvergence {
+            sweeps: N,
+            residual,
+        });
+    }
+    Ok((power, residual))
+}
+
+#[cfg(test)]
+mod rotated_petz_recovery_tests {
+    use super::*;
+
+    const TOLERANCE: f64 = 1e-10;
+
+    #[test]
+    fn zero_modular_rotation_reproduces_ordinary_petz_fidelity() {
+        for seed in 0..16 {
+            let petz = simulate_small_hayden_preskill_petz_recovery(
+                0x7E70 + seed,
+                TOLERANCE,
+            )
+            .unwrap();
+            let rotated = simulate_small_hayden_preskill_rotated_petz_recovery(
+                0x7E70 + seed,
+                0.0,
+                TOLERANCE,
+            )
+            .unwrap();
+            assert!((rotated.entanglement_fidelity - petz.entanglement_fidelity).abs() < 1e-8);
+            assert!(rotated.inverse_modular_power_residual < 1e-8);
+            assert!(rotated.trace_preservation_residual < 1e-8);
+        }
+    }
+
+    #[test]
+    fn nonzero_rotated_petz_parameters_remain_cptp_and_have_bounded_fidelity() {
+        for modular_parameter in [-2.0, -0.5, 0.5, 2.0] {
+            let sample = simulate_small_hayden_preskill_rotated_petz_recovery(
+                0xA17E,
+                modular_parameter,
+                TOLERANCE,
+            )
+            .unwrap();
+            assert!((0.0..=1.0).contains(&sample.entanglement_fidelity));
+            assert!(sample.inverse_modular_power_residual < 1e-8);
+            assert!(sample.trace_preservation_residual < 1e-8);
+            assert_eq!(sample.accessible_input_dimension, 4);
+            assert_eq!(sample.recovered_message_dimension, 2);
+        }
+    }
+
+    #[test]
+    fn rotated_petz_ensemble_reports_uncertainty_and_is_seed_reproducible() {
+        let first =
+            sample_small_hayden_preskill_rotated_petz_ensemble(8, 0xB047, 0.75, TOLERANCE)
+                .unwrap();
+        let repeated =
+            sample_small_hayden_preskill_rotated_petz_ensemble(8, 0xB047, 0.75, TOLERANCE)
+                .unwrap();
+        assert_eq!(first, repeated);
+        assert_eq!(first.sample_count, 8);
+        assert!((0.0..=1.0).contains(&first.mean_entanglement_fidelity));
+        assert!(first.standard_error_entanglement_fidelity >= 0.0);
+        assert!(first.maximum_inverse_modular_power_residual < 1e-8);
+        assert!(first.maximum_trace_preservation_residual < 1e-8);
+    }
+
+    #[test]
+    fn rotated_petz_rejects_nonfinite_parameter_and_too_small_ensemble() {
+        assert!(matches!(
+            simulate_small_hayden_preskill_rotated_petz_recovery(1, f64::NAN, TOLERANCE),
+            Err(QuantumInformationError::InvalidTolerance(_))
+        ));
+        assert!(matches!(
+            sample_small_hayden_preskill_rotated_petz_ensemble(1, 1, 0.0, TOLERANCE),
+            Err(QuantumInformationError::InvalidEnsembleSampleCount(1))
+        ));
+    }
+}
+
 /// Analytic no-scrambling control: M is forwarded to E and the R register is
 /// a spectator. The Petz decoder should discard R and recover M with fidelity 1.
 pub fn simulate_identity_hayden_preskill_petz_control(
