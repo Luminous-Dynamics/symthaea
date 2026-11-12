@@ -337,3 +337,66 @@ The first synthetic cross-system record is now committed alongside this specific
 Fixture ID: `APPAREL-TWIN-SYNTH-0001`. It binds a synthetic overshirt product, design revision, pattern pieces, fabric/thread lots, BOM, planned cut/sew/inspect operations, geometry projections, unperformed physical tests and four claims. Its expected result is **structurally complete but physically unqualified**. The fabric's key mechanical properties remain unknown/not measured, the physical article has not been manufactured, and an incomplete modelled drape projection cannot support a physical drape claim.
 
 This is deliberately a negative epistemic example: a structurally connected digital thread must not be mistaken for a physically qualified garment. The schema and example were locally JSON-parsed after authoring. An independent JSON Schema Draft 2020-12 validator and cross-field semantic validator have **not** yet been run; no validation result beyond JSON parsing is claimed.
+
+
+## 14. Competitive benchmark refresh — 12 November 2026
+
+The first draft benchmark list has been sharpened with the latest public research. A machine-readable source register is committed at:
+
+`docs/research/fixtures/apparel_engineering_thread_v0_1/benchmark_sources_2026-11-12.json`
+
+It records dataset/research identity, public scope, license state, limitations, split policy and claim ceilings. It does **not** assert that the data have been downloaded, licensed for redistribution or reproduced.
+
+### RGBench — real garment physics, not just simple cloth
+
+The AAAI-26 RGBench paper describes a 6,000+ garment mesh corpus, a measured material-property pipeline and the GarmentDynamics FEM-based cloth simulator. It evaluates dual-arm grasp, fling and fold and reports bidirectional Chamfer/Hausdorff measures. The paper reports approximately 20% lower simulation error and approximately 3× faster simulation than its evaluated baselines. These are author-reported results, not a Luminous result.
+
+A critical availability distinction: the current [public Hugging Face evaluation release](https://huggingface.co/datasets/RGBench/RGBench-Cloth-Sim2Real-v1) contains nine real-captured garments, three actions and approximately 100 evaluation samples. It includes camera extrinsics/initial poses, bimanual joint/end-effector records, segmented point clouds and OBJ/USD meshes. The dataset card lists CC-BY-4.0. The larger 6k+ mesh library and GarmentDynamics are described as forthcoming follow-up releases. Two released garments are excluded from the paper's published baseline results because of non-manifold meshes.
+
+**Our immediate goal:** reproduce the available public evaluation package and the exact metric definitions before attempting to beat the paper. Keep the public nine-garment subset separate from any future paper-scale assets.
+
+The next qualification layer must extend beyond global point-cloud distance:
+- local geometry around seams, hems, cuffs, collars, closures and fold lines;
+- self-intersection, penetration and invalid-topology counts;
+- time-series deformation, phase lag, settling and contact/fold event timing;
+- physical parameter calibration for thickness, areal mass, warp/weft stretch, bending and surface friction;
+- uncertainty and held-out specimen validation;
+- downstream manipulation success, damage and recovery;
+- initialization/step time, memory, numerical failures and accuracy/runtime Pareto fronts.
+
+The published bidirectional CD/HD metrics remain necessary for comparability, but no global geometric average may compensate for a catastrophic local seam/topology or dynamics failure.
+
+### ClothDojo — learned trajectory generation, not a substitute for physical truth
+
+The 31 October 2026 [ClothDojo preprint](https://arxiv.org/abs/2611.01190) reports nearly 8,000 successful simulated trajectories for bimanual garment flattening/folding over hundreds of garments. It uses canonical mesh-coordinate cues, a learned data-generation policy and appearance-randomized RGB observations for downstream policy training. It reports improvements over direct human-demonstration training in its evaluated splits, while explicitly leaving unseen-garment generalization as an open problem.
+
+The Luminous research question is whether generated trajectories improve **held-out physical garment performance**, not simply the number of successful simulated rollouts. Appearance randomization must not mutate material mechanics; rollouts must bind exact garment/material/solver/action/seed identity; and simulation success must remain distinct from physical trial success.
+
+### Robotic sewing — a real seam-error comparator
+
+The 21 September 2026 [robotic sewing study](https://doi.org/10.1007/s41315-026-00590-3) reports a single-arm SCARA platform with an unmodified industrial sewing machine, vision-based contour/trajectory generation, demonstration-trained grasp prediction, vision seam tracking and force-regulated tension. It reports seam deviation within ±2.5 mm on its experimental tasks, while noting that limited user intervention remains and that generalization to large/highly elastic fabrics needs more work.
+
+Use ±2.5 mm as a published reference only when the same task geometry, seam type, metrology definition, material and control envelope are matched. It is not a universal seam-quality tolerance or proof of autonomous production.
+
+### Visual garment sorting and fibre-composition sensing are separate tasks
+
+The 30 September 2026 [TexSortML paper](https://doi.org/10.3390/s26196236) contains 751 post-consumer garments in 11 visual categories and three presentation-difficulty stages, with 2,253 annotated frames. Its garment-level five-fold split keeps each specimen's three presentation images together. The directly fine-tuned ViT reports 95.23%, 91.90% and 85.94% accuracy across the three stages, a 9.3 percentage-point drop. ResNet-18 and ResNet-50 report drops of 16.9 and 16.6 points. The authors note the sample is small and class-imbalanced and came from collection containers that had already been pre-sorted at one facility.
+
+Crucially, TexSortML labels **visual garment category and presentation state**, not fibre composition. Do not turn “jacket” or “shirt” into a material assertion.
+
+[NIST NIR-SORT](https://catalog.data.gov/dataset/near-infrared-spectra-of-origin-defined-and-real-world-textiles-nir-sort-a-spectroscopic-a) contributes a separate material-sensing lane: 113 specimens (70 known-provenance known-fibre, 20 known-provenance undyed blends, 11 post-consumer, 12 pre-consumer), nominally seven NIR replicates, benchtop 833–2500 nm and handheld 1550–1950 nm ranges, plus microscopy data. The catalog lists roughly 193 MB spectroscopy and 10.6 GB microscopy.
+
+**Paradigm:** a sorting system should produce separate, calibrated evidence for visual garment family, spectral composition, contamination/material state, and route eligibility. Sensor disagreement or out-of-domain samples should lead to a second measurement or an explicit unknown—not a forced class. The actual sort stream must be evaluated by purity, mass balance and qualified recovery output, not classification accuracy alone.
+
+The associated work is [Symthaea #11743 — TEXTILE-SORT-FUSION-001](https://github.com/Luminous-Dynamics/symthaea/issues/11743).
+
+### Research execution order
+
+1. Reproduce RGBench on the currently public nine-garment evaluation set; preserve its published split and exact two-direction metric.
+2. Independently calibrate Symtropy's named cloth profile on physical coupons; use held-out specimens and report uncertainty.
+3. Compare generated-data policies (including ClothDojo-style methods where reproducible) on unseen garment and material identities.
+4. Reproduce TexSortML's garment-level split and NIR-SORT specimen-level grouping as separate lanes.
+5. Add multimodal fusion with open-set rejection, then measure physical sort purity and qualified recovery outputs.
+6. Compare robotic seam tracking with the published ±2.5 mm study only on matched tasks and measurements.
+
+No dataset has been declared ingested or reproduced by this specification. Rights/terms, attribution and exact file checksums must be reviewed and recorded before any external data is committed or redistributed.
