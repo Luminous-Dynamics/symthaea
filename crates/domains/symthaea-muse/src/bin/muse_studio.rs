@@ -2866,12 +2866,14 @@ fn fluidsynth_candidate_wav(
             .map(|()| map.receipt_sha256)
         });
 
+        // This is the semantic profile shared by a baseline and its
+        // counterfactual. Exact paths and argv remain bound separately in
+        // process_observation; including per-run temp paths here would make
+        // otherwise equivalent render profiles compare unequal.
         let render_config_bytes = match serde_json::to_vec(&serde_json::json!({
-            "config_version": "muse-fluidsynth-render-config-v2",
-            "renderer_path": &process_observation.executable_path,
-            "soundfont_path": &process_observation.soundfont_path,
-            "input_midi_path": &process_observation.midi_path,
-            "argv": &process_observation.arguments,
+            "config_version": "muse-fluidsynth-semantic-render-profile-v3",
+            "renderer_executable_sha256": &process_observation.executable_sha256_after,
+            "soundfont_sha256": &process_observation.soundfont_sha256_after,
             "child_environment_sha256": &process_observation.environment_sha256,
             "gain": 0.8,
             "output_format": "wav",
