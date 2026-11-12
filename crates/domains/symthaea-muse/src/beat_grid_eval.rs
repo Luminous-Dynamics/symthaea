@@ -1282,6 +1282,145 @@ mod tests {
     }
 
     #[test]
+    fn pinned_mir_eval_0_8_2_goto_p_score_and_information_gain_fixtures_match() {
+        let reference_beats: Vec<f64> = (0..10).map(|index| index as f64 * 0.5).collect();
+        let exact = reference_beats.clone();
+        let offbeat_50ms: Vec<f64> =
+            reference_beats.iter().map(|time| time + 0.05).collect();
+        let offbeat_100ms: Vec<f64> =
+            reference_beats.iter().map(|time| time + 0.1).collect();
+        let half_time: Vec<f64> =
+            (0..5).map(|index| index as f64).collect();
+        let double_time: Vec<f64> =
+            (0..19).map(|index| index as f64 * 0.25).collect();
+
+        let config = BeatGridEvaluationConfigV1::default();
+        assert_eq!(goto_score(&reference_beats, &exact, &config), 1.0);
+        assert!((p_score(&reference_beats, &exact, &config).unwrap() - 1.0).abs() < 1e-12);
+        assert!((information_gain(&reference_beats, &exact, 41) - 1.0).abs() < 1e-12);
+
+        assert_eq!(goto_score(&reference_beats, &offbeat_50ms, &config), 1.0);
+        assert!((p_score(&reference_beats, &offbeat_50ms, &config).unwrap() - 1.0).abs() < 1e-12);
+        assert!(
+            (information_gain(&reference_beats, &offbeat_50ms, 41)
+                - 0.9124608415961211)
+                .abs()
+                < 1e-12
+        );
+
+        assert_eq!(goto_score(&reference_beats, &offbeat_100ms, &config), 0.0);
+        assert!((p_score(&reference_beats, &offbeat_100ms, &config).unwrap() - 0.9).abs() < 1e-12);
+        assert!(
+            (information_gain(&reference_beats, &offbeat_100ms, 41)
+                - 0.9124608415961211)
+                .abs()
+                < 1e-12
+        );
+
+        assert_eq!(goto_score(&reference_beats, &half_time, &config), 0.0);
+        assert!((p_score(&reference_beats, &half_time, &config).unwrap() - 0.5).abs() < 1e-12);
+        assert!(
+            (information_gain(&reference_beats, &half_time, 41)
+                - 0.8133475887610566)
+                .abs()
+                < 1e-12
+        );
+
+        assert_eq!(goto_score(&reference_beats, &double_time, &config), 0.0);
+        assert!(
+            (p_score(&reference_beats, &double_time, &config).unwrap()
+                - 0.5263157894736842)
+                .abs()
+                < 1e-12
+        );
+        assert!(
+            (information_gain(&reference_beats, &double_time, 41)
+                - 0.8137207286066387)
+                .abs()
+                < 1e-12
+        );
+    }
+
+    #[test]
+    fn pinned_mir_eval_broken_continuity_and_empty_prediction_metrics_match() {
+        let reference_beats: Vec<f64> = (0..10).map(|index| index as f64 * 0.5).collect();
+        let broken = vec![
+            0.0, 0.5, 1.0, 1.85, 2.35, 2.85, 3.35, 3.85, 4.35, 4.85,
+        ];
+        let config = BeatGridEvaluationConfigV1::default();
+        assert_eq!(goto_score(&reference_beats, &broken, &config), 0.0);
+        assert!((p_score(&reference_beats, &broken, &config).unwrap() - 0.3).abs() < 1e-12);
+        assert!(
+            (information_gain(&reference_beats, &broken, 41)
+                - 0.7581989231048688)
+                .abs()
+                < 1e-12
+        );
+        assert_eq!(goto_score(&reference_beats, &[], &config), 0.0);
+        assert_eq!(p_score(&reference_beats, &[], &config), Some(0.0));
+        assert_eq!(information_gain(&reference_beats, &[], 41), 0.0);
+    }
+
+    #[test]
+    fn legacy_beat_metrics_are_included_in_reference_report_and_commitment() {
+        let beats: Vec<f64> = (0..10).map(|index| index as f64 * 0.5).collect();
+        let references = [reference("a", Some("clip-a"), &beats, &[])];
+        let report = evaluate_beat_grid_v1(
+            &prediction(&beats, &[]),
+            &references,
+            BeatGridEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        let score = &report.reference_scores[0];
+        assert_eq!(score.goto_score, 1.0);
+        assert_eq!(score.p_score, Some(1.0));
+        assert_eq!(score.information_gain, 1.0);
+
+        let original = beat_grid_evaluation_commitment_v1(&report).unwrap();
+        let mut tampered = report.clone();
+        tampered.reference_scores[0].goto_score = 0.0;
+        let changed = beat_grid_evaluation_commitment_v1(&tampered).unwrap();
+        assert_ne!(original, changed);
+    }
+
+    #[test]
+    fn p_score_is_unknown_when_10ms_quantization_collapses_reference_periods() {
+        let reference_beats = [0.0, 0.001, 0.002, 0.003];
+        let estimated_beats = [0.0, 0.001, 0.002, 0.003];
+        assert_eq!(
+            p_score(
+                &reference_beats,
+                &estimated_beats,
+                &BeatGridEvaluationConfigV1::default()
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn legacy_metric_config_bounds_are_validated() {
+        let beats = [0.0, 0.5, 1.0];
+        let references = [reference("a", None, &beats, &[])];
+        let invalid = [
+            BeatGridEvaluationConfigV1 {
+                goto_threshold_basis_points: 10_000,
+                ..Default::default()
+            },
+            BeatGridEvaluationConfigV1 {
+                p_score_threshold_basis_points: 0,
+                ..Default::default()
+            },
+            BeatGridEvaluationConfigV1 {
+                information_gain_bins: 1,
+                ..Default::default()
+            },
+        ];
+        for config in invalid {
+            assert!(evaluate_beat_grid_v1(&prediction(&beats, &[]), &references, config).is_err());
+        }
+    }
+
+    #[test]
     fn exact_beat_and_downbeat_sequences_are_perfect() {
         let beats = [0.0, 0.5, 1.0, 1.5, 2.0];
         let downbeats = [0.0, 2.0];
