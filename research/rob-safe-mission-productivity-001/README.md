@@ -26,7 +26,7 @@ Failed, incomplete and unsafe missions remain in the denominator for throughput/
 
 Candidate/baseline comparisons require one-to-one pair_id matches and exact equality of the frozen workload, scenario, seed, initial state, robot, model, local control policy, hardware, observation budget and compute budget. Only the scheduler arm is allowed to differ.
 
-The report retains a vector per task class and per robot, including per-robot hard-safety regressions. It does not combine unlike task units or produce one fleet-wide weighted winner. A candidate is non-inferior only when declared safe-success, SLO-success, deadline, hard-violation, service-floor and causal-closure margins hold for every task class and robot. Productivity dominance is reported only when non-inferiority holds, no task class loses productivity, and at least one task class improves.
+The report retains a vector per task class and per robot, including per-robot hard-safety regressions. It does not combine unlike task units or produce one fleet-wide weighted winner. A candidate's point-estimate non-inferiority flag is true only when declared safe-success, SLO-success, deadline, hard-violation, service-floor and causal-closure margins hold for every task class and robot. Point-estimate productivity dominance is reported only when this gate holds, no task class loses productivity on either time basis, and at least one task class improves. The report explicitly marks its statistical status as PointEstimatesOnly: it does not compute confidence intervals, p-values or cluster-aware uncertainty.
 
 Energy, joules, EVSI, regret, latency and task work remain distinct quantities. Energy is a separate evidence/measurement coverage vector, not a productivity conversion factor.
 
@@ -72,7 +72,7 @@ Keep published results on different models, tasks and GPUs as external reference
 - No per-robot safe-success, deadline or starvation regression hidden by fleet-average productivity.
 - Publish every task-class and robot stratum, including null results and cases where Round Robin, EDF, static caps, Armory or RED performs better.
 
-The 10% target is prospective. It must be preregistered after baseline variance and measurement boundaries are established and confirmed on held-out paired mission sequences with confidence intervals clustered at the independent mission level.
+The 10% target is prospective. It must be preregistered after baseline variance and measurement boundaries are established and confirmed on held-out paired mission sequences with confidence intervals clustered by robot/workload (or a predeclared higher-level independent cluster). The current reference emits point estimates only; those estimates are not statistical evidence of non-inferiority or superiority.
 
 ## Run
 
