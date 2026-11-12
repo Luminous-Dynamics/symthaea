@@ -922,10 +922,7 @@ mod tests {
             r.comparisons[0].pressure_measurement_method,
             "calibrated load-cell fixture"
         );
-        assert_eq!(
-            r.comparisons[0].pressure_instrument_ref,
-            "PRESSURE-MET-01"
-        );
+        assert_eq!(r.comparisons[0].pressure_instrument_ref, "PRESSURE-MET-01");
         assert_eq!(
             r.comparisons[0].combined_pressure_uncertainty_milli_mpa,
             100
