@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "manifest_id": "APPAREL-TEXTILE-BENCHMARK-SOURCES-2026-11-12",
-  "purpose": "Versioned source register for research baselines in cloth simulation, robotic garment manipulation, textile sorting and sewing. This manifest does not declare any dataset ingested or authorize redistribution. This revision adds OpenTextile-NIR, two inverse-design research comparators, a design-sorting mismatch study and a 2026 critical fabric-design review. Reported percentages/metrics are source-specific and must not be treated as universal or reproduced Luminous results. This revision adds apparel scheduling comparators spanning dual-resource MIP/CP/heuristics, textile steam-aware multi-objective RL, source-load coordination, multi-line flow shops and human-centered scheduling. Published case results are scope-specific and are not a common leaderboard. This revision adds ASTM D6673-10 pattern interchange, the Knitout v0.6 machine-independent knitting instruction format and an open parametric sweater reference generator. These formats cover different layers and must not be conflated as a complete garment digital thread. This revision adds human-AI sustainable fashion co-design, sketch-to-parametric garment generation, spatially varying ease/pattern extraction, controllable fashion diffusion and multimodal sketch/text-to-pattern sources. These are distinct levels of the workflow; image generation, editable pattern generation, 3D fit evaluation and physical product qualification must not be conflated. This revision adds textile-reinforced concrete and digital construction sources: process classification, hybrid textile/SHCC placement, robotic rebar insertion/grouting, in-process mesh placement, robotic steel reinforcement/welding and textile-waste cementitious composites. These are structural-material benchmarks, distinct from apparel qualification. Revision r7 adds the textile pre-processing review, NIR contamination and elastane challenges, and industrial/reuse-flow evidence for polyester-cotton and stretch-textile recovery. Identification, physical separation, material output and downstream acceptance remain separate evaluation stages. Revision r8 explicitly records ASTM D6673-10 as withdrawn in 2019 (legacy compatibility only), adds the NIST STEP/EXPRESS apparel-pattern information-model precedent, and separates Knitout syntax from backend/machine execution support.",
+  "purpose": "Versioned source register for research baselines in cloth simulation, robotic garment manipulation, textile sorting and sewing. This manifest does not declare any dataset ingested or authorize redistribution. This revision adds OpenTextile-NIR, two inverse-design research comparators, a design-sorting mismatch study and a 2026 critical fabric-design review. Reported percentages/metrics are source-specific and must not be treated as universal or reproduced Luminous results. This revision adds apparel scheduling comparators spanning dual-resource MIP/CP/heuristics, textile steam-aware multi-objective RL, source-load coordination, multi-line flow shops and human-centered scheduling. Published case results are scope-specific and are not a common leaderboard. This revision adds ASTM D6673-10 pattern interchange, the Knitout v0.6 machine-independent knitting instruction format and an open parametric sweater reference generator. These formats cover different layers and must not be conflated as a complete garment digital thread. This revision adds human-AI sustainable fashion co-design, sketch-to-parametric garment generation, spatially varying ease/pattern extraction, controllable fashion diffusion and multimodal sketch/text-to-pattern sources. These are distinct levels of the workflow; image generation, editable pattern generation, 3D fit evaluation and physical product qualification must not be conflated. This revision adds textile-reinforced concrete and digital construction sources: process classification, hybrid textile/SHCC placement, robotic rebar insertion/grouting, in-process mesh placement, robotic steel reinforcement/welding and textile-waste cementitious composites. These are structural-material benchmarks, distinct from apparel qualification. Revision r7 adds the textile pre-processing review, NIR contamination and elastane challenges, and industrial/reuse-flow evidence for polyester-cotton and stretch-textile recovery. Identification, physical separation, material output and downstream acceptance remain separate evaluation stages. Revision r8 explicitly records ASTM D6673-10 as withdrawn in 2019 (legacy compatibility only), adds the NIST STEP/EXPRESS apparel-pattern information-model precedent, and separates Knitout syntax from backend/machine execution support. Revision r9 expands OpenTextile-NIR's sample-level data contract: 71 post-industrial specimens, supplier-sourced composition labels, 3 unknown and 11 outlier flags, 288 summary wavelengths per sample, and an approximately 11.8 GB full image corpus. The first benchmark should use sample-level summaries before any image-cube ingestion.",
   "sources": [
     {
       "source_id": "RGBENCH-REAL-GARMENT-EVAL-V1",
@@ -298,15 +298,42 @@
         ],
         "spectra_count_over": 11000000,
         "annotated_spectra_count_over": 6000000,
-        "representative_sample_spectra_and_RGB_per_sample": true
+        "representative_sample_spectra_and_RGB_per_sample": true,
+        "sample_count": 71,
+        "sample_piece_size_approx_cm": [
+          10,
+          10
+        ],
+        "camera": "Specim SWIR 3",
+        "spectral_bands": 288,
+        "wavelength_range_nm": [
+          953.04,
+          2547.64
+        ],
+        "total_dataset_size_gb_approx": 11.8,
+        "sample_level_csv_files": [
+          "ground_truth_final.csv",
+          "rgb_mean_values.csv",
+          "swir_mean_spectra.csv",
+          "swir_mean_spectra_coordinates.csv"
+        ],
+        "ground_truth_source": "supplier-provided composition information relayed by the post-industrial textile management partner",
+        "labels_with_unknown_composition": 3,
+        "labels_flagged_as_outliers": 11,
+        "summary_spectrum_rows": 71,
+        "spectra_per_summary_sample": 288
       },
       "known_limitations": [
-        "post-industrial sample domain; transfer to post-consumer mixed garments must be tested",
-        "pixel spectra from a specimen are correlated; never split pixels from one physical sample across train/test",
-        "verify instrument/calibration, exact class balance and file-level reuse terms"
+        "post-industrial cut garment pieces collected in Finland, not a random sample of incoming post-consumer garments",
+        "composition labels were supplied by suppliers via the collection partner; they are not described as independent laboratory re-characterization",
+        "three samples are flagged unknown and eleven are flagged outliers; preserve both states as separate metadata and do not silently discard or convert to ordinary labels",
+        "all pixels/spectra from a sample are correlated; split by sample identity, not by pixel or spectral observation",
+        "the full dataset is approximately 11.8 GB; start from sample-level summary CSVs and download image cubes only when a spatial task requires them"
       ],
-      "intended_use": "spatially resolved fibre/composition recognition, RGB-NIR fusion, sample-level held-out evaluation and calibration analysis",
-      "redistribution_action": "inspect article supplement and repository/data-package license before downloading or redistributing"
+      "intended_use": "specimen-level NIR-HSI and RGB baseline, sample-grouped open-set/unknown/outlier treatment, spectral instrument/domain calibration and later spatial component recognition; not direct physical sorting throughput",
+      "redistribution_action": "Zenodo record is described as open access; verify exact dataset file license and citation instructions. Hash each exact downloaded file and preserve supplier-declared ground-truth status and unknown/outlier labels.",
+      "dataset_url": "https://doi.org/10.5281/zenodo.18269172",
+      "dataset_available_date": "2026-01-19"
     },
     {
       "source_id": "INVERSE-DESIGN-CURVED-YARNS-2026",
@@ -1008,11 +1035,11 @@
       "name": "Intelligent and Automated Technologies for Textile Recycling Pre-Processing: A Systematic Literature Review",
       "source_kind": "systematic_review_sorting_and_contaminant_automation",
       "paper_url": "https://www.mdpi.com/2227-7080/14/4/200",
-      "publication_date": "2026",
+      "publication_date": "2026-03-27",
       "license_status": "open_access_article; verify_article_specific_license",
       "reported_scope": {
         "primary_studies": 21,
-        "literature_window": "2020-2025",
+        "literature_window": "2015-2025; included 21 studies published 2020-2025",
         "task_counts": {
           "identification": 19,
           "explicit_physical_sorting": 4,
@@ -1022,7 +1049,8 @@
       "known_limitations": [
         "review counts describe selected published studies, not the industrial market or all deployed systems",
         "identification, routing and physical separation definitions differ across studies",
-        "not a performance dataset or leaderboard"
+        "not a performance dataset or leaderboard",
+        "review explicitly distinguishes identification from physical routing/separation and reports most studies validated in laboratory conditions with limited semi-industrial evidence"
       ],
       "intended_use": "benchmark-gap justification for separating identification, physical sorting and contaminant removal",
       "redistribution_action": "cite the article; do not infer industrial deployment prevalence from study counts"
@@ -1204,5 +1232,5 @@
   ],
   "cross_dataset_rule": "TexSortML visual garment-family labels are not fibre-composition labels. NIR-SORT composition observations are not garment-category labels. Fusion is permitted only with matched item identity, independent measurement provenance and explicit missing/unknown states.",
   "claim_ceiling": "This source register is a research intake manifest. It does not prove that any dataset has been downloaded, parsed, reproduced, licensed for redistribution, or evaluated by Luminous Dynamics. The companion RGBench garment asset subset is separately licensed for non-commercial research; do not treat its rights as inherited from the CC-BY-4.0 capture set.",
-  "revision": "2026-11-12-r8"
+  "revision": "2026-11-12-r9"
 }
