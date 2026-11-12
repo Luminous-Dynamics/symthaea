@@ -18,10 +18,10 @@ The synthetic fixture must return INCOMPLETE as physical evidence. Exit codes:
 
 ## V0 measurements
 
-- Fixed band, declared operating-condition fingerprint and declared window duration.
-- Per-run timebase receipt, background method/trace, raw acoustic-window digest and independent cavitation-observation digest.
+- Fixed band, declared service fingerprint and declared window duration.
+- Per-run timebase and service-fingerprint receipts; per-window acoustic and cavitation-observation digests and time bounds are repeated in the deterministic report receipt.
 - Per-window ITTC Rev.03 §2.5.3 treatment: below 3 dB unusable; 3 dB <= margin < 10 dB energy-corrected; above 10 dB unadjusted; exactly 10 dB unresolved because Rev.03 does not state a disposition.
-- Per-run usable/excluded windows, occupancy, contiguous false-to-true onset count, observed onsets per covered hour, energy-equivalent mean, median, p05/p95, and cavitation-present/absent conditioned energy means.
+- Per-run usable/excluded windows, occupancy, contiguous false-to-true onset count, left-censored active-segment count at run start/acquisition gaps, observed onsets per covered hour, energy-equivalent mean, median, p05/p95, and cavitation-present/absent conditioned energy means.
 - Independent runs remain separate; the case-level run-to-run dispersion is computed from each run's energy-equivalent mean.
 
 The energy-equivalent mean is computed as:
