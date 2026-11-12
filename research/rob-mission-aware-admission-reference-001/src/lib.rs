@@ -419,7 +419,6 @@ fn compare_request(
     }
 }
 
-
 /// Deterministic static active-episode cap baseline for shared brain/KV serving.
 ///
 /// This is deliberately separate from request-level resource admission. It
