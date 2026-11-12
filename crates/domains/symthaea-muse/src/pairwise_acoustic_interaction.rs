@@ -150,6 +150,7 @@ pub enum PairwiseInteractionError {
     InvalidRendererReceipt,
     RendererProfileMismatch,
     AudioLayoutMismatch,
+    WindowLongerThanAudio,
     CoalitionScheduleMismatch,
     DuplicateCoalitionArtifact,
     RetainedEventLineageChanged,
@@ -168,6 +169,7 @@ impl std::fmt::Display for PairwiseInteractionError {
             Self::InvalidRendererReceipt => write!(f, "one or more renderer receipts failed replay"),
             Self::RendererProfileMismatch => write!(f, "four coalition renders do not share one renderer profile"),
             Self::AudioLayoutMismatch => write!(f, "four coalition audio layouts differ"),
+            Self::WindowLongerThanAudio => write!(f, "analysis window is longer than the coalition audio"),
             Self::CoalitionScheduleMismatch => write!(f, "one or more exact coalition schedules are invalid"),
             Self::DuplicateCoalitionArtifact => write!(f, "coalition schedules, maps, or renderer receipts are reused"),
             Self::RetainedEventLineageChanged => write!(f, "a retained source event changed identity, pitch, track, channel, or time"),
@@ -237,6 +239,11 @@ fn verify_coalition<'a>(
     score: &Score,
     excluded: &[usize],
 ) -> Result<VerifiedCoalition<'a>, PairwiseInteractionError> {
+    let midi_bytes = evidence
+        .receipt_inputs
+        .input_midi_bytes
+        .ok_or(PairwiseInteractionError::InvalidRendererReceipt)?;
+    let schedule_sha256 = sha256_hex(midi_bytes);
     let binding = if excluded.is_empty() {
         verify_renderer_audio_binding_for_score(
             evidence.receipt,
@@ -258,14 +265,10 @@ fn verify_coalition<'a>(
     }
     .map_err(|_| PairwiseInteractionError::InvalidRendererReceipt)?;
 
-    let midi_bytes = evidence
-        .receipt_inputs
-        .input_midi_bytes
-        .ok_or(PairwiseInteractionError::InvalidRendererReceipt)?;
     Ok(VerifiedCoalition {
         binding,
         audio: evidence.audio,
-        schedule_sha256: sha256_hex(midi_bytes),
+        schedule_sha256,
         map_artifact_sha256: sha256_hex(evidence.performed_event_map_bytes),
     })
 }
@@ -521,6 +524,10 @@ pub fn measure_pairwise_acoustic_interaction(
         return Err(PairwiseInteractionError::RetainedEventLineageChanged);
     }
 
+    if config.window_size_frames > total_frames {
+        return Err(PairwiseInteractionError::WindowLongerThanAudio);
+    }
+
     let schedules = [
         baseline.schedule_sha256.clone(),
         remove_a.schedule_sha256.clone(),
@@ -552,7 +559,7 @@ pub fn measure_pairwise_acoustic_interaction(
         audio_sha256(&remove_both.audio),
     ];
 
-    for group in [&schedules[..], &map_artifacts[..], &map_receipts[..], &audio_digests[..]] {
+    for group in [&schedules[..], &map_artifacts[..], &map_receipts[..]] {
         let unique: std::collections::BTreeSet<&str> = group.iter().map(String::as_str).collect();
         if unique.len() != 4 {
             return Err(PairwiseInteractionError::DuplicateCoalitionArtifact);
@@ -771,9 +778,6 @@ mod tests {
 
     #[test]
     fn identical_event_indices_reject() {
-        let mut config = PairwiseInteractionConfig::default();
-        config.window_size_frames = 16;
-        config.hop_size_frames = 8;
         assert_eq!(
             validate_source_pair(3, 3, 4),
             Err(PairwiseInteractionError::SameSourceEvent)
