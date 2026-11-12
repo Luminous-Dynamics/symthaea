@@ -1319,7 +1319,9 @@ mod tests {
             &counterfactual_wav,
         );
 
-        let renderer_profile_digest_for_test_placeholder = crate::renderer_execution_receipt::sha256_hex(b"renderer profile fixture");
+        let source_score_digest = crate::renderer_execution_receipt::sha256_hex(score);
+        let baseline_schedule_digest = crate::renderer_execution_receipt::sha256_hex(baseline_schedule);
+        let counterfactual_schedule_digest = crate::renderer_execution_receipt::sha256_hex(counterfactual_schedule);
         let report = estimate_from_verified_renderer_evidence(
             native_evidence(
                 &baseline_receipt,
@@ -1346,11 +1348,11 @@ mod tests {
                 &counterfactual_wav,
             ),
             VerifiedInfluenceRequest {
-                source_score_sha256: &crate::renderer_execution_receipt::sha256_hex(score),
+                source_score_sha256: &source_score_digest,
                 source_event_id: "score_event_index:3",
                 intervention: CounterfactualIntervention::Remove,
-                baseline_schedule_sha256: &crate::renderer_execution_receipt::sha256_hex(baseline_schedule),
-                counterfactual_schedule_sha256: &crate::renderer_execution_receipt::sha256_hex(counterfactual_schedule),
+                baseline_schedule_sha256: &baseline_schedule_digest,
+                counterfactual_schedule_sha256: &counterfactual_schedule_digest,
             },
             &calibrated_config(),
         )
@@ -1398,6 +1400,9 @@ mod tests {
         let mut substituted_wav = counterfactual_wav.clone();
         substituted_wav[48] ^= 0x01;
 
+        let source_score_digest = crate::renderer_execution_receipt::sha256_hex(score);
+        let baseline_schedule_digest = crate::renderer_execution_receipt::sha256_hex(baseline_schedule);
+        let counterfactual_schedule_digest = crate::renderer_execution_receipt::sha256_hex(counterfactual_schedule);
         let error = estimate_from_verified_renderer_evidence(
             native_evidence(
                 &baseline_receipt,
@@ -1424,12 +1429,11 @@ mod tests {
                 &substituted_wav,
             ),
             VerifiedInfluenceRequest {
-                source_score_sha256: crate::renderer_execution_receipt::sha256_hex(score).leak(),
+                source_score_sha256: &source_score_digest,
                 source_event_id: "score_event_index:3",
                 intervention: CounterfactualIntervention::Remove,
-                baseline_schedule_sha256: crate::renderer_execution_receipt::sha256_hex(baseline_schedule).leak(),
-                counterfactual_schedule_sha256: crate::renderer_execution_receipt::sha256_hex(counterfactual_schedule).leak(),
-                renderer_profile_sha256: DIGEST_A,
+                baseline_schedule_sha256: &baseline_schedule_digest,
+                counterfactual_schedule_sha256: &counterfactual_schedule_digest,
             },
             &calibrated_config(),
         )
