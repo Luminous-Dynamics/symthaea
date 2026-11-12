@@ -17,8 +17,15 @@
 //! named by `SYMTHAEA_SOUNDFONT`. The Muse Studio launcher provides both
 //! via `nix-shell`.
 
+use sha2::{Digest, Sha256};
+use std::ffi::{OsStr, OsString};
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+const PROCESS_DIAGNOSTIC_PREVIEW_BYTES: usize = 4096;
+static FLUID_OUTPUT_NONCE: AtomicU64 = AtomicU64::new(0);
 
 /// The consciousness-state color mapped into FluidSynth settings — so the
 /// Studio's state sliders keep DOING something under the soundfont
@@ -101,79 +108,378 @@ pub fn available() -> Option<(PathBuf, PathBuf)> {
     Some((binary, soundfont))
 }
 
-/// Render a Standard MIDI File to MASTERED 16-bit stereo WAV bytes via
-/// FluidSynth. Returns `None` (caller falls back to the native renderer) when
-/// the environment lacks fluidsynth/soundfont, the render fails, or the result
-/// is silent.
+/// Captured local observation of one FluidSynth child-process invocation.
 ///
-/// FluidSynth's default gain (0.2) leaves our deliberately-soft velocities
-/// whisper-quiet, so the render runs at gain 0.8 and the PCM then goes through
-/// [`master_wav`] — the same BS.1770-4 chain and the same
-/// [`crate::auto_master::MasteringConfig`] the native path uses, so the two
-/// renderers are post-processed identically.
+/// The complete stdout/stderr streams are committed by digest; only bounded
+/// previews are retained in receipts. Executable and SoundFont hashes are
+/// measured on both sides of the invocation. Matching pre/post hashes detect
+/// ordinary replacement races, but do not attest which inode or pages the
+/// kernel actually loaded and do not defend against a privileged/malicious host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FluidSynthRenderObservation {
+    pub executable_path: PathBuf,
+    pub soundfont_path: PathBuf,
+    pub midi_path: PathBuf,
+    pub executable_sha256_before: String,
+    pub executable_sha256_after: String,
+    pub soundfont_sha256_before: String,
+    pub soundfont_sha256_after: String,
+    pub midi_sha256_before: String,
+    pub midi_sha256_after: String,
+    /// Ordered argv excluding argv[0], which is executable_path.
+    pub arguments: Vec<String>,
+    /// Digest of the exact environment snapshot explicitly passed to the child.
+    /// Values are not persisted because process environments can contain secrets.
+    pub environment_sha256: String,
+    pub stdout_sha256: String,
+    pub stderr_sha256: String,
+    pub stdout_preview: String,
+    pub stderr_preview: String,
+    pub stdout_truncated: bool,
+    pub stderr_truncated: bool,
+    /// None means the process could not be started or did not report an exit code.
+    pub exit_code: Option<i32>,
+    pub spawn_error: Option<String>,
+    /// Digest of the final mastered WAV when the complete render succeeded.
+    pub mastered_wav_sha256: Option<String>,
+    /// Present only after exit 0, stable executable/assets and successful mastering.
+    pub mastered_wav_bytes: Option<Vec<u8>>,
+}
+
+fn sha256_hex(bytes: &[u8]) -> String {
+    format!("{:x}", Sha256::digest(bytes))
+}
+
+fn sha256_file(path: &Path) -> Option<String> {
+    let mut file = std::fs::File::open(path).ok()?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let count = file.read(&mut buffer).ok()?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+    }
+    Some(format!("{:x}", hasher.finalize()))
+}
+
+#[cfg(unix)]
+fn os_str_bytes(value: &OsStr) -> Vec<u8> {
+    use std::os::unix::ffi::OsStrExt;
+    value.as_bytes().to_vec()
+}
+
+#[cfg(windows)]
+fn os_str_bytes(value: &OsStr) -> Vec<u8> {
+    use std::os::windows::ffi::OsStrExt;
+    value.encode_wide().flat_map(|unit| unit.to_le_bytes()).collect()
+}
+
+#[cfg(not(any(unix, windows)))]
+fn os_str_bytes(value: &OsStr) -> Vec<u8> {
+    value.to_string_lossy().as_bytes().to_vec()
+}
+
+/// Only pass the runtime variables FluidSynth and its dynamic loader need.
+/// In particular, credentials and unrelated application secrets are never
+/// inherited by the child process. The digest commits to this exact allowlist.
+const CHILD_ENV_ALLOWLIST: [&str; 8] = [
+    "PATH",
+    "HOME",
+    "LANG",
+    "LC_ALL",
+    "LD_LIBRARY_PATH",
+    "XDG_CONFIG_HOME",
+    "TMPDIR",
+    "TEMP",
+];
+
+fn filter_child_environment(
+    entries: impl IntoIterator<Item = (OsString, OsString)>,
+) -> Vec<(OsString, OsString)> {
+    let mut environment: Vec<(OsString, OsString)> = entries
+        .into_iter()
+        .filter(|(key, _)| {
+            CHILD_ENV_ALLOWLIST
+                .iter()
+                .any(|allowed| key == OsStr::new(allowed))
+        })
+        .collect();
+    environment.sort_by(|left, right| left.0.cmp(&right.0));
+    environment
+}
+
+fn snapshot_environment() -> Vec<(OsString, OsString)> {
+    filter_child_environment(std::env::vars_os())
+}
+
+fn environment_sha256(environment: &[(OsString, OsString)]) -> String {
+    let mut ordered = environment.to_vec();
+    ordered.sort_by(|left, right| left.0.cmp(&right.0));
+    let mut hasher = Sha256::new();
+    hasher.update(b"muse-fluidsynth-child-environment-v1\0");
+    for (key, value) in ordered {
+        let key = os_str_bytes(&key);
+        let value = os_str_bytes(&value);
+        hasher.update((key.len() as u64).to_le_bytes());
+        hasher.update(key);
+        hasher.update((value.len() as u64).to_le_bytes());
+        hasher.update(value);
+    }
+    format!("{:x}", hasher.finalize())
+}
+
+fn diagnostic_preview(bytes: &[u8]) -> (String, bool) {
+    let visible = bytes.len().min(PROCESS_DIAGNOSTIC_PREVIEW_BYTES);
+    (
+        String::from_utf8_lossy(&bytes[..visible]).into_owned(),
+        bytes.len() > PROCESS_DIAGNOSTIC_PREVIEW_BYTES,
+    )
+}
+
+#[derive(Debug)]
+struct CapturedDiagnostic {
+    sha256: String,
+    preview: String,
+    truncated: bool,
+}
+
+/// Hash an entire child stream incrementally while retaining only a bounded
+/// diagnostic prefix. Memory use is O(preview cap), independent of log size.
+fn capture_diagnostic<R: Read>(mut reader: R) -> std::io::Result<CapturedDiagnostic> {
+    let mut hasher = Sha256::new();
+    let mut preview = Vec::with_capacity(PROCESS_DIAGNOSTIC_PREVIEW_BYTES);
+    let mut truncated = false;
+    let mut buffer = [0_u8; 16 * 1024];
+
+    loop {
+        let count = reader.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        hasher.update(&buffer[..count]);
+
+        let remaining = PROCESS_DIAGNOSTIC_PREVIEW_BYTES.saturating_sub(preview.len());
+        let retained = remaining.min(count);
+        preview.extend_from_slice(&buffer[..retained]);
+        if retained < count {
+            truncated = true;
+        }
+    }
+
+    Ok(CapturedDiagnostic {
+        sha256: format!("{:x}", hasher.finalize()),
+        preview: String::from_utf8_lossy(&preview).into_owned(),
+        truncated,
+    })
+}
+
+fn empty_captured_diagnostic() -> CapturedDiagnostic {
+    CapturedDiagnostic {
+        sha256: sha256_hex(&[]),
+        preview: String::new(),
+        truncated: false,
+    }
+}
+
+/// Execute FluidSynth and return the process observation even when the child
+/// exits unsuccessfully. No shell is involved: the executable and ordered
+/// argument vector are passed directly to Command. The child receives an
+/// explicit snapshot of the parent environment, and that snapshot is hashed.
+/// A missing executable/SoundFont or an unrecordable non-UTF-8 argv returns
+/// None; a spawn/exit/render failure is represented in the returned observation.
+pub fn render_midi_to_wav_observed(
+    midi_path: &Path,
+    sample_rate: u32,
+    color: Option<RenderColor>,
+) -> Option<FluidSynthRenderObservation> {
+    let (binary, soundfont) = available()?;
+    let environment = snapshot_environment();
+    render_midi_to_wav_observed_with_paths(
+        midi_path,
+        sample_rate,
+        color,
+        &binary,
+        &soundfont,
+        &environment,
+    )
+}
+
+/// Execute against explicitly selected paths/environment. Kept private for
+/// production use, but provides a deterministic seam for hostile fake-child
+/// tests without mutating process-global environment variables.
+fn render_midi_to_wav_observed_with_paths(
+    midi_path: &Path,
+    sample_rate: u32,
+    color: Option<RenderColor>,
+    binary: &Path,
+    soundfont: &Path,
+    environment: &[(OsString, OsString)],
+) -> Option<FluidSynthRenderObservation> {
+    let binary = binary.canonicalize().ok()?;
+    let soundfont = soundfont.canonicalize().ok()?;
+    let midi_path = midi_path.canonicalize().ok()?;
+
+    let executable_sha256_before = sha256_file(&binary)?;
+    let soundfont_sha256_before = sha256_file(&soundfont)?;
+    let midi_sha256_before = sha256_file(&midi_path)?;
+    let environment = filter_child_environment(environment.iter().cloned());
+    let environment_sha256 = environment_sha256(&environment);
+
+    let nonce = FLUID_OUTPUT_NONCE.fetch_add(1, Ordering::Relaxed);
+    let out = std::env::temp_dir().join(format!(
+        "muse_fluid_{}_{}.wav",
+        std::process::id(),
+        nonce
+    ));
+
+    let mut arguments = Vec::<OsString>::new();
+    if let Some(c) = color {
+        arguments.push(OsString::from("-o"));
+        arguments.push(OsString::from(format!(
+            "synth.reverb.room-size={:.3}",
+            c.reverb_room.clamp(0.0, 1.0)
+        )));
+        arguments.push(OsString::from("-o"));
+        arguments.push(OsString::from(format!(
+            "synth.reverb.level={:.3}",
+            c.reverb_level.clamp(0.0, 1.0)
+        )));
+        arguments.push(OsString::from("-o"));
+        arguments.push(OsString::from(format!(
+            "synth.reverb.damp={:.3}",
+            c.reverb_damp.clamp(0.0, 1.0)
+        )));
+        if c.chorus_level > 0.05 {
+            arguments.push(OsString::from("-o"));
+            arguments.push(OsString::from(format!(
+                "synth.chorus.level={:.3}",
+                c.chorus_level.clamp(0.0, 10.0)
+            )));
+        } else {
+            arguments.push(OsString::from("-o"));
+            arguments.push(OsString::from("synth.chorus.active=0"));
+        }
+    }
+    arguments.extend([
+        OsString::from("-g"),
+        OsString::from("0.8"),
+        OsString::from("-T"),
+        OsString::from("wav"),
+        OsString::from("-F"),
+        out.as_os_str().to_owned(),
+        OsString::from("-r"),
+        OsString::from(sample_rate.to_string()),
+        OsString::from("-ni"),
+        soundfont.as_os_str().to_owned(),
+        midi_path.as_os_str().to_owned(),
+    ]);
+    // A receipt must be able to state the exact argument strings. Refuse
+    // platform paths that cannot be represented losslessly as UTF-8.
+    let argument_strings: Vec<String> = arguments
+        .iter()
+        .map(|argument| argument.to_str().map(str::to_owned))
+        .collect::<Option<Vec<_>>>()?;
+
+    let mut command = Command::new(&binary);
+    command
+        .args(&arguments)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .env_clear();
+    for (key, value) in &environment {
+        command.env(key, value);
+    }
+
+    // Drain stdout and stderr concurrently. Command::output() would retain
+    // unbounded diagnostic buffers in memory even though the receipt only
+    // needs a digest and bounded preview.
+    let (stdout_capture, stderr_capture, exit_code, spawn_error) = match command.spawn() {
+        Err(error) => (
+            empty_captured_diagnostic(),
+            empty_captured_diagnostic(),
+            None,
+            Some(error.to_string()),
+        ),
+        Ok(mut child) => {
+            let stdout = child.stdout.take()?;
+            let stderr = child.stderr.take()?;
+            let stdout_reader = std::thread::spawn(move || capture_diagnostic(stdout));
+            let stderr_reader = std::thread::spawn(move || capture_diagnostic(stderr));
+            let status_result = child.wait();
+
+            let stdout_capture = stdout_reader.join().ok()?.ok()?;
+            let stderr_capture = stderr_reader.join().ok()?.ok()?;
+            match status_result {
+                Ok(status) => (stdout_capture, stderr_capture, status.code(), None),
+                Err(error) => (
+                    stdout_capture,
+                    stderr_capture,
+                    None,
+                    Some(error.to_string()),
+                ),
+            }
+        }
+    };
+
+    let executable_sha256_after = sha256_file(&binary).unwrap_or_default();
+    let soundfont_sha256_after = sha256_file(&soundfont).unwrap_or_default();
+    let midi_sha256_after = sha256_file(&midi_path).unwrap_or_default();
+
+    // The exact input file must remain unchanged through the child invocation.
+    // This is a before/after content check, not proof of which inode/pages the
+    // child loaded if an attacker changes and restores the path between reads.
+    let artifacts_stable = !executable_sha256_after.is_empty()
+        && !soundfont_sha256_after.is_empty()
+        && !midi_sha256_after.is_empty()
+        && executable_sha256_before == executable_sha256_after
+        && soundfont_sha256_before == soundfont_sha256_after
+        && midi_sha256_before == midi_sha256_after;
+    let mastered_wav_bytes = if exit_code == Some(0) && spawn_error.is_none() && artifacts_stable {
+        master_wav(&out)
+    } else {
+        None
+    };
+    let mastered_wav_sha256 = mastered_wav_bytes
+        .as_ref()
+        .map(|bytes| sha256_hex(bytes));
+    let _ = std::fs::remove_file(&out);
+
+    Some(FluidSynthRenderObservation {
+        executable_path: binary,
+        soundfont_path: soundfont,
+        midi_path,
+        executable_sha256_before,
+        executable_sha256_after,
+        soundfont_sha256_before,
+        soundfont_sha256_after,
+        midi_sha256_before,
+        midi_sha256_after,
+        arguments: argument_strings,
+        environment_sha256,
+        stdout_sha256: stdout_capture.sha256,
+        stderr_sha256: stderr_capture.sha256,
+        stdout_preview: stdout_capture.preview,
+        stderr_preview: stderr_capture.preview,
+        stdout_truncated: stdout_capture.truncated,
+        stderr_truncated: stderr_capture.truncated,
+        exit_code,
+        spawn_error,
+        mastered_wav_sha256,
+        mastered_wav_bytes,
+    })
+}
+
+/// Backward-compatible convenience wrapper. Evidence-bearing callers should
+/// use render_midi_to_wav_observed and retain its process observation.
 pub fn render_midi_to_wav(
     midi_path: &Path,
     sample_rate: u32,
     color: Option<RenderColor>,
 ) -> Option<Vec<u8>> {
-    let (binary, soundfont) = available()?;
-    let out = std::env::temp_dir().join(format!(
-        "muse_fluid_{}_{}.wav",
-        std::process::id(),
-        midi_path
-            .file_stem()
-            .and_then(|s| s.to_str())
-            .unwrap_or("render")
-    ));
-    let mut cmd = Command::new(&binary);
-    if let Some(c) = color {
-        cmd.arg("-o")
-            .arg(format!(
-                "synth.reverb.room-size={:.3}",
-                c.reverb_room.clamp(0.0, 1.0)
-            ))
-            .arg("-o")
-            .arg(format!(
-                "synth.reverb.level={:.3}",
-                c.reverb_level.clamp(0.0, 1.0)
-            ))
-            .arg("-o")
-            .arg(format!(
-                "synth.reverb.damp={:.3}",
-                c.reverb_damp.clamp(0.0, 1.0)
-            ));
-        if c.chorus_level > 0.05 {
-            cmd.arg("-o").arg(format!(
-                "synth.chorus.level={:.3}",
-                c.chorus_level.clamp(0.0, 10.0)
-            ));
-        } else {
-            cmd.arg("-o").arg("synth.chorus.active=0");
-        }
-    }
-    let status = cmd
-        .arg("-g")
-        .arg("0.8")
-        .arg("-T")
-        .arg("wav")
-        .arg("-F")
-        .arg(&out)
-        .arg("-r")
-        .arg(sample_rate.to_string())
-        .arg("-ni")
-        .arg(&soundfont)
-        .arg(midi_path)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .ok()?;
-    if !status.success() {
-        let _ = std::fs::remove_file(&out);
-        return None;
-    }
-    let result = master_wav(&out);
-    let _ = std::fs::remove_file(&out);
-    result
+    render_midi_to_wav_observed(midi_path, sample_rate, color)
+        .and_then(|observation| observation.mastered_wav_bytes)
 }
 
 /// Read a WAV, run the full mastering chain, re-encode as 16-bit in memory.
@@ -269,6 +575,49 @@ fn master_wav(path: &Path) -> Option<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn child_environment_commitment_is_order_independent_and_content_sensitive() {
+        let first = vec![
+            (OsString::from("A"), OsString::from("one")),
+            (OsString::from("B"), OsString::from("two")),
+        ];
+        let reordered = vec![
+            (OsString::from("B"), OsString::from("two")),
+            (OsString::from("A"), OsString::from("one")),
+        ];
+        let changed = vec![
+            (OsString::from("A"), OsString::from("changed")),
+            (OsString::from("B"), OsString::from("two")),
+        ];
+        assert_eq!(environment_sha256(&first), environment_sha256(&reordered));
+        assert_ne!(environment_sha256(&first), environment_sha256(&changed));
+    }
+
+    #[test]
+    fn child_diagnostic_capture_hashes_full_stream_with_bounded_memory() {
+        let bytes = vec![b'z'; PROCESS_DIAGNOSTIC_PREVIEW_BYTES * 8 + 19];
+        let captured = capture_diagnostic(std::io::Cursor::new(&bytes)).unwrap();
+        assert_eq!(captured.sha256, sha256_hex(&bytes));
+        assert_eq!(captured.preview.len(), PROCESS_DIAGNOSTIC_PREVIEW_BYTES);
+        assert!(captured.truncated);
+
+        let empty = capture_diagnostic(std::io::empty()).unwrap();
+        assert_eq!(empty.sha256, sha256_hex(&[]));
+        assert!(empty.preview.is_empty());
+        assert!(!empty.truncated);
+    }
+
+    #[test]
+    fn child_diagnostic_preview_is_bounded_and_marks_truncation() {
+        let bytes = vec![b'x'; PROCESS_DIAGNOSTIC_PREVIEW_BYTES + 7];
+        let (preview, truncated) = diagnostic_preview(&bytes);
+        assert_eq!(preview.len(), PROCESS_DIAGNOSTIC_PREVIEW_BYTES);
+        assert!(truncated);
+        let (full, truncated) = diagnostic_preview(b"renderer ok");
+        assert_eq!(full, "renderer ok");
+        assert!(!truncated);
+    }
 
     #[cfg(feature = "theory")]
     #[test]
@@ -387,5 +736,212 @@ mod tests {
         w.finalize().unwrap();
         assert!(master_wav(&silent).is_none());
         std::fs::remove_file(&silent).ok();
+    }
+
+
+    #[cfg(unix)]
+    mod fake_child_tests {
+        use super::*;
+        use std::os::unix::fs::PermissionsExt;
+
+        fn unique_path(extension: &str) -> PathBuf {
+            let nonce = FLUID_OUTPUT_NONCE.fetch_add(1, Ordering::Relaxed);
+            std::env::temp_dir().join(format!(
+                "muse-fluid-observed-{}-{nonce}.{extension}",
+                std::process::id()
+            ))
+        }
+
+        fn shell_quote(path: &Path) -> String {
+            let value = path.to_string_lossy();
+            format!("'{}'", value.replace('\'', "'\"'\"'"))
+        }
+
+        fn write_test_wav(path: &Path) {
+            let spec = hound::WavSpec {
+                channels: 2,
+                sample_rate: 48_000,
+                bits_per_sample: 16,
+                sample_format: hound::SampleFormat::Int,
+            };
+            let mut writer = hound::WavWriter::create(path, spec).unwrap();
+            for frame in 0..4_800 {
+                let sample = ((frame as f32 * 0.071).sin() * 0.12 * i16::MAX as f32) as i16;
+                writer.write_sample(sample).unwrap();
+                writer.write_sample(sample).unwrap();
+            }
+            writer.finalize().unwrap();
+        }
+
+        fn write_fake_executable(body: &str, executable: bool) -> PathBuf {
+            let path = unique_path("sh");
+            std::fs::write(&path, format!("#!/bin/sh\nset -eu\n{body}\n")).unwrap();
+            let mut permissions = std::fs::metadata(&path).unwrap().permissions();
+            permissions.set_mode(if executable { 0o755 } else { 0o644 });
+            std::fs::set_permissions(&path, permissions).unwrap();
+            path
+        }
+
+        fn fake_inputs() -> (PathBuf, PathBuf, PathBuf) {
+            let midi = unique_path("mid");
+            let soundfont = unique_path("sf2");
+            let wav = unique_path("wav");
+            std::fs::write(&midi, b"MThd-fixture-midi").unwrap();
+            std::fs::write(&soundfont, b"fake-soundfont-bytes").unwrap();
+            write_test_wav(&wav);
+            (midi, soundfont, wav)
+        }
+
+        fn cleanup(paths: &[&Path]) {
+            for path in paths {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+
+        fn run_fake(
+            midi: &Path,
+            soundfont: &Path,
+            binary: &Path,
+        ) -> FluidSynthRenderObservation {
+            let environment = snapshot_environment();
+            render_midi_to_wav_observed_with_paths(
+                midi,
+                48_000,
+                None,
+                binary,
+                soundfont,
+                &environment,
+            )
+            .expect("all fake fixture paths are present and canonicalizable")
+        }
+
+        fn parse_output_and_font_body(copy_from: &Path) -> String {
+            format!(
+                "output=''\nfont=''\nprevious=''\nfor arg in \"$@\"; do\n  if [ \"$previous\" = '-F' ]; then output=\"$arg\"; fi\n  if [ \"$previous\" = '-ni' ]; then font=\"$arg\"; fi\n  previous=\"$arg\"\ndone\nprintf 'fake renderer stdout\\n'\nprintf 'fake renderer stderr\\n' >&2\n/bin/cp {} \"$output\"",
+                shell_quote(copy_from)
+            )
+        }
+
+        #[test]
+        fn child_receipt_binds_exact_midi_and_keeps_only_allowlisted_environment() {
+            let (midi, soundfont, wav) = fake_inputs();
+            let script = write_fake_executable(&parse_output_and_font_body(&wav), true);
+            let observation = run_fake(&midi, &soundfont, &script);
+            assert_eq!(observation.exit_code, Some(0));
+            assert!(observation.spawn_error.is_none());
+            assert!(observation.mastered_wav_bytes.is_some());
+            assert_eq!(observation.midi_sha256_before, observation.midi_sha256_after);
+            assert!(observation.stdout_preview.contains("fake renderer stdout"));
+            assert!(observation.stderr_preview.contains("fake renderer stderr"));
+            assert!(!observation.arguments.is_empty());
+            assert_eq!(observation.environment_sha256.len(), 64);
+            assert_eq!(
+                observation.executable_sha256_before,
+                observation.executable_sha256_after
+            );
+            assert_eq!(
+                observation.soundfont_sha256_before,
+                observation.soundfont_sha256_after
+            );
+            cleanup(&[&midi, &soundfont, &wav, &script]);
+        }
+
+        #[test]
+        fn nonzero_child_exit_preserves_diagnostics_and_no_wav() {
+            let (midi, soundfont, wav) = fake_inputs();
+            let script = write_fake_executable("printf 'expected failure\\n' >&2\nexit 23", true);
+            let observation = run_fake(&midi, &soundfont, &script);
+            assert_eq!(observation.exit_code, Some(23));
+            assert!(observation.spawn_error.is_none());
+            assert!(observation.mastered_wav_bytes.is_none());
+            assert!(observation.stderr_preview.contains("expected failure"));
+            cleanup(&[&midi, &soundfont, &wav, &script]);
+        }
+
+        #[test]
+        fn midi_changed_during_child_execution_never_produces_audio() {
+            let (midi, soundfont, wav) = fake_inputs();
+            let body = "last=''\nfor arg in \"$@\"; do last=\"$arg\"; done\nprintf 'substituted-midi' > \"$last\"\nexit 0";
+            let script = write_fake_executable(body, true);
+            let observation = run_fake(&midi, &soundfont, &script);
+            assert_eq!(observation.exit_code, Some(0));
+            assert_ne!(observation.midi_sha256_before, observation.midi_sha256_after);
+            assert!(observation.mastered_wav_bytes.is_none());
+            cleanup(&[&midi, &soundfont, &wav, &script]);
+        }
+
+        #[test]
+        fn soundfont_changed_during_child_execution_never_produces_audio() {
+            let (midi, soundfont, wav) = fake_inputs();
+            let body = format!(
+                "output=''\nfont=''\nprevious=''\nfor arg in \"$@\"; do\n  if [ \"$previous\" = '-F' ]; then output=\"$arg\"; fi\n  if [ \"$previous\" = '-ni' ]; then font=\"$arg\"; fi\n  previous=\"$arg\"\ndone\nprintf 'substituted-soundfont' > \"$font\"\n/bin/cp {} \"$output\"",
+                shell_quote(&wav)
+            );
+            let script = write_fake_executable(&body, true);
+            let observation = run_fake(&midi, &soundfont, &script);
+            assert_eq!(observation.exit_code, Some(0));
+            assert_ne!(
+                observation.soundfont_sha256_before,
+                observation.soundfont_sha256_after
+            );
+            assert!(observation.mastered_wav_bytes.is_none());
+            cleanup(&[&midi, &soundfont, &wav, &script]);
+        }
+
+        #[test]
+        fn successful_exit_without_output_is_not_successful_render() {
+            let (midi, soundfont, wav) = fake_inputs();
+            let script = write_fake_executable(":", true);
+            let observation = run_fake(&midi, &soundfont, &script);
+            assert_eq!(observation.exit_code, Some(0));
+            assert!(observation.mastered_wav_bytes.is_none());
+            cleanup(&[&midi, &soundfont, &wav, &script]);
+        }
+
+        #[test]
+        fn spawn_failure_is_retained_as_observation() {
+            let (midi, soundfont, wav) = fake_inputs();
+            let script = write_fake_executable("exit 0", false);
+            let observation = run_fake(&midi, &soundfont, &script);
+            assert!(observation.exit_code.is_none());
+            assert!(observation.spawn_error.is_some());
+            assert!(observation.mastered_wav_bytes.is_none());
+            cleanup(&[&midi, &soundfont, &wav, &script]);
+        }
+
+        #[test]
+        fn long_stderr_is_drained_without_unbounded_preview() {
+            let (midi, soundfont, wav) = fake_inputs();
+            let body = format!(
+                "output=''\nprevious=''\nfor arg in \"$@\"; do\n  if [ \"$previous\" = '-F' ]; then output=\"$arg\"; fi\n  previous=\"$arg\"\ndone\ni=0\nwhile [ $i -lt 2000 ]; do printf 'x1234567890\\n' >&2; i=$((i+1)); done\n/bin/cp {} \"$output\"",
+                shell_quote(&wav)
+            );
+            let script = write_fake_executable(&body, true);
+            let observation = run_fake(&midi, &soundfont, &script);
+            assert_eq!(observation.exit_code, Some(0));
+            assert!(observation.mastered_wav_bytes.is_some());
+            assert!(observation.stderr_truncated);
+            assert_eq!(observation.stderr_sha256.len(), 64);
+            cleanup(&[&midi, &soundfont, &wav, &script]);
+        }
+
+        #[test]
+        fn child_environment_filter_never_passes_unrelated_secrets() {
+            let entries = vec![
+                (OsString::from("PATH"), OsString::from("/usr/bin")),
+                (OsString::from("OPENAI_API_KEY"), OsString::from("secret")),
+                (OsString::from("DEEPSEEK_API_KEY"), OsString::from("secret")),
+                (OsString::from("LD_LIBRARY_PATH"), OsString::from("/nix/store/lib")),
+            ];
+            let filtered = filter_child_environment(entries);
+            let names: Vec<String> = filtered
+                .iter()
+                .map(|(key, _)| key.to_string_lossy().into_owned())
+                .collect();
+            assert!(names.contains(&"PATH".to_owned()));
+            assert!(names.contains(&"LD_LIBRARY_PATH".to_owned()));
+            assert!(!names.contains(&"OPENAI_API_KEY".to_owned()));
+            assert!(!names.contains(&"DEEPSEEK_API_KEY".to_owned()));
+        }
     }
 }
