@@ -1,0 +1,252 @@
+{
+  "schema_version": "luminous.industry-benchmark-validity-register.v0.1",
+  "snapshot_date": "2026-11-13",
+  "purpose": "Source-qualified external benchmark and standards anchors for cross-vendor comparison. The register records reported claims and validity limitations; it contains no Luminous candidate results.",
+  "status_vocabulary": {
+    "provider_or_paper_reported": "Claim/result reported by the named organization or authors; not independently reproduced by Luminous.",
+    "independent_benchmark_review": "External evaluator's methodology assessment; does not automatically apply to later benchmark revisions.",
+    "normative_standard": "Published standard or Recommendation; not a performance score.",
+    "field_demonstration": "Physical system field result under the exact published workload, site and measurement boundary.",
+    "active_leaderboard_snapshot": "Time-sensitive leaderboard snapshot, including model + harness configuration; recheck before use."
+  },
+  "entries": [
+    {
+      "id": "swe-bench-pro-v2",
+      "domain": "software_engineering",
+      "title": "SWE-Bench Pro V2: A Cleaner, Harder-to-Game Coding Benchmark",
+      "revision": "arXiv:2610.24206, 2026-10-16",
+      "evidence_class": "provider_or_paper_reported",
+      "reported_metrics": {
+        "revised_tasks": 642,
+        "original_tasks": 731,
+        "repaired_or_retired": 480,
+        "engineer_hours": 404,
+        "professional_engineers": 23,
+        "hard_split_tasks": 51,
+        "maximum_reported_resolution_rate_percent": 99.4,
+        "hard_split_reported_range_percent": [
+          52.9,
+          98
+        ]
+      },
+      "methodology_facts": [
+        "Agentic audits, expert adjudication and blind re-implementation were used to repair or retire 480 of 731 tasks.",
+        "Hardened protocol restricts network access to the model endpoint and re-grades patches in a clean container."
+      ],
+      "limitations": [
+        "Results are paper-reported; no independent Luminous replication.",
+        "The 99.4% maximum applies to the reported 642-task V2 public set and may be near saturation; the 51-task Hard split is a separate cohort.",
+        "Do not compare V1 and V2 scores as if the task sets and protocols were identical."
+      ],
+      "recommended_use": "Replicate exact V2 revision, report public and Hard split separately, and add fresh repository-heldout tasks for generalization.",
+      "source": "https://arxiv.org/abs/2610.24206"
+    },
+    {
+      "id": "terminal-bench-4-1",
+      "domain": "computer_use_and_agentic_work",
+      "title": "Terminal-Bench 4.1 current leaderboard snapshot",
+      "revision": "4.1, accessed 2026-11-13",
+      "evidence_class": "active_leaderboard_snapshot",
+      "reported_metrics": [
+        {
+          "rank": 1,
+          "system": "Opus 5.5 (max) + Claude Code",
+          "resolution_percent": 65.8,
+          "uncertainty_percent": 3.1,
+          "reported_model_release_date": "2026-09-22"
+        },
+        {
+          "rank": 2,
+          "system": "Sonnet 5.5 (max) + Claude Code",
+          "resolution_percent": 63.9,
+          "uncertainty_percent": 3,
+          "reported_model_release_date": "2026-09-28"
+        },
+        {
+          "rank": 3,
+          "system": "GPT-6.1 Sol (max) + Codex",
+          "resolution_percent": 60.9,
+          "uncertainty_percent": 3,
+          "reported_model_release_date": "2026-09-29"
+        },
+        {
+          "rank": 4,
+          "system": "GPT-6 Astra (max) + Codex",
+          "resolution_percent": 60.3,
+          "uncertainty_percent": 2.8,
+          "reported_model_release_date": "2026-09-03"
+        }
+      ],
+      "methodology_facts": [
+        "Rows identify model + agent/harness configurations.",
+        "Terminal-Bench 4.0 release notes describe resource calibration, task fixes and removal of saturated tasks."
+      ],
+      "limitations": [
+        "Leaderboard snapshot is time-sensitive and must be rechecked before a comparison.",
+        "Scores are system configurations, not model-only capability.",
+        "Do not infer cross-domain capability from terminal tasks."
+      ],
+      "recommended_use": "Pin the exact 4.1 task and harness revision; compare cost, tokens, wall time and system configuration, not only resolution rate.",
+      "sources": [
+        "https://www.tbench.ai/",
+        "https://www.tbench.ai/news/terminal-bench-4-0"
+      ]
+    },
+    {
+      "id": "terminal-bench-4-0-independent-review",
+      "domain": "benchmark_validity",
+      "title": "Epoch AI review of Terminal-Bench 4.0.0",
+      "revision": "Reviewed 2026-09-04",
+      "evidence_class": "independent_benchmark_review",
+      "reported_metrics": {
+        "tasks": 66,
+        "tasks_with_noted_scoring_defects": 30,
+        "share_percent": 45.5,
+        "verdict": "Flawed"
+      },
+      "limitations": [
+        "The review concerns version 4.0.0 specifically.",
+        "Do not transfer the 30/66 finding automatically to later 4.1 tasks.",
+        "A noted scoring defect does not necessarily have equal severity across tasks."
+      ],
+      "recommended_use": "Re-audit the current benchmark revision and preserve task-level verifier defect reports.",
+      "source": "https://epoch.ai/benchmarks/terminal-bench-4/review"
+    },
+    {
+      "id": "robot-manipulation-benchmark-audit",
+      "domain": "robotics",
+      "title": "What Are We Actually Benchmarking in Robot Manipulation?",
+      "revision": "arXiv:2606.04233, 2026-06-02; CoRL 2026 oral listing",
+      "evidence_class": "independent_benchmark_review",
+      "reported_metrics": {
+        "diagnostics": [
+          "shortcut_solvability",
+          "statistical_significance",
+          "creeping_overfitting",
+          "data_source_dependence"
+        ],
+        "benchmark_families": [
+          "LIBERO",
+          "CALVIN",
+          "SimplerEnv",
+          "RoboCasa",
+          "RoboTwin 2.0"
+        ]
+      },
+      "methodology_facts": [
+        "Authors report that LIBERO and CALVIN fail multiple diagnostics, while RoboCasa and RoboTwin 2.0 fail fewer under their audit.",
+        "The audit includes a 0.09B probe without a language encoder that scores near reported SOTA on LIBERO."
+      ],
+      "limitations": [
+        "This is a methodological audit, not a new physical-robot performance leaderboard.",
+        "Findings should be applied to exact benchmark versions and protocols; they do not imply every later benchmark release is invalid."
+      ],
+      "recommended_use": "Run shortcut probes, held-out data-source tests, within-distribution perturbations, adequate repeated trials and real-hardware transfer checks.",
+      "source": "https://arxiv.org/abs/2606.04233"
+    },
+    {
+      "id": "nature-energy-datacentre-flexibility",
+      "domain": "datacentre_operations",
+      "title": "AI data centres as grid-interactive assets",
+      "revision": "Nature Energy, DOI 10.1038/s41560-025-01927-1",
+      "evidence_class": "field_demonstration",
+      "reported_metrics": {
+        "gpu_cluster_size": 256,
+        "power_reduction_percent": 25,
+        "duration_hours": 3,
+        "storage_or_hardware_modification": false,
+        "qos": "maintained under the study's declared AI quality-of-service guarantees"
+      },
+      "limitations": [
+        "Result is specific to the studied Phoenix facility, cluster, workloads, controls and measurement boundary.",
+        "It is not a universal flexibility target and does not demonstrate every facility can defer the same share of demand.",
+        "Grid-facing power reduction must be separated from whole-facility energy per completed work and rebound."
+      ],
+      "recommended_use": "Treat as a field replication envelope; match hardware/workload/QoS/measurement and report whole-facility energy, rebound and opportunity cost.",
+      "source": "https://doi.org/10.1038/s41560-025-01927-1"
+    },
+    {
+      "id": "nist-ir-8536",
+      "domain": "manufacturing_traceability",
+      "title": "Supply Chain Traceability: A Manufacturing Meta-Framework",
+      "revision": "NIST IR 8536 final, 2026-09-09",
+      "evidence_class": "normative_standard",
+      "reported_metrics": null,
+      "methodology_facts": [
+        "Defines an industry-neutral meta-framework for organizing, linking and querying supply-chain traceability data across diverse ecosystems.",
+        "Emphasizes cryptographic links, interoperability, selective disclosure and continued use of existing standards."
+      ],
+      "limitations": [
+        "This is a meta-framework/report, not product certification or a single mandatory API.",
+        "NIST's announced Python reference implementation was still undergoing final review at publication."
+      ],
+      "recommended_use": "Use as a mapping and design reference; test interoperability against independent existing standards implementations.",
+      "source": "https://csrc.nist.gov/pubs/ir/8536/final"
+    },
+    {
+      "id": "gs1-epcis-2-0-1",
+      "domain": "manufacturing_traceability",
+      "title": "GS1 EPCIS / CBV 2.0.1 normative artefacts",
+      "revision": "2.0.1",
+      "evidence_class": "normative_standard",
+      "reported_metrics": null,
+      "methodology_facts": [
+        "Provides event semantics and normative JSON-LD context, REST/OpenAPI interfaces, query schema and JSON/JSON-LD validation artefacts."
+      ],
+      "limitations": [
+        "Standards conformance is not performance superiority.",
+        "A local checkpoint or batch field cannot be mapped by name alone; identifier granularity, business step, disposition, time and quantity semantics must be explicit."
+      ],
+      "recommended_use": "Select a bounded event profile and round-trip through an independent EPCIS implementation.",
+      "source": "https://ref.gs1.org/standards/epcis/artefacts"
+    },
+    {
+      "id": "w3c-vc-2-0",
+      "domain": "credentials_and_identity",
+      "title": "W3C Verifiable Credentials Data Model 2.0 and Data Integrity 1.0",
+      "revision": "W3C Recommendations published 2025-05-15",
+      "evidence_class": "normative_standard",
+      "reported_metrics": null,
+      "methodology_facts": [
+        "Defines a machine-verifiable, privacy-respecting credential data model and cryptographic integrity mechanisms."
+      ],
+      "limitations": [
+        "A credential does not establish that the underlying real-world statement is true.",
+        "Legacy JWT credential profiles must not be relabeled VC DM 2.0 / Data Integrity conformant without an explicit profile and tests."
+      ],
+      "recommended_use": "Pin the securing mechanism and profile; test issuer/subject binding, status, validity, disclosure and correlation.",
+      "source": "https://www.w3.org/news/2025/the-verifiable-credentials-2-0-family-of-specifications-is-now-a-w3c-recommendation/"
+    },
+    {
+      "id": "ietf-rfc-9943",
+      "domain": "supply_chain_transparency",
+      "title": "An Architecture for Trustworthy and Transparent Digital Supply Chains",
+      "revision": "RFC 9943, June 2026",
+      "evidence_class": "normative_standard",
+      "reported_metrics": null,
+      "methodology_facts": [
+        "Standards-track architecture for single-issuer signed statement transparency."
+      ],
+      "limitations": [
+        "RFC 9943 is a Proposed Standard.",
+        "Related SCITT APIs and CCF receipt-profile drafts remain in the publication pipeline and are not final RFCs as of 2026-11-13.",
+        "A local event hash or DKG claim ID is not a transparency receipt."
+      ],
+      "recommended_use": "Keep statement identity, issuer signature and independent transparency receipt as separate verified evidence.",
+      "sources": [
+        "https://www.rfc-editor.org/info/rfc9943/",
+        "https://datatracker.ietf.org/wg/scitt/documents/"
+      ]
+    }
+  ],
+  "admission_rules": [
+    "Every result must pin task revision, task universe, harness, model/provider, tools, resource limits, grader and environment.",
+    "Rerun after task, environment, resource, tool access or agent execution semantics change.",
+    "Regrade after verifier/oracle/judge semantics change when exact run artifacts remain valid.",
+    "Reuse only after metadata/non-semantic changes with unchanged benchmark, environment and grader semantics.",
+    "Keep reported, independent-review, field-demonstration and normative-standard evidence classes separate.",
+    "Do not promote provider-reported results into independent reproduction.",
+    "No weighted aggregate can compensate for critical security, authority, evidence or physical-safety failure."
+  ],
+  "claim_limit": "This register is a planning reference, not a Luminous benchmark result or a universal SOTA leaderboard."
+}
