@@ -280,9 +280,9 @@ fn validate_unique<'a>(
     Ok(())
 }
 
-fn evidence_registry<'a>(
-    records: &'a [EvidenceRecord],
-) -> Result<BTreeMap<&'a str, &'a EvidenceRecord>, AuditError> {
+fn evidence_registry(
+    records: &[EvidenceRecord],
+) -> Result<BTreeMap<&str, &EvidenceRecord>, AuditError> {
     if records.is_empty() {
         return Err(AuditError("evidence registry must not be empty".into()));
     }
@@ -295,15 +295,14 @@ fn evidence_registry<'a>(
         validate_digest(&record.source_digest, "evidence source digest")?;
         require_nonempty(&record.claim_scope, "evidence claim scope")?;
         require_nonempty(&record.rights_ref, "evidence rights reference")?;
-        if record.evidence_class == EvidenceClass::PhysicalMeasurement
-            || record.evidence_class == EvidenceClass::IndependentLaboratory
+        if (record.evidence_class == EvidenceClass::PhysicalMeasurement
+            || record.evidence_class == EvidenceClass::IndependentLaboratory)
+            && record.metrology_ref.as_deref().is_none_or(str::is_empty)
         {
-            if record.metrology_ref.as_deref().is_none_or(str::is_empty) {
-                return Err(AuditError(format!(
-                    "physical evidence {} requires a metrology reference",
-                    record.evidence_id
-                )));
-            }
+            return Err(AuditError(format!(
+                "physical evidence {} requires a metrology reference",
+                record.evidence_id
+            )));
         }
         map.insert(record.evidence_id.as_str(), record);
     }
@@ -468,12 +467,12 @@ fn validate_status(o: &CellObservation, e: &EvidenceRecord) -> Result<(), AuditE
             }
         }
     }
-    if let Some(v) = o.capacity_retention_permille {
-        if v > 1000 {
-            return Err(AuditError(
-                "capacity retention must be <=1000 permille".into(),
-            ));
-        }
+    if let Some(v) = o.capacity_retention_permille
+        && v > 1000
+    {
+        return Err(AuditError(
+            "capacity retention must be <=1000 permille".into(),
+        ));
     }
     Ok(())
 }
