@@ -473,8 +473,9 @@ pub fn derive_motor_shaft_operating_point(
             "motor-to-rotor speed ratio must be finite and positive for motoring",
         ));
     }
-    if !transmission_efficiency.is_finite()
-        || !(0.0 < transmission_efficiency && transmission_efficiency <= 1.0)
+    if !(transmission_efficiency.is_finite()
+        && 0.0 < transmission_efficiency
+        && transmission_efficiency <= 1.0)
     {
         return Err(DriveError::InvalidConfiguration(
             "transmission efficiency must be finite and in (0, 1]",
@@ -574,7 +575,7 @@ pub fn evaluate_drive_with_map_evidence(
     ];
     if efficiencies
         .iter()
-        .any(|value| !value.is_finite() || !(0.0 < *value && *value <= 1.0))
+        .any(|value| !(value.is_finite() && 0.0 < *value && *value <= 1.0))
         || !(evidence.efficiency_lower_bound <= evidence.efficiency_nominal
             && evidence.efficiency_nominal <= evidence.efficiency_upper_bound)
     {
@@ -744,7 +745,7 @@ pub fn evaluate_motor_shaft_coordinate_envelope(
     ];
     if efficiencies
         .iter()
-        .any(|value| !value.is_finite() || !(0.0 < *value && *value <= 1.0))
+        .any(|value| !(value.is_finite() && 0.0 < *value && *value <= 1.0))
         || evidence.efficiency_lower_bound > evidence.efficiency_nominal
         || evidence.efficiency_nominal > evidence.efficiency_upper_bound
     {
