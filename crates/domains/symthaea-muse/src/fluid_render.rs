@@ -986,6 +986,81 @@ mod tests {
             assert!(attempt.observation.stderr_sha256.is_some());
             cleanup(&[&midi, &soundfont, &fixture_wav, &script]);
         }
+
+        #[test]
+        fn soundfont_substitution_during_child_execution_fails_closed() {
+            let (midi, soundfont, fixture_wav) = fake_inputs();
+            let body = format!(
+                "output=''\\nfont=''\\nprevious=''\\nfor arg in \\\"$@\\\"; do\\n  if [ \\\"$previous\\\" = '-F' ]; then output=\\\"$arg\\\"; fi\\n  if [ \\\"$previous\\\" = '-ni' ]; then font=\\\"$arg\\\"; fi\\n  previous=\\\"$arg\\\"\\ndone\\nprintf 'substituted-soundfont' > \\\"$font\\\"\\n/bin/cp {} \\\"$output\\\"",
+                shell_quote(&fixture_wav)
+            );
+            let script = write_fake_executable(&body);
+            let attempt = render_midi_to_wav_with_paths(
+                &midi,
+                48_000,
+                None,
+                &script,
+                &soundfont,
+            );
+            assert!(attempt.wav_bytes.is_none());
+            assert_eq!(
+                attempt.observation.disposition,
+                FluidSynthInvocationDispositionV1::RendererAssetChangedDuringRender
+            );
+            assert_ne!(
+                attempt.observation.soundfont_sha256_before,
+                attempt.observation.soundfont_sha256_after
+            );
+            cleanup(&[&midi, &soundfont, &fixture_wav, &script]);
+        }
+
+        #[test]
+        fn successful_exit_without_output_is_not_a_render_success() {
+            let (midi, soundfont, fixture_wav) = fake_inputs();
+            let script = write_fake_executable(":");
+            let attempt = render_midi_to_wav_with_paths(
+                &midi,
+                48_000,
+                None,
+                &script,
+                &soundfont,
+            );
+            assert!(attempt.wav_bytes.is_none());
+            assert_eq!(
+                attempt.observation.disposition,
+                FluidSynthInvocationDispositionV1::OutputMissing
+            );
+            assert!(attempt.observation.process_success);
+            assert_eq!(attempt.observation.process_exit_code, Some(0));
+            cleanup(&[&midi, &soundfont, &fixture_wav, &script]);
+        }
+
+        #[test]
+        fn non_executable_renderer_preserves_spawn_failure() {
+            let (midi, soundfont, fixture_wav) = fake_inputs();
+            let script = unique_path("not-executable");
+            std::fs::write(&script, b"#!/bin/sh\\nexit 0\\n").unwrap();
+            let mut permissions = std::fs::metadata(&script).unwrap().permissions();
+            permissions.set_mode(0o644);
+            std::fs::set_permissions(&script, permissions).unwrap();
+            let attempt = render_midi_to_wav_with_paths(
+                &midi,
+                48_000,
+                None,
+                &script,
+                &soundfont,
+            );
+            assert!(attempt.wav_bytes.is_none());
+            assert_eq!(
+                attempt.observation.disposition,
+                FluidSynthInvocationDispositionV1::SpawnFailed
+            );
+            assert!(!attempt.observation.process_spawned);
+            assert!(!attempt.observation.process_success);
+            assert!(attempt.observation.spawn_error.is_some());
+            cleanup(&[&midi, &soundfont, &fixture_wav, &script]);
+        }
+
     }
 
 }
