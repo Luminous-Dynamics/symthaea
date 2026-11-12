@@ -2299,24 +2299,6 @@ fn complex_matrix4_multiply(left: &ComplexMatrix4, right: &ComplexMatrix4) -> Co
     product
 }
 
-fn complex_matrix4_sub_identity_scaled(
-    matrix: &ComplexMatrix4,
-    scale: f64,
-) -> ComplexMatrix4 {
-    let mut result = *matrix;
-    for index in 0..4 {
-        result[index * 4 + index] =
-            Complex64::new(scale, 0.0) - result[index * 4 + index];
-    }
-    for row in 0..4 {
-        for column in 0..4 {
-            if row != column {
-                result[row * 4 + column] = -result[row * 4 + column];
-            }
-        }
-    }
-    result
-}
 
 fn complex_matrix4_scaled(matrix: &ComplexMatrix4, scale: f64) -> ComplexMatrix4 {
     core::array::from_fn(|index| matrix[index] * scale)
@@ -2341,44 +2323,49 @@ fn complex_hermitian_inverse_sqrt_4(
     tolerance: f64,
 ) -> Result<(ComplexMatrix4, f64), QuantumInformationError> {
     let mut hermitian_residual: f64 = 0.0;
-    let mut scale: f64 = 0.0;
+    let mut trace = 0.0;
     for row in 0..4 {
         for column in 0..4 {
             hermitian_residual = hermitian_residual
                 .max((matrix[row * 4 + column] - matrix[column * 4 + row].conj()).norm());
-            scale = scale.max(matrix[row * 4 + column].norm());
         }
+        trace += matrix[row * 4 + row].re;
     }
-    if hermitian_residual > tolerance * 10.0 || !scale.is_finite() || scale <= 0.0 {
+    if hermitian_residual > tolerance * 10.0 || !trace.is_finite() || trace <= 0.0 {
         return Err(QuantumInformationError::NonHermitian {
             residual: hermitian_residual,
             tolerance: tolerance * 10.0,
         });
     }
 
-    // For a normalized density matrix, lambda_max <= 1, so the spectrum is
-    // inside the Newton-Schulz convergence interval (0,3). Start Y=A, Z=I;
-    // the iteration makes Z converge to A^(-1/2).
-    let mut y = complex_matrix4_scaled(&matrix, 1.0 / scale);
+    // rho_A is a trace-one positive matrix, so A=rho_A/trace has spectrum
+    // in (0,1]. Newton-Schulz starts Y_0=A, Z_0=I and uses
+    // T_k=(3I-Z_k Y_k)/2; Z_k converges to A^(-1/2).
+    let normalized = complex_matrix4_scaled(&matrix, trace.recip());
+    let mut y = normalized;
     let mut z = complex_matrix4_identity();
     let identity = complex_matrix4_identity();
     let mut residual = f64::INFINITY;
     for _iteration in 0..80 {
         let zy = complex_matrix4_multiply(&z, &y);
-        let correction = complex_matrix4_sub_identity_scaled(&zy, 1.5);
-        let correction = complex_matrix4_scaled(&correction, -1.0);
+        let mut correction = complex_matrix4_scaled(&zy, -0.5);
+        for index in 0..4 {
+            correction[index * 4 + index] += Complex64::new(1.5, 0.0);
+        }
         y = complex_matrix4_multiply(&y, &correction);
         z = complex_matrix4_multiply(&correction, &z);
-        let za = complex_matrix4_multiply(&z, &matrix);
+        let za = complex_matrix4_multiply(&z, &normalized);
         let zaz = complex_matrix4_multiply(&za, &z);
         residual = complex_matrix4_residual_from_identity(&zaz);
         if residual <= tolerance * 10.0 {
-            return Ok((complex_matrix4_scaled(&z, 1.0 / scale.sqrt()), residual));
+            // (rho/trace)^(-1/2) / sqrt(trace) = rho^(-1/2).
+            return Ok((complex_matrix4_scaled(&z, trace.sqrt().recip()), residual));
         }
     }
+    let _ = identity;
     Err(QuantumInformationError::EigensolverNonconvergence {
         sweeps: 80,
-        residual: residual.max(complex_matrix4_residual_from_identity(&identity)),
+        residual,
     })
 }
 
