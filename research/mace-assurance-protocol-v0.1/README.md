@@ -15,7 +15,7 @@ The preregistration authority freezes a typed control inventory. The harness sup
 
 The matrix package defines four SUT layers (foundation model, interaction/access, execution and scheduling, underlying infrastructure) and six scenario classes (tool-using, long-term memory, DevOps/development, embodied, multi-agent, autonomous/iterative). A versioned profile catalogue maps criterion obligations to one or more layers and scenarios.
 
-The compiler selects rows when layer and scenario scopes both intersect the declared profile. It composes duplicates conservatively: mandatory is OR; N/A permission is AND. The selected profile and catalogue version determine a stable profile identity; the resulting inventory is sorted and hashed. This does not prove catalogue completeness. Catalogue ownership and independent review remain external governance requirements.
+The compiler selects rows when layer and scenario scopes both intersect the declared profile. It composes duplicates conservatively: mandatory is OR; N/A permission is AND. It hashes the complete catalogue after canonicalizing row and scope order, then binds that catalogue digest and the selected profile to the inventory identity. Even an edit to a currently unselected catalogue row changes the digest. This does not prove catalogue completeness. Catalogue ownership and independent review remain external governance requirements.
 
 ## Verify
 
