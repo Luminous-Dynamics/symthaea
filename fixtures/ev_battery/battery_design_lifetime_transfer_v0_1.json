@@ -1,0 +1,106 @@
+{
+  "schema_version": "0.1.0",
+  "manifest_id": "SYNTH-DESIGN-LIFETIME-TRANSFER-001",
+  "cutoff_cycles": [
+    5,
+    10,
+    20,
+    50
+  ],
+  "cells": [
+    {
+      "cell_id": "CELL-A1",
+      "design_group_id": "DESIGN-A",
+      "protocol_group_id": "PROTO-1",
+      "feature_available_through_cycle": 50,
+      "prediction_cutoff_cycle": 50,
+      "feature_evidence_ref": "SYNTH-FEATURE-A1"
+    },
+    {
+      "cell_id": "CELL-A2",
+      "design_group_id": "DESIGN-A",
+      "protocol_group_id": "PROTO-1",
+      "feature_available_through_cycle": 50,
+      "prediction_cutoff_cycle": 50,
+      "feature_evidence_ref": "SYNTH-FEATURE-A2"
+    },
+    {
+      "cell_id": "CELL-B1",
+      "design_group_id": "DESIGN-B",
+      "protocol_group_id": "PROTO-2",
+      "feature_available_through_cycle": 50,
+      "prediction_cutoff_cycle": 50,
+      "feature_evidence_ref": "SYNTH-FEATURE-B1"
+    },
+    {
+      "cell_id": "CELL-C1",
+      "design_group_id": "DESIGN-C",
+      "protocol_group_id": "PROTO-2",
+      "feature_available_through_cycle": 20,
+      "prediction_cutoff_cycle": 20,
+      "feature_evidence_ref": "SYNTH-FEATURE-C1"
+    }
+  ],
+  "split": {
+    "split_id": "SYNTH-LODO-1",
+    "kind": "leave_one_design_group_out",
+    "train_cell_ids": [
+      "CELL-A1",
+      "CELL-A2",
+      "CELL-C1"
+    ],
+    "validation_cell_ids": [],
+    "test_cell_ids": [
+      "CELL-B1"
+    ],
+    "train_design_group_ids": [
+      "DESIGN-A",
+      "DESIGN-C"
+    ],
+    "validation_design_group_ids": [],
+    "test_design_group_ids": [
+      "DESIGN-B"
+    ]
+  },
+  "predictions": [
+    {
+      "cell_id": "CELL-B1",
+      "design_group_id": "DESIGN-B",
+      "prediction_cutoff_cycle": 50,
+      "predicted_cycle_life": 900,
+      "lower_cycle_life": 820,
+      "upper_cycle_life": 980,
+      "model_evidence_ref": "SYNTH-MODEL-1"
+    }
+  ],
+  "outcomes": [
+    {
+      "cell_id": "CELL-A1",
+      "kind": "event_observed",
+      "observed_through_cycle": 1100,
+      "event_cycle": 1100,
+      "event_code": null
+    },
+    {
+      "cell_id": "CELL-A2",
+      "kind": "right_censored",
+      "observed_through_cycle": 850,
+      "event_cycle": null,
+      "event_code": null
+    },
+    {
+      "cell_id": "CELL-B1",
+      "kind": "event_observed",
+      "observed_through_cycle": 950,
+      "event_cycle": 950,
+      "event_code": null
+    },
+    {
+      "cell_id": "CELL-C1",
+      "kind": "competing_event",
+      "observed_through_cycle": 700,
+      "event_cycle": 700,
+      "event_code": "SYNTH-COMPETING-MODE"
+    }
+  ]
+}
