@@ -914,7 +914,7 @@ mod tests {
 
         #[test]
         fn nonzero_exit_preserves_failure_diagnostics() {
-            let (midi, soundfont, fixture_wav, _) = fake_inputs();
+            let (midi, soundfont, fixture_wav) = fake_inputs();
             let script = write_fake_executable(
                 "printf 'expected failure\\\\n' >&2\nexit 23",
             );
@@ -939,7 +939,7 @@ mod tests {
 
         #[test]
         fn midi_substitution_during_child_execution_fails_closed() {
-            let (midi, soundfont, fixture_wav, _) = fake_inputs();
+            let (midi, soundfont, fixture_wav) = fake_inputs();
             let script = write_fake_executable(
                 "last=''\nfor arg in \"$@\"; do last=\"$arg\"; done\nprintf 'substituted-midi' > \"$last\"\nexit 0",
             );
@@ -964,7 +964,7 @@ mod tests {
 
         #[test]
         fn stderr_is_drained_beyond_preview_limit_without_deadlock() {
-            let (midi, soundfont, fixture_wav, _) = fake_inputs();
+            let (midi, soundfont, fixture_wav) = fake_inputs();
             let body = format!(
                 "output=''\nprevious=''\nfor arg in \"$@\"; do\n  if [ \"$previous\" = '-F' ]; then output=\"$arg\"; fi\n  previous=\"$arg\"\ndone\ni=0\nwhile [ $i -lt 2000 ]; do printf 'x1234567890\\\\n' >&2; i=$((i+1)); done\n/bin/cp {} \"$output\"",
                 shell_quote(&fixture_wav)
