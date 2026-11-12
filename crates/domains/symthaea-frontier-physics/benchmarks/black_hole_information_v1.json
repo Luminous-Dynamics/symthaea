@@ -55,7 +55,9 @@
       "eigensolver_nonconvergence",
       "ill_conditioned",
       "unsupported_subsystem",
-      "unresolved"
+      "unresolved",
+      "invalid_mutual_information",
+      "information_identity_error"
     ],
     "forbidden_behaviors": [
       "diagonal-only von Neumann entropy for non-diagonal density matrices",
@@ -334,7 +336,10 @@
         "information_complementarity_residual": 1e-10,
         "independent_seed_mean_and_standard_error": true,
         "seed_reproducibility": true,
-        "decoder_claim": "prohibited; this stage implements no recovery channel"
+        "decoder_claim": "prohibited; this stage implements no recovery channel",
+        "schmidt_complementary_entropy_identity": 1e-10,
+        "negative_mutual_information": "typed rejection if below declared tolerance",
+        "information_complementarity_failure": "dedicated information identity error"
       },
       "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
       "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_single_emission_v1.json",
@@ -616,7 +621,8 @@
       "QI_2S_seeded_fixed_charge_Haar_sampler": "source_authored_not_executed",
       "QI_3_U1_finite_depth_scrambling": "source_authored_not_executed",
       "QI_3T_U1_domain_wall_transport": "source_authored_not_executed",
-      "QI_4A_single_emission_decoupling": "source_authored_not_executed"
+      "QI_4A_single_emission_decoupling": "source_authored_not_executed",
+      "QI_4A_information_error_taxonomy": "source_authored_not_executed"
     },
     "not_implemented_or_not_qualified": {
       "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
