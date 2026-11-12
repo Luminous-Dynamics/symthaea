@@ -180,7 +180,7 @@ The evaluator checks:
 
 Eleven Rust unit tests are authored for fixture replay, bondability-window calculation, untreated controls, over-treatment rejection, contact-angle invariance and optionality, missing loads, energy mismatch, insufficient replicates, and service / energy boundary mismatch.
 
-**Execution status:** the exact branch files and fixture are fetched back and the JSON is parsed / structurally checked. This execution environment does not contain cargo, rustc or rustfmt. The Rust module and ten tests are authored but are not compiled or executed; no CI result or physical validation is claimed.
+**Execution status:** the exact branch files and fixture are fetched back and the JSON is parsed / structurally checked. This execution environment does not contain cargo, rustc or rustfmt. The Rust module and eleven tests are authored but are not compiled or executed; no CI result or physical validation is claimed.
 
 
 ## Machine-readable literature register
