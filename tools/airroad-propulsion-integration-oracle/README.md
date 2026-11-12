@@ -6,8 +6,8 @@ pins and composes four independently owned Symthaea reference crates:
 | Role | Package | Immutable source revision |
 |---|---|---|
 | Calibrated synchronized observations | `electric-propulsion-observation-oracle` 0.3.0 | `d81f5b4f1ee050d677c3bae1c7733d5bfe73fa20` |
-| Strict context-bound motor map | `electric-propulsion-map-oracle` 0.2.0 | `45d6060cc6de03cc2511060b7c9f36a583c00fec` |
-| Gearbox-aware drive/map envelope | `electric-rotorcraft-drive-oracle` 0.5.0 | `745d1776cd17b3af3007a38d80f5022077e4ad12` |
+| Strict coordinate-aware context-bound motor map | `electric-propulsion-map-oracle` 0.3.0 | `b99e8cb896cbeec34698cb71e5807b033fb77c07` |
+| Gearbox-aware and motor-shaft coordinate drive envelope | `electric-rotorcraft-drive-oracle` 0.6.0 | `c8441438f0e00cceeb1e951ea3c4d88a9aaf3b80` |
 | Electrical and thermal loss ledgers | `electric-thermal-loss-ledger-oracle` 0.2.0 | `2865e86a755e92a99bc534a5ea6dd13c272d8dc9` |
 
 Dependencies are pinned by Git commit in `Cargo.toml` and repeated in
@@ -33,12 +33,17 @@ observed point. The map lookup is explicitly adapted into the drive oracle's
 map-evidence contract; map identity, cell, weights, configuration, context,
 and source-manifest identity are retained.
 
-The observation's absolute torque/RPM and shaft-power bounds remain available
-in the returned observation. **This version does not yet propagate those
-coordinate bounds through the motor map and drive model.** Its adverse,
-nominal, and favourable DC-demand scenarios vary the map-efficiency bound only.
-Do not interpret the resulting envelope as the complete metrology-to-bus
-uncertainty envelope.
+The v0.3 integration propagates the complete rectangular torque/RPM
+metrology set through every intersected bilinear map cell, including rectangles
+that cross a grid line. It then passes the coordinate and efficiency bounds to
+the motor-shaft demand consumer to calculate minimum, nominal and upper DC-bus
+scenarios. Any partial excursion outside map support remains OOD.
+
+The drive-demand input is explicitly at the motor-shaft output boundary.
+Gearbox ratio and transmission efficiency are not applied a second time.
+The upper demand is used in the synthetic propulsion electrical-load ledger;
+the transmission loss, motor loss and inverter loss are separately represented
+in the thermal-source ledger for that same upper-bound scenario.
 
 The adverse, nominal, and favourable efficiency cases are independently
 evaluated. The adverse case feeds a branch-meter ledger containing propulsion,
