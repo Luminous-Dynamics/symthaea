@@ -5,6 +5,7 @@ use std::{env, fs, process};
 const SCHEMA_VERSION: &str = "0.1.0";
 const EARTH_RADIUS_M: f64 = 6_371_000.0;
 const TIME_TOLERANCE_S: f64 = 1.0e-6;
+const SEL_QUANTITY_ID: &str = "sound_exposure_level_db_re_1upa2_s";
 
 #[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -13,6 +14,13 @@ enum EvidenceKind { Synthetic, Measured }
 #[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 enum RightsStatus { PublicOrPermitted, Unknown, Restricted }
+
+#[derive(Debug, Deserialize, PartialEq, Eq, Copy, Clone)]
+#[serde(rename_all = "snake_case")]
+enum SourceEnergySumBasis {
+    IncoherentOrPhaseAveraged,
+    Unknown,
+}
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -31,6 +39,9 @@ struct Case {
 #[serde(deny_unknown_fields)]
 struct ExposurePeriod {
     period_id: String,
+    mission_id: String,
+    route_id: String,
+    source_energy_sum_basis: SourceEnergySumBasis,
     start_time_s: f64,
     end_time_s: f64,
     service_fingerprint_sha256: String,
@@ -150,6 +161,10 @@ struct AuditReport {
     schema_version: &'static str,
     case_id: String,
     period_id: String,
+    mission_id: String,
+    route_id: String,
+    source_energy_sum_basis: &'static str,
+    sel_quantity_id: &'static str,
     disposition: &'static str,
     partitions: Vec<ExposurePartitionReport>,
     limit_results: Vec<LimitResult>,
@@ -165,15 +180,15 @@ struct ExposurePartitionReport {
     unique_source_event_count: usize,
     unique_temporal_coverage_s: f64,
     summed_source_contribution_duration_s: f64,
-    ship_only_cumulative_sel_db: f64,
-    ship_only_cumulative_sel_lower_db: f64,
-    ship_only_cumulative_sel_upper_db: f64,
+    ship_only_cumulative_sel_db: Option<f64>,
+    ship_only_cumulative_sel_lower_db: Option<f64>,
+    ship_only_cumulative_sel_upper_db: Option<f64>,
     maximum_individual_contribution_received_level_db: f64,
     maximum_individual_contribution_received_level_lower_db: f64,
     maximum_individual_contribution_received_level_upper_db: f64,
-    maximum_simultaneous_ship_received_level_db: f64,
-    maximum_simultaneous_ship_received_level_lower_db: f64,
-    maximum_simultaneous_ship_received_level_upper_db: f64,
+    maximum_simultaneous_ship_received_level_db: Option<f64>,
+    maximum_simultaneous_ship_received_level_lower_db: Option<f64>,
+    maximum_simultaneous_ship_received_level_upper_db: Option<f64>,
     contribution_reports: Vec<ContributionReport>,
     ambient_observation_count: usize,
     ambient_reference_sel_db: Option<f64>,
@@ -260,6 +275,10 @@ fn finite_positive(value: f64) -> bool {
     value.is_finite() && value > 0.0
 }
 
+fn finite_nonnegative(value: f64) -> bool {
+    value.is_finite() && value >= 0.0
+}
+
 fn valid_lat_lon(latitude: f64, longitude: f64) -> bool {
     latitude.is_finite() && (-90.0..=90.0).contains(&latitude)
         && longitude.is_finite() && (-180.0..=180.0).contains(&longitude)
@@ -319,6 +338,8 @@ fn validate_case(case: &Case) -> Vec<String> {
         errors.push(format!("unsupported schema_version {}; expected {SCHEMA_VERSION}", case.schema_version));
     }
     if case.case_id.trim().is_empty() || case.period.period_id.trim().is_empty()
+        || case.period.mission_id.trim().is_empty()
+        || case.period.route_id.trim().is_empty()
         || !case.period.start_time_s.is_finite()
         || !case.period.end_time_s.is_finite()
         || case.period.end_time_s <= case.period.start_time_s
@@ -345,7 +366,9 @@ fn validate_case(case: &Case) -> Vec<String> {
         {
             errors.push(format!("source event {} lacks required identity/method metadata", event.event_id));
         }
-        if event.service_fingerprint_sha256 != case.period.service_fingerprint_sha256
+        if event.mission_id != case.period.mission_id
+            || event.route_id != case.period.route_id
+            || event.service_fingerprint_sha256 != case.period.service_fingerprint_sha256
             || event.environment_fingerprint_sha256 != case.period.environment_fingerprint_sha256
         {
             errors.push(format!("source event {} does not match the frozen service/environment fingerprint", event.event_id));
@@ -384,7 +407,7 @@ fn validate_case(case: &Case) -> Vec<String> {
     for receiver in &case.receivers {
         if receiver.receiver_id.trim().is_empty() || !receivers.insert(receiver.receiver_id.clone())
             || !valid_lat_lon(receiver.latitude_deg,receiver.longitude_deg)
-            || !finite_positive(receiver.depth_m)
+            || !finite_nonnegative(receiver.depth_m)
             || !is_sha256(&receiver.location_evidence_sha256)
         {
             errors.push(format!("receiver {} has invalid/duplicate identity, coordinates, depth or location evidence", receiver.receiver_id));
@@ -422,7 +445,7 @@ fn validate_case(case: &Case) -> Vec<String> {
             errors.push(format!("contribution {} has invalid/out-of-period time interval or duration", contribution.contribution_id));
         }
         if !valid_lat_lon(contribution.source_latitude_deg,contribution.source_longitude_deg)
-            || !finite_positive(contribution.source_depth_m)
+            || !finite_nonnegative(contribution.source_depth_m)
             || !finite_positive(contribution.range_m)
             || !finite_positive(contribution.range_tolerance_m)
         {
@@ -678,6 +701,7 @@ fn calculate_ambient_sel(
 fn audit(case:&Case)->AuditReport {
     let validation_errors=validate_case(case);
     let mut reasons=validation_errors.clone();
+    let can_energy_sum = case.period.source_energy_sum_basis == SourceEnergySumBasis::IncoherentOrPhaseAveraged;
     let mut grouped:BTreeMap<(String,String),Vec<CalculatedContribution>>=BTreeMap::new();
     if validation_errors.is_empty() {
         for contribution in &case.contributions {
@@ -699,12 +723,13 @@ fn audit(case:&Case)->AuditReport {
         let central:Vec<f64>=contributions.iter().map(|item|item.sel_db).collect();
         let lower:Vec<f64>=contributions.iter().map(|item|item.sel_lower_db).collect();
         let upper:Vec<f64>=contributions.iter().map(|item|item.sel_upper_db).collect();
-        let Some(ship_sel)=log_energy_sum(&central) else {
+        let ship_sel=if can_energy_sum { log_energy_sum(&central) } else { None };
+        let ship_lower=if can_energy_sum { log_energy_sum(&lower) } else { None };
+        let ship_upper=if can_energy_sum { log_energy_sum(&upper) } else { None };
+        if can_energy_sum && (ship_sel.is_none() || ship_lower.is_none() || ship_upper.is_none()) {
             reasons.push(format!("receiver {receiver_id} band {band_id} ship SEL could not be accumulated"));
             continue;
-        };
-        let Some(ship_lower)=log_energy_sum(&lower) else { continue; };
-        let Some(ship_upper)=log_energy_sum(&upper) else { continue; };
+        }
         let intervals:Vec<(f64,f64)>=contributions.iter()
             .map(|item|(item.input.start_time_s,item.input.end_time_s)).collect();
         let unique_coverage=union_duration(&intervals);
@@ -713,9 +738,9 @@ fn audit(case:&Case)->AuditReport {
         let max_individual=contributions.iter().map(|item|item.received_level_db).fold(f64::NEG_INFINITY,f64::max);
         let max_individual_lower=contributions.iter().map(|item|item.received_level_lower_db).fold(f64::NEG_INFINITY,f64::max);
         let max_individual_upper=contributions.iter().map(|item|item.received_level_upper_db).fold(f64::NEG_INFINITY,f64::max);
-        let max_simultaneous=maximum_simultaneous_level(&contributions,|item|item.received_level_db).unwrap_or(f64::NEG_INFINITY);
-        let max_simultaneous_lower=maximum_simultaneous_level(&contributions,|item|item.received_level_lower_db).unwrap_or(f64::NEG_INFINITY);
-        let max_simultaneous_upper=maximum_simultaneous_level(&contributions,|item|item.received_level_upper_db).unwrap_or(f64::NEG_INFINITY);
+        let max_simultaneous=if can_energy_sum { maximum_simultaneous_level(&contributions,|item|item.received_level_db) } else { None };
+        let max_simultaneous_lower=if can_energy_sum { maximum_simultaneous_level(&contributions,|item|item.received_level_lower_db) } else { None };
+        let max_simultaneous_upper=if can_energy_sum { maximum_simultaneous_level(&contributions,|item|item.received_level_upper_db) } else { None };
         let contribution_reports=contributions.iter().map(|item|ContributionReport {
             contribution_id:item.input.contribution_id.clone(),
             event_id:item.input.event_id.clone(),
@@ -797,18 +822,24 @@ fn audit(case:&Case)->AuditReport {
         let partition=partitions.iter().find(|item|item.receiver_id==limit.receiver_id&&item.band_id==limit.band_id);
         let (lower,upper,status)=match partition {
             Some(partition)=>{
-                let lower=partition.ship_only_cumulative_sel_lower_db;
-                let upper=partition.ship_only_cumulative_sel_upper_db;
-                let status=if upper<=limit.upper_sel_threshold_db {
-                    "pass"
-                } else if lower>limit.upper_sel_threshold_db {
-                    any_limit_failed=true;
-                    "fail"
+                if let (Some(lower),Some(upper)) = (
+                    partition.ship_only_cumulative_sel_lower_db,
+                    partition.ship_only_cumulative_sel_upper_db
+                ) {
+                    let status=if upper<=limit.upper_sel_threshold_db {
+                        "pass"
+                    } else if lower>limit.upper_sel_threshold_db {
+                        any_limit_failed=true;
+                        "fail"
+                    } else {
+                        any_limit_unresolved=true;
+                        "unresolved"
+                    };
+                    (Some(lower),Some(upper),status)
                 } else {
                     any_limit_unresolved=true;
-                    "unresolved"
-                };
-                (Some(lower),Some(upper),status)
+                    (None,None,"unresolved_source_sum_basis")
+                }
             }
             None=>{
                 any_limit_unresolved=true;
@@ -832,13 +863,17 @@ fn audit(case:&Case)->AuditReport {
         || !event.independently_reviewed) {
         reasons.push("one or more source events are synthetic, unreviewed or not rights-cleared".to_string());
     }
+    if case.period.source_energy_sum_basis == SourceEnergySumBasis::Unknown {
+        reasons.push("source contributions cannot be energy-summed because incoherence or phase-averaging basis is unknown".to_string());
+    }
     if case.ambient_observations.iter().any(|obs|obs.evidence_kind!=EvidenceKind::Measured
         || obs.rights_status!=RightsStatus::PublicOrPermitted
         || !obs.independently_reviewed) {
         reasons.push("one or more ambient observations are synthetic, unreviewed or not rights-cleared".to_string());
     }
 
-    let evidence_incomplete=case.source_events.iter().any(|event|event.evidence_kind!=EvidenceKind::Measured
+    let evidence_incomplete=case.period.source_energy_sum_basis == SourceEnergySumBasis::Unknown
+        || case.source_events.iter().any(|event|event.evidence_kind!=EvidenceKind::Measured
         || event.rights_status!=RightsStatus::PublicOrPermitted
         || !event.independently_reviewed)
         || case.ambient_observations.iter().any(|obs|obs.evidence_kind!=EvidenceKind::Measured
@@ -858,6 +893,13 @@ fn audit(case:&Case)->AuditReport {
         schema_version:SCHEMA_VERSION,
         case_id:case.case_id.clone(),
         period_id:case.period.period_id.clone(),
+        mission_id:case.period.mission_id.clone(),
+        route_id:case.period.route_id.clone(),
+        source_energy_sum_basis:match case.period.source_energy_sum_basis {
+            SourceEnergySumBasis::IncoherentOrPhaseAveraged => "incoherent_or_phase_averaged",
+            SourceEnergySumBasis::Unknown => "unknown",
+        },
+        sel_quantity_id:SEL_QUANTITY_ID,
         disposition,
         partitions,
         limit_results,
@@ -1005,6 +1047,9 @@ mod tests {
             case_id:"synthetic-test-case".to_string(),
             period:ExposurePeriod {
                 period_id:"one-hour-window".to_string(),
+                mission_id:"mission-1".to_string(),
+                route_id:"route-1".to_string(),
+                source_energy_sum_basis:SourceEnergySumBasis::IncoherentOrPhaseAveraged,
                 start_time_s:0.0,
                 end_time_s:3600.0,
                 service_fingerprint_sha256:digest('1'),
@@ -1025,6 +1070,24 @@ mod tests {
                 requirement_reference:"scenario-limit:receiver-1-125hz".to_string(),
             }],
         }
+    }
+
+    #[test]
+    fn unknown_source_coherence_basis_withholds_aggregate_SEL_and_limit_decision() {
+        let mut input=case();
+        input.period.source_energy_sum_basis=SourceEnergySumBasis::Unknown;
+        let report=audit(&input);
+        assert_eq!(report.disposition,"INCOMPLETE");
+        assert_eq!(report.partitions[0].ship_only_cumulative_sel_db,None);
+        assert_eq!(report.limit_results[0].status,"unresolved_source_sum_basis");
+        assert_eq!(report.partitions[0].contribution_reports.len(),2);
+    }
+
+    #[test]
+    fn source_event_mission_and_route_must_match_period() {
+        let mut input=case();
+        input.source_events[0].route_id="different-route".to_string();
+        assert_eq!(audit(&input).disposition,"INVALID");
     }
 
     #[test]
@@ -1192,7 +1255,7 @@ mod tests {
 
     #[test]
     fn slant_range_includes_source_receiver_depth_difference() {
-        let expected = (111.195_f64.powi(2) + 10.0_f64.powi(2)).sqrt();
+        let expected = 111.19492664455873_f64.hypot(10.0);
         let calculated = haversine_slant_distance_m(0.0,0.0,10.0,0.0,0.001,20.0);
         assert!((calculated-expected).abs()<1.0e-6);
     }
