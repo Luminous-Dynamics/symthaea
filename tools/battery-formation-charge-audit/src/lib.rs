@@ -151,7 +151,7 @@ pub struct AuditReport {
     pub synthetic_outcome_count: usize,
     pub physical_lifetime_outcome_count: usize,
     pub maximum_observed_feature_cutoff_cycle: u32,
-    pub reference_arm_id: String,
+    pub reference_arm_ids: Vec<String>,
     pub claim_ceiling: String,
 }
 
@@ -427,7 +427,7 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
     )?;
 
     let mut arms_by_id = BTreeMap::new();
-    let mut reference_arm_ids = Vec::new();
+    let mut reference_arms_by_design = BTreeMap::<(String, String), Vec<String>>::new();
     let mut design_formations: BTreeMap<(String, String), BTreeSet<(String, String)>> =
         BTreeMap::new();
     let mut design_charge_policies: BTreeMap<(String, String), BTreeSet<(String, String)>> =
@@ -488,16 +488,27 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
             arm.charge_policy_revision.clone(),
         ));
         if arm.is_reference {
-            reference_arm_ids.push(arm.arm_id.clone());
+            reference_arms_by_design
+                .entry(design_key.clone())
+                .or_default()
+                .push(arm.arm_id.clone());
         }
         arms_by_id.insert(arm.arm_id.as_str(), arm);
     }
 
-    if reference_arm_ids.len() != 1 {
-        return Err(AuditError(format!(
-            "campaign requires exactly one reference arm; found {}",
-            reference_arm_ids.len()
-        )));
+    for design_key in design_formations.keys() {
+        let reference_ids = reference_arms_by_design
+            .get(design_key)
+            .map(Vec::as_slice)
+            .unwrap_or_default();
+        if reference_ids.len() != 1 {
+            return Err(AuditError(format!(
+                "design {}@{} requires exactly one reference arm; found {}",
+                design_key.0,
+                design_key.1,
+                reference_ids.len()
+            )));
+        }
     }
     if formation_profiles.len() < 2 || charge_policies.len() < 2 {
         return Err(AuditError(
@@ -758,10 +769,10 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         }
     }
 
-    let reference_arm_id = reference_arm_ids
-        .into_iter()
-        .next()
-        .ok_or_else(|| AuditError("reference arm disappeared".into()))?;
+    let reference_arm_ids = reference_arms_by_design
+        .values()
+        .flat_map(|arm_ids| arm_ids.iter().cloned())
+        .collect();
     Ok(AuditReport {
         campaign_id: campaign.campaign_id.clone(),
         arm_count: manifest.arms.len(),
@@ -779,7 +790,7 @@ pub fn audit_campaign(manifest: &Manifest) -> Result<AuditReport, AuditError> {
         synthetic_outcome_count,
         physical_lifetime_outcome_count,
         maximum_observed_feature_cutoff_cycle,
-        reference_arm_id,
+        reference_arm_ids,
         claim_ceiling: "Finite campaign design, split and evidence semantics only; no electrochemical performance, cycle-life gain, safety or commercial claim.".into(),
     })
 }
@@ -926,7 +937,7 @@ mod tests {
         assert_eq!(report.observed_eol_count, 0);
         assert_eq!(report.synthetic_outcome_count, 12);
         assert_eq!(report.physical_lifetime_outcome_count, 0);
-        assert_eq!(report.reference_arm_id, "reference");
+        assert_eq!(report.reference_arm_ids, vec!["reference".to_string()]);
     }
 
     #[test]
