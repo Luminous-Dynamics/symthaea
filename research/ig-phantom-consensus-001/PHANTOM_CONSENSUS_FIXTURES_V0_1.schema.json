@@ -310,7 +310,8 @@
           "required": [
             "validator_disposition",
             "phantom_consensus",
-            "rationale"
+            "rationale",
+            "transparency_recovery_improves"
           ],
           "properties": {
             "validator_disposition": {
@@ -325,6 +326,9 @@
             },
             "rationale": {
               "type": "string"
+            },
+            "transparency_recovery_improves": {
+              "type": "boolean"
             }
           }
         }
