@@ -49,6 +49,12 @@ Every model/full-scale pair declares a cavitation-pattern class and an explicit 
 
 The receipt preserves model/full-scale hydrophone instrument IDs, calibration-certificate digests and the model facility-transfer-function evidence digest, in addition to timebase and raw-trace digests. These are identity/provenance references only: v0.1 checks digest syntax but does not authenticate certificates, verify raw trace bytes, resolve the calibration registry or consume the shared calibration/timebase binding receipt from #11641. That registry integration remains a prerequisite for real campaign use.
 
+## Grouped blind holdout
+
+Each model/full-scale pair binds to a declared benchmark group. The frozen split manifest records a digest, protocol ID, calibration/held-out role, and identities for model facility, full-scale trial site, vessel, propeller design/revision, campaign and operating-condition family. Selected grouping dimensions must have zero overlap across calibration and held-out groups; every pair must reference exactly one declared group and every group must be used.
+
+The receipt and pair reports preserve split role and group ID. Calibration and held-out band outcomes are reported separately; the held-out outcome is computed only from held-out pairs. A calibration outlier cannot change the held-out result. The split audit proves only metadata-level leakage integrity; it does not prove that the source dataset is complete, rights-cleared, independent or physically representative. Dataset byte acquisition, rights and measurement-semantics admission remain the separate requirement in #8146.
+
 ## Interpretation and limitations
 
 computational_comparison_only means only that the supplied numerical comparison and declared metadata passed this audit. It is not a validation of physical similarity, CFD, model-scale-to-full-scale generalization, an ISO/ITTC measurement, ecological impact, or improved propeller performance.
