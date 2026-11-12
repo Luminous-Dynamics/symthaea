@@ -41,7 +41,7 @@ pub fn three_qubit_bit_flip_syndrome(bits: [bool; 3]) -> (bool, usize) {
 /// the DFS consists of states with total spin projection m = 0.
 /// dim(DFS) = C(n, n/2) for even n.
 pub fn dfs_dimension_collective_dephasing(n_qubits: usize) -> usize {
-    if n_qubits % 2 != 0 {
+    if !n_qubits.is_multiple_of(2) {
         return 0; // Odd number of qubits has no m=0 subspace in strict sense
     }
     // C(n, n/2) = n! / ((n/2)!)^2
@@ -114,7 +114,7 @@ mod tests {
     #[test]
     fn test_bit_flip_no_error() {
         let (logical, syndrome) = three_qubit_bit_flip_syndrome([false, false, false]);
-        assert_eq!(logical, false);
+        assert!(!logical);
         assert_eq!(syndrome, 0); // No error
     }
 
@@ -129,7 +129,7 @@ mod tests {
     #[test]
     fn test_bit_flip_encodes_one() {
         let (logical, syndrome) = three_qubit_bit_flip_syndrome([true, true, true]);
-        assert_eq!(logical, true);
+        assert!(logical);
         assert_eq!(syndrome, 0);
     }
 
