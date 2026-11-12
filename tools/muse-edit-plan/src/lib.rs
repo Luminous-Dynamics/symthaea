@@ -1079,7 +1079,18 @@ fn canonical_request_contract(request: &EditRequest) -> String {
 
         let mut controls = stage.controls;
         controls.sort_by(|a, b| {
-            (&a.control_id, &a.unit).cmp(&(&b.control_id, &b.unit))
+            (
+                &a.control_id,
+                &a.unit,
+                a.minimum.to_bits(),
+                a.maximum.to_bits(),
+            )
+                .cmp(&(
+                    &b.control_id,
+                    &b.unit,
+                    b.minimum.to_bits(),
+                    b.maximum.to_bits(),
+                ))
         });
         for control in controls {
             lines.push(format!(
@@ -1908,6 +1919,37 @@ mod tests {
         ));
         request.sources[0].rights_basis_sha256 = Some(RIGHTS_DIGEST.to_string());
         assert!(compile_plan(&request, &registry()).is_ok());
+    }
+
+    #[test]
+    fn restricted_source_rights_are_never_admitted_even_when_policy_is_relaxed() {
+        let mut request = request();
+        request.policy.require_verified_rights = false;
+        request.sources[0].rights = RightsStatus::Restricted;
+        assert!(matches!(
+            compile_plan(&request, &registry()),
+            Err(CompileError::InvalidRequest(_))
+        ));
+    }
+
+    #[test]
+    fn verified_operator_rights_need_a_digest_bound_basis() {
+        let mut registry = registry();
+        registry.operators[0].rights_basis_sha256 = None;
+        assert!(matches!(
+            compile_plan(&request(), &registry),
+            Err(CompileError::Unsupported { .. })
+        ));
+    }
+
+    #[test]
+    fn verified_observer_rights_need_a_digest_bound_basis() {
+        let mut registry = registry();
+        registry.observers[0].rights_basis_sha256 = None;
+        assert!(matches!(
+            compile_plan(&request(), &registry),
+            Err(CompileError::Unsupported { .. })
+        ));
     }
 
     #[test]
