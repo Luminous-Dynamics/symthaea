@@ -2736,10 +2736,13 @@ fn fluidsynth_candidate_wav(
         if sha256_hex(&midi_bytes_after) != sha256_hex(&midi_bytes) {
             return None;
         }
+        let midi_sha256 = sha256_hex(&midi_bytes);
         if invocation.exit_code != Some(0)
             || invocation.spawn_error.is_some()
             || invocation.executable_sha256_before != invocation.executable_sha256_after
             || invocation.soundfont_sha256_before != invocation.soundfont_sha256_after
+            || invocation.midi_sha256_before != midi_sha256
+            || invocation.midi_sha256_after != midi_sha256
         {
             eprintln!(
                 "FluidSynth invocation rejected: exit={:?}, spawn_error={:?}, stderr={}",
@@ -2761,6 +2764,9 @@ fn fluidsynth_candidate_wav(
             soundfont_path,
             soundfont_sha256_before: invocation.soundfont_sha256_before.clone(),
             soundfont_sha256_after: invocation.soundfont_sha256_after.clone(),
+            midi_path: invocation.midi_path.to_str()?.to_owned(),
+            midi_sha256_before: invocation.midi_sha256_before.clone(),
+            midi_sha256_after: invocation.midi_sha256_after.clone(),
             arguments: invocation.arguments.clone(),
             environment_sha256: invocation.environment_sha256.clone(),
             stdout_sha256: invocation.stdout_sha256.clone(),
@@ -2801,10 +2807,12 @@ fn fluidsynth_candidate_wav(
         });
 
         let render_config_bytes = serde_json::to_vec(&serde_json::json!({
-            "config_version": "muse-fluidsynth-render-config-v1",
-            "renderer_path": binary.to_string_lossy(),
-            "soundfont_path": soundfont.to_string_lossy(),
-            "input_midi_path": path.to_string_lossy(),
+            "config_version": "muse-fluidsynth-render-config-v2",
+            "renderer_path": &process_observation.executable_path,
+            "soundfont_path": &process_observation.soundfont_path,
+            "input_midi_path": &process_observation.midi_path,
+            "argv": &process_observation.arguments,
+            "child_environment_sha256": &process_observation.environment_sha256,
             "gain": 0.8,
             "output_format": "wav",
             "sample_rate_hz": SAMPLE_RATE,
