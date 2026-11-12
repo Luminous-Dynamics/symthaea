@@ -30,7 +30,6 @@
     "wake_field_evidence_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
     "cavitation_state_evidence_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
     "water_quality_nuclei_evidence_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
-    "facility_transfer_function_applied": true,
     "background_measurement_per_condition_available": true
   },
   "full_scale_trial": {
@@ -75,13 +74,19 @@
             "independence_evidence_ref": null
           },
           "signal_to_background_margin_db": 12,
-          "background_correction_applied": false
+          "background_correction_applied": false,
+          "model_signal_plus_background_spl_db": 120,
+          "model_background_spl_db": 108,
+          "facility_transfer_function_db": 0
         }
       ],
       "model_source_level_reference_distance_m": 1,
       "full_scale_source_level_reference_distance_m": 1,
       "background_measurement_method": "BARE_HUB",
-      "background_raw_trace_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      "background_raw_trace_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "cavitation_pattern": "SHEET",
+      "wake_similarity_disposition": "MATCHED",
+      "water_quality_comparability": "MATCHED"
     },
     {
       "pair_id": "synthetic-pair-12rps",
@@ -113,13 +118,19 @@
             "independence_evidence_ref": null
           },
           "signal_to_background_margin_db": 12,
-          "background_correction_applied": false
+          "background_correction_applied": false,
+          "model_signal_plus_background_spl_db": 120,
+          "model_background_spl_db": 108,
+          "facility_transfer_function_db": 0
         }
       ],
       "model_source_level_reference_distance_m": 1,
       "full_scale_source_level_reference_distance_m": 1,
       "background_measurement_method": "BARE_HUB",
-      "background_raw_trace_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+      "background_raw_trace_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "cavitation_pattern": "SHEET",
+      "wake_similarity_disposition": "MATCHED",
+      "water_quality_comparability": "MATCHED"
     }
   ]
 }
