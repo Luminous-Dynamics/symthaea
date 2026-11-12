@@ -869,6 +869,124 @@ fn merge_intervals(mut intervals: Vec<FrameInterval>) -> Vec<FrameInterval> {
     merged
 }
 
+fn validate_support_policy(
+    policy: &InfluenceSupportPolicy,
+    total_frames: usize,
+    sample_rate_hz: u32,
+    total_windows: usize,
+) -> Result<(), CounterfactualInfluenceError> {
+    if policy.version != INFLUENCE_SUPPORT_POLICY_VERSION {
+        return Err(CounterfactualInfluenceError::InvalidSupportPolicy(
+            "unsupported policy version",
+        ));
+    }
+    for (name, ratio) in [
+        ("release_rms_ratio", policy.release_rms_ratio),
+        ("release_spectral_ratio", policy.release_spectral_ratio),
+    ] {
+        if !ratio.is_finite() || ratio <= 0.0 || ratio > 1.0 {
+            return Err(CounterfactualInfluenceError::InvalidSupportPolicy(name));
+        }
+    }
+    if policy.minimum_consecutive_entry_windows == 0
+        || policy.minimum_consecutive_entry_windows > total_windows
+    {
+        return Err(CounterfactualInfluenceError::InvalidSupportPolicy(
+            "minimum_consecutive_entry_windows must be within the measured window count",
+        ));
+    }
+    // Tail extension is bounded both by the output and by ten seconds at the
+    // declared sample rate; it can never create support beyond the WAV.
+    let maximum_tail_frames = (sample_rate_hz as usize)
+        .saturating_mul(10)
+        .min(total_frames);
+    if policy.tail_extension_frames > maximum_tail_frames {
+        return Err(CounterfactualInfluenceError::InvalidSupportPolicy(
+            "tail_extension_frames exceeds the ten-second/output-horizon bound",
+        ));
+    }
+    Ok(())
+}
+
+/// Apply channel-local entry/release hysteresis. A run starts only at an
+/// entry-threshold crossing; subsequent windows may remain while exceeding
+/// either channel's lower release threshold.
+fn qualify_support_intervals(
+    measurements: &[InfluenceWindowMeasurement],
+    channels: usize,
+    total_frames: usize,
+    policy: &InfluenceSupportPolicy,
+) -> Vec<QualifiedInfluenceInterval> {
+    let mut output = Vec::new();
+    for channel in 0..channels {
+        let channel_measurements: Vec<&InfluenceWindowMeasurement> = measurements
+            .iter()
+            .filter(|measurement| measurement.channel == channel)
+            .collect();
+        let mut index = 0usize;
+        while index < channel_measurements.len() {
+            if !channel_measurements[index].effect_detected {
+                index += 1;
+                continue;
+            }
+
+            let start_index = index;
+            let mut maximum_consecutive_entries = 0usize;
+            let mut consecutive_entries = 0usize;
+            let mut measured_end_frame = channel_measurements[index].end_frame;
+
+            while index < channel_measurements.len() {
+                let measurement = channel_measurements[index];
+                let above_release = measurement.rms_delta
+                    > measurement.calibrated_rms_threshold * policy.release_rms_ratio
+                    || measurement.spectral_magnitude_distance
+                        > measurement.calibrated_spectral_threshold
+                            * policy.release_spectral_ratio;
+                if !above_release {
+                    break;
+                }
+
+                if measurement.effect_detected {
+                    consecutive_entries = consecutive_entries.saturating_add(1);
+                    maximum_consecutive_entries =
+                        maximum_consecutive_entries.max(consecutive_entries);
+                } else {
+                    consecutive_entries = 0;
+                }
+                measured_end_frame = measured_end_frame.max(measurement.end_frame);
+                index += 1;
+            }
+
+            if maximum_consecutive_entries >= policy.minimum_consecutive_entry_windows {
+                let start_frame = channel_measurements[start_index].start_frame;
+                let qualified_end_frame = measured_end_frame
+                    .saturating_add(policy.tail_extension_frames)
+                    .min(total_frames);
+                output.push(QualifiedInfluenceInterval {
+                    channel,
+                    start_frame,
+                    measured_end_frame,
+                    qualified_end_frame,
+                    tail_extension_frames_applied: qualified_end_frame
+                        .saturating_sub(measured_end_frame),
+                });
+            }
+
+            // The first non-release window is reconsidered only if it crossed
+            // the entry threshold and can begin a new run.
+            if index < channel_measurements.len()
+                && !channel_measurements[index].effect_detected
+            {
+                index += 1;
+            } else if index == start_index {
+                index += 1;
+            }
+        }
+    }
+    output.sort_by_key(|interval| (interval.channel, interval.start_frame));
+    output
+}
+
 fn seal_calibration(
     mut calibration: RepeatabilityCalibration,
 ) -> Result<RepeatabilityCalibration, CounterfactualInfluenceError> {
