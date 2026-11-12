@@ -183,12 +183,46 @@
         "ensemble_mean": "inside preregistered sampling confidence interval or within a declared standard-error threshold",
         "unconstrained_Page_formula_is_not_used_as_U1_equilibrium": true,
         "seeds_and_sample_count_frozen_before_evaluation": true,
-        "block_dimensions_sum_to_binomial_N_K": true
+        "block_dimensions_sum_to_binomial_N_K": true,
+        "small_sector_known_answers": "N=2,K=1,A=1: 1/2; N=4,K=1,A=2: 7/12; N=4,K=2,A=2: 19/20 nats, from the stated charge-block Dirichlet/Page decomposition."
       },
-      "implementation_status": "exact symmetry-resolved Page oracle and seeded fixed-charge Haar sampler with Welford statistics authored; Rust execution pending",
+      "implementation_status": "symmetry-resolved Page oracle and seeded fixed-charge Haar sampler source-authored; small analytic controls updated to charge-block results; Rust execution pending",
       "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
       "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/fixed_charge_page_u1_v1.json",
-      "claim_ceiling": "Finite-dimensional Haar random states within an exact U(1) charge sector. No claim about gravitational evaporation, a local circuit reaching equilibrium, a Page island, or QES dominance."
+      "claim_ceiling": "Finite-dimensional Haar random states within an exact U(1) charge sector. No claim about gravitational evaporation, a local circuit reaching equilibrium, a Page island, or QES dominance.",
+      "analytic_controls": [
+        {
+          "N": 2,
+          "K": 1,
+          "A": 1,
+          "charge_block_dimensions": [
+            1,
+            1
+          ],
+          "exact_entropy_nats": 0.5
+        },
+        {
+          "N": 4,
+          "K": 1,
+          "A": 2,
+          "charge_block_dimensions": [
+            2,
+            2
+          ],
+          "exact_entropy_nats": 0.5833333333333334
+        },
+        {
+          "N": 4,
+          "K": 2,
+          "A": 2,
+          "charge_block_dimensions": [
+            1,
+            4,
+            1
+          ],
+          "exact_entropy_nats": 0.95
+        }
+      ]
     },
     {
       "id": "QI-3",
