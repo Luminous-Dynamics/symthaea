@@ -2633,7 +2633,7 @@ fn summarize_imported_notation_structure(
             let mut barline_event_count = 0usize;
             let mut non_controlling_measure_count = 0usize;
             for graph in &graphs {
-                match graph.map.status {
+                match &graph.map.status {
                     symthaea_muse::barline_eval::MeasureMapStatus::Supported => {
                         supported_part_count += 1;
                     }
@@ -2783,7 +2783,7 @@ async fn imported_work_notation_graph(
     let actual_digest =
         symthaea_muse::evidence_digest::canonical_json_sha256(&graphs)
             .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    if actual_digest != expected_digest {
+    if actual_digest.as_str() != expected_digest {
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
     Ok(Json(graphs))
