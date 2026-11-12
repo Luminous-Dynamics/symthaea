@@ -465,6 +465,9 @@
       "fixtures": [
         "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
         "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_petz_recovery_u4_v1.json"
+      ],
+      "references": [
+        "https://arxiv.org/abs/2610.31501"
       ]
     },
     {
@@ -496,21 +499,46 @@
     {
       "id": "QI-6",
       "name": "tensor-network scaling and truncation",
-      "status": "planned",
+      "status": "contract_authored; no tensor-network backend implemented",
       "observables": [
-        "bond_dimension",
-        "discarded_weight",
-        "entropy_error",
-        "fidelity_error",
-        "wall_time",
-        "peak_memory"
+        "MPS bond dimension by bond and time",
+        "charge-block-resolved Schmidt spectrum",
+        "discarded Schmidt weight per truncation event",
+        "cumulative conservative state-vector error bound from local truncations",
+        "trace-distance and entropy error against exact dense reference",
+        "local density/current continuity residual",
+        "total charge expectation and variance drift",
+        "radiation entropy and operator-spreading profiles",
+        "runtime, peak memory, allocation volume, and energy if measured"
       ],
       "acceptance": {
+        "exact_dense_overlap_sizes": [
+          8,
+          10,
+          12
+        ],
+        "proposed_large_sizes": [
+          16,
+          24,
+          32,
+          48,
+          64
+        ],
         "cost_comparison_at_matched_accuracy": true,
-        "truncation_error_reported": true,
-        "exact_small_system_reference_required": true
+        "per_truncation_discarded_weight_reported": true,
+        "charge_sectors_preserved_exactly": true,
+        "cumulative_state_error_bound": "Report a conservative sum of per-truncation vector-distance bounds; do not equate a local discarded weight to a global fidelity guarantee.",
+        "dense_vs_MPS_trace_distance_well_conditioned": 0.000001,
+        "dense_vs_MPS_entropy_absolute_error_nats": 0.00001,
+        "local_charge_continuity_residual": 1e-10,
+        "unresolved_or_over_bond_cap": "fail closed or explicitly return unresolved; never hide bond-dimension saturation",
+        "independent_comparator": "Quimb CircuitMPS/TEBD and a second declared tensor-network implementation at matched truncation policy",
+        "runtime_rule": "Compare wall time and peak memory only after matching output precision, bond cutoff, error, and physical gate ensemble",
+        "claim_ceiling": "Finite-dimensional unitary-circuit MPS benchmark. Not a gravity or QES result."
       },
-      "implementation_status": "not_implemented"
+      "implementation_status": "benchmark contract authored; Rust MPS/TEBD backend not implemented",
+      "model": "U(1)-symmetric MPS/TEBD simulation of finite-depth charge-conserving circuits and sequential product-state boundary emission, cross-checked against exact dense state vectors on overlapping small sizes and independent tensor-network implementations.",
+      "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/tensor_network_qualification_v1.json"
     },
     {
       "id": "QI-7",
@@ -648,6 +676,11 @@
       "name": "MPS/tensor-network methods",
       "role": "scaling comparator with truncation and discarded-weight accounting",
       "not_a": "exact result unless truncation error is controlled"
+    },
+    {
+      "name": "Petz recovery and binary-hypothesis-testing bounds (Can–Wilde 2026)",
+      "role": "one-shot operational recovery-fidelity comparator; use finite-size and support-aware bounds",
+      "not_a": "a black-hole gravitational model or a scalable quantum circuit"
     }
   ],
   "references": [
@@ -692,6 +725,18 @@
       "citation": "Saha, Non-perturbative transitions in the island formula: A finite-N resolution of the Page curve kink, Physics Letters B 882 (2026) 140981",
       "url": "https://doi.org/10.1016/j.physletb.2026.140981",
       "role": "recent finite-N smoothing proposal; reproduce independently, not treated as universal ground truth"
+    },
+    {
+      "id": "can-wilde-petz-2026",
+      "citation": "Can and Wilde, One-shot entanglement generation and distillation via Petz recovery and binary hypothesis testing, arXiv:2610.31501 (22 October 2026)",
+      "url": "https://arxiv.org/abs/2610.31501",
+      "role": "one-shot Petz decoder fidelity bounds through binary hypothesis testing; general quantum-channel theory, not a black-hole model"
+    },
+    {
+      "id": "quimb-mps-docs",
+      "citation": "Quimb tensor-network and MPS circuit simulator documentation, current development documentation accessed 12 November 2026",
+      "url": "https://quimb.readthedocs.io/en/latest/autoapi/quimb/tensor/circuit/mps/index.html",
+      "role": "external MPS/TEBD implementation comparator with explicit bond dimension and truncation cutoffs"
     }
   ],
   "provenance": {
@@ -805,5 +850,8 @@
       },
       "claim_ceiling": "No Rust build, Clippy pass, or Rust test pass is claimed at this head."
     }
+  },
+  "benchmark_policy": {
+    "claim_boundary": "Petz recovery fidelity, Haar/Page equilibrium, finite-depth scrambling, U(1) transport and gravitational QES/island calculations are distinct model classes. A successful recovery toy model is not an evaporation result."
   }
 }
