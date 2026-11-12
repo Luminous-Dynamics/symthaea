@@ -7,6 +7,9 @@
 //! any shared Foundry or learning corpus.
 
 use crate::evidence_digest::sha256_hex;
+use crate::midi_measure_sidecar::{
+    parse_midi_measure_sidecar, MidiMeasureSidecarReceiptV1,
+};
 use crate::musicxml_barline_adapter::{
     parse_musicxml_part_notation_graph, MusicXmlMeasureAdapterError,
     MusicXmlPartNotationGraphV1,
@@ -36,6 +39,8 @@ struct RawNote {
 pub enum ImportedNotationStructureV1 {
     /// Exact per-part MusicXML measure maps and typed boundary events.
     MusicXmlPartGraphs(Vec<MusicXmlPartNotationGraphV1>),
+    /// Explicit MIDI measure maps bound to the exact MIDI bytes and PPQ header.
+    MidiExplicitMeasureSidecar(MidiMeasureSidecarReceiptV1),
     /// The source imported as a Score, but did not supply enough explicit
     /// structure to claim a measure/barline map.
     Unknown { reason: String },
@@ -97,6 +102,30 @@ pub fn parse_symbolic_with_structure(
         score,
         notation_structure,
     })
+}
+
+/// Parse MIDI into its legacy Score and use an explicit source-bound
+/// measure sidecar when one is available. This API does not infer measures
+/// from FF 58 time-signature metadata or from Score::meter.
+pub fn parse_symbolic_with_midi_measure_sidecar(
+    midi_bytes: &[u8],
+    sidecar_bytes: &[u8],
+    score_clock_id: &str,
+) -> Result<StructuredSymbolicImportV1, String> {
+    let mut imported = parse_symbolic_with_structure(
+        midi_bytes,
+        SymbolicImportFormat::Midi,
+        score_clock_id,
+    )?;
+    let receipt = parse_midi_measure_sidecar(
+        midi_bytes,
+        sidecar_bytes,
+        score_clock_id,
+    )
+    .map_err(|error| format!("MIDI measure sidecar rejected: {error:?}"))?;
+    imported.notation_structure =
+        ImportedNotationStructureV1::MidiExplicitMeasureSidecar(receipt);
+    Ok(imported)
 }
 
 pub fn parse_symbolic(bytes: &[u8], format: SymbolicImportFormat) -> Result<Score, String> {
@@ -616,6 +645,101 @@ mod tests {
             xml,
             SymbolicImportFormat::MusicXml,
             "  ",
+        ).is_err());
+    }
+
+
+    #[test]
+    fn structured_midi_import_with_sidecar_returns_score_and_exact_measure_maps() {
+        let midi: [u8; 35] = [
+            b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 1, 0, 1, 1, 0xE0,
+            b'M', b'T', b'r', b'k', 0, 0, 0, 13,
+            0, 0x90, 60, 64,
+            0x83, 0x60, 0x80, 60, 64,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let sidecar = crate::midi_measure_sidecar::MidiMeasureSidecarV1 {
+            schema: crate::midi_measure_sidecar::MIDI_MEASURE_SIDECAR_SCHEMA_V1.into(),
+            midi_sha256: sha256_hex(&midi),
+            ticks_per_quarter: 480,
+            score_clock_id: "midi-score-clock".into(),
+            parts: vec![crate::midi_measure_sidecar::MidiPartMeasureSidecarV1 {
+                part_id: "Piano".into(),
+                source_track_index: 0,
+                measures: vec![crate::midi_measure_sidecar::MidiMeasureSpanSidecarV1 {
+                    start_tick: 0,
+                    end_tick: 1920,
+                    kind: crate::barline_eval::MeasureKind::Regular,
+                    measure_number: Some("1".into()),
+                    source_measure_id: Some("bar-1".into()),
+                    display_text: None,
+                    implicit: false,
+                    non_controlling: false,
+                }],
+            }],
+        };
+        let sidecar_bytes = serde_json::to_vec(&sidecar).unwrap();
+        let imported = parse_symbolic_with_midi_measure_sidecar(
+            &midi,
+            &sidecar_bytes,
+            "midi-score-clock",
+        ).unwrap();
+        assert_eq!(imported.source_format, SymbolicImportFormat::Midi);
+        assert_eq!(imported.source_sha256, sha256_hex(&midi));
+        assert_eq!(imported.score.notes.len(), 1);
+        match imported.notation_structure {
+            ImportedNotationStructureV1::MidiExplicitMeasureSidecar(receipt) => {
+                assert_eq!(receipt.midi_sha256, sha256_hex(&midi));
+                assert_eq!(receipt.ticks_per_quarter, 480);
+                assert_eq!(receipt.part_maps.len(), 1);
+                assert_eq!(receipt.part_maps[0].map.measures[0].end,
+                    crate::barline_eval::RationalBeat::new(4, 1).unwrap());
+                assert_eq!(
+                    receipt.part_maps[0].measure_locators[0].measure_number.as_deref(),
+                    Some("1")
+                );
+            }
+            other => panic!("expected explicit MIDI sidecar maps, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn malformed_or_wrong_source_midi_sidecar_is_not_accepted() {
+        let midi: [u8; 35] = [
+            b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 1, 0, 1, 1, 0xE0,
+            b'M', b'T', b'r', b'k', 0, 0, 0, 13,
+            0, 0x90, 60, 64,
+            0x83, 0x60, 0x80, 60, 64,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let mut sidecar = crate::midi_measure_sidecar::MidiMeasureSidecarV1 {
+            schema: crate::midi_measure_sidecar::MIDI_MEASURE_SIDECAR_SCHEMA_V1.into(),
+            midi_sha256: "0".repeat(64),
+            ticks_per_quarter: 480,
+            score_clock_id: "midi-score-clock".into(),
+            parts: vec![crate::midi_measure_sidecar::MidiPartMeasureSidecarV1 {
+                part_id: "Piano".into(),
+                source_track_index: 0,
+                measures: vec![crate::midi_measure_sidecar::MidiMeasureSpanSidecarV1 {
+                    start_tick: 0,
+                    end_tick: 1920,
+                    kind: crate::barline_eval::MeasureKind::Regular,
+                    measure_number: None,
+                    source_measure_id: None,
+                    display_text: None,
+                    implicit: false,
+                    non_controlling: false,
+                }],
+            }],
+        };
+        let wrong_sidecar = serde_json::to_vec(&sidecar).unwrap();
+        assert!(parse_symbolic_with_midi_measure_sidecar(
+            &midi, &wrong_sidecar, "midi-score-clock"
+        ).is_err());
+        sidecar.midi_sha256 = sha256_hex(&midi);
+        let wrong_clock = serde_json::to_vec(&sidecar).unwrap();
+        assert!(parse_symbolic_with_midi_measure_sidecar(
+            &midi, &wrong_clock, "different-clock"
         ).is_err());
     }
 
