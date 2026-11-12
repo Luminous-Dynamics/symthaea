@@ -13,3 +13,5 @@ path = "src/lib.rs"
 
 [lints.rust]
 unsafe_code = "forbid"
+
+[workspace]
