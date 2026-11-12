@@ -435,6 +435,21 @@ Sources:
 - https://www.tu.berlin/en/raumfahrttechnik/research/current-projects/somo
 - https://www.nature.com/articles/s44453-026-00053-w
 
+### Regolith-derived moonglass + perovskite alternative
+
+A 2025 *Device* paper, *Moon photovoltaics utilizing lunar regolith and halide perovskites*, demonstrates a complementary ISRU strategy to the Blue Alchemist silicon route: use anorthositic regolith simulant to make glass substrate/encapsulation, then deposit ultrathin halide-perovskite layers and contacts. It avoids semiconductor-grade silicon purification in that pathway but retains imported perovskite/contact precursor dependencies.
+
+The paper reports AM0 cell efficiencies of approximately 8.5–8.6% for one superstrate configuration and 12.1% for an IZO substrate configuration on moonglass, plus 99.6% efficiency retention after exposure to (2\times10^{12}) 68-MeV protons/cm². Its thinner-glass efficiency estimates (approximately 21.5–22.7%) are simulations/projections, not measured devices. Its 99% imported-material reduction and 22–50 W/g power-per-launched-mass figures are study-specific scenario estimates and must not be compared directly with complete installed-array W/kg.
+
+This is an important third manufacturing architecture:
+1. local glass substrate / protective cover;
+2. imported thin absorber and contacts;
+3. eventual local production of a larger fraction of the absorber/contact supply chain only if resource chemistry and process evidence justify it.
+
+A matched study must account for regolith mineralogy and FeO content, glass optical transmission, furnace and concentration system, perovskite precursors, contacts, deposition/encapsulation equipment, process energy/heat, production yield, radiation/thermal/dust stability and replacement logistics.
+
+Primary source: <https://doi.org/10.1016/j.device.2025.100747>
+
 ### Lunar thermal and long-duration storage
 
 NASA's 2026 Thermal & Fluids Analysis Workshop proceedings include a concept for a radiant heat-pump system with a radiation-only condenser/radiator and preliminary analysis of roughly 15 kW peak habitat heat load. The work is described as concept/model development with future representative testing; it is not a demonstrated lunar product.
