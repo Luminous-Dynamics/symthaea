@@ -21,6 +21,7 @@
       "required": [
         "campaign_id",
         "mission_id",
+        "blocking_axis",
         "holdout_axis",
         "maximum_feature_cutoff_cycle"
       ],
@@ -44,6 +45,12 @@
         "maximum_feature_cutoff_cycle": {
           "type": "integer",
           "minimum": 1
+        },
+        "blocking_axis": {
+          "enum": [
+            "lot",
+            "line"
+          ]
         }
       }
     },
