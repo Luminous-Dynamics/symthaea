@@ -220,7 +220,7 @@ Near-term benchmark ladder:
 5. Qualify manufacturing over multiple lots and lines; target >90% first-pass yield before making scale/cost claims.
 6. Benchmark prospective design/lifetime models against random, DOE/factorial, descriptor regression and Discovery Learning-style transfer baselines at equal data, experiment, time and energy budgets.
 
-Draft [PR #11770](https://github.com/Luminous-Dynamics/symthaea/pull/11770) implements the first read-only audit slice on branch `research/assb-practical-translation-v0.1`. Exact head `1075e8fbdd8311c9ebda3146f63485f43bcd1671` passed Draft 2020-12 schema/fixture validation, locked metadata, Rust 1.96 formatting, 23/23 tests and strict Clippy (https://github.com/Luminous-Dynamics/symthaea/actions/runs/43274827165). It rejects fabrication-pressure, batch, line, process-revision, design-revision, method/instrument and uncertainty confounding; audits inactive electrode mass plus complete-cell volume. All evidence remains synthetic; this is not an electrochemical performance claim.
+Draft [PR #11770](https://github.com/Luminous-Dynamics/symthaea/pull/11770) implements the first read-only audit slice on branch `research/assb-practical-translation-v0.1`. Exact head `1075e8fbdd8311c9ebda3146f63485f43bcd1671` passed Draft 2020-12 schema/fixture validation, locked metadata, Rust 1.96 formatting, 23/23 tests and strict Clippy (https://github.com/Luminous-Dynamics/symthaea/actions/runs/43274827165). It rejects fabrication-pressure, batch, line, process-revision, design-revision, method/instrument and uncertainty confounding; audits active/inactive electrode mass plus complete-cell mass/volume. All evidence remains synthetic; this is not an electrochemical performance claim. The PR remains draft.
 
 ## ASSB benchmark frontier: targets beyond low-pressure headlines
 
@@ -272,7 +272,7 @@ The benchmark should therefore report a multi-axis vector—pressure, full-cell 
 
 ### Interlaboratory reproducibility is a first-class research lane
 
-A separate programme, **ASSB-ROUNDROBIN-001 #11784**, is now open with a first read-only data/audit slice in branch `research/assb-roundrobin-v0.1`. It composes the ASSB translation audit rather than duplicating it.
+A separate programme, **ASSB-ROUNDROBIN-001 #11784** / draft [PR #11787](https://github.com/Luminous-Dynamics/symthaea/pull/11787), now has a first read-only data/audit slice on branch `research/assb-roundrobin-v0.1`. Exact head `57bcca2d2c8397e7ac54189247a390f1a9e4549d` passed schema/fixture validation, locked metadata, formatting, **16/16 Rust tests** and strict Clippy (https://github.com/Luminous-Dynamics/symthaea/actions/runs/43293053009). The synthetic 3-lab × 3-cell fixture is explicitly `KnownAnswerFixtureOnly`; no physical labs participated. The PR remains draft. It composes the ASSB translation audit rather than duplicating it.
 
 The motivation:
 - A 2024 *Nature Energy* interlaboratory study supplied common materials to 21 groups and found large variation associated with pressing pressure, pressing duration and In-to-Li ratio. It recommended standard parameter reporting and triplicate data:
