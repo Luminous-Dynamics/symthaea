@@ -959,6 +959,7 @@ mod tests {
     fn zero_fabrication_pressure_remains_a_declared_measurement() {
         let mut m = fixture();
         m.observations[0].pressure.fabrication_pressure_mpa = 0.0;
+        m.observations[1].pressure.fabrication_pressure_mpa = 0.0;
         assert!(audit_manifest(&m).is_ok());
         // Zero fabrication pressure is allowed; it is a real declared measurement,
         // not a missing value. Operating pressure remains independently required.
@@ -1065,6 +1066,8 @@ mod tests {
     #[test]
     fn right_censoring_remains_distinct() {
         let mut m = fixture();
+        m.evidence[0].evidence_class = EvidenceClass::PhysicalMeasurement;
+        m.evidence[0].metrology_ref = Some("CALIBRATED-METROLOGY-REF".into());
         m.observations[0].outcome_status = OutcomeStatus::RightCensored;
         m.observations[0].event_cycle = None;
         let r = audit_manifest(&m).expect("right censor valid");
