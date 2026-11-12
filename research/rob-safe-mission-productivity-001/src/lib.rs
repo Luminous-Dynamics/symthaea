@@ -11,6 +11,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const PPM: u128 = 1_000_000;
 const MICROS_PER_GPU_HOUR: u128 = 3_600_000_000;
+const NANOS_PER_ROBOT_HOUR: u128 = 3_600_000_000_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EvidenceState {
@@ -134,8 +135,11 @@ pub struct TaskClassScorecard {
     pub service_floor_breaches: u64,
     pub productive_work_units: u128,
     pub gpu_micros: u128,
+    pub elapsed_ns: u128,
     /// Fixed-point milli-work-units per GPU-hour; None if no GPU service was measured.
     pub work_units_per_gpu_hour_milli: Option<u64>,
+    /// Fixed-point milli-work-units per robot-hour; uses all mission wall time.
+    pub work_units_per_robot_hour_milli: Option<u64>,
     pub thermal_unknown_or_invalid: u64,
     pub recovery_unknown_or_invalid: u64,
     pub energy_qualified_missions: u64,
@@ -319,6 +323,7 @@ struct ClassAccumulator {
     service_floor_breaches: u64,
     productive_work_units: u128,
     gpu_micros: u128,
+    elapsed_ns: u128,
     thermal_unknown_or_invalid: u64,
     recovery_unknown_or_invalid: u64,
     energy_qualified_missions: u64,
@@ -456,6 +461,7 @@ pub fn evaluate_fleet(
             )?;
         }
         checked_add_u128(&mut class.gpu_micros, u128::from(trial.gpu_micros))?;
+        checked_add_u128(&mut class.elapsed_ns, u128::from(trial.elapsed_ns))?;
         if trial.critical_deadline_miss {
             checked_add(&mut class.critical_deadline_misses, 1)?;
         }
@@ -531,7 +537,7 @@ pub fn evaluate_fleet(
         total.causal_closure.applications_causally_closed,
     );
     for (task_class, a) in classes {
-        let rate = if a.gpu_micros == 0 {
+        let gpu_hour_rate = if a.gpu_micros == 0 {
             None
         } else {
             let milli = a
@@ -539,6 +545,16 @@ pub fn evaluate_fleet(
                 .checked_mul(MICROS_PER_GPU_HOUR * 1_000)
                 .ok_or(EvaluationError::MetricOverflow)?
                 / a.gpu_micros;
+            Some(u64::try_from(milli).map_err(|_| EvaluationError::MetricOverflow)?)
+        };
+        let robot_hour_rate = if a.elapsed_ns == 0 {
+            None
+        } else {
+            let milli = a
+                .productive_work_units
+                .checked_mul(NANOS_PER_ROBOT_HOUR * 1_000)
+                .ok_or(EvaluationError::MetricOverflow)?
+                / a.elapsed_ns;
             Some(u64::try_from(milli).map_err(|_| EvaluationError::MetricOverflow)?)
         };
         total.task_classes.insert(
@@ -560,7 +576,9 @@ pub fn evaluate_fleet(
                 service_floor_breaches: a.service_floor_breaches,
                 productive_work_units: a.productive_work_units,
                 gpu_micros: a.gpu_micros,
-                work_units_per_gpu_hour_milli: rate,
+                elapsed_ns: a.elapsed_ns,
+                work_units_per_gpu_hour_milli: gpu_hour_rate,
+                work_units_per_robot_hour_milli: robot_hour_rate,
                 thermal_unknown_or_invalid: a.thermal_unknown_or_invalid,
                 recovery_unknown_or_invalid: a.recovery_unknown_or_invalid,
                 energy_qualified_missions: a.energy_qualified_missions,
@@ -667,6 +685,9 @@ pub struct TaskClassComparison {
     pub baseline_work_units_per_gpu_hour_milli: Option<u64>,
     pub candidate_work_units_per_gpu_hour_milli: Option<u64>,
     pub productivity_delta_milli: Option<i128>,
+    pub baseline_work_units_per_robot_hour_milli: Option<u64>,
+    pub candidate_work_units_per_robot_hour_milli: Option<u64>,
+    pub robot_hour_productivity_delta_milli: Option<i128>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -761,9 +782,9 @@ pub fn compare_fleet_arms(
             c.missions,
         );
         let slo = rate_delta(
-            b.evidence_qualified_safe_successes,
+            b.slo_qualified_missions,
             b.missions,
-            c.evidence_qualified_safe_successes,
+            c.slo_qualified_missions,
             c.missions,
         );
         let deadline = rate_delta(
@@ -807,12 +828,19 @@ pub fn compare_fleet_arms(
         let bp = b.work_units_per_gpu_hour_milli;
         let cp = c.work_units_per_gpu_hour_milli;
         let productivity_delta = bp.zip(cp).map(|(bv, cv)| i128::from(cv) - i128::from(bv));
+        let br = b.work_units_per_robot_hour_milli;
+        let cr = c.work_units_per_robot_hour_milli;
+        let robot_hour_delta = br
+            .zip(cr)
+            .map(|(bv, cv)| i128::from(cv) - i128::from(bv));
         match productivity_delta {
             Some(d) if d > 0 => productivity_improved_classes.push(class.clone()),
             Some(d) if d < 0 => productivity_regressed_classes.push(class.clone()),
             _ => {}
         }
-        if productivity_delta.is_none_or(|d| d < 0) {
+        if productivity_delta.is_none_or(|d| d < 0)
+            || robot_hour_delta.is_none_or(|d| d < 0)
+        {
             pareto_dominates_productivity = false;
         }
         per_task_class.insert(
@@ -828,6 +856,9 @@ pub fn compare_fleet_arms(
                 baseline_work_units_per_gpu_hour_milli: bp,
                 candidate_work_units_per_gpu_hour_milli: cp,
                 productivity_delta_milli: productivity_delta,
+                baseline_work_units_per_robot_hour_milli: br,
+                candidate_work_units_per_robot_hour_milli: cr,
+                robot_hour_productivity_delta_milli: robot_hour_delta,
             },
         );
     }
