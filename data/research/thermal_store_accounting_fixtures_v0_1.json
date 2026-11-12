@@ -1,0 +1,621 @@
+{
+  "schema_version": "0.1.0",
+  "programme": "THERMAL-STORE-INDUSTRIAL-001",
+  "generated_date": "2026-11-12",
+  "energy_unit": "J",
+  "claim_ceiling": "SYNTHETIC_ACCOUNTING_FIXTURE_ONLY",
+  "scenarios": [
+    {
+      "scenario_id": "HTTES-RESISTANCE-BASELINE-001",
+      "technology": "RESISTANCE_JOULE_HEATER",
+      "evidence_class": "SYNTHETIC_ACCOUNTING_FIXTURE",
+      "energy_unit": "J",
+      "service": {
+        "service_contract_id": "INDUSTRIAL-HEAT-500C-1H",
+        "service_type": "process_heat",
+        "outlet_temperature_mK": 773150,
+        "outlet_pressure_pa": null,
+        "mass_flow_mg_s": null,
+        "delivery_duration_s": 3600,
+        "delivery_trace_digest": "synthetic-trace:heat-demand-500c-001"
+      },
+      "metering_mode": "NON_OVERLAPPING_BRANCH_METERS",
+      "wall_plug_inputs": [
+        {
+          "input_id": "heater-input",
+          "meter_boundary_id": "meter:heater-terminal",
+          "role": "PRIMARY_PROCESS",
+          "energy_j": 3600000000
+        },
+        {
+          "input_id": "aux-input",
+          "meter_boundary_id": "meter:auxiliary-bus",
+          "role": "AUXILIARY",
+          "energy_j": 180000000
+        }
+      ],
+      "charge": {
+        "stored_energy_increase_j": 3240000000,
+        "charge_conversion_loss_j": 360000000,
+        "auxiliary_dissipation_j": 180000000
+      },
+      "hold": {
+        "stored_energy_after_hold_j": 3078000000,
+        "storage_hold_loss_j": 162000000,
+        "hold_duration_s": 86400
+      },
+      "discharge": {
+        "stored_energy_withdrawn_j": 3078000000,
+        "useful_heat_delivered_j": 2770000000,
+        "discharge_loss_j": 308000000
+      },
+      "expected_disposition": "PASS"
+    },
+    {
+      "scenario_id": "HTTES-PLASMA-CANDIDATE-001",
+      "technology": "PLASMA_HEATER",
+      "evidence_class": "SYNTHETIC_ACCOUNTING_FIXTURE",
+      "energy_unit": "J",
+      "service": {
+        "service_contract_id": "INDUSTRIAL-HEAT-500C-1H",
+        "service_type": "process_heat",
+        "outlet_temperature_mK": 773150,
+        "outlet_pressure_pa": null,
+        "mass_flow_mg_s": null,
+        "delivery_duration_s": 3600,
+        "delivery_trace_digest": "synthetic-trace:heat-demand-500c-001"
+      },
+      "metering_mode": "NON_OVERLAPPING_BRANCH_METERS",
+      "wall_plug_inputs": [
+        {
+          "input_id": "heater-input",
+          "meter_boundary_id": "meter:heater-terminal",
+          "role": "PRIMARY_PROCESS",
+          "energy_j": 4000000000
+        },
+        {
+          "input_id": "aux-input",
+          "meter_boundary_id": "meter:auxiliary-bus",
+          "role": "AUXILIARY",
+          "energy_j": 100000000
+        }
+      ],
+      "charge": {
+        "stored_energy_increase_j": 3400000000,
+        "charge_conversion_loss_j": 600000000,
+        "auxiliary_dissipation_j": 100000000
+      },
+      "hold": {
+        "stored_energy_after_hold_j": 3230000000,
+        "storage_hold_loss_j": 170000000,
+        "hold_duration_s": 86400
+      },
+      "discharge": {
+        "stored_energy_withdrawn_j": 3230000000,
+        "useful_heat_delivered_j": 2770000000,
+        "discharge_loss_j": 460000000
+      },
+      "expected_disposition": "PASS"
+    },
+    {
+      "scenario_id": "HTTES-RESISTANCE-600C-001",
+      "technology": "RESISTANCE_JOULE_HEATER",
+      "evidence_class": "SYNTHETIC_ACCOUNTING_FIXTURE",
+      "energy_unit": "J",
+      "service": {
+        "service_contract_id": "INDUSTRIAL-HEAT-600C-1H",
+        "service_type": "process_heat",
+        "outlet_temperature_mK": 873150,
+        "outlet_pressure_pa": null,
+        "mass_flow_mg_s": null,
+        "delivery_duration_s": 3600,
+        "delivery_trace_digest": "synthetic-trace:heat-demand-600c-001"
+      },
+      "metering_mode": "NON_OVERLAPPING_BRANCH_METERS",
+      "wall_plug_inputs": [
+        {
+          "input_id": "heater-input",
+          "meter_boundary_id": "meter:heater-terminal",
+          "role": "PRIMARY_PROCESS",
+          "energy_j": 3600000000
+        },
+        {
+          "input_id": "aux-input",
+          "meter_boundary_id": "meter:auxiliary-bus",
+          "role": "AUXILIARY",
+          "energy_j": 180000000
+        }
+      ],
+      "charge": {
+        "stored_energy_increase_j": 3240000000,
+        "charge_conversion_loss_j": 360000000,
+        "auxiliary_dissipation_j": 180000000
+      },
+      "hold": {
+        "stored_energy_after_hold_j": 3078000000,
+        "storage_hold_loss_j": 162000000,
+        "hold_duration_s": 86400
+      },
+      "discharge": {
+        "stored_energy_withdrawn_j": 3078000000,
+        "useful_heat_delivered_j": 2770000000,
+        "discharge_loss_j": 308000000
+      },
+      "expected_disposition": "PASS"
+    },
+    {
+      "scenario_id": "NC-UNKNOWN-AUXILIARY-ENERGY",
+      "technology": "RESISTANCE_JOULE_HEATER",
+      "evidence_class": "SYNTHETIC_ACCOUNTING_FIXTURE",
+      "energy_unit": "J",
+      "service": {
+        "service_contract_id": "INDUSTRIAL-HEAT-500C-1H",
+        "service_type": "process_heat",
+        "outlet_temperature_mK": 773150,
+        "outlet_pressure_pa": null,
+        "mass_flow_mg_s": null,
+        "delivery_duration_s": 3600,
+        "delivery_trace_digest": "synthetic-trace:heat-demand-500c-001"
+      },
+      "metering_mode": "NON_OVERLAPPING_BRANCH_METERS",
+      "wall_plug_inputs": [
+        {
+          "input_id": "heater-input",
+          "meter_boundary_id": "meter:heater-terminal",
+          "role": "PRIMARY_PROCESS",
+          "energy_j": 3600000000
+        },
+        {
+          "input_id": "aux-input",
+          "meter_boundary_id": "meter:auxiliary-bus",
+          "role": "AUXILIARY",
+          "energy_j": null
+        }
+      ],
+      "charge": {
+        "stored_energy_increase_j": 3240000000,
+        "charge_conversion_loss_j": 360000000,
+        "auxiliary_dissipation_j": 180000000
+      },
+      "hold": {
+        "stored_energy_after_hold_j": 3078000000,
+        "storage_hold_loss_j": 162000000,
+        "hold_duration_s": 86400
+      },
+      "discharge": {
+        "stored_energy_withdrawn_j": 3078000000,
+        "useful_heat_delivered_j": 2770000000,
+        "discharge_loss_j": 308000000
+      },
+      "expected_disposition": "BLOCKED"
+    },
+    {
+      "scenario_id": "NC-MIXED-TOTAL-AND-BRANCH-METERS",
+      "technology": "RESISTANCE_JOULE_HEATER",
+      "evidence_class": "SYNTHETIC_ACCOUNTING_FIXTURE",
+      "energy_unit": "J",
+      "service": {
+        "service_contract_id": "INDUSTRIAL-HEAT-500C-1H",
+        "service_type": "process_heat",
+        "outlet_temperature_mK": 773150,
+        "outlet_pressure_pa": null,
+        "mass_flow_mg_s": null,
+        "delivery_duration_s": 3600,
+        "delivery_trace_digest": "synthetic-trace:heat-demand-500c-001"
+      },
+      "metering_mode": "TOTAL_METER_ONLY",
+      "wall_plug_inputs": [
+        {
+          "input_id": "total-input",
+          "meter_boundary_id": "meter:total-wall-plug",
+          "role": "TOTAL",
+          "energy_j": 3780000000
+        },
+        {
+          "input_id": "heater-input",
+          "meter_boundary_id": "meter:heater-terminal",
+          "role": "PRIMARY_PROCESS",
+          "energy_j": 3600000000
+        },
+        {
+          "input_id": "aux-input",
+          "meter_boundary_id": "meter:auxiliary-bus",
+          "role": "AUXILIARY",
+          "energy_j": 180000000
+        }
+      ],
+      "charge": {
+        "stored_energy_increase_j": 3240000000,
+        "charge_conversion_loss_j": 360000000,
+        "auxiliary_dissipation_j": 180000000
+      },
+      "hold": {
+        "stored_energy_after_hold_j": 3078000000,
+        "storage_hold_loss_j": 162000000,
+        "hold_duration_s": 86400
+      },
+      "discharge": {
+        "stored_energy_withdrawn_j": 3078000000,
+        "useful_heat_delivered_j": 2770000000,
+        "discharge_loss_j": 308000000
+      },
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "scenario_id": "NC-DUPLICATE-METER-BOUNDARY",
+      "technology": "RESISTANCE_JOULE_HEATER",
+      "evidence_class": "SYNTHETIC_ACCOUNTING_FIXTURE",
+      "energy_unit": "J",
+      "service": {
+        "service_contract_id": "INDUSTRIAL-HEAT-500C-1H",
+        "service_type": "process_heat",
+        "outlet_temperature_mK": 773150,
+        "outlet_pressure_pa": null,
+        "mass_flow_mg_s": null,
+        "delivery_duration_s": 3600,
+        "delivery_trace_digest": "synthetic-trace:heat-demand-500c-001"
+      },
+      "metering_mode": "NON_OVERLAPPING_BRANCH_METERS",
+      "wall_plug_inputs": [
+        {
+          "input_id": "heater-input",
+          "meter_boundary_id": "meter:heater-terminal",
+          "role": "PRIMARY_PROCESS",
+          "energy_j": 3600000000
+        },
+        {
+          "input_id": "aux-input",
+          "meter_boundary_id": "meter:heater-terminal",
+          "role": "AUXILIARY",
+          "energy_j": 180000000
+        }
+      ],
+      "charge": {
+        "stored_energy_increase_j": 3240000000,
+        "charge_conversion_loss_j": 360000000,
+        "auxiliary_dissipation_j": 180000000
+      },
+      "hold": {
+        "stored_energy_after_hold_j": 3078000000,
+        "storage_hold_loss_j": 162000000,
+        "hold_duration_s": 86400
+      },
+      "discharge": {
+        "stored_energy_withdrawn_j": 3078000000,
+        "useful_heat_delivered_j": 2770000000,
+        "discharge_loss_j": 308000000
+      },
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "scenario_id": "NC-CHARGE-BALANCE-MISMATCH",
+      "technology": "RESISTANCE_JOULE_HEATER",
+      "evidence_class": "SYNTHETIC_ACCOUNTING_FIXTURE",
+      "energy_unit": "J",
+      "service": {
+        "service_contract_id": "INDUSTRIAL-HEAT-500C-1H",
+        "service_type": "process_heat",
+        "outlet_temperature_mK": 773150,
+        "outlet_pressure_pa": null,
+        "mass_flow_mg_s": null,
+        "delivery_duration_s": 3600,
+        "delivery_trace_digest": "synthetic-trace:heat-demand-500c-001"
+      },
+      "metering_mode": "NON_OVERLAPPING_BRANCH_METERS",
+      "wall_plug_inputs": [
+        {
+          "input_id": "heater-input",
+          "meter_boundary_id": "meter:heater-terminal",
+          "role": "PRIMARY_PROCESS",
+          "energy_j": 3600000000
+        },
+        {
+          "input_id": "aux-input",
+          "meter_boundary_id": "meter:auxiliary-bus",
+          "role": "AUXILIARY",
+          "energy_j": 180000000
+        }
+      ],
+      "charge": {
+        "stored_energy_increase_j": 3140000000,
+        "charge_conversion_loss_j": 360000000,
+        "auxiliary_dissipation_j": 180000000
+      },
+      "hold": {
+        "stored_energy_after_hold_j": 3078000000,
+        "storage_hold_loss_j": 162000000,
+        "hold_duration_s": 86400
+      },
+      "discharge": {
+        "stored_energy_withdrawn_j": 3078000000,
+        "useful_heat_delivered_j": 2770000000,
+        "discharge_loss_j": 308000000
+      },
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "scenario_id": "NC-HOLD-BALANCE-MISMATCH",
+      "technology": "RESISTANCE_JOULE_HEATER",
+      "evidence_class": "SYNTHETIC_ACCOUNTING_FIXTURE",
+      "energy_unit": "J",
+      "service": {
+        "service_contract_id": "INDUSTRIAL-HEAT-500C-1H",
+        "service_type": "process_heat",
+        "outlet_temperature_mK": 773150,
+        "outlet_pressure_pa": null,
+        "mass_flow_mg_s": null,
+        "delivery_duration_s": 3600,
+        "delivery_trace_digest": "synthetic-trace:heat-demand-500c-001"
+      },
+      "metering_mode": "NON_OVERLAPPING_BRANCH_METERS",
+      "wall_plug_inputs": [
+        {
+          "input_id": "heater-input",
+          "meter_boundary_id": "meter:heater-terminal",
+          "role": "PRIMARY_PROCESS",
+          "energy_j": 3600000000
+        },
+        {
+          "input_id": "aux-input",
+          "meter_boundary_id": "meter:auxiliary-bus",
+          "role": "AUXILIARY",
+          "energy_j": 180000000
+        }
+      ],
+      "charge": {
+        "stored_energy_increase_j": 3240000000,
+        "charge_conversion_loss_j": 360000000,
+        "auxiliary_dissipation_j": 180000000
+      },
+      "hold": {
+        "stored_energy_after_hold_j": 2978000000,
+        "storage_hold_loss_j": 162000000,
+        "hold_duration_s": 86400
+      },
+      "discharge": {
+        "stored_energy_withdrawn_j": 3078000000,
+        "useful_heat_delivered_j": 2770000000,
+        "discharge_loss_j": 308000000
+      },
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "scenario_id": "NC-DISCHARGE-BALANCE-MISMATCH",
+      "technology": "RESISTANCE_JOULE_HEATER",
+      "evidence_class": "SYNTHETIC_ACCOUNTING_FIXTURE",
+      "energy_unit": "J",
+      "service": {
+        "service_contract_id": "INDUSTRIAL-HEAT-500C-1H",
+        "service_type": "process_heat",
+        "outlet_temperature_mK": 773150,
+        "outlet_pressure_pa": null,
+        "mass_flow_mg_s": null,
+        "delivery_duration_s": 3600,
+        "delivery_trace_digest": "synthetic-trace:heat-demand-500c-001"
+      },
+      "metering_mode": "NON_OVERLAPPING_BRANCH_METERS",
+      "wall_plug_inputs": [
+        {
+          "input_id": "heater-input",
+          "meter_boundary_id": "meter:heater-terminal",
+          "role": "PRIMARY_PROCESS",
+          "energy_j": 3600000000
+        },
+        {
+          "input_id": "aux-input",
+          "meter_boundary_id": "meter:auxiliary-bus",
+          "role": "AUXILIARY",
+          "energy_j": 180000000
+        }
+      ],
+      "charge": {
+        "stored_energy_increase_j": 3240000000,
+        "charge_conversion_loss_j": 360000000,
+        "auxiliary_dissipation_j": 180000000
+      },
+      "hold": {
+        "stored_energy_after_hold_j": 3078000000,
+        "storage_hold_loss_j": 162000000,
+        "hold_duration_s": 86400
+      },
+      "discharge": {
+        "stored_energy_withdrawn_j": 3078000000,
+        "useful_heat_delivered_j": 2670000000,
+        "discharge_loss_j": 308000000
+      },
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "scenario_id": "NC-INCOMPLETE-SERVICE-BOUNDARY",
+      "technology": "RESISTANCE_JOULE_HEATER",
+      "evidence_class": "SYNTHETIC_ACCOUNTING_FIXTURE",
+      "energy_unit": "J",
+      "service": {
+        "service_contract_id": "INDUSTRIAL-HEAT-500C-1H",
+        "service_type": "process_heat",
+        "outlet_temperature_mK": null,
+        "outlet_pressure_pa": null,
+        "mass_flow_mg_s": null,
+        "delivery_duration_s": 3600,
+        "delivery_trace_digest": "synthetic-trace:heat-demand-500c-001"
+      },
+      "metering_mode": "NON_OVERLAPPING_BRANCH_METERS",
+      "wall_plug_inputs": [
+        {
+          "input_id": "heater-input",
+          "meter_boundary_id": "meter:heater-terminal",
+          "role": "PRIMARY_PROCESS",
+          "energy_j": 3600000000
+        },
+        {
+          "input_id": "aux-input",
+          "meter_boundary_id": "meter:auxiliary-bus",
+          "role": "AUXILIARY",
+          "energy_j": 180000000
+        }
+      ],
+      "charge": {
+        "stored_energy_increase_j": 3240000000,
+        "charge_conversion_loss_j": 360000000,
+        "auxiliary_dissipation_j": 180000000
+      },
+      "hold": {
+        "stored_energy_after_hold_j": 3078000000,
+        "storage_hold_loss_j": 162000000,
+        "hold_duration_s": 86400
+      },
+      "discharge": {
+        "stored_energy_withdrawn_j": 3078000000,
+        "useful_heat_delivered_j": 2770000000,
+        "discharge_loss_j": 308000000
+      },
+      "expected_disposition": "BLOCKED"
+    },
+    {
+      "scenario_id": "NC-UNKNOWN-ENERGY-UNIT",
+      "technology": "RESISTANCE_JOULE_HEATER",
+      "evidence_class": "SYNTHETIC_ACCOUNTING_FIXTURE",
+      "energy_unit": "kWh",
+      "service": {
+        "service_contract_id": "INDUSTRIAL-HEAT-500C-1H",
+        "service_type": "process_heat",
+        "outlet_temperature_mK": 773150,
+        "outlet_pressure_pa": null,
+        "mass_flow_mg_s": null,
+        "delivery_duration_s": 3600,
+        "delivery_trace_digest": "synthetic-trace:heat-demand-500c-001"
+      },
+      "metering_mode": "NON_OVERLAPPING_BRANCH_METERS",
+      "wall_plug_inputs": [
+        {
+          "input_id": "heater-input",
+          "meter_boundary_id": "meter:heater-terminal",
+          "role": "PRIMARY_PROCESS",
+          "energy_j": 3600000000
+        },
+        {
+          "input_id": "aux-input",
+          "meter_boundary_id": "meter:auxiliary-bus",
+          "role": "AUXILIARY",
+          "energy_j": 180000000
+        }
+      ],
+      "charge": {
+        "stored_energy_increase_j": 3240000000,
+        "charge_conversion_loss_j": 360000000,
+        "auxiliary_dissipation_j": 180000000
+      },
+      "hold": {
+        "stored_energy_after_hold_j": 3078000000,
+        "storage_hold_loss_j": 162000000,
+        "hold_duration_s": 86400
+      },
+      "discharge": {
+        "stored_energy_withdrawn_j": 3078000000,
+        "useful_heat_delivered_j": 2770000000,
+        "discharge_loss_j": 308000000
+      },
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "scenario_id": "HTTES-TOTAL-METER-ONLY-REFERENCE",
+      "technology": "RESISTANCE_JOULE_HEATER",
+      "evidence_class": "SYNTHETIC_ACCOUNTING_FIXTURE",
+      "energy_unit": "J",
+      "service": {
+        "service_contract_id": "INDUSTRIAL-HEAT-500C-1H",
+        "service_type": "process_heat",
+        "outlet_temperature_mK": 773150,
+        "outlet_pressure_pa": null,
+        "mass_flow_mg_s": null,
+        "delivery_duration_s": 3600,
+        "delivery_trace_digest": "synthetic-trace:heat-demand-500c-001"
+      },
+      "metering_mode": "TOTAL_METER_ONLY",
+      "wall_plug_inputs": [
+        {
+          "input_id": "total-input",
+          "meter_boundary_id": "meter:total-wall-plug",
+          "role": "TOTAL",
+          "energy_j": 3780000000
+        }
+      ],
+      "charge": {
+        "stored_energy_increase_j": 3240000000,
+        "charge_conversion_loss_j": 360000000,
+        "auxiliary_dissipation_j": 180000000
+      },
+      "hold": {
+        "stored_energy_after_hold_j": 3078000000,
+        "storage_hold_loss_j": 162000000,
+        "hold_duration_s": 86400
+      },
+      "discharge": {
+        "stored_energy_withdrawn_j": 3078000000,
+        "useful_heat_delivered_j": 2770000000,
+        "discharge_loss_j": 308000000
+      },
+      "expected_disposition": "PASS"
+    },
+    {
+      "scenario_id": "NC-AUXILIARY-METER-OMITTED",
+      "technology": "RESISTANCE_JOULE_HEATER",
+      "evidence_class": "SYNTHETIC_ACCOUNTING_FIXTURE",
+      "energy_unit": "J",
+      "service": {
+        "service_contract_id": "INDUSTRIAL-HEAT-500C-1H",
+        "service_type": "process_heat",
+        "outlet_temperature_mK": 773150,
+        "outlet_pressure_pa": null,
+        "mass_flow_mg_s": null,
+        "delivery_duration_s": 3600,
+        "delivery_trace_digest": "synthetic-trace:heat-demand-500c-001"
+      },
+      "metering_mode": "NON_OVERLAPPING_BRANCH_METERS",
+      "wall_plug_inputs": [
+        {
+          "input_id": "heater-input",
+          "meter_boundary_id": "meter:heater-terminal",
+          "role": "PRIMARY_PROCESS",
+          "energy_j": 3600000000
+        }
+      ],
+      "charge": {
+        "stored_energy_increase_j": 3240000000,
+        "charge_conversion_loss_j": 360000000,
+        "auxiliary_dissipation_j": 0
+      },
+      "hold": {
+        "stored_energy_after_hold_j": 3078000000,
+        "storage_hold_loss_j": 162000000,
+        "hold_duration_s": 86400
+      },
+      "discharge": {
+        "stored_energy_withdrawn_j": 3078000000,
+        "useful_heat_delivered_j": 2770000000,
+        "discharge_loss_j": 308000000
+      },
+      "expected_disposition": "BLOCKED"
+    }
+  ],
+  "comparisons": [
+    {
+      "comparison_id": "CMP-RESISTANCE-VS-PLASMA-SAME-HEAT-SERVICE",
+      "baseline_scenario_id": "HTTES-RESISTANCE-BASELINE-001",
+      "candidate_scenario_id": "HTTES-PLASMA-CANDIDATE-001",
+      "expected_disposition": "COMPARABLE"
+    },
+    {
+      "comparison_id": "NC-CMP-500C-VS-600C",
+      "baseline_scenario_id": "HTTES-RESISTANCE-BASELINE-001",
+      "candidate_scenario_id": "HTTES-RESISTANCE-600C-001",
+      "expected_disposition": "NOT_COMPARABLE"
+    },
+    {
+      "comparison_id": "NC-CMP-VALID-VS-UNKNOWN-AUX",
+      "baseline_scenario_id": "HTTES-RESISTANCE-BASELINE-001",
+      "candidate_scenario_id": "NC-UNKNOWN-AUXILIARY-ENERGY",
+      "expected_disposition": "BLOCKED"
+    }
+  ]
+}
