@@ -15,6 +15,10 @@ members = [
 # members despite being listed below, because of this). `default-members`
 # below may still reference "." — only the `members` array triggers the bug.
 exclude = [
+    # Source/examples-only directory matched by crates/core/*; it has no Cargo.toml.
+    "crates/core/symthaea",
+    # Source-only attestation prototype; not a Cargo package until separately integrated.
+    "crates/core/symthaea-observation-attestation",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
