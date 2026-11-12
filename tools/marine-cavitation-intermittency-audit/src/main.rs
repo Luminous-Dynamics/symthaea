@@ -1321,8 +1321,8 @@ mod tests {
     #[test]
     fn malformed_nuclei_distribution_digest_is_invalid() {
         let mut input = case();
-        input.runs[0].water_condition.nuclei_distribution_evidence_sha256 =
-            Some("not-a-digest".to_string());
+        input.runs[0].water_condition.nuclei_distribution.as_mut().unwrap().evidence_sha256 =
+            "not-a-digest".to_string();
         assert_eq!(audit(&input).disposition, "INVALID");
     }
 
@@ -1330,10 +1330,81 @@ mod tests {
     fn partial_nuclei_distribution_evidence_coverage_is_incomplete() {
         let mut input = case();
         input.evidence_kind = EvidenceKind::Measured;
-        input.runs[1].water_condition.nuclei_distribution_evidence_sha256 = None;
+        input.runs[1].water_condition.nuclei_distribution = None;
         let report = audit(&input);
         assert_eq!(report.disposition, "INCOMPLETE");
         assert_eq!(report.nuclei_distribution_coverage_fraction, 0.5);
+    }
+
+    #[test]
+    fn same_total_but_shifted_nuclei_size_distribution_is_incomparable() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        let bins = &mut input.runs[1].water_condition.nuclei_distribution.as_mut().unwrap().bins;
+        bins[0].number_concentration_per_ml = 50.0;
+        bins[1].number_concentration_per_ml = 100.0;
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPARABLE_CONDITION");
+        let comparison = &report.nuclei_distribution_comparisons[0];
+        assert!((comparison.absolute_total_number_concentration_difference_per_ml.unwrap()).abs() < 1e-12);
+        assert!((comparison.wasserstein1_distance_um.unwrap() - 0.25).abs() < 1e-12);
+        assert_eq!(comparison.disposition, "outside_equivalence_tolerance");
+    }
+
+    #[test]
+    fn nuclei_population_total_concentration_is_a_separate_gate() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        let bins = &mut input.runs[1].water_condition.nuclei_distribution.as_mut().unwrap().bins;
+        bins[0].number_concentration_per_ml = 200.0;
+        bins[1].number_concentration_per_ml = 100.0;
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPARABLE_CONDITION");
+        let comparison = &report.nuclei_distribution_comparisons[0];
+        assert_eq!(comparison.wasserstein1_distance_um, Some(0.0));
+        assert!(comparison.total_number_concentration_difference_lower_per_ml.unwrap() > 100.0);
+    }
+
+    #[test]
+    fn nuclei_distribution_uncertainty_crossing_wasserstein_tolerance_is_incomplete() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        for bin in &mut input.runs[1].water_condition.nuclei_distribution.as_mut().unwrap().bins {
+            bin.expanded_uncertainty_per_ml = 25.0;
+        }
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(
+            report.nuclei_distribution_comparisons[0].disposition,
+            "uncertainty_overlaps_equivalence_tolerance"
+        );
+    }
+
+    #[test]
+    fn incompatible_nuclei_distribution_method_is_not_hidden_by_matching_alpha() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        input.runs[1].water_condition.nuclei_distribution.as_mut().unwrap().method_id =
+            "different-nuclei-method".to_string();
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPARABLE_CONDITION");
+        assert_eq!(
+            report.nuclei_distribution_comparisons[0].disposition,
+            "incomparable_distribution_method_or_binning"
+        );
+    }
+
+    #[test]
+    fn changed_nuclei_size_bins_are_incomparable_not_interpolated() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        input.runs[1].water_condition.nuclei_distribution.as_mut().unwrap().bins[0].diameter_upper_um = 0.9;
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPARABLE_CONDITION");
+        assert_eq!(
+            report.nuclei_distribution_comparisons[0].disposition,
+            "incomparable_distribution_method_or_binning"
+        );
     }
 
     #[test]
@@ -1353,7 +1424,7 @@ mod tests {
         let mut input = case();
         input.evidence_kind = EvidenceKind::Measured;
         for run in &mut input.runs {
-            run.water_condition.nuclei_distribution_evidence_sha256 = None;
+            run.water_condition.nuclei_distribution = None;
         }
         let report = audit(&input);
         assert_eq!(report.nuclei_distribution_coverage_fraction, 0.0);
@@ -1368,7 +1439,12 @@ mod tests {
         assert_eq!(water.measure, SusceptibilityMeasure::CavitationSusceptibilityAlpha);
         assert_eq!(water.method_id, "synthetic-alpha-method");
         assert_eq!(water.evidence_sha256, digest('6'));
+        assert_eq!(
+            water.nuclei_distribution.as_ref().unwrap().method_id,
+            "laser-optical-nuclei-counter-v1"
+        );
         assert_eq!(report.nuclei_distribution_coverage_fraction, 1.0);
+        assert_eq!(report.nuclei_distribution_comparisons.len(), 1);
     }
 
     #[test]
@@ -1385,14 +1461,25 @@ mod tests {
             "measure", "value", "unit", "expanded_uncertainty",
             "equivalence_tolerance", "method_id", "instrument_id",
             "calibration_certificate_sha256", "evidence_sha256",
-            "nuclei_distribution_evidence_sha256"
+            "nuclei_distribution"
         ] {
             assert!(schema["$defs"]["waterCondition"]["required"]
                 .as_array().unwrap().iter().any(|value| value == required));
         }
+        for required in [
+            "measurement_id", "method_id", "instrument_id",
+            "calibration_certificate_sha256", "evidence_sha256",
+            "sample_volume_ml", "number_concentration_equivalence_tolerance_per_ml",
+            "wasserstein1_equivalence_tolerance_um", "bins"
+        ] {
+            assert!(schema["$defs"]["nucleiDistribution"]["required"]
+                .as_array().unwrap().iter().any(|value| value == required));
+        }
         for run in fixture["runs"].as_array().unwrap() {
             assert!(run.get("water_condition").is_some());
-            assert_eq!(run["water_condition"]["evidence_sha256"].as_str().unwrap().len(), 64);
+            let distribution = &run["water_condition"]["nuclei_distribution"];
+            assert_eq!(distribution["evidence_sha256"].as_str().unwrap().len(), 64);
+            assert!(distribution["bins"].as_array().unwrap().len() >= 2);
         }
     }
 
