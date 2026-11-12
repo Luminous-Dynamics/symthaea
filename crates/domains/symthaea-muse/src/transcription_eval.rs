@@ -172,6 +172,8 @@ pub struct MidiTranscriptionEvaluationReportV1 {
     pub reference_manifest_sha256: String,
     pub prediction_midi_sha256: String,
     pub config: MidiTranscriptionEvaluationConfigV1,
+    /// Exact time-signature events declared by the prediction MIDI.
+    pub prediction_time_signature_points: Vec<MidiTimeSignaturePointV1>,
     pub reference_note_count: u32,
     pub prediction_note_count: u32,
     pub prediction_unclosed_note_count: u32,
@@ -271,6 +273,7 @@ struct ReportCommitmentV1<'a> {
     reference_manifest_sha256: &'a str,
     prediction_midi_sha256: &'a str,
     config: &'a MidiTranscriptionEvaluationConfigV1,
+    prediction_time_signature_points: &'a [MidiTimeSignaturePointV1],
     reference_note_count: u32,
     prediction_note_count: u32,
     prediction_unclosed_note_count: u32,
@@ -1758,6 +1761,7 @@ pub fn midi_transcription_evaluation_commitment_v1(
         reference_manifest_sha256: &report.reference_manifest_sha256,
         prediction_midi_sha256: &report.prediction_midi_sha256,
         config: &report.config,
+        prediction_time_signature_points: &report.prediction_time_signature_points,
         reference_note_count: report.reference_note_count,
         prediction_note_count: report.prediction_note_count,
         prediction_unclosed_note_count: report.prediction_unclosed_note_count,
@@ -1954,6 +1958,7 @@ pub fn evaluate_midi_transcription_v1(
         reference_manifest_sha256: reference.manifest_sha256.clone(),
         prediction_midi_sha256: sha256_hex(prediction_midi_bytes),
         config: config.clone(),
+        prediction_time_signature_points: parsed.time_signature_points.clone(),
         reference_note_count: u32::try_from(reference_notes.len()).unwrap_or(u32::MAX),
         prediction_note_count: u32::try_from(predicted_notes.len()).unwrap_or(u32::MAX),
         prediction_unclosed_note_count: parsed.unclosed_note_count,
@@ -2546,6 +2551,55 @@ mod tests {
             parse_transcribed_midi_v1(&bytes).unwrap_err(),
             MidiTranscriptionEvaluationIssueV1::ConflictingTimeSignature { tick: 0 }
         );
+    }
+
+    #[test]
+    fn explicit_three_four_meter_is_reported_as_reference_mismatch() {
+        let reference = reference_artifact(&[(60, 0, 480)], 40);
+        let prediction = build_midi_with_meter(&[(60, 0, 480)], 40, Some((3, 4)));
+        let report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.meter_metadata.prediction_initial_numerator, Some(3));
+        assert_eq!(report.meter_metadata.prediction_initial_denominator, Some(4));
+        assert_eq!(report.meter_metadata.prediction_initial_matches_reference, Some(false));
+        assert_eq!(report.prediction_time_signature_points.len(), 1);
+    }
+
+    #[test]
+    fn time_signature_parser_preserves_later_meter_changes() {
+        let events = vec![
+            (0, 0, 0, 4, 2, 24, 8),
+            (1_920, 0, 1, 3, 2, 24, 8),
+            (3_360, 0, 2, 5, 3, 24, 8),
+        ];
+        let points = time_signature_points_from_events(&events).unwrap();
+        assert_eq!(points.len(), 3);
+        assert_eq!(points[0].denominator, 4);
+        assert_eq!(points[1].start_tick, 1_920);
+        assert_eq!(points[1].numerator, 3);
+        assert_eq!(points[2].start_tick, 3_360);
+        assert_eq!(points[2].numerator, 5);
+        assert_eq!(points[2].denominator, 8);
+    }
+
+    #[test]
+    fn meter_metadata_and_events_are_bound_by_report_commitment() {
+        let reference = reference_artifact(&[(60, 0, 480)], 40);
+        let prediction = build_midi(&[(60, 0, 480)], 40, &[(0, 500_000)]);
+        let mut report = evaluate_midi_transcription_v1(
+            &prediction,
+            &reference,
+            default_config(),
+        )
+        .unwrap();
+        let original = midi_transcription_evaluation_commitment_v1(&report).unwrap();
+        report.prediction_time_signature_points[0].numerator = 3;
+        let tampered = midi_transcription_evaluation_commitment_v1(&report).unwrap();
+        assert_ne!(original, tampered);
     }
 
     #[test]
