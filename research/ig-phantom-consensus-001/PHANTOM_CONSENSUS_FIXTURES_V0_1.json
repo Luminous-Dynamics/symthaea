@@ -146,7 +146,8 @@
       "expected": {
         "validator_disposition": "pass",
         "phantom_consensus": false,
-        "rationale": "Private repeat baseline; peer estimates match the recorded roster."
+        "rationale": "Private repeat baseline; peer estimates match the recorded roster.",
+        "transparency_recovery_improves": false
       }
     },
     {
@@ -291,7 +292,8 @@
       "expected": {
         "validator_disposition": "pass",
         "phantom_consensus": false,
-        "rationale": "Neutral public text control."
+        "rationale": "Neutral public text control.",
+        "transparency_recovery_improves": false
       }
     },
     {
@@ -476,7 +478,8 @@
       "expected": {
         "validator_disposition": "pass",
         "phantom_consensus": true,
-        "rationale": "Synthetic phantom-consensus control: private peer plurality is A while perceived peer plurality is B."
+        "rationale": "Synthetic phantom-consensus control: private peer plurality is A while perceived peer plurality is B.",
+        "transparency_recovery_improves": false
       }
     },
     {
@@ -621,7 +624,8 @@
       "expected": {
         "validator_disposition": "pass",
         "phantom_consensus": false,
-        "rationale": "Ambiguous signal without a phantom-consensus outcome."
+        "rationale": "Ambiguous signal without a phantom-consensus outcome.",
+        "transparency_recovery_improves": false
       }
     },
     {
@@ -766,7 +770,8 @@
       "expected": {
         "validator_disposition": "pass",
         "phantom_consensus": false,
-        "rationale": "Separates explicit recommendation-following from mistaken inference about private peer beliefs."
+        "rationale": "Separates explicit recommendation-following from mistaken inference about private peer beliefs.",
+        "transparency_recovery_improves": false
       }
     },
     {
@@ -832,8 +837,8 @@
             "agent_id": "agent-1",
             "estimate_status": "reported",
             "probabilities_permille": {
-              "A": 500,
-              "B": 500,
+              "A": 200,
+              "B": 800,
               "C": 0,
               "ABSTAIN": 0,
               "UNKNOWN": 0
@@ -847,8 +852,8 @@
             "agent_id": "agent-2",
             "estimate_status": "reported",
             "probabilities_permille": {
-              "A": 500,
-              "B": 500,
+              "A": 200,
+              "B": 800,
               "C": 0,
               "ABSTAIN": 0,
               "UNKNOWN": 0
@@ -862,8 +867,8 @@
             "agent_id": "agent-3",
             "estimate_status": "reported",
             "probabilities_permille": {
-              "A": 500,
-              "B": 500,
+              "A": 200,
+              "B": 800,
               "C": 0,
               "ABSTAIN": 0,
               "UNKNOWN": 0
@@ -877,8 +882,8 @@
             "agent_id": "agent-4",
             "estimate_status": "reported",
             "probabilities_permille": {
-              "A": 750,
-              "B": 250,
+              "A": 200,
+              "B": 800,
               "C": 0,
               "ABSTAIN": 0,
               "UNKNOWN": 0
@@ -892,8 +897,8 @@
             "agent_id": "agent-5",
             "estimate_status": "reported",
             "probabilities_permille": {
-              "A": 750,
-              "B": 250,
+              "A": 200,
+              "B": 800,
               "C": 0,
               "ABSTAIN": 0,
               "UNKNOWN": 0
@@ -972,8 +977,9 @@
       },
       "expected": {
         "validator_disposition": "pass",
-        "phantom_consensus": false,
-        "rationale": "Verified anonymous tally is disclosed after the post-signal estimate, without revealing the answer key."
+        "phantom_consensus": true,
+        "rationale": "Verified anonymous tally is disclosed after the post-signal estimate, without revealing the answer key.",
+        "transparency_recovery_improves": true
       }
     },
     {
@@ -1039,8 +1045,8 @@
             "agent_id": "agent-1",
             "estimate_status": "reported",
             "probabilities_permille": {
-              "A": 500,
-              "B": 500,
+              "A": 200,
+              "B": 800,
               "C": 0,
               "ABSTAIN": 0,
               "UNKNOWN": 0
@@ -1054,8 +1060,8 @@
             "agent_id": "agent-2",
             "estimate_status": "reported",
             "probabilities_permille": {
-              "A": 500,
-              "B": 500,
+              "A": 200,
+              "B": 800,
               "C": 0,
               "ABSTAIN": 0,
               "UNKNOWN": 0
@@ -1069,8 +1075,8 @@
             "agent_id": "agent-3",
             "estimate_status": "reported",
             "probabilities_permille": {
-              "A": 500,
-              "B": 500,
+              "A": 200,
+              "B": 800,
               "C": 0,
               "ABSTAIN": 0,
               "UNKNOWN": 0
@@ -1084,8 +1090,8 @@
             "agent_id": "agent-4",
             "estimate_status": "reported",
             "probabilities_permille": {
-              "A": 750,
-              "B": 250,
+              "A": 200,
+              "B": 800,
               "C": 0,
               "ABSTAIN": 0,
               "UNKNOWN": 0
@@ -1099,8 +1105,8 @@
             "agent_id": "agent-5",
             "estimate_status": "reported",
             "probabilities_permille": {
-              "A": 750,
-              "B": 250,
+              "A": 200,
+              "B": 800,
               "C": 0,
               "ABSTAIN": 0,
               "UNKNOWN": 0
@@ -1199,8 +1205,9 @@
       },
       "expected": {
         "validator_disposition": "pass",
-        "phantom_consensus": false,
-        "rationale": "Verified peer-level private records are disclosed after the post-signal estimate, without revealing the answer key."
+        "phantom_consensus": true,
+        "rationale": "Verified peer-level private records are disclosed after the post-signal estimate, without revealing the answer key.",
+        "transparency_recovery_improves": true
       }
     },
     {
@@ -1351,7 +1358,8 @@
       "expected": {
         "validator_disposition": "pass",
         "phantom_consensus": false,
-        "rationale": "Fabricated tally is explicitly unverified and must not replace the committed private baseline."
+        "rationale": "Fabricated tally is explicitly unverified and must not replace the committed private baseline.",
+        "transparency_recovery_improves": false
       }
     },
     {
@@ -1496,7 +1504,8 @@
       "expected": {
         "validator_disposition": "pass",
         "phantom_consensus": false,
-        "rationale": "Abstentions remain explicit; a tied A/B aggregate is NO_DECISION, not manufactured consensus."
+        "rationale": "Abstentions remain explicit; a tied A/B aggregate is NO_DECISION, not manufactured consensus.",
+        "transparency_recovery_improves": false
       }
     },
     {
@@ -1641,7 +1650,8 @@
       "expected": {
         "validator_disposition": "indeterminate",
         "phantom_consensus": false,
-        "rationale": "An unrecorded private judgment remains UNKNOWN in every peer denominator; the fixture is indeterminate."
+        "rationale": "An unrecorded private judgment remains UNKNOWN in every peer denominator; the fixture is indeterminate.",
+        "transparency_recovery_improves": false
       }
     },
     {
@@ -1786,7 +1796,8 @@
       "expected": {
         "validator_disposition": "reject",
         "phantom_consensus": false,
-        "rationale": "Duplicate AgentInstanceId is a deliberate negative control and must be rejected."
+        "rationale": "Duplicate AgentInstanceId is a deliberate negative control and must be rejected.",
+        "transparency_recovery_improves": false
       }
     },
     {
@@ -1931,7 +1942,8 @@
       "expected": {
         "validator_disposition": "pass",
         "phantom_consensus": false,
-        "rationale": "Multiple legitimate fictional priorities; the recorded distribution is measurable but no gold policy choice exists."
+        "rationale": "Multiple legitimate fictional priorities; the recorded distribution is measurable but no gold policy choice exists.",
+        "transparency_recovery_improves": false
       }
     }
   ]
