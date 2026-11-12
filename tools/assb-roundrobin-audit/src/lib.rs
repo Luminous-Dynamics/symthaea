@@ -352,11 +352,20 @@ fn group_comparability(
     }
 
     let minimum = per_lab.values().map(BTreeSet::len).min().unwrap_or(0);
-    let synthetic = rows.iter().all(|row| {
-        evidence
-            .get(row.evidence_id.as_str())
-            .is_some_and(|e| e.evidence_class == EvidenceClass::Synthetic)
-    });
+    let synthetic_count = rows
+        .iter()
+        .filter(|row| {
+            evidence
+                .get(row.evidence_id.as_str())
+                .is_some_and(|e| e.evidence_class == EvidenceClass::Synthetic)
+        })
+        .count();
+    if synthetic_count != 0 && synthetic_count != rows.len() {
+        return Err(AuditError(format!(
+            "replicate group {group_id} mixes synthetic fixtures with physical observations"
+        )));
+    }
+    let synthetic = synthetic_count == rows.len();
     let comparability = if synthetic {
         GroupComparability::KnownAnswerFixtureOnly
     } else {
@@ -732,9 +741,6 @@ mod tests {
             }
         }
         for observation in &mut manifest.observations {
-            observation.evidence_id = observation
-                .evidence_id
-                .replace("SYNTHETIC-EVIDENCE", "SYNTHETIC-EVIDENCE");
             observation.outcome_status = OutcomeStatus::RightCensored;
             observation.event_cycle = None;
         }
@@ -773,9 +779,14 @@ mod tests {
     #[test]
     fn cross_lab_native_protocol_group_is_rejected_from_pooling() {
         let mut manifest = fixture_manifest();
-        manifest.observations[0].protocol_mode = ProtocolMode::LabNative;
-        manifest.observations[1].protocol_mode = ProtocolMode::LabNative;
-        manifest.observations[2].protocol_mode = ProtocolMode::LabNative;
+        manifest.observations = vec![
+            manifest.observations[0].clone(),
+            manifest.observations[3].clone(),
+            manifest.observations[6].clone(),
+        ];
+        for observation in &mut manifest.observations {
+            observation.protocol_mode = ProtocolMode::LabNative;
+        }
         assert!(audit_manifest(&manifest).is_err());
     }
 
@@ -797,9 +808,28 @@ mod tests {
     #[test]
     fn right_censoring_remains_distinct() {
         let mut manifest = fixture_manifest();
+        manifest.laboratories.retain(|lab| lab.lab_id == "LAB-A");
+        manifest.fixtures.retain(|fixture| fixture.fixture_id == "FIX-A");
+        manifest.cells.retain(|cell| cell.cell_id == "LAB-A-CELL-1");
+        manifest
+            .observations
+            .retain(|observation| observation.observation_id == "LAB-A-OBS-1");
+        manifest.evidence.retain(|record| {
+            record.evidence_id == "SYNTHETIC-CAL-A"
+                || record.evidence_id == "SYNTHETIC-EVIDENCE-A-1"
+        });
+        for record in &mut manifest.evidence {
+            record.evidence_class = if record.evidence_id == "SYNTHETIC-CAL-A" {
+                EvidenceClass::IndependentLaboratory
+            } else {
+                EvidenceClass::PhysicalMeasurement
+            };
+            record.metrology_ref = Some(format!("MET-{}", record.evidence_id));
+        }
         manifest.observations[0].outcome_status = OutcomeStatus::RightCensored;
         manifest.observations[0].event_cycle = None;
-        assert_eq!(audit_manifest(&manifest).unwrap().right_censored_count, 0);
+        let report = audit_manifest(&manifest).expect("physical right-censored record valid");
+        assert_eq!(report.right_censored_count, 1);
     }
 
     #[test]
