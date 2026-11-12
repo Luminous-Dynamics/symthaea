@@ -617,16 +617,40 @@ fn weighted_quantile(values: &[(f64, f64)], probability: f64) -> Option<f64> {
 
 fn compute_field_summary(field: &WakeField) -> FieldSummary {
     let total = field.points.len() as f64;
-    let axial = field.points.iter().filter(|p| p.vx_over_vref.is_some()).count() as f64 / total;
-    let radial = field.points.iter().filter(|p| p.vr_over_vref.is_some()).count() as f64 / total;
-    let tangential = field.points.iter().filter(|p| p.vt_over_vref.is_some()).count() as f64 / total;
-    let weight_sum: f64 = field.points.iter().map(|p| p.area_weight).sum();
-    let wake_fraction = if axial >= 1.0 - GRID_TOLERANCE {
-        Some(1.0 - field.points.iter().map(|p| p.area_weight * p.vx_over_vref.as_ref().unwrap().value).sum::<f64>())
-    } else { None };
-    let wake_bound = if axial >= 1.0 - GRID_TOLERANCE {
-        Some(field.points.iter().map(|p| p.area_weight * p.vx_over_vref.as_ref().unwrap().expanded_uncertainty).sum::<f64>())
-    } else { None };
+    let (axial, radial, tangential, weight_sum) = if total > 0.0 {
+        (
+            field.points.iter().filter(|p| p.vx_over_vref.is_some()).count() as f64 / total,
+            field.points.iter().filter(|p| p.vr_over_vref.is_some()).count() as f64 / total,
+            field.points.iter().filter(|p| p.vt_over_vref.is_some()).count() as f64 / total,
+            field.points.iter().filter(|p| p.area_weight.is_finite()).map(|p| p.area_weight).sum::<f64>(),
+        )
+    } else {
+        (0.0, 0.0, 0.0, 0.0)
+    };
+    let valid_axial_quadrature = total > 0.0
+        && field.points.iter().all(|point| {
+            point.area_weight.is_finite()
+                && point.area_weight > 0.0
+                && point.vx_over_vref.as_ref().is_some_and(|component| {
+                    component.value.is_finite() && component.expanded_uncertainty.is_finite()
+                })
+        });
+    let wake_fraction = if valid_axial_quadrature {
+        let value = 1.0 - field.points.iter()
+            .map(|point| point.area_weight * point.vx_over_vref.as_ref().unwrap().value)
+            .sum::<f64>();
+        value.is_finite().then_some(value)
+    } else {
+        None
+    };
+    let wake_bound = if valid_axial_quadrature {
+        let value = field.points.iter()
+            .map(|point| point.area_weight * point.vx_over_vref.as_ref().unwrap().expanded_uncertainty)
+            .sum::<f64>();
+        value.is_finite().then_some(value)
+    } else {
+        None
+    };
     FieldSummary {
         field_id: field.field_id.clone(),
         method: method_name(field.method),
