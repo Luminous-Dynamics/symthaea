@@ -574,7 +574,7 @@ mod tests {
         let (negative, positive) =
             validate_semantic_corpus(&semantics).expect("semantic corpus is consistent");
         assert_eq!((negative, positive), (26, 4));
-        assert_eq!(validate_source_manifest(&sources).unwrap(), 21);
+        assert_eq!(validate_source_manifest(&sources).unwrap(), 26);
     }
 
     #[test]
