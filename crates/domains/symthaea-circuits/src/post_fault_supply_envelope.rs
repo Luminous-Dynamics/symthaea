@@ -68,6 +68,8 @@ pub enum SupplyProfileError {
     EmptyIdentity(&'static str),
     NoCriticalLoads,
     DuplicateCriticalLoadId(String),
+    NonCanonicalCriticalLoadOrder,
+    NonCanonicalSegmentLoadOrder { segment_id: String },
     NoSegments,
     EmptySegmentId,
     DuplicateSegmentId(String),
@@ -258,6 +260,11 @@ fn validate_profile(profile: &PostFaultSupplyProfile) -> Result<(), SupplyProfil
         return Err(SupplyProfileError::NoCriticalLoads);
     }
     for (index, load_id) in profile.critical_load_ids.iter().enumerate() {
+        if index > 0
+            && profile.critical_load_ids[index - 1].as_str() >= load_id.as_str()
+        {
+            return Err(SupplyProfileError::NonCanonicalCriticalLoadOrder);
+        }
         if load_id.trim().is_empty() {
             return Err(SupplyProfileError::EmptyIdentity("critical_load_id"));
         }
@@ -300,7 +307,15 @@ fn validate_profile(profile: &PostFaultSupplyProfile) -> Result<(), SupplyProfil
         }
 
         let mut observed_load_ids = Vec::with_capacity(segment.critical_loads.len());
-        for load in &segment.critical_loads {
+        for (load_index, load) in segment.critical_loads.iter().enumerate() {
+            if load_index > 0
+                && segment.critical_loads[load_index - 1].load_id.as_str()
+                    >= load.load_id.as_str()
+            {
+                return Err(SupplyProfileError::NonCanonicalSegmentLoadOrder {
+                    segment_id: segment.segment_id.clone(),
+                });
+            }
             if observed_load_ids.contains(&load.load_id) {
                 return Err(SupplyProfileError::DuplicateLoadInSegment {
                     segment_id: segment.segment_id.clone(),
@@ -514,6 +529,43 @@ mod tests {
         assert_eq!(
             evaluate_post_fault_supply(&p),
             Err(SupplyProfileError::EmptyIdentity("configuration_digest"))
+        );
+    }
+
+    #[test]
+    fn multiple_critical_loads_are_aggregated_and_order_is_canonical() {
+        let mut p = profile(
+            1_000,
+            vec![PostFaultSupplySegment {
+                segment_id: "two-loads".to_string(),
+                start_seconds: 0,
+                duration_seconds: 1,
+                non_storage_source_capacity_lower_w: 100,
+                storage_discharge_power_lower_w: 100,
+                critical_loads: vec![
+                    available_load("critical-a", 80),
+                    available_load("critical-b", 70),
+                ],
+            }],
+        );
+        p.critical_load_ids = vec![
+            "critical-a".to_string(),
+            "critical-b".to_string(),
+        ];
+        assert_eq!(
+            evaluate_post_fault_supply(&p).unwrap(),
+            ElectricalSupplyDisposition::SustainedElectricalSupply {
+                total_duration_seconds: 1,
+                maximum_storage_power_required_w: 50,
+                required_storage_energy_j: 50,
+                remaining_storage_energy_lower_j: 950,
+            }
+        );
+
+        p.critical_load_ids.reverse();
+        assert_eq!(
+            evaluate_post_fault_supply(&p),
+            Err(SupplyProfileError::NonCanonicalCriticalLoadOrder)
         );
     }
 
