@@ -17,7 +17,7 @@ use std::collections::HashSet;
 use serde::{Deserialize, Serialize};
 
 /// Property names and states are aligned with OLI M0 fixture v0.1.
-pub const SYMTHAEA_OLI_CONTEXT_VERSION: &str = "symthaea-oli-context-v0.4.0";
+pub const SYMTHAEA_OLI_CONTEXT_VERSION: &str = "symthaea-oli-context-v0.5.0";
 
 /// Substrate-agnostic properties using the canonical OLI M0 property keys.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -332,12 +332,20 @@ impl EvidenceConflict {
             }
             match evidence.iter().find(|record| record.id == *id) {
                 Some(record) => {
+                    if matches!(
+                        record.outcome,
+                        EvidenceOutcome::InvalidMeasurement | EvidenceOutcome::NotAcquired
+                    ) {
+                        issues.push(format!(
+                            "{path} cannot use unusable supporting evidence id {id} in a conflict"
+                        ));
+                    }
                     if let Some(digest) = &record.artifact_sha256 {
                         supporting_artifacts.insert(digest.to_ascii_lowercase());
                     }
                     match &record.independence_group {
                         Some(group) if !group.trim().is_empty() => {
-                            supporting_groups.insert(group.clone());
+                            supporting_groups.insert(group.trim().to_owned());
                         }
                         _ => groups_complete = false,
                     }
@@ -361,12 +369,20 @@ impl EvidenceConflict {
             }
             match evidence.iter().find(|record| record.id == *id) {
                 Some(record) => {
+                    if matches!(
+                        record.outcome,
+                        EvidenceOutcome::InvalidMeasurement | EvidenceOutcome::NotAcquired
+                    ) {
+                        issues.push(format!(
+                            "{path} cannot use unusable contradicting evidence id {id} in a conflict"
+                        ));
+                    }
                     if let Some(digest) = &record.artifact_sha256 {
                         contradicting_artifacts.insert(digest.to_ascii_lowercase());
                     }
                     match &record.independence_group {
                         Some(group) if !group.trim().is_empty() => {
-                            contradicting_groups.insert(group.clone());
+                            contradicting_groups.insert(group.trim().to_owned());
                         }
                         _ => groups_complete = false,
                     }
@@ -538,6 +554,15 @@ impl SystemProfile {
                     "{path}.independence_group must be omitted rather than empty"
                 ));
             }
+            if record
+                .independence_group
+                .as_ref()
+                .is_some_and(|group| group.trim() != group)
+            {
+                issues.push(format!(
+                    "{path}.independence_group must not contain leading or trailing whitespace"
+                ));
+            }
             if let Some(digest) = &record.artifact_sha256
                 && (digest.len() != 64 || !digest.bytes().all(|byte| byte.is_ascii_hexdigit()))
             {
@@ -588,15 +613,17 @@ impl SystemProfile {
                     }
                 }
                 PropertyAssessment::NotObservableWithCurrentInstrument => {
-                    let has_instrument_limitation = finding.evidence_ids.iter().any(|id| {
+                    let has_sourced_instrument_limitation = finding.evidence_ids.iter().any(|id| {
                         self.evidence.iter().any(|record| {
                             record.id == *id
                                 && record.outcome == EvidenceOutcome::InstrumentLimitation
+                                && (record.source_ref.as_ref().is_some_and(|source| !source.trim().is_empty())
+                                    || record.artifact_sha256.is_some())
                         })
                     });
-                    if !has_instrument_limitation {
+                    if !has_sourced_instrument_limitation {
                         issues.push(format!(
-                            "{path} NotObservable requires linked InstrumentLimitation evidence; InvalidMeasurement and NoDetection are not instrument-capability proofs"
+                            "{path} NotObservable requires sourced InstrumentLimitation evidence with source_ref or artifact_sha256; InvalidMeasurement and NoDetection are not instrument-capability proofs"
                         ));
                     }
                     if finding.coverage.is_none() {
