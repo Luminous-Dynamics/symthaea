@@ -1106,7 +1106,7 @@ mod tests {
         for required in [
             "coordinate_frame", "angular_origin", "positive_azimuth",
             "axial_positive_direction", "area_weight_method_id",
-            "area_weight_evidence_sha256"
+            "area_weight_evidence_sha256", "operating_point_receipt_sha256"
         ] {
             assert!(schema["$defs"]["wakeField"]["required"]
                 .as_array().unwrap().iter().any(|value| value == required));
@@ -1119,6 +1119,18 @@ mod tests {
         assert_eq!(report.component_metrics.len(), 3);
         assert_eq!(report.cell_comparisons.len(), 72);
         assert!(report.blockage.below_ittc_twenty_percent_recommendation);
+        assert_eq!(
+            fixture.target.operating_point_receipt_sha256,
+            digest('8')
+        );
+        assert_eq!(
+            fixture.realized.operating_point_receipt_sha256,
+            digest('9')
+        );
+        assert_ne!(
+            report.target_summary.operating_point_receipt_sha256,
+            report.realized_summary.operating_point_receipt_sha256
+        );
     }
 
     #[test]
