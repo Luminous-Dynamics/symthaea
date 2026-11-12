@@ -58,7 +58,7 @@ Compare not only one plasma cell against one incumbent, but also line speed, tre
 
 ## Frozen first comparison
 
-Use one exact rigid-plastic adherend / adhesive pair for the first lap-shear comparison. The appropriate method candidate is ASTM D3163-01(2023), intended for comparative single-lap shear testing of adhesively bonded rigid-plastic joints. It is not a design-allowables method.
+Use one exact rigid-plastic adherend / adhesive pair for the first lap-shear comparison. For direct reconstruction of Péczi-Kovács and Kókai (2026), preserve their PET-G / adhesive and PP / adhesive material identities and use **ISO 4587:2003**, the method used in their study. ISO lists this edition as published/current and states that it specifies tensile lap-shear strength for rigid-to-rigid bonded assemblies; it does not provide design information. The standard was confirmed in 2021 and entered systematic review in July 2026. ASTM D3163-01(2023) may be selected for a separate protocol where appropriate, but results from different standards or specimen preparation must remain distinct.
 
 Freeze these arms before tuning:
 - untreated control;
