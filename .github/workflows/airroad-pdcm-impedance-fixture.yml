@@ -5,7 +5,10 @@ on:
     paths:
       - "docs/research/AIRROAD_PDCM_IMPEDANCE_001_V0_1.md"
       - "docs/research/fixtures/airroad-pdcm-two-converter-shared-source-v0.1.json"
+      - "docs/research/AIRROAD_PDCM_ROBUST_STABILITY_001_V0_1.md"
+      - "docs/research/fixtures/airroad-pdcm-robust-stability-v0.1.json"
       - "tools/airroad-pdcm-impedance-qualifier/verify_two_converter_fixture.py"
+      - "tools/airroad-pdcm-impedance-qualifier/verify_robust_bounds.py"
       - "crates/domains/symthaea-circuits/src/dc_bus_interaction.rs"
       - "crates/domains/symthaea-circuits/src/lib.rs"
       - "crates/domains/symthaea-circuits/README.md"
@@ -16,7 +19,10 @@ on:
     paths:
       - "docs/research/AIRROAD_PDCM_IMPEDANCE_001_V0_1.md"
       - "docs/research/fixtures/airroad-pdcm-two-converter-shared-source-v0.1.json"
+      - "docs/research/AIRROAD_PDCM_ROBUST_STABILITY_001_V0_1.md"
+      - "docs/research/fixtures/airroad-pdcm-robust-stability-v0.1.json"
       - "tools/airroad-pdcm-impedance-qualifier/verify_two_converter_fixture.py"
+      - "tools/airroad-pdcm-impedance-qualifier/verify_robust_bounds.py"
       - "crates/domains/symthaea-circuits/src/dc_bus_interaction.rs"
       - "crates/domains/symthaea-circuits/src/lib.rs"
       - "crates/domains/symthaea-circuits/README.md"
@@ -42,6 +48,10 @@ jobs:
         run: python3 -m py_compile tools/airroad-pdcm-impedance-qualifier/verify_two_converter_fixture.py
       - name: Verify exact-rational shared-source interaction fixture
         run: python3 tools/airroad-pdcm-impedance-qualifier/verify_two_converter_fixture.py
+      - name: Compile and verify robust hard-bound fixture
+        run: |
+          python3 -m py_compile tools/airroad-pdcm-impedance-qualifier/verify_robust_bounds.py
+          python3 tools/airroad-pdcm-impedance-qualifier/verify_robust_bounds.py
       - name: Check circuits crate formatting without workspace resolution
         run: rustfmt --edition 2024 --check crates/domains/symthaea-circuits/src/lib.rs
       - name: Compile and run zero-dependency circuits tests
