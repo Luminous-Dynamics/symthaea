@@ -84,6 +84,16 @@ pub enum Determinism {
     Nondeterministic,
 }
 
+impl Determinism {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Deterministic => "deterministic",
+            Self::Seeded => "seeded",
+            Self::Nondeterministic => "nondeterministic",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub enum EvidenceKind {
     EditExecution,
@@ -1012,6 +1022,25 @@ mod tests {
             plan.seal_sha256("not-a-digest").unwrap_err().kind,
             PlanErrorKind::InvalidRequestDigest
         );
+    }
+
+    #[test]
+    fn canonical_plan_binds_normalized_request_budget() {
+        let original = compile_plan(&request(), &registry()).unwrap();
+        let mut changed_request = request();
+        changed_request.budget.max_latency_ms += 1;
+        let changed = compile_plan(&changed_request, &registry()).unwrap();
+        assert_ne!(original.canonical_bytes, changed.canonical_bytes);
+    }
+
+    #[test]
+    fn canonical_plan_binds_operator_version_and_artifact_digest() {
+        let original = compile_plan(&request(), &registry()).unwrap();
+        let mut changed_registry = registry();
+        changed_registry.operators[0].version = "2026.11".into();
+        changed_registry.operators[0].artifact_sha256 = DIGEST_C.into();
+        let changed = compile_plan(&request(), &changed_registry).unwrap();
+        assert_ne!(original.canonical_bytes, changed.canonical_bytes);
     }
 
     #[test]
