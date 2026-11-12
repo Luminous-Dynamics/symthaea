@@ -1,0 +1,117 @@
+{
+  "schema_version": "0.1.0",
+  "case_id": "synthetic-known-answer-001",
+  "evidence_kind": "synthetic",
+  "source": {
+    "dataset_id": "synthetic-fixture",
+    "citation": "Synthetic known-answer fixture; not measured data",
+    "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rights_status": "unknown",
+    "independently_reviewed": false
+  },
+  "scaling": {
+    "method_id": "ITTC-7.5-02-03-03.9-2024-Rev03",
+    "frequency_regime": "low_frequency",
+    "frequency_regime_basis": "Synthetic test selection only; no physical regime claim",
+    "bandwidth": "proportional",
+    "representation": "power_spectrum"
+  },
+  "similarity": {
+    "wake": "qualified",
+    "cavitation_pattern": "qualified",
+    "gas_nuclei_state": "qualified",
+    "reynolds_scale_review": "reviewed",
+    "facility_transfer_function": "measured_and_applied"
+  },
+  "frequency_match_tolerance_fraction": 0.01,
+  "pairs": [
+    {
+      "pair_id": "pair-1",
+      "shared_timebase_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "scale_transfer_u95_db": 0.4,
+      "model": {
+        "run_id": "model-1",
+        "operating_point_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "raw_trace_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "diameter_m": 0.25,
+        "rpm_hz": 20,
+        "cavitation_number_n_d": 1,
+        "source_reference_distance_m": 1,
+        "bands": [
+          {
+            "band_id": "bpf-fundamental",
+            "center_frequency_hz": 200,
+            "total_spl_db": 110,
+            "background_spl_db": 100,
+            "facility_transfer_function_db": 20,
+            "total_u95_db": 0.2,
+            "background_u95_db": 0.2,
+            "facility_transfer_u95_db": 0.1
+          }
+        ]
+      },
+      "full_scale": {
+        "run_id": "full-1",
+        "operating_point_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "raw_trace_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "diameter_m": 5,
+        "rpm_hz": 1,
+        "cavitation_number_n_d": 1,
+        "source_reference_distance_m": 1,
+        "source_level_method_id": "declared-independent-source-level-method",
+        "bands": [
+          {
+            "band_id": "bpf-fundamental",
+            "center_frequency_hz": 10,
+            "source_level_db": 115.56242509439325,
+            "source_level_u95_db": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "pair_id": "pair-2",
+      "shared_timebase_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "scale_transfer_u95_db": 0.4,
+      "model": {
+        "run_id": "model-2",
+        "operating_point_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "raw_trace_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "diameter_m": 0.25,
+        "rpm_hz": 22,
+        "cavitation_number_n_d": 1,
+        "source_reference_distance_m": 1,
+        "bands": [
+          {
+            "band_id": "bpf-fundamental",
+            "center_frequency_hz": 220,
+            "total_spl_db": 111,
+            "background_spl_db": 101,
+            "facility_transfer_function_db": 20,
+            "total_u95_db": 0.2,
+            "background_u95_db": 0.2,
+            "facility_transfer_u95_db": 0.1
+          }
+        ]
+      },
+      "full_scale": {
+        "run_id": "full-2",
+        "operating_point_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "raw_trace_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "diameter_m": 5,
+        "rpm_hz": 1.1,
+        "cavitation_number_n_d": 1,
+        "source_reference_distance_m": 1,
+        "source_level_method_id": "declared-independent-source-level-method",
+        "bands": [
+          {
+            "band_id": "bpf-fundamental",
+            "center_frequency_hz": 11,
+            "source_level_db": 116.56242509439325,
+            "source_level_u95_db": 0.5
+          }
+        ]
+      }
+    }
+  ]
+}
