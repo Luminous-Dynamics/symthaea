@@ -6,6 +6,11 @@
 //! classify a musician's work as one of Muse's territories and do not mutate
 //! any shared Foundry or learning corpus.
 
+use crate::evidence_digest::sha256_hex;
+use crate::musicxml_barline_adapter::{
+    parse_musicxml_part_notation_graph, MusicXmlMeasureAdapterError,
+    MusicXmlPartNotationGraphV1,
+};
 use midly::{MetaMessage, MidiMessage, Smf, TrackEventKind};
 use std::collections::{BTreeSet, HashMap};
 use symthaea_muse_protocol::{
@@ -22,6 +27,76 @@ struct RawNote {
     onset: u64,
     duration: u64,
     velocity: u8,
+}
+
+/// Structure evidence accompanying a note-centric Score import.
+///
+/// A successful Score parse does not imply a supported measure/barline map.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ImportedNotationStructureV1 {
+    /// Exact per-part MusicXML measure maps and typed boundary events.
+    MusicXmlPartGraphs(Vec<MusicXmlPartNotationGraphV1>),
+    /// The source imported as a Score, but did not supply enough explicit
+    /// structure to claim a measure/barline map.
+    Unknown { reason: String },
+    /// The source representation is not supported by the current structure
+    /// adapter, while the legacy note-centric Score may still be usable.
+    Unsupported { reason: String },
+}
+
+/// Structured import result. The legacy Score remains available unchanged;
+/// notation structure and its availability are carried beside it.
+#[derive(Clone, Debug)]
+pub struct StructuredSymbolicImportV1 {
+    pub source_format: SymbolicImportFormat,
+    pub source_sha256: String,
+    pub score: Score,
+    pub notation_structure: ImportedNotationStructureV1,
+}
+
+/// Parse the legacy Score and preserve any explicit notation structure the
+/// source format can provide. The source digest is computed from the exact
+/// byte slice here; callers cannot supply a substitute digest.
+pub fn parse_symbolic_with_structure(
+    bytes: &[u8],
+    format: SymbolicImportFormat,
+    score_clock_id: &str,
+) -> Result<StructuredSymbolicImportV1, String> {
+    if matches!(&format, SymbolicImportFormat::MusicXml) && score_clock_id.trim().is_empty() {
+        return Err("MusicXML structured import requires a non-empty score_clock_id".into());
+    }
+    let score = parse_symbolic(bytes, format.clone())?;
+    let source_sha256 = sha256_hex(bytes);
+    let source_id = format!("sha256:{source_sha256}");
+    let notation_structure = match &format {
+        SymbolicImportFormat::MusicXml => {
+            match parse_musicxml_part_notation_graph(bytes, &source_id, score_clock_id) {
+                Ok(parts) => ImportedNotationStructureV1::MusicXmlPartGraphs(parts),
+                Err(MusicXmlMeasureAdapterError::UnsupportedRoot { root }) => {
+                    ImportedNotationStructureV1::Unsupported {
+                        reason: format!("MusicXML root <{root}> is unsupported by the V1 notation graph"),
+                    }
+                }
+                Err(error) => ImportedNotationStructureV1::Unknown {
+                    reason: format!(
+                        "The note-centric Score parsed, but the explicit MusicXML notation graph could not be established: {error:?}"
+                    ),
+                },
+            }
+        }
+        SymbolicImportFormat::Midi => ImportedNotationStructureV1::Unknown {
+            reason: "MIDI time-signature metadata does not establish a complete notated barline sequence; an explicit provenance-bound barline sidecar is required".into(),
+        },
+        SymbolicImportFormat::MuseScore => ImportedNotationStructureV1::Unknown {
+            reason: "the current MuseScore-to-Score JSON path does not preserve an explicit measure-boundary graph".into(),
+        },
+    };
+    Ok(StructuredSymbolicImportV1 {
+        source_format: format,
+        source_sha256,
+        score,
+        notation_structure,
+    })
 }
 
 pub fn parse_symbolic(bytes: &[u8], format: SymbolicImportFormat) -> Result<Score, String> {
@@ -407,4 +482,141 @@ mod tests {
         assert!(analysis.source_native);
         assert!(analysis.inferred_territory.is_none());
     }
+
+    #[test]
+    fn structured_musicxml_import_returns_score_and_exact_notation_graph() {
+        let xml = br#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration></note>
+            </measure>
+            <measure number="2">
+                <note><pitch><step>E</step><octave>4</octave></pitch><duration>16</duration></note>
+                <barline location="right" id="bar-2"><repeat direction="backward" times="2"/></barline>
+            </measure>
+        </part></score-partwise>"#;
+        let imported = parse_symbolic_with_structure(
+            xml,
+            SymbolicImportFormat::MusicXml,
+            "fixture-score-clock",
+        ).unwrap();
+        assert_eq!(imported.source_sha256, sha256_hex(xml));
+        assert_eq!(imported.source_sha256.len(), 64);
+        assert_eq!(imported.score.notes.len(), 2);
+        match imported.notation_structure {
+            ImportedNotationStructureV1::MusicXmlPartGraphs(parts) => {
+                assert_eq!(parts.len(), 1);
+                assert_eq!(parts[0].part_id, "P1");
+                assert_eq!(parts[0].map.status, crate::barline_eval::MeasureMapStatus::Supported);
+                assert_eq!(parts[0].map.measures.len(), 2);
+                assert_eq!(parts[0].barline_events.len(), 1);
+                assert_eq!(
+                    parts[0].barline_events[0].repeat.as_ref().and_then(|repeat| repeat.times.as_deref()),
+                    Some("2")
+                );
+            }
+            other => panic!("expected MusicXML notation graph, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn musicxml_import_exposes_explicit_graph_without_inferring_from_score_meter() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions><key><fifths>0</fifths></key><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        let imported = parse_symbolic_with_structure(
+            xml,
+            SymbolicImportFormat::MusicXml,
+            "score-clock",
+        ).unwrap();
+        assert_eq!(imported.source_format, SymbolicImportFormat::MusicXml);
+        assert!(matches!(
+            imported.notation_structure,
+            ImportedNotationStructureV1::MusicXmlPartGraphs(_)
+        ));
+    }
+
+
+    #[test]
+    fn musescore_json_import_keeps_score_but_marks_measure_structure_unknown() {
+        let score = Score::new(Key::major(PitchClass::new(0)), 120.0, 4);
+        let bytes = serde_json::to_vec(&score).unwrap();
+        let imported = parse_symbolic_with_structure(
+            &bytes,
+            SymbolicImportFormat::MuseScore,
+            "musescore-score-clock",
+        ).unwrap();
+        assert_eq!(imported.score.meter, 4);
+        assert_eq!(imported.source_sha256, sha256_hex(&bytes));
+        assert!(matches!(
+            imported.notation_structure,
+            ImportedNotationStructureV1::Unknown { .. }
+        ));
+    }
+
+    #[test]
+    fn midi_import_keeps_score_but_requires_explicit_barline_sidecar() {
+        // One quarter-note C4, with no time-signature or barline sidecar.
+        let midi: [u8; 35] = [
+            b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 0, 0, 1, 1, 0xE0,
+            b'M', b'T', b'r', b'k', 0, 0, 0, 13,
+            0, 0x90, 60, 64,
+            0x83, 0x60, 0x80, 60, 64,
+            0, 0xFF, 0x2F, 0,
+        ];
+        let imported = parse_symbolic_with_structure(
+            &midi,
+            SymbolicImportFormat::Midi,
+            "midi-score-clock",
+        ).unwrap();
+        assert_eq!(imported.score.notes.len(), 1);
+        assert_eq!(imported.source_sha256, sha256_hex(&midi));
+        assert!(matches!(
+            imported.notation_structure,
+            ImportedNotationStructureV1::Unknown { .. }
+        ));
+    }
+
+
+    #[test]
+    fn invalid_graph_adapter_state_does_not_discard_a_valid_legacy_score() {
+        // The legacy parser tolerates duplicate part IDs; the structure graph
+        // must reject the ambiguous ownership while preserving the imported
+        // note-centric Score and exposing Unknown structure.
+        let xml = br#"<score-partwise>
+            <part id="P1"><measure number="1">
+                <attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure></part>
+            <part id="P1"><measure number="1">
+                <attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+                <note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration></note>
+            </measure></part>
+        </score-partwise>"#;
+        let imported = parse_symbolic_with_structure(
+            xml,
+            SymbolicImportFormat::MusicXml,
+            "score-clock",
+        ).unwrap();
+        assert_eq!(imported.score.notes.len(), 2);
+        assert!(matches!(
+            imported.notation_structure,
+            ImportedNotationStructureV1::Unknown { .. }
+        ));
+    }
+
+    #[test]
+    fn musicxml_structured_import_rejects_an_empty_score_clock_id() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration></note>
+        </measure></part></score-partwise>"#;
+        assert!(parse_symbolic_with_structure(
+            xml,
+            SymbolicImportFormat::MusicXml,
+            "  ",
+        ).is_err());
+    }
+
 }

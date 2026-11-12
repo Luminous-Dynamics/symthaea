@@ -144,6 +144,9 @@ pub fn AddMusicPage() -> impl IntoView {
                 let playback_title = title.clone();
                 let analysis = work.analysis.clone();
                 let instrumentation_note = work.instrumentation_note.clone();
+                let notation_structure = work.notation_structure.clone();
+                let notation_graph_url =
+                    api::imported_notation_graph_url(api::DEFAULT_BACKEND, &work_id);
                 view! {
                     <section class="import-analysis">
                         <header>
@@ -158,6 +161,28 @@ pub fn AddMusicPage() -> impl IntoView {
                             <span><small>"Territory"</small><strong>"Unclassified"</strong></span>
                         </div>
                         <p>"Muse preserved the work as source-native. Section and motif findings remain reconstructed suggestions until you confirm them."</p>
+                        {notation_structure.map(|structure| {
+                            let graph_url = notation_graph_url.clone();
+                            view! {
+                                <div class="notation-structure">
+                                    <strong>{format!("Notation structure · {}", structure.status)}</strong>
+                                    <span>{format!(
+                                        "{} parts · {} supported · {} unknown · {} measures · {} boundary events",
+                                        structure.part_count,
+                                        structure.supported_part_count,
+                                        structure.unknown_part_count,
+                                        structure.measure_count,
+                                        structure.barline_event_count
+                                    )}</span>
+                                    {structure.explanation.map(|reason| view! {
+                                        <p class="muted small">{reason}</p>
+                                    })}
+                                    {structure.graph_sha256.map(|_| view! {
+                                        <A href=graph_url>"Inspect preserved MusicXML notation graph"</A>
+                                    })}
+                                </div>
+                            }
+                        })}
                         {analysis.motifs.first().cloned().map(|motif| view! {
                             <div class="import-motif-result">
                                 <strong>"Possible opening motif"</strong>

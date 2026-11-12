@@ -223,6 +223,13 @@ pub async fn import_music(
         .map_err(|error| format!("could not read import receipt: {error}"))
 }
 
+pub fn imported_notation_graph_url(backend: &str, work_id: &str) -> String {
+    format!(
+        "{}/api/music/import/{work_id}/notation-graph",
+        backend.trim_end_matches('/')
+    )
+}
+
 pub fn imported_audio_url(backend: &str, work_id: &str) -> String {
     format!(
         "{}/api/music/import/{work_id}/audio",
