@@ -587,6 +587,23 @@ mod tests {
     }
 
     #[test]
+    fn counterbalanced_design_is_eligible_but_not_a_causal_effect_estimate() {
+        let mut input = case();
+        make_measured(&mut input);
+        input.design_strategy = DesignStrategy::Counterbalanced;
+        let report = audit(&input);
+        assert_eq!(report.disposition, "CONTRAST_ELIGIBLE");
+        assert!(report.claim_ceiling.contains("no_additive_source_decomposition"));
+    }
+
+    #[test]
+    fn malformed_design_evidence_digest_is_invalid() {
+        let mut input = case();
+        input.design_evidence_sha256 = "missing".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
     fn synthetic_fixture_is_never_contrast_eligible() {
         let report = audit(&case());
         assert_eq!(report.disposition, "INCOMPLETE");
