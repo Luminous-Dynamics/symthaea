@@ -1,0 +1,99 @@
+{
+  "schema_version": "0.1.0",
+  "case_id": "synthetic-facility-tf-repeatability-001",
+  "evidence_kind": "synthetic",
+  "source": {
+    "dataset_id": "synthetic-facility-transfer-campaign",
+    "citation": "Synthetic known-answer facility transfer-function fixture; not measured data",
+    "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rights_status": "public_or_permitted",
+    "independently_reviewed": false
+  },
+  "facility": {
+    "facility_id": "cavitation-tunnel-A",
+    "test_section_revision": "section-r2",
+    "geometry_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "is_closed_test_section": true,
+    "operating_condition_fingerprint_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "water_condition_evidence_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "flow_state_id": "reference-flow-off",
+    "free_surface_state_id": "closed-test-section-no-free-surface"
+  },
+  "projector": {
+    "instrument_id": "projector-P1",
+    "projector_type": "calibrated-underwater-projector",
+    "projector_revision": "projector-r1",
+    "transmitter_chain_id": "amplifier-chain-A",
+    "transmitter_chain_evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "signal_type": "broadband_noise",
+    "tvr_basis": "independently_measured",
+    "tvr_or_reference_source_level_evidence_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+  },
+  "receiver": {
+    "hydrophone_instrument_id": "hydrophone-H1",
+    "hydrophone_calibration_certificate_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "acquisition_chain_id": "daq-chain-A",
+    "acquisition_chain_evidence_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "repeatability_tolerance_db": 1.5,
+  "samples": [
+    {
+      "sample_id": "sample-001",
+      "repeat_id": "repeat-001",
+      "source_position": {
+        "position_id": "source-A",
+        "x_m": 0,
+        "y_m": 0,
+        "z_m": 0.2,
+        "expanded_position_uncertainty_m": 0.001
+      },
+      "receiver_position": {
+        "position_id": "receiver-A",
+        "x_m": 0.4,
+        "y_m": 0,
+        "z_m": 0.2,
+        "expanded_position_uncertainty_m": 0.001
+      },
+      "frequency_band_id": "one-third-octave-1000Hz",
+      "center_frequency_hz": 1000,
+      "quantity": "one_third_octave_band_spl",
+      "bandwidth_id": "iec-61260-class-1-one-third-octave",
+      "source_level_db": 150,
+      "source_level_expanded_uncertainty_db": 0.1,
+      "received_spl_db": 120,
+      "received_spl_expanded_uncertainty_db": 0.1,
+      "additional_source_basis_uncertainty_db": null,
+      "source_trace_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+      "received_trace_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+    },
+    {
+      "sample_id": "sample-002",
+      "repeat_id": "repeat-002",
+      "source_position": {
+        "position_id": "source-A",
+        "x_m": 0,
+        "y_m": 0,
+        "z_m": 0.2,
+        "expanded_position_uncertainty_m": 0.001
+      },
+      "receiver_position": {
+        "position_id": "receiver-A",
+        "x_m": 0.4,
+        "y_m": 0,
+        "z_m": 0.2,
+        "expanded_position_uncertainty_m": 0.001
+      },
+      "frequency_band_id": "one-third-octave-1000Hz",
+      "center_frequency_hz": 1000,
+      "quantity": "one_third_octave_band_spl",
+      "bandwidth_id": "iec-61260-class-1-one-third-octave",
+      "source_level_db": 150,
+      "source_level_expanded_uncertainty_db": 0.1,
+      "received_spl_db": 121,
+      "received_spl_expanded_uncertainty_db": 0.1,
+      "additional_source_basis_uncertainty_db": null,
+      "source_trace_sha256": "5555555555555555555555555555555555555555555555555555555555555555",
+      "received_trace_sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+    }
+  ]
+}
