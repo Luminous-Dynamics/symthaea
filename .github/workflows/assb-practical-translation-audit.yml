@@ -1,0 +1,58 @@
+name: ASSB practical-cell translation audit v0.1
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "docs/transport/ASSB_PRACTICAL_CELL_TRANSLATION_V0_1.md"
+      - "schemas/transport/assb_practical_translation_v0_1.schema.json"
+      - "fixtures/assb/assb_practical_translation_v0_1.json"
+      - "tools/assb-practical-translation-audit/**"
+      - ".github/workflows/assb-practical-translation-audit.yml"
+  push:
+    branches: [research/assb-practical-translation-v0.1]
+    paths:
+      - "docs/transport/ASSB_PRACTICAL_CELL_TRANSLATION_V0_1.md"
+      - "schemas/transport/assb_practical_translation_v0_1.schema.json"
+      - "fixtures/assb/assb_practical_translation_v0_1.json"
+      - "tools/assb-practical-translation-audit/**"
+      - ".github/workflows/assb-practical-translation-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    steps:
+      - name: Checkout exact branch head
+        uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: Validate Draft 2020-12 schema and fixture
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+          schema = json.loads(Path("schemas/transport/assb_practical_translation_v0_1.schema.json").read_text(encoding="utf-8"))
+          fixture = json.loads(Path("fixtures/assb/assb_practical_translation_v0_1.json").read_text(encoding="utf-8"))
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(fixture)
+          assert len(fixture["observations"]) == 3
+          assert len(fixture["comparisons"]) == 1
+          print("schema=VALID fixture=VALID observations=3 comparisons=1")
+          PY
+      - name: Check locked package metadata
+        run: cargo metadata --manifest-path tools/assb-practical-translation-audit/Cargo.toml --locked --no-deps
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/assb-practical-translation-audit/Cargo.toml -- --check
+      - name: Run matched-condition audit tests
+        run: cargo test --manifest-path tools/assb-practical-translation-audit/Cargo.toml --locked
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path tools/assb-practical-translation-audit/Cargo.toml --all-targets --locked -- -D warnings
