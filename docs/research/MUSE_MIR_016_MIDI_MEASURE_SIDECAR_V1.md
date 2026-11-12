@@ -35,7 +35,7 @@ The JSON envelope contains:
 - each part's unique `part_id`, source MIDI `source_track_index`, and ordered measure spans;
 - every measure's `start_tick`, exclusive `end_tick`, `MeasureKind`, optional source number/ID/display text, `implicit` flag and `non_controlling` flag.
 
-V1 maps one sidecar part to one source MIDI track. MIDI format-0 files therefore use their single track as one part for this contract. Multiple tracks retain independent measure lattices while sharing the supplied score-clock identity.
+V1 maps one sidecar part to one source MIDI track. Every note-bearing source track must have an explicit map; empty conductor/metadata tracks may be omitted. MIDI format-0 files therefore use their single track as one part for this contract. Multiple tracks retain independent measure lattices while sharing the supplied score-clock identity.
 
 ## Exact normalization
 
@@ -57,6 +57,7 @@ Sidecar validation checks:
 - supported schema version;
 - one or more parts, unique part IDs and unique source track indices;
 - source track indices in range;
+- every note-bearing track represented by the sidecar (empty conductor/metadata tracks may be omitted);
 - non-empty, ordered measure lists;
 - first measure starts at tick zero;
 - all spans have positive length and are exactly contiguous;
@@ -99,7 +100,8 @@ For a valid sidecar import, Studio:
 - persists the raw `midi-measure-sidecar.json`;
 - persists normalized `midi-measure-maps.json`;
 - exposes a backward-compatible `measure_map_sha256` field in `notation_structure`;
-- adds `GET /api/music/import/{work_id}/midi-measure-maps`, which recomputes the normalized receipt digest and confirms its MIDI digest matches the import manifest.
+- adds `GET /api/music/import/{work_id}/midi-measure-maps`;
+- recomputes the canonical receipt commitment and replays the exact stored MIDI plus raw sidecar bytes before returning the maps. The endpoint rejects a modified source file, raw sidecar or normalized receipt.
 
 The Add Music page now has an optional MIDI measure-sidecar picker and a link to inspect the verified per-track measure maps. MusicXML continues to use the separate notation-graph endpoint.
 
@@ -111,7 +113,7 @@ The Add Music page now has an optional MIDI measure-sidecar picker and a link to
 - source digest mismatch;
 - PPQ mismatch;
 - SMPTE time-code refusal;
-- nonexistent source track and duplicate part/track rejection;
+- nonexistent source track, duplicate part/track and omitted note-bearing track rejection;
 - empty score-clock identity;
 - gap, overlap and zero-length span controls;
 - two polymetric track lattices on a shared score clock;
@@ -126,6 +128,8 @@ The Add Music page now has an optional MIDI measure-sidecar picker and a link to
 ### Muse Studio helper (1 new test)
 
 - normalized MIDI receipt summary, JSON persistence and canonical digest round-trip.
+
+The Studio getter additionally replays the persisted MIDI/sidecar inputs against the stored normalized receipt before serving maps. That filesystem endpoint path is authored but has not been exercised by a live server test in this environment.
 
 Existing MusicXML note-only import, structured graph import, MuseScore/MIDI Unknown behavior, and private import tests remain in the branch. Tests are authored, not executed.
 
