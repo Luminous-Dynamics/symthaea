@@ -72,7 +72,7 @@ The coverage model also records explicit `FalseNegativeRisk` modes:
 - `SignatureMismatch`
 - `Unknown`
 
-If the observation interval is longer than the declared target-process timescale, `TemporalAliasing` must be recorded. A no-detection or not-observable finding must identify at least one false-negative mode. A detection limit requires units. A calibrated detection probability requires a reference abundance and a linked calibration-evidence record. Legacy serialized coverage defaults its unrecorded miss mechanism to `Unknown`, not to "no risk".
+If the observation interval is longer than the declared target-process timescale, `TemporalAliasing` must be recorded. A no-detection or not-observable finding must identify at least one false-negative mode. A detection limit requires units. A calibrated detection probability requires a reference abundance and a linked evidence record whose outcome is specifically `CalibrationReference`; a generic `SignalDetected` measurement is not calibration evidence. `InstrumentLimitation` is separately required for `NOT_OBSERVABLE_WITH_CURRENT_INSTRUMENT`. Legacy serialized coverage defaults its unrecorded miss mechanism to `Unknown`, not to "no risk".
 
 A negative measurement cannot be the sole evidence supporting `SUPPORTED_WITHIN_SCOPE`. The module does not infer biological absence from non-detection.
 
