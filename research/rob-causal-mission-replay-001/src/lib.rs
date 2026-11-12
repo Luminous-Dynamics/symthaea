@@ -414,13 +414,28 @@ fn register_stamp(
     findings: &mut Vec<ReplayFinding>,
 ) {
     if stamp.event_id.trim().is_empty() {
-        push_finding(findings, FindingSeverity::Invalid, "EMPTY_EVENT_ID", "<empty>");
+        push_finding(
+            findings,
+            FindingSeverity::Invalid,
+            "EMPTY_EVENT_ID",
+            "<empty>",
+        );
     }
     if !index.ids.insert(stamp.event_id.clone()) {
-        push_finding(findings, FindingSeverity::Invalid, "DUPLICATE_EVENT_ID", &stamp.event_id);
+        push_finding(
+            findings,
+            FindingSeverity::Invalid,
+            "DUPLICATE_EVENT_ID",
+            &stamp.event_id,
+        );
     }
     if !index.sequences.insert(stamp.sequence) {
-        push_finding(findings, FindingSeverity::Invalid, "DUPLICATE_EVENT_SEQUENCE", &stamp.event_id);
+        push_finding(
+            findings,
+            FindingSeverity::Invalid,
+            "DUPLICATE_EVENT_SEQUENCE",
+            &stamp.event_id,
+        );
     }
     if stamp.robot_id != scope.robot_id
         || stamp.clock_id != scope.clock_id
@@ -490,8 +505,14 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         ("mission_id", trace.scope.mission_id.as_str()),
         ("robot_id", trace.scope.robot_id.as_str()),
         ("clock_id", trace.scope.clock_id.as_str()),
-        ("scenario_manifest_digest", trace.scope.scenario_manifest_digest.as_str()),
-        ("initial_reserve_state_digest", trace.scope.initial_reserve_state_digest.as_str()),
+        (
+            "scenario_manifest_digest",
+            trace.scope.scenario_manifest_digest.as_str(),
+        ),
+        (
+            "initial_reserve_state_digest",
+            trace.scope.initial_reserve_state_digest.as_str(),
+        ),
     ] {
         if value.trim().is_empty() {
             push_finding(
@@ -1066,7 +1087,8 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
                 &mut findings,
             );
         }
-        if last_physical_stamp.is_none_or(|previous| previous.sequence < transition.stamp.sequence) {
+        if last_physical_stamp.is_none_or(|previous| previous.sequence < transition.stamp.sequence)
+        {
             last_physical_stamp = Some(&transition.stamp);
         }
         if transition.transition_id.trim().is_empty()
@@ -1130,8 +1152,7 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             .iter()
             .map(String::as_str)
             .collect();
-        if actual_nodes.len() != transition.thermal_node_ids.len()
-            || actual_nodes != required_nodes
+        if actual_nodes.len() != transition.thermal_node_ids.len() || actual_nodes != required_nodes
         {
             push_finding(
                 &mut findings,
@@ -1207,9 +1228,15 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         ),
     }
 
-    let disposition = if findings.iter().any(|finding| finding.severity == FindingSeverity::Invalid) {
+    let disposition = if findings
+        .iter()
+        .any(|finding| finding.severity == FindingSeverity::Invalid)
+    {
         ReplayDisposition::Rejected
-    } else if findings.iter().any(|finding| finding.severity == FindingSeverity::Unknown) {
+    } else if findings
+        .iter()
+        .any(|finding| finding.severity == FindingSeverity::Unknown)
+    {
         ReplayDisposition::Unknown
     } else {
         ReplayDisposition::Closed
@@ -1477,7 +1504,10 @@ mod tests {
         trace.terminal.as_mut().unwrap().stamp.event_id = "event-7b".to_owned();
         let report = replay_mission(&trace);
         assert_eq!(report.disposition, ReplayDisposition::Rejected);
-        assert!(has_finding(&report, "REMOTE_RESPONSE_CAUSAL_OR_EXPIRY_VIOLATION"));
+        assert!(has_finding(
+            &report,
+            "REMOTE_RESPONSE_CAUSAL_OR_EXPIRY_VIOLATION"
+        ));
     }
 
     #[test]
@@ -1535,7 +1565,10 @@ mod tests {
         trace.assurance[0].disposition = AssuranceDisposition::Rejected;
         let report = replay_mission(&trace);
         assert_eq!(report.disposition, ReplayDisposition::Rejected);
-        assert!(has_finding(&report, "APPLICATION_AFTER_ASSURANCE_REJECTION"));
+        assert!(has_finding(
+            &report,
+            "APPLICATION_AFTER_ASSURANCE_REJECTION"
+        ));
     }
 
     #[test]
@@ -1553,7 +1586,10 @@ mod tests {
         trace.physical_transitions[0].thermal_node_ids.pop();
         let report = replay_mission(&trace);
         assert_eq!(report.disposition, ReplayDisposition::Unknown);
-        assert!(has_finding(&report, "THERMAL_NODE_MANIFEST_INCOMPLETE_OR_DUPLICATE"));
+        assert!(has_finding(
+            &report,
+            "THERMAL_NODE_MANIFEST_INCOMPLETE_OR_DUPLICATE"
+        ));
     }
 
     #[test]
