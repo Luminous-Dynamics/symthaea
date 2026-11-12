@@ -59,6 +59,9 @@ pub struct BridgeConfig {
     pub max_frame_bytes: usize,
     pub initial_dt_us: u64,
     pub maximum_frame_gap_us: u64,
+    /// Maximum age from camera capture to bridge delivery, in microseconds.
+    /// Zero is invalid; stale observations are rejected before temporal state advances.
+    pub maximum_observation_delivery_age_us: u64,
     pub maximum_sensor_clock_skew_us: u64,
     /// Weight of the visual manifold state in parts per million.
     /// The proprioceptive weight is 1,000,000 minus this value.
@@ -85,6 +88,9 @@ impl BridgeConfig {
         }
         if self.initial_dt_us == 0 || self.maximum_frame_gap_us < self.initial_dt_us {
             return Err(BridgeError::InvalidConfig("invalid initial timestep or maximum frame gap"));
+        }
+        if self.maximum_observation_delivery_age_us == 0 {
+            return Err(BridgeError::InvalidConfig("maximum observation delivery age must be non-zero"));
         }
         if self.visual_weight_ppm > 1_000_000 {
             return Err(BridgeError::InvalidConfig("visual weight must be <= 1,000,000 ppm"));
@@ -243,6 +249,7 @@ pub enum BridgeError {
     UpstreamTimestampMismatch,
     UpstreamGeometryMismatch,
     UpstreamClockOrderInvalid,
+    UpstreamDeliveryAgeExceeded,
     UpstreamActionReferenceInvalid,
     BridgeFaulted,
 }
@@ -679,6 +686,13 @@ impl CameraDrivingBridge {
         {
             return Err(BridgeError::UpstreamClockOrderInvalid);
         }
+        let delivery_age_us = upstream
+            .delivered_timestamp_us
+            .checked_sub(upstream.capture_timestamp_us)
+            .ok_or(BridgeError::UpstreamClockOrderInvalid)?;
+        if delivery_age_us > self.config.maximum_observation_delivery_age_us {
+            return Err(BridgeError::UpstreamDeliveryAgeExceeded);
+        }
         if upstream.tick == 0 {
             if upstream.applied_action_receipt_id.is_some()
                 || upstream.applied_action_receipt_sha256.is_some()
@@ -870,6 +884,7 @@ mod tests {
             max_frame_bytes: 4096,
             initial_dt_us: 10_000,
             maximum_frame_gap_us: 100_000,
+            maximum_observation_delivery_age_us: 5_000,
             maximum_sensor_clock_skew_us: 2_000,
             visual_weight_ppm: 500_000,
             vehicle_encoder_seed_phrase: "symthaea-camera-driving-bridge-test-seed".to_string(),
@@ -1021,6 +1036,53 @@ mod tests {
             Some(BridgeError::UpstreamReceiptMalformed)
         );
         assert_eq!(bridge.frames_processed(), 0);
+    }
+
+    #[test]
+    fn rejects_over_age_camera_delivery_before_advancing_temporal_state() {
+        let mut config = config();
+        config.maximum_observation_delivery_age_us = 1_000;
+        let mut bridge =
+            CameraDrivingBridge::try_new(config, VisionConfig::default()).unwrap();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        let mut item = observation(&pixels, 1, 10_000, &state);
+        item.upstream.delivered_timestamp_us = item.upstream.capture_timestamp_us + 1_001;
+        item.upstream.receipt_sha256 = item.upstream.calculated_receipt_sha256();
+
+        assert_eq!(
+            bridge.observe(item).err(),
+            Some(BridgeError::UpstreamDeliveryAgeExceeded)
+        );
+        assert_eq!(bridge.frames_processed(), 0);
+        assert_eq!(bridge.training_steps(), 0);
+    }
+
+    #[test]
+    fn accepts_camera_delivery_at_the_declared_freshness_boundary() {
+        let mut config = config();
+        config.maximum_observation_delivery_age_us = 1_000;
+        let mut bridge =
+            CameraDrivingBridge::try_new(config, VisionConfig::default()).unwrap();
+        let state = VehicleState::cruising(10.0);
+        let pixels = vec![128; 16 * 16 * 3];
+        let mut item = observation(&pixels, 1, 10_000, &state);
+        item.upstream.delivered_timestamp_us = item.upstream.capture_timestamp_us + 1_000;
+        item.upstream.receipt_sha256 = item.upstream.calculated_receipt_sha256();
+
+        let accepted = bridge.observe(item).unwrap();
+        assert_eq!(bridge.frames_processed(), 1);
+        assert!(accepted.receipt.vision_learning_frozen);
+    }
+
+    #[test]
+    fn rejects_zero_delivery_age_budget_as_invalid_bridge_config() {
+        let mut config = config();
+        config.maximum_observation_delivery_age_us = 0;
+        assert!(matches!(
+            CameraDrivingBridge::try_new(config, VisionConfig::default()),
+            Err(BridgeError::InvalidConfig(_))
+        ));
     }
 
     #[test]
