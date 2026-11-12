@@ -76,3 +76,12 @@ The `mimo_impedance_passport` module validates complete multi-port impedance swe
 Measured sweeps require instrument, calibration-certificate, channel-map and synchronization digests. Matrix lookup is exact-knot only; interpolation and extrapolation are not authorized. Missing cross-port responses are errors, never implicit zeros. Derived impedances are point estimates; supplied voltage/current error bounds are retained but not propagated into a formal complex interval enclosure.
 
 See `docs/research/AIRROAD_PDCM_MIMO_PASSPORT_001_V0_1.md`.
+
+
+## MIMO impedance matrix evidence passport
+
+The `mimo_impedance_passport` module validates complete multi-port impedance sweeps. Each matrix column is one injected-current port; every output voltage port must be observed at every exact frequency knot. The sweep binds configuration, operating-point and sweep digests, explicit port voltage/current sign conventions, column excitation/payload digests, uncertainty bounds, and measured/simulated/analytical evidence origin.
+
+Measured sweeps require instrument, calibration-certificate, channel-map and synchronization digests. Matrix lookup is exact-knot only; interpolation and extrapolation are not authorized. Missing cross-port responses are errors, never implicit zeros. Derived impedances are point estimates; supplied voltage/current error bounds are retained but not propagated into a formal complex interval enclosure.
+
+See `docs/research/AIRROAD_PDCM_MIMO_PASSPORT_001_V0_1.md`.
