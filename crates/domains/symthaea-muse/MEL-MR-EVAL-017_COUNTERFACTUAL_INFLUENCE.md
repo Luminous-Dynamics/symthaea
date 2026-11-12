@@ -98,6 +98,24 @@ Independent replay re-runs the measurements over the supplied exact artifacts an
 7. **No native schedule support:** NativeMuse needs a canonical performed-schedule serialization captured at the actual synthesizer boundary, not a recomputed schedule.
 8. **No confidence-calibrated threshold:** max over three no-op controls is a prototype floor. Held-out repeated renders, tail quantiles or robust uncertainty intervals are required before any probabilistic reliability claim.
 
+## Versioned support trace and hysteresis policy (MEL-EVAL-017-SUP-001)
+
+The follow-on report version v0.2 now exposes the complete ordered `InfluenceWindowMeasurement` trace. Each entry retains channel, frame window, waveform RMS, peak delta, spectral-magnitude distance, both calibrated thresholds, and the entry-threshold decision. The trace is part of the report digest and is recomputed by `verify_counterfactual_influence`.
+
+A separately versioned `InfluenceSupportPolicy` derives channel-specific support:
+
+- **Entry:** the existing calibrated threshold crossing. Raw entry-only intervals remain unchanged and continue to be reported as `measured_influence_intervals`.
+- **Release:** an active run can continue while either RMS or spectral delta exceeds its own configured fraction of the entry threshold. The release ratios must be finite and in (0, 1].
+- **Minimum run:** a support run is emitted only when the configured number of consecutive entry-threshold windows is reached. Release-only windows cannot satisfy this minimum.
+- **Tail:** an optional fixed frame extension is recorded in `tail_extension_frames_applied` and `qualified_end_frame`. It is bounded by the output horizon and ten seconds at the declared sample rate. It is policy-derived, not measured acoustic influence.
+- **Channel separation:** qualified intervals retain channel identity. They are not collapsed into one channel-less union.
+
+The legacy `measure_counterfactual_influence` API remains source-compatible and delegates to a documented default policy (0.5 RMS release ratio, 0.5 spectral release ratio, one consecutive entry window, zero tail extension). New experiments can use `measure_counterfactual_influence_with_support_policy` to bind a frozen explicit policy. Replay uses the policy embedded in the report; changing a policy or a per-window measurement invalidates the receipt.
+
+This version does **not** infer a population-level noise quantile, perceptual audibility, or true renderer release time. The policy provides stable support morphology; the measured trace remains the factual evidence. Renderer-specific tail calibration and listener validation remain separate.
+
+Five new tests cover release-gap bridging, minimum-run rejection, bounded tail extension, channel-local intervals and invalid-policy rejection. The existing end-to-end removal test now checks report trace completeness and policy/trace tamper rejection. These tests are authored, not yet executed by the pinned workflow.
+
 ## Benchmark programme
 
 ### Matched public comparisons
