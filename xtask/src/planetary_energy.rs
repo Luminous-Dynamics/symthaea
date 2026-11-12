@@ -1261,3 +1261,378 @@ mod service_tests {
             .any(|finding| finding.code == "SERVICE_EVIDENCE_CLASS"));
     }
 }
+
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompetitiveSnapshot {
+    schema_version: String,
+    status: String,
+    as_of_date: String,
+    parent_issue: String,
+    evidence_policy: CompetitiveEvidencePolicy,
+    references: Vec<CompetitiveReference>,
+    metrics: Vec<CompetitiveMetric>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompetitiveEvidencePolicy {
+    rules: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompetitiveReference {
+    reference_id: String,
+    source: String,
+    url: String,
+    source_class: String,
+    published_year: u16,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CompetitiveMetric {
+    metric_id: String,
+    metric: String,
+    unit: String,
+    value: serde_json::Value,
+    boundary: String,
+    evidence_class: String,
+    reference_id: String,
+    caveats: Vec<String>,
+}
+
+#[derive(Debug, Serialize, PartialEq)]
+pub struct CompetitiveReferenceAuditReport {
+    pub report_schema: &'static str,
+    pub source_sha256: String,
+    pub status: &'static str,
+    pub claim_ceiling: &'static str,
+    pub reference_count: usize,
+    pub metric_count: usize,
+    pub passed_count: usize,
+    pub blocked_count: usize,
+    pub corpus_findings: Vec<Finding>,
+    pub metrics: Vec<CompetitiveMetricResult>,
+}
+
+#[derive(Debug, Serialize, PartialEq)]
+pub struct CompetitiveMetricResult {
+    pub metric_id: String,
+    pub status: &'static str,
+    pub findings: Vec<Finding>,
+}
+
+/// Checks that each published/industry metric is bound to a source, unit,
+/// evidence class, boundary and caveat. It does not independently reproduce
+/// or validate the underlying source measurement.
+pub fn audit_competitive_snapshot(bytes: &[u8]) -> Result<CompetitiveReferenceAuditReport> {
+    const SCHEMA: &str = "planetary-energy-competitive-reference-v0.1";
+    const STATUS: &str = "source_reported_benchmarks_not_luminous_results";
+    const SOURCE_CLASSES: &[&str] = &[
+        "government_technical_survey",
+        "government_technical_survey_product_table",
+        "government_design_reference",
+        "government_research_solicitation_target",
+        "government_programme_summary",
+        "government_project_record",
+        "government_technology_survey",
+        "peer_reviewed_experimental_study",
+        "peer_reviewed_review",
+        "peer_reviewed_perspective",
+        "field_fleet_dataset_summary",
+        "government_prototype_test_report",
+    ];
+    const METRIC_EVIDENCE_CLASSES: &[&str] = &[
+        "government_survey_summary",
+        "manufacturer_product_value_reported_in_government_survey",
+        "government_survey_of_flown_mission_dataset",
+        "government_design_reference",
+        "government_research_solicitation_target",
+        "government_programme_summary",
+        "government_project_record",
+        "peer_reviewed_experimental_study",
+        "peer_reviewed_review_estimate",
+        "field_fleet_dataset_summary",
+        "peer_reviewed_perspective",
+        "government_programme_target",
+        "government_prototype_test_report",
+    ];
+
+    let snapshot: CompetitiveSnapshot =
+        serde_json::from_slice(bytes).context("parsing competitive reference snapshot")?;
+    let source_sha256 = sha256_hex(bytes);
+    let mut corpus_findings = Vec::new();
+
+    if snapshot.schema_version != SCHEMA {
+        corpus_findings.push(finding(
+            "COMPETITIVE_SCHEMA_VERSION",
+            format!("expected {SCHEMA}, received {}", snapshot.schema_version),
+        ));
+    }
+    if snapshot.status != STATUS {
+        corpus_findings.push(finding(
+            "COMPETITIVE_SNAPSHOT_STATUS",
+            format!("expected {STATUS}, received {}", snapshot.status),
+        ));
+    }
+    if snapshot.as_of_date.len() != 10
+        || !snapshot.as_of_date.chars().all(|ch| ch.is_ascii_digit() || ch == '-')
+    {
+        corpus_findings.push(finding(
+            "COMPETITIVE_AS_OF_DATE",
+            "as_of_date must use YYYY-MM-DD format".to_string(),
+        ));
+    }
+    if !snapshot.parent_issue.ends_with("/issues/11756") {
+        corpus_findings.push(finding(
+            "COMPETITIVE_PARENT_LINEAGE",
+            "parent_issue must identify Symthaea issue #11756".to_string(),
+        ));
+    }
+    if snapshot.evidence_policy.rules.is_empty()
+        || snapshot
+            .evidence_policy
+            .rules
+            .iter()
+            .any(|rule| rule.trim().is_empty())
+    {
+        corpus_findings.push(finding(
+            "COMPETITIVE_EVIDENCE_POLICY",
+            "at least one non-empty evidence rule is required".to_string(),
+        ));
+    }
+    if snapshot.references.is_empty() {
+        corpus_findings.push(finding(
+            "COMPETITIVE_REFERENCES_EMPTY",
+            "at least one source reference is required".to_string(),
+        ));
+    }
+    if snapshot.metrics.is_empty() {
+        corpus_findings.push(finding(
+            "COMPETITIVE_METRICS_EMPTY",
+            "at least one competitive metric is required".to_string(),
+        ));
+    }
+
+    let mut reference_ids = BTreeSet::new();
+    let mut valid_reference_ids = BTreeSet::new();
+    for reference in &snapshot.references {
+        let mut valid = true;
+        if reference.reference_id.trim().is_empty() {
+            valid = false;
+            corpus_findings.push(finding(
+                "COMPETITIVE_REFERENCE_ID_EMPTY",
+                "reference_id is required".to_string(),
+            ));
+        } else if !reference_ids.insert(reference.reference_id.clone()) {
+            valid = false;
+            corpus_findings.push(finding(
+                "COMPETITIVE_REFERENCE_ID_DUPLICATE",
+                format!("duplicate reference_id {}", reference.reference_id),
+            ));
+        }
+        if reference.source.trim().is_empty() {
+            valid = false;
+            corpus_findings.push(finding(
+                "COMPETITIVE_REFERENCE_SOURCE_EMPTY",
+                format!("{} has no source title", reference.reference_id),
+            ));
+        }
+        if !reference.url.starts_with("https://") {
+            valid = false;
+            corpus_findings.push(finding(
+                "COMPETITIVE_REFERENCE_URL",
+                format!("{} must use an HTTPS source URL", reference.reference_id),
+            ));
+        }
+        if !SOURCE_CLASSES.contains(&reference.source_class.as_str()) {
+            valid = false;
+            corpus_findings.push(finding(
+                "COMPETITIVE_REFERENCE_CLASS",
+                format!(
+                    "{} has unsupported source_class {}",
+                    reference.reference_id, reference.source_class
+                ),
+            ));
+        }
+        if !(1900..=2200).contains(&reference.published_year) {
+            valid = false;
+            corpus_findings.push(finding(
+                "COMPETITIVE_REFERENCE_YEAR",
+                format!("{} has invalid published_year", reference.reference_id),
+            ));
+        }
+        if valid {
+            valid_reference_ids.insert(reference.reference_id.clone());
+        }
+    }
+
+    let mut seen_metric_ids = BTreeSet::new();
+    let mut metrics = Vec::with_capacity(snapshot.metrics.len());
+    for metric in snapshot.metrics {
+        let mut findings = Vec::new();
+
+        if metric.metric_id.trim().is_empty() {
+            findings.push(finding(
+                "COMPETITIVE_METRIC_ID_EMPTY",
+                "metric_id is required".to_string(),
+            ));
+        } else if !seen_metric_ids.insert(metric.metric_id.clone()) {
+            findings.push(finding(
+                "COMPETITIVE_METRIC_ID_DUPLICATE",
+                format!("duplicate metric_id {}", metric.metric_id),
+            ));
+        }
+        if metric.metric.trim().is_empty() {
+            findings.push(finding(
+                "COMPETITIVE_METRIC_NAME_EMPTY",
+                "metric name is required".to_string(),
+            ));
+        }
+        if metric.unit.trim().is_empty() {
+            findings.push(finding(
+                "COMPETITIVE_METRIC_UNIT_EMPTY",
+                format!("{} has no unit", metric.metric_id),
+            ));
+        }
+        if metric.boundary.trim().is_empty() {
+            findings.push(finding(
+                "COMPETITIVE_METRIC_BOUNDARY_EMPTY",
+                format!("{} has no system boundary", metric.metric_id),
+            ));
+        }
+        if !METRIC_EVIDENCE_CLASSES.contains(&metric.evidence_class.as_str()) {
+            findings.push(finding(
+                "COMPETITIVE_METRIC_EVIDENCE_CLASS",
+                format!(
+                    "{} has unsupported evidence_class {}",
+                    metric.metric_id, metric.evidence_class
+                ),
+            ));
+        }
+        if !valid_reference_ids.contains(&metric.reference_id) {
+            findings.push(finding(
+                "COMPETITIVE_METRIC_SOURCE_UNRESOLVED",
+                format!(
+                    "{} refers to missing or invalid source {}",
+                    metric.metric_id, metric.reference_id
+                ),
+            ));
+        }
+        if metric.caveats.is_empty()
+            || metric.caveats.iter().any(|caveat| caveat.trim().is_empty())
+        {
+            findings.push(finding(
+                "COMPETITIVE_METRIC_CAVEATS",
+                format!("{} requires at least one non-empty caveat", metric.metric_id),
+            ));
+        }
+        match metric.unit.as_str() {
+            "qualitative" => {
+                if !metric.value.is_string() {
+                    findings.push(finding(
+                        "COMPETITIVE_QUALITATIVE_VALUE",
+                        format!("{} must provide a qualitative string value", metric.metric_id),
+                    ));
+                }
+            }
+            _ => match &metric.value {
+                serde_json::Value::Null => findings.push(finding(
+                    "COMPETITIVE_METRIC_VALUE_NULL",
+                    format!("{} cannot use null as a metric value", metric.metric_id),
+                )),
+                serde_json::Value::Number(number) if number.as_f64().is_none() => {
+                    findings.push(finding(
+                        "COMPETITIVE_METRIC_VALUE_INVALID",
+                        format!("{} has a non-numeric JSON number", metric.metric_id),
+                    ));
+                }
+                serde_json::Value::Object(map) if map.is_empty() => {
+                    findings.push(finding(
+                        "COMPETITIVE_METRIC_VALUE_EMPTY",
+                        format!("{} has an empty structured value", metric.metric_id),
+                    ));
+                }
+                serde_json::Value::String(_) | serde_json::Value::Bool(_) => {
+                    findings.push(finding(
+                        "COMPETITIVE_METRIC_VALUE_TYPE",
+                        format!(
+                            "{} requires a numeric or structured value for unit {}",
+                            metric.metric_id, metric.unit
+                        ),
+                    ));
+                }
+                _ => {}
+            },
+        }
+
+        findings.sort();
+        let status = if findings.is_empty() {
+            "PASS_SOURCE_REFERENCE_ONLY"
+        } else {
+            "BLOCKED"
+        };
+        metrics.push(CompetitiveMetricResult {
+            metric_id: metric.metric_id,
+            status,
+            findings,
+        });
+    }
+
+    metrics.sort_by(|left, right| left.metric_id.cmp(&right.metric_id));
+    corpus_findings.sort();
+    let passed_count = metrics
+        .iter()
+        .filter(|metric| metric.status == "PASS_SOURCE_REFERENCE_ONLY")
+        .count();
+    let blocked_count = metrics.len() - passed_count;
+    let status = if corpus_findings.is_empty() && blocked_count == 0 {
+        "PASS"
+    } else {
+        "BLOCKED"
+    };
+
+    Ok(CompetitiveReferenceAuditReport {
+        report_schema: "planetary-energy-competitive-reference-audit-v0.1",
+        source_sha256,
+        status,
+        claim_ceiling: "source_binding_and_metric_boundary_completeness_only",
+        reference_count: snapshot.references.len(),
+        metric_count: metrics.len(),
+        passed_count,
+        blocked_count,
+        corpus_findings,
+        metrics,
+    })
+}
+
+pub fn run_competitive_reference_audit(input: &Path, output: Option<&Path>) -> Result<()> {
+    let bytes = fs::read(input)
+        .with_context(|| format!("reading competitive reference snapshot {}", input.display()))?;
+    let report = audit_competitive_snapshot(&bytes)?;
+    let rendered = serde_json::to_string_pretty(&report)?;
+
+    if let Some(path) = output {
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent)
+                    .with_context(|| format!("creating report directory {}", parent.display()))?;
+            }
+        }
+        fs::write(path, &rendered)
+            .with_context(|| format!("writing competitive reference report {}", path.display()))?;
+    }
+    println!("{rendered}");
+
+    if report.status != "PASS" {
+        bail!(
+            "competitive reference audit BLOCKED: {} corpus finding(s), {} metric(s) blocked",
+            report.corpus_findings.len(),
+            report.blocked_count
+        );
+    }
+    Ok(())
+}
