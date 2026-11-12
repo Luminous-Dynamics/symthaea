@@ -13,7 +13,7 @@
 
 use core::fmt;
 use num_complex::Complex64;
-use rand::{Rng, SeedableRng};
+use rand::{Rng, SeedableRng, seq::SliceRandom};
 use rand_chacha::ChaCha20Rng;
 
 pub const MAX_DENSE_REDUCED_DIMENSION: usize = 64;
@@ -32,6 +32,8 @@ pub enum QuantumInformationError {
     PageReferenceDimensionLimit { requested: usize, maximum: usize },
     InvalidPageEntropy(f64),
     InvalidEnsembleSampleCount(usize),
+    InvalidCircuitTopology,
+    UnitaryConstructionFailure,
     InvalidTolerance(f64),
     NonFiniteState { index: usize },
     NonFiniteMatrix { row: usize, column: usize },
@@ -55,6 +57,8 @@ impl fmt::Display for QuantumInformationError {
             Self::PageReferenceDimensionLimit { requested, maximum } => write!(f, "Page reference dimension product {requested} exceeds limit {maximum}"),
             Self::InvalidPageEntropy(value) => write!(f, "Page reference entropy is invalid: {value}"),
             Self::InvalidEnsembleSampleCount(count) => write!(f, "Haar ensemble needs at least two samples, got {count}"),
+            Self::InvalidCircuitTopology => write!(f, "circuit topology requires at least two qubits"),
+            Self::UnitaryConstructionFailure => write!(f, "failed to construct a numerically independent Haar unitary basis"),
             Self::InvalidTolerance(t) => write!(f, "invalid tolerance {t}"),
             Self::NonFiniteState { index } => write!(f, "non-finite state amplitude at index {index}"),
             Self::NonFiniteMatrix { row, column } => write!(f, "non-finite matrix entry ({row}, {column})"),
@@ -312,6 +316,270 @@ pub fn page_average_entropy_nats(
     } else {
         Err(QuantumInformationError::InvalidPageEntropy(entropy))
     }
+}
+
+/// Topology for finite-depth random two-qubit scrambling circuits.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RandomCircuitTopology {
+    /// Nearest-neighbour 1D brickwork; even and odd bonds alternate.
+    Brickwork1D,
+    /// A fresh random disjoint matching of qubit pairs at every layer.
+    AllToAllMatching,
+}
+
+/// One depth's reproducible random-circuit observables.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RandomCircuitEntropySample {
+    pub number_of_qubits: usize,
+    pub depth: usize,
+    pub seed: u64,
+    pub topology: RandomCircuitTopology,
+    pub two_qubit_gate_count: usize,
+    pub state_norm_squared: f64,
+    pub subsystem_entropy_nats: f64,
+    pub subsystem_purity: f64,
+}
+
+/// Ensemble statistics over independent circuit seeds at one declared depth.
+#[derive(Debug, Clone, PartialEq)]
+pub struct RandomCircuitEntropySummary {
+    pub number_of_qubits: usize,
+    pub depth: usize,
+    pub topology: RandomCircuitTopology,
+    pub sample_count: usize,
+    pub first_seed: u64,
+    pub mean_entropy_nats: f64,
+    pub sample_variance_nats_squared: f64,
+    pub standard_error_nats: f64,
+}
+
+/// Generate a Haar-distributed 4x4 complex unitary by Gram-Schmidt
+/// orthonormalization of iid complex Gaussian columns (Ginibre construction).
+fn haar_unitary_4(
+    rng: &mut ChaCha20Rng,
+) -> Result<[[Complex64; 4]; 4], QuantumInformationError> {
+    let mut columns = [[Complex64::new(0.0, 0.0); 4]; 4];
+    for column in 0..4 {
+        let mut accepted = false;
+        for _attempt in 0..8 {
+            let mut vector = [Complex64::new(0.0, 0.0); 4];
+            for entry in &mut vector {
+                let u1 = rng.gen_range(0.0_f64..1.0_f64).max(f64::MIN_POSITIVE);
+                let u2 = rng.gen_range(0.0_f64..1.0_f64);
+                let radius = (-2.0 * u1.ln()).sqrt();
+                let phase = core::f64::consts::TAU * u2;
+                *entry = Complex64::new(radius * phase.cos(), radius * phase.sin());
+            }
+            for previous in 0..column {
+                let mut overlap = Complex64::new(0.0, 0.0);
+                for row in 0..4 {
+                    overlap += columns[previous][row].conj() * vector[row];
+                }
+                for row in 0..4 {
+                    vector[row] -= columns[previous][row] * overlap;
+                }
+            }
+            let norm_squared: f64 = vector.iter().map(|value| value.norm_sqr()).sum();
+            if norm_squared.is_finite() && norm_squared > 1e-24 {
+                let inverse_norm = norm_squared.sqrt().recip();
+                for row in 0..4 {
+                    columns[column][row] = vector[row] * inverse_norm;
+                }
+                accepted = true;
+                break;
+            }
+        }
+        if !accepted {
+            return Err(QuantumInformationError::UnitaryConstructionFailure);
+        }
+    }
+    let mut unitary = [[Complex64::new(0.0, 0.0); 4]; 4];
+    for row in 0..4 {
+        for column in 0..4 {
+            unitary[row][column] = columns[column][row];
+        }
+    }
+    Ok(unitary)
+}
+
+/// Apply a two-qubit gate in basis order |00>, |01>, |10>, |11>.
+/// The register convention is MSB-first, matching DensityMatrix partial trace.
+fn apply_two_qubit_unitary(
+    amplitudes: &mut [Complex64],
+    number_of_qubits: usize,
+    first_qubit: usize,
+    second_qubit: usize,
+    unitary: &[[Complex64; 4]; 4],
+) -> Result<(), QuantumInformationError> {
+    if first_qubit >= number_of_qubits || second_qubit >= number_of_qubits
+        || first_qubit == second_qubit
+    {
+        return Err(QuantumInformationError::InvalidQubit {
+            qubit: first_qubit.max(second_qubit),
+            register_size: number_of_qubits,
+        });
+    }
+    let expected = 1usize.checked_shl(number_of_qubits as u32)
+        .ok_or(QuantumInformationError::DimensionOverflow)?;
+    if amplitudes.len() != expected {
+        return Err(QuantumInformationError::DimensionMismatch {
+            expected,
+            actual: amplitudes.len(),
+        });
+    }
+    let first_bit = number_of_qubits - 1 - first_qubit;
+    let second_bit = number_of_qubits - 1 - second_qubit;
+    let first_mask = 1usize << first_bit;
+    let second_mask = 1usize << second_bit;
+    for base in 0..expected {
+        if base & first_mask != 0 || base & second_mask != 0 {
+            continue;
+        }
+        let indices = [
+            base,
+            base | second_mask,
+            base | first_mask,
+            base | first_mask | second_mask,
+        ];
+        let input = [
+            amplitudes[indices[0]],
+            amplitudes[indices[1]],
+            amplitudes[indices[2]],
+            amplitudes[indices[3]],
+        ];
+        for row in 0..4 {
+            let mut value = Complex64::new(0.0, 0.0);
+            for column in 0..4 {
+                value += unitary[row][column] * input[column];
+            }
+            amplitudes[indices[row]] = value;
+        }
+    }
+    Ok(())
+}
+
+/// Simulate one seeded random-circuit sample and return subsystem entropy.
+/// This is a finite-depth scrambling experiment, not an evaporation model.
+pub fn simulate_random_circuit_entropy(
+    number_of_qubits: usize,
+    depth: usize,
+    topology: RandomCircuitTopology,
+    retained_qubits: &[usize],
+    seed: u64,
+    tolerance: f64,
+) -> Result<RandomCircuitEntropySample, QuantumInformationError> {
+    validate_tolerance(tolerance)?;
+    if number_of_qubits < 2 {
+        return Err(QuantumInformationError::InvalidCircuitTopology);
+    }
+    if number_of_qubits > MAX_DENSE_STATE_QUBITS {
+        return Err(QuantumInformationError::DenseStateQubitLimit {
+            requested: number_of_qubits,
+            maximum: MAX_DENSE_STATE_QUBITS,
+        });
+    }
+    let dimension = 1usize << number_of_qubits;
+    let mut amplitudes = vec![Complex64::new(0.0, 0.0); dimension];
+    amplitudes[0] = Complex64::new(1.0, 0.0);
+    let mut rng = ChaCha20Rng::seed_from_u64(seed);
+    let mut gate_count = 0usize;
+
+    for layer in 0..depth {
+        let pairs = match topology {
+            RandomCircuitTopology::Brickwork1D => {
+                let parity = layer % 2;
+                (parity..(number_of_qubits - 1))
+                    .step_by(2)
+                    .map(|first| (first, first + 1))
+                    .collect::<Vec<_>>()
+            }
+            RandomCircuitTopology::AllToAllMatching => {
+                let mut qubits = (0..number_of_qubits).collect::<Vec<_>>();
+                qubits.shuffle(&mut rng);
+                qubits.chunks_exact(2)
+                    .map(|pair| (pair[0], pair[1]))
+                    .collect::<Vec<_>>()
+            }
+        };
+        for (first, second) in pairs {
+            let unitary = haar_unitary_4(&mut rng)?;
+            apply_two_qubit_unitary(
+                &mut amplitudes,
+                number_of_qubits,
+                first,
+                second,
+                &unitary,
+            )?;
+            gate_count += 1;
+        }
+    }
+
+    let norm_squared: f64 = amplitudes.iter().map(|amplitude| amplitude.norm_sqr()).sum();
+    if !norm_squared.is_finite() {
+        return Err(QuantumInformationError::NonFiniteState { index: dimension });
+    }
+    if (norm_squared - 1.0).abs() > tolerance {
+        return Err(QuantumInformationError::NormalizationError {
+            norm_squared,
+            tolerance,
+        });
+    }
+    let reduced = DensityMatrix::from_pure_state(
+        &amplitudes,
+        number_of_qubits,
+        retained_qubits,
+        tolerance,
+    )?;
+    let entropy = reduced.von_neumann_entropy(tolerance)?;
+    let purity = reduced.diagnostics(tolerance)?.purity;
+    Ok(RandomCircuitEntropySample {
+        number_of_qubits,
+        depth,
+        seed,
+        topology,
+        two_qubit_gate_count: gate_count,
+        state_norm_squared: norm_squared,
+        subsystem_entropy_nats: entropy,
+        subsystem_purity: purity,
+    })
+}
+
+/// Run an independent-seed finite-depth circuit ensemble at a fixed topology
+/// and depth. This reports sampling variance; it does not assume Haar equilibrium.
+pub fn sample_random_circuit_entropy_ensemble(
+    number_of_qubits: usize,
+    depth: usize,
+    topology: RandomCircuitTopology,
+    retained_qubits: &[usize],
+    sample_count: usize,
+    first_seed: u64,
+    tolerance: f64,
+) -> Result<RandomCircuitEntropySummary, QuantumInformationError> {
+    if sample_count < 2 {
+        return Err(QuantumInformationError::InvalidEnsembleSampleCount(sample_count));
+    }
+    let mut mean = 0.0;
+    let mut sum_squared_deviations = 0.0;
+    for sample_index in 0..sample_count {
+        let seed = first_seed.wrapping_add(sample_index as u64);
+        let sample = simulate_random_circuit_entropy(
+            number_of_qubits, depth, topology, retained_qubits, seed, tolerance,
+        )?;
+        let delta = sample.subsystem_entropy_nats - mean;
+        mean += delta / (sample_index + 1) as f64;
+        sum_squared_deviations += delta * (sample.subsystem_entropy_nats - mean);
+    }
+    let variance = sum_squared_deviations / (sample_count - 1) as f64;
+    Ok(RandomCircuitEntropySummary {
+        number_of_qubits,
+        depth,
+        topology,
+        sample_count,
+        first_seed,
+        mean_entropy_nats: mean,
+        sample_variance_nats_squared: variance,
+        standard_error_nats: (variance / sample_count as f64).sqrt(),
+    })
 }
 
 /// Summary of a seeded Haar-random pure-state Page-entropy ensemble.
@@ -621,6 +889,54 @@ mod tests {
             assert!(forward <= (m.min(n) as f64).ln() + 1e-13);
             assert!(forward >= 0.0);
         }
+    }
+
+    #[test]
+    fn haar_two_qubit_unitary_is_unitary_to_roundoff() {
+        let mut rng = ChaCha20Rng::seed_from_u64(0xA11CE);
+        let unitary = haar_unitary_4(&mut rng).unwrap();
+        for row in 0..4 {
+            for column in 0..4 {
+                let mut dot = Complex64::new(0.0, 0.0);
+                for k in 0..4 {
+                    dot += unitary[k][row].conj() * unitary[k][column];
+                }
+                let expected = if row == column { 1.0 } else { 0.0 };
+                assert!((dot.re - expected).abs() < 1e-12);
+                assert!(dot.im.abs() < 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn random_brickwork_circuit_is_seed_reproducible_and_norm_preserving() {
+        let first = simulate_random_circuit_entropy(
+            6, 6, RandomCircuitTopology::Brickwork1D, &[0, 1, 2], 0xB12C, TOL,
+        ).unwrap();
+        let repeated = simulate_random_circuit_entropy(
+            6, 6, RandomCircuitTopology::Brickwork1D, &[0, 1, 2], 0xB12C, TOL,
+        ).unwrap();
+        assert_eq!(first, repeated);
+        assert!((first.state_norm_squared - 1.0).abs() < 1e-12);
+        assert!(first.subsystem_entropy_nats >= 0.0);
+        assert!(first.subsystem_entropy_nats <= 3.0_f64.ln() + 1e-10);
+        assert!(first.subsystem_purity > 0.0 && first.subsystem_purity <= 1.0 + 1e-10);
+    }
+
+    #[test]
+    fn local_and_all_to_all_circuit_ensembles_report_seeded_statistics() {
+        let local = sample_random_circuit_entropy_ensemble(
+            6, 4, RandomCircuitTopology::Brickwork1D, &[0, 1, 2], 16, 100, TOL,
+        ).unwrap();
+        let global = sample_random_circuit_entropy_ensemble(
+            6, 4, RandomCircuitTopology::AllToAllMatching, &[0, 1, 2], 16, 100, TOL,
+        ).unwrap();
+        assert_eq!(local.sample_count, 16);
+        assert_eq!(global.sample_count, 16);
+        assert!(local.sample_variance_nats_squared >= 0.0);
+        assert!(global.sample_variance_nats_squared >= 0.0);
+        assert!(local.standard_error_nats >= 0.0);
+        assert!(global.standard_error_nats >= 0.0);
     }
 
     #[test]
