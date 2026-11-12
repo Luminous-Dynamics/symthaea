@@ -109,6 +109,7 @@ pub struct RepeatabilityCalibration {
     /// Parser-reconstructed receipt digest from the baseline MIDI bytes.
     pub performed_event_map_receipt_sha256: String,
     pub expected_primary_pitches_sha256: String,
+    pub counterfactual_expected_primary_pitches_sha256: String,
     pub baseline_schedule_sha256: String,
     pub renderer_identity_sha256: String,
     pub renderer_config_sha256: String,
@@ -391,6 +392,54 @@ pub fn verify_renderer_audio_binding_for_score(
         expected_primary_midi_by_score_index.len(),
         &expected_primary_midi_by_score_index,
         excluded_source_event_index,
+        audio,
+    )
+}
+
+/// Verify a counterfactual transposition against the original typed Score.
+/// The expected target pitch is derived internally from the exact source Score
+/// and the signed semitone delta; callers cannot provide a self-asserted target
+/// pitch inventory. The original Score digest remains the lineage root.
+#[cfg(feature = "theory")]
+pub fn verify_renderer_audio_binding_for_score_transposition(
+    receipt: &RendererExecutionReceipt,
+    inputs: RendererReceiptInputs<'_>,
+    performed_event_map_bytes: &[u8],
+    score: &symthaea_music_theory::Score,
+    source_event_index: usize,
+    semitones: i16,
+    audio: &AudioView<'_>,
+) -> Result<VerifiedRendererAudioBinding, CounterfactualInfluenceError> {
+    if semitones == 0 || !(-127..=127).contains(&semitones) {
+        return Err(CounterfactualInfluenceError::InvalidIntervention);
+    }
+    let serialized_score = serde_json::to_vec(score)
+        .map_err(|_| CounterfactualInfluenceError::SerializationFailure)?;
+    if inputs.score_bytes != serialized_score.as_slice()
+        || receipt.score_sha256 != sha256_hex(&serialized_score)
+    {
+        return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
+    }
+    let mut expected_primary_midi_by_score_index: Vec<u8> = score
+        .events()
+        .iter()
+        .map(|event| event.pitch.midi())
+        .collect();
+    let target = expected_primary_midi_by_score_index
+        .get_mut(source_event_index)
+        .ok_or(CounterfactualInfluenceError::InvalidEventId)?;
+    let transformed = i16::from(*target) + semitones;
+    if !(0..=127).contains(&transformed) {
+        return Err(CounterfactualInfluenceError::InvalidIntervention);
+    }
+    *target = transformed as u8;
+    verify_renderer_audio_binding(
+        receipt,
+        inputs,
+        performed_event_map_bytes,
+        expected_primary_midi_by_score_index.len(),
+        &expected_primary_midi_by_score_index,
+        None,
         audio,
     )
 }
@@ -1006,10 +1055,94 @@ fn validate_intervention(
 ) -> Result<(), CounterfactualInfluenceError> {
     match intervention {
         EventIntervention::Remove => Ok(()),
-        // Other typed variants remain reserved until their operation-specific
-        // MIDI obligations are implemented and independently tested.
+        EventIntervention::Transpose { semitones }
+            if *semitones != 0 && (-127..=127).contains(semitones) =>
+        {
+            Ok(())
+        }
+        // Tick/velocity operations remain reserved until the performed map
+        // retains exact PPQ/tick/tempo/velocity data and their own validators.
         _ => Err(CounterfactualInfluenceError::InvalidIntervention),
     }
+}
+
+fn expected_counterfactual_primary_pitches(
+    baseline: &[u8],
+    source_event_index: usize,
+    intervention: &EventIntervention,
+) -> Result<Vec<u8>, CounterfactualInfluenceError> {
+    let mut expected = baseline.to_vec();
+    match intervention {
+        EventIntervention::Remove => Ok(expected),
+        EventIntervention::Transpose { semitones } => {
+            validate_intervention(intervention)?;
+            let target = expected
+                .get_mut(source_event_index)
+                .ok_or(CounterfactualInfluenceError::InvalidEventId)?;
+            let transformed = i16::from(*target) + *semitones;
+            if !(0..=127).contains(&transformed) {
+                return Err(CounterfactualInfluenceError::InvalidIntervention);
+            }
+            *target = transformed as u8;
+            Ok(expected)
+        }
+        _ => Err(CounterfactualInfluenceError::InvalidIntervention),
+    }
+}
+
+fn lineage_rows_match(
+    baseline: &[&PerformedEventLineage],
+    counterfactual: &[&PerformedEventLineage],
+    require_stable_note_on_ordinal: bool,
+) -> bool {
+    if baseline.len() != counterfactual.len() {
+        return false;
+    }
+    let mut left = baseline.to_vec();
+    let mut right = counterfactual.to_vec();
+    left.sort_by_key(|row| (&row.source_event_id, row.descendant_ordinal));
+    right.sort_by_key(|row| (&row.source_event_id, row.descendant_ordinal));
+    left.iter().zip(right.iter()).all(|(before, after)| {
+        before.source_event_id == after.source_event_id
+            && before.descendant_ordinal == after.descendant_ordinal
+            && before.midi_track_index == after.midi_track_index
+            && (!require_stable_note_on_ordinal
+                || before.note_on_ordinal == after.note_on_ordinal)
+            && before.midi_channel == after.midi_channel
+            && before.midi_note == after.midi_note
+            && before.onset_micros == after.onset_micros
+            && before.end_micros == after.end_micros
+            && before.onset_frame == after.onset_frame
+            && before.end_frame == after.end_frame
+    })
+}
+
+fn transposed_target_rows_match(
+    baseline: &[&PerformedEventLineage],
+    counterfactual: &[&PerformedEventLineage],
+    semitones: i16,
+) -> bool {
+    if baseline.is_empty() || baseline.len() != counterfactual.len() {
+        return false;
+    }
+    let mut left = baseline.to_vec();
+    let mut right = counterfactual.to_vec();
+    left.sort_by_key(|row| row.descendant_ordinal);
+    right.sort_by_key(|row| row.descendant_ordinal);
+    left.iter().zip(right.iter()).all(|(before, after)| {
+        let transformed_pitch = i16::from(before.midi_note) + semitones;
+        (0..=127).contains(&transformed_pitch)
+            && before.source_event_id == after.source_event_id
+            && before.descendant_ordinal == after.descendant_ordinal
+            && before.midi_track_index == after.midi_track_index
+            && before.note_on_ordinal == after.note_on_ordinal
+            && before.midi_channel == after.midi_channel
+            && i16::from(after.midi_note) == transformed_pitch
+            && before.onset_micros == after.onset_micros
+            && before.end_micros == after.end_micros
+            && before.onset_frame == after.onset_frame
+            && before.end_frame == after.end_frame
+    })
 }
 
 fn validate_input(
@@ -1017,15 +1150,20 @@ fn validate_input(
     calibration: &RepeatabilityCalibration,
 ) -> Result<usize, CounterfactualInfluenceError> {
     validate_intervention(&input.intervention)?;
-    let excluded_index = parse_score_event_index(input.source_event_id)
+    let target_index = parse_score_event_index(input.source_event_id)
         .ok_or(CounterfactualInfluenceError::InvalidEventId)?;
     if input.expected_score_event_count == 0
         || input.expected_score_event_count > 100_000
         || input.expected_primary_midi_by_score_index.len() != input.expected_score_event_count
-        || excluded_index >= input.expected_score_event_count
+        || target_index >= input.expected_score_event_count
     {
         return Err(CounterfactualInfluenceError::InvalidEventId);
     }
+    let counterfactual_primary_pitches = expected_counterfactual_primary_pitches(
+        input.expected_primary_midi_by_score_index,
+        target_index,
+        &input.intervention,
+    )?;
     for (name, bytes) in [
         ("source_score", input.source_score_bytes),
         ("performed_event_map", input.performed_event_map_bytes),
@@ -1067,15 +1205,16 @@ fn validate_input(
     {
         return Err(CounterfactualInfluenceError::RendererAudioMismatch);
     }
-    let expected_pitch_sha256 = sha256_hex(input.expected_primary_midi_by_score_index);
+    let baseline_pitch_sha256 = sha256_hex(input.expected_primary_midi_by_score_index);
+    let counterfactual_pitch_sha256 = sha256_hex(&counterfactual_primary_pitches);
     if input.baseline_renderer_evidence.source_score_sha256
         != sha256_hex(input.source_score_bytes)
         || input.counterfactual_renderer_evidence.source_score_sha256
             != sha256_hex(input.source_score_bytes)
         || input.baseline_renderer_evidence.expected_primary_pitches_sha256
-            != expected_pitch_sha256
+            != baseline_pitch_sha256
         || input.counterfactual_renderer_evidence.expected_primary_pitches_sha256
-            != expected_pitch_sha256
+            != counterfactual_pitch_sha256
         || input.baseline_renderer_evidence.input_artifact_sha256
             != sha256_hex(input.baseline_schedule_bytes)
         || input.counterfactual_renderer_evidence.input_artifact_sha256
@@ -1100,15 +1239,18 @@ fn validate_input(
         .iter()
         .filter_map(|row| parse_score_event_index(&row.source_event_id))
         .collect();
-    let expected_baseline_ids: std::collections::BTreeSet<usize> =
+    let expected_ids: std::collections::BTreeSet<usize> =
         (0..input.expected_score_event_count).collect();
-    let expected_counterfactual_ids: std::collections::BTreeSet<usize> =
-        (0..input.expected_score_event_count)
-            .filter(|index| *index != excluded_index)
-            .collect();
-    if baseline_ids != expected_baseline_ids
-        || counterfactual_ids != expected_counterfactual_ids
-    {
+    let expected_counterfactual_ids = match input.intervention {
+        EventIntervention::Remove => expected_ids
+            .iter()
+            .copied()
+            .filter(|index| *index != target_index)
+            .collect(),
+        EventIntervention::Transpose { .. } => expected_ids.clone(),
+        _ => return Err(CounterfactualInfluenceError::InvalidIntervention),
+    };
+    if baseline_ids != expected_ids || counterfactual_ids != expected_counterfactual_ids {
         return Err(CounterfactualInfluenceError::InvalidIntervention);
     }
     if input.baseline_renderer_evidence.performed_event_map_sha256
@@ -1123,41 +1265,55 @@ fn validate_input(
         .iter()
         .filter(|row| row.source_event_id == input.source_event_id)
         .collect();
-    let counterfactual_target_present = input
+    let counterfactual_target_rows: Vec<&PerformedEventLineage> = input
         .counterfactual_renderer_evidence
         .performed_event_lineage
         .iter()
-        .any(|row| row.source_event_id == input.source_event_id);
-    if baseline_target_rows.is_empty() || counterfactual_target_present {
-        return Err(CounterfactualInfluenceError::InvalidIntervention);
-    }
+        .filter(|row| row.source_event_id == input.source_event_id)
+        .collect();
 
-    // A true Remove operation must preserve every non-target descendant exactly.
-    // MIDI ordinal is omitted because removing a prior note shifts later per-track ordinals.
     let baseline_protected: Vec<&PerformedEventLineage> = input
         .baseline_renderer_evidence
         .performed_event_lineage
         .iter()
         .filter(|row| row.source_event_id != input.source_event_id)
         .collect();
-    let counterfactual_protected =
-        &input.counterfactual_renderer_evidence.performed_event_lineage;
-    if baseline_protected.len() != counterfactual_protected.len()
-        || baseline_protected.iter().any(|baseline| {
-            !counterfactual_protected.iter().any(|candidate| {
-                candidate.source_event_id == baseline.source_event_id
-                    && candidate.descendant_ordinal == baseline.descendant_ordinal
-                    && candidate.midi_track_index == baseline.midi_track_index
-                    && candidate.midi_channel == baseline.midi_channel
-                    && candidate.midi_note == baseline.midi_note
-                    && candidate.onset_micros == baseline.onset_micros
-                    && candidate.end_micros == baseline.end_micros
-                    && candidate.onset_frame == baseline.onset_frame
-                    && candidate.end_frame == baseline.end_frame
-            })
-        })
-    {
-        return Err(CounterfactualInfluenceError::InvalidIntervention);
+    let counterfactual_protected: Vec<&PerformedEventLineage> = input
+        .counterfactual_renderer_evidence
+        .performed_event_lineage
+        .iter()
+        .filter(|row| row.source_event_id != input.source_event_id)
+        .collect();
+
+    match input.intervention {
+        EventIntervention::Remove => {
+            if baseline_target_rows.is_empty() || !counterfactual_target_rows.is_empty() {
+                return Err(CounterfactualInfluenceError::InvalidIntervention);
+            }
+            // Removing a prior note shifts MIDI note-on ordinals on its track;
+            // every other musical field and stable descendant identity must stay exact.
+            if !lineage_rows_match(
+                &baseline_protected,
+                &counterfactual_protected,
+                false,
+            ) {
+                return Err(CounterfactualInfluenceError::InvalidIntervention);
+            }
+        }
+        EventIntervention::Transpose { semitones } => {
+            if !transposed_target_rows_match(
+                &baseline_target_rows,
+                &counterfactual_target_rows,
+                semitones,
+            ) || !lineage_rows_match(
+                &baseline_protected,
+                &counterfactual_protected,
+                true,
+            ) {
+                return Err(CounterfactualInfluenceError::InvalidIntervention);
+            }
+        }
+        _ => return Err(CounterfactualInfluenceError::InvalidIntervention),
     }
 
     if input.baseline_renderer_evidence.receipt_sha256
@@ -1175,7 +1331,6 @@ fn validate_input(
     }
     Ok(frames)
 }
-
 
 fn seal_report(
     mut report: CounterfactualInfluenceReport,
@@ -1276,6 +1431,14 @@ pub fn measure_counterfactual_influence(
         expected_primary_pitches_sha256: calibration
             .expected_primary_pitches_sha256
             .clone(),
+        counterfactual_expected_primary_pitches_sha256: sha256_hex(
+            &expected_counterfactual_primary_pitches(
+                input.expected_primary_midi_by_score_index,
+                parse_score_event_index(input.source_event_id)
+                    .ok_or(CounterfactualInfluenceError::InvalidEventId)?,
+                &input.intervention,
+            )?,
+        ),
         baseline_schedule_sha256: sha256_hex(input.baseline_schedule_bytes),
         counterfactual_schedule_sha256: sha256_hex(input.counterfactual_schedule_bytes),
         renderer_identity_sha256: input.baseline_renderer_evidence.renderer_identity_sha256.clone(),
