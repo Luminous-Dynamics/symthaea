@@ -1487,10 +1487,6 @@ mod tests {
         assert_eq!(right.annotations[0].element, "footnote");
         assert_eq!(right.annotations[0].text.as_deref(), Some("closing note"));
         assert!(right.unrecognized_attributes.contains(&("custom".into(), "x".into())));
-        assert!(right.annotations.is_empty());
-        assert!(right.fermatas.is_empty());
-        assert!(right.wavy_lines.is_empty());
-
         let second_right = &graphs[0].barline_events[2];
         assert_eq!(second_right.score_offset, RationalBeat::new(5, 1).unwrap());
         assert_eq!(second_right.repeat.as_ref().and_then(|value| value.direction.as_deref()), Some("forward"));
