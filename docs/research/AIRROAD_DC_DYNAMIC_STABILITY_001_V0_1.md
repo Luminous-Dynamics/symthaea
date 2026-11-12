@@ -140,7 +140,7 @@ At 50 V:
 - source current = load current = 50 A;
 - \(\lambda=0\;s^{-1}\).
 
-The repeated root is a fold boundary, not a margin-bearing stable design.
+The repeated root is a fold boundary, not a margin-bearing stable design. In this model, the vector field is non-positive on both sides: trajectories approach the fold from above but move away from it below.
 
 ### Case no-equilibrium
 
