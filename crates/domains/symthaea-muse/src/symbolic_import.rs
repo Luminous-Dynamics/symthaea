@@ -62,7 +62,7 @@ pub fn parse_symbolic_with_structure(
     format: SymbolicImportFormat,
     score_clock_id: &str,
 ) -> Result<StructuredSymbolicImportV1, String> {
-    if matches!(format, SymbolicImportFormat::MusicXml) && score_clock_id.trim().is_empty() {
+    if matches!(&format, SymbolicImportFormat::MusicXml) && score_clock_id.trim().is_empty() {
         return Err("MusicXML structured import requires a non-empty score_clock_id".into());
     }
     let score = parse_symbolic(bytes, format.clone())?;
