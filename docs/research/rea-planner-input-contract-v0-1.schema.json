@@ -1,0 +1,734 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/rea-planner-input-contract-v0-1.schema.json",
+  "title": "REA planner input contract v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "case_id",
+    "qualification_mode",
+    "claim_obligation_refs",
+    "artifact_scope",
+    "evidence_catalog",
+    "hypotheses",
+    "experiments",
+    "likelihood_scenarios",
+    "terminal_decisions",
+    "planner_configs",
+    "input_provenance"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "contract_id": {
+      "const": "luminous.rea.planner-input.v0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 128
+    },
+    "qualification_mode": {
+      "enum": [
+        "math_only_synthetic",
+        "planner_integration_observed"
+      ]
+    },
+    "claim_obligation_refs": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 2
+      }
+    },
+    "artifact_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subject_sha256",
+        "operation",
+        "environment_id"
+      ],
+      "properties": {
+        "subject_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "operation": {
+          "type": "string",
+          "minLength": 2
+        },
+        "environment_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "evidence_catalog": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/evidence"
+      }
+    },
+    "hypotheses": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/hypothesis"
+      }
+    },
+    "experiments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/experiment"
+      }
+    },
+    "likelihood_scenarios": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/scenario"
+      }
+    },
+    "terminal_decisions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/decision"
+      }
+    },
+    "planner_configs": {
+      "$ref": "#/$defs/configs"
+    },
+    "input_provenance": {
+      "$ref": "#/$defs/provenance"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "qualification_mode": {
+            "const": "math_only_synthetic"
+          }
+        },
+        "required": [
+          "qualification_mode"
+        ]
+      },
+      "then": {
+        "properties": {
+          "evidence_catalog": {
+            "items": {
+              "properties": {
+                "origin": {
+                  "const": "synthetic"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "qualification_mode": {
+            "const": "planner_integration_observed"
+          }
+        },
+        "required": [
+          "qualification_mode"
+        ]
+      },
+      "then": {
+        "properties": {
+          "evidence_catalog": {
+            "items": {
+              "properties": {
+                "origin": {
+                  "enum": [
+                    "independent_observation",
+                    "independent_derivation"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "origin",
+        "parent_evidence_ids",
+        "raw_sha256",
+        "source_family_id"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "pattern": "^ev_[0-9a-f]{64}$"
+        },
+        "origin": {
+          "enum": [
+            "independent_observation",
+            "independent_derivation",
+            "model_generated",
+            "synthetic",
+            "external_reference"
+          ]
+        },
+        "parent_evidence_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^ev_[0-9a-f]{64}$"
+          }
+        },
+        "raw_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "source_family_id": {
+          "type": "string",
+          "minLength": 2
+        }
+      }
+    },
+    "hypothesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "proposition",
+        "prior_probability",
+        "supporting_evidence_ids",
+        "contradicting_evidence_ids"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "proposition": {
+          "type": "string",
+          "minLength": 8
+        },
+        "prior_probability": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "supporting_evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^ev_[0-9a-f]{64}$"
+          }
+        },
+        "contradicting_evidence_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^ev_[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "likelihoodRow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypothesis_id",
+        "outcome_order",
+        "outcome_probabilities"
+      ],
+      "properties": {
+        "hypothesis_id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "outcome_probabilities": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          }
+        },
+        "outcome_order": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "outcomes",
+        "point_likelihoods",
+        "authorization",
+        "reversible",
+        "destructive",
+        "target_impact",
+        "estimated_time_seconds",
+        "estimated_energy_joules",
+        "estimated_risk"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "point_likelihoods": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/likelihoodRow"
+          }
+        },
+        "authorization": {
+          "enum": [
+            "unknown",
+            "denied",
+            "authorized"
+          ]
+        },
+        "reversible": {
+          "type": "boolean"
+        },
+        "destructive": {
+          "type": "boolean"
+        },
+        "target_impact": {
+          "enum": [
+            "read_only_observation",
+            "temporary_configuration",
+            "service_restart",
+            "data_mutation",
+            "physical_actuation"
+          ]
+        },
+        "estimated_time_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "estimated_energy_joules": {
+          "type": "number",
+          "minimum": 0
+        },
+        "estimated_risk": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "scenarioExperiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "experiment_id",
+        "likelihoods"
+      ],
+      "properties": {
+        "experiment_id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "likelihoods": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/likelihoodRow"
+          }
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "scenario_probability",
+        "experiments",
+        "coverage_note"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "scenario_probability": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "experiments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/scenarioExperiment"
+          }
+        },
+        "coverage_note": {
+          "type": "string",
+          "minLength": 8
+        }
+      }
+    },
+    "decisionUtility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hypothesis_id",
+        "utility"
+      ],
+      "properties": {
+        "hypothesis_id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "utility": {
+          "type": "number"
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "utilities"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "utilities": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/decisionUtility"
+          }
+        }
+      }
+    },
+    "baseConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_time_seconds",
+        "max_energy_joules",
+        "max_risk",
+        "cost_weights",
+        "max_target_impact",
+        "minimum_information_gain_bits"
+      ],
+      "properties": {
+        "max_time_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_energy_joules": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_risk": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "cost_weights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "time",
+            "energy",
+            "risk"
+          ],
+          "properties": {
+            "time": {
+              "type": "number",
+              "minimum": 0
+            },
+            "energy": {
+              "type": "number",
+              "minimum": 0
+            },
+            "risk": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "max_target_impact": {
+          "enum": [
+            "read_only_observation",
+            "temporary_configuration",
+            "service_restart",
+            "data_mutation",
+            "physical_actuation"
+          ]
+        },
+        "minimum_information_gain_bits": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "robustConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "base",
+        "ranking_policy",
+        "lower_tail_probability",
+        "minimum_top1_stability"
+      ],
+      "properties": {
+        "base": {
+          "$ref": "#/$defs/baseConfig"
+        },
+        "ranking_policy": {
+          "enum": [
+            "expected_information_gain",
+            "worst_case_information_gain",
+            "lower_tail_cvar"
+          ]
+        },
+        "lower_tail_probability": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "minimum_top1_stability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "decisionConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "robust",
+        "ranking_policy",
+        "minimum_decision_stability",
+        "maximum_worst_case_regret",
+        "regret_penalty",
+        "minimum_selection_value",
+        "max_policy_evaluations"
+      ],
+      "properties": {
+        "robust": {
+          "$ref": "#/$defs/robustConfig"
+        },
+        "ranking_policy": {
+          "enum": [
+            "expected_evsi",
+            "worst_case_evsi",
+            "lower_tail_cvar_evsi",
+            "expected_evsi_minus_worst_case_regret",
+            "minimax_regret"
+          ]
+        },
+        "minimum_decision_stability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maximum_worst_case_regret": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "regret_penalty": {
+          "type": "number",
+          "minimum": 0
+        },
+        "minimum_selection_value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "max_policy_evaluations": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "configs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "point",
+        "robust",
+        "decision_aware"
+      ],
+      "properties": {
+        "point": {
+          "$ref": "#/$defs/baseConfig"
+        },
+        "robust": {
+          "$ref": "#/$defs/robustConfig"
+        },
+        "decision_aware": {
+          "$ref": "#/$defs/decisionConfig"
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prior",
+        "likelihood_models",
+        "utility_matrix"
+      ],
+      "properties": {
+        "prior": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner",
+            "method",
+            "calibration_status",
+            "source_digest"
+          ],
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 2
+            },
+            "method": {
+              "type": "string",
+              "minLength": 4
+            },
+            "calibration_status": {
+              "enum": [
+                "synthetic_known_answer",
+                "externally_calibrated",
+                "uncalibrated_expert_elicitation"
+              ]
+            },
+            "source_digest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        "likelihood_models": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner",
+            "method",
+            "calibration_status",
+            "dataset_digest",
+            "model_version"
+          ],
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 2
+            },
+            "method": {
+              "type": "string",
+              "minLength": 4
+            },
+            "calibration_status": {
+              "enum": [
+                "synthetic_known_answer",
+                "externally_calibrated",
+                "uncalibrated_expert_elicitation"
+              ]
+            },
+            "dataset_digest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "model_version": {
+              "type": "string",
+              "minLength": 2
+            }
+          }
+        },
+        "utility_matrix": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner",
+            "method",
+            "scope",
+            "time_horizon",
+            "excluded_consequences"
+          ],
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 2
+            },
+            "method": {
+              "type": "string",
+              "minLength": 4
+            },
+            "scope": {
+              "type": "string",
+              "minLength": 4
+            },
+            "time_horizon": {
+              "type": "string",
+              "minLength": 2
+            },
+            "excluded_consequences": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 2
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
