@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-acoustic-scale-transfer-v0.1.0.schema.json",
+  "title": "Marine acoustic model-to-full-scale transfer audit v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "case_id", "evidence_kind", "source", "scaling", "similarity", "frequency_match_tolerance_fraction", "pairs"],
+  "properties": {
+    "schema_version": {"const": "0.1.0"},
+    "case_id": {"type": "string", "minLength": 1},
+    "evidence_kind": {"enum": ["synthetic", "measured"]},
+    "source": {
+      "type": "object", "additionalProperties": false,
+      "required": ["dataset_id", "citation", "raw_data_sha256", "rights_status", "independently_reviewed"],
+      "properties": {
+        "dataset_id": {"type": "string", "minLength": 1},
+        "citation": {"type": "string", "minLength": 1},
+        "raw_data_sha256": {"$ref": "#/$defs/digest"},
+        "rights_status": {"enum": ["public_or_permitted", "unknown", "restricted"]},
+        "independently_reviewed": {"type": "boolean"}
+      }
+    },
+    "scaling": {
+      "type": "object", "additionalProperties": false,
+      "required": ["method_id", "frequency_regime", "frequency_regime_basis", "bandwidth", "representation"],
+      "properties": {
+        "method_id": {"const": "ITTC-7.5-02-03-03.9-2024-Rev03"},
+        "frequency_regime": {"enum": ["high_frequency", "low_frequency"]},
+        "frequency_regime_basis": {"type": "string", "minLength": 1},
+        "bandwidth": {"enum": ["proportional", "constant"]},
+        "representation": {"enum": ["power_spectrum", "power_spectral_density"]}
+      }
+    },
+    "similarity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["wake", "cavitation_pattern", "gas_nuclei_state", "reynolds_scale_review", "facility_transfer_function"],
+      "properties": {
+        "wake": {"enum": ["qualified", "dissimilar", "unknown"]},
+        "cavitation_pattern": {"enum": ["qualified", "dissimilar", "unknown"]},
+        "gas_nuclei_state": {"enum": ["qualified", "dissimilar", "unknown"]},
+        "reynolds_scale_review": {"enum": ["reviewed", "not_reviewed"]},
+        "facility_transfer_function": {"enum": ["measured_and_applied", "unknown", "rejected"]}
+      }
+    },
+    "frequency_match_tolerance_fraction": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1},
+    "pairs": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["pair_id", "shared_timebase_receipt_sha256", "scale_transfer_u95_db", "model", "full_scale"],
+        "properties": {
+          "pair_id": {"type": "string", "minLength": 1},
+          "shared_timebase_receipt_sha256": {"$ref": "#/$defs/digest"},
+          "scale_transfer_u95_db": {"type": "number", "exclusiveMinimum": 0},
+          "model": {"$ref": "#/$defs/modelRun"},
+          "full_scale": {"$ref": "#/$defs/fullScaleRun"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[A-Fa-f0-9]{64}$"},
+    "modelRun": {
+      "type": "object", "additionalProperties": false,
+      "required": ["run_id", "operating_point_receipt_sha256", "raw_trace_sha256", "diameter_m", "rpm_hz", "cavitation_number_n_d", "source_reference_distance_m", "bands"],
+      "properties": {
+        "run_id": {"type": "string", "minLength": 1},
+        "operating_point_receipt_sha256": {"$ref": "#/$defs/digest"},
+        "raw_trace_sha256": {"$ref": "#/$defs/digest"},
+        "diameter_m": {"type": "number", "exclusiveMinimum": 0},
+        "rpm_hz": {"type": "number", "exclusiveMinimum": 0},
+        "cavitation_number_n_d": {"type": "number", "exclusiveMinimum": 0},
+        "source_reference_distance_m": {"type": "number", "exclusiveMinimum": 0},
+        "bands": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/modelBand"}}
+      }
+    },
+    "modelBand": {
+      "type": "object", "additionalProperties": false,
+      "required": ["band_id", "center_frequency_hz", "total_spl_db", "background_spl_db", "facility_transfer_function_db", "total_u95_db", "background_u95_db", "facility_transfer_u95_db"],
+      "properties": {
+        "band_id": {"type": "string", "minLength": 1},
+        "center_frequency_hz": {"type": "number", "exclusiveMinimum": 0},
+        "total_spl_db": {"type": "number"},
+        "background_spl_db": {"type": "number"},
+        "facility_transfer_function_db": {"type": "number"},
+        "total_u95_db": {"type": "number", "exclusiveMinimum": 0},
+        "background_u95_db": {"type": "number", "exclusiveMinimum": 0},
+        "facility_transfer_u95_db": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "fullScaleRun": {
+      "type": "object", "additionalProperties": false,
+      "required": ["run_id", "operating_point_receipt_sha256", "raw_trace_sha256", "diameter_m", "rpm_hz", "cavitation_number_n_d", "source_reference_distance_m", "source_level_method_id", "bands"],
+      "properties": {
+        "run_id": {"type": "string", "minLength": 1},
+        "operating_point_receipt_sha256": {"$ref": "#/$defs/digest"},
+        "raw_trace_sha256": {"$ref": "#/$defs/digest"},
+        "diameter_m": {"type": "number", "exclusiveMinimum": 0},
+        "rpm_hz": {"type": "number", "exclusiveMinimum": 0},
+        "cavitation_number_n_d": {"type": "number", "exclusiveMinimum": 0},
+        "source_reference_distance_m": {"type": "number", "exclusiveMinimum": 0},
+        "source_level_method_id": {"type": "string", "minLength": 1},
+        "bands": {"type": "array", "items": {"$ref": "#/$defs/fullScaleBand"}}
+      }
+    },
+    "fullScaleBand": {
+      "type": "object", "additionalProperties": false,
+      "required": ["band_id", "center_frequency_hz", "source_level_db", "source_level_u95_db"],
+      "properties": {
+        "band_id": {"type": "string", "minLength": 1},
+        "center_frequency_hz": {"type": "number", "exclusiveMinimum": 0},
+        "source_level_db": {"type": "number"},
+        "source_level_u95_db": {"type": "number", "exclusiveMinimum": 0}
+      }
+    }
+  }
+}
