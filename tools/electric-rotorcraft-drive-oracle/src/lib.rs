@@ -201,6 +201,90 @@ pub struct DriveMapEnvelope {
     pub favourable_efficiency_scenario: Result<DriveReport, DriveError>,
 }
 
+
+/// Context-bound motor-shaft coordinate bounds plus the map envelope derived
+/// over that entire rectangle. The coordinate bounds are absolute sets, not
+/// probabilistic intervals.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MotorShaftCoordinateMapEvidence {
+    pub map_id: String,
+    pub map_digest: String,
+    pub map_model_version: String,
+    pub configuration_digest: String,
+    pub context_digest: String,
+    pub evidence_manifest_digest: String,
+    pub nominal_motor_torque_nm: f64,
+    pub torque_lower_bound_nm: f64,
+    pub torque_upper_bound_nm: f64,
+    pub nominal_motor_speed_rpm: f64,
+    pub speed_lower_bound_rpm: f64,
+    pub speed_upper_bound_rpm: f64,
+    pub efficiency_lower_bound: f64,
+    pub efficiency_nominal: f64,
+    pub efficiency_upper_bound: f64,
+}
+
+/// Electrical limits for a demand measured at the motor-shaft boundary.
+///
+/// Transmission loss is deliberately absent: the input is motor-shaft output
+/// power, so applying gearbox efficiency again would double-count it.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MotorShaftDemandConfig {
+    pub inverter_efficiency: f64,
+    pub dc_bus_voltage_v: f64,
+    pub duration_s: f64,
+    pub minimum_dc_bus_voltage_v: f64,
+    pub maximum_dc_bus_current_a: f64,
+    pub maximum_dc_bus_power_w: f64,
+    pub energy_balance_tolerance_j: f64,
+}
+
+/// Electrical demand and conversion accounting for one motor-shaft scenario.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MotorShaftDemandReport {
+    pub motor_shaft_torque_nm: f64,
+    pub motor_speed_rpm: f64,
+    pub motor_shaft_output_power_w: f64,
+    pub motor_efficiency: f64,
+    pub motor_electrical_input_power_w: f64,
+    pub motor_loss_w: f64,
+    pub inverter_efficiency: f64,
+    pub dc_bus_input_power_w: f64,
+    pub inverter_loss_w: f64,
+    pub dc_bus_current_a: f64,
+    pub motor_shaft_energy_j: f64,
+    pub dc_bus_input_energy_j: f64,
+    pub energy_balance_residual_j: f64,
+}
+
+/// Demand envelope propagated from a bounded motor-shaft operating point
+/// and a coordinate-aware motor efficiency map envelope.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MotorShaftDemandEnvelope {
+    pub map_id: String,
+    pub map_digest: String,
+    pub map_model_version: String,
+    pub configuration_digest: String,
+    pub context_digest: String,
+    pub evidence_manifest_digest: String,
+    pub torque_lower_bound_nm: f64,
+    pub torque_upper_bound_nm: f64,
+    pub speed_lower_bound_rpm: f64,
+    pub speed_upper_bound_rpm: f64,
+    pub efficiency_lower_bound: f64,
+    pub efficiency_nominal: f64,
+    pub efficiency_upper_bound: f64,
+    pub shaft_power_lower_bound_w: f64,
+    pub shaft_power_nominal_w: f64,
+    pub shaft_power_upper_bound_w: f64,
+    /// Lower mechanical power with upper efficiency: minimum DC demand.
+    pub minimum_demand_scenario: Result<MotorShaftDemandReport, DriveError>,
+    /// Nominal coordinates and nominal efficiency.
+    pub nominal_demand_scenario: Result<MotorShaftDemandReport, DriveError>,
+    /// Upper mechanical power with lower efficiency: maximum DC demand.
+    pub upper_demand_scenario: Result<MotorShaftDemandReport, DriveError>,
+}
+
 /// Explicit non-PASS outcomes for unsupported or infeasible operating points.
 #[derive(Debug, Clone, PartialEq)]
 pub enum DriveError {
@@ -570,6 +654,251 @@ pub fn evaluate_drive_with_kinematics(
         motor_angular_velocity_rad_s: motor_point.motor_angular_velocity_rad_s,
         motor_speed_rpm: motor_point.motor_speed_rpm,
         motor_shaft_output_torque_nm: motor_point.motor_shaft_output_torque_nm,
+    })
+}
+
+
+/// Propagate rectangular motor-shaft torque/RPM bounds and a coordinate-aware
+/// map efficiency envelope into DC-bus demand.
+///
+/// This consumes measurements at the motor-shaft output boundary. It does not
+/// apply transmission efficiency or gearbox kinematics again. The minimum and
+/// upper scenarios combine interval endpoints independently and are therefore
+/// sound but potentially conservative when torque, speed and efficiency are
+/// correlated. They are deterministic bounds, not probability intervals.
+pub fn evaluate_motor_shaft_coordinate_envelope(
+    config: &MotorShaftDemandConfig,
+    expected_context: DriveMapExpectedContext<'_>,
+    evidence: &MotorShaftCoordinateMapEvidence,
+) -> Result<MotorShaftDemandEnvelope, DriveError> {
+    let identities = [
+        evidence.map_id.as_str(),
+        evidence.map_digest.as_str(),
+        evidence.map_model_version.as_str(),
+        evidence.configuration_digest.as_str(),
+        evidence.context_digest.as_str(),
+        evidence.evidence_manifest_digest.as_str(),
+        expected_context.configuration_digest,
+        expected_context.context_digest,
+    ];
+    if identities.iter().any(|value| value.trim().is_empty()) {
+        return Err(DriveError::InvalidConfiguration(
+            "map, configuration, context and evidence identities must not be empty",
+        ));
+    }
+    if evidence.configuration_digest != expected_context.configuration_digest {
+        return Err(DriveError::InvalidConfiguration(
+            "map configuration digest does not match expected drive configuration",
+        ));
+    }
+    if evidence.context_digest != expected_context.context_digest {
+        return Err(DriveError::InvalidConfiguration(
+            "map context digest does not match expected drive context",
+        ));
+    }
+
+    let config_values = [
+        config.inverter_efficiency,
+        config.dc_bus_voltage_v,
+        config.duration_s,
+        config.minimum_dc_bus_voltage_v,
+        config.maximum_dc_bus_current_a,
+        config.maximum_dc_bus_power_w,
+        config.energy_balance_tolerance_j,
+    ];
+    if config_values.iter().any(|value| !value.is_finite())
+        || !(0.0 < config.inverter_efficiency && config.inverter_efficiency <= 1.0)
+        || config.dc_bus_voltage_v <= 0.0
+        || config.duration_s <= 0.0
+        || config.minimum_dc_bus_voltage_v <= 0.0
+        || config.maximum_dc_bus_current_a <= 0.0
+        || config.maximum_dc_bus_power_w <= 0.0
+        || config.energy_balance_tolerance_j <= 0.0
+    {
+        return Err(DriveError::InvalidConfiguration(
+            "inverter efficiency, bus limits, voltage, duration and tolerance must be finite and valid",
+        ));
+    }
+    if config.dc_bus_voltage_v < config.minimum_dc_bus_voltage_v {
+        return Err(DriveError::DcBusUndervoltage {
+            measured_voltage_v: config.dc_bus_voltage_v,
+            minimum_voltage_v: config.minimum_dc_bus_voltage_v,
+        });
+    }
+
+    let coordinates = [
+        evidence.nominal_motor_torque_nm,
+        evidence.torque_lower_bound_nm,
+        evidence.torque_upper_bound_nm,
+        evidence.nominal_motor_speed_rpm,
+        evidence.speed_lower_bound_rpm,
+        evidence.speed_upper_bound_rpm,
+    ];
+    if coordinates.iter().any(|value| !value.is_finite())
+        || evidence.torque_lower_bound_nm <= 0.0
+        || evidence.speed_lower_bound_rpm <= 0.0
+        || evidence.torque_lower_bound_nm > evidence.nominal_motor_torque_nm
+        || evidence.nominal_motor_torque_nm > evidence.torque_upper_bound_nm
+        || evidence.speed_lower_bound_rpm > evidence.nominal_motor_speed_rpm
+        || evidence.nominal_motor_speed_rpm > evidence.speed_upper_bound_rpm
+    {
+        return Err(DriveError::InvalidOperatingPoint(
+            "motor torque/speed bounds must be finite, positive, ordered and contain the nominal point",
+        ));
+    }
+
+    let efficiencies = [
+        evidence.efficiency_lower_bound,
+        evidence.efficiency_nominal,
+        evidence.efficiency_upper_bound,
+    ];
+    if efficiencies
+        .iter()
+        .any(|value| !value.is_finite() || !(0.0 < *value && *value <= 1.0))
+        || evidence.efficiency_lower_bound > evidence.efficiency_nominal
+        || evidence.efficiency_nominal > evidence.efficiency_upper_bound
+    {
+        return Err(DriveError::InvalidConfiguration(
+            "motor efficiency bounds must be finite, positive and ordered",
+        ));
+    }
+
+    let shaft_power = |torque_nm: f64, speed_rpm: f64| {
+        torque_nm * (speed_rpm * TAU / 60.0)
+    };
+    let shaft_power_lower_bound_w = shaft_power(
+        evidence.torque_lower_bound_nm,
+        evidence.speed_lower_bound_rpm,
+    );
+    let shaft_power_nominal_w = shaft_power(
+        evidence.nominal_motor_torque_nm,
+        evidence.nominal_motor_speed_rpm,
+    );
+    let shaft_power_upper_bound_w = shaft_power(
+        evidence.torque_upper_bound_nm,
+        evidence.speed_upper_bound_rpm,
+    );
+    let powers = [
+        shaft_power_lower_bound_w,
+        shaft_power_nominal_w,
+        shaft_power_upper_bound_w,
+    ];
+    if powers.iter().any(|value| !value.is_finite() || *value <= 0.0)
+        || shaft_power_lower_bound_w > shaft_power_nominal_w
+        || shaft_power_nominal_w > shaft_power_upper_bound_w
+    {
+        return Err(DriveError::NumericalOverflow);
+    }
+
+    let evaluate = |torque_nm: f64,
+                    speed_rpm: f64,
+                    mechanical_power_w: f64,
+                    motor_efficiency: f64|
+     -> Result<MotorShaftDemandReport, DriveError> {
+        let motor_electrical_input_power_w = mechanical_power_w / motor_efficiency;
+        let motor_loss_w = motor_electrical_input_power_w - mechanical_power_w;
+        let dc_bus_input_power_w =
+            motor_electrical_input_power_w / config.inverter_efficiency;
+        let inverter_loss_w = dc_bus_input_power_w - motor_electrical_input_power_w;
+        let dc_bus_current_a = dc_bus_input_power_w / config.dc_bus_voltage_v;
+        let derived = [
+            motor_electrical_input_power_w,
+            motor_loss_w,
+            dc_bus_input_power_w,
+            inverter_loss_w,
+            dc_bus_current_a,
+        ];
+        if derived.iter().any(|value| !value.is_finite())
+            || derived[1..].iter().any(|value| *value < 0.0)
+            || dc_bus_input_power_w <= 0.0
+            || dc_bus_current_a <= 0.0
+        {
+            return Err(DriveError::NumericalOverflow);
+        }
+        if dc_bus_input_power_w > config.maximum_dc_bus_power_w {
+            return Err(DriveError::DcBusPowerLimitExceeded {
+                required_power_w: dc_bus_input_power_w,
+                maximum_power_w: config.maximum_dc_bus_power_w,
+            });
+        }
+        if dc_bus_current_a > config.maximum_dc_bus_current_a {
+            return Err(DriveError::DcBusCurrentLimitExceeded {
+                required_current_a: dc_bus_current_a,
+                maximum_current_a: config.maximum_dc_bus_current_a,
+            });
+        }
+
+        let motor_shaft_energy_j = mechanical_power_w * config.duration_s;
+        let dc_bus_input_energy_j = dc_bus_input_power_w * config.duration_s;
+        let energy_balance_residual_j = dc_bus_input_energy_j
+            - motor_shaft_energy_j
+            - motor_loss_w * config.duration_s
+            - inverter_loss_w * config.duration_s;
+        if !motor_shaft_energy_j.is_finite()
+            || !dc_bus_input_energy_j.is_finite()
+            || !energy_balance_residual_j.is_finite()
+        {
+            return Err(DriveError::NumericalOverflow);
+        }
+        if energy_balance_residual_j.abs() > config.energy_balance_tolerance_j {
+            return Err(DriveError::EnergyBalanceExceeded {
+                residual_j: energy_balance_residual_j,
+                tolerance_j: config.energy_balance_tolerance_j,
+            });
+        }
+
+        Ok(MotorShaftDemandReport {
+            motor_shaft_torque_nm: torque_nm,
+            motor_speed_rpm: speed_rpm,
+            motor_shaft_output_power_w: mechanical_power_w,
+            motor_efficiency,
+            motor_electrical_input_power_w,
+            motor_loss_w,
+            inverter_efficiency: config.inverter_efficiency,
+            dc_bus_input_power_w,
+            inverter_loss_w,
+            dc_bus_current_a,
+            motor_shaft_energy_j,
+            dc_bus_input_energy_j,
+            energy_balance_residual_j,
+        })
+    };
+
+    Ok(MotorShaftDemandEnvelope {
+        map_id: evidence.map_id.clone(),
+        map_digest: evidence.map_digest.clone(),
+        map_model_version: evidence.map_model_version.clone(),
+        configuration_digest: evidence.configuration_digest.clone(),
+        context_digest: evidence.context_digest.clone(),
+        evidence_manifest_digest: evidence.evidence_manifest_digest.clone(),
+        torque_lower_bound_nm: evidence.torque_lower_bound_nm,
+        torque_upper_bound_nm: evidence.torque_upper_bound_nm,
+        speed_lower_bound_rpm: evidence.speed_lower_bound_rpm,
+        speed_upper_bound_rpm: evidence.speed_upper_bound_rpm,
+        efficiency_lower_bound: evidence.efficiency_lower_bound,
+        efficiency_nominal: evidence.efficiency_nominal,
+        efficiency_upper_bound: evidence.efficiency_upper_bound,
+        shaft_power_lower_bound_w,
+        shaft_power_nominal_w,
+        shaft_power_upper_bound_w,
+        minimum_demand_scenario: evaluate(
+            evidence.torque_lower_bound_nm,
+            evidence.speed_lower_bound_rpm,
+            shaft_power_lower_bound_w,
+            evidence.efficiency_upper_bound,
+        ),
+        nominal_demand_scenario: evaluate(
+            evidence.nominal_motor_torque_nm,
+            evidence.nominal_motor_speed_rpm,
+            shaft_power_nominal_w,
+            evidence.efficiency_nominal,
+        ),
+        upper_demand_scenario: evaluate(
+            evidence.torque_upper_bound_nm,
+            evidence.speed_upper_bound_rpm,
+            shaft_power_upper_bound_w,
+            evidence.efficiency_lower_bound,
+        ),
     })
 }
 
@@ -1276,4 +1605,140 @@ mod tests {
         assert!(high_ratio.motor_speed_rpm > low_ratio.motor_speed_rpm);
         assert!(high_ratio.motor_shaft_output_torque_nm < low_ratio.motor_shaft_output_torque_nm);
     }
+
+    fn coordinate_evidence() -> MotorShaftCoordinateMapEvidence {
+        MotorShaftCoordinateMapEvidence {
+            map_id: "map-01".to_owned(),
+            map_digest: "map-digest-01".to_owned(),
+            map_model_version: "electric-propulsion-map-oracle-v0.3.0".to_owned(),
+            configuration_digest: "aircraft-config".to_owned(),
+            context_digest: "motor-context".to_owned(),
+            evidence_manifest_digest: "source-manifest".to_owned(),
+            nominal_motor_torque_nm: 6.0,
+            torque_lower_bound_nm: 5.0,
+            torque_upper_bound_nm: 7.0,
+            nominal_motor_speed_rpm: 2_500.0,
+            speed_lower_bound_rpm: 2_000.0,
+            speed_upper_bound_rpm: 3_000.0,
+            efficiency_lower_bound: 0.80,
+            efficiency_nominal: 0.85,
+            efficiency_upper_bound: 0.90,
+        }
+    }
+
+    fn coordinate_config() -> MotorShaftDemandConfig {
+        MotorShaftDemandConfig {
+            inverter_efficiency: 0.98,
+            dc_bus_voltage_v: 400.0,
+            duration_s: 2.0,
+            minimum_dc_bus_voltage_v: 300.0,
+            maximum_dc_bus_current_a: 100.0,
+            maximum_dc_bus_power_w: 20_000.0,
+            energy_balance_tolerance_j: 1.0e-6,
+        }
+    }
+
+    #[test]
+    fn motor_shaft_coordinate_envelope_matches_closed_form_bounds() {
+        let evidence = coordinate_evidence();
+        let result = evaluate_motor_shaft_coordinate_envelope(
+            &coordinate_config(),
+            DriveMapExpectedContext {
+                configuration_digest: "aircraft-config",
+                context_digest: "motor-context",
+            },
+            &evidence,
+        ).unwrap();
+
+        let lower_shaft = 5.0 * (2_000.0 * TAU / 60.0);
+        let nominal_shaft = 6.0 * (2_500.0 * TAU / 60.0);
+        let upper_shaft = 7.0 * (3_000.0 * TAU / 60.0);
+        assert!((result.shaft_power_lower_bound_w - lower_shaft).abs() < 1.0e-10);
+        assert!((result.shaft_power_nominal_w - nominal_shaft).abs() < 1.0e-10);
+        assert!((result.shaft_power_upper_bound_w - upper_shaft).abs() < 1.0e-10);
+
+        let minimum = result.minimum_demand_scenario.unwrap();
+        let nominal = result.nominal_demand_scenario.unwrap();
+        let upper = result.upper_demand_scenario.unwrap();
+        assert!((minimum.dc_bus_input_power_w
+            - lower_shaft / (0.90 * 0.98)).abs() < 1.0e-9);
+        assert!((nominal.dc_bus_input_power_w
+            - nominal_shaft / (0.85 * 0.98)).abs() < 1.0e-9);
+        assert!((upper.dc_bus_input_power_w
+            - upper_shaft / (0.80 * 0.98)).abs() < 1.0e-9);
+        assert!(minimum.dc_bus_input_power_w
+            <= nominal.dc_bus_input_power_w);
+        assert!(nominal.dc_bus_input_power_w
+            <= upper.dc_bus_input_power_w);
+        assert_eq!(result.evidence_manifest_digest, "source-manifest");
+    }
+
+    #[test]
+    fn upper_motor_shaft_demand_failure_is_not_hidden_by_nominal_pass() {
+        let evidence = coordinate_evidence();
+        let mut config = coordinate_config();
+        config.maximum_dc_bus_power_w = 2_000.0;
+        let result = evaluate_motor_shaft_coordinate_envelope(
+            &config,
+            DriveMapExpectedContext {
+                configuration_digest: "aircraft-config",
+                context_digest: "motor-context",
+            },
+            &evidence,
+        ).unwrap();
+
+        assert!(result.minimum_demand_scenario.is_ok());
+        assert!(result.nominal_demand_scenario.is_ok());
+        assert!(matches!(
+            result.upper_demand_scenario,
+            Err(DriveError::DcBusPowerLimitExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn motor_shaft_coordinate_envelope_rejects_wrong_context_and_invalid_bounds() {
+        let mut evidence = coordinate_evidence();
+        assert!(matches!(
+            evaluate_motor_shaft_coordinate_envelope(
+                &coordinate_config(),
+                DriveMapExpectedContext {
+                    configuration_digest: "wrong-config",
+                    context_digest: "motor-context",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+
+        evidence.torque_lower_bound_nm = 6.1;
+        assert!(matches!(
+            evaluate_motor_shaft_coordinate_envelope(
+                &coordinate_config(),
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config",
+                    context_digest: "motor-context",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidOperatingPoint(_))
+        ));
+    }
+
+    #[test]
+    fn motor_shaft_coordinate_envelope_rejects_partial_or_empty_identity() {
+        let mut evidence = coordinate_evidence();
+        evidence.map_digest.clear();
+        assert!(matches!(
+            evaluate_motor_shaft_coordinate_envelope(
+                &coordinate_config(),
+                DriveMapExpectedContext {
+                    configuration_digest: "aircraft-config",
+                    context_digest: "motor-context",
+                },
+                &evidence,
+            ),
+            Err(DriveError::InvalidConfiguration(_))
+        ));
+    }
+
 }
