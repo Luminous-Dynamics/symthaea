@@ -28,7 +28,7 @@ The four supported Eq. 16 profiles are fixed in code. The caller cannot replace 
 
 The audit requires distinct model-RPM strata, revision identity, positive scale inputs, explicit facility transfer-function and background corrections, wake/cavitation/water-quality evidence digests, full-scale source-level basis, propagation separation, and explicit per-band uncertainty.
 
-Version 0.1 accepts exact frequency-bound scaling only. It does not interpolate or re-bin spectra. A band is eligible only when its model signal is above background.
+Version 0.1 accepts exact frequency-bound scaling only. It does not interpolate or re-bin spectra. A band is eligible only when its model signal/background margin and correction disposition satisfy the ITTC thresholds.
 
 The model-scale and full-scale comparison must use source levels normalized to the same 1 m reference distance. The model value must already include the applicable facility transfer-function or distance normalization; the full-scale value must already have propagation separated and be reduced to source level. Accordingly, v0.1 asserts both Eq. 16 reference distances are 1 m (so r_m/r_s = 1) and refuses raw hydrophone SPL/received-level inputs. This avoids applying a second, inconsistent range correction. Received levels or unlike radiated-noise quantities are not interchangeable. The synthetic fixture remains incomplete even when every reference resolves.
 
