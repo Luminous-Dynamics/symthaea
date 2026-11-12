@@ -3215,11 +3215,7 @@ pub fn simulate_u1_conserving_sequential_evaporation(
         initial_excited_qubits.push(0);
         let mut remaining_sites = (2..number_of_qubits).collect::<Vec<_>>();
         remaining_sites.shuffle(&mut rng);
-        initial_excited_qubits.extend(
-            remaining_sites
-                .into_iter()
-                .take(initial_excitations - 1),
-        );
+        initial_excited_qubits.extend(remaining_sites.into_iter().take(initial_excitations - 1));
     }
     initial_excited_qubits.sort_unstable();
     let initial_basis = initial_excited_qubits.iter().fold(0usize, |basis, &qubit| {
