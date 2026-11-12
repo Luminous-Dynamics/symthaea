@@ -620,6 +620,171 @@
         "Its optimized geometry, fan operation and insulation assumptions must be matched before comparison with another store."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "FUSION-DEC-LLNL-22-STAGE-1977",
+      "lane": "FUSION_DIRECT_ENERGY_CONVERSION",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Experimental and computational results on direct energy conversion for mirror fusion reactors",
+        "publisher": "Nuclear Fusion",
+        "publication_date": "1977",
+        "volume": "17",
+        "doi": "10.1088/0029-5515/17/5/012",
+        "url": "https://doi.org/10.1088/0029-5515/17/5/012"
+      },
+      "configuration": {
+        "converter": "22-stage electrostatic periodic-focusing direct converter",
+        "upstream": "magnetic expander",
+        "source": "hydrogen plasma source",
+        "test_class": "low-beam-density experiment with higher-beam-density space-charge series"
+      },
+      "observations": [
+        {
+          "metric": "measured_average_conversion_efficiency",
+          "value": 86.5,
+          "uncertainty": 1.5,
+          "qualifier": "low-beam-density condition; exact energy denominator and source-specific boundary must be extracted",
+          "unit": "percent"
+        },
+        {
+          "metric": "predicted_average_conversion_efficiency",
+          "value": 88.6,
+          "uncertainty": 1.5,
+          "qualifier": "associated source model at low beam density; not a measured result",
+          "unit": "percent"
+        },
+        {
+          "metric": "economic_design_mean_ion_energy_threshold",
+          "value": 500,
+          "qualifier": "paper's design assessment suggested the recovery system was probably economic only above this mean ion energy",
+          "unit": "keV",
+          "relation": "greater_than"
+        }
+      ],
+      "source_conclusion": "The experiment reports a 22-stage electrostatic periodic-focusing converter and a magnetic expander. At higher beam density, measured efficiency decreased with increasing space charge, in agreement with predictions.",
+      "comparison_status": "HISTORICAL_PHYSICAL_REFERENCE_DENOMINATOR_AND_BEAM_MATCH_REQUIRED",
+      "blockers": [
+        "Source beam distribution, particle species, energy range, beam density and full energy denominator must be extracted before quantitative matching.",
+        "Low-beam-density efficiency is not directly comparable to later prototype or plant system efficiencies.",
+        "This is not a fusion-born alpha-particle or whole-plant electricity demonstration."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "FUSION-DEC-LLNL-TMX-1983",
+      "lane": "FUSION_DIRECT_ENERGY_CONVERSION",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Test Results on Plasma Direct Converters",
+        "publisher": "Fusion Science and Technology",
+        "publication_date": "1983-01",
+        "volume": "3",
+        "issue": "1",
+        "pages": "98-111",
+        "doi": "10.13182/FST83-A20820",
+        "url": "https://doi.org/10.13182/FST83-A20820",
+        "archive": "https://wx1.ans.org/pubs/journals/fst/a_20820"
+      },
+      "observations": [
+        {
+          "metric": "TMX_incident_end_loss_power",
+          "value": 138,
+          "qualifier": "single-stage unit mounted at the TMX end wall; reported source condition",
+          "unit": "W"
+        },
+        {
+          "metric": "TMX_recovered_electrical_power",
+          "value": 79,
+          "qualifier": "gross recovered power reported by the paper",
+          "unit": "W"
+        },
+        {
+          "metric": "TMX_suppressor_grid_power",
+          "value": 12,
+          "qualifier": "power consumed by the suppressor grid",
+          "unit": "W"
+        },
+        {
+          "metric": "TMX_reported_net_efficiency",
+          "value": 48,
+          "qualifier": "paper-reported net efficiency after suppressor-grid consumption; values rounded in source",
+          "unit": "percent"
+        },
+        {
+          "metric": "bench_converter_voltage_max",
+          "value": 100,
+          "qualifier": "single-stage and two-stage Venetian-blind test conditions",
+          "unit": "kV"
+        },
+        {
+          "metric": "bench_converter_power_max",
+          "value": 6,
+          "qualifier": "single-stage and two-stage test conditions",
+          "unit": "kW"
+        },
+        {
+          "metric": "bench_converter_test_duration",
+          "value": 80,
+          "qualifier": "approximately, across stated tests",
+          "unit": "h"
+        },
+        {
+          "metric": "bench_test_power_density_max",
+          "value": 70,
+          "qualifier": "source reports reactor-predicted conditions around 100 W/cm2",
+          "unit": "W/cm2"
+        }
+      ],
+      "source_conclusion": "The article describes two bench converter tests and a third single-stage converter mounted on the TMX end wall intercepting end-loss plasma. It identifies background gas ionization and secondary-electron emission as scale-up effects, and high-voltage breakdown as an unresolved concern for large converters.",
+      "comparison_status": "SOURCE_SPECIFIC_TMX_NET_BOUNDARY_AND_BENCH_TESTS_SEPARATE",
+      "blockers": [
+        "The 6 kW / 100 kV / approximately 80 h figures describe separate bench testing, not the 138 W TMX test.",
+        "Use source-reported 48% net efficiency only with the 138 W incident and 12 W suppressor boundary.",
+        "TMX end-loss plasma is not a D-T fusion-born alpha-particle or plant-level result."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "FUSION-DEC-HELION-INDUCTIVE-RECOVERY-2026",
+      "lane": "FUSION_DIRECT_ENERGY_CONVERSION",
+      "evidence_class": "MANUFACTURER_PRODUCT_CLAIM",
+      "source": {
+        "title": "Helion technology and Polaris direct electricity recapture",
+        "publisher": "Helion Energy",
+        "publication_date": "2026",
+        "url": "https://www.helionenergy.com/technology",
+        "related_sources": [
+          {
+            "title": "Polaris",
+            "url": "https://www.helionenergy.com/polaris"
+          },
+          {
+            "title": "FAQ — net electricity and demonstration status",
+            "url": "https://www.helionenergy.com/faq"
+          },
+          {
+            "title": "More on Helion's pulsed approach to fusion",
+            "url": "https://www.helionenergy.com/blog/more-on-helions-pulsed-approach-to-fusion"
+          }
+        ]
+      },
+      "architecture": {
+        "confinement": "field-reversed configuration (FRC)",
+        "energy_recovery": "inductive recovery from changing magnetic fields as plasma expands",
+        "power_architecture": "pulsed magnetic compression and recapture into electrical storage/conditioning",
+        "fuel_claim": "D-D / D-T / D-He3 configurations are described in company materials"
+      },
+      "observations": [],
+      "source_conclusion": "Helion describes an inductive, pulsed magnetic energy-recovery architecture that converts changing magnetic flux during plasma expansion into electrical current. Its public product materials identify inductive recovery as a core design feature, but do not provide a source-matched numerical conversion-efficiency dataset suitable for an independent ranking. Helion's FAQ states it now focuses on demonstrating electricity from fusion and clarifies that earlier use of 'net electricity' was insufficiently defined.",
+      "comparison_status": "ALTERNATE_INDUCTIVE_ARCHITECTURE_VENDOR_CLAIM_NUMERICAL_DATA_NOT_PUBLIC",
+      "blockers": [
+        "This is a distinct inductive pulsed-recovery architecture, not electrostatic grid DEC.",
+        "No public source-matched numerical efficiency or full loss ledger is supplied in the cited product/FAQ materials.",
+        "Do not infer measured fusion-born recapture fraction or a net-electricity demonstration from an architecture description.",
+        "Must separate recovered electrical input energy from fusion-origin energy."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -702,6 +867,26 @@
       "control_id": "NC-HTTES-002",
       "condition": "Claim plasma-heater superiority against the refractory store without matching service, geometry, duration, wall-plug meter boundary and discharge profile.",
       "expected_disposition": "NOT_COMPARABLE_MATCHED_BASELINE_REQUIRED"
+    },
+    {
+      "control_id": "NC-DEC-004",
+      "condition": "Treat the 1977 low-beam-density 86.5% measured converter result as directly comparable to the 1983 TMX 48% net result without matching ion energy, beam density, converter stages and denominators.",
+      "expected_disposition": "NOT_COMPARABLE_DIFFERENT_SOURCE_BOUNDARIES"
+    },
+    {
+      "control_id": "NC-DEC-005",
+      "condition": "Count 1983 gross recovered power (79 W) as net output while omitting the 12 W suppressor-grid load.",
+      "expected_disposition": "REJECT_OMITTED_PARASITIC_LOAD"
+    },
+    {
+      "control_id": "NC-DEC-006",
+      "condition": "Infer Helion's numerical inductive energy-recovery efficiency from its architecture description without source-matched power traces.",
+      "expected_disposition": "BLOCKED_NO_NUMERIC_SOURCE_DATA"
+    },
+    {
+      "control_id": "NC-DEC-007",
+      "condition": "Treat electrostatic mirror loss-cone conversion and pulsed FRC inductive recapture as the same converter architecture.",
+      "expected_disposition": "NOT_COMPARABLE_PHYSICS_AND_BOUNDARY_MISMATCH"
     }
   ],
   "derived_reference_checks": [
@@ -740,6 +925,22 @@
         "neutron_energy_percent": 80.11363636363636
       },
       "interpretation": "Only the charged alpha product's kinetic-energy component is directly accessible to an electrostatic charged-particle converter in the basic D-T reaction partition. The neutron component is neutral and must be treated as a separate blanket/thermal path unless a separately qualified neutral-particle conversion mechanism is specified. This arithmetic does not imply the alpha energy is captured by a converter: confinement, plasma heating, exhaust fraction, interception, conversion, conditioning and whole-plant parasitics remain separate.",
+      "luminous_measurement": false
+    },
+    {
+      "check_id": "FUSION-DEC-TMX-NET-POWER-CHECK-001",
+      "source_case_id": "FUSION-DEC-LLNL-TMX-1983",
+      "evidence_class": "DERIVED_ARITHMETIC_FROM_PUBLISHED_CONVERTER_POWER_VALUES",
+      "inputs": {
+        "incident_end_loss_power_W": 138,
+        "gross_recovered_power_W": 79,
+        "suppressor_grid_power_W": 12
+      },
+      "derivation": {
+        "net_recovered_power_W": 67,
+        "net_recovered_fraction_of_incident": 48.55072463768116
+      },
+      "interpretation": "Using the paper's rounded reported power values, suppressor-grid power is subtracted from gross recovered power. The derived net is 67 W and approximately 48.55% of 138 W, consistent with the paper's rounded 48% report. This is a check of the stated TMX test boundary, not a whole-plant or fusion-born energy efficiency.",
       "luminous_measurement": false
     }
   ]
