@@ -908,7 +908,8 @@ mod tests {
         let mut manifest = valid_manifest();
         manifest.outcomes[2].observed_through_cycle = 40;
 
-        let error = audit_design_lifetime_manifest(&manifest).expect_err("short outcome horizon fails");
+        let error =
+            audit_design_lifetime_manifest(&manifest).expect_err("short outcome horizon fails");
         assert!(
             error
                 .0
