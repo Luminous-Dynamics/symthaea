@@ -79,6 +79,44 @@ These remain separate dimensions. A weighted score may not hide an infeasible or
 6. Measure yield and accepted-cell cost before claiming scale-up.
 7. Set numeric life and charge-rate thresholds only after reproducing the reference and measuring repeatability/power.
 
+## Industry comparator and practical translation targets
+
+The USABC October 21, 2025 solid-electrolyte RFPI is a particularly useful automotive comparator because it separates **material-level goals** from **cell-level goals**, calls for 5 Ah or larger cells, and supplies test methods rather than a single marketing figure.
+
+| USABC level | Parameter | Goal | Method / boundary |
+|---|---|---:|---|
+| Material | Ionic conductivity | >10 mS/cm at 30°C; >1 mS/cm at 0°C | Pellet |
+| Material | Electronic conductivity | <1×10⁻⁸ mS/cm | Pellet |
+| Material | Critical current density | >13 mA/cm² | Pellet |
+| Material | Thermal stability | >250°C | DSC, <1 J/g, 5°C/min |
+| Material | Water stability | <10% ionic-conductivity loss | 72 h, −40°C dew point |
+| Material | Cost | <$10/kg | 75 kt/year scale assumption |
+| Cell | Stack pressure | <2 MPa | USABC EV Test Manual |
+| Cell | Low-temperature usable energy | >70% of 30°C usable energy | −20°C, C/3 discharge, unassisted |
+| Cell | Electrolyte thickness | <20 μm | Sheet |
+| Cell | Calendar life | >15 years | EV goals |
+| Cell | Cycle life | >1,000 cycles | Dynamic stress test |
+
+These are aspirational development goals, not current market averages or independently achieved Luminous results. The 5 Ah minimum applies to the cell-level RFPI context. Read the official appendix and associated test manual before using these numbers in a formal comparison:
+https://uscar.org/wp-content/uploads/2025/12/USABC-Electrolyte-RFPI.pdf
+
+A new sulfide full-cell paper published 7 November 2026 reports room-temperature operation at ≤0.3 MPa and 2.4 mAh/cm² at 0.1C. This is a valuable research frontier because it is far below the USABC <2 MPa target, but it does not by itself establish >5 Ah format, fast charge, >1,000 cycles, calendar life, complete-cell energy density or production yield:
+https://www.nature.com/articles/s41467-026-79393-w
+
+The industry scale-up bar is also manufacturing, not just electrochemistry. IEA reports >4 TWh of global Li-ion nameplate capacity by end-2025, more than 80% of that capacity in China, and says >90% average manufacturing yield is required to compete in today's market; it also notes that new plants can take more than five years to approach nominal output. These are industry context/competitive thresholds, not ASSB-specific demonstrated yield:
+https://www.iea.org/reports/global-ev-outlook-2026/electric-vehicle-batteries
+
+### Our matched evaluation ladder
+
+1. **Material:** reproduce ionic/electronic conductivity, critical current, stability and cost at the exact test temperature, method, density and sample preparation.
+2. **Electrode:** require practical areal loading/capacity, composite inactive fractions, current-collector and lithium-inventory accounting.
+3. **Cell:** move from symmetric/half cell to full cell, ≥5 Ah, then larger-format samples; retain independent physical replicates and censored outcomes.
+4. **Pressure:** vary operating pressure while holding fabrication pressure, design revision, production batch, line, process revision and measurement method fixed. Any process-pressure change becomes a separate DOE factor, not a pressure-only comparison.
+5. **Manufacturing:** qualify thickness/density/porosity distributions, yield, scrap/rework, cycle time, moisture control and cost per accepted cell across multiple lots.
+6. **Application:** compare useful energy, power, cold performance, life and safety at the same test boundary and cell format.
+
+A practical target progression is: exact-paper reproduction → ≤2 MPa cell-level operation → ≤0.3 MPa replication → ≥5 Ah matched full cells → >1,000 DST cycles and >15-year calendar-life evidence under the applicable methods → repeatable manufacturing yield above 90%. Do not assume that progress on one rung implies the next.
+
 ## First software slice
 
 The Rust audit validates only:
