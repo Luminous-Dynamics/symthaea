@@ -425,11 +425,16 @@ fn assess_tick(
         || calibration.calibration_split_digest.trim().is_empty()
         || calibration.loss_model_digest != contract.loss_model_digest
         || calibration.loss_scale_id != contract.loss_scale_id
-        || calibration.action_domain_digest.trim().is_empty()
-        || calibration.action_domain_digest != evidence.action_domain_digest
     {
         return Ok(TickDisposition::Unknown {
             reason: UnknownReason::CalibrationIdentityMismatch,
+        });
+    }
+    if calibration.action_domain_digest.trim().is_empty()
+        || calibration.action_domain_digest != evidence.action_domain_digest
+    {
+        return Ok(TickDisposition::Unknown {
+            reason: UnknownReason::CalibrationActionDomainMismatch,
         });
     }
     if calibration.coverage_ppm > 1_000_000 {
