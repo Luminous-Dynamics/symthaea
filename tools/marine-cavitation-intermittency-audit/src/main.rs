@@ -137,10 +137,12 @@ struct RunReport {
     excluded_background_dominated: usize,
     excluded_exact_ten_db_boundary: usize,
     excluded_uncertainty_unresolved: usize,
+    excluded_invalid_window: usize,
     cavitation_annotation_coverage: f64,
     cavitation_occupancy_fraction: Option<f64>,
     observed_cavitation_onsets: Option<usize>,
     observed_cavitation_onsets_per_hour: Option<f64>,
+    active_segments_censored_by_window_or_gap: Option<usize>,
     energy_equivalent_mean_spl_db: Option<f64>,
     median_spl_db: Option<f64>,
     p05_spl_db: Option<f64>,
@@ -384,7 +386,7 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
     } else {
         annotated_count as f64 / usable.len() as f64
     };
-    let (occupancy, onsets, onsets_per_hour, on_mean, off_mean, conditioned_delta) =
+    let (occupancy, onsets, onsets_per_hour, censored_segments, on_mean, off_mean, conditioned_delta) =
         if annotated_count == usable.len() && !usable.is_empty() {
             let present: Vec<f64> = usable.iter()
                 .filter(|window| window.cavitation_present == Some(true))
@@ -397,18 +399,24 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
             let occupancy = present.len() as f64 / usable.len() as f64;
 
             let mut onsets = 0usize;
+            let mut censored_active_segments = 0usize;
             for index in 0..usable.len() {
                 let is_present = usable[index].cavitation_present == Some(true);
-                let is_onset = if index == 0 {
-                    is_present
-                } else {
-                    let contiguous = (usable[index].start_time_s - usable[index - 1].end_time_s).abs()
-                        <= WINDOW_DURATION_TOLERANCE_S;
-                    contiguous
-                        && is_present
-                        && usable[index - 1].cavitation_present == Some(false)
-                };
-                if is_onset {
+                if !is_present {
+                    continue;
+                }
+                if index == 0 {
+                    // The first observed window is left-censored: onset may
+                    // have occurred before this run began.
+                    censored_active_segments += 1;
+                    continue;
+                }
+                let contiguous = (usable[index].start_time_s - usable[index - 1].end_time_s).abs()
+                    <= WINDOW_DURATION_TOLERANCE_S;
+                if !contiguous {
+                    // A gap hides the transition, so do not invent an onset.
+                    censored_active_segments += 1;
+                } else if usable[index - 1].cavitation_present == Some(false) {
                     onsets += 1;
                 }
             }
@@ -423,9 +431,9 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
                 (Some(on), Some(off)) => Some(on - off),
                 _ => None,
             };
-            (Some(occupancy), Some(onsets), onsets_per_hour, on_mean, off_mean, delta)
+            (Some(occupancy), Some(onsets), onsets_per_hour, Some(censored_active_segments), on_mean, off_mean, delta)
         } else {
-            (None, None, None, None, None, None)
+            (None, None, None, None, None, None, None)
         };
 
     let window_evidence = run.windows.iter().map(|window| WindowEvidenceRef {
@@ -452,10 +460,12 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
         excluded_background_dominated,
         excluded_exact_ten_db_boundary,
         excluded_uncertainty_unresolved,
+        excluded_invalid_window,
         cavitation_annotation_coverage: annotation_coverage,
         cavitation_occupancy_fraction: occupancy,
         observed_cavitation_onsets: onsets,
         observed_cavitation_onsets_per_hour: onsets_per_hour,
+        active_segments_censored_by_window_or_gap: censored_segments,
         energy_equivalent_mean_spl_db: energy_mean,
         median_spl_db: median,
         p05_spl_db: p05,
@@ -613,14 +623,19 @@ mod tests {
         std::iter::repeat_n(letter, 64).collect()
     }
 
-    fn sample_window(index: usize, level: f64, cavitation: bool) -> Window {
+    fn digest_seed(seed: usize) -> String {
+        format!("{seed:064x}")
+    }
+
+    fn sample_window(index: usize, run_index: usize, level: f64, cavitation: bool) -> Window {
         let start = index as f64;
+        let seed = run_index * 100 + index + 1;
         Window {
             window_id: format!("window-{index}"),
             start_time_s: start,
             end_time_s: start + 1.0,
-            acoustic_trace_sha256: digest(if index % 2 == 0 { 'a' } else { 'b' }),
-            cavitation_observation_sha256: digest(if index % 2 == 0 { 'c' } else { 'd' }),
+            acoustic_trace_sha256: digest_seed(seed),
+            cavitation_observation_sha256: digest_seed(seed + 10_000),
             cavitation_present: Some(cavitation),
             total_spl_db: level,
             background_spl_db: 90.0,
@@ -629,17 +644,17 @@ mod tests {
         }
     }
 
-    fn run(id: &str, levels: &[f64], cavitation: &[bool]) -> Run {
+    fn run(id: &str, run_index: usize, levels: &[f64], cavitation: &[bool]) -> Run {
         let windows = levels.iter().zip(cavitation)
             .enumerate()
-            .map(|(index, (level, present))| sample_window(index, *level, *present))
+            .map(|(index, (level, present))| sample_window(index, run_index, *level, *present))
             .collect();
         Run {
             run_id: id.to_string(),
             timebase_receipt_sha256: digest('e'),
             service_fingerprint_sha256: digest('f'),
             background_method: BackgroundMethod::BareHub,
-            background_trace_sha256: digest('1'),
+            background_trace_sha256: digest(if run_index == 0 { '1' } else { '2' }),
             windows,
         }
     }
@@ -671,7 +686,7 @@ mod tests {
             window_duration_s: 1.0,
             minimum_usable_windows_per_run: 4,
             minimum_runs: 2,
-            runs: vec![run("run-1", &levels, &states), run("run-2", &levels, &states)],
+            runs: vec![run("run-1", 0, &levels, &states), run("run-2", 1, &levels, &states)],
         }
     }
 
@@ -788,6 +803,33 @@ mod tests {
         assert_eq!(report.run_reports.len(), 2);
         assert_eq!(report.run_reports[0].total_windows, 8);
         assert_eq!(report.run_reports[1].total_windows, 8);
+    }
+
+    #[test]
+    fn event_rate_does_not_invent_onsets_across_gaps_or_at_run_start() {
+        let mut input = case();
+        // A run begins while cavitation is already present (left-censored),
+        // then a gap occurs before another cavitation-present window.
+        let windows = &mut input.runs[0].windows;
+        windows[0].cavitation_present = Some(true);
+        windows[1].cavitation_present = Some(false);
+        windows[2].start_time_s = 4.0;
+        windows[2].end_time_s = 5.0;
+        windows[2].cavitation_present = Some(true);
+        let report = audit(&input);
+        let run = &report.run_reports[0];
+        assert_eq!(run.observed_cavitation_onsets, Some(1));
+        assert_eq!(run.active_segments_censored_by_window_or_gap, Some(2));
+    }
+
+    #[test]
+    fn every_window_has_a_distinct_raw_trace_and_cavitation_receipt() {
+        let report = audit(&case());
+        let refs = &report.run_reports[0].window_evidence;
+        let acoustic: BTreeSet<_> = refs.iter().map(|item| &item.acoustic_trace_sha256).collect();
+        let cavitation: BTreeSet<_> = refs.iter().map(|item| &item.cavitation_observation_sha256).collect();
+        assert_eq!(acoustic.len(), refs.len());
+        assert_eq!(cavitation.len(), refs.len());
     }
 
     #[test]
