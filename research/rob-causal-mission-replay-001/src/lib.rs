@@ -867,7 +867,10 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
         if application.command_id.trim().is_empty()
             || application.actuator_id.trim().is_empty()
             || application.actuator_configuration_digest.trim().is_empty()
-            || application.controller_configuration_digest.trim().is_empty()
+            || application
+                .controller_configuration_digest
+                .trim()
+                .is_empty()
             || application.application_receipt_digest.trim().is_empty()
         {
             push_finding(
@@ -1142,7 +1145,10 @@ pub fn replay_mission(trace: &MissionTrace) -> ReplayReport {
             || transition.resulting_state_digest.trim().is_empty()
             || transition.thermal_model_digest.trim().is_empty()
             || transition.thermal_snapshot_digest.trim().is_empty()
-            || transition.thermal_sensor_calibration_digest.trim().is_empty()
+            || transition
+                .thermal_sensor_calibration_digest
+                .trim()
+                .is_empty()
         {
             transition_closed = false;
             push_finding(
@@ -1693,7 +1699,6 @@ mod tests {
         assert!(has_finding(&report, "RECOVERY_TOPOLOGY_UNKNOWN"));
     }
 
-
     #[test]
     fn missing_physical_effect_does_not_count_as_causally_closed() {
         let mut trace = valid_trace();
@@ -1716,10 +1721,7 @@ mod tests {
 
         let mut thermal = valid_trace();
         thermal.physical_transitions[0].thermal_node_ids.pop();
-        assert_eq!(
-            replay_mission(&thermal).causal_closure.closure_ppm,
-            Some(0)
-        );
+        assert_eq!(replay_mission(&thermal).causal_closure.closure_ppm, Some(0));
     }
 
     #[test]
@@ -1727,24 +1729,20 @@ mod tests {
         let mut trace = valid_trace();
         trace.applications.clear();
         trace.physical_transitions.clear();
-        assert_eq!(
-            replay_mission(&trace).causal_closure.closure_ppm,
-            None
-        );
+        assert_eq!(replay_mission(&trace).causal_closure.closure_ppm, None);
     }
-
 
     #[test]
     fn malformed_required_thermal_manifest_blocks_all_positive_closure() {
         let mut empty = valid_trace();
         empty.scope.required_thermal_node_ids.clear();
-        assert_eq!(
-            replay_mission(&empty).causal_closure.closure_ppm,
-            Some(0)
-        );
+        assert_eq!(replay_mission(&empty).causal_closure.closure_ppm, Some(0));
 
         let mut duplicate = valid_trace();
-        duplicate.scope.required_thermal_node_ids.push("motor".to_owned());
+        duplicate
+            .scope
+            .required_thermal_node_ids
+            .push("motor".to_owned());
         assert_eq!(
             replay_mission(&duplicate).causal_closure.closure_ppm,
             Some(0)
@@ -1766,10 +1764,7 @@ mod tests {
     fn duplicate_event_identity_forces_zero_closure() {
         let mut trace = valid_trace();
         trace.decisions[0].stamp.event_id = trace.observations[0].stamp.event_id.clone();
-        assert_eq!(
-            replay_mission(&trace).causal_closure.closure_ppm,
-            Some(0)
-        );
+        assert_eq!(replay_mission(&trace).causal_closure.closure_ppm, Some(0));
     }
 
     #[test]
