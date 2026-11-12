@@ -1692,11 +1692,16 @@ mod competitive_reference_tests {
     #[test]
     fn missing_metric_boundary_blocks_cross_boundary_comparison() {
         let mut value = value_from_fixture();
+        let metric_id = value["metrics"][0]["metric_id"]
+            .as_str()
+            .expect("metric id")
+            .to_string();
         value["metrics"][0]["boundary"] = serde_json::json!("");
         let bytes = serde_json::to_vec(&value).expect("snapshot serializes");
         let report = audit_competitive_snapshot(&bytes).expect("snapshot parses");
         assert_eq!(report.status, "BLOCKED");
-        assert!(report.metrics[0].findings.iter().any(|finding| {
+        let metric = report.metrics.iter().find(|metric| metric.metric_id == metric_id).unwrap();
+        assert!(metric.findings.iter().any(|finding| {
             finding.code == "COMPETITIVE_METRIC_BOUNDARY_EMPTY"
         }));
     }
@@ -1704,11 +1709,16 @@ mod competitive_reference_tests {
     #[test]
     fn unknown_or_invalid_source_reference_cannot_be_used() {
         let mut value = value_from_fixture();
+        let metric_id = value["metrics"][0]["metric_id"]
+            .as_str()
+            .expect("metric id")
+            .to_string();
         value["metrics"][0]["reference_id"] = serde_json::json!("not-in-reference-register");
         let bytes = serde_json::to_vec(&value).expect("snapshot serializes");
         let report = audit_competitive_snapshot(&bytes).expect("snapshot parses");
         assert_eq!(report.status, "BLOCKED");
-        assert!(report.metrics[0].findings.iter().any(|finding| {
+        let metric = report.metrics.iter().find(|metric| metric.metric_id == metric_id).unwrap();
+        assert!(metric.findings.iter().any(|finding| {
             finding.code == "COMPETITIVE_METRIC_SOURCE_UNRESOLVED"
         }));
     }
@@ -1722,11 +1732,16 @@ mod competitive_reference_tests {
             .iter()
             .position(|metric| metric["unit"] == "qualitative")
             .expect("qualitative metric exists");
+        let metric_id = value["metrics"][qualitative]["metric_id"]
+            .as_str()
+            .expect("metric id")
+            .to_string();
         value["metrics"][qualitative]["unit"] = serde_json::json!("kW");
         let bytes = serde_json::to_vec(&value).expect("snapshot serializes");
         let report = audit_competitive_snapshot(&bytes).expect("snapshot parses");
         assert_eq!(report.status, "BLOCKED");
-        assert!(report.metrics[qualitative].findings.iter().any(|finding| {
+        let metric = report.metrics.iter().find(|metric| metric.metric_id == metric_id).unwrap();
+        assert!(metric.findings.iter().any(|finding| {
             finding.code == "COMPETITIVE_METRIC_VALUE_TYPE"
         }));
     }
@@ -1734,11 +1749,16 @@ mod competitive_reference_tests {
     #[test]
     fn null_values_are_unknown_not_zero() {
         let mut value = value_from_fixture();
+        let metric_id = value["metrics"][0]["metric_id"]
+            .as_str()
+            .expect("metric id")
+            .to_string();
         value["metrics"][0]["value"] = serde_json::Value::Null;
         let bytes = serde_json::to_vec(&value).expect("snapshot serializes");
         let report = audit_competitive_snapshot(&bytes).expect("snapshot parses");
         assert_eq!(report.status, "BLOCKED");
-        assert!(report.metrics[0].findings.iter().any(|finding| {
+        let metric = report.metrics.iter().find(|metric| metric.metric_id == metric_id).unwrap();
+        assert!(metric.findings.iter().any(|finding| {
             finding.code == "COMPETITIVE_METRIC_VALUE_NULL"
         }));
     }
