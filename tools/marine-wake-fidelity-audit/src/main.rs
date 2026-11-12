@@ -406,13 +406,6 @@ fn calculate_blockage(case: &Case) -> Result<BlockageReport, String> {
     }
     let below_recommendation = ratio < ITTC_BLOCKAGE_RECOMMENDATION;
     let review_required = !below_recommendation;
-    if review_required {
-        if case.blockage.review_state != BlockageReviewState::Reviewed
-            || !case.blockage.review_evidence_sha256.as_deref().is_some_and(is_sha256)
-        {
-            return Err("blockage >=20% requires a reviewed blockage assessment and evidence digest".to_string());
-        }
-    }
     if let Some(digest) = case.blockage.review_evidence_sha256.as_deref() {
         if !is_sha256(digest) {
             return Err("blockage review evidence digest is malformed".to_string());
@@ -426,6 +419,10 @@ fn calculate_blockage(case: &Case) -> Result<BlockageReport, String> {
         area_blockage_ratio: ratio,
         below_ittc_twenty_percent_recommendation: below_recommendation,
         review_state: review_name(case.blockage.review_state),
+        review_required,
+        review_assessment_eligible: !review_required
+            || (case.blockage.review_state == BlockageReviewState::Reviewed
+                && case.blockage.review_evidence_sha256.as_deref().is_some_and(is_sha256)),
         review_evidence_sha256: case.blockage.review_evidence_sha256.clone(),
         interpretation: "area_ratio_is_an_ittc_recommendation_marker_not_a_correction_or_proof_of_zero_acoustic_blockage_effect",
     })
@@ -436,13 +433,17 @@ fn point_key(point: &WakePoint) -> (i64, i64) {
 }
 
 fn validate_field(field: &WakeField, case: &Case, label: &str, errors: &mut Vec<String>) {
-    if field.field_id.trim().is_empty() || field.instrument_or_solver_id.trim().is_empty() {
-        errors.push(format!("{label}: field and instrument/solver IDs are required"));
+    if field.field_id.trim().is_empty()
+        || field.instrument_or_solver_id.trim().is_empty()
+        || field.area_weight_method_id.trim().is_empty()
+    {
+        errors.push(format!("{label}: field, instrument/solver and area-weight method IDs are required"));
     }
     for (name, digest) in [
         ("condition fingerprint", &field.condition_fingerprint_sha256),
         ("calibration/solver validation", &field.calibration_or_solver_validation_sha256),
         ("raw data", &field.raw_data_sha256),
+        ("area quadrature evidence", &field.area_weight_evidence_sha256),
     ] {
         if !is_sha256(digest) {
             errors.push(format!("{label}: {name} digest must be SHA-256 hex"));
@@ -546,6 +547,33 @@ fn same_grid(target: &WakeField, realized: &WakeField) -> bool {
     t.sort_unstable();
     r.sort_unstable();
     t == r
+}
+
+fn same_quadrature(target: &WakeField, realized: &WakeField) -> bool {
+    if target.area_weight_method_id != realized.area_weight_method_id {
+        return false;
+    }
+    let target_points = grid_index(target);
+    let realized_points = grid_index(realized);
+    target_points.iter().all(|(key, target_point)| {
+        realized_points.get(key).is_some_and(|realized_point| {
+            (target_point.area_weight - realized_point.area_weight).abs() <= WEIGHT_SUM_TOLERANCE
+        })
+    })
+}
+
+fn field_coordinates_match_case(field: &WakeField, case: &Case) -> bool {
+    field.coordinate_frame == case.coordinate_frame
+        && field.angular_origin == case.angular_origin
+        && field.positive_azimuth == case.positive_azimuth
+        && field.axial_positive_direction == case.axial_positive_direction
+}
+
+fn field_coordinates_match_each_other(target: &WakeField, realized: &WakeField) -> bool {
+    target.coordinate_frame == realized.coordinate_frame
+        && target.angular_origin == realized.angular_origin
+        && target.positive_azimuth == realized.positive_azimuth
+        && target.axial_positive_direction == realized.axial_positive_direction
 }
 
 fn grid_index(field: &WakeField) -> BTreeMap<(i64, i64), &WakePoint> {
