@@ -59,22 +59,22 @@ impl MatrixProductState {
 
         // First site: A^0 = [s2, 0; 0, 0], A^1 = [0, 0; 0, s2]
         let mut t_first = vec![0.0; d * chi * chi];
-        t_first[0 * chi * chi + 0 * chi + 0] = s2; // A^0[0,0]
-        t_first[1 * chi * chi + 1 * chi + 1] = s2; // A^1[1,1]
+        t_first[0] = s2; // A^0[0,0]
+        t_first[7] = s2; // A^1[1,1]
         tensors.push(t_first);
 
         // Middle sites: A^0 = [[1,0],[0,0]], A^1 = [[0,0],[0,1]]
         for _ in 1..n_sites - 1 {
             let mut t = vec![0.0; d * chi * chi];
-            t[0 * chi * chi + 0 * chi + 0] = 1.0; // A^0[0,0]
-            t[1 * chi * chi + 1 * chi + 1] = 1.0; // A^1[1,1]
+            t[0] = 1.0; // A^0[0,0]
+            t[7] = 1.0; // A^1[1,1]
             tensors.push(t);
         }
 
         // Last site: A^0 = [1, 0; 0, 0], A^1 = [0, 0; 0, 1]
         let mut t_last = vec![0.0; d * chi * chi];
-        t_last[0 * chi * chi + 0 * chi + 0] = 1.0;
-        t_last[1 * chi * chi + 1 * chi + 1] = 1.0;
+        t_last[0] = 1.0;
+        t_last[7] = 1.0;
         tensors.push(t_last);
 
         Self {
@@ -194,6 +194,6 @@ mod tests {
     #[test]
     fn test_parameter_count() {
         let mps = MatrixProductState::product_state(10, 2);
-        assert_eq!(mps.parameter_count(), 10 * 2 * 1 * 1);
+        assert_eq!(mps.parameter_count(), 20);
     }
 }
