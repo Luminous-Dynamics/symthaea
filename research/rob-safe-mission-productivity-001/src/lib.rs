@@ -1209,6 +1209,10 @@ mod tests {
         )
         .unwrap();
         assert!(report.candidate_point_estimate_noninferior);
+        assert_eq!(
+            report.statistical_status,
+            StatisticalStatus::PointEstimatesOnly
+        );
         assert_eq!(report.per_task_class.len(), 1);
         assert_eq!(report.per_robot.len(), 2);
         assert!(!report.point_estimate_pareto_dominates_productivity);
