@@ -11,8 +11,6 @@
   },
   "scaling": {
     "method_id": "ITTC-7.5-02-03-03.9-2024-Rev03",
-    "frequency_regime": "low_frequency",
-    "frequency_regime_basis": "Synthetic test selection only; no physical regime claim",
     "bandwidth": "proportional",
     "representation": "power_spectrum"
   },
@@ -46,7 +44,9 @@
             "facility_transfer_function_db": 20,
             "total_u95_db": 0.2,
             "background_u95_db": 0.2,
-            "facility_transfer_u95_db": 0.1
+            "facility_transfer_u95_db": 0.1,
+            "frequency_regime": "low_frequency",
+            "frequency_regime_basis": "Synthetic known-answer selection only; no physical regime claim"
           }
         ]
       },
@@ -63,7 +63,7 @@
           {
             "band_id": "bpf-fundamental",
             "center_frequency_hz": 10,
-            "source_level_db": 115.56242509439325,
+            "source_level_db": 115.56302500767288,
             "source_level_u95_db": 0.5
           }
         ]
@@ -90,7 +90,9 @@
             "facility_transfer_function_db": 20,
             "total_u95_db": 0.2,
             "background_u95_db": 0.2,
-            "facility_transfer_u95_db": 0.1
+            "facility_transfer_u95_db": 0.1,
+            "frequency_regime": "low_frequency",
+            "frequency_regime_basis": "Synthetic known-answer selection only; no physical regime claim"
           }
         ]
       },
@@ -107,7 +109,7 @@
           {
             "band_id": "bpf-fundamental",
             "center_frequency_hz": 11,
-            "source_level_db": 116.56242509439325,
+            "source_level_db": 116.56302500767288,
             "source_level_u95_db": 0.5
           }
         ]
