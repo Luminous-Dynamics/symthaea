@@ -729,7 +729,6 @@ fn compute_receipt_sha256(
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-
 /// Renderer evidence for one output. The receipt is independently replayed
 /// against its exact score, schedule, configuration and WAV bytes before the
 /// audio is admitted to the influence experiment.
