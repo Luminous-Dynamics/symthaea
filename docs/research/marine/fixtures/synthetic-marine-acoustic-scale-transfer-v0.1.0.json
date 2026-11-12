@@ -142,7 +142,7 @@
   ],
   "validation_split": {
     "split_manifest_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
-    "protocol_id": "leave-one-facility-vessel-propeller-campaign-condition-out",
+    "protocol_id": "nested_group_holdout",
     "grouping_dimensions": [
       "model_facility_id",
       "full_scale_trial_site_id",
