@@ -37,7 +37,7 @@
     "trial_id": "synthetic-full-scale-trial-001",
     "propeller_revision": "synthetic-propeller-rev-a",
     "full_scale_propeller_diameter_m": 2,
-    "source_level_basis": "SOURCE_LEVEL",
+    "source_level_basis": "SOURCE_LEVEL_AT_1M",
     "source_level_method_id": "SYNTHETIC_SOURCE_LEVEL_REDUCTION",
     "propagation_separated": true,
     "calibration_certificate_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
@@ -51,8 +51,6 @@
       "full_scale_rotation_rate_rps": 2,
       "model_cavitation_number_n_d": 1,
       "full_scale_cavitation_number_n_d": 0.8,
-      "model_reference_distance_m": 1,
-      "full_scale_reference_distance_m": 100,
       "model_reynolds_number": 500000,
       "full_scale_reynolds_number": 50000000,
       "operating_point_profile_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
@@ -67,7 +65,7 @@
           "full_scale_lower_hz": 160.99689437998487,
           "full_scale_upper_hz": 196.7739820199815,
           "model_source_level_db": 120,
-          "observed_full_scale_source_level_db": 110.5,
+          "observed_full_scale_source_level_db": 150.5,
           "model_signal_above_background": true,
           "uncertainty": {
             "model_measurement_db": 1,
@@ -78,7 +76,9 @@
             "independence_evidence_ref": null
           }
         }
-      ]
+      ],
+      "model_source_level_reference_distance_m": 1,
+      "full_scale_source_level_reference_distance_m": 1
     },
     {
       "pair_id": "synthetic-pair-12rps",
@@ -86,8 +86,6 @@
       "full_scale_rotation_rate_rps": 2.4,
       "model_cavitation_number_n_d": 1,
       "full_scale_cavitation_number_n_d": 0.8,
-      "model_reference_distance_m": 1,
-      "full_scale_reference_distance_m": 100,
       "model_reynolds_number": 600000,
       "full_scale_reynolds_number": 60000000,
       "operating_point_profile_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
@@ -102,7 +100,7 @@
           "full_scale_lower_hz": 321.99378875996973,
           "full_scale_upper_hz": 393.547964039963,
           "model_source_level_db": 118.5,
-          "observed_full_scale_source_level_db": 109,
+          "observed_full_scale_source_level_db": 149,
           "model_signal_above_background": true,
           "uncertainty": {
             "model_measurement_db": 1,
@@ -113,7 +111,9 @@
             "independence_evidence_ref": null
           }
         }
-      ]
+      ],
+      "model_source_level_reference_distance_m": 1,
+      "full_scale_source_level_reference_distance_m": 1
     }
   ]
 }
