@@ -815,12 +815,20 @@ fn audit(case:&Case)->AuditReport {
         });
     }
 
+    let source_evidence_eligible=case.source_events.iter().all(|event|
+        event.evidence_kind==EvidenceKind::Measured
+            && event.rights_status==RightsStatus::PublicOrPermitted
+            && event.independently_reviewed
+    ) && can_energy_sum;
     let mut limit_results=Vec::new();
     let mut any_limit_failed=false;
     let mut any_limit_unresolved=false;
     for limit in &case.exposure_limits {
         let partition=partitions.iter().find(|item|item.receiver_id==limit.receiver_id&&item.band_id==limit.band_id);
-        let (lower,upper,status)=match partition {
+        let (lower,upper,status)=if !source_evidence_eligible {
+            any_limit_unresolved=true;
+            (None,None,"unresolved_source_evidence_or_sum_basis")
+        } else { match partition {
             Some(partition)=>{
                 if let (Some(lower),Some(upper)) = (
                     partition.ship_only_cumulative_sel_lower_db,
@@ -845,7 +853,7 @@ fn audit(case:&Case)->AuditReport {
                 any_limit_unresolved=true;
                 (None,None,"missing")
             }
-        };
+        }};
         limit_results.push(LimitResult {
             limit_id:limit.limit_id.clone(),
             receiver_id:limit.receiver_id.clone(),
@@ -1111,7 +1119,7 @@ mod tests {
         let report=audit(&case());
         let partition=&report.partitions[0];
         let expected=log_energy_sum(&[60.0,59.0]).unwrap();
-        assert!((partition.maximum_simultaneous_ship_received_level_db-expected).abs()<1e-12);
+        assert!((partition.maximum_simultaneous_ship_received_level_db.unwrap()-expected).abs()<1e-12);
         assert!((partition.maximum_individual_contribution_received_level_db-60.0).abs()<1e-12);
     }
 
@@ -1120,7 +1128,7 @@ mod tests {
         let mut input=case();
         input.contributions[1].start_time_s=10.0;
         input.contributions[1].end_time_s=20.0;
-        assert!((audit(&input).partitions[0].maximum_simultaneous_ship_received_level_db-60.0).abs()<1e-12);
+        assert!((audit(&input).partitions[0].maximum_simultaneous_ship_received_level_db.unwrap()-60.0).abs()<1e-12);
         assert!((audit(&input).partitions[0].unique_temporal_coverage_s-20.0).abs()<1e-12);
     }
 
@@ -1137,15 +1145,15 @@ mod tests {
         let mut input=case();
         input.contributions.truncate(1);
         let report=audit(&input);
-        assert!((report.partitions[0].ship_only_cumulative_sel_db-70.0).abs()<1e-12);
+        assert!((report.partitions[0].ship_only_cumulative_sel_db.unwrap()-70.0).abs()<1e-12);
     }
 
     #[test]
     fn overlapping_independent_ship_events_are_energy_summed_not_db_added() {
         let report=audit(&case());
         let expected=log_energy_sum(&[70.0,69.0]).unwrap();
-        assert!((report.partitions[0].ship_only_cumulative_sel_db-expected).abs()<1e-12);
-        assert!(report.partitions[0].ship_only_cumulative_sel_db<100.0);
+        assert!((report.partitions[0].ship_only_cumulative_sel_db.unwrap()-expected).abs()<1e-12);
+        assert!(report.partitions[0].ship_only_cumulative_sel_db.unwrap()<100.0);
         assert!((report.partitions[0].unique_temporal_coverage_s-10.0).abs()<1e-12);
         assert!((report.partitions[0].summed_source_contribution_duration_s-20.0).abs()<1e-12);
     }
@@ -1156,7 +1164,7 @@ mod tests {
         let partition=&report.partitions[0];
         assert!(partition.ambient_reference_sel_db.is_some());
         assert_eq!(partition.ambient_only_basis,"separate_ambient_reference_not_added_to_ship_energy");
-        assert!((partition.ship_only_cumulative_sel_db-log_energy_sum(&[70.0,69.0]).unwrap()).abs()<1e-12);
+        assert!((partition.ship_only_cumulative_sel_db.unwrap()-log_energy_sum(&[70.0,69.0]).unwrap()).abs()<1e-12);
     }
 
     #[test]
@@ -1199,6 +1207,16 @@ mod tests {
         input.source_events[0].evidence_kind=EvidenceKind::Synthetic;
         let report=audit(&input);
         assert_eq!(report.disposition,"INCOMPLETE");
+    }
+
+    #[test]
+    fn synthetic_source_evidence_cannot_pass_or_fail_an_exposure_threshold() {
+        let mut input=case();
+        input.source_events[0].evidence_kind=EvidenceKind::Synthetic;
+        input.exposure_limits[0].upper_sel_threshold_db=1.0;
+        let report=audit(&input);
+        assert_eq!(report.disposition,"INCOMPLETE");
+        assert_eq!(report.limit_results[0].status,"unresolved_source_evidence_or_sum_basis");
     }
 
     #[test]
