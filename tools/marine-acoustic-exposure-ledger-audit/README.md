@@ -19,12 +19,13 @@ The synthetic fixture must return INCOMPLETE as physical evidence.
 - Cumulative ship-only SEL combines segment SELs in the linear energy domain.
 - Maximum individual-contribution SPL and maximum simultaneous ship SPL are reported separately. Simultaneous SPL uses a time-boundary sweep; only events active at the same time are energy-summed.
 - The period must explicitly declare the source-energy summation basis as incoherent or phase-averaged. If this basis is unknown, per-contribution results remain available but aggregate ship SEL, maximum simultaneous level and exposure-limit decisions are withheld.
-- Source-level and transmission-loss expanded uncertainties must carry matching coverage levels. V0 conservatively adds their bounds; it does not assume statistical independence.
+- Source-level and transmission-loss expanded uncertainties must carry matching coverage levels. V0 conservatively adds their bounds; it does not assume statistical independence. Ambient samples carry their own coverage level, which must remain consistent across a receiver/band reference series.
 - Receiver range is checked against geodetic horizontal distance plus vertical source/receiver separation.
 - Source-to-propagation clock alignment has its own receipt digest, separate from both the source-level and propagation timebase receipts.
 - Ambient reference SEL is calculated and reported separately. It is not added to ship-only SEL because shipping contributions must not be double-counted as “ambient-only” evidence.
 - Overlapping repeated ambient reference windows for the same receiver/band are rejected rather than summed twice.
-- A declared upper SEL threshold passes only when the entire ship-only cumulative SEL interval is below/equal to it, fails only when the lower bound exceeds it, and is otherwise unresolved.
+- Every band ID has one canonical centre frequency across source events, propagation contributions, ambient records and exposure limits. Quantity IDs explicitly distinguish source level, received SPL and SEL.
+- A declared upper SEL threshold passes only when the entire ship-only cumulative SEL interval is below/equal to it, fails only when the lower bound exceeds it, and is otherwise unresolved. Synthetic, rights-uncleared or unreviewed source evidence cannot produce a threshold pass or fail.
 
 ## Interpretation and limits
 
