@@ -40,7 +40,8 @@
     "initial_excited_qubit_labels",
     "initial_product_state_entropy",
     "first_emission_entropy_growth",
-    "final_complete_radiation_purification"
+    "final_complete_radiation_purification",
+    "smaller_complementary_reduction_dimension"
   ],
   "reference_controls": [
     {
@@ -191,5 +192,12 @@
       "late_complete_radiation_entropy"
     ],
     "ci_policy": "queued, missing, or skipped checks are not passes"
+  },
+  "implementation_status": "source_authored_smaller_complementary_reduction; exact-head Rust execution pending",
+  "numerics": {
+    "dense_reduced_dimension_max": 64,
+    "strategy": "At each pure B|R cut, materialize the smaller subsystem only; complementary nonzero Schmidt spectra imply equal entropies and purities.",
+    "equality_residual": "Report |S(R)-S(B)| and |Tr(rho_R^2)-Tr(rho_B^2)| using the computed smaller-side values.",
+    "no_over_cap_materialization": true
   }
 }
