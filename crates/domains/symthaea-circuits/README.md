@@ -12,7 +12,7 @@ checked against textbook values.
 |------|-----|
 | DC | `dc::{current, voltage, power, series_resistance, parallel_resistance, voltage_divider}` |
 | Transients | `transient::{rc_time_constant, rc_charging_voltage, rc_discharging_voltage, rl_time_constant}` |
-| DC-bus stability | `dc_bus_stability::analyze` — reduced Thevenin / constant-power-load equilibrium and phase-line reference; near-fold cases fail closed as numerically indeterminate |
+| DC-bus stability | `dc_bus_stability::analyze` — reduced Thevenin / constant-power-load equilibrium and phase-line reference |
 | AC | `ac::{capacitive_reactance, inductive_reactance, resonant_frequency, series_rlc_impedance}` |
 
 ## Example
@@ -41,4 +41,4 @@ loops, line inductance, battery electrochemistry, switching, protection,
 aircraft dynamics or certification.
 
 The frozen contract and machine-readable known-answer vectors are tracked in
-[ AIRROAD-DC-DYNAMIC-STABILITY-001 #11712 ](https://github.com/Luminous-Dynamics/symthaea/pull/11712).
+[AIRROAD-DC-DYNAMIC-STABILITY-001 #11712](https://github.com/Luminous-Dynamics/symthaea/pull/11712).
