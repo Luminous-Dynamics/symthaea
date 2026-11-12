@@ -10,7 +10,7 @@
     "evidence_kind",
     "source",
     "operating_condition_id",
-    "operating_condition_fingerprint_sha256",
+    "service_fingerprint_sha256",
     "environment_fingerprint_sha256",
     "hydrophone_instrument_id",
     "calibration_certificate_sha256",
@@ -40,9 +40,6 @@
     "operating_condition_id": {
       "type": "string",
       "minLength": 1
-    },
-    "operating_condition_fingerprint_sha256": {
-      "$ref": "#/$defs/digest"
     },
     "environment_fingerprint_sha256": {
       "$ref": "#/$defs/digest"
@@ -75,6 +72,9 @@
       "items": {
         "$ref": "#/$defs/run"
       }
+    },
+    "service_fingerprint_sha256": {
+      "$ref": "#/$defs/digest"
     }
   },
   "$defs": {
