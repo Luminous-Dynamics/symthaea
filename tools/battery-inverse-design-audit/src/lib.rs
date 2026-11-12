@@ -822,7 +822,6 @@ mod tests {
                     lower_bound: values[2] - offset - 1.0,
                     upper_bound: values[2] - offset + 1.0,
                     evidence_id: "SYNTH-EVIDENCE".into(),
-                    evidence_class: EvidenceClass::SyntheticFixture,
                 },
             ]
         };
