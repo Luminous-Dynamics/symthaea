@@ -44,12 +44,13 @@ This is directly motivated by **GlobalTap** (arXiv submitted 8 November 2026): 2
 
 ## Tests authored
 
-Sixteen focused Rust tests cover:
+Nineteen focused Rust tests cover:
 - exact beat and downbeat sequences;
 - inclusive 70 ms beat tolerance;
 - duplicate predictions as false positives;
 - missing beats lowering recall;
 - half-time strict-F1 failure and metric-level-tolerant Cemgil behavior;
+- CML/AML continuity scores for a broken sequence, half-time metric-level recovery and single-beat abstention;
 - beat correctness separated from downbeat correctness;
 - missing downbeat annotation remaining unknown;
 - multiple reference interpretations and pairwise agreement;
@@ -67,7 +68,7 @@ The tests are authored, not compiled or executed.
 
 ### mir_eval beat protocol
 
-\`mir_eval.beat.f_measure\` uses a 70 ms default tolerance. Its beat evaluation documentation also describes Cemgil, Goto, P-score, continuity metrics (CMLc/CMLt/AMLc/AMLt), and information gain. The current Rust V1 implements strict F1 and direct/best-metric-level Cemgil; it does **not** claim full \`mir_eval\` API parity. In particular, Goto, P-score, continuity and information gain remain follow-up work.
+\`mir_eval.beat.f_measure\` uses a 70 ms default tolerance. Its beat evaluation documentation also describes Cemgil, Goto, P-score, continuity metrics (CMLc/CMLt/AMLc/AMLt), and information gain. The current Rust V1 implements strict F1, direct/best-metric-level Cemgil, and the CMLc/CMLt/AMLc/AMLt continuity metrics using the documented 0.175 phase and period thresholds. It does **not** claim full \`mir_eval\` API parity. In particular, Goto, P-score and information gain remain follow-up work.
 
 References:
 - https://mir-eval.readthedocs.io/latest/api/beat.html
@@ -99,7 +100,7 @@ Reference: https://arxiv.org/abs/2605.12287
 
 1. Reproduce the MIREX 2026 beat evaluation protocol for all accessible public sets before making a leaderboard comparison.
 2. Report strict beat F1 at 70 ms, Cemgil direct and best metric level, downbeat F1, continuity metrics, and p50/p95 timing errors as separate dimensions.
-3. Add \`CMLc\`, \`CMLt\`, \`AMLc\`, \`AMLt\`, Goto, P-score, and information gain in a parity-tested follow-up.
+3. Add Goto, P-score and information gain in a parity-tested follow-up.
 4. Report results separately by dataset, genre, country/tradition where consent and metadata allow, tempo range, rhythmic density, and metrical ambiguity.
 5. Use GlobalTap's multi-reference structure to report per-annotation and across-annotation distributions, not one flattened consensus.
 6. Compare against BeatThis, DBN/madmom, and the relevant MIREX 2026 systems under identical input, trimming and post-processing rules.
