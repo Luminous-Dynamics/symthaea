@@ -111,14 +111,18 @@ pub fn parse_musicxml_measure_map(
     }
 
     let reference = &normalized_parts[0];
+    if normalized_parts
+        .iter()
+        .flatten()
+        .any(|measure| measure.non_controlling)
+    {
+        return Ok(unknown_map(
+            source_id,
+            score_clock_id,
+            "a part declares non-controlling measures; use per-part measure maps",
+        ));
+    }
     for (part_index, measures) in normalized_parts.iter().enumerate().skip(1) {
-        if measures.iter().any(|measure| measure.non_controlling) {
-            return Ok(unknown_map(
-                source_id,
-                score_clock_id,
-                "a part declares non-controlling measures; use per-part measure maps",
-            ));
-        }
         if measures.len() != reference.len() {
             return Ok(unknown_map(
                 source_id,
