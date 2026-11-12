@@ -140,10 +140,13 @@ pub struct TaskClassScorecard {
     pub work_units_per_gpu_hour_milli: Option<u64>,
     /// Fixed-point milli-work-units per robot-hour; uses all mission wall time.
     pub work_units_per_robot_hour_milli: Option<u64>,
-    pub thermal_unknown_or_invalid: u64,
-    pub recovery_unknown_or_invalid: u64,
+    pub thermal_unknown_missions: u64,
+    pub thermal_invalid_missions: u64,
+    pub recovery_unknown_missions: u64,
+    pub recovery_invalid_missions: u64,
     pub energy_qualified_missions: u64,
-    pub energy_unknown_or_invalid_missions: u64,
+    pub energy_unknown_missions: u64,
+    pub energy_invalid_missions: u64,
     pub known_energy_joules: u128,
     pub causal_closure: CausalClosureTotals,
 }
@@ -325,10 +328,13 @@ struct ClassAccumulator {
     productive_work_units: u128,
     gpu_micros: u128,
     elapsed_ns: u128,
-    thermal_unknown_or_invalid: u64,
-    recovery_unknown_or_invalid: u64,
+    thermal_unknown_missions: u64,
+    thermal_invalid_missions: u64,
+    recovery_unknown_missions: u64,
+    recovery_invalid_missions: u64,
     energy_qualified_missions: u64,
-    energy_unknown_or_invalid_missions: u64,
+    energy_unknown_missions: u64,
+    energy_invalid_missions: u64,
     known_energy_joules: u128,
     applications_examined: u64,
     applications_linked: u64,
@@ -471,20 +477,26 @@ pub fn evaluate_fleet(
         if starvation_breach {
             checked_add(&mut class.service_floor_breaches, 1)?;
         }
-        if trial.thermal_evidence != EvidenceState::Qualified {
-            checked_add(&mut class.thermal_unknown_or_invalid, 1)?;
+        match trial.thermal_evidence {
+            EvidenceState::Qualified => {}
+            EvidenceState::Unknown => checked_add(&mut class.thermal_unknown_missions, 1)?,
+            EvidenceState::Invalid => checked_add(&mut class.thermal_invalid_missions, 1)?,
         }
-        if trial.recovery_evidence != EvidenceState::Qualified {
-            checked_add(&mut class.recovery_unknown_or_invalid, 1)?;
+        match trial.recovery_evidence {
+            EvidenceState::Qualified => {}
+            EvidenceState::Unknown => checked_add(&mut class.recovery_unknown_missions, 1)?,
+            EvidenceState::Invalid => checked_add(&mut class.recovery_invalid_missions, 1)?,
         }
-        if trial.energy_evidence == EvidenceState::Qualified {
-            checked_add(&mut class.energy_qualified_missions, 1)?;
-            checked_add_u128(
-                &mut class.known_energy_joules,
-                u128::from(trial.measured_energy_joules.unwrap_or(0)),
-            )?;
-        } else {
-            checked_add(&mut class.energy_unknown_or_invalid_missions, 1)?;
+        match trial.energy_evidence {
+            EvidenceState::Qualified => {
+                checked_add(&mut class.energy_qualified_missions, 1)?;
+                checked_add_u128(
+                    &mut class.known_energy_joules,
+                    u128::from(trial.measured_energy_joules.unwrap_or(0)),
+                )?;
+            }
+            EvidenceState::Unknown => checked_add(&mut class.energy_unknown_missions, 1)?,
+            EvidenceState::Invalid => checked_add(&mut class.energy_invalid_missions, 1)?,
         }
         checked_add(
             &mut class.applications_examined,
@@ -582,10 +594,13 @@ pub fn evaluate_fleet(
                 elapsed_ns: a.elapsed_ns,
                 work_units_per_gpu_hour_milli: gpu_hour_rate,
                 work_units_per_robot_hour_milli: robot_hour_rate,
-                thermal_unknown_or_invalid: a.thermal_unknown_or_invalid,
-                recovery_unknown_or_invalid: a.recovery_unknown_or_invalid,
+                thermal_unknown_missions: a.thermal_unknown_missions,
+                thermal_invalid_missions: a.thermal_invalid_missions,
+                recovery_unknown_missions: a.recovery_unknown_missions,
+                recovery_invalid_missions: a.recovery_invalid_missions,
                 energy_qualified_missions: a.energy_qualified_missions,
-                energy_unknown_or_invalid_missions: a.energy_unknown_or_invalid_missions,
+                energy_unknown_missions: a.energy_unknown_missions,
+                energy_invalid_missions: a.energy_invalid_missions,
                 known_energy_joules: a.known_energy_joules,
                 causal_closure: CausalClosureTotals {
                     applications_examined: a.applications_examined,
@@ -838,9 +853,19 @@ pub fn compare_fleet_arms(
         let robot_hour_delta = br
             .zip(cr)
             .map(|(bv, cv)| i128::from(cv) - i128::from(bv));
-        match productivity_delta {
-            Some(d) if d > 0 => productivity_improved_classes.push(class.clone()),
-            Some(d) if d < 0 => productivity_regressed_classes.push(class.clone()),
+        match (productivity_delta, robot_hour_delta) {
+            (Some(gpu_delta), Some(robot_delta))
+                if gpu_delta >= 0
+                    && robot_delta >= 0
+                    && (gpu_delta > 0 || robot_delta > 0) =>
+            {
+                productivity_improved_classes.push(class.clone());
+            }
+            (Some(gpu_delta), Some(robot_delta))
+                if gpu_delta < 0 || robot_delta < 0 =>
+            {
+                productivity_regressed_classes.push(class.clone());
+            }
             _ => {}
         }
         if productivity_delta.is_none_or(|d| d < 0)
@@ -1047,7 +1072,8 @@ mod tests {
         assert_eq!(score.physical_safe_successes, 1);
         assert_eq!(score.evidence_qualified_safe_successes, 0);
         assert_eq!(score.slo_qualified_missions, 0);
-        assert_eq!(score.task_classes["delivery"].thermal_unknown_or_invalid, 1);
+        assert_eq!(score.task_classes["delivery"].thermal_unknown_missions, 1);
+        assert_eq!(score.task_classes["delivery"].thermal_invalid_missions, 0);
     }
 
     #[test]
@@ -1074,7 +1100,8 @@ mod tests {
         let score = evaluate_fleet("candidate", &[input], contract()).unwrap();
         let class = &score.task_classes["delivery"];
         assert_eq!(class.energy_qualified_missions, 0);
-        assert_eq!(class.energy_unknown_or_invalid_missions, 1);
+        assert_eq!(class.energy_unknown_missions, 1);
+        assert_eq!(class.energy_invalid_missions, 0);
         assert_eq!(class.known_energy_joules, 0);
     }
 
