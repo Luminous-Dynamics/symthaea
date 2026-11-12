@@ -301,7 +301,7 @@
         "instrument_id",
         "calibration_certificate_sha256",
         "evidence_sha256",
-        "nuclei_distribution_evidence_sha256"
+        "nuclei_distribution"
       ],
       "properties": {
         "measure": {
@@ -340,15 +340,97 @@
         "evidence_sha256": {
           "$ref": "#/$defs/digest"
         },
-        "nuclei_distribution_evidence_sha256": {
+        "nuclei_distribution": {
           "oneOf": [
             {
-              "$ref": "#/$defs/digest"
+              "$ref": "#/$defs/nucleiDistribution"
             },
             {
               "type": "null"
             }
           ]
+        }
+      }
+    },
+    "nucleiDistribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "measurement_id",
+        "method_id",
+        "instrument_id",
+        "calibration_certificate_sha256",
+        "evidence_sha256",
+        "sample_volume_ml",
+        "number_concentration_equivalence_tolerance_per_ml",
+        "wasserstein1_equivalence_tolerance_um",
+        "bins"
+      ],
+      "properties": {
+        "measurement_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "sample_volume_ml": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "number_concentration_equivalence_tolerance_per_ml": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "wasserstein1_equivalence_tolerance_um": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "bins": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/nucleiBin"
+          }
+        }
+      }
+    },
+    "nucleiBin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "diameter_lower_um",
+        "diameter_upper_um",
+        "number_concentration_per_ml",
+        "expanded_uncertainty_per_ml"
+      ],
+      "properties": {
+        "diameter_lower_um": {
+          "type": "number",
+          "minimum": 0
+        },
+        "diameter_upper_um": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "number_concentration_per_ml": {
+          "type": "number",
+          "minimum": 0
+        },
+        "expanded_uncertainty_per_ml": {
+          "type": "number",
+          "exclusiveMinimum": 0
         }
       }
     }
