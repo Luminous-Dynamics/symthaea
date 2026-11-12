@@ -115,7 +115,7 @@ A human-assisted run must not be ranked as a blind run. Any provided meter, key,
 
 Random excerpt splits are inadequate for the primary generalization claims. At least one grouped holdout must be preregistered for each of:
 
-- composer/work (an in-distribution work holdout may repeat composers; an OOD composer claim holds out the composer group itself);
+- work/composer (work is the unit for in-distribution holdouts where composers may recur; composer is the unit for an OOD composer claim);
 - artist/performer;
 - recording session/source recording;
 - instrument family/ensemble;
@@ -147,7 +147,7 @@ A metric value must carry a protocol ID, unit, direction, tolerance/matching rul
 - exact evaluated-sample digests and counts;
 - report and protocol commitments.
 
-The comparison function requires an identical protocol fingerprint, identical overall sample counts and exact metric-sample manifest. It compares one named metric at a time and never produces a composite winner score. A protocol mismatch, track mismatch, renderer mismatch or different evaluated sample set prevents ranking. Out-of-distribution claims require a non-random grouping unit and an evaluation group set exactly equal to the declared held-out group set; in-distribution claims use random-excerpt splits.
+The comparison function requires an identical protocol fingerprint, identical overall sample counts and exact metric-sample manifest. It compares one named metric at a time and never produces a composite winner score. A protocol mismatch, track mismatch, renderer mismatch or different evaluated sample set prevents ranking. Out-of-distribution claims require a non-random grouping unit and an evaluation group set exactly equal to the declared held-out group set; every held-out group must have a slice containing every declared metric. The overall slice must also contain all declared metrics. In-distribution claims may use random-excerpt, work-level or recording-session-level holdouts; work/session identity is disjoint even when composers recur.
 
 These digests commit the report content; they do not authenticate the dataset or independently prove the split. Provenance and rights authorization remain separate evidence requirements.
 
@@ -164,4 +164,4 @@ These digests commit the report content; they do not authenticate the dataset or
 
 ## Qualification boundary
 
-The Rust validator and tests are authored, not compiled or executed in this environment. The code includes 11 authored validator tests for valid OOD receipts, group leakage, invalid OOD split claims, in-distribution grouping, missing renderer identity, metric-protocol mismatch, exact sample-subset mismatch, report/protocol tampering, fraction-range errors, and one-metric comparison. It validates report provenance, split disjointness and comparison compatibility; it does not itself compute MV2H, CLEWS, score F1, human correction time or confidence intervals. Those metric engines and data collection protocols must be independently implemented and qualified. No MUSE SOTA claim is made here.
+The Rust validator and tests are authored, not compiled or executed in this environment. The code includes 13 authored validator tests for valid OOD receipts, group leakage, invalid OOD split claims, in-distribution grouping, missing renderer identity, metric-protocol mismatch, exact sample-subset mismatch, report/protocol tampering, fraction-range errors, and one-metric comparison. It validates report provenance, split disjointness and comparison compatibility; it does not itself compute MV2H, CLEWS, score F1, human correction time or confidence intervals. Those metric engines and data collection protocols must be independently implemented and qualified. No MUSE SOTA claim is made here.
