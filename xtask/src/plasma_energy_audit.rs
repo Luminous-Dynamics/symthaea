@@ -76,6 +76,8 @@ struct ThermalScenario {
     technology: String,
     evidence_class: String,
     energy_unit: String,
+    /// Exact declared wall-plug input boundary, including the included auxiliary systems.
+    energy_boundary_contract_id: String,
     service: ServiceBoundary,
     metering_mode: MeteringMode,
     wall_plug_inputs: Vec<EnergyInput>,
@@ -318,6 +320,9 @@ fn evaluate_scenario(scenario: &ThermalScenario) -> ScenarioResult {
     if scenario.energy_unit != EXPECTED_ENERGY_UNIT {
         return reject("scenario energy unit must be joules (J)");
     }
+    if scenario.energy_boundary_contract_id.trim().is_empty() {
+        return blocked("declared wall-plug energy-boundary contract identity is missing");
+    }
 
     if scenario.service.service_contract_id.trim().is_empty()
         || scenario.service.service_type.trim().is_empty()
@@ -542,11 +547,12 @@ fn evaluate_comparison(
 
     if baseline.service.service_contract_id != candidate.service.service_contract_id
         || baseline.service != candidate.service
+        || baseline.energy_boundary_contract_id != candidate.energy_boundary_contract_id
     {
         return comparison_result(
             comparison,
             ComparisonDisposition::NotComparable,
-            "functional service contract or one or more service-boundary fields differ",
+            "functional service contract or complete wall-plug energy-boundary contract differs",
             baseline_result.wall_plug_to_useful_heat_ppm,
             candidate_result.wall_plug_to_useful_heat_ppm,
         );
@@ -638,6 +644,7 @@ mod tests {
             technology: "RESISTANCE_JOULE_HEATER".to_owned(),
             evidence_class: SYNTHETIC_EVIDENCE_CLASS.to_owned(),
             energy_unit: "J".to_owned(),
+            energy_boundary_contract_id: "WALL-PLUG-COMPLETE-THERMAL-STORE-V1".to_owned(),
             service: ServiceBoundary {
                 service_contract_id: "HEAT-500C-1H".to_owned(),
                 service_type: "process_heat".to_owned(),
@@ -795,6 +802,38 @@ mod tests {
             evaluate_comparison(&pair, &scenarios, &results).disposition,
             ComparisonDisposition::NotComparable
         );
+    }
+
+    #[test]
+    fn energy_boundary_mismatch_is_not_comparable_even_when_service_matches() {
+        let baseline = base_scenario();
+        let mut candidate = base_scenario();
+        candidate.scenario_id = "candidate".to_owned();
+        candidate.energy_boundary_contract_id =
+            "WALL-PLUG-HEATER-ONLY-V1".to_owned();
+
+        let baseline_result = evaluate_scenario(&baseline);
+        let candidate_result = evaluate_scenario(&candidate);
+        assert_eq!(baseline_result.disposition, ScenarioDisposition::Pass);
+        assert_eq!(candidate_result.disposition, ScenarioDisposition::Pass);
+
+        let scenarios = BTreeMap::from([
+            (baseline.scenario_id.clone(), &baseline),
+            (candidate.scenario_id.clone(), &candidate),
+        ]);
+        let results = BTreeMap::from([
+            (baseline.scenario_id.clone(), baseline_result),
+            (candidate.scenario_id.clone(), candidate_result),
+        ]);
+        let pair = ComparisonPair {
+            comparison_id: "energy-boundary-mismatch".to_owned(),
+            baseline_scenario_id: baseline.scenario_id.clone(),
+            candidate_scenario_id: candidate.scenario_id.clone(),
+            expected_disposition: ComparisonDisposition::NotComparable,
+        };
+        let result = evaluate_comparison(&pair, &scenarios, &results);
+        assert_eq!(result.disposition, ComparisonDisposition::NotComparable);
+        assert!(result.reason.contains("energy-boundary contract"));
     }
 
     #[test]
