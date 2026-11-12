@@ -306,11 +306,14 @@ fn build_event_support(
         domains.insert(format!("fluidsynth:effects-group:{group}"));
     }
 
-    if report.measured_influence_intervals.len() > MAX_SUPPORT_INTERVALS_PER_EVENT {
+    // Only temporally qualified episodes enter the planner support graph.
+    // Raw threshold-positive intervals remain in the replayed EVAL-017 report
+    // for audit and cannot promote isolated spikes into planner evidence.
+    if report.qualified_support_intervals.len() > MAX_SUPPORT_INTERVALS_PER_EVENT {
         return Err(CounterfactualSupportAdapterError::InvalidSupportIntervals);
     }
-    let mut acoustic_support = Vec::with_capacity(report.measured_influence_intervals.len());
-    for interval in &report.measured_influence_intervals {
+    let mut acoustic_support = Vec::with_capacity(report.qualified_support_intervals.len());
+    for interval in &report.qualified_support_intervals {
         let start_frame = u64::try_from(interval.start_frame)
             .map_err(|_| CounterfactualSupportAdapterError::InvalidSupportIntervals)?;
         let end_frame = u64::try_from(interval.end_frame)
