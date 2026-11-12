@@ -328,6 +328,6 @@ Runner-independent work should begin with P1 fixtures and P2 pure accounting/sch
 - NREL, REopt: <https://reopt.nrel.gov/>
 - PyPSA: <https://pypsa.org/>
 - GenX: <https://github.com/GenXProject/GenX>
-- Nature Reviews Clean Technology (2026), perovskite PV commercialization perspective: <https://www.nature.com/articles/s44359-026-00123-4>
+- Nature Reviews Clean Technology (2026), perovskite PV commercialization perspective: <https://www.nature.com/articles/s44359-026-00173-2>
 
 Source URLs are discovery pointers. Each future admitted case must pin the exact publication/product version, date, system boundary, evidence class, applicability, data rights and source bytes/digest. Links alone are not qualification evidence.
