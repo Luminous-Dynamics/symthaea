@@ -161,6 +161,44 @@ This is an exact algebraic negative control, not a claim about a physical aircra
 
 The next extension is not to add PWM detail. It is to replace the static branch conductance approximation with independently measured or analytically qualified frequency-dependent source, feeder and converter port impedances. SISO and MIMO return-ratio conventions must be frozen before Nyquist classification. A two-port generalized-Nyquist or state-space eigenvalue reference must distinguish component-local stability from network-interaction stability.
 
+## Industry baseline and where Luminous must differentiate
+
+The implementation target is not a replacement for mature circuit and power-electronics tools.
+
+- **PLECS 5.0** already provides small-signal analysis blocks, AC/linearized-circuit analysis, and frequency-response analysis by applying discrete sinusoidal perturbations around a simulated steady state. Its standalone analysis also exposes loop-gain and output-impedance workflows. See [PLECS Frequency Response](https://docs.plexim.com/plecs/5.0/analysis/frequency-response/), [Small Signal Response](https://docs.plexim.com/plecs/latest/components-by-category/smallsignalresponse/) and [Analysis Tools](https://docs.plexim.com/plecs/latest/analysis/).
+- **NASA NEAT** supports megawatt-scale electrical powertrain tests under simulated altitude, with AC/DC/bidirectional DC power, batteries, load banks, ground-loop paths, cooling and electric-machine testing. See [NASA NEAT](https://www.nasa.gov/eap-labs-and-testbeds/neat/).
+- **NASA AREAL** is a high-power DC testbed aimed at electric-powertrain architectures and standards/verification for vertical-lift vehicles and electrified transport. See [NASA EAP Labs and Testbeds](https://www.nasa.gov/eap-labs-and-testbeds/).
+
+Accordingly, a synthetic Rust model or a successful PLECS/ngspice comparison is not evidence that Luminous has matched these facilities. The realistic sequence is analytical fixtures, independent software-tool comparison, guarded low-energy laboratory work, PHIL with a qualified partner, then higher-power test infrastructure where authorized.
+
+The potential product differentiation is the **evidence and decision layer around the solver**:
+
+1. Exact as-built aircraft power-tree, port directions, motor-to-battery mapping and configuration revision.
+2. Calibrated complex impedance records with frequency, temperature, bias, operating-point and uncertainty validity.
+3. Explicit distinction between measured, fitted, simulated, extrapolated and unknown values.
+4. Hard-bound robust stability dispositions that abstain when a required sweep or discrepancy bound is missing.
+5. Cross-tool replay with solver version, netlist/model digest, exact operating point, excitation, frequency set and raw output digest.
+6. Composition into mission-phase constraints, topology-aware control allocation (#11737), capacitor mass/lifetime (#11738), thermal feedback and fault evidence without giving the analysis system actuator or certification authority.
+7. Decision-focused experiment selection via #7803: recommend the measurement most likely to change a real architecture choice, not merely the one expected to reduce entropy.
+
+### Matched comparison protocol
+
+On matched topology, operating point, model order, parameter set, port convention, frequency band and excitation, compare:
+- PLECS small-signal / frequency-response results where a reproducible model is available;
+- ngspice AC/transient outputs after #5633 validates the solver result parser and convergence semantics;
+- independent state-space eigenvalues and generalized-Nyquist results;
+- measured impedance sweeps / PHIL responses only when calibration and exact test topology are available.
+
+Report per-frequency complex (Z) residual, magnitude and phase error, resonance frequency/Q error, stability-margin error, runtime, model-order, data requirement and unsupported-domain coverage separately. Never compare a Luminous reduced-order model to an unrelated high-fidelity model or different operating point and call the difference a win.
+
+Proposed internal targets remain:
+- 100% correct classification on the frozen analytical SISO/MIMO corpus;
+- zero false-stable and false-robust negative controls;
+- zero accepted extrapolated impedance points;
+- exact agreement with independent state-space / Nyquist references on matched supported models;
+- explicit abstention and evidence-coverage reporting;
+- physical error targets fixed only after a calibrated measurement / PHIL holdout exists.
+
 ## Claim ceiling
 
 This fixture qualifies only the stated synthetic three-state RC / constant-power-load model. It does not model line inductance, converter control loops, switching, battery electrochemistry, protection, faults, thermal response, flight control, an aircraft electrical network, PHIL/HIL performance, airworthiness or certification.
