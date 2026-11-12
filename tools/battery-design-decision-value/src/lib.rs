@@ -238,7 +238,9 @@ fn validate_digest(value: &str, label: &str) -> Result<(), AuditError> {
 
 fn validate_nonnegative(value: f64, label: &str) -> Result<(), AuditError> {
     if !value.is_finite() || value < 0.0 {
-        return Err(AuditError(format!("{label} must be finite and non-negative")));
+        return Err(AuditError(format!(
+            "{label} must be finite and non-negative"
+        )));
     }
     Ok(())
 }
@@ -268,9 +270,10 @@ fn require_evidence<'a>(
     evidence_id: &str,
     owner: &str,
 ) -> Result<&'a EvidenceRecord, AuditError> {
-    let record = registry.get(evidence_id).copied().ok_or_else(|| {
-        AuditError(format!("{owner} references unknown evidence {evidence_id}"))
-    })?;
+    let record = registry
+        .get(evidence_id)
+        .copied()
+        .ok_or_else(|| AuditError(format!("{owner} references unknown evidence {evidence_id}")))?;
     if record.admission != EvidenceAdmission::AdmittedForEvaluation {
         return Err(AuditError(format!(
             "{owner} references evidence {evidence_id} that is not evaluation-admitted"
@@ -279,9 +282,7 @@ fn require_evidence<'a>(
     Ok(record)
 }
 
-fn validate_case(
-    case: &BenchmarkCase,
-) -> Result<BTreeMap<&str, &EvidenceRecord>, AuditError> {
+fn validate_case(case: &BenchmarkCase) -> Result<BTreeMap<&str, &EvidenceRecord>, AuditError> {
     require_nonempty(&case.case_id, "case ID")?;
     require_nonempty(&case.decision_loss_unit, "decision-loss unit")?;
     if case.alternatives.is_empty() || case.worlds.is_empty() {
@@ -337,7 +338,10 @@ fn validate_case(
     if let Some(basis) = &case.probability_basis {
         require_nonempty(&basis.model_id, "probability model ID")?;
         require_nonempty(&basis.validity_domain, "probability validity domain")?;
-        require_nonempty(&basis.calibration_profile, "probability calibration profile")?;
+        require_nonempty(
+            &basis.calibration_profile,
+            "probability calibration profile",
+        )?;
         let calibration = require_evidence(
             &registry,
             &basis.calibration_evidence_id,
@@ -355,10 +359,7 @@ fn validate_case(
     Ok(registry)
 }
 
-fn loss_for<'a>(
-    world: &'a World,
-    alternative_id: &str,
-) -> Result<&'a AlternativeLoss, AuditError> {
+fn loss_for<'a>(world: &'a World, alternative_id: &str) -> Result<&'a AlternativeLoss, AuditError> {
     world
         .losses
         .iter()
@@ -390,8 +391,11 @@ fn validate_experiment(
             .map(|item| item.world_id.as_str()),
         "experiment world ID",
     )?;
-    let expected_worlds: BTreeSet<&str> =
-        case.worlds.iter().map(|world| world.world_id.as_str()).collect();
+    let expected_worlds: BTreeSet<&str> = case
+        .worlds
+        .iter()
+        .map(|world| world.world_id.as_str())
+        .collect();
     let actual_worlds: BTreeSet<&str> = experiment
         .outcomes_by_world
         .iter()
@@ -406,7 +410,11 @@ fn validate_experiment(
     let probability_modes: BTreeSet<bool> = experiment
         .outcomes_by_world
         .iter()
-        .flat_map(|row| row.outcomes.iter().map(|outcome| outcome.probability.is_some()))
+        .flat_map(|row| {
+            row.outcomes
+                .iter()
+                .map(|outcome| outcome.probability.is_some())
+        })
         .collect();
     if probability_modes.len() > 1 {
         return Err(AuditError(
@@ -424,7 +432,9 @@ fn validate_experiment(
     let mut canonical_outcomes: Option<BTreeSet<&str>> = None;
     for row in &experiment.outcomes_by_world {
         validate_unique(
-            row.outcomes.iter().map(|outcome| outcome.outcome_id.as_str()),
+            row.outcomes
+                .iter()
+                .map(|outcome| outcome.outcome_id.as_str()),
             "outcome ID within world",
         )?;
         if row.outcomes.is_empty() {
@@ -497,7 +507,11 @@ fn validate_experiment(
                 "world prior probabilities sum to {prior_total}, not 1"
             )));
         }
-    } else if case.worlds.iter().any(|world| world.prior_probability.is_some()) {
+    } else if case
+        .worlds
+        .iter()
+        .any(|world| world.prior_probability.is_some())
+    {
         return Err(AuditError(
             "set-valued mode must not contain probability-bearing world priors".into(),
         ));
@@ -514,7 +528,10 @@ fn expected_decision(
         let mut expected_loss = 0.0;
         let mut feasible_everywhere = true;
         for world in &case.worlds {
-            let probability = probabilities.get(world.world_id.as_str()).copied().unwrap_or(0.0);
+            let probability = probabilities
+                .get(world.world_id.as_str())
+                .copied()
+                .unwrap_or(0.0);
             if probability <= EPSILON {
                 continue;
             }
@@ -529,8 +546,7 @@ fn expected_decision(
             let candidate = (alternative.alternative_id.clone(), expected_loss);
             if best.as_ref().is_none_or(|current| {
                 candidate.1 < current.1 - EPSILON
-                    || ((candidate.1 - current.1).abs() <= EPSILON
-                        && candidate.0 < current.0)
+                    || ((candidate.1 - current.1).abs() <= EPSILON && candidate.0 < current.0)
             }) {
                 best = Some(candidate);
             }
@@ -576,10 +592,7 @@ pub fn evaluate_evsi(
             Ok((
                 world.world_id.as_str(),
                 world.prior_probability.ok_or_else(|| {
-                    AuditError(format!(
-                        "world {} has no prior probability",
-                        world.world_id
-                    ))
+                    AuditError(format!("world {} has no prior probability", world.world_id))
                 })?,
             ))
         })
@@ -712,8 +725,7 @@ fn worst_case_regret(
             let candidate = (alternative.alternative_id.clone(), max_regret);
             if best.as_ref().is_none_or(|current| {
                 candidate.1 < current.1 - EPSILON
-                    || ((candidate.1 - current.1).abs() <= EPSILON
-                        && candidate.0 < current.0)
+                    || ((candidate.1 - current.1).abs() <= EPSILON && candidate.0 < current.0)
             }) {
                 best = Some(candidate);
             }
@@ -751,13 +763,16 @@ pub fn evaluate_minimax_regret(
         .iter()
         .map(|world| world.world_id.as_str())
         .collect();
-    let (baseline_choice, baseline_worst_case_regret) =
-        worst_case_regret(case, &all_world_ids)?;
+    let (baseline_choice, baseline_worst_case_regret) = worst_case_regret(case, &all_world_ids)?;
 
     let outcome_ids: BTreeSet<&str> = experiment
         .outcomes_by_world
         .iter()
-        .flat_map(|row| row.outcomes.iter().map(|outcome| outcome.outcome_id.as_str()))
+        .flat_map(|row| {
+            row.outcomes
+                .iter()
+                .map(|outcome| outcome.outcome_id.as_str())
+        })
         .collect();
     if outcome_ids.is_empty() {
         return Err(AuditError("experiment has no possible outcomes".into()));
@@ -769,7 +784,11 @@ pub fn evaluate_minimax_regret(
         let supported_world_ids: BTreeSet<&str> = experiment
             .outcomes_by_world
             .iter()
-            .filter(|row| row.outcomes.iter().any(|outcome| outcome.outcome_id == outcome_id))
+            .filter(|row| {
+                row.outcomes
+                    .iter()
+                    .any(|outcome| outcome.outcome_id == outcome_id)
+            })
             .map(|row| row.world_id.as_str())
             .collect();
         let (posterior_choice, posterior_worst_case_regret) =
@@ -785,8 +804,7 @@ pub fn evaluate_minimax_regret(
     }
     outcome_values.sort_by(|left, right| left.outcome_id.cmp(&right.outcome_id));
 
-    let robust_regret_reduction =
-        baseline_worst_case_regret - worst_post_observation_regret;
+    let robust_regret_reduction = baseline_worst_case_regret - worst_post_observation_regret;
     Ok(MinimaxRegretReport {
         case_id: case.case_id.clone(),
         experiment_id: experiment.experiment_id.clone(),
@@ -836,7 +854,9 @@ pub fn select_experiment(
         validate_nonnegative(value, label)?;
     }
     validate_unique(
-        experiments.iter().map(|experiment| experiment.experiment_id.as_str()),
+        experiments
+            .iter()
+            .map(|experiment| experiment.experiment_id.as_str()),
         "experiment ID",
     )?;
 
@@ -1094,12 +1114,8 @@ mod tests {
     #[test]
     fn interval_or_set_valued_inputs_cannot_be_scored_as_evsi() {
         let case = base_case(false);
-        let mut set_experiment = experiment(
-            "SET-VALUED",
-            0.0,
-            RiskClass::Low,
-            [[0.5, 0.5], [0.5, 0.5]],
-        );
+        let mut set_experiment =
+            experiment("SET-VALUED", 0.0, RiskClass::Low, [[0.5, 0.5], [0.5, 0.5]]);
         for row in &mut set_experiment.outcomes_by_world {
             for outcome in &mut row.outcomes {
                 outcome.probability = None;
@@ -1175,20 +1191,14 @@ mod tests {
     #[test]
     fn high_risk_or_over_budget_experiment_is_not_selected() {
         let case = base_case(true);
-        let good = experiment(
-            "GOOD",
-            1.0,
-            RiskClass::Low,
-            [[0.9, 0.1], [0.1, 0.9]],
-        );
-        let risky = experiment(
-            "RISKY",
-            100.0,
-            RiskClass::High,
-            [[1.0, 0.0], [0.0, 1.0]],
-        );
-        let good_value = evaluate_evsi(&case, &good).expect("good experiment").net_decision_value;
-        let risky_value = evaluate_evsi(&case, &risky).expect("risky experiment").net_decision_value;
+        let good = experiment("GOOD", 1.0, RiskClass::Low, [[0.9, 0.1], [0.1, 0.9]]);
+        let risky = experiment("RISKY", 100.0, RiskClass::High, [[1.0, 0.0], [0.0, 1.0]]);
+        let good_value = evaluate_evsi(&case, &good)
+            .expect("good experiment")
+            .net_decision_value;
+        let risky_value = evaluate_evsi(&case, &risky)
+            .expect("risky experiment")
+            .net_decision_value;
         let budget = ExperimentBudget {
             max_decision_loss_cost: 2.0,
             max_cost_usd: 200.0,
@@ -1202,17 +1212,14 @@ mod tests {
             ("RISKY".to_string(), risky_value),
         ]);
         let result = select_experiment(&[risky, good], &values, &budget).expect("selection works");
-        assert!(matches!(result, ExperimentSelection::Select { experiment_id, .. } if experiment_id == "GOOD"));
+        assert!(
+            matches!(result, ExperimentSelection::Select { experiment_id, .. } if experiment_id == "GOOD")
+        );
     }
 
     #[test]
     fn zero_net_value_keeps_no_experiment_option() {
-        let item = experiment(
-            "NO-VALUE",
-            1.0,
-            RiskClass::Low,
-            [[0.5, 0.5], [0.5, 0.5]],
-        );
+        let item = experiment("NO-VALUE", 1.0, RiskClass::Low, [[0.5, 0.5], [0.5, 0.5]]);
         let values = BTreeMap::from([("NO-VALUE".to_string(), -1.0)]);
         let budget = ExperimentBudget {
             max_decision_loss_cost: 2.0,
@@ -1222,7 +1229,8 @@ mod tests {
             max_risk_class: RiskClass::Moderate,
             allow_no_experiment: true,
         };
-        let result = select_experiment(&[item], &values, &budget).expect("no experiment is allowed");
+        let result =
+            select_experiment(&[item], &values, &budget).expect("no experiment is allowed");
         assert!(matches!(result, ExperimentSelection::NoExperiment { .. }));
     }
 
@@ -1247,8 +1255,16 @@ mod tests {
         assert!((first.gross_evsi - second.gross_evsi).abs() <= EPSILON);
         assert_eq!(first.baseline_choice, second.baseline_choice);
         assert_eq!(
-            first.outcome_values.iter().map(|item| &item.outcome_id).collect::<Vec<_>>(),
-            second.outcome_values.iter().map(|item| &item.outcome_id).collect::<Vec<_>>()
+            first
+                .outcome_values
+                .iter()
+                .map(|item| &item.outcome_id)
+                .collect::<Vec<_>>(),
+            second
+                .outcome_values
+                .iter()
+                .map(|item| &item.outcome_id)
+                .collect::<Vec<_>>()
         );
     }
 
