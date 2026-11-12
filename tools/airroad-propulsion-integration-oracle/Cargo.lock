@@ -4,7 +4,7 @@ version = 4
 
 [[package]]
 name = "airroad-propulsion-integration-oracle"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "electric-propulsion-map-oracle",
  "electric-propulsion-observation-oracle",
@@ -14,8 +14,8 @@ dependencies = [
 
 [[package]]
 name = "electric-propulsion-map-oracle"
-version = "0.2.0"
-source = "git+https://github.com/Luminous-Dynamics/symthaea?rev=45d6060cc6de03cc2511060b7c9f36a583c00fec#45d6060cc6de03cc2511060b7c9f36a583c00fec"
+version = "0.3.0"
+source = "git+https://github.com/Luminous-Dynamics/symthaea?rev=b99e8cb896cbeec34698cb71e5807b033fb77c07#b99e8cb896cbeec34698cb71e5807b033fb77c07"
 
 [[package]]
 name = "electric-propulsion-observation-oracle"
@@ -24,8 +24,8 @@ source = "git+https://github.com/Luminous-Dynamics/symthaea?rev=d81f5b4f1ee050d6
 
 [[package]]
 name = "electric-rotorcraft-drive-oracle"
-version = "0.5.0"
-source = "git+https://github.com/Luminous-Dynamics/symthaea?rev=745d1776cd17b3af3007a38d80f5022077e4ad12#745d1776cd17b3af3007a38d80f5022077e4ad12"
+version = "0.6.0"
+source = "git+https://github.com/Luminous-Dynamics/symthaea?rev=c8441438f0e00cceeb1e951ea3c4d88a9aaf3b80#c8441438f0e00cceeb1e951ea3c4d88a9aaf3b80"
 
 [[package]]
 name = "electric-thermal-loss-ledger-oracle"
