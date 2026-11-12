@@ -1,0 +1,334 @@
+{
+  "schema_version": "0.1.0",
+  "programme": "PLASMA-SURFACE-001",
+  "generated_date": "2026-11-12",
+  "claim_ceiling": "SOURCE_REGISTER_ONLY_NO_LUMINOUS_REPRODUCTION_NO_PROCESS_RECIPE_NO_DEVICE_QUALIFICATION",
+  "rules": {
+    "contact_angle_is_not_adhesion": false,
+    "immediate_bond_result_establishes_bondability_lifetime": false,
+    "substrate_property_retention_must_be_application_specific": true,
+    "mixed_material_or_adhesive_pairs_are_comparable": false,
+    "different_test_standards_are_poolable": false,
+    "published_laboratory_metrics_are_complete_wall_plug_system_metrics": false,
+    "luminous_reproduction": false
+  },
+  "evidence_classes": [
+    "PUBLISHED_LAB_EXPERIMENT",
+    "PUBLISHED_REVIEW_OR_ROADMAP"
+  ],
+  "cases": [
+    {
+      "case_id": "SURF-THERMOPLASTIC-ARGON-NITROGEN-2026",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Effect of argon and nitrogen plasma surface treatment on wettability and adhesive bond strength of PP, HIPS, PVC, PC and PET",
+        "authors": [
+          "Péter Péczi-Kovács",
+          "Eszter Kókai"
+        ],
+        "publisher": "Discover Mechanical Engineering",
+        "publication_date": "2026-10-20",
+        "doi": "10.1007/s44245-026-00396-4",
+        "url": "https://doi.org/10.1007/s44245-026-00396-4"
+      },
+      "experiment": {
+        "plasma_source": "FARI PM-G13A atmospheric rotating cold plasma",
+        "nominal_power_w": 1000,
+        "measured_discharge_power_w": 529,
+        "measured_discharge_power_uncertainty_w": 1,
+        "gas_conditions": [
+          {
+            "gas": "nitrogen",
+            "purity_fraction": 0.99995,
+            "pressure_reducer_bar": 3.5
+          },
+          {
+            "gas": "argon",
+            "purity_fraction": 0.99996,
+            "pressure_reducer_bar": 3.5
+          }
+        ],
+        "substrate_temperature_c": {
+          "reported_room_temperature": 22,
+          "uncertainty": 1,
+          "substrate_temperature_measured_directly": false
+        },
+        "nozzle_standoff_mm": 5,
+        "treatment_head_speed_mm_per_min_range": [
+          100,
+          2000
+        ],
+        "substrates": [
+          {
+            "family": "PP",
+            "thickness_mm": 5
+          },
+          {
+            "family": "HIPS",
+            "thickness_mm": 4
+          },
+          {
+            "family": "PVC",
+            "thickness_mm": 5
+          },
+          {
+            "family": "PC",
+            "thickness_mm": 5
+          },
+          {
+            "family": "PET-G",
+            "thickness_mm": 5,
+            "source_paper_label": "PET"
+          }
+        ],
+        "surface_measurements": {
+          "water_contact_angle_method": "sessile_drop",
+          "parallel_measurements_per_sample": 3,
+          "timing": "immediately_after_treatment"
+        },
+        "bond_test": {
+          "standard": "ISO 4587:2003",
+          "joint_geometry": "single_lap",
+          "overlap_mm": 12.5,
+          "crosshead_speed_mm_per_s": 10,
+          "specimens_per_treatment_category": 3,
+          "bond_timing": "immediately_after_treatment",
+          "bondline_thickness_measured": false
+        }
+      },
+      "selected_reported_observations": [
+        {
+          "material": "PET-G",
+          "adhesive": "Loctite 4860",
+          "argon_lap_shear_mpa": {
+            "mean": 2.4,
+            "uncertainty": 0.5
+          },
+          "nitrogen_lap_shear_mpa": {
+            "mean": 2,
+            "uncertainty": 0.1
+          },
+          "argon_water_contact_angle_deg": 31,
+          "nitrogen_water_contact_angle_deg": 13,
+          "interpretation": "Argon had higher reported lap-shear strength despite higher water contact angle; exact source test conditions apply."
+        },
+        {
+          "material": "PP",
+          "adhesive": "Soudal Fix All Flexi",
+          "argon_lap_shear_mpa": {
+            "mean": 0.8
+          },
+          "nitrogen_lap_shear_mpa": {
+            "mean": 0.3,
+            "uncertainty": 0.05
+          },
+          "argon_water_contact_angle_deg": 60,
+          "nitrogen_water_contact_angle_deg": 17,
+          "interpretation": "Argon had higher reported lap-shear strength despite higher water contact angle; exact source test conditions apply."
+        },
+        {
+          "material": "HIPS",
+          "adhesive": "Soudal Fix All X-treme Power Express",
+          "argon_lap_shear_mpa": {
+            "mean": 4.9
+          },
+          "nitrogen_lap_shear_mpa": {
+            "mean": 4.9
+          },
+          "argon_water_contact_angle_deg": 25,
+          "nitrogen_water_contact_angle_deg": 0,
+          "interpretation": "Nitrogen achieved lower water contact angle without higher reported lap-shear strength."
+        },
+        {
+          "material": "PVC",
+          "adhesive": "Loctite EA 9466",
+          "nitrogen_lap_shear_mpa": {
+            "mean": 12.8,
+            "uncertainty": 2.3
+          },
+          "untreated_lap_shear_mpa": {
+            "mean": 2.1,
+            "uncertainty": 0.3
+          },
+          "reported_failure_mode": "substrate_failure",
+          "interpretation": "Nitrogen was highly effective for this exact material/adhesive combination; this prevents an argon-superiority generalization."
+        }
+      ],
+      "comparison_status": "SOURCE_SPECIFIC_LAB_RESULTS_NOT_A_LIFETIME_OR_INDUSTRIAL_COMPARISON",
+      "blockers": [
+        "Only three specimens per treatment category were tested.",
+        "Bonding was immediate; no delayed-bonding or bondability-window data were produced.",
+        "Exact bondline thickness was not measured.",
+        "The substrate temperature was not measured directly.",
+        "The reported 529 W is measured discharge power, not a complete grid-to-accepted-bonded-area energy balance.",
+        "Different polymer/adhesive combinations are distinct service profiles and must not be pooled."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "SURF-PE-BARRIER-ARGON-2026",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Argon Cold Plasma Modification of Polyethylene Films to Tailor Surface and Barrier Properties",
+        "authors": [
+          "Aikaterini Spanou",
+          "Chrysi Lagkouvardou",
+          "Petrina Vogiannou",
+          "Vasiliki Korka",
+          "Enrico Maurizzi",
+          "Ioanna Georgia I. Athanasoulia",
+          "Dimitrios Ladakis",
+          "Andrea Pulvirenti",
+          "Efstathios Z. Panagou",
+          "Demetres Briassoulis",
+          "Apostolis Koutinas",
+          "Theofania Tsironi"
+        ],
+        "publisher": "Journal of Applied Polymer Science",
+        "publication_date": "2026-02-07",
+        "doi": "10.1002/app.70533",
+        "url": "https://doi.org/10.1002/app.70533"
+      },
+      "experiment": {
+        "plasma_source": "kINPen IND jet-type atmospheric-pressure argon cold plasma",
+        "substrate_films": [
+          {
+            "material": "LDPE",
+            "thickness_um": 40
+          },
+          {
+            "material": "HDPE",
+            "thickness_um": 20
+          }
+        ],
+        "argon_purity_fraction": 0.99998,
+        "gas_flow_l_per_min": 4,
+        "sample_to_nozzle_distance_mm": 10,
+        "nominal_plasma_power_w_range": [
+          0.3,
+          3.5
+        ],
+        "reported_entire_system_power_w": 20,
+        "measured_surface_temperature_c": 35,
+        "outcomes_measured": [
+          "water_contact_angle",
+          "surface_free_energy",
+          "surface_morphology",
+          "surface_chemical_composition",
+          "water_vapour_permeability",
+          "oxygen_permeability",
+          "aging_and_hydrophobic_recovery"
+        ]
+      },
+      "selected_reported_observations": [
+        {
+          "metric": "water_vapour_permeability_increase",
+          "value": 60,
+          "unit": "percent",
+          "qualifier": "up to; source-specific treatment conditions"
+        },
+        {
+          "metric": "oxygen_permeability_increase",
+          "value": 45,
+          "unit": "percent",
+          "qualifier": "up to; source-specific treatment conditions"
+        },
+        {
+          "metric": "water_contact_angle",
+          "value": "approximately_halved",
+          "qualifier": "reported abstract-level summary; exact material/treatment condition must be extracted before matched reuse"
+        }
+      ],
+      "comparison_status": "SOURCE_SPECIFIC_LAB_RESULTS_WITH_APPLICATION_PROPERTY_TRADEOFF",
+      "blockers": [
+        "This source evaluates polyethylene surface and barrier properties, not a matched structural bond-strength benchmark.",
+        "Barrier-property changes are specific to the studied films and treatment conditions; they are not universal plasma damage factors.",
+        "A packaging use case must preserve its required permeability and shelf-life specifications while improving adhesion.",
+        "The reported nominal plasma power and total-system power are source-specific; Luminous system boundaries require independent reconstruction."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "SURF-ADHESION-AGING-REVIEW-2024",
+      "evidence_class": "PUBLISHED_REVIEW_OR_ROADMAP",
+      "source": {
+        "title": "Surface Modification of Polymers by Plasma Treatment for Appropriate Adhesion of Coatings",
+        "authors": [
+          "Marko Primc",
+          "Aleksander Mozetič"
+        ],
+        "publisher": "Materials",
+        "publication_date": "2024-04-01",
+        "doi": "10.3390/ma17071494",
+        "url": "https://doi.org/10.3390/ma17071494"
+      },
+      "reported_findings": [
+        "Wettability and adhesion do not have a universal monotonic relationship.",
+        "Hydrophobic recovery can alter surface properties after treatment.",
+        "Weakly bonded low-molecular-weight interlayers can affect adhesion."
+      ],
+      "comparison_status": "REVIEW_CONTEXT_NOT_A_PRIMARY_DEVICE_BENCHMARK",
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "SURF-PLASMA-SCALEUP-ROADMAP-2026",
+      "evidence_class": "PUBLISHED_REVIEW_OR_ROADMAP",
+      "source": {
+        "title": "Large-Scale Applications of Plasma Technologies: Progresses and Challenges",
+        "publisher": "High Voltage",
+        "publication_date": "2026-09-30",
+        "doi": "10.1049/hve2.70241",
+        "url": "https://doi.org/10.1049/hve2.70241"
+      },
+      "reported_findings": [
+        "Process controllability during scale-up is a major translation challenge.",
+        "Source-to-useful-outcome energy efficiency and lifecycle accounting matter beyond plasma-to-chemistry efficiency.",
+        "Long-term reliability and harmonized application-relevant diagnostics are needed for industrial translation."
+      ],
+      "comparison_status": "REVIEW_ROADMAP_NOT_A_PRIMARY_DEVICE_BENCHMARK",
+      "luminous_reproduction": false
+    }
+  ],
+  "negative_controls": [
+    {
+      "control_id": "SURF-NC-001",
+      "claim": "lowest contact angle means highest bond strength",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "SURF-NC-002",
+      "claim": "three immediate-bond specimens establish production reliability or bondability lifetime",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "SURF-NC-003",
+      "claim": "PET and PET-G are interchangeable without grade identity",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "SURF-NC-004",
+      "claim": "polymer/adhesive pairs can be pooled into one gas leaderboard",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "SURF-NC-005",
+      "claim": "discharge power is the complete grid-to-service energy boundary",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "SURF-NC-006",
+      "claim": "improved polyethylene wettability can be scored without checking barrier retention",
+      "expected_disposition": "BLOCKED"
+    },
+    {
+      "control_id": "SURF-NC-007",
+      "claim": "reported barrier-property changes are universal across polyethylene grades and plasma configurations",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "SURF-NC-008",
+      "claim": "an immediate-bond ISO 4587 result can be pooled with another test standard or joint geometry",
+      "expected_disposition": "REJECTED"
+    }
+  ]
+}
