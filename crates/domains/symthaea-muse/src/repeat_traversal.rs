@@ -500,7 +500,7 @@ mod tests {
         for index in 0..4 {
             let mut barlines = String::new();
             for (measure_index, location, repeat) in repeat_events {
-                if *measure_index == index.to_string() {
+                if measure_index.parse::<usize>().ok() == Some(index) {
                     barlines.push_str(&format!(
                         r#"<barline location="{location}">{repeat}</barline>"#
                     ));
@@ -643,9 +643,12 @@ mod tests {
     #[test]
     fn zero_and_malformed_repeat_counts_are_rejected() {
         for value in ["0", "invalid"] {
+            let repeat_markup = format!(
+                r#"<repeat direction="backward" times="{value}"/>"#
+            );
             let graph = graph_with_repeats(&[
                 ("0", "left", r#"<repeat direction="forward"/>"#),
-                ("1", "right", &format!(r#"<repeat direction="backward" times="{value}"/>"#)),
+                ("1", "right", &repeat_markup),
             ]);
             assert!(matches!(
                 derive_playback_traversal(&graph, &RepeatTraversalConfigV1::default()),
