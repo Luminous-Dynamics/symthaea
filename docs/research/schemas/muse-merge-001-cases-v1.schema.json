@@ -66,7 +66,12 @@
         "time_domain",
         "authorization",
         "artifact_integrity",
-        "description"
+        "description",
+        "musical_dependencies",
+        "intent_mode",
+        "hard_constraints_satisfied",
+        "unknown_dependencies",
+        "requires_revalidation"
       ],
       "properties": {
         "operation": {
@@ -113,6 +118,29 @@
         "description": {
           "type": "string",
           "minLength": 1
+        },
+        "musical_dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "intent_mode": {
+          "enum": [
+            "direct",
+            "alternative"
+          ]
+        },
+        "hard_constraints_satisfied": {
+          "type": "boolean"
+        },
+        "unknown_dependencies": {
+          "type": "boolean"
+        },
+        "requires_revalidation": {
+          "type": "boolean"
         }
       }
     },
@@ -128,7 +156,10 @@
         "expected_outcome",
         "reason",
         "requires_human_decision",
-        "requires_render_revalidation"
+        "requires_render_revalidation",
+        "base_matches",
+        "commit_state",
+        "revalidation_available"
       ],
       "properties": {
         "id": {
@@ -168,6 +199,19 @@
           "type": "boolean"
         },
         "requires_render_revalidation": {
+          "type": "boolean"
+        },
+        "base_matches": {
+          "type": "boolean"
+        },
+        "commit_state": {
+          "enum": [
+            "Prepared",
+            "AlreadyCommittedSameKey",
+            "AcknowledgementLost"
+          ]
+        },
+        "revalidation_available": {
           "type": "boolean"
         }
       }
