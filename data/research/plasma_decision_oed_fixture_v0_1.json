@@ -114,6 +114,19 @@
       "admissible": false,
       "quantity": "unapproved_chemistry_signal",
       "unit": "a.u."
+    },
+    {
+      "action_id": "MOISTURE_CONTENT",
+      "fidelity": "F1",
+      "quantity": "moisture_content",
+      "unit": "wt_pct",
+      "cost_units": 2,
+      "latency_hours": 6,
+      "specimens": 1,
+      "provides": [
+        "substrate_moisture_state"
+      ],
+      "admissible": true
     }
   ],
   "scenarios": [
@@ -131,7 +144,9 @@
         "acceptable_failure_modes": [
           "cohesive",
           "mixed"
-        ]
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
       },
       "budget": {
         "max_cost_units": 8,
@@ -226,7 +241,8 @@
       "expected": {
         "audit_disposition": "BLOCKED",
         "product_decision": "ABSTAIN"
-      }
+      },
+      "substrate_condition": null
     },
     {
       "scenario_id": "contact-angle-trap-reject",
@@ -242,7 +258,9 @@
         "acceptable_failure_modes": [
           "cohesive",
           "mixed"
-        ]
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
       },
       "budget": {
         "max_cost_units": 30,
@@ -343,7 +361,8 @@
       "expected": {
         "audit_disposition": "PASS",
         "product_decision": "REJECT_WINDOW"
-      }
+      },
+      "substrate_condition": null
     },
     {
       "scenario_id": "aging-reversal-reject",
@@ -359,7 +378,9 @@
         "acceptable_failure_modes": [
           "cohesive",
           "mixed"
-        ]
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
       },
       "budget": {
         "max_cost_units": 30,
@@ -460,7 +481,8 @@
       "expected": {
         "audit_disposition": "PASS",
         "product_decision": "REJECT_WINDOW"
-      }
+      },
+      "substrate_condition": null
     },
     {
       "scenario_id": "packaging-barrier-tradeoff-reject",
@@ -476,7 +498,9 @@
         "acceptable_failure_modes": [
           "cohesive",
           "mixed"
-        ]
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
       },
       "budget": {
         "max_cost_units": 60,
@@ -650,7 +674,8 @@
       "expected": {
         "audit_disposition": "PASS",
         "product_decision": "REJECT_WINDOW"
-      }
+      },
+      "substrate_condition": null
     },
     {
       "scenario_id": "durable-multifidelity-accept-synthetic",
@@ -666,7 +691,9 @@
         "acceptable_failure_modes": [
           "cohesive",
           "mixed"
-        ]
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
       },
       "budget": {
         "max_cost_units": 40,
@@ -797,7 +824,8 @@
       "expected": {
         "audit_disposition": "PASS",
         "product_decision": "ACCEPT_WINDOW"
-      }
+      },
+      "substrate_condition": null
     },
     {
       "scenario_id": "unmodelled-shared-preparation-abstain",
@@ -813,7 +841,9 @@
         "acceptable_failure_modes": [
           "cohesive",
           "mixed"
-        ]
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
       },
       "budget": {
         "max_cost_units": 40,
@@ -932,7 +962,8 @@
       "expected": {
         "audit_disposition": "BLOCKED",
         "product_decision": "ABSTAIN"
-      }
+      },
+      "substrate_condition": null
     },
     {
       "scenario_id": "training-group-overlap-blocked",
@@ -948,7 +979,9 @@
         "acceptable_failure_modes": [
           "cohesive",
           "mixed"
-        ]
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
       },
       "budget": {
         "max_cost_units": 40,
@@ -1077,7 +1110,8 @@
       "expected": {
         "audit_disposition": "REJECTED",
         "product_decision": "ABSTAIN"
-      }
+      },
+      "substrate_condition": null
     },
     {
       "scenario_id": "over-budget-proposal-rejected",
@@ -1093,7 +1127,9 @@
         "acceptable_failure_modes": [
           "cohesive",
           "mixed"
-        ]
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
       },
       "budget": {
         "max_cost_units": 10,
@@ -1142,7 +1178,8 @@
       "expected": {
         "audit_disposition": "REJECTED",
         "product_decision": "ABSTAIN"
-      }
+      },
+      "substrate_condition": null
     },
     {
       "scenario_id": "inadmissible-action-abstain",
@@ -1158,7 +1195,9 @@
         "acceptable_failure_modes": [
           "cohesive",
           "mixed"
-        ]
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
       },
       "budget": {
         "max_cost_units": 40,
@@ -1307,7 +1346,8 @@
       "expected": {
         "audit_disposition": "REJECTED",
         "product_decision": "ABSTAIN"
-      }
+      },
+      "substrate_condition": null
     },
     {
       "scenario_id": "model-family-inadequate-abstain",
@@ -1323,7 +1363,9 @@
         "acceptable_failure_modes": [
           "cohesive",
           "mixed"
-        ]
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
       },
       "budget": {
         "max_cost_units": 40,
@@ -1454,6 +1496,335 @@
       "expected": {
         "audit_disposition": "BLOCKED",
         "product_decision": "ABSTAIN"
+      },
+      "substrate_condition": null
+    },
+    {
+      "scenario_id": "pa6-missing-moisture-state-abstain",
+      "profile": {
+        "profile_id": "PA6_PUR_ADHESIVE_A",
+        "material_family": "PA6",
+        "requires_barrier_preservation": false,
+        "requires_moisture_measurement": true,
+        "maximum_moisture_measurement_age_hours": 12,
+        "min_bond_strength_mpa": 5,
+        "min_aged_bond_strength_mpa": 4.5,
+        "min_retention": 0.85,
+        "max_wvtr_ratio": null,
+        "max_otr_ratio": null,
+        "acceptable_failure_modes": [
+          "cohesive",
+          "mixed"
+        ]
+      },
+      "budget": {
+        "max_cost_units": 50,
+        "max_latency_hours": 480,
+        "max_specimens": 35
+      },
+      "selection_receipt": {
+        "receipt_id": "synthetic-pa6-selection-pa6-missing-moisture-state-abstain",
+        "owner": "UAP-OED-001",
+        "method": "SYNTHETIC_ADVISORY_SELECTION",
+        "objective": "ROBUST_DECISION_EVIDENCE",
+        "selected_action_ids": [
+          "WCA_SCREEN",
+          "FTIR_CHEMISTRY",
+          "MOISTURE_CONTENT",
+          "LAP_SHEAR",
+          "AGED_LAP_SHEAR"
+        ],
+        "training_group_manifest": {
+          "manifest_id": "synthetic-pa6-training-groups-v1",
+          "training_lots": [
+            "TRAIN-PA6-01",
+            "TRAIN-PA6-02"
+          ],
+          "training_devices": [
+            "TRAIN-PA6-HEAD-01"
+          ],
+          "training_days": [
+            "2026-11-01",
+            "2026-11-02"
+          ]
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-pa6-adequacy-pa6-missing-moisture-state-abstain",
+        "other_model_registered": true
+      },
+      "measurements": [
+        {
+          "measurement_id": "pa6-missing-moisture-state-abstain-wca_screen",
+          "action_id": "WCA_SCREEN",
+          "specimen_id": "pa6-missing-moisture-state-abstain-spec-1",
+          "lot_id": "HOLDOUT-PA6-pa6-missing-moisture-state-abstain",
+          "device_id": "PA6-HEAD-pa6-missing-moisture-state-abstain",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pa6-missing-moisture-state-abstain",
+          "independence_group": "wet-pa6-missing-moisture-state-abstain",
+          "covariance_model_id": null,
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-cal-pa6-missing-moisture-state-abstain-WCA_SCREEN",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-wca_screen"
+        },
+        {
+          "measurement_id": "pa6-missing-moisture-state-abstain-ftir_chemistry",
+          "action_id": "FTIR_CHEMISTRY",
+          "specimen_id": "pa6-missing-moisture-state-abstain-spec-2",
+          "lot_id": "HOLDOUT-PA6-pa6-missing-moisture-state-abstain",
+          "device_id": "PA6-HEAD-pa6-missing-moisture-state-abstain",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pa6-missing-moisture-state-abstain",
+          "independence_group": "chem-pa6-missing-moisture-state-abstain",
+          "covariance_model_id": null,
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-cal-pa6-missing-moisture-state-abstain-FTIR_CHEMISTRY",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-ftir_chemistry"
+        },
+        {
+          "measurement_id": "pa6-missing-moisture-state-abstain-moisture_content",
+          "action_id": "MOISTURE_CONTENT",
+          "specimen_id": "pa6-missing-moisture-state-abstain-spec-3",
+          "lot_id": "HOLDOUT-PA6-pa6-missing-moisture-state-abstain",
+          "device_id": "PA6-HEAD-pa6-missing-moisture-state-abstain",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "moisture-pa6-missing-moisture-state-abstain",
+          "independence_group": "moisture-pa6-missing-moisture-state-abstain",
+          "covariance_model_id": null,
+          "quantity": "moisture_content",
+          "unit": "wt_pct",
+          "calibration_record_id": "synthetic-cal-pa6-missing-moisture-state-abstain-MOISTURE_CONTENT",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-moisture_content"
+        },
+        {
+          "measurement_id": "pa6-missing-moisture-state-abstain-lap_shear",
+          "action_id": "LAP_SHEAR",
+          "specimen_id": "pa6-missing-moisture-state-abstain-spec-4",
+          "lot_id": "HOLDOUT-PA6-pa6-missing-moisture-state-abstain",
+          "device_id": "PA6-HEAD-pa6-missing-moisture-state-abstain",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "bond-pa6-missing-moisture-state-abstain",
+          "independence_group": "bond-pa6-missing-moisture-state-abstain",
+          "covariance_model_id": null,
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-cal-pa6-missing-moisture-state-abstain-LAP_SHEAR",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-lap_shear"
+        },
+        {
+          "measurement_id": "pa6-missing-moisture-state-abstain-aged_lap_shear",
+          "action_id": "AGED_LAP_SHEAR",
+          "specimen_id": "pa6-missing-moisture-state-abstain-spec-5",
+          "lot_id": "HOLDOUT-PA6-pa6-missing-moisture-state-abstain",
+          "device_id": "PA6-HEAD-pa6-missing-moisture-state-abstain",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "aging-pa6-missing-moisture-state-abstain",
+          "independence_group": "aging-pa6-missing-moisture-state-abstain",
+          "covariance_model_id": null,
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-cal-pa6-missing-moisture-state-abstain-AGED_LAP_SHEAR",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-aged_lap_shear"
+        }
+      ],
+      "covariance_models": [],
+      "outcomes": {
+        "wca_deg": 15,
+        "bond_strength_mpa": 6,
+        "aged_bond_strength_mpa": 5.5,
+        "bond_retention": 0.9166666666666666,
+        "failure_mode": "cohesive",
+        "wvtr_ratio": null,
+        "otr_ratio": null,
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "expected": {
+        "audit_disposition": "BLOCKED",
+        "product_decision": "ABSTAIN"
+      },
+      "substrate_condition": null
+    },
+    {
+      "scenario_id": "pa6-saturated-state-low-wca-reject",
+      "profile": {
+        "profile_id": "PA6_PUR_ADHESIVE_A",
+        "material_family": "PA6",
+        "requires_barrier_preservation": false,
+        "requires_moisture_measurement": true,
+        "maximum_moisture_measurement_age_hours": 12,
+        "min_bond_strength_mpa": 5,
+        "min_aged_bond_strength_mpa": 4.5,
+        "min_retention": 0.85,
+        "max_wvtr_ratio": null,
+        "max_otr_ratio": null,
+        "acceptable_failure_modes": [
+          "cohesive",
+          "mixed"
+        ]
+      },
+      "budget": {
+        "max_cost_units": 50,
+        "max_latency_hours": 480,
+        "max_specimens": 35
+      },
+      "selection_receipt": {
+        "receipt_id": "synthetic-pa6-selection-pa6-saturated-state-low-wca-reject",
+        "owner": "UAP-OED-001",
+        "method": "SYNTHETIC_ADVISORY_SELECTION",
+        "objective": "ROBUST_DECISION_EVIDENCE",
+        "selected_action_ids": [
+          "WCA_SCREEN",
+          "FTIR_CHEMISTRY",
+          "MOISTURE_CONTENT",
+          "LAP_SHEAR",
+          "AGED_LAP_SHEAR"
+        ],
+        "training_group_manifest": {
+          "manifest_id": "synthetic-pa6-training-groups-v1",
+          "training_lots": [
+            "TRAIN-PA6-01",
+            "TRAIN-PA6-02"
+          ],
+          "training_devices": [
+            "TRAIN-PA6-HEAD-01"
+          ],
+          "training_days": [
+            "2026-11-01",
+            "2026-11-02"
+          ]
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-pa6-adequacy-pa6-saturated-state-low-wca-reject",
+        "other_model_registered": true
+      },
+      "measurements": [
+        {
+          "measurement_id": "pa6-saturated-state-low-wca-reject-wca_screen",
+          "action_id": "WCA_SCREEN",
+          "specimen_id": "pa6-saturated-state-low-wca-reject-spec-1",
+          "lot_id": "HOLDOUT-PA6-pa6-saturated-state-low-wca-reject",
+          "device_id": "PA6-HEAD-pa6-saturated-state-low-wca-reject",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pa6-saturated-state-low-wca-reject",
+          "independence_group": "wet-pa6-saturated-state-low-wca-reject",
+          "covariance_model_id": null,
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-WCA_SCREEN",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-wca_screen"
+        },
+        {
+          "measurement_id": "pa6-saturated-state-low-wca-reject-ftir_chemistry",
+          "action_id": "FTIR_CHEMISTRY",
+          "specimen_id": "pa6-saturated-state-low-wca-reject-spec-2",
+          "lot_id": "HOLDOUT-PA6-pa6-saturated-state-low-wca-reject",
+          "device_id": "PA6-HEAD-pa6-saturated-state-low-wca-reject",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pa6-saturated-state-low-wca-reject",
+          "independence_group": "chem-pa6-saturated-state-low-wca-reject",
+          "covariance_model_id": null,
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-FTIR_CHEMISTRY",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-ftir_chemistry"
+        },
+        {
+          "measurement_id": "pa6-saturated-state-low-wca-reject-moisture_content",
+          "action_id": "MOISTURE_CONTENT",
+          "specimen_id": "pa6-saturated-state-low-wca-reject-spec-3",
+          "lot_id": "HOLDOUT-PA6-pa6-saturated-state-low-wca-reject",
+          "device_id": "PA6-HEAD-pa6-saturated-state-low-wca-reject",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "moisture-pa6-saturated-state-low-wca-reject",
+          "independence_group": "moisture-pa6-saturated-state-low-wca-reject",
+          "covariance_model_id": null,
+          "quantity": "moisture_content",
+          "unit": "wt_pct",
+          "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-MOISTURE_CONTENT",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-moisture_content"
+        },
+        {
+          "measurement_id": "pa6-saturated-state-low-wca-reject-lap_shear",
+          "action_id": "LAP_SHEAR",
+          "specimen_id": "pa6-saturated-state-low-wca-reject-spec-4",
+          "lot_id": "HOLDOUT-PA6-pa6-saturated-state-low-wca-reject",
+          "device_id": "PA6-HEAD-pa6-saturated-state-low-wca-reject",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "bond-pa6-saturated-state-low-wca-reject",
+          "independence_group": "bond-pa6-saturated-state-low-wca-reject",
+          "covariance_model_id": null,
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-LAP_SHEAR",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-lap_shear"
+        },
+        {
+          "measurement_id": "pa6-saturated-state-low-wca-reject-aged_lap_shear",
+          "action_id": "AGED_LAP_SHEAR",
+          "specimen_id": "pa6-saturated-state-low-wca-reject-spec-5",
+          "lot_id": "HOLDOUT-PA6-pa6-saturated-state-low-wca-reject",
+          "device_id": "PA6-HEAD-pa6-saturated-state-low-wca-reject",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "aging-pa6-saturated-state-low-wca-reject",
+          "independence_group": "aging-pa6-saturated-state-low-wca-reject",
+          "covariance_model_id": null,
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-AGED_LAP_SHEAR",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-aged_lap_shear"
+        }
+      ],
+      "covariance_models": [],
+      "outcomes": {
+        "wca_deg": 15,
+        "bond_strength_mpa": 4.2,
+        "aged_bond_strength_mpa": 3.4,
+        "bond_retention": 0.8095238095238094,
+        "failure_mode": "interfacial",
+        "wvtr_ratio": null,
+        "otr_ratio": null,
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "expected": {
+        "audit_disposition": "PASS",
+        "product_decision": "REJECT_WINDOW"
+      },
+      "substrate_condition": {
+        "condition_id": "synthetic-condition-pa6-saturated-state-low-wca-reject",
+        "conditioning_protocol_id": "SYNTHETIC_PA6_MOISTURE_CONDITIONING_V1",
+        "moisture_content_wt_pct": 3,
+        "moisture_measurement_method": "GRAVIMETRIC",
+        "moisture_measurement_receipt_id": "synthetic-moisture-receipt-pa6-saturated-state-low-wca-reject",
+        "moisture_calibration_record_id": "synthetic-moisture-calibration-pa6-saturated-state-low-wca-reject",
+        "measured_at_unix_ms": 1794524400000,
+        "plasma_run_at_unix_ms": 1794528000000,
+        "conditioning_temperature_c": 23,
+        "conditioning_relative_humidity_pct": 50,
+        "condition_evidence_digest": "sha256:synthetic-pa6-condition-pa6-saturated-state-low-wca-reject"
       }
     }
   ]
