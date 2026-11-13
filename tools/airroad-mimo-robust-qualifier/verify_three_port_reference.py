@@ -238,7 +238,7 @@ def main() -> None:
     assert exact_margin == 1
 
     margin_cases = {case["id"]: case for case in margin["cases"]}
-    for case_id, expected_disposition in (
+    for case_id, expected_case in (
         ("half-margin", "ROBUSTLY_STABLE"),
         ("at-margin", "NOT_ESTABLISHED_MARGINAL_BOUNDARY"),
         ("beyond-margin", "NOT_ESTABLISHED_WITH_DESTABILIZATION_WITNESS"),
@@ -249,7 +249,7 @@ def main() -> None:
         gamma_max = gamma_nominal + scale_value * radius * delta_upper
         assert gamma_min == q(case["gamma_lower"])
         assert gamma_max == q(case["gamma_upper"])
-        assert case["expected"] == expected_disposition
+        assert case["expected"] == expected_case
         if case_id == "half-margin":
             assert gamma_max < boundary
             assert Fraction(1) - 8 * gamma_max > 0
