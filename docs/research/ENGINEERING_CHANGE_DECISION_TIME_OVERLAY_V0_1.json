@@ -196,5 +196,27 @@
     "A server receipt proves canonical record commitment under its trust model, not source truth or model visibility.",
     "Temporal admissibility does not establish engineering safety, compliance, professional approval or release authority.",
     "No new temporal ledger, evidence graph, event log, receipt schema, validator or decision authority is introduced."
-  ]
+  ],
+  "gold_record_compatibility": {
+    "inspected_contract": "https://github.com/Luminous-Dynamics/symthaea/blob/research/eng-design-change-qual-gold-protocol-v0-1/benchmarks/engineering-change-impact/gold-record.schema.json",
+    "current_root_additional_properties": false,
+    "structured_temporal_admissibility_fields": false,
+    "notes_field_machine_readable": false,
+    "temporal_gold_adjudication_ready": false,
+    "prerequisite": "Approve a versioned optional nested temporal-evidence extension or an independently validated content-addressed companion record bound to the existing gold record.",
+    "required_semantics": [
+      "target_time_T",
+      "decision_frontier_K",
+      "source_version_identity",
+      "publication_or_release_evidence",
+      "receipt_and_acquisition_evidence",
+      "derived_materialization_evidence",
+      "actual_run_context_inclusion_if_claimed",
+      "rights_profile_and_time",
+      "clock_precision_and_uncertainty",
+      "explicit_unknown_states"
+    ],
+    "preserve_existing_dispositions": true,
+    "do_not_use_notes_as_structured_temporal_record": true
+  }
 }
