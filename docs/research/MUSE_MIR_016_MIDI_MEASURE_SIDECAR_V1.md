@@ -32,10 +32,11 @@ The JSON envelope contains:
 - `ticks_per_quarter` required to match the MIDI header's Metrical timing division;
 - caller-bound `score_clock_id`;
 - one or more part records;
-- each part's unique `part_id`, source MIDI `source_track_index`, and ordered measure spans;
+- each part's unique `part_id`, source MIDI `source_track_index`, optional source `channel` (0–15), and ordered measure spans;
+- `source_channel: null` means the entire track is intentionally one composite part; a channel number maps only that MIDI channel. Multiple sidecar parts may share a track when they use distinct explicit channels.
 - every measure's `start_tick`, exclusive `end_tick`, `MeasureKind`, optional source number/ID/display text, `implicit` flag and `non_controlling` flag.
 
-V1 maps one sidecar part to one source MIDI track. Every note-bearing source track must have an explicit map; empty conductor/metadata tracks may be omitted. MIDI format-0 files therefore use their single track as one part for this contract. Multiple tracks retain independent measure lattices while sharing the supplied score-clock identity.
+V1 maps one sidecar part to one source MIDI track. Every note-bearing source track must have an explicit map; empty conductor/metadata tracks may be omitted. MIDI format-0 files may map the combined track as one composite part, or split it into multiple channel-specific part maps. This preserves distinct channels when the source file combines instruments in one track. Format-1 tracks share the file's score-clock identity and may have independent measure lattices. Format-2 files contain independent sequential patterns and are rejected by V1 rather than incorrectly assigning them one shared score clock.
 
 ## Exact normalization
 
@@ -57,14 +58,14 @@ Sidecar validation checks:
 - supported schema version;
 - one or more parts, unique part IDs and unique source track indices;
 - source track indices in range;
-- every note-bearing track represented by the sidecar (empty conductor/metadata tracks may be omitted);
+- every note-bearing channel represented exactly once by a channel-specific map or a whole-track composite map (empty conductor/metadata tracks may be omitted);
 - non-empty, ordered measure lists;
 - first measure starts at tick zero;
 - all spans have positive length and are exactly contiguous;
 - ticks fit the checked rational arithmetic domain;
 - no gaps, overlaps, reversed measures or zero-length measures.
 
-The resulting per-part `MeasureMap` has canonicalization version `midi-explicit-ppq-ticks-to-rational-quarter-beats-v1`. Original tick coordinates and source measure locators remain available beside the normalized spans.
+The resulting per-part `MeasureMap` has canonicalization version `midi-explicit-ppq-ticks-to-rational-quarter-beats-v1`. Source identity includes track and channel scope. Original tick coordinates and source measure locators remain available beside the normalized spans.
 
 ## Provenance and replay
 
