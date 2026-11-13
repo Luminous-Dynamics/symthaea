@@ -14,5 +14,7 @@ go vet ./...
 tmp_binary="$(mktemp)"
 trap 'rm -f "$tmp_binary"' EXIT
 go build -o "$tmp_binary" ./cmd/mace-evalqual
+go build -o "${tmp_binary}.observerlab" ./cmd/mace-observerlab
 "$tmp_binary" validate -corpus fixtures/corpus.json -manifest fixtures/manifest.json
 "$tmp_binary" score -corpus fixtures/corpus.json -manifest fixtures/manifest.json -observations fixtures/observations.json > /dev/null
+"${tmp_binary}.observerlab" > /dev/null
