@@ -1481,7 +1481,7 @@ mod tests {
             let observation = candidate.metrics.iter_mut()
                 .find(|metric| metric.metric_id == "availability")
                 .unwrap();
-            observation.value = if candidate.candidate_id == "A" { 0.99 } else { 0.95 };
+            observation.value = if candidate.candidate_id == "A" { 0.99 } else { 0.96 };
             observation.expanded_uncertainty = 0.001;
         }
         let report = audit(&input);
