@@ -1229,13 +1229,10 @@ mod tests {
     fn acceptance_from_same_issuer_is_not_independent() {
         let mut bundle = empty_bundle();
         bundle.condition = Some(condition(ProductCondition::Wearable, UseSafetyStatus::Passed));
-        bundle.downstream_acceptance = Some(evidence(
-            "ACCEPT-SELF",
-            EvidenceKind::DownstreamAcceptance,
-            EvidenceTier::IndependentAcceptance,
-            "receiving-mill",
-            Some("receiving-mill"),
-        ));
+        let mut accepted = acceptance();
+        accepted.evidence.evidence_id = "ACCEPT-SELF".to_owned();
+        accepted.evidence.verifier_id = Some(accepted.evidence.issuer_id.clone());
+        bundle.downstream_acceptance = Some(accepted);
         let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &policy());
         assert_eq!(result.disposition, RouteDisposition::Ineligible);
         assert!(result.reasons.contains(&RouteReason::InvalidDownstreamAcceptance));
