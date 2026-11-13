@@ -4,6 +4,7 @@ set -Eeuo pipefail
 TOOLCHAIN="${1:-1.100.0}"
 EXPECTED="${2:-1.100.0}"
 ROOT="$(git rev-parse --show-toplevel)"
+export CARGO_TERM_COLOR=never
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
@@ -63,10 +64,12 @@ EOF
   cat "$LOG"
 
   direct_count="$(grep -Eic 'warning: unused dependency `' "$LOG" || true)"
+  # Cargo's workspace-lint diagnostics are repeated for each selected package;
+  # collect unique workspace dependency names after both runs rather than sum
+  # the duplicate warnings.
   workspace_count="$(grep -Eic 'warning: unused workspace dependency `' "$LOG" || true)"
   TOTAL_DIRECT_WARNINGS=$((TOTAL_DIRECT_WARNINGS + direct_count))
-  TOTAL_WORKSPACE_WARNINGS=$((TOTAL_WORKSPACE_WARNINGS + workspace_count))
-  printf 'package=%s exit=%s unused_package_dependencies=%s unused_workspace_dependencies=%s\n' \
+  printf 'package=%s exit=%s unused_package_dependencies=%s raw_workspace_warnings=%s\n' \
     "$package" "$status" "$direct_count" "$workspace_count"
 
   if [[ $status -ne 0 ]]; then
@@ -74,6 +77,13 @@ EOF
     OVERALL_STATUS=1
   fi
 done
+
+grep -hE 'warning: unused workspace dependency `' "$WORK"/*-unused-dependencies.log \
+  | sed -E 's/.*`([^\`]+)`.*/\1/' \
+  | sort -u > "$WORK/unused-workspace-dependencies.txt" || true
+TOTAL_WORKSPACE_WARNINGS="$(wc -l < "$WORK/unused-workspace-dependencies.txt" | tr -d ' ')"
+echo "unused_workspace_dependency_names:"
+cat "$WORK/unused-workspace-dependencies.txt"
 
 AFTER="$(sha256sum "$WORK/Cargo.lock" | awk '{print $1}')"
 [[ "$BEFORE" == "$AFTER" ]] || {
