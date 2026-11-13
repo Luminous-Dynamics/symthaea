@@ -367,7 +367,7 @@ fn scorecard_from_counts(counts: &PartCounts) -> MusicXmlNotationPartScorecardV1
 }
 
 fn event_family(event: &crate::musicxml_notation_events::MusicXmlNotationEventV1) -> EventFamily {
-    match event.kind {
+    match &event.kind {
         MusicXmlNotationEventKindV1::Pitched(_) => EventFamily::Pitched,
         MusicXmlNotationEventKindV1::Rest { .. } => EventFamily::Rest,
         MusicXmlNotationEventKindV1::Unpitched { .. } => EventFamily::Unpitched,
@@ -399,13 +399,13 @@ fn validate_part_graph(
     graph: &MusicXmlPartNotationGraphV1,
 ) -> Result<(), MusicXmlNotationEvaluationErrorV1> {
     let part_id = &graph.part_id;
-    if !matches!(graph.map.status, MeasureMapStatus::Supported) {
+    if !matches!(&graph.map.status, MeasureMapStatus::Supported) {
         return Err(MusicXmlNotationEvaluationErrorV1::UnsupportedMeasureMap {
             part_id: part_id.clone(),
         });
     }
     if !matches!(
-        graph.notation_events.status,
+        &graph.notation_events.status,
         MusicXmlNotationEventsStatusV1::Supported
     ) {
         return Err(MusicXmlNotationEvaluationErrorV1::UnknownNotationEvents {
@@ -661,18 +661,6 @@ fn cursor_positions(
         .collect()
 }
 
-fn exact_option_duration(
-    gold: Option<RationalBeat>,
-    prediction: Option<RationalBeat>,
-    tolerance: RationalBeat,
-) -> Result<bool, MusicXmlNotationEvaluationErrorV1> {
-    match (gold, prediction) {
-        (Some(gold), Some(prediction)) => within_tolerance(gold, prediction, tolerance),
-        (None, None) => Ok(true),
-        _ => Ok(false),
-    }
-}
-
 fn evaluate_part(
     gold: &MusicXmlPartNotationEventsV1,
     prediction: &MusicXmlPartNotationEventsV1,
@@ -689,7 +677,7 @@ fn evaluate_part(
 
     let gold_pitched: Vec<_> = gold_notes
         .iter()
-        .filter(|event| matches!(event.kind, MusicXmlNotationEventKindV1::Pitched(_)))
+        .filter(|event| matches!(&event.kind, MusicXmlNotationEventKindV1::Pitched(_)))
         .collect();
     let prediction_pitched: Vec<_> = prediction_notes
         .iter()
@@ -697,7 +685,7 @@ fn evaluate_part(
         .collect();
     let gold_rests: Vec<_> = gold_notes
         .iter()
-        .filter(|event| matches!(event.kind, MusicXmlNotationEventKindV1::Rest { .. }))
+        .filter(|event| matches!(&event.kind, MusicXmlNotationEventKindV1::Rest { .. }))
         .collect();
     let prediction_rests: Vec<_> = prediction_notes
         .iter()
@@ -705,7 +693,7 @@ fn evaluate_part(
         .collect();
     let gold_unpitched: Vec<_> = gold_notes
         .iter()
-        .filter(|event| matches!(event.kind, MusicXmlNotationEventKindV1::Unpitched { .. }))
+        .filter(|event| matches!(&event.kind, MusicXmlNotationEventKindV1::Unpitched { .. }))
         .collect();
     let prediction_unpitched: Vec<_> = prediction_notes
         .iter()
@@ -751,8 +739,8 @@ fn evaluate_part(
     let matched_pitched = note_matches
         .iter()
         .filter(|(g, p)| {
-            matches!(gold_notes[*g].kind, MusicXmlNotationEventKindV1::Pitched(_))
-                && matches!(prediction_notes[*p].kind, MusicXmlNotationEventKindV1::Pitched(_))
+            matches!(&gold_notes[*g].kind, MusicXmlNotationEventKindV1::Pitched(_))
+                && matches!(&prediction_notes[*p].kind, MusicXmlNotationEventKindV1::Pitched(_))
         })
         .copied()
         .collect::<Vec<_>>();
@@ -973,7 +961,10 @@ fn evaluate_part(
     );
     let attribute_exact = attribute_matches
         .iter()
-        .filter(|(g, p)| gold_attribute_events[*g].source == prediction_attribute_events[*p].source)
+        .filter(|(g, p)| {
+            gold_attribute_events[*g].score_offset == prediction_attribute_events[*p].score_offset
+                && gold_attribute_events[*g].source == prediction_attribute_events[*p].source
+        })
         .count();
     counts.attribute_event_exactness = metric_counts(
         gold_attribute_events.len(),
@@ -995,7 +986,10 @@ fn evaluate_part(
     );
     let auxiliary_exact = auxiliary_matches
         .iter()
-        .filter(|(g, p)| gold_auxiliary_events[*g].source == prediction_auxiliary_events[*p].source)
+        .filter(|(g, p)| {
+            gold_auxiliary_events[*g].score_offset == prediction_auxiliary_events[*p].score_offset
+                && gold_auxiliary_events[*g].source == prediction_auxiliary_events[*p].source
+        })
         .count();
     counts.auxiliary_event_exactness = metric_counts(
         gold_auxiliary_events.len(),
@@ -1019,6 +1013,10 @@ fn evaluate_part(
         .iter()
         .filter(|(g, p)| {
             gold_cursor_moves[*g].direction == prediction_cursor_moves[*p].direction
+                && gold_cursor_moves[*g].score_offset_before
+                    == prediction_cursor_moves[*p].score_offset_before
+                && gold_cursor_moves[*g].score_offset_after
+                    == prediction_cursor_moves[*p].score_offset_after
                 && gold_cursor_moves[*g].duration == prediction_cursor_moves[*p].duration
                 && gold_cursor_moves[*g].voice == prediction_cursor_moves[*p].voice
                 && gold_cursor_moves[*g].staff == prediction_cursor_moves[*p].staff
@@ -1068,6 +1066,22 @@ pub fn evaluate_musicxml_notation_graphs(
             maximum: MUSICXML_NOTATION_EVALUATION_MAX_PARTS_V1,
         });
     }
+    let total_events = gold_graphs
+        .iter()
+        .chain(prediction_graphs)
+        .map(|graph| {
+            graph.notation_events.note_events.len()
+                + graph.notation_events.attribute_events.len()
+                + graph.notation_events.auxiliary_events.len()
+                + graph.notation_events.cursor_moves.len()
+        })
+        .sum::<usize>();
+    if total_events > MUSICXML_NOTATION_EVALUATION_MAX_TOTAL_EVENTS_V1 {
+        return Err(MusicXmlNotationEvaluationErrorV1::TooManyEvents {
+            count: total_events,
+            maximum: MUSICXML_NOTATION_EVALUATION_MAX_TOTAL_EVENTS_V1,
+        });
+    }
     let gold_map = graph_map(gold_graphs)?;
     let prediction_map = graph_map(prediction_graphs)?;
     if gold_map.keys().ne(prediction_map.keys()) {
@@ -1078,7 +1092,9 @@ pub fn evaluate_musicxml_notation_graphs(
     let mut part_scorecards = Vec::with_capacity(part_count);
     let mut aggregate_counts = PartCounts::default();
     for (part_id, gold) in &gold_map {
-        let prediction = prediction_map[part_id];
+        let prediction = *prediction_map
+            .get(part_id)
+            .expect("part sets were checked for equality");
         validate_part_graph(gold)?;
         validate_part_graph(prediction)?;
         if gold.map.score_clock_id != prediction.map.score_clock_id
@@ -1403,7 +1419,7 @@ mod tests {
         let prediction = graph(prediction_xml, "sha256:aux-pred", "same-clock");
         let report = evaluate_musicxml_notation_graphs(&gold, &prediction, config()).unwrap();
         assert_eq!(report.aggregate.attribute_event_presence.f1, Some(1.0));
-        assert_eq!(report.aggregate.attribute_event_exactness.f1, Some(0.0));
+        assert_eq!(report.aggregate.attribute_event_exactness.f1, Some(2.0 / 3.0));
         assert_eq!(report.aggregate.auxiliary_event_presence.f1, Some(1.0));
         assert_eq!(report.aggregate.auxiliary_event_exactness.f1, Some(0.0));
         assert_eq!(report.aggregate.cursor_move_presence.f1, Some(1.0));
