@@ -31,6 +31,10 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # These glob-matched source-only prototypes do not yet contain Cargo manifests.
+    # Keep them excluded until their crate ownership and package boundaries are resolved.
+    "crates/core/symthaea",
+    "crates/core/symthaea-observation-attestation",
 ]
 default-members = [
     "xtask",
