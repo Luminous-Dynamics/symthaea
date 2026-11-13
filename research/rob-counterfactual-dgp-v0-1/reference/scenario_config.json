@@ -1,0 +1,19 @@
+{
+  "benchmark": "MCR2-v17-known-truth-dgp-v0.1",
+  "default_seed": 20261113,
+  "default_blocks_per_scenario": 10000,
+  "episodes_per_block": 2,
+  "horizon": 20.0,
+  "reference_hazard_per_time_unit": {"high": 0.12, "low": 0.02},
+  "candidate_high_risk_hazard_per_time_unit": 0.06,
+  "candidate_low_risk_hazard_per_time_unit": 0.02,
+  "competing_hazard_per_time_unit": 0.004,
+  "minimum_endpoint_observation_probability_for_oracle_ipw_diagnostic": 0.05,
+  "endpoint_observation_probability_by_scenario": {
+    "complete_followup": {"high": 1.0, "low": 1.0},
+    "mcar_endpoint_loss": {"high": 0.9, "low": 0.9},
+    "conditional_endpoint_loss": {"high": 0.48, "low": 0.96},
+    "positivity_failure": {"high": 0.0, "low": 0.96}
+  },
+  "randomization": "one reference_safe and one anticipatory_safe episode per block, matched on observed pre-assignment stratum"
+}
