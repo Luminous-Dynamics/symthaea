@@ -10,7 +10,7 @@
 
 use crate::barline_eval::{MeasureKind, MeasureMap, MeasureMapStatus, MeasureSpan, RationalBeat};
 use crate::evidence_digest::{canonical_json_sha256, sha256_hex};
-use midly::{MidiMessage, Smf, Timing, TrackEventKind};
+use midly::{Format, MidiMessage, Smf, Timing, TrackEventKind};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
@@ -99,6 +99,7 @@ pub enum MidiMeasureSidecarError {
     SidecarScoreClockMismatch,
     PpqMismatch { expected: u16, actual: u16 },
     SmpteTimingUnsupported,
+    IndependentSequencesUnsupported,
     InvalidPpq,
     NoTracks,
     NoParts,
@@ -131,6 +132,9 @@ pub fn parse_midi_measure_sidecar(
         .map_err(|error| MidiMeasureSidecarError::InvalidMidi(error.to_string()))?;
     if smf.tracks.is_empty() {
         return Err(MidiMeasureSidecarError::NoTracks);
+    }
+    if smf.header.format == Format::Sequential {
+        return Err(MidiMeasureSidecarError::IndependentSequencesUnsupported);
     }
     let ppq = match smf.header.timing {
         Timing::Metrical(value) => {
@@ -321,10 +325,14 @@ mod tests {
     use super::*;
 
     fn midi_file(ppq: u16, track_count: u16) -> Vec<u8> {
+        midi_file_with_format(ppq, track_count, 1)
+    }
+
+    fn midi_file_with_format(ppq: u16, track_count: u16, format: u16) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(b"MThd");
         bytes.extend_from_slice(&6_u32.to_be_bytes());
-        bytes.extend_from_slice(&1_u16.to_be_bytes());
+        bytes.extend_from_slice(&format.to_be_bytes());
         bytes.extend_from_slice(&track_count.to_be_bytes());
         bytes.extend_from_slice(&ppq.to_be_bytes());
         for _ in 0..track_count {
@@ -705,6 +713,32 @@ mod tests {
             Err(MidiMeasureSidecarError::MissingTrackMeasureMap {
                 track_index: 1
             })
+        );
+    }
+
+
+    #[test]
+    fn format_two_independent_sequences_are_not_given_one_shared_score_clock() {
+        let midi = midi_file_with_format(480, 2, 2);
+        let json = sidecar(
+            &midi,
+            480,
+            vec![
+                MidiPartMeasureSidecarV1 {
+                    part_id: "Pattern A".into(),
+                    source_track_index: 0,
+                    measures: vec![measure(0, 1920)],
+                },
+                MidiPartMeasureSidecarV1 {
+                    part_id: "Pattern B".into(),
+                    source_track_index: 1,
+                    measures: vec![measure(0, 1920)],
+                },
+            ],
+        );
+        assert_eq!(
+            parse_midi_measure_sidecar(&midi, &json, "midi-test-clock"),
+            Err(MidiMeasureSidecarError::IndependentSequencesUnsupported)
         );
     }
 
