@@ -482,7 +482,8 @@
           "observation_valid_from_unix_seconds",
           "observation_valid_to_unix_seconds",
           "assessed_at_unix_seconds",
-          "max_observation_age_seconds"
+          "max_observation_age_seconds",
+          "freshness_policy_ref"
         ],
         "properties": {
           "assessment_id": {
@@ -622,6 +623,12 @@
               "null"
             ],
             "minimum": 1
+          },
+          "freshness_policy_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       }
