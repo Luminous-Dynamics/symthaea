@@ -206,6 +206,10 @@ pub enum MusicEditAdapterIssueV1 {
     QualifiedWithoutEvidence,
     NonQualifiedWithEvidence,
     EmptyCapabilityBoundary,
+    EmptyScopeField(&'static str),
+    InvalidScopeDigest(&'static str),
+    DuplicateNativeMetric,
+    MissingNativeMetric,
     UnknownOperation,
 }
 
@@ -425,6 +429,45 @@ pub fn compare_music_edit_scopes_v1(
     right: &MusicEditComparisonScopeV1,
 ) -> MusicEditScopeComparisonV1 {
     let mut mismatches = Vec::new();
+    for (scope_name, scope) in [("left", left), ("right", right)] {
+        for (field, value) in [
+            ("benchmark_id", scope.benchmark_id.as_str()),
+            ("benchmark_version", scope.benchmark_version.as_str()),
+            ("native_track_id", scope.native_track_id.as_str()),
+            ("split_id", scope.split_id.as_str()),
+        ] {
+            if value.trim().is_empty() {
+                mismatches.push(MusicEditScopeMismatchV1::Schema);
+                let _ = (scope_name, field);
+            }
+        }
+        for (field, digest) in [
+            ("protocol_sha256", scope.protocol_sha256.as_str()),
+            ("scorer_sha256", scope.scorer_sha256.as_str()),
+            ("sample_manifest_sha256", scope.sample_manifest_sha256.as_str()),
+        ] {
+            if !is_lower_sha256(digest) {
+                mismatches.push(match field {
+                    "protocol_sha256" => MusicEditScopeMismatchV1::Protocol,
+                    "scorer_sha256" => MusicEditScopeMismatchV1::Scorer,
+                    _ => MusicEditScopeMismatchV1::SampleManifest,
+                });
+            }
+        }
+        if scope.native_metric_ids.is_empty()
+            || scope.native_metric_ids.iter().any(|metric| metric.trim().is_empty())
+        {
+            mismatches.push(MusicEditScopeMismatchV1::NativeMetricSet);
+        }
+        let mut unique_metrics = BTreeSet::new();
+        if scope
+            .native_metric_ids
+            .iter()
+            .any(|metric| !unique_metrics.insert(metric))
+        {
+            mismatches.push(MusicEditScopeMismatchV1::NativeMetricSet);
+        }
+    }
     if left.schema_version != right.schema_version
         || left.schema_version != MUSIC_EDIT_COMPARISON_SCOPE_SCHEMA_V1
         || right.schema_version != MUSIC_EDIT_COMPARISON_SCOPE_SCHEMA_V1
@@ -631,6 +674,27 @@ mod tests {
         let result = compare_music_edit_scopes_v1(&left, &right);
         assert!(!result.directly_comparable);
         assert!(result.mismatches.contains(&MusicEditScopeMismatchV1::Track));
+    }
+
+    #[test]
+    fn identical_valid_scopes_are_directly_comparable() {
+        let left = scope("smebench-test", MusicEditDatasetStratumV1::MidiSynthesized);
+        let right = scope("smebench-test", MusicEditDatasetStratumV1::MidiSynthesized);
+        let result = compare_music_edit_scopes_v1(&left, &right);
+        assert!(result.directly_comparable);
+        assert!(result.mismatches.is_empty());
+    }
+
+    #[test]
+    fn invalid_or_duplicate_scope_metrics_prevent_direct_comparison() {
+        let left = scope("smebench-test", MusicEditDatasetStratumV1::MidiSynthesized);
+        let mut right = left.clone();
+        right.protocol_sha256 = "not-a-digest".to_owned();
+        right.native_metric_ids.push("target_agreement".to_owned());
+        let result = compare_music_edit_scopes_v1(&left, &right);
+        assert!(!result.directly_comparable);
+        assert!(result.mismatches.contains(&MusicEditScopeMismatchV1::Protocol));
+        assert!(result.mismatches.contains(&MusicEditScopeMismatchV1::NativeMetricSet));
     }
 
     #[test]
