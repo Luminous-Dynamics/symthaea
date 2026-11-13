@@ -965,6 +965,7 @@ impl<const K: usize> AbelianChargeBlockPlan<K> {
 mod tests {
     use super::{
         AbelianCharge, AbelianChargeBlockPlan, AbelianChargeError, AbelianChargeTensor, AbelianMps,
+        AbelianTwoSiteTruncationPolicy,
     };
     use num_complex::Complex64;
 
@@ -974,6 +975,69 @@ mod tests {
 
     fn zero() -> Complex64 {
         Complex64::new(0.0, 0.0)
+    }
+
+
+
+    fn two_sector_schmidt_pair() -> (
+        AbelianChargeTensor<2>,
+        AbelianChargeTensor<2>,
+    ) {
+        let vacuum = q(0, 0);
+        let up = q(1, 1);
+        let down = q(1, -1);
+        let double = q(2, 0);
+        let physical = vec![vacuum, up, down, double];
+        let bond = vec![vacuum, up, down, double];
+
+        let mut first_data = vec![zero(); 16];
+        first_data[5] = Complex64::new(0.8, 0.0);
+        first_data[10] = Complex64::new(0.6, 0.0);
+        let first = AbelianChargeTensor::new(
+            0,
+            vec![vacuum],
+            physical.clone(),
+            bond.clone(),
+            first_data,
+            1.0e-12,
+        )
+        .unwrap();
+
+        let mut second_data = vec![zero(); 16];
+        second_data[6] = Complex64::new(1.0, 0.0);
+        second_data[9] = Complex64::new(1.0, 0.0);
+        let second = AbelianChargeTensor::new(
+            1,
+            bond,
+            physical,
+            vec![double],
+            second_data,
+            1.0e-12,
+        )
+        .unwrap();
+        (first, second)
+    }
+
+    fn contracted_two_site_norm_squared<const K: usize>(
+        left: &AbelianChargeTensor<K>,
+        right: &AbelianChargeTensor<K>,
+    ) -> f64 {
+        let mut norm_squared = 0.0;
+        for left_index in 0..left.left_dimension() {
+            for first_physical in 0..left.physical_dimension() {
+                for second_physical in 0..right.physical_dimension() {
+                    for right_index in 0..right.right_dimension() {
+                        let mut amplitude = Complex64::new(0.0, 0.0);
+                        for middle in 0..left.right_dimension() {
+                            amplitude += left.get(left_index, first_physical, middle)
+                                * right.get(middle, second_physical, right_index);
+                        }
+                        norm_squared += amplitude.norm_sqr();
+                    }
+                }
+            }
+        }
+        norm_squared
     }
 
     #[test]
@@ -1323,6 +1387,123 @@ mod tests {
             AbelianChargeBlockPlan::split_exact(&first, &mismatched, 1.0e-12),
             Err(AbelianChargeError::BondChargeMismatch { .. })
         ));
+    }
+
+
+    #[test]
+    fn u1k_truncation_applies_global_bond_cap_across_charge_vectors() {
+        let (first, second) = two_sector_schmidt_pair();
+        let result = AbelianChargeBlockPlan::split_truncated(
+            &first,
+            &second,
+            AbelianTwoSiteTruncationPolicy {
+                max_bond_dimension: 1,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: 1.0e-12,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(result.total_singular_value_count, 4);
+        assert_eq!(result.retained_singular_value_count, 1);
+        assert_eq!(result.cutoff_discarded_singular_value_count, 0);
+        assert_eq!(result.bond_cap_discarded_singular_value_count, 1);
+        assert!(result.bond_cap_binding);
+        assert!((result.total_schmidt_weight - 1.0).abs() <= 1.0e-12);
+        assert!((result.retained_schmidt_weight - 0.64).abs() <= 1.0e-12);
+        assert!((result.bond_cap_discarded_weight - 0.36).abs() <= 1.0e-12);
+        assert!((result.discarded_weight - 0.36).abs() <= 1.0e-12);
+        assert!((result.relative_discarded_weight - 0.36).abs() <= 1.0e-12);
+        assert!((result.renormalization_factor_to_restore_original_norm - 1.25).abs() <= 1.0e-12);
+        assert_eq!(result.retained_rank_by_charge.len(), 1);
+        assert!(result.reconstruction_l2_residual >= 0.6 - 1.0e-12);
+    }
+
+    #[test]
+    fn u1k_relative_cutoff_and_global_bond_cap_have_separate_loss_receipts() {
+        let (first, second) = two_sector_schmidt_pair();
+        let result = AbelianChargeBlockPlan::split_truncated(
+            &first,
+            &second,
+            AbelianTwoSiteTruncationPolicy {
+                max_bond_dimension: 8,
+                relative_singular_value_cutoff: 0.8,
+                tolerance: 1.0e-12,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(result.retained_singular_value_count, 1);
+        assert_eq!(result.cutoff_discarded_singular_value_count, 1);
+        assert_eq!(result.bond_cap_discarded_singular_value_count, 0);
+        assert!(!result.bond_cap_binding);
+        assert!((result.cutoff_discarded_weight - 0.36).abs() <= 1.0e-12);
+        assert!(result.bond_cap_discarded_weight.abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn u1k_truncation_preserves_charge_vectors_and_does_not_renormalize() {
+        let (first, second) = two_sector_schmidt_pair();
+        let result = AbelianChargeBlockPlan::split_truncated(
+            &first,
+            &second,
+            AbelianTwoSiteTruncationPolicy {
+                max_bond_dimension: 1,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: 1.0e-12,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            result.left_tensor.right_charges(),
+            result.right_tensor.left_charges()
+        );
+        assert_eq!(
+            contracted_two_site_norm_squared(&result.left_tensor, &result.right_tensor),
+            result.post_truncation_norm_squared
+        );
+        assert!((result.post_truncation_norm_squared - 0.64).abs() <= 1.0e-12);
+        assert!(result.post_truncation_norm_squared < result.pre_truncation_norm_squared);
+        let rebuilt = AbelianMps::new(
+            vec![result.left_tensor, result.right_tensor],
+            q(2, 0),
+            1.0e-12,
+        )
+        .unwrap();
+        assert_eq!(rebuilt.selection_rule_residual(), 0.0);
+    }
+
+    #[test]
+    fn u1k_truncation_rejects_invalid_global_policy() {
+        let (first, second) = two_sector_schmidt_pair();
+        for policy in [
+            AbelianTwoSiteTruncationPolicy {
+                max_bond_dimension: 0,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: 1.0e-12,
+            },
+            AbelianTwoSiteTruncationPolicy {
+                max_bond_dimension: 1,
+                relative_singular_value_cutoff: -0.1,
+                tolerance: 1.0e-12,
+            },
+            AbelianTwoSiteTruncationPolicy {
+                max_bond_dimension: 1,
+                relative_singular_value_cutoff: 1.1,
+                tolerance: 1.0e-12,
+            },
+            AbelianTwoSiteTruncationPolicy {
+                max_bond_dimension: 1,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: f64::NAN,
+            },
+        ] {
+            assert!(matches!(
+                AbelianChargeBlockPlan::split_truncated(&first, &second, policy),
+                Err(AbelianChargeError::InvalidTruncationPolicy { .. })
+            ));
+        }
     }
 
 }
