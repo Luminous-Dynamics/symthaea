@@ -40,22 +40,22 @@ type AuthorizationReceipt struct {
 }
 
 type InvocationReceipt struct {
-	Meta                  ReceiptMeta `json:"meta"`
-	AuthorizationID       string      `json:"authorization_receipt_id"`
-	PermitID              string      `json:"permit_id"`
-	ExecutionID           string      `json:"execution_id"`
-	TaskID                string      `json:"task_id"`
-	PrincipalID           string      `json:"principal_id"`
-	Target                string      `json:"target"`
-	ActionSHA256          string      `json:"action_sha256"`
-	ArgumentsSHA256       string      `json:"arguments_sha256"`
-	CapabilityID          string      `json:"capability_id"`
+	Meta                 ReceiptMeta `json:"meta"`
+	AuthorizationID      string      `json:"authorization_receipt_id"`
+	PermitID             string      `json:"permit_id"`
+	ExecutionID          string      `json:"execution_id"`
+	TaskID               string      `json:"task_id"`
+	PrincipalID          string      `json:"principal_id"`
+	Target               string      `json:"target"`
+	ActionSHA256         string      `json:"action_sha256"`
+	ArgumentsSHA256      string      `json:"arguments_sha256"`
+	CapabilityID         string      `json:"capability_id"`
 	PolicySHA256          string      `json:"policy_sha256"`
-	RevocationGeneration  uint64      `json:"revocation_generation"`
-	ImplementationSHA256  string      `json:"implementation_sha256"`
-	RuntimeWorkloadID     string      `json:"runtime_workload_id"`
-	InvocationID          string      `json:"invocation_id"`
-	ObserverSequence      uint64      `json:"observer_sequence"`
+	RevocationGeneration uint64      `json:"revocation_generation"`
+	ImplementationSHA256 string      `json:"implementation_sha256"`
+	RuntimeWorkloadID    string      `json:"runtime_workload_id"`
+	InvocationID         string      `json:"invocation_id"`
+	ObserverSequence     uint64      `json:"observer_sequence"`
 }
 
 type DispatchStatus string
