@@ -331,9 +331,10 @@ fn validate_graph(
         });
     }
     let mut previous_end = None;
-    for span in &graph.map.measures {
+    for (index, span) in graph.map.measures.iter().enumerate() {
         if !rational_is_canonical(span.start)
             || !rational_is_canonical(span.end)
+            || (index == 0 && span.start != RationalBeat::new(0, 1).expect("zero is rational"))
             || span.start.compare_exact(span.end) != Ordering::Less
             || previous_end.is_some_and(|end| end != span.start)
         {
@@ -449,7 +450,16 @@ fn validate_graph(
             });
         }
     }
-    if orders.len() != total
+    let family_order_is_strict = [
+        graph.notation_events.note_events.iter().map(|event| event.source_order).collect::<Vec<_>>(),
+        graph.notation_events.attribute_events.iter().map(|event| event.source_order).collect::<Vec<_>>(),
+        graph.notation_events.auxiliary_events.iter().map(|event| event.source_order).collect::<Vec<_>>(),
+        graph.notation_events.cursor_moves.iter().map(|event| event.source_order).collect::<Vec<_>>(),
+    ]
+    .iter()
+    .all(|family| family.windows(2).all(|pair| pair[0] < pair[1]));
+    if !family_order_is_strict
+        || orders.len() != total
         || orders.iter().copied().enumerate().any(|(expected, observed)| expected != observed)
     {
         return Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure {
@@ -1231,10 +1241,6 @@ mod tests {
     fn extra_note_is_false_positive_without_erasing_matched_note_accuracy() {
         let reference = graph(fixture_xml());
         let prediction_xml = fixture_xml().replace(
-            r#"</pitch><duration>16</duration><voice>1</voice><staff>1</staff><type>quarter</type><tie type="start"/> "#,
-            r#"</pitch><duration>16</duration><voice>1</voice><staff>1</staff><type>quarter</type><tie type="start"/> "#,
-        );
-        let prediction_xml = prediction_xml.replace(
             r#"</notations></note>
             <note><pitch><step>D</step>"#,
             r#"</notations></note>
@@ -1255,10 +1261,7 @@ mod tests {
 
     #[test]
     fn decimal_pitch_alteration_lexemes_compare_by_exact_numeric_value() {
-        let reference = graph(&fixture_xml().replace(
-            "<step>C</step><alter>0</alter><octave>4</octave>",
-            "<step>C</step><alter>0</alter><octave>4</octave>",
-        ));
+        let reference = graph(fixture_xml());
         let prediction = graph(&fixture_xml().replace(
             "<step>C</step><alter>0</alter><octave>4</octave>",
             "<step>C</step><alter>0.000</alter><octave>4</octave>",
@@ -1344,6 +1347,14 @@ mod tests {
         let report = evaluate_musicxml_notation_graphs(&reference, &prediction, config).unwrap();
         assert!(report.duration_error.mean_absolute_quarter_beats.unwrap() > 0.0);
         assert!(report.duration_error.within_tolerance_rate.unwrap() < 1.0);
+        assert_eq!(
+            report.note_onset_error.mean_absolute_quarter_beats,
+            Some(1.0 / 64.0)
+        );
+        assert_eq!(
+            report.note_onset_error.p95_absolute_quarter_beats,
+            Some(1.0 / 16.0)
+        );
     }
 
     #[test]
@@ -1371,6 +1382,35 @@ mod tests {
         assert!(!validate_musicxml_notation_evaluation_report(
             &reference,&changed,config, &original
         ).unwrap());
+    }
+
+    #[test]
+    fn noncanonical_and_discontinuous_measure_maps_refuse_evaluation() {
+        let reference = graph(fixture_xml());
+        let mut prediction = reference.clone();
+        prediction.map.measures[0].start = RationalBeat::new(1, 1).unwrap();
+        assert!(matches!(
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()),
+            Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure { .. })
+        ));
+    }
+
+    #[test]
+    fn duplicated_or_reordered_source_ordinals_refuse_evaluation() {
+        let reference = graph(fixture_xml());
+        let mut prediction = reference.clone();
+        prediction.notation_events.note_events[1].source_order =
+            prediction.notation_events.note_events[0].source_order;
+        assert!(matches!(
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()),
+            Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure { .. })
+        ));
+        prediction = reference.clone();
+        prediction.notation_events.note_events.swap(0, 1);
+        assert!(matches!(
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()),
+            Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure { .. })
+        ));
     }
 
     #[test]
