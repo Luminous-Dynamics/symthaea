@@ -8,7 +8,10 @@ Reference environment: Linux/amd64, Go 1.23.2, AMD EPYC 9V74.
 - `go vet ./...`: PASS
 - `gofmt` check: PASS
 - CLI build: PASS
-- 29 named tests; join package statement coverage 76.7%. CLI has no dedicated test file yet.
+- 38 top-level test functions plus 18 subtest cases.
+- `go test -cover ./...`: join package 76.7%; CLI package 66.2%.
+- The CLI tests cover missing out-of-band trust/policy files, agent-supplied trust fields in the evidence, duplicate JSON keys, unknown pinned fields, empty files, missing files and oversized input.
+- The global receipt-ID test rejects collisions across all five roles, including a witness ID colliding with an authorization receipt.
 
 Five-run verifier microbenchmark:
 
