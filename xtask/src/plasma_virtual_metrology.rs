@@ -41,6 +41,7 @@ struct Fixture {
     allowed_material_profiles: Vec<String>,
     required_sensors: Vec<String>,
     maximum_sensor_time_offset_ms: u64,
+    energy_boundary_contract_id: String,
     required_calibration_status: String,
     required_energy_subsystems: Vec<String>,
     scenarios: Vec<Scenario>,
@@ -195,6 +196,9 @@ pub fn audit_fixture_json(input: &str) -> std::result::Result<AuditReport, Strin
     {
         return Err("service profile is incomplete or invalid".to_owned());
     }
+    if fixture.energy_boundary_contract_id.trim().is_empty() {
+        return Err("empty fixture energy-boundary contract ID".to_owned());
+    }
     if fixture.required_sensors.is_empty() || fixture.required_energy_subsystems.is_empty() {
         return Err("required telemetry / energy boundary lists cannot be empty".to_owned());
     }
@@ -323,6 +327,7 @@ fn evaluate_scenario(scenario: &Scenario, fixture: &Fixture) -> ScenarioResult {
 
     let energy = &scenario.energy;
     if energy.energy_boundary_contract_id.trim().is_empty()
+        || energy.energy_boundary_contract_id != fixture.energy_boundary_contract_id
         || !energy.complete_system_energy_kwh.is_finite()
         || energy.complete_system_energy_kwh < 0.0
     {
@@ -540,6 +545,18 @@ mod tests {
     fn unverified_group_holdout_is_blocked() {
         let report = audit_fixture_json(FIXTURE).expect("fixture audit");
         assert_eq!(result_for(&report, "model-holdout-unverified").disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn mismatched_energy_boundary_contract_is_rejected() {
+        let mut value: serde_json::Value = serde_json::from_str(FIXTURE).unwrap();
+        value["scenarios"][0]["energy"]["energy_boundary_contract_id"] =
+            serde_json::json!("GENERATOR_ONLY_NOT_GRID_TO_BOND");
+        let report = audit_fixture_json(&value.to_string()).unwrap();
+        assert_eq!(
+            result_for(&report, "aligned-heldout-valid").disposition,
+            Disposition::Rejected
+        );
     }
 
     #[test]
