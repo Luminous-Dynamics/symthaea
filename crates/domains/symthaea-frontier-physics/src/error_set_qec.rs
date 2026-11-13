@@ -1116,8 +1116,7 @@ mod tests {
     fn strong_petz_bound_rejects_coefficients_outside_schatten_two_ball() {
         let code = repetition_code_isometry();
         let errors = bit_flip_error_set();
-        let diagnostics =
-            compute_error_set_qec_diagnostics(&code, &errors, 1.0e-12).unwrap();
+        let diagnostics = compute_error_set_qec_diagnostics(&code, &errors, 1.0e-12).unwrap();
         let coefficient = ComplexMatrix::from_real(
             4,
             4,
