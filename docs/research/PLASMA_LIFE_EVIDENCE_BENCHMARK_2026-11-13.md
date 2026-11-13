@@ -209,3 +209,73 @@ Before a laboratory study:
 ## 11. Claim ceiling
 
 S0 validates only clock/event/censor/provenance and accelerated-transfer refusal semantics on synthetic records. It does not estimate real bond life, establish a degradation law, qualify accelerated aging, prove mechanism invariance, predict service life, improve adhesion, save inspection cost, certify a product or authorize equipment operation.
+
+
+## 12. External durability SOTA comparators (reviewed 13 November 2026)
+
+The durability benchmark must compare against actual adhesive-life and fatigue-lifetime methods, not only surface-wettability regression.
+
+### A. Plasma-treated TPO / silicone BIPV service-life model (2026)
+
+Zhu et al., *Surface and Coatings Technology* 522 (15 February 2026), DOI [10.1016/j.surfcoat.2026.133164](https://doi.org/10.1016/j.surfcoat.2026.133164), study a TPO-to-silicone adhesive interface for building-integrated photovoltaic structures.
+
+The article reports:
+- interface bond strength increasing from 0.23 MPa untreated to 1.25 MPa after plasma modification;
+- lap-shear strength increasing from 0.42 MPa to 1.84 MPa;
+- plasma parameter exploration across air, O₂, Ar, time and power conditions;
+- a generalized Eyring model combining numerical simulation and accelerated stress/humidity/thermal aging;
+- a reported model accuracy of 98% and a predicted 18.17-year service life at 45 °C and 30% RH.
+
+These values are the authors' reported results for their specific TPO/glass/silicone BIPV structure. They are not directly comparable to PP/PE lap-shear results, a different adhesive, or an unvalidated Luminous process. The 98% headline must not be treated as an external predictive-coverage result until its exact metric, training/test split, stress-condition holdout and uncertainty are audited.
+
+**Benchmark consequence:** generalized Eyring multi-stress coupling is a direct competitor baseline, not a novelty claim for Luminous. Our challenge should test whether such a model transfers across unseen temperature/RH/load combinations, substrate/adhesive lots and independently adjudicated failure mechanisms. Compare in-range prediction, held-out stress-condition prediction and lower-bound calibration separately.
+
+Source: [ScienceDirect article record and abstract](https://www.sciencedirect.com/science/article/abs/pii/S0257897226000162).
+
+### B. Hygrothermal CFRP adhesive fracture and Weibull fatigue (2026)
+
+Vigón et al., *Applied Sciences* 16(21), 10810 (2026), DOI [10.3390/app162110810](https://doi.org/10.3390/app162110810), investigate Mode I fracture and fatigue behaviour of carbon/epoxy adhesive joints after 60 °C / 70% RH exposure for 1, 2, 4 and 12 weeks.
+
+The study is valuable because it distinguishes:
+- cross-sectional static DCB fracture toughness by aging cohort;
+- fatigue crack initiation life under cyclic loading;
+- subsequent crack propagation rate;
+- run-out specimens treated as right-censored observations in a Weibull regression model;
+- fracture-surface evidence showing that the relative cohesive/interlaminar failure contributions change with aging.
+
+The reported static G_IC response is non-monotonic: it reaches a minimum after two weeks and increases at longer aging, while fatigue-initiation resistance and crack-growth behaviour follow different trends. The authors discuss competing moisture plasticisation and adhesive post-curing explanations; they do not claim the mechanism is uniquely resolved.
+
+**Benchmark consequence:** compare strength-at-age distributions and fatigue survival as different endpoints. Use run-outs as censored, and use fracture-surface adjudication to test mechanism transfer. A single monotonic degradation curve or one scalar "retention" score would conceal the observed behaviour.
+
+Source: [Open-access article](https://www.mdpi.com/2076-3417/16/21/10810).
+
+### C. Weibull and Cox survival with aging covariates (2026)
+
+*Survival Analysis of Fatigue Lifetime in Aged Elastomers Using Weibull and Cox Regression Models*, first published 2 July 2026, DOI [10.1111/ffe.70344](https://doi.org/10.1111/ffe.70344), treats specimens that fail outside the gauge length as right-censored and compares Weibull and Cox models. It adds aging-related material descriptors (including crosslink density) and uses a Cox frailty term to account for population heterogeneity.
+
+The authors report consistent predictions within the data-supported region and greater covariate flexibility for the Cox model, while noting limited specimen counts and uncertainty. Elastomer fatigue is an adjacent statistical comparator rather than a direct plasma-bonding dataset.
+
+**Benchmark consequence:** include both parametric Weibull and semiparametric Cox/frailty baselines once the actual event-time cohort supports them. Report calibration by aging stratum and specimen/lot cluster; do not confuse model fit with validated extrapolation.
+
+Source: [Open-access article](https://onlinelibrary.wiley.com/doi/10.1111/ffe.70344).
+
+### D. Defect interactions and multiple evidence modalities (2025 review)
+
+Dachev et al., *Materials* 18(12), 2724 (10 June 2025), DOI [10.3390/ma18122724](https://doi.org/10.3390/ma18122724), review defects and reliability in adhesive bonding, including kissing bonds, porosity, voids, poor cure, substrate failures, environmental aging and the difficulty of modelling interactions among defects and stochastic variability.
+
+**Benchmark consequence:** plasma durability must not be reduced to a temperature-time stress model alone. Record adhesive cure, bondline geometry, defect indicators, contamination, substrate variability and mode adjudication. Compare multi-method inspection only at each method's real support; an NDT output is not a destructive strength label. 
+
+Source: [PubMed record](https://pubmed.ncbi.nlm.nih.gov/40572857/).
+
+### SOTA comparison matrix
+
+| Baseline / comparator | Correct target | What it tests | Key limitation |
+|---|---|---|---|
+| Generalized Eyring multi-stress model (TPO/silicone BIPV, 2026) | Service life under coupled stress/humidity/thermal conditions | Stress interaction and service-life prediction | Material/adhesive-specific; audit exact validation split and metric |
+| Weibull regression of fatigue initiation with run-outs (CFRP, 2026) | Cycles to crack initiation | Censoring-aware fatigue and aging effects | Specific Mode I DCB geometry and stress range |
+| Weibull + Cox/frailty (aged elastomer, 2026) | Fatigue cycles to failure | Parametric vs covariate-adjusted survival | Adjacent material class; small/censored cohort |
+| Cross-sectional strength at age | Strength distribution after predeclared exposure | Retention, quantiles and accepted fraction | Not time-to-failure |
+| Non-parametric survival / Aalen–Johansen | True event-time and competing-cause data | Censoring-aware event probability | Censoring assumptions; no extrapolation by default |
+| Mechanism-stratified / discrepancy-aware transfer | Held-out stress and material regimes | Whether one acceleration relationship remains valid | Requires sufficient failure-mode and stress coverage |
+
+The same raw cohort must not be used to tune the acceleration model, choose its failure mode and claim independent validation. Preserve training, calibration and blinded confirmation by whole specimens/lots/days/stress regimes.
