@@ -9,7 +9,7 @@
 //! referenced bytes were actually read and hashed. V1 deliberately stops
 //! before claiming byte verification or full legal/annotation qualification.
 
-use crate::evidence_digest::canonical_json_sha256;
+use crate::evidence_digest::{canonical_json_sha256, sha256_hex};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -87,6 +87,7 @@ pub enum CorpusQualificationStageV1 {
     SampleDigestsDeclared,
     SplitQualified,
     ProtocolFrozen,
+    ByteVerified,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -132,6 +133,8 @@ pub struct CorpusSampleV1 {
     pub split: CorpusSplitRoleV1,
     pub composer_group_id: Option<String>,
     pub work_group_id: Option<String>,
+    pub input_relative_path: String,
+    pub reference_relative_path: String,
     pub input_sha256: String,
     pub reference_sha256: String,
 }
@@ -143,6 +146,42 @@ pub struct CorpusSampleManifestV1 {
     pub release_id: String,
     pub track_id: String,
     pub samples: Vec<CorpusSampleV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CorpusByteVerificationEntryV1 {
+    pub sample_id: String,
+    pub input_relative_path: String,
+    pub reference_relative_path: String,
+    pub input_sha256: String,
+    pub reference_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CorpusByteVerificationReceiptV1 {
+    pub schema: String,
+    pub sample_manifest_sha256: String,
+    pub verifier_build_sha256: String,
+    pub entries: Vec<CorpusByteVerificationEntryV1>,
+    pub receipt_sha256: String,
+}
+
+#[derive(Serialize)]
+struct CorpusByteVerificationCommitmentV1<'a> {
+    schema: &'a str,
+    sample_manifest_sha256: &'a str,
+    verifier_build_sha256: &'a str,
+    entries: &'a [CorpusByteVerificationEntryV1],
+}
+
+/// Borrowed file bytes. The caller resolves the declared relative paths under
+/// a controlled corpus root and streams one pair at a time into the verifier.
+pub struct CorpusArtifactBytesV1<'a> {
+    pub sample_id: &'a str,
+    pub input_relative_path: &'a str,
+    pub input_bytes: &'a [u8],
+    pub reference_relative_path: &'a str,
+    pub reference_bytes: &'a [u8],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -184,8 +223,18 @@ pub enum CorpusQualificationIssueV1 {
     EmptySampleId,
     EmptyFoldId { sample_id: String },
     DuplicateSampleId { sample_id: String },
+    InvalidInputPath { sample_id: String },
+    InvalidReferencePath { sample_id: String },
     InvalidInputDigest { sample_id: String },
     InvalidReferenceDigest { sample_id: String },
+    InputBytesMismatch { sample_id: String },
+    ReferenceBytesMismatch { sample_id: String },
+    MissingByteVerificationSample { sample_id: String },
+    DuplicateByteVerificationSample { sample_id: String },
+    UnknownByteVerificationSample { sample_id: String },
+    ByteVerificationPathMismatch { sample_id: String },
+    InvalidByteVerifierDigest,
+    InvalidByteVerificationReceipt,
     MissingComposerGroup { sample_id: String },
     MissingWorkGroup { sample_id: String },
     ComposerLeakage { fold_id: String, composer_group_id: String },
@@ -239,6 +288,17 @@ fn is_sha256(value: &str) -> bool {
 
 fn is_https_uri(value: &str) -> bool {
     value.starts_with("https://") && value.len() > "https://".len()
+}
+
+fn is_safe_relative_path(value: &str) -> bool {
+    !value.trim().is_empty()
+        && !value.starts_with('/')
+        && !value.contains('\\')
+        && !value.contains(':')
+        && !value.contains('\0')
+        && value
+            .split('/')
+            .all(|part| !part.is_empty() && part != "." && part != "..")
 }
 
 pub fn validate_corpus_registration(
@@ -377,6 +437,16 @@ pub fn validate_corpus_sample_manifest(
         }
         if sample.fold_id.trim().is_empty() {
             issues.push(CorpusQualificationIssueV1::EmptyFoldId {
+                sample_id: sample.sample_id.clone(),
+            });
+        }
+        if !is_safe_relative_path(&sample.input_relative_path) {
+            issues.push(CorpusQualificationIssueV1::InvalidInputPath {
+                sample_id: sample.sample_id.clone(),
+            });
+        }
+        if !is_safe_relative_path(&sample.reference_relative_path) {
+            issues.push(CorpusQualificationIssueV1::InvalidReferencePath {
                 sample_id: sample.sample_id.clone(),
             });
         }
@@ -585,6 +655,167 @@ pub fn qualification_report_commitment(
         issues: &report.issues,
         next_stage_requirements: &report.next_stage_requirements,
     })
+}
+
+
+fn corpus_byte_verification_commitment(
+    receipt: &CorpusByteVerificationReceiptV1,
+) -> Result<String, serde_json::Error> {
+    canonical_json_sha256(&CorpusByteVerificationCommitmentV1 {
+        schema: &receipt.schema,
+        sample_manifest_sha256: &receipt.sample_manifest_sha256,
+        verifier_build_sha256: &receipt.verifier_build_sha256,
+        entries: &receipt.entries,
+    })
+}
+
+/// Hash the exact input/reference byte slices for every sample. The iterator
+/// may yield one sample at a time; the function does not retain source bytes.
+/// The receipt proves byte consistency with this manifest, not the legal
+/// authority or authenticity of the source root.
+pub fn verify_corpus_artifact_bytes<'a, I>(
+    manifest: &CorpusSampleManifestV1,
+    artifacts: I,
+    verifier_build_sha256: &str,
+) -> Result<CorpusByteVerificationReceiptV1, Vec<CorpusQualificationIssueV1>>
+where
+    I: IntoIterator<Item = CorpusArtifactBytesV1<'a>>,
+{
+    let mut issues = Vec::new();
+    if !is_sha256(verifier_build_sha256) {
+        issues.push(CorpusQualificationIssueV1::InvalidByteVerifierDigest);
+    }
+    let expected: BTreeMap<_, _> = manifest
+        .samples
+        .iter()
+        .map(|sample| (sample.sample_id.as_str(), sample))
+        .collect();
+    let mut seen = BTreeSet::new();
+    let mut entries = BTreeMap::new();
+
+    for artifact in artifacts {
+        if !seen.insert(artifact.sample_id.to_string()) {
+            issues.push(CorpusQualificationIssueV1::DuplicateByteVerificationSample {
+                sample_id: artifact.sample_id.to_string(),
+            });
+            continue;
+        }
+        let Some(sample) = expected.get(artifact.sample_id) else {
+            issues.push(CorpusQualificationIssueV1::UnknownByteVerificationSample {
+                sample_id: artifact.sample_id.to_string(),
+            });
+            continue;
+        };
+        if artifact.input_relative_path != sample.input_relative_path
+            || artifact.reference_relative_path != sample.reference_relative_path
+        {
+            issues.push(CorpusQualificationIssueV1::ByteVerificationPathMismatch {
+                sample_id: artifact.sample_id.to_string(),
+            });
+            continue;
+        }
+        let input_sha256 = sha256_hex(artifact.input_bytes);
+        let reference_sha256 = sha256_hex(artifact.reference_bytes);
+        if input_sha256 != sample.input_sha256 {
+            issues.push(CorpusQualificationIssueV1::InputBytesMismatch {
+                sample_id: artifact.sample_id.to_string(),
+            });
+        }
+        if reference_sha256 != sample.reference_sha256 {
+            issues.push(CorpusQualificationIssueV1::ReferenceBytesMismatch {
+                sample_id: artifact.sample_id.to_string(),
+            });
+        }
+        entries.insert(
+            artifact.sample_id.to_string(),
+            CorpusByteVerificationEntryV1 {
+                sample_id: artifact.sample_id.to_string(),
+                input_relative_path: artifact.input_relative_path.to_string(),
+                reference_relative_path: artifact.reference_relative_path.to_string(),
+                input_sha256,
+                reference_sha256,
+            },
+        );
+    }
+
+    for sample in &manifest.samples {
+        if !seen.contains(&sample.sample_id) {
+            issues.push(CorpusQualificationIssueV1::MissingByteVerificationSample {
+                sample_id: sample.sample_id.clone(),
+            });
+        }
+    }
+    if !issues.is_empty() {
+        return Err(issues);
+    }
+
+    let mut receipt = CorpusByteVerificationReceiptV1 {
+        schema: "muse-corpus-byte-verification-receipt-v1".into(),
+        sample_manifest_sha256: canonical_json_sha256(manifest).unwrap_or_default(),
+        verifier_build_sha256: verifier_build_sha256.to_string(),
+        entries: entries.into_values().collect(),
+        receipt_sha256: String::new(),
+    };
+    receipt.receipt_sha256 = corpus_byte_verification_commitment(&receipt).unwrap_or_default();
+    Ok(receipt)
+}
+
+pub fn validate_corpus_byte_verification_receipt(
+    manifest: &CorpusSampleManifestV1,
+    receipt: &CorpusByteVerificationReceiptV1,
+) -> bool {
+    if receipt.schema != "muse-corpus-byte-verification-receipt-v1"
+        || !is_sha256(&receipt.verifier_build_sha256)
+        || canonical_json_sha256(manifest).ok().as_deref()
+            != Some(receipt.sample_manifest_sha256.as_str())
+        || corpus_byte_verification_commitment(receipt).ok().as_deref()
+            != Some(receipt.receipt_sha256.as_str())
+        || receipt.entries.len() != manifest.samples.len()
+    {
+        return false;
+    }
+    let expected: BTreeMap<_, _> = manifest
+        .samples
+        .iter()
+        .map(|sample| (sample.sample_id.as_str(), sample))
+        .collect();
+    let mut seen = BTreeSet::new();
+    receipt.entries.iter().all(|entry| {
+        let Some(sample) = expected.get(entry.sample_id.as_str()) else {
+            return false;
+        };
+        seen.insert(entry.sample_id.as_str())
+            && entry.input_relative_path == sample.input_relative_path
+            && entry.reference_relative_path == sample.reference_relative_path
+            && entry.input_sha256 == sample.input_sha256
+            && entry.reference_sha256 == sample.reference_sha256
+            && is_sha256(&entry.input_sha256)
+            && is_sha256(&entry.reference_sha256)
+    }) && seen.len() == manifest.samples.len()
+}
+
+pub fn qualify_corpus_track_with_byte_verification(
+    registration: &CorpusRegistrationV1,
+    manifest: Option<&CorpusSampleManifestV1>,
+    protocol: Option<&CorpusProtocolFingerprintV1>,
+    receipt: Option<&CorpusByteVerificationReceiptV1>,
+) -> CorpusQualificationReportV1 {
+    let mut report = qualify_corpus_track(registration, manifest, protocol);
+    if let (Some(manifest), Some(receipt)) = (manifest, receipt) {
+        if validate_corpus_byte_verification_receipt(manifest, receipt)
+            && report.stage == CorpusQualificationStageV1::ProtocolFrozen
+        {
+            report.stage = CorpusQualificationStageV1::ByteVerified;
+            report.next_stage_requirements.retain(|item| !item.contains("byte verifier"));
+        } else {
+            report.issues.push(CorpusQualificationIssueV1::InvalidByteVerificationReceipt);
+            report.next_stage_requirements.push(
+                "Regenerate the byte-verification receipt from the exact manifest artifacts after protocol freeze".into()
+            );
+        }
+    }
+    report.report_sha256 = qualification_report_commitment(&report).unwrap_or_default();
+    report
 }
 
 /// Metadata-only candidate registry. No sample bytes, SHA-256 manifests or
