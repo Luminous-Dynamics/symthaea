@@ -3057,11 +3057,57 @@ async fn imported_work_midi_measure_maps(
     Ok(Json(receipt))
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ImportedAudioIntegrity {
+    VerifiedSha256,
+    LegacyUnverified,
+}
+
+/// Verify new imported audio artifacts against the exact digest in their
+/// summary. Old summaries deserialize with LegacyUnverified and no digest;
+/// they remain readable under that explicit legacy policy, but do not receive
+/// a verified-integrity response header.
+fn imported_audio_integrity(
+    audition_kind: symthaea_muse_protocol::ImportedAuditionKind,
+    expected_sha256: Option<&str>,
+    bytes: &[u8],
+) -> Result<ImportedAudioIntegrity, StatusCode> {
+    match expected_sha256 {
+        Some(expected) if expected == sha256_hex(bytes) => {
+            Ok(ImportedAudioIntegrity::VerifiedSha256)
+        }
+        Some(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        None if audition_kind == symthaea_muse_protocol::ImportedAuditionKind::LegacyUnverified => {
+            Ok(ImportedAudioIntegrity::LegacyUnverified)
+        }
+        None => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
 async fn imported_work_audio(AxPath(id): AxPath<String>) -> Result<Response, StatusCode> {
-    read_import_summary(&id)?;
+    let summary = read_import_summary(&id)?;
     let bytes = std::fs::read(Path::new(IMPORT_ROOT).join(id).join("audition.wav"))
         .map_err(|_| StatusCode::NOT_FOUND)?;
-    Ok(([(header::CONTENT_TYPE, "audio/wav")], bytes).into_response())
+    let integrity = imported_audio_integrity(
+        summary.audition_kind,
+        summary.audition_wav_sha256.as_deref(),
+        &bytes,
+    )?;
+    let integrity_header = match integrity {
+        ImportedAudioIntegrity::VerifiedSha256 => "verified-sha256",
+        ImportedAudioIntegrity::LegacyUnverified => "legacy-unverified",
+    };
+    Ok((
+        [
+            (header::CONTENT_TYPE, "audio/wav"),
+            (
+                axum::http::HeaderName::from_static("x-muse-audio-integrity"),
+                integrity_header,
+            ),
+        ],
+        bytes,
+    )
+        .into_response())
 }
 
 async fn teaching_summary()
@@ -6014,3 +6060,100 @@ mod notation_summary_tests {
 
 }
 
+
+
+#[cfg(test)]
+mod imported_audio_provenance_tests {
+    use super::*;
+
+    fn minimal_smf(format: u16) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"MThd");
+        bytes.extend_from_slice(&6u32.to_be_bytes());
+        bytes.extend_from_slice(&format.to_be_bytes());
+        bytes.extend_from_slice(&1u16.to_be_bytes());
+        bytes.extend_from_slice(&480u16.to_be_bytes());
+        bytes.extend_from_slice(b"MTrk");
+        bytes.extend_from_slice(&4u32.to_be_bytes());
+        bytes.extend_from_slice(&[0x00, 0xff, 0x2f, 0x00]);
+        bytes
+    }
+
+    #[test]
+    fn source_midi_audition_accepts_simultaneous_smf_formats_zero_and_one() {
+        assert!(validate_source_midi_audition(&minimal_smf(0)).is_ok());
+        assert!(validate_source_midi_audition(&minimal_smf(1)).is_ok());
+    }
+
+    #[test]
+    fn source_midi_audition_rejects_sequential_format_two() {
+        assert_eq!(
+            validate_source_midi_audition(&minimal_smf(2)),
+            Err(SourceMidiAuditionError::SequentialFormatUnsupported)
+        );
+    }
+
+    #[test]
+    fn source_midi_audition_rejects_malformed_bytes() {
+        assert!(matches!(
+            validate_source_midi_audition(b"not a standard MIDI file"),
+            Err(SourceMidiAuditionError::MalformedMidi(_))
+        ));
+    }
+
+    #[test]
+    fn materialized_source_midi_bytes_are_identical_to_the_upload() {
+        let source = minimal_smf(1);
+        let path = materialize_source_midi_audition(&source).unwrap();
+        let on_disk = std::fs::read(&path).unwrap();
+        assert_eq!(on_disk, source);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn new_import_audio_digest_accepts_exact_wav_bytes() {
+        let wav = b"RIFF-fixture-audition";
+        let digest = sha256_hex(wav);
+        assert_eq!(
+            imported_audio_integrity(
+                symthaea_muse_protocol::ImportedAuditionKind::SourceMidiPerformance,
+                Some(&digest),
+                wav,
+            ),
+            Ok(ImportedAudioIntegrity::VerifiedSha256)
+        );
+    }
+
+    #[test]
+    fn imported_audio_digest_rejects_tampered_wav() {
+        let expected = sha256_hex(b"original WAV");
+        assert_eq!(
+            imported_audio_integrity(
+                symthaea_muse_protocol::ImportedAuditionKind::ReconstructedScore,
+                Some(&expected),
+                b"modified WAV",
+            ),
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        );
+    }
+
+    #[test]
+    fn missing_digest_is_servable_only_under_explicit_legacy_policy() {
+        assert_eq!(
+            imported_audio_integrity(
+                symthaea_muse_protocol::ImportedAuditionKind::LegacyUnverified,
+                None,
+                b"legacy WAV",
+            ),
+            Ok(ImportedAudioIntegrity::LegacyUnverified)
+        );
+        assert_eq!(
+            imported_audio_integrity(
+                symthaea_muse_protocol::ImportedAuditionKind::ReconstructedScore,
+                None,
+                b"new WAV without digest",
+            ),
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        );
+    }
+}
