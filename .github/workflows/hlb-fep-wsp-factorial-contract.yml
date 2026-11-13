@@ -98,6 +98,14 @@ jobs:
           rustfmt --edition 2024 --check src/dynamics/cfc/network.rs
           rustfmt --edition 2024 --check src/dynamics/cfc/mod.rs
 
+      - name: Assert hierarchical information-gain test discovery
+        run: |
+          set -euo pipefail
+          cargo test --locked --release -p symthaea-fep --lib hierarchical_information_gain::tests -- --list > /tmp/hierarchical-information-gain-tests.txt
+          test -s /tmp/hierarchical-information-gain-tests.txt
+          discovered_count="$(awk '/hierarchical_information_gain::tests::.*: test$/ { count++ } END { print count + 0 }' /tmp/hierarchical-information-gain-tests.txt)"
+          echo "Discovered ${discovered_count} hierarchical information-gain tests"
+          test "${discovered_count}" -ge 7 || { echo "ERROR: expected at least 7 hierarchical information-gain tests"; exit 1; }
       - name: Test four-factor contract invariants
         run: |
           set -euo pipefail

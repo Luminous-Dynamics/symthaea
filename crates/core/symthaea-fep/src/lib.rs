@@ -140,6 +140,7 @@
 mod agent;
 mod bridge;
 pub mod free_energy;
+pub mod hierarchical_information_gain;
 pub mod generative_model;
 pub mod haptic_semantic_binder;
 pub mod hierarchical;
