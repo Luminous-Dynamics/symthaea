@@ -2827,9 +2827,12 @@ fn summarize_imported_notation_structure(
                 }
             }
             let unknown_part_count = part_count.saturating_sub(supported_part_count);
-            let status = if unknown_part_count == 0 && part_count > 0 {
+            let status = if unknown_part_count == 0
+                && notation_unknown_part_count == 0
+                && part_count > 0
+            {
                 "supported"
-            } else if supported_part_count > 0 {
+            } else if supported_part_count > 0 || notation_supported_part_count > 0 {
                 "partially_unknown"
             } else {
                 "unknown"
@@ -2837,8 +2840,8 @@ fn summarize_imported_notation_structure(
             let graph_sha256 = symthaea_muse::evidence_digest::canonical_json_sha256(&graphs)
                 .map_err(internal)?;
             let graph_json = serde_json::to_vec_pretty(&graphs).map_err(internal)?;
-            let explanation = (unknown_part_count > 0).then(|| {
-                "One or more parts lack a fully resolvable explicit measure map; inspect the per-part graph status before scoring or editing.".to_owned()
+            let explanation = (unknown_part_count > 0 || notation_unknown_part_count > 0).then(|| {
+                "One or more parts have unresolved measure-map or notation-event semantics; inspect both per-part statuses before scoring or editing.".to_owned()
             });
             Ok((
                 ImportedNotationStructureSummary {
@@ -6002,8 +6005,12 @@ mod notation_summary_tests {
     fn musicxml_graph_summary_commits_the_persisted_sidecar() {
         let xml = br#"<score-partwise><part id="P1">
             <measure number="1">
-                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
                 <note><rest/><duration>16</duration></note>
+                <backup><duration>16</duration></backup>
+                <forward><duration>16</duration></forward>
+                <direction><direction-type><dynamics><f/></dynamics></direction-type><offset>-2</offset><sound tempo="88"/></direction>
+                <harmony><root><root-step>G</root-step></root><kind>major</kind><offset>-4</offset></harmony>
                 <barline location="right" id="bar-1"><repeat direction="backward" times="2"/></barline>
             </measure>
         </part></score-partwise>"#;
@@ -6024,6 +6031,13 @@ mod notation_summary_tests {
         assert_eq!(summary.measure_count, 1);
         assert_eq!(summary.barline_event_count, 1);
         assert_eq!(summary.notation_event_count, 1);
+        assert_eq!(summary.notation_auxiliary_event_count, 2);
+        assert_eq!(summary.notation_attribute_event_count, 2);
+        assert_eq!(summary.notation_cursor_move_count, 2);
+        assert_eq!(summary.unpitched_event_count, 0);
+        assert_eq!(summary.cue_note_count, 0);
+        assert_eq!(summary.chord_member_count, 0);
+        assert_eq!(summary.time_modification_count, 0);
         assert_eq!(summary.notation_supported_part_count, 1);
         assert_eq!(summary.notation_unknown_part_count, 0);
         assert_eq!(summary.rest_event_count, 1);
