@@ -702,6 +702,14 @@ mod tests {
                 unknown_joining_method_is_not_promoted_to_reversible_design();
                 ("incomplete", Some("JoiningMethodUnknown"))
             }
+            "DESIGN-012-PERMANENT-NON-TARGET-SEAM" => {
+                permanent_non_target_seam_is_allowed_when_target_path_is_declared();
+                ("complete", None)
+            }
+            "DESIGN-013-NO-TARGET-JOINTS" => {
+                disassembly_intent_must_name_recovery_relevant_joints();
+                ("incomplete", Some("DisassemblyIntentWithoutTargetJoints"))
+            }
             other => panic!("unknown textile design corpus case: {other}"),
         }
     }
@@ -720,7 +728,7 @@ mod tests {
         let schema: serde_json::Value =
             serde_json::from_str(SCHEMA).expect("design schema must parse as JSON");
         assert_eq!(schema["properties"]["schema_version"]["const"], "0.1.0");
-        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(11));
+        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(13));
         assert_eq!(corpus["schema_version"], "0.1.0");
         assert_eq!(corpus["corpus_id"], "TEXTILE-DESIGN-CASES-001");
         assert_eq!(corpus["fixture_class"], "synthetic");
@@ -728,7 +736,7 @@ mod tests {
         let cases = corpus["cases"]
             .as_array()
             .expect("design cases must be an array");
-        assert_eq!(cases.len(), 11, "review design corpus count changes");
+        assert_eq!(cases.len(), 13, "review design corpus count changes");
         let mut seen = BTreeSet::new();
         for case in cases {
             let case_id = case["case_id"]
@@ -748,6 +756,6 @@ mod tests {
             assert_eq!(disposition, expected_disposition, "case {case_id} disposition");
             assert_eq!(reason, expected_reason, "case {case_id} reason");
         }
-        assert_eq!(seen.len(), 11);
+        assert_eq!(seen.len(), 13);
     }
 }
