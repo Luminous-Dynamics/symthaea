@@ -248,6 +248,7 @@ pub struct ComplexU1Mps {
     dense_input_charge_leakage_weight: f64,
     dense_reconstruction_max_residual: Option<f64>,
     dense_reconstruction_l2_residual: Option<f64>,
+    dense_svd_rank_by_charge_and_cut: Option<Vec<Vec<(i32, usize)>>>,
 }
 
 impl ComplexU1Mps {
@@ -318,6 +319,7 @@ impl ComplexU1Mps {
             dense_input_charge_leakage_weight: 0.0,
             dense_reconstruction_max_residual: None,
             dense_reconstruction_l2_residual: None,
+            dense_svd_rank_by_charge_and_cut: None,
         })
     }
 
@@ -374,6 +376,10 @@ impl ComplexU1Mps {
 
     pub fn dense_reconstruction_l2_residual(&self) -> Option<f64> {
         self.dense_reconstruction_l2_residual
+    }
+
+    pub fn dense_svd_rank_by_charge_and_cut(&self) -> Option<&[Vec<(i32, usize)>]> {
+        self.dense_svd_rank_by_charge_and_cut.as_deref()
     }
 
     pub fn maximum_bond_dimension(&self) -> usize {
@@ -471,8 +477,16 @@ impl ComplexU1Mps {
             }
             if (index.count_ones() as i32) != total_charge {
                 let forbidden = amplitude.norm();
+                if !forbidden.is_finite() {
+                    return Err(U1MpsError::NonFiniteTensorEntry { site: 0, index });
+                }
                 dense_input_charge_leakage_max = dense_input_charge_leakage_max.max(forbidden);
                 dense_input_charge_leakage_weight += forbidden * forbidden;
+                if !dense_input_charge_leakage_weight.is_finite() {
+                    return Err(U1MpsError::NonFiniteContraction(
+                        "dense input charge-leakage weight",
+                    ));
+                }
                 if forbidden > tolerance {
                     return Err(U1MpsError::DenseChargeLeakage {
                         basis_index: index,
@@ -489,6 +503,7 @@ impl ComplexU1Mps {
         let mut current = DMatrix::<Complex64>::from_row_slice(1, dense_dimension, amplitudes);
         let mut left_charges = vec![0_i32];
         let mut tensors = Vec::with_capacity(site_count);
+        let mut svd_rank_by_charge_and_cut = Vec::with_capacity(site_count.saturating_sub(1));
 
         for site in 0..(site_count - 1) {
             let suffix_sites = site_count - site - 1;
@@ -559,17 +574,43 @@ impl ComplexU1Mps {
                     rows: block_rows,
                     columns: block_columns,
                 })?;
-                let singular_values = decomposition.singular_values.iter().copied().collect();
+                // Remove exact zero singular directions only. Every positive
+                // singular value is retained, however small; no cutoff is applied.
+                let kept_indices: Vec<usize> = decomposition
+                    .singular_values
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, value)| (*value > 0.0).then_some(index))
+                    .collect();
+                if kept_indices.is_empty() {
+                    continue;
+                }
+                let kept_u = DMatrix::<Complex64>::from_fn(rows.len(), kept_indices.len(), |r, col| {
+                    u[(r, kept_indices[col])]
+                });
+                let kept_v_t =
+                    DMatrix::<Complex64>::from_fn(kept_indices.len(), columns.len(), |r, col| {
+                        v_t[(kept_indices[r], col)]
+                    });
+                let singular_values = kept_indices
+                    .iter()
+                    .map(|&index| decomposition.singular_values[index])
+                    .collect();
                 blocks.push(ChargeBlockSvd {
                     charge,
                     rows,
                     columns,
-                    u,
-                    v_t,
+                    u: kept_u,
+                    v_t: kept_v_t,
                     singular_values,
                 });
             }
 
+            let cut_ranks: Vec<(i32, usize)> = blocks
+                .iter()
+                .map(|block| (block.charge, block.singular_values.len()))
+                .collect();
+            svd_rank_by_charge_and_cut.push(cut_ranks);
             let next_bond_dimension = blocks.iter().try_fold(0_usize, |sum, block| {
                 sum.checked_add(block.singular_values.len())
                     .ok_or(U1MpsError::DimensionOverflow)
@@ -660,6 +701,7 @@ impl ComplexU1Mps {
         }
         state.dense_reconstruction_max_residual = Some(maximum_residual);
         state.dense_reconstruction_l2_residual = Some(residual_squared.sqrt());
+        state.dense_svd_rank_by_charge_and_cut = Some(svd_rank_by_charge_and_cut);
         Ok(state)
     }
 
