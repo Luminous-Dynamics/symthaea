@@ -25,7 +25,6 @@
 //! application, charge-block SVD, TEBD, truncation or discarded-weight bounds.
 
 use nalgebra::DMatrix;
-use nalgebra::DMatrix;
 use num_complex::Complex64;
 
 /// A single-site qubit tensor with explicit integer charges on both virtual bonds.
@@ -903,8 +902,8 @@ impl U1TwoSiteGate {
         }
 
         let mut charge_conservation_residual: f64 = 0.0;
-        for output in 0..4 {
-            for input in 0..4 {
+        for output in 0_usize..4 {
+            for input in 0_usize..4 {
                 if output.count_ones() != input.count_ones() {
                     charge_conservation_residual =
                         charge_conservation_residual.max(matrix[output][input].norm());
@@ -912,10 +911,10 @@ impl U1TwoSiteGate {
             }
         }
         if charge_conservation_residual > tolerance {
-            let witness = (0..4)
-                .flat_map(|output| (0..4).map(move |input| (output, input)))
+            let witness = (0_usize..4)
+                .flat_map(|output| (0_usize..4).map(move |input| (output, input)))
                 .find(|(output, input)| {
-                    output.count_ones() != input.count_ones()
+                    (*output).count_ones() != (*input).count_ones()
                         && matrix[*output][*input].norm() > tolerance
                 })
                 .unwrap_or((0, 0));
