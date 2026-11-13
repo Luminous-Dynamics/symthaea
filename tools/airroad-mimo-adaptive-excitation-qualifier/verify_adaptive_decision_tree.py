@@ -137,6 +137,7 @@ def main() -> None:
     assert action2["approved"] is True and action3["approved"] is True
     assert action_admissible(action2, domain) and action_admissible(action3, domain)
     assert deterministic_first_action(data["candidate_actions"], domain) == "action-omega-2"
+    assert data["expected_policy"]["first_action"] == deterministic_first_action(data["candidate_actions"], domain)
     assert q(action2["cost"]) == q(action3["cost"]) == 1
     assert q(action2["omega"]) == 2 and q(action3["omega"]) == 3
 
