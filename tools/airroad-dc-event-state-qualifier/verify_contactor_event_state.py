@@ -155,12 +155,10 @@ def main() -> None:
 
     # Silent reset controls: zeroing either state erases its stored energy.
     zero_state = (Fraction(0), Fraction(0))
-    reset_i_initial = add(scale(square_nonnegative(zero_state), L / 2), e_c_initial)
     reset_i_accounted = add(e_c_final, e_fault)
-    assert not overlap(reset_i_initial, reset_i_accounted)
-    reset_v_initial = add(e_l_initial, scale(square_nonnegative(zero_state), C / 2))
+    assert not overlap(e_initial_total, reset_i_accounted)
     reset_v_accounted = add(e_l_final, e_comm)
-    assert not overlap(reset_v_initial, reset_v_accounted)
+    assert not overlap(e_initial_total, reset_v_accounted)
 
     controls = {item["id"]: item["expected"] for item in data["negative_controls"]}
     assert controls["silent-inductor-current-reset"] == "reject_energy_loss"
