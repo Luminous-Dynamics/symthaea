@@ -116,7 +116,7 @@ cargo run -p xtask -- edlc-sequential-reserve-audit
 cargo test -p xtask edlc_sequential_reserve
 ```
 
-The command and 12 authored unit tests are committed to the research branch. Neither command is claimed to have run in this environment.
+The command and 13 authored unit tests are committed to the research branch. Neither command is claimed to have run in this environment.
 
 ## 5. Literature and industry position
 
@@ -146,7 +146,7 @@ These are proposed engineering targets, not established standards or results:
 | G5 independent replication | Same frozen profile across at least three labs, with instrument/fixture calibration and device/lot traceability | External credibility |
 | G6 production | Process capability, yield, cost, repairability, recycling and field-outage evidence | Commercial readiness |
 
-For context, under an ideal independent, identically distributed binomial model with **zero** failed device sequences, the minimum sample sizes for a one-sided 95% lower confidence bound are 29 sequences for a 90% reliability floor, 59 for 95%, and 299 for 99%. These are mathematical lower bounds, not a substitute for power analysis. Repeated events are not independent devices; lot/lab clustering, multiple strata, censoring and nonzero failures require an appropriate design and analysis. A multi-stratum programme should not reuse one nominal 95% per-stratum interval and imply simultaneous 95% coverage.
+For context, under an ideal independent, identically distributed binomial model with **zero** failed device sequences, the minimum sample sizes for a one-sided 95% lower confidence bound are 29 sequences for a 90% reliability floor, 59 for 95%, and 299 for 99%. For zero observed failures, the exact one-sided binomial lower bound is (p_L = 0.05^{1/n}); the minimum (n) for a target floor (p_0) is (lceil\log(0.05)/\log(p_0)\rceil). These are mathematical lower bounds, not a substitute for power analysis. Repeated events are not independent devices; lot/lab clustering, multiple strata, censoring and nonzero failures require an appropriate design and analysis. A multi-stratum programme should not reuse one nominal 95% per-stratum interval and imply simultaneous 95% coverage.
 
 ## 7. What would beat current practice
 
