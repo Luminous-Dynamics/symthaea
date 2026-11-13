@@ -62,7 +62,8 @@
         "denominator": "1"
       },
       "remains_connected_after_source_contactor_open": true
-    }
+    },
+    "event_id": "synthetic-source-contactor-open-001"
   },
   "post_event_mode": {
     "elapsed_time_s": {
