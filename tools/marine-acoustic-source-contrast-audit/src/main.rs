@@ -20,7 +20,7 @@ enum RightsStatus {
     Restricted,
 }
 
-#[derive(Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
 #[serde(rename_all = "snake_case")]
 enum SourceKind {
     PropellerCavitation,
@@ -113,7 +113,7 @@ struct Observation {
     bands: Vec<BandMeasurement>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(deny_unknown_fields)]
 struct SourceStateEvidence {
     source: SourceKind,
@@ -146,11 +146,14 @@ struct AuditReport {
     source_data_sha256: String,
     target_source: &'static str,
     design_evidence_sha256: String,
+    intervention_protocol_sha256: String,
     baseline_hydrophone_instrument_id: String,
     calibration_certificate_sha256: String,
     timebase_receipt_sha256: String,
     baseline_acoustic_trace_sha256: String,
     candidate_acoustic_trace_sha256: String,
+    baseline_source_states: Vec<SourceStateEvidence>,
+    candidate_source_states: Vec<SourceStateEvidence>,
     service_fingerprint_sha256: String,
     environment_fingerprint_sha256: String,
     design_strategy: &'static str,
@@ -490,11 +493,14 @@ fn audit(case: &Case) -> AuditReport {
         source_data_sha256: case.source.raw_data_sha256.clone(),
         target_source: case.target_source.name(),
         design_evidence_sha256: case.design_evidence_sha256.clone(),
+        intervention_protocol_sha256: case.intervention_protocol_sha256.clone(),
         baseline_hydrophone_instrument_id: case.baseline.hydrophone_instrument_id.clone(),
         calibration_certificate_sha256: case.baseline.calibration_certificate_sha256.clone(),
         timebase_receipt_sha256: case.baseline.timebase_receipt_sha256.clone(),
         baseline_acoustic_trace_sha256: case.baseline.acoustic_trace_sha256.clone(),
         candidate_acoustic_trace_sha256: case.candidate.acoustic_trace_sha256.clone(),
+        baseline_source_states: case.baseline.source_states.clone(),
+        candidate_source_states: case.candidate.source_states.clone(),
         service_fingerprint_sha256: case.service_fingerprint_sha256.clone(),
         environment_fingerprint_sha256: case.environment_fingerprint_sha256.clone(),
         design_strategy: match case.design_strategy {
@@ -584,7 +590,11 @@ mod tests {
                 evidence_sha256: if source == SourceKind::PropellerCavitation {
                     digest(target_digest)
                 } else {
-                    let non_target_digest_chars = ['b', 'c', 'd', 'e', 'f', '0'];
+                    let non_target_digest_chars = if target_digest == '4' {
+                        ['a', 'b', 'c', 'd', 'e', 'f']
+                    } else {
+                        ['6', '7', '8', '9', 'a', 'b']
+                    };
                     digest(non_target_digest_chars[index - 1])
                 },
                 measured_value: if source == SourceKind::PropellerCavitation && state == "cavitating" {
@@ -711,6 +721,9 @@ mod tests {
         let input = case();
         let report = audit(&input);
         assert_eq!(report.design_evidence_sha256, digest('7'));
+        assert_eq!(report.intervention_protocol_sha256, input.intervention_protocol_sha256);
+        assert_eq!(report.baseline_source_states.len(), 7);
+        assert_eq!(report.candidate_source_states.len(), 7);
         assert_eq!(report.source_dataset_id, input.source.dataset_id);
         assert_eq!(report.source_data_sha256, input.source.raw_data_sha256);
         assert_eq!(report.baseline_acoustic_trace_sha256, input.baseline.acoustic_trace_sha256);
@@ -786,6 +799,14 @@ mod tests {
             .collect();
         assert!(digests.iter().all(|digest| is_sha256(digest)));
         assert_eq!(digests.iter().collect::<BTreeSet<_>>().len(), digests.len());
+    }
+
+    #[test]
+    fn each_source_state_observation_has_a_distinct_baseline_and_candidate_digest() {
+        let input = case();
+        for (baseline, candidate) in input.baseline.source_states.iter().zip(&input.candidate.source_states) {
+            assert_ne!(baseline.evidence_sha256, candidate.evidence_sha256);
+        }
     }
 
     #[test]
