@@ -818,7 +818,7 @@ mod tests {
         assert_eq!(events.note_events[0].score_offset, RationalBeat::new(0, 1).unwrap());
         assert_eq!(events.note_events[1].score_offset, RationalBeat::new(0, 1).unwrap());
         assert!(events.note_events[1].is_chord_member);
-        assert_eq!(events.note_events[1].chord_anchor_source_order, Some(0));
+        assert_eq!(events.note_events[1].chord_anchor_source_order, Some(2));
         assert_eq!(events.note_events[2].score_offset, RationalBeat::new(4, 1).unwrap());
     }
 
