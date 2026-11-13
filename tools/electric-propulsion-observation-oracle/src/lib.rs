@@ -537,7 +537,7 @@ pub fn derive_motor_map_operating_point(
         || !non_empty(&point.evidence_manifest_digest)
     {
         return Err(ObservationError::InvalidMotorMapOperatingPoint(
-            "synchronized run, asset, configuration, context and evidence identities must be present",
+            "run, asset, config, context and evidence IDs are required",
         ));
     }
 
@@ -560,12 +560,16 @@ pub fn derive_motor_map_operating_point(
         .observations
         .iter()
         .find(|observation| observation.channel_id == torque_channel_id)
-        .ok_or_else(|| ObservationError::MissingRequiredChannel(torque_channel_id.to_owned()))?;
+        .ok_or_else(|| {
+            ObservationError::MissingRequiredChannel(torque_channel_id.to_owned())
+        })?;
     let speed = point
         .observations
         .iter()
         .find(|observation| observation.channel_id == speed_channel_id)
-        .ok_or_else(|| ObservationError::MissingRequiredChannel(speed_channel_id.to_owned()))?;
+        .ok_or_else(|| {
+            ObservationError::MissingRequiredChannel(speed_channel_id.to_owned())
+        })?;
 
     for observation in [torque, speed] {
         if !non_empty(&observation.channel_id)
@@ -576,7 +580,7 @@ pub fn derive_motor_map_operating_point(
             || !non_empty(&observation.clock_source_id)
         {
             return Err(ObservationError::InvalidMotorMapOperatingPoint(
-                "selected motor-map observations require channel, boundary, calibration, raw-data and clock identities",
+                "selected observations require channel, calibration, raw-data and clock IDs",
             ));
         }
         let expected_offset =
@@ -593,7 +597,7 @@ pub fn derive_motor_map_operating_point(
             || observation.combined_time_error_ns > point.maximum_combined_time_error_ns
         {
             return Err(ObservationError::InvalidMotorMapOperatingPoint(
-                "selected observation timing provenance is inconsistent with its timestamp and synchronization envelope",
+                "selected observation timing does not match its declared synchronization envelope",
             ));
         }
     }
