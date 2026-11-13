@@ -206,8 +206,8 @@
       "authors": "Meng et al.",
       "published": "2026-10-05",
       "evidence_class": "peer_reviewed_literature",
-      "permitted_use": "Research comparator for dual-gradient MXene/polypyrrole@CNT gel electrodes; abstract-reported 42.7 mg cm-2 loading, 6.2 F cm-2 areal capacitance, 0.86 mWh cm-2 areal energy, 71.1% capacitance retention across a 40-fold current-density increase and 98.8% retention after 15,000 cycles",
-      "prohibited_inference": "Abstract does not establish complete-device gravimetric/volumetric denominator, full inactive-mass or packaging boundary, process yield, independent-lab reproducibility or commercial performance; do not infer Wh/kg or Wh/L, and do not conflate with the distinct July 2026 carbon/Zn pouch-cell comparator"
+      "permitted_use": "Research comparator for stepwise multi-ink 3D-printed dual-gradient MXene/polypyrrole@CNT gel electrodes: electrolyte-facing region with larger microlattice openings, lower micron-scale porosity and higher specific surface area; current-collector side with smaller openings, higher micron-scale porosity and coarser transport pores; micro-CT verification of geometry; COMSOL-predicted suppression of concentration polarization and homogenized reaction-current distribution; abstract-reported 42.7 mg cm-2 loading, 6.2 F cm-2 areal capacitance, 0.86 mWh cm-2 areal energy, 71.1% retention across a 40-fold current-density increase and 98.8% after 15,000 cycles",
+      "prohibited_inference": "COMSOL local reaction-current maps are simulated, not direct current measurements; micro-CT verifies geometry, not local reaction current. Abstract does not establish complete-device gravimetric/volumetric denominator, full inactive-mass or packaging boundary, process yield, independent-lab reproducibility or commercial performance. Data are stated by authors to be available from corresponding author on reasonable request; obtain supporting information and any needed data/rights before exact reproduction. Do not infer Wh/kg or Wh/L, and do not conflate with the distinct July 2026 carbon/Zn pouch-cell comparator."
     }
   ]
 }
