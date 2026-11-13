@@ -251,6 +251,38 @@
         "denominator": "1"
       },
       "approved": false
+    },
+    "out_of_domain_action": {
+      "action_id": "out-of-domain",
+      "omega": {
+        "numerator": "4",
+        "denominator": "1"
+      },
+      "driven_port_id": "bus-b",
+      "observed_port_id": "bus-a",
+      "hard_disk_radius": {
+        "numerator": "1",
+        "denominator": "10"
+      },
+      "cost": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "approved": true
+    },
+    "missing_cost_action": {
+      "action_id": "missing-cost",
+      "omega": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "driven_port_id": "bus-b",
+      "observed_port_id": "bus-a",
+      "hard_disk_radius": {
+        "numerator": "1",
+        "denominator": "10"
+      },
+      "approved": true
     }
   },
   "negative_controls": [
@@ -299,5 +331,15 @@
     "Synthetic exact-rational adaptive decision-tree reference only.",
     "Uniform prior is used only for the 5/3 expected test-count calculation.",
     "No calibrated probabilistic EIG or physical test authority is established."
-  ]
+  ],
+  "model_set_valid_frequency_domain_rad_s": {
+    "lower": {
+      "numerator": "2",
+      "denominator": "1"
+    },
+    "upper": {
+      "numerator": "3",
+      "denominator": "1"
+    }
+  }
 }
