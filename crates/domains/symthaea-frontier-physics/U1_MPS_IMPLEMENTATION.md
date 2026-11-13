@@ -119,6 +119,20 @@ For a site's left-isometry matrix \(A\), the receipt measures \(\|A^\dagger A-I\
 
 This receipt is an independent check of the canonical form, not a declaration that an arbitrary MPS was already canonical. The next integration step is to make TEBD call this method immediately before each local truncation and promote the global error flag only when every receipt and contribution passes.
 
+
+## Globally qualified TEBD truncation receipts
+
+The integrated layer executor now canonicalizes the current MPS around each active bond immediately before applying that gate and its truncation. It stores the per-gate \`U1CanonicalGaugeReceipt\` and passes it to the truncation ledger.
+
+For each qualified gate \(j\), the global error contribution is bounded by
+\[
+e_j \le \delta^{\mathrm{gauge}}_j
++ \|L_j\|_{\mathrm{upper}}\|R_j\|_{\mathrm{upper}}\sqrt{w_j},
+\]
+where \(\delta^{\mathrm{gauge}}_j\) is the measured MPS state-reconstruction L2 residual introduced by finite-precision canonicalization, \(w_j\) is the local discarded squared Schmidt weight, and the two exterior operator-norm upper bounds come from the receipt's per-site Gram residuals. The layer's cumulative global bound is the sum of these contributions, valid for unitary gates and orthogonal Schmidt projections without nonlinear renormalization.
+
+A single missing, mismatched or failing receipt invalidates the global bound for the entire layer. The local discarded-weight ledger remains available, but the global upper bound is cleared and cannot be silently re-enabled later in that layer. Every result carries both the individual receipts and the global qualification flag.
+
 ## Explicit limitations
 
 This increment does **not** yet implement:
