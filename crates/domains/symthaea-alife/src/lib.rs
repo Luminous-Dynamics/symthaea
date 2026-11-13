@@ -25,6 +25,7 @@
 
 pub mod agent_id;
 pub mod coalition;
+pub mod comparative_baseline;
 pub mod earth_forcing;
 pub mod encounter;
 pub mod environment;
