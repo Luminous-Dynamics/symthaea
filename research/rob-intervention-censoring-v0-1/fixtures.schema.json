@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MCR2 intervention-censoring synthetic fixture envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "description", "episodes", "randomized_policy_trials"],
+  "properties": {
+    "schema_version": {"const": "mcr2-intervention-censoring-fixtures-v0.1"},
+    "description": {"type": "string", "minLength": 1},
+    "episodes": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/episode"}},
+    "randomized_policy_trials": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/episode"}}
+  },
+  "$defs": {
+    "episode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["episode_id", "assigned_policy", "assignment_design", "followup_end", "event_time", "event_kind", "intervention_time", "intervention_delivery_known", "time_zero_valid", "clock_valid", "instrumentation_valid", "followup_end_reason", "policy_endpoint", "policy_followup_complete"],
+      "properties": {
+        "episode_id": {"type": "string", "minLength": 1},
+        "assigned_policy": {"type": "string", "minLength": 1},
+        "assignment_design": {"enum": ["randomized_blocked", "randomized_unblocked", "observational"]},
+        "followup_end": {"type": "integer", "minimum": 1},
+        "event_time": {"type": ["integer", "null"], "minimum": 0},
+        "event_kind": {"enum": ["boundary", "competing", null]},
+        "intervention_time": {"type": ["integer", "null"], "minimum": 0},
+        "intervention_delivery_known": {"type": "boolean"},
+        "time_zero_valid": {"type": "boolean"},
+        "clock_valid": {"type": "boolean"},
+        "instrumentation_valid": {"type": "boolean"},
+        "followup_end_reason": {"enum": ["scheduled_admin", "telemetry_loss", "abort", "unknown"]},
+        "policy_endpoint": {"enum": ["safe_success", "boundary_event", "task_failure", "competing_event", null]},
+        "policy_followup_complete": {"type": "boolean"},
+        "censor_model_qualified": {"type": "boolean", "default": false},
+        "censoring_positivity_supported": {"type": "boolean", "default": false},
+        "censoring_weights_supported": {"type": "boolean", "default": false}
+      }
+    }
+  }
+}
