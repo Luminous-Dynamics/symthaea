@@ -105,13 +105,23 @@ def main() -> None:
     # Verify the exact derivative supremum L=4. Let u=t^2 in [0,1/4].
     # h(u)=4u(1-8u)^2 has stationary points 1/8 and 1/24, with values 0
     # and 2/27; endpoint values are 0 and 1. Thus h<=1 and |d'|<=4.
-    h_0 = Fraction(0)
-    h_quarter = 4 * Fraction(1, 4) * (1 - 8 * Fraction(1, 4)) ** 2
-    h_eighth = 4 * Fraction(1, 8) * (1 - 8 * Fraction(1, 8)) ** 2
-    h_twentyfourth = 4 * Fraction(1, 24) * (1 - 8 * Fraction(1, 24)) ** 2
-    assert (h_0, h_quarter, h_eighth, h_twentyfourth) == (
-        Fraction(0), Fraction(1), Fraction(0), Fraction(2, 27)
+    h = lambda u: 4 * u * (1 - 8 * u) ** 2
+    h_prime = lambda u: 4 - 128 * u + 768 * u**2
+    h_second = lambda u: -128 + 1536 * u
+    stationary_u = (Fraction(1, 24), Fraction(1, 8))
+    h_values = (h(Fraction(0)), h(Fraction(1, 4)),
+                h(stationary_u[0]), h(stationary_u[1]))
+    assert h_values == (
+        Fraction(0), Fraction(1), Fraction(2, 27), Fraction(0)
     )
+    assert all(h_prime(u) == 0 for u in stationary_u)
+    # The derivative is a quadratic with exactly these two roots; checking
+    # both stationary points and both interval endpoints proves h<=1.
+    assert h_prime(Fraction(0)) > 0
+    assert h_prime(Fraction(1, 4)) > 0
+    assert h_second(Fraction(1, 24)) < 0
+    assert h_second(Fraction(1, 8)) > 0
+    assert max(h_values) == 1
     lipschitz = q(data["exact_certificate"]["derivative_absolute_bound"])
     assert lipschitz == 4
     assert lipschitz**2 == q(data["exact_certificate"]["derivative_squared_bound"]) == 16
