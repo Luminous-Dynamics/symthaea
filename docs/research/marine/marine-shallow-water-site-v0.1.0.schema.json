@@ -689,13 +689,14 @@
       "additionalProperties": false,
       "required": [
         "band_id",
-        "quantity",
         "center_frequency_hz",
-        "site_cutoff_frequency_hz",
+        "evidence_sha256",
+        "expanded_uncertainty_confidence_level",
+        "expanded_uncertainty_db",
         "propagation_method_id",
         "propagation_method_revision",
-        "expanded_uncertainty_db",
-        "evidence_sha256"
+        "quantity",
+        "site_cutoff_frequency_hz"
       ],
       "properties": {
         "band_id": {
@@ -735,6 +736,11 @@
         },
         "evidence_sha256": {
           "$ref": "#/$defs/digest"
+        },
+        "expanded_uncertainty_confidence_level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
         }
       }
     },
