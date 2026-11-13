@@ -1,6 +1,6 @@
-# Symthaea Rust toolchain qualification v0.2
+# Symthaea Rust toolchain qualification v0.3
 
-**Status:** stacked on the workspace-integrity prerequisite PR #8674. The repository's declared default remains Rust/Cargo 1.96.0. Rust/Cargo 1.99.1 is a candidate only; no default toolchain promotion is proposed.
+**Status:** stacked on the workspace-integrity prerequisite PR #8674 and the generated lockfile repair PR #11792. The repository's declared default remains Rust/Cargo 1.96.0. Rust 1.99.1 remains an intermediate stable comparison point; Rust 1.100.0 is the current stable candidate. No default toolchain promotion is proposed.
 
 ## Why this is stacked
 
@@ -9,33 +9,48 @@ The main branch's `crates/core/*` glob discovers three directories that do not c
 - `crates/core/symthaea-observation-attestation`;
 - `crates/domains/symthaea-rea-evidence-verifier`.
 
-PR #8674 proposes explicit exclusions for those source-only/incomplete paths, with no source deletion, placeholder crate, or weakened gate. Its updated exact head has a prior workspace metadata/buildability pass. This qualification is based on that workspace-integrity branch so it does not silently work around invalid workspace discovery.
+PR #8674 proposes explicit exclusions for those source-only/incomplete paths, with no source deletion, placeholder crate, or weakened gate. PR #11792 repairs a distinct Cargo.lock edge for `sha2 0.10.9` in `symthaea-epistemic-types`, generated under Rust 1.96.0. This qualification stacks on those exact prerequisites rather than bypassing workspace or lockfile failures.
 
-## Toolchains and scope
+## Three exact toolchains
 
-- Baseline: Rust/Cargo 1.96.0, matching the root `rust-toolchain.toml`.
-- Candidate: Rust/Cargo 1.99.1.
-- Every command uses explicit `cargo +<version>` / `rustc +<version>` selectors. The repository toolchain file can otherwise override the version selected by a CI setup action.
-- Both jobs run against identical source and unchanged Cargo.lock.
+| Role | rustc / Cargo | Meaning |
+|---|---|---|
+| Baseline | 1.96.0 | Current root `rust-toolchain.toml` pin |
+| Intermediate | 1.99.1 | Previous stable release reference |
+| Candidate | 1.100.0 | Current stable release (Nov 12, 2026) |
+
+Every command uses explicit `cargo +<version>` / `rustc +<version>` selectors. The repository toolchain file can otherwise override the version selected by a CI setup action. The intermediate and candidate jobs check out the exact same PR head commit as the baseline.
+
+## Focused packages and qualification
 
 The focused packages are:
 - `symthaea-core`;
 - `symthaea-fep`.
 
-Each toolchain runs locked workspace metadata, package formatting, library compilation, library unit tests, Clippy and rustdoc. The workflow intentionally avoids `--all-targets` and does not claim that all repository packages, target triples, feature combinations, CUDA, WASM, robotics or hardware integrations are qualified.
+Each toolchain independently runs locked workspace metadata, package formatting, library compilation, library unit tests, Clippy and rustdoc, then checks Cargo.lock immutability. A disposable Git archive is used for an unlocked lockfile-drift diagnosis if a compile step fails; the checked-out lockfile is never modified by that diagnostic.
+
+The workflow intentionally avoids `--all-targets` and does not claim that all repository packages, target triples, feature combinations, CUDA, WASM, robotics or hardware integrations are qualified. The two selected core libraries are a first, bounded qualification cell.
+
+## Rust 1.100 changes to watch
+
+1. **Never type stabilization and fallback change.** Never-to-any fallback changes from `()` to `!` across all editions, not just 2024. Older-edition generic code that accidentally depended on unit fallback can now fail or change inference. Core-package compilation under the exact candidate is necessary but does not prove all external/workspace crates are migrated.
+2. **Cargo unused-dependency lint.** Cargo's own `cargo::unused_dependencies` lint reports dependencies not used by any relevant build target. It does not report unused dev-dependencies and may require all build targets before it can decide.
+3. **Cargo publication-age policy.** Cargo now has stable dependency cooldown resolution; we should test it against a deterministic local sparse registry, not just assume a configuration parses.
+4. **Cargo intermediate build layout.** Downstream tools should use Cargo JSON `compiler-artifact` messages, not private `target/debug/deps`/build paths.
+5. **Sample-based PGO.** `-Cprofile-sample-use` is stabilized. This opens a measured optimization path for real HDC/LTC/FEP workloads: collect representative CPU samples, build with the profile, then compare output correctness and runtime. It is not automatically a performance win.
 
 ## Non-goals and safety
 
-- No change to the default `rust-toolchain.toml`.
-- No change to Cargo.toml, Cargo.lock, edition, package MSRV or dependencies.
-- No change to default CI jobs or its large feature matrix.
+- No change to default `rust-toolchain.toml`.
+- No change to Cargo.toml, Cargo.lock, edition, package MSRV or dependency versions in this qualification branch.
+- No change to default CI jobs or the large workspace feature matrix.
 - No Nixpkgs/flake update.
-- No scientific model code, experiment seed, runtime parameters or generated artifact changes.
+- No scientific model code, experiment seed, runtime parameter or generated artifact changes.
 - No live host changes.
 
 ## Performance and SOTA programme
 
-The first candidate gate establishes compatibility, not speed. The next opt-in phase should compare:
+The first candidate gate establishes compatibility, not speed.
 
 ### Compiler/build
 - Clean-target `cargo check`, debug and release builds.
@@ -44,6 +59,7 @@ The first candidate gate establishes compatibility, not speed. The next opt-in p
 - Cargo `--timings` critical path by package.
 - Repeat-build output reproducibility.
 - sccache hit/miss rate measured in a separate profile.
+- PGO with and without sample profiles, only after a stable baseline workload has been frozen.
 
 Use upstream `rustc-perf` for the general compiler ecosystem baseline; use Cargo timings to separate compiler cost from dependency graph/build-script/linker cost.
 
@@ -68,9 +84,13 @@ Use existing Criterion targets `hdc_benchmarks`, `hdc_simd_compare`, `hdc_ltc_le
 
 ## Promotion rule
 
-Keep Rust 1.96.0 as the default until both exact toolchains pass the named gates, candidate-only failures are understood, numerical differences are explained, and separate benchmark results support any claimed improvement. A later default pin change requires its own PR.
+Keep Rust 1.96.0 as the default until all three exact toolchains pass the named core-package gates, candidate-only failures are understood, numerical differences are explained, and separate benchmark results support any claimed improvement. A later default pin change requires its own PR.
 
 ## References
+
+- Rust 1.100.0 announcement: https://blog.rust-lang.org/2026/11/12/Rust-1.100.0/
 - Rust compiler performance testing: https://rustc-dev-guide.rust-lang.org/tests/perf.html
+- Rust PGO / sample PGO: https://doc.rust-lang.org/rustc/profile-guided-optimization.html
+- Never-type fallback migration note: https://doc.rust-lang.org/beta/edition-guide/rust-2024/never-type-fallback.html
 - Cargo build timings: https://doc.rust-lang.org/cargo/reference/timings.html
 - Criterion.rs: https://bheisler.github.io/criterion.rs/book/
