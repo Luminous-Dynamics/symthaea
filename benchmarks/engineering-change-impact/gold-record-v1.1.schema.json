@@ -969,6 +969,15 @@
               "EVIDENCE_FRONTIER_INCOMPLETE"
             ]
           }
+        },
+        "evidence_validity_at_target_time": {
+          "enum": [
+            "valid",
+            "invalid",
+            "indeterminate",
+            "not_applicable",
+            "not_assessed"
+          ]
         }
       }
     },
@@ -1281,6 +1290,7 @@
           "type": "object",
           "additionalProperties": false,
           "required": [
+            "evidence_validity_at_target_time",
             "source_availability",
             "system_availability",
             "run_context_presence",
@@ -1327,6 +1337,15 @@
                 "indeterminate",
                 "not_applicable"
               ]
+            },
+            "evidence_validity_at_target_time": {
+              "enum": [
+                "valid",
+                "invalid",
+                "indeterminate",
+                "not_applicable",
+                "not_assessed"
+              ]
             }
           }
         },
@@ -1338,38 +1357,6 @@
         }
       },
       "allOf": [
-        {
-          "if": {
-            "properties": {
-              "source_version": {
-                "properties": {
-                  "identity_state": {
-                    "const": "known"
-                  }
-                },
-                "required": [
-                  "identity_state"
-                ]
-              }
-            },
-            "required": [
-              "source_version"
-            ]
-          },
-          "then": {
-            "properties": {
-              "outcome": {
-                "properties": {
-                  "source_availability": {
-                    "not": {
-                      "const": "admissible"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
         {
           "if": {
             "properties": {
@@ -1541,6 +1528,248 @@
                         "const": "permitted"
                       }
                     }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "source_availability": {
+                    "const": "admissible"
+                  }
+                },
+                "required": [
+                  "source_availability"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_version": {
+                "properties": {
+                  "identity_state": {
+                    "const": "known"
+                  }
+                },
+                "required": [
+                  "identity_state"
+                ]
+              },
+              "availability": {
+                "anyOf": [
+                  {
+                    "properties": {
+                      "source_publication": {
+                        "properties": {
+                          "state": {
+                            "const": "observed"
+                          }
+                        },
+                        "required": [
+                          "state"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "issuer_availability": {
+                        "properties": {
+                          "state": {
+                            "const": "observed"
+                          }
+                        },
+                        "required": [
+                          "state"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "system_availability": {
+                    "const": "available"
+                  }
+                },
+                "required": [
+                  "system_availability"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "source_availability": {
+                    "const": "admissible"
+                  }
+                }
+              },
+              "availability": {
+                "properties": {
+                  "acquisition_ingestion": {
+                    "properties": {
+                      "state": {
+                        "const": "observed"
+                      }
+                    },
+                    "required": [
+                      "state"
+                    ]
+                  }
+                },
+                "anyOf": [
+                  {
+                    "properties": {
+                      "derived_materialization": {
+                        "properties": {
+                          "state": {
+                            "const": "observed"
+                          }
+                        },
+                        "required": [
+                          "state"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "properties": {
+                      "derived_materialization": {
+                        "properties": {
+                          "state": {
+                            "const": "not_applicable"
+                          }
+                        },
+                        "required": [
+                          "state"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "run_context_presence": {
+                    "const": "included"
+                  }
+                },
+                "required": [
+                  "run_context_presence"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "system_availability": {
+                    "const": "available"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "evidence_validity_at_target_time": {
+                    "enum": [
+                      "valid",
+                      "invalid"
+                    ]
+                  }
+                },
+                "required": [
+                  "evidence_validity_at_target_time"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "target_world_time": {
+                "properties": {
+                  "state": {
+                    "const": "known"
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "target_world_time": {
+                "properties": {
+                  "state": {
+                    "enum": [
+                      "unknown",
+                      "not_applicable"
+                    ]
+                  }
+                },
+                "required": [
+                  "state"
+                ]
+              }
+            },
+            "required": [
+              "target_world_time"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "evidence_validity_at_target_time": {
+                    "enum": [
+                      "indeterminate",
+                      "not_applicable",
+                      "not_assessed"
+                    ]
                   }
                 }
               }
