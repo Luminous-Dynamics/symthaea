@@ -604,7 +604,9 @@ fn validate_option_reserve_count(
     if let Some(reserve) = reserves.get(&ReserveKind::RecoveryOptionCount) {
         if reserve.disposition == EvidenceDisposition::Qualified
             && reserve.terminal_lower_bound
-                != Some(u64::from(summary.option_set.terminal_qualified_option_count))
+                != Some(u64::from(
+                    summary.option_set.terminal_qualified_option_count,
+                ))
         {
             return Err(CapabilityRetentionError::OptionSetReserveCountMismatch {
                 arm_id: arm_id.to_owned(),
@@ -834,9 +836,7 @@ pub fn compare_work_and_terminal_capability(
             "independence_receipt_digest",
             &cluster.independence_receipt_digest,
         )
-        .map_err(|_| CapabilityRetentionError::MissingClusterReceipt(
-            cluster.cluster_id.clone(),
-        ))?;
+        .map_err(|_| CapabilityRetentionError::MissingClusterReceipt(cluster.cluster_id.clone()))?;
 
         if !cluster_ids.insert(cluster.cluster_id.clone()) {
             return Err(CapabilityRetentionError::DuplicateOrEmptyClusterId(
@@ -864,10 +864,20 @@ pub fn compare_work_and_terminal_capability(
             (&input.candidate_manifest.arm_id, &cluster.candidate),
         ] {
             summary.work.validate(arm_id, &cluster.cluster_id)?;
-            require_nonempty("work_outcome_receipt_digest", &summary.work_outcome_receipt_digest)
-                .map_err(|_| CapabilityRetentionError::MissingClusterReceipt(cluster.cluster_id.clone()))?;
-            require_nonempty("operating_time_receipt_digest", &summary.operating_time_receipt_digest)
-                .map_err(|_| CapabilityRetentionError::MissingClusterReceipt(cluster.cluster_id.clone()))?;
+            require_nonempty(
+                "work_outcome_receipt_digest",
+                &summary.work_outcome_receipt_digest,
+            )
+            .map_err(|_| {
+                CapabilityRetentionError::MissingClusterReceipt(cluster.cluster_id.clone())
+            })?;
+            require_nonempty(
+                "operating_time_receipt_digest",
+                &summary.operating_time_receipt_digest,
+            )
+            .map_err(|_| {
+                CapabilityRetentionError::MissingClusterReceipt(cluster.cluster_id.clone())
+            })?;
             if summary.available_robot_minutes == 0 {
                 return Err(CapabilityRetentionError::ZeroAvailableRobotTime {
                     arm_id: arm_id.clone(),
@@ -989,8 +999,12 @@ pub fn compare_work_and_terminal_capability(
             work_rate_delta_milli_per_hour: i128::from(candidate_rate) - i128::from(baseline_rate),
             baseline_human_intervention_minutes: cluster.baseline.human_intervention_minutes,
             candidate_human_intervention_minutes: cluster.candidate.human_intervention_minutes,
-            baseline_nonproductive_downtime_minutes: cluster.baseline.nonproductive_downtime_minutes,
-            candidate_nonproductive_downtime_minutes: cluster.candidate.nonproductive_downtime_minutes,
+            baseline_nonproductive_downtime_minutes: cluster
+                .baseline
+                .nonproductive_downtime_minutes,
+            candidate_nonproductive_downtime_minutes: cluster
+                .candidate
+                .nonproductive_downtime_minutes,
             baseline_electrical_energy_milli_wh: cluster.baseline.electrical_energy_milli_wh,
             candidate_electrical_energy_milli_wh: cluster.candidate.electrical_energy_milli_wh,
             baseline_compute_energy_milli_joules: cluster.baseline.compute_energy_milli_joules,
@@ -1506,7 +1520,10 @@ mod tests {
     #[test]
     fn work_outcome_receipt_is_required() {
         let mut audit = input();
-        audit.clusters[0].candidate.work_outcome_receipt_digest.clear();
+        audit.clusters[0]
+            .candidate
+            .work_outcome_receipt_digest
+            .clear();
         assert!(matches!(
             compare_work_and_terminal_capability(&audit),
             Err(CapabilityRetentionError::MissingClusterReceipt(cluster))
@@ -1517,8 +1534,10 @@ mod tests {
     #[test]
     fn starting_physical_state_must_match_between_arms() {
         let mut audit = input();
-        audit.clusters[0].candidate.option_set.predecessor_state_digest =
-            "different-physical-start".into();
+        audit.clusters[0]
+            .candidate
+            .option_set
+            .predecessor_state_digest = "different-physical-start".into();
         assert_eq!(
             compare_work_and_terminal_capability(&audit),
             Err(CapabilityRetentionError::StartingPhysicalStateMismatch(
