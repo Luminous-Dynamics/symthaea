@@ -1,0 +1,96 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "TEXTILE-DESIGN-CASES-001",
+  "fixture_class": "synthetic",
+  "claim_ceiling": "Static design-dossier topology checks only; no physical seam-strength, durability, repair, disassembly or material recovery result.",
+  "cases": [
+    {
+      "case_id": "DESIGN-001-COMPLETE-MODULAR",
+      "mutation": "Valid modular garment dossier with declared reversible joint, tools and repair instructions",
+      "expected": {
+        "disposition": "complete",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "DESIGN-002-DUPLICATE-COMPONENT",
+      "mutation": "Duplicate component identity",
+      "expected": {
+        "disposition": "blocked",
+        "reason": "DuplicateComponentIdentity"
+      }
+    },
+    {
+      "case_id": "DESIGN-003-DANGLING-COMPONENT",
+      "mutation": "Joint references undeclared component",
+      "expected": {
+        "disposition": "blocked",
+        "reason": "UnknownComponentReference"
+      }
+    },
+    {
+      "case_id": "DESIGN-004-REVERSIBLE-NO-TOOL",
+      "mutation": "Reversible joint has no tool declaration",
+      "expected": {
+        "disposition": "incomplete",
+        "reason": "ReversibleJointMissingTools"
+      }
+    },
+    {
+      "case_id": "DESIGN-005-PERMANENT-CONFLICT",
+      "mutation": "Permanent joint contradicts a disassembly intent",
+      "expected": {
+        "disposition": "blocked",
+        "reason": "PermanentJointConflictsWithIntent"
+      }
+    },
+    {
+      "case_id": "DESIGN-006-REPAIR-NO-MODULE",
+      "mutation": "Repair intent has no replaceable module",
+      "expected": {
+        "disposition": "incomplete",
+        "reason": "RepairIntentWithoutReplaceablePart"
+      }
+    },
+    {
+      "case_id": "DESIGN-007-DEPENDENCY-CYCLE",
+      "mutation": "Joint removal dependency graph is circular",
+      "expected": {
+        "disposition": "blocked",
+        "reason": "CyclicDisassemblyDependencies"
+      }
+    },
+    {
+      "case_id": "DESIGN-008-JOINT-UNKNOWN",
+      "mutation": "Joint reversibility is unknown under a disassembly claim",
+      "expected": {
+        "disposition": "incomplete",
+        "reason": "JointReversibilityUnknown"
+      }
+    },
+    {
+      "case_id": "DESIGN-009-DISASSEMBLY-NO-JOINTS",
+      "mutation": "Disassembly intent declares no joints",
+      "expected": {
+        "disposition": "incomplete",
+        "reason": "DisassemblyIntentWithoutJoints"
+      }
+    },
+    {
+      "case_id": "DESIGN-010-REPLACEABLE-NO-INSTRUCTIONS",
+      "mutation": "Replaceable component has no replacement instruction",
+      "expected": {
+        "disposition": "incomplete",
+        "reason": "ReplaceableComponentMissingInstructions"
+      }
+    },
+    {
+      "case_id": "DESIGN-011-UNKNOWN-JOINING-METHOD",
+      "mutation": "Joint joining method is unknown",
+      "expected": {
+        "disposition": "incomplete",
+        "reason": "JoiningMethodUnknown"
+      }
+    }
+  ]
+}
