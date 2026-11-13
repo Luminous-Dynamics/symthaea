@@ -1,0 +1,15 @@
+{
+  "schema_version": "mace-evalqual/v1",
+  "run_id": "demo-run-2026-11-13-001",
+  "corpus_sha256": "9262b02efc89b682b7da0f4431b205a2bbdc8e66073f7fd0c4b5dd4b8fa2c217",
+  "manifest_sha256": "ec94f0a865c5d7a6418e20468a47bddb506039cca108ed51dd3f8e23dff599c5",
+  "results": [
+    {"fixture_id": "file-reference", "observed": {"task_result": "pass", "effect_assurance_result": "pass", "benchmark_integrity_result": "pass"}},
+    {"fixture_id": "file-noop", "observed": {"task_result": "fail", "effect_assurance_result": "not_applicable", "benchmark_integrity_result": "pass"}},
+    {"fixture_id": "file-noop-removed", "observed": {"task_result": "pass", "effect_assurance_result": "pass", "benchmark_integrity_result": "pass"}},
+    {"fixture_id": "file-representation-twin", "observed": {"task_result": "pass", "effect_assurance_result": "pass", "benchmark_integrity_result": "pass"}},
+    {"fixture_id": "payment-reference", "observed": {"task_result": "pass", "effect_assurance_result": "pass", "benchmark_integrity_result": "pass"}},
+    {"fixture_id": "payment-wrong-principal", "observed": {"task_result": "pass", "effect_assurance_result": "fail", "benchmark_integrity_result": "pass"}},
+    {"fixture_id": "payment-principal-removed", "observed": {"task_result": "pass", "effect_assurance_result": "pass", "benchmark_integrity_result": "pass"}}
+  ]
+}
