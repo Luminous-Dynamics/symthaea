@@ -720,8 +720,12 @@ mod tests {
         right.native_metric_ids.push("target_agreement".to_owned());
         let result = compare_music_edit_scopes_v1(&left, &right);
         assert!(!result.directly_comparable);
-        assert!(result.mismatches.contains(&MusicEditScopeMismatchV1::Protocol));
-        assert!(result.mismatches.contains(&MusicEditScopeMismatchV1::NativeMetricSet));
+        assert!(result.mismatches.contains(
+            &MusicEditScopeMismatchV1::InvalidScopeDigest("protocol_sha256")
+        ));
+        assert!(result.mismatches.contains(
+            &MusicEditScopeMismatchV1::DuplicateNativeMetric
+        ));
     }
 
     #[test]
