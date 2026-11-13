@@ -1264,7 +1264,9 @@ mod tests {
         assert_eq!(report.written_type_and_dots.accuracy, Some(1.0));
         assert_eq!(report.voice_assignment.accuracy, Some(1.0));
         assert_eq!(report.staff_assignment.accuracy, Some(1.0));
-        assert_eq!(report.instrument_assignment.accuracy, Some(1.0));
+        assert_eq!(report.instrument_assignment.accuracy, None);
+        assert_eq!(report.instrument_reference_unassigned_count, 4);
+        assert_eq!(report.instrument_unexpected_assignment_count, 0);
         assert_eq!(report.sound_tie_semantics.accuracy, Some(1.0));
         assert_eq!(report.visual_tie_semantics.accuracy, Some(1.0));
         assert_eq!(report.time_modification.accuracy, Some(1.0));
@@ -1278,6 +1280,30 @@ mod tests {
         assert_eq!(report.cursor_move_presence.f1, Some(1.0));
         assert_eq!(report.cursor_move_semantics.accuracy, Some(1.0));
         assert_eq!(report.report_sha256.len(), 64);
+    }
+
+    #[test]
+    fn missing_reference_assignments_are_reported_not_scored_as_correct() {
+        let mut reference = graph(fixture_xml());
+        let mut prediction = reference.clone();
+        reference.notation_events.note_events[0].voice = None;
+        reference.notation_events.note_events[0].staff = None;
+        prediction.notation_events.note_events[0].instrument_ids = vec!["P1-I1".into()];
+        let report = evaluate_musicxml_notation_graphs(
+            &reference,
+            &prediction,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.voice_assignment.accuracy, Some(1.0));
+        assert_eq!(report.voice_reference_unassigned_count, 1);
+        assert_eq!(report.voice_unexpected_assignment_count, 0);
+        assert_eq!(report.staff_assignment.accuracy, Some(1.0));
+        assert_eq!(report.staff_reference_unassigned_count, 1);
+        assert_eq!(report.staff_unexpected_assignment_count, 0);
+        assert_eq!(report.instrument_assignment.accuracy, None);
+        assert_eq!(report.instrument_reference_unassigned_count, 4);
+        assert_eq!(report.instrument_unexpected_assignment_count, 1);
     }
 
     #[test]
