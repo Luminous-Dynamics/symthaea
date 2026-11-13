@@ -188,7 +188,54 @@
             "$ref": "#/$defs/event"
           }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "measured"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "events": {
+                "minItems": 2
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "failed",
+                  "invalid",
+                  "censored"
+                ]
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "required": [
+              "failure_reason"
+            ],
+            "properties": {
+              "events": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
     },
     "event": {
       "type": "object",
@@ -274,7 +321,58 @@
           ],
           "minLength": 1
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "readiness_probe_status": {
+                "const": "not_applicable"
+              }
+            },
+            "required": [
+              "readiness_probe_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "readiness_probe_profile_id": {
+                "type": "null"
+              },
+              "time_to_restored_readiness_hours": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "readiness_probe_status": {
+                "enum": [
+                  "passed",
+                  "failed"
+                ]
+              }
+            },
+            "required": [
+              "readiness_probe_status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "readiness_probe_profile_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "time_to_restored_readiness_hours": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      ]
     },
     "expected": {
       "type": "object",
