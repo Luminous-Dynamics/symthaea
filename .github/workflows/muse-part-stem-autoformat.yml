@@ -1,0 +1,55 @@
+name: MUSE Part-Stem Scoped Autoformat
+
+on:
+  push:
+    branches:
+      - "research/muse-part-stem-evidence-v1"
+    paths:
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse/src/audio_event_observation.rs"
+      - "crates/domains/symthaea-muse/src/part_stem_evidence.rs"
+      - ".github/workflows/muse-part-stem-autoformat.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: muse-part-stem-scoped-autoformat
+  cancel-in-progress: true
+
+jobs:
+  format-and-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format only PR-owned source files
+        run: |
+          set -euo pipefail
+          rustfmt --edition 2024 --config skip_children=true crates/domains/symthaea-muse/src/lib.rs
+          rustfmt --edition 2024 crates/domains/symthaea-muse/src/audio_event_observation.rs
+          rustfmt --edition 2024 crates/domains/symthaea-muse/src/part_stem_evidence.rs
+
+      - name: Commit formatting only when changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- crates/domains/symthaea-muse/src/lib.rs crates/domains/symthaea-muse/src/audio_event_observation.rs crates/domains/symthaea-muse/src/part_stem_evidence.rs; then
+            echo "PR-owned Rust files are already formatted."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/domains/symthaea-muse/src/lib.rs crates/domains/symthaea-muse/src/audio_event_observation.rs crates/domains/symthaea-muse/src/part_stem_evidence.rs
+          git commit -m "style(muse): format part-stem evidence sources"
+          git push origin HEAD:${GITHUB_REF_NAME}
