@@ -1598,8 +1598,7 @@ impl U1TwoSiteState {
         for left in 0..self.left_dimension() {
             for first_physical in 0..2 {
                 for second_physical in 0..2 {
-                    let pair = first_physical * 2 + second_physical;
-                    for right in 0..self.right_dimension() {
+                        for right in 0..self.right_dimension() {
                         let mut value = Complex64::new(0.0, 0.0);
                         for middle in 0..retained_rank {
                             value += left_tensor.get(left, first_physical, middle)
@@ -2511,12 +2510,18 @@ mod tests {
             result.left_tensor.right_charges(),
             result.right_tensor.left_charges()
         );
-        let norm_squared = result
-            .left_tensor
-            .data()
-            .iter()
-            .map(|value| value.norm_sqr())
-            .sum::<f64>();
+        let mut norm_squared = 0.0;
+        for first_physical in 0..2 {
+            for second_physical in 0..2 {
+                let pair = first_physical * 2 + second_physical;
+                let mut amplitude = Complex64::new(0.0, 0.0);
+                for middle in 0..result.left_tensor.right_dimension() {
+                    amplitude += result.left_tensor.get(0, first_physical, middle)
+                        * result.right_tensor.get(middle, second_physical, 0);
+                }
+                norm_squared += amplitude.norm_sqr();
+            }
+        }
         assert!(norm_squared <= 1.0 + 1.0e-12);
         assert!((norm_squared - 0.64).abs() <= 1.0e-12);
     }
