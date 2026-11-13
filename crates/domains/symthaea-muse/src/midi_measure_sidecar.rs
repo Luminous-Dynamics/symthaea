@@ -39,6 +39,10 @@ pub struct MidiMeasureSpanSidecarV1 {
 pub struct MidiPartMeasureSidecarV1 {
     pub part_id: String,
     pub source_track_index: usize,
+    /// MIDI channel 0..15 when this map represents one channel. None means
+    /// the entire track is intentionally one composite part.
+    #[serde(default)]
+    pub source_channel: Option<u8>,
     pub measures: Vec<MidiMeasureSpanSidecarV1>,
 }
 
@@ -71,6 +75,7 @@ pub struct MidiMeasureLocatorV1 {
 pub struct MidiPartMeasureMapV1 {
     pub part_id: String,
     pub source_track_index: usize,
+    pub source_channel: Option<u8>,
     pub measure_locators: Vec<MidiMeasureLocatorV1>,
     pub non_controlling_measure_indices: Vec<usize>,
     pub map: MeasureMap,
@@ -106,6 +111,9 @@ pub enum MidiMeasureSidecarError {
     EmptyPartId,
     DuplicatePartId { part_id: String },
     DuplicateTrackIndex { track_index: usize },
+    DuplicateTrackChannel { track_index: usize, channel: u8 },
+    ConflictingTrackChannelCoverage { track_index: usize },
+    InvalidSourceChannel { channel: u8 },
     TrackIndexOutOfRange { track_index: usize, track_count: usize },
     MissingTrackMeasureMap { track_index: usize },
     EmptyMeasureList { part_id: String },
@@ -175,7 +183,9 @@ pub fn parse_midi_measure_sidecar(
 
     let sidecar_sha256 = sha256_hex(sidecar_bytes);
     let mut part_ids = BTreeSet::new();
-    let mut track_indices = BTreeSet::new();
+    let mut track_channels = BTreeSet::new();
+    let mut whole_track_indices = BTreeSet::new();
+    let mut channel_indices = BTreeSet::new();
     let mut part_maps = Vec::with_capacity(sidecar.parts.len());
 
     for part in sidecar.parts {
@@ -187,16 +197,30 @@ pub fn parse_midi_measure_sidecar(
                 part_id: part.part_id,
             });
         }
-        if !track_indices.insert(part.source_track_index) {
-            return Err(MidiMeasureSidecarError::DuplicateTrackIndex {
-                track_index: part.source_track_index,
-            });
-        }
         if part.source_track_index >= smf.tracks.len() {
             return Err(MidiMeasureSidecarError::TrackIndexOutOfRange {
                 track_index: part.source_track_index,
                 track_count: smf.tracks.len(),
             });
+        }
+        if let Some(channel) = part.source_channel {
+            if channel >= 16 {
+                return Err(MidiMeasureSidecarError::InvalidSourceChannel { channel });
+            }
+            if !track_channels.insert((part.source_track_index, Some(channel))) {
+                return Err(MidiMeasureSidecarError::DuplicateTrackChannel {
+                    track_index: part.source_track_index,
+                    channel,
+                });
+            }
+            channel_indices.insert((part.source_track_index, channel));
+        } else {
+            if !track_channels.insert((part.source_track_index, None)) {
+                return Err(MidiMeasureSidecarError::DuplicateTrackIndex {
+                    track_index: part.source_track_index,
+                });
+            }
+            whole_track_indices.insert(part.source_track_index);
         }
         if part.measures.is_empty() {
             return Err(MidiMeasureSidecarError::EmptyMeasureList {
@@ -267,7 +291,9 @@ pub fn parse_midi_measure_sidecar(
                 source_id: format!(
                     "midi-sha256:{}/sidecar-sha256:{}#track={}",
                     sidecar.midi_sha256, sidecar_sha256, part.source_track_index
-                ),
+                ) + &part.source_channel
+                    .map(|channel| format!("#channel={channel}"))
+                    .unwrap_or_else(|| "#all-channels".into()),
                 score_clock_id: score_clock_id.to_string(),
                 canonicalization_version: MIDI_MEASURE_CANONICALIZATION_V1.into(),
                 status: MeasureMapStatus::Supported,
@@ -276,18 +302,37 @@ pub fn parse_midi_measure_sidecar(
         });
     }
 
-    // Every note-bearing source track must have explicit structural
-    // coverage. Empty conductor/metadata tracks do not become score parts.
+    // A whole-track map is mutually exclusive with channel-specific maps.
+    for track_index in &whole_track_indices {
+        if channel_indices.iter().any(|(mapped_track, _)| mapped_track == track_index) {
+            return Err(MidiMeasureSidecarError::ConflictingTrackChannelCoverage {
+                track_index: *track_index,
+            });
+        }
+    }
+
+    // Every note-bearing MIDI channel must be covered exactly once. A
+    // whole-track map covers all channels in that track; otherwise each
+    // note-bearing channel needs an explicit per-channel map.
     for (track_index, track) in smf.tracks.iter().enumerate() {
-        let contains_note_events = track.iter().any(|event| match event.kind {
-            TrackEventKind::Midi { message, .. } => matches!(
-                message,
-                MidiMessage::NoteOn { .. } | MidiMessage::NoteOff { .. }
-            ),
-            _ => false,
-        });
-        if contains_note_events && !track_indices.contains(&track_index) {
-            return Err(MidiMeasureSidecarError::MissingTrackMeasureMap { track_index });
+        let note_channels: BTreeSet<u8> = track
+            .iter()
+            .filter_map(|event| match event.kind {
+                TrackEventKind::Midi {
+                    channel,
+                    message: MidiMessage::NoteOn { .. } | MidiMessage::NoteOff { .. },
+                } => Some(channel.as_int()),
+                _ => None,
+            })
+            .collect();
+        for channel in note_channels {
+            if !whole_track_indices.contains(&track_index)
+                && !channel_indices.contains(&(track_index, channel))
+            {
+                return Err(MidiMeasureSidecarError::MissingTrackMeasureMap {
+                    track_index,
+                });
+            }
         }
     }
 
@@ -378,6 +423,8 @@ mod tests {
                 vec![MidiPartMeasureSidecarV1 {
                     part_id: "Piano".into(),
                     source_track_index: 0,
+
+                    source_channel: None,
                     measures: vec![measure(0, u64::from(ppq) * 4)],
                 }],
             );
@@ -401,6 +448,8 @@ mod tests {
             vec![MidiPartMeasureSidecarV1 {
                 part_id: "Piano".into(),
                 source_track_index: 0,
+
+                source_channel: None,
                 measures: vec![measure(0, 1920)],
             }],
         ))
@@ -422,6 +471,8 @@ mod tests {
             vec![MidiPartMeasureSidecarV1 {
                 part_id: "Piano".into(),
                 source_track_index: 0,
+
+                source_channel: None,
                 measures: vec![measure(0, 3840)],
             }],
         );
@@ -445,6 +496,8 @@ mod tests {
             vec![MidiPartMeasureSidecarV1 {
                 part_id: "Piano".into(),
                 source_track_index: 0,
+
+                source_channel: None,
                 measures: vec![measure(0, 1920)],
             }],
         );
@@ -463,6 +516,8 @@ mod tests {
             vec![MidiPartMeasureSidecarV1 {
                 part_id: "Piano".into(),
                 source_track_index: 1,
+
+                source_channel: None,
                 measures: vec![measure(0, 1920)],
             }],
         );
@@ -478,11 +533,15 @@ mod tests {
                 MidiPartMeasureSidecarV1 {
                     part_id: "Piano".into(),
                     source_track_index: 0,
+
+                    source_channel: None,
                     measures: vec![measure(0, 1920)],
                 },
                 MidiPartMeasureSidecarV1 {
                     part_id: "Strings".into(),
                     source_track_index: 0,
+
+                    source_channel: None,
                     measures: vec![measure(0, 1920)],
                 },
             ],
@@ -503,11 +562,15 @@ mod tests {
                 MidiPartMeasureSidecarV1 {
                     part_id: "Piano".into(),
                     source_track_index: 0,
+
+                    source_channel: None,
                     measures: vec![measure(0, 1920)],
                 },
                 MidiPartMeasureSidecarV1 {
                     part_id: "Piano".into(),
                     source_track_index: 0,
+
+                    source_channel: None,
                     measures: vec![measure(0, 1920)],
                 },
             ],
@@ -523,6 +586,8 @@ mod tests {
             vec![MidiPartMeasureSidecarV1 {
                 part_id: "Piano".into(),
                 source_track_index: 0,
+
+                source_channel: None,
                 measures: vec![measure(0, 1920)],
             }],
         );
@@ -567,6 +632,8 @@ mod tests {
                 MidiPartMeasureSidecarV1 {
                     part_id: "Waltz".into(),
                     source_track_index: 0,
+
+                    source_channel: None,
                     measures: vec![
                         measure(0, 1440),
                         measure(1440, 2880),
@@ -575,6 +642,8 @@ mod tests {
                 MidiPartMeasureSidecarV1 {
                     part_id: "Ostinato".into(),
                     source_track_index: 1,
+
+                    source_channel: None,
                     measures: vec![
                         measure(0, 960),
                         MidiMeasureSpanSidecarV1 {
@@ -633,6 +702,8 @@ mod tests {
             vec![MidiPartMeasureSidecarV1 {
                 part_id: "Piano".into(),
                 source_track_index: 0,
+
+                source_channel: None,
                 measures: vec![pickup, irregular],
             }],
         );
@@ -654,6 +725,8 @@ mod tests {
             vec![MidiPartMeasureSidecarV1 {
                 part_id: "Piano".into(),
                 source_track_index: 0,
+
+                source_channel: None,
                 measures: vec![measure(0, 1920)],
             }],
         );
@@ -705,6 +778,8 @@ mod tests {
             vec![MidiPartMeasureSidecarV1 {
                 part_id: "Conductor".into(),
                 source_track_index: 0,
+
+                source_channel: None,
                 measures: vec![measure(0, 1920)],
             }],
         );
@@ -727,11 +802,15 @@ mod tests {
                 MidiPartMeasureSidecarV1 {
                     part_id: "Pattern A".into(),
                     source_track_index: 0,
+
+                    source_channel: None,
                     measures: vec![measure(0, 1920)],
                 },
                 MidiPartMeasureSidecarV1 {
                     part_id: "Pattern B".into(),
                     source_track_index: 1,
+
+                    source_channel: None,
                     measures: vec![measure(0, 1920)],
                 },
             ],
@@ -739,6 +818,83 @@ mod tests {
         assert_eq!(
             parse_midi_measure_sidecar(&midi, &json, "midi-test-clock"),
             Err(MidiMeasureSidecarError::IndependentSequencesUnsupported)
+        );
+    }
+
+
+    #[test]
+    fn format_zero_multi_channel_tracks_can_keep_independent_part_maps() {
+        let mut midi = Vec::new();
+        midi.extend_from_slice(b"MThd");
+        midi.extend_from_slice(&6_u32.to_be_bytes());
+        midi.extend_from_slice(&0_u16.to_be_bytes());
+        midi.extend_from_slice(&1_u16.to_be_bytes());
+        midi.extend_from_slice(&480_u16.to_be_bytes());
+        midi.extend_from_slice(b"MTrk");
+        midi.extend_from_slice(&22_u32.to_be_bytes());
+        midi.extend_from_slice(&[
+            0, 0x90, 60, 64, // channel 0 note on
+            0, 0x91, 48, 64, // channel 1 note on
+            0x83, 0x60, 0x80, 60, 64, // channel 0 note off
+            0, 0x81, 48, 64, // channel 1 note off
+            0, 0xFF, 0x2F, 0,
+        ]);
+        let json = sidecar(
+            &midi,
+            480,
+            vec![
+                MidiPartMeasureSidecarV1 {
+                    part_id: "Piano".into(),
+                    source_track_index: 0,
+                    source_channel: Some(0),
+                    measures: vec![measure(0, 1920)],
+                },
+                MidiPartMeasureSidecarV1 {
+                    part_id: "Bass".into(),
+                    source_track_index: 0,
+                    source_channel: Some(1),
+                    measures: vec![measure(0, 1920)],
+                },
+            ],
+        );
+        let receipt = parse_midi_measure_sidecar(&midi, &json, "midi-test-clock").unwrap();
+        assert_eq!(receipt.part_maps.len(), 2);
+        assert_eq!(receipt.part_maps[0].source_track_index, 0);
+        assert_eq!(receipt.part_maps[0].source_channel, Some(0));
+        assert_eq!(receipt.part_maps[1].source_track_index, 0);
+        assert_eq!(receipt.part_maps[1].source_channel, Some(1));
+        assert_ne!(
+            receipt.part_maps[0].map.source_id,
+            receipt.part_maps[1].map.source_id
+        );
+    }
+
+    #[test]
+    fn whole_track_and_channel_specific_maps_cannot_overlap() {
+        let midi = midi_file_with_format(480, 1, 0);
+        let json = sidecar(
+            &midi,
+            480,
+            vec![
+                MidiPartMeasureSidecarV1 {
+                    part_id: "Composite".into(),
+                    source_track_index: 0,
+                    source_channel: None,
+                    measures: vec![measure(0, 1920)],
+                },
+                MidiPartMeasureSidecarV1 {
+                    part_id: "Piano".into(),
+                    source_track_index: 0,
+                    source_channel: Some(0),
+                    measures: vec![measure(0, 1920)],
+                },
+            ],
+        );
+        assert_eq!(
+            parse_midi_measure_sidecar(&midi, &json, "midi-test-clock"),
+            Err(MidiMeasureSidecarError::ConflictingTrackChannelCoverage {
+                track_index: 0
+            })
         );
     }
 
