@@ -243,6 +243,38 @@
         "disposition": "ineligible",
         "reason": "InvalidDesignRevisionBinding"
       }
+    },
+    {
+      "case_id": "ROUTE-031-FIBRE-LENGTH-TRIAL-MISMATCH",
+      "mutation": "Attach fibre-length data from a different mechanical-recycling trial",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "FibreLengthTrialBindingMismatch"
+      }
+    },
+    {
+      "case_id": "ROUTE-032-FIBRE-LENGTH-OUTPUT-LOT-MISMATCH",
+      "mutation": "Attach fibre-length data from an unrelated accepted output lot",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "FibreLengthTrialBindingMismatch"
+      }
+    },
+    {
+      "case_id": "ROUTE-033-RECEIVER-OUTPUT-LOT-MISMATCH",
+      "mutation": "Reuse a receiver acceptance from an unrelated output lot",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "DownstreamAcceptanceBindingMismatch"
+      }
+    },
+    {
+      "case_id": "ROUTE-034-RECEIVER-BASIS-TRIAL-MISMATCH",
+      "mutation": "Reuse a receiver acceptance from a different process trial",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "DownstreamAcceptanceBindingMismatch"
+      }
     }
   ]
 }
