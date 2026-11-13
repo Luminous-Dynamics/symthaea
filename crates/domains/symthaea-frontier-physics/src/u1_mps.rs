@@ -428,6 +428,7 @@ pub struct U1CanonicalGaugeReceipt {
     pub right_exterior_operator_norm_upper_bound: f64,
     pub factorization_max_residual: f64,
     pub factorization_l2_residual: f64,
+    pub state_reconstruction_l2_residual: f64,
     pub exact_zero_singular_values_omitted: usize,
     pub selection_rule_residual: f64,
     pub input_norm_squared: f64,
@@ -444,6 +445,7 @@ impl U1CanonicalGaugeReceipt {
             && self.maximum_left_isometry_residual <= tolerance
             && self.maximum_right_isometry_residual <= tolerance
             && self.factorization_max_residual <= tolerance
+            && self.state_reconstruction_l2_residual <= tolerance
             && self.relative_norm_drift <= tolerance
             && self.selection_rule_residual <= tolerance
             && self.left_exterior_operator_norm_upper_bound.is_finite()
@@ -1029,10 +1031,11 @@ impl ComplexU1Mps {
         }
 
         let input_norm_squared = self.norm_squared(tolerance)?;
+        let mut tensors = self.tensors.clone();
         let mut factorization_stats = CanonicalizationStats::default();
 
         for site in 0..bond {
-            let stats = left_canonicalize_site(&mut self.tensors, site, tolerance)?;
+            let stats = left_canonicalize_site(&mut tensors, site, tolerance)?;
             factorization_stats.max_residual =
                 factorization_stats.max_residual.max(stats.max_residual);
             factorization_stats.residual_squared += stats.residual_squared;
@@ -1041,7 +1044,7 @@ impl ComplexU1Mps {
         }
 
         for site in ((bond + 2)..self.site_count()).rev() {
-            let stats = right_canonicalize_site(&mut self.tensors, site, tolerance)?;
+            let stats = right_canonicalize_site(&mut tensors, site, tolerance)?;
             factorization_stats.max_residual =
                 factorization_stats.max_residual.max(stats.max_residual);
             factorization_stats.residual_squared += stats.residual_squared;
@@ -1049,12 +1052,25 @@ impl ComplexU1Mps {
                 stats.exact_zero_singular_values_omitted;
         }
 
-        let validated = Self::new(self.tensors.clone(), self.total_charge, tolerance)?;
-        self.tensors = validated.tensors;
-        self.selection_rule_residual = validated.selection_rule_residual;
-        let output_norm_squared = self.norm_squared(tolerance)?;
+        // Validate a candidate first. On any failure the original MPS is unchanged.
+        let candidate = Self::new(tensors, self.total_charge, tolerance)?;
+        let output_norm_squared = candidate.norm_squared(tolerance)?;
+        let overlap = self.inner_product(&candidate)?;
+        let scale = input_norm_squared.max(output_norm_squared).max(1.0);
+        let imaginary_overlap_residual = overlap.im.abs();
+        let difference_squared = input_norm_squared + output_norm_squared - 2.0 * overlap.re;
+        if imaginary_overlap_residual > tolerance * scale {
+            return Err(U1MpsError::ComplexNormResidual {
+                imaginary_part: imaginary_overlap_residual,
+                tolerance: tolerance * scale,
+            });
+        }
+        if difference_squared < -tolerance * scale {
+            return Err(U1MpsError::NegativeNormSquared(difference_squared));
+        }
+        let state_reconstruction_l2_residual = difference_squared.max(0.0).sqrt();
         let relative_norm_drift =
-            (output_norm_squared - input_norm_squared).abs() / input_norm_squared.abs().max(1.0);
+            (output_norm_squared - input_norm_squared).abs() / scale;
 
         let mut left_isometry_residuals = Vec::with_capacity(bond);
         let mut right_isometry_residuals =
@@ -1065,13 +1081,13 @@ impl ComplexU1Mps {
         let mut right_exterior_operator_norm_upper_bound = 1.0;
 
         for site in 0..bond {
-            let residual = left_isometry_residual(&self.tensors[site])?;
+            let residual = left_isometry_residual(&candidate.tensors[site])?;
             maximum_left_isometry_residual = maximum_left_isometry_residual.max(residual);
             left_exterior_operator_norm_upper_bound *= (1.0 + residual).sqrt();
             left_isometry_residuals.push((site, residual));
         }
         for site in ((bond + 2)..self.site_count()).rev() {
-            let residual = right_isometry_residual(&self.tensors[site])?;
+            let residual = right_isometry_residual(&candidate.tensors[site])?;
             maximum_right_isometry_residual = maximum_right_isometry_residual.max(residual);
             right_exterior_operator_norm_upper_bound *= (1.0 + residual).sqrt();
             right_isometry_residuals.push((site, residual));
@@ -1082,12 +1098,13 @@ impl ComplexU1Mps {
         let qualified = maximum_left_isometry_residual <= tolerance
             && maximum_right_isometry_residual <= tolerance
             && factorization_stats.max_residual <= tolerance
+            && state_reconstruction_l2_residual <= tolerance * scale.sqrt()
             && relative_norm_drift <= tolerance
-            && self.selection_rule_residual <= tolerance
+            && candidate.selection_rule_residual <= tolerance
             && left_exterior_operator_norm_upper_bound.is_finite()
             && right_exterior_operator_norm_upper_bound.is_finite();
 
-        Ok(U1CanonicalGaugeReceipt {
+        let receipt = U1CanonicalGaugeReceipt {
             bond,
             site_count: self.site_count(),
             total_charge: self.total_charge,
@@ -1099,14 +1116,17 @@ impl ComplexU1Mps {
             right_exterior_operator_norm_upper_bound,
             factorization_max_residual: factorization_stats.max_residual,
             factorization_l2_residual,
+            state_reconstruction_l2_residual,
             exact_zero_singular_values_omitted: factorization_stats
                 .exact_zero_singular_values_omitted,
-            selection_rule_residual: self.selection_rule_residual,
+            selection_rule_residual: candidate.selection_rule_residual,
             input_norm_squared,
             output_norm_squared,
             relative_norm_drift,
             qualified,
-        })
+        };
+        *self = candidate;
+        Ok(receipt)
     }
 
     pub fn site_count(&self) -> usize {
@@ -1462,6 +1482,66 @@ impl ComplexU1Mps {
         state.dense_reconstruction_l2_residual = Some(residual_squared.sqrt());
         state.dense_svd_rank_by_charge_and_cut = Some(svd_rank_by_charge_and_cut);
         Ok(state)
+    }
+
+
+    /// Contract the overlap <self|other> without dense expansion.
+    pub fn inner_product(&self, other: &Self) -> Result<Complex64, U1MpsError> {
+        if self.site_count() != other.site_count() {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+        let mut environment = vec![Complex64::new(1.0, 0.0)];
+        let mut bra_dimension = 1_usize;
+        let mut ket_dimension = 1_usize;
+
+        for (bra_tensor, ket_tensor) in self.tensors.iter().zip(other.tensors.iter()) {
+            if bra_dimension != bra_tensor.left_dimension()
+                || ket_dimension != ket_tensor.left_dimension()
+            {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "inconsistent overlap transfer-environment dimension",
+                ));
+            }
+            let next_bra_dimension = bra_tensor.right_dimension();
+            let next_ket_dimension = ket_tensor.right_dimension();
+            let next_entries = next_bra_dimension
+                .checked_mul(next_ket_dimension)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let mut next = vec![Complex64::new(0.0, 0.0); next_entries];
+
+            for bra_left in 0..bra_dimension {
+                for ket_left in 0..ket_dimension {
+                    let env = environment[bra_left * ket_dimension + ket_left];
+                    for physical in 0..2 {
+                        for bra_right in 0..next_bra_dimension {
+                            let bra = bra_tensor.get(bra_left, physical, bra_right).conj();
+                            for ket_right in 0..next_ket_dimension {
+                                let ket = ket_tensor.get(ket_left, physical, ket_right);
+                                next[bra_right * next_ket_dimension + ket_right] += env * bra * ket;
+                            }
+                        }
+                    }
+                }
+            }
+            if next
+                .iter()
+                .any(|value| !value.re.is_finite() || !value.im.is_finite())
+            {
+                return Err(U1MpsError::NonFiniteContraction("overlap transfer environment"));
+            }
+            environment = next;
+            bra_dimension = next_bra_dimension;
+            ket_dimension = next_ket_dimension;
+        }
+
+        if bra_dimension != 1 || ket_dimension != 1 || environment.len() != 1 {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+        let overlap = environment[0];
+        if !overlap.re.is_finite() || !overlap.im.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction("MPS overlap"));
+        }
+        Ok(overlap)
     }
 
     /// Compute the MPS norm by contracting the double-layer transfer matrices.
