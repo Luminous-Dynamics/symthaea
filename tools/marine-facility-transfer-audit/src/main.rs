@@ -182,6 +182,8 @@ struct AuditReport {
     aggregation_method_id: String,
     position_count: usize,
     minimum_position_count_met: bool,
+    distinct_azimuth_sectors: usize,
+    outer_disc_position_count: usize,
     minimum_repeats_per_position: usize,
     disposition: &'static str,
     band_summaries: Vec<BandSummary>,
@@ -436,6 +438,7 @@ fn validate(case: &Case) -> Vec<String> {
             || !finite_positive(position.position_uncertainty_m)
             || !position.radial_position_ratio.is_finite()
             || position.radial_position_ratio < 0.0
+            || position.radial_position_ratio > 1.05
             || !position.azimuth_deg.is_finite()
             || !position.orientation_yaw_deg.is_finite()
             || !position.orientation_pitch_deg.is_finite()
@@ -637,7 +640,16 @@ fn audit(case: &Case) -> AuditReport {
         Scope::WholePropellerDisc => 5,
         Scope::RestrictedSector => 3,
     };
-    let minimum_met = case.positions.len() >= minimum_positions;
+    let distinct_azimuth_sectors = case.positions.iter()
+        .map(|position| (position.azimuth_deg.rem_euclid(360.0) / 90.0).floor() as u8)
+        .collect::<BTreeSet<_>>()
+        .len();
+    let outer_disc_position_count = case.positions.iter()
+        .filter(|position| position.radial_position_ratio >= 0.7)
+        .count();
+    let whole_disc_geometry_met = case.scope != Scope::WholePropellerDisc
+        || (distinct_azimuth_sectors >= 3 && outer_disc_position_count >= 3);
+    let minimum_met = case.positions.len() >= minimum_positions && whole_disc_geometry_met;
 
     let disposition = if reasons.iter().any(|reason| reason.contains("digest") || reason.contains("invalid") || reason.contains("unique")) {
         "INVALID"
@@ -673,6 +685,8 @@ fn audit(case: &Case) -> AuditReport {
         aggregation_method_id: case.aggregation_method_id.clone(),
         position_count: case.positions.len(),
         minimum_position_count_met: minimum_met,
+        distinct_azimuth_sectors,
+        outer_disc_position_count,
         minimum_repeats_per_position: case.minimum_repeats_per_position,
         disposition,
         band_summaries,
@@ -1017,7 +1031,10 @@ mod tests {
         for position in &mut input.positions {
             position.azimuth_deg = 10.0 + position.position_id[9..].parse::<f64>().unwrap();
         }
-        assert_eq!(audit(&input).disposition, "INCOMPLETE");
+        let report = audit(&input);
+        assert_eq!(report.distinct_azimuth_sectors, 1);
+        assert_eq!(report.minimum_position_count_met, false);
+        assert_eq!(report.disposition, "INCOMPLETE");
     }
 
     #[test]
