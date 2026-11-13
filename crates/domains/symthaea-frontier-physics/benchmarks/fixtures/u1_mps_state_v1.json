@@ -6,8 +6,8 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "U1 MPS core, exact charge-block factorization/splitting, truncation diagnostics, mixed-canonical gauge receipts, canonical-gauge-weighted global TEBD truncation ledger, analytic U1 two-site Hamiltonian exponentiation, second-order Strang stepper and transfer-environment step-doubling diagnostic are source-authored. Exact-head Rust 1.96 harness pending.",
-  "claim_ceiling": "Step-doubling Richardson diagnostic is asymptotic, not a formal Trotter theorem. Hamiltonian projection, truncation/canonicalization and coarse/fine product-formula defects are separately recorded. No total physical error proof, interval arithmetic, SOTA performance or quantum-advantage claim.",
+  "execution_status": "U1 MPS core, charge-block factorization/splitting, truncation receipts, mixed-canonical gauge receipts, canonical-gauge-weighted global TEBD truncation ledger, analytic U1 Hamiltonian exponentiation, second-order Strang evolution, MPS transfer-overlap step-doubling and typed separated error-budget receipts are source-authored. Latest exact-head Rust 1.96 validation pending.",
+  "claim_ceiling": "The step-doubling Richardson quantity is an asymptotic estimate, not a formal Trotter upper theorem. Hamiltonian projection, canonicalization drift, Schmidt truncation and step-doubling defect remain separate. total_physical_error_upper_bound remains None; no interval arithmetic, total physical error proof, SOTA performance or quantum-advantage claim.",
   "conventions": {
     "physical_dimension": 2,
     "physical_charges": [
@@ -347,6 +347,25 @@
         "step_doubling_reports_qualified_richardson_estimate_against_exact_xy_state",
         "second_order_step_doubling_defect_scales_cubically_with_single_step_dt"
       ]
+    },
+    "error_budget": {
+      "type": "U1TeBDErrorBudget",
+      "status": "source_authored_runner_pending",
+      "fields": [
+        "hamiltonian_projection_residual_sum",
+        "canonicalization_rebase_l2_residual_sum",
+        "schmidt_truncation_l2_upper_bound",
+        "truncation_global_bound_qualified",
+        "measured_step_doubling_defect_l2",
+        "richardson_fine_trotter_error_estimate",
+        "richardson_estimate_qualified",
+        "total_physical_error_upper_bound",
+        "total_physical_error_qualified",
+        "unqualified_terms"
+      ],
+      "total_physical_error_upper_bound": null,
+      "total_physical_error_qualified": false,
+      "rationale": "Trotter Richardson value is asymptotic, f64 residuals are not interval-enclosed, and Hamiltonian projection residual is a separate input/data correction."
     }
   },
   "known_answers": [
@@ -561,6 +580,19 @@
         "measured fine solution error compared with exact three-site XY state",
         "single-step defect scales cubically under dt halving"
       ]
+    },
+    {
+      "id": "MPS-10",
+      "name": "Typed non-conflating U1 TEBD numerical error budget",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "Hamiltonian projection residual is separately reported per bond",
+        "canonicalization rebase residual is separately summed",
+        "Schmidt truncation L2 bound is separately summed and gauge-qualified",
+        "step-doubling defect and asymptotic Richardson estimate are separately reported",
+        "total physical error upper bound remains None while Trotter or floating-point terms are not formal bounds",
+        "failed gauge receipts suppress the relevant truncation bound and Richardson qualification"
+      ]
     }
   ],
   "negative_controls": [
@@ -617,7 +649,10 @@
     "ignore small Hamiltonian non-Hermitian or charge-leaking component without projection receipt",
     "treat coarse/fine step difference as pure Trotter error without adding truncation contamination",
     "apply Richardson divisor other than 2^p-1 for declared order",
-    "qualify step-doubling estimate when any canonical gauge receipt fails"
+    "qualify step-doubling estimate when any canonical gauge receipt fails",
+    "populate total physical error field from an asymptotic Richardson estimate alone",
+    "sum Hamiltonian projection, truncation and Trotter terms without recording each source or qualification",
+    "report a qualified total physical error while interval roundoff and Trotter upper bounds are missing"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -699,7 +734,16 @@
     "step_doubling_fine_truncation_bound",
     "step_doubling_richardson_estimate",
     "step_doubling_estimate_qualified",
-    "step_doubling_trotter_order"
+    "step_doubling_trotter_order",
+    "hamiltonian_projection_residual_sum",
+    "canonicalization_rebase_l2_residual_sum",
+    "schmidt_truncation_l2_upper_bound",
+    "measured_step_doubling_defect_l2",
+    "richardson_fine_trotter_error_estimate",
+    "richardson_estimate_qualified",
+    "total_physical_error_upper_bound",
+    "total_physical_error_qualified",
+    "unqualified_terms"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
