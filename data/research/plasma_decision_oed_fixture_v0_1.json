@@ -1,0 +1,1889 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "PLASMA-OED-001",
+  "evidence_class": "SYNTHETIC",
+  "synthetic_only": true,
+  "physical_measurements": false,
+  "optimizer_executed": false,
+  "automatic_experiment_execution": false,
+  "automatic_quality_release": false,
+  "claim_ceiling": "Synthetic application-profile validation only; no physical measurements, trained model, optimizer performance or execution authority.",
+  "action_catalog": [
+    {
+      "action_id": "WCA_SCREEN",
+      "fidelity": "F0",
+      "cost_units": 1,
+      "latency_hours": 0.25,
+      "specimens": 1,
+      "provides": [
+        "wettability_screen"
+      ],
+      "admissible": true,
+      "quantity": "water_contact_angle",
+      "unit": "degree"
+    },
+    {
+      "action_id": "FTIR_CHEMISTRY",
+      "fidelity": "F1",
+      "cost_units": 3,
+      "latency_hours": 8,
+      "specimens": 1,
+      "provides": [
+        "surface_chemistry"
+      ],
+      "admissible": true,
+      "quantity": "infrared_signature",
+      "unit": "a.u."
+    },
+    {
+      "action_id": "XPS_CHEMISTRY",
+      "fidelity": "F1",
+      "cost_units": 5,
+      "latency_hours": 24,
+      "specimens": 1,
+      "provides": [
+        "surface_chemistry"
+      ],
+      "admissible": true,
+      "quantity": "surface_atomic_fraction",
+      "unit": "at.%"
+    },
+    {
+      "action_id": "LAP_SHEAR",
+      "fidelity": "F2",
+      "cost_units": 8,
+      "latency_hours": 72,
+      "specimens": 5,
+      "provides": [
+        "bond_strength",
+        "failure_mode"
+      ],
+      "admissible": true,
+      "quantity": "lap_shear_strength",
+      "unit": "MPa"
+    },
+    {
+      "action_id": "AGED_LAP_SHEAR",
+      "fidelity": "F3",
+      "cost_units": 14,
+      "latency_hours": 168,
+      "specimens": 5,
+      "provides": [
+        "aged_bond_strength",
+        "bond_retention"
+      ],
+      "admissible": true,
+      "quantity": "aged_lap_shear_strength",
+      "unit": "MPa"
+    },
+    {
+      "action_id": "WVTR",
+      "fidelity": "F4",
+      "cost_units": 12,
+      "latency_hours": 96,
+      "specimens": 5,
+      "provides": [
+        "water_vapour_barrier"
+      ],
+      "admissible": true,
+      "quantity": "water_vapour_transmission_ratio",
+      "unit": "ratio"
+    },
+    {
+      "action_id": "OTR",
+      "fidelity": "F4",
+      "cost_units": 12,
+      "latency_hours": 96,
+      "specimens": 5,
+      "provides": [
+        "oxygen_barrier"
+      ],
+      "admissible": true,
+      "quantity": "oxygen_transmission_ratio",
+      "unit": "ratio"
+    },
+    {
+      "action_id": "UNAPPROVED_CHEMICAL_ACTIVATION",
+      "fidelity": "F1",
+      "cost_units": 2,
+      "latency_hours": 8,
+      "specimens": 1,
+      "provides": [
+        "surface_chemistry"
+      ],
+      "admissible": false,
+      "quantity": "unapproved_chemistry_signal",
+      "unit": "a.u."
+    },
+    {
+      "action_id": "MOISTURE_CONTENT",
+      "fidelity": "F1",
+      "quantity": "moisture_content",
+      "unit": "wt_pct",
+      "cost_units": 2,
+      "latency_hours": 6,
+      "specimens": 1,
+      "provides": [
+        "substrate_moisture_state"
+      ],
+      "admissible": true
+    }
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "proxy-only-abstain",
+      "profile": {
+        "profile_id": "PP_ADHESIVE_A",
+        "material_family": "PP",
+        "requires_barrier_preservation": false,
+        "min_bond_strength_mpa": 5,
+        "min_aged_bond_strength_mpa": 4.5,
+        "min_retention": 0.85,
+        "max_wvtr_ratio": null,
+        "max_otr_ratio": null,
+        "acceptable_failure_modes": [
+          "cohesive",
+          "mixed"
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
+      },
+      "budget": {
+        "max_cost_units": 8,
+        "max_latency_hours": 48,
+        "max_specimens": 3
+      },
+      "selection_receipt": {
+        "receipt_id": "synthetic-selection-proxy-only",
+        "owner": "UAP-OED-001",
+        "method": "SYNTHETIC_ADVISORY_SELECTION",
+        "objective": "COST_NORMALIZED_INFORMATION_GAIN",
+        "selected_action_ids": [
+          "WCA_SCREEN",
+          "FTIR_CHEMISTRY"
+        ],
+        "training_group_manifest": {
+          "manifest_id": "synthetic-groups-1",
+          "training_lots": [
+            "TRAIN-PP-01",
+            "TRAIN-PP-02"
+          ],
+          "training_devices": [
+            "TRAIN-HEAD-01"
+          ],
+          "training_days": [
+            "2026-11-01",
+            "2026-11-02"
+          ]
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-1",
+        "other_model_registered": true
+      },
+      "measurements": [
+        {
+          "measurement_id": "m1-wca",
+          "action_id": "WCA_SCREEN",
+          "specimen_id": "s1",
+          "lot_id": "HOLDOUT-PP-01",
+          "device_id": "HEAD-NEW-01",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-01",
+          "independence_group": "wetting-01",
+          "covariance_model_id": "cov-prep-01",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-wca-01",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m1-wca",
+          "uncertainty": 0.01,
+          "measured_value": 12
+        },
+        {
+          "measurement_id": "m1-ftir",
+          "action_id": "FTIR_CHEMISTRY",
+          "specimen_id": "s2",
+          "lot_id": "HOLDOUT-PP-01",
+          "device_id": "HEAD-NEW-01",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-01",
+          "independence_group": "chem-01",
+          "covariance_model_id": "cov-prep-01",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-ftir-01",
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-calibration-m1-ftir",
+          "uncertainty": 0.01,
+          "measured_value": 0.5
+        }
+      ],
+      "covariance_models": [
+        {
+          "model_id": "cov-prep-01",
+          "evidence_class": "SYNTHETIC",
+          "receipt_id": "synthetic-covariance-receipt-01",
+          "measurement_ids": [
+            "m1-wca",
+            "m1-ftir"
+          ]
+        }
+      ],
+      "outcomes": {
+        "wca_deg": 12,
+        "bond_strength_mpa": null,
+        "aged_bond_strength_mpa": null,
+        "bond_retention": null,
+        "failure_mode": null,
+        "wvtr_ratio": null,
+        "otr_ratio": null,
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "expected": {
+        "audit_disposition": "BLOCKED",
+        "product_decision": "ABSTAIN"
+      },
+      "substrate_condition": null
+    },
+    {
+      "scenario_id": "contact-angle-trap-reject",
+      "profile": {
+        "profile_id": "PP_ADHESIVE_A",
+        "material_family": "PP",
+        "requires_barrier_preservation": false,
+        "min_bond_strength_mpa": 5,
+        "min_aged_bond_strength_mpa": 4.5,
+        "min_retention": 0.85,
+        "max_wvtr_ratio": null,
+        "max_otr_ratio": null,
+        "acceptable_failure_modes": [
+          "cohesive",
+          "mixed"
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
+      },
+      "budget": {
+        "max_cost_units": 30,
+        "max_latency_hours": 480,
+        "max_specimens": 20
+      },
+      "selection_receipt": {
+        "receipt_id": "synthetic-selection-contact-trap",
+        "owner": "UAP-OED-001",
+        "method": "SYNTHETIC_ADVISORY_SELECTION",
+        "objective": "DECISION_RELEVANT_EVIDENCE",
+        "selected_action_ids": [
+          "WCA_SCREEN",
+          "LAP_SHEAR",
+          "AGED_LAP_SHEAR"
+        ],
+        "training_group_manifest": {
+          "manifest_id": "synthetic-groups-2",
+          "training_lots": [
+            "TRAIN-PP-01"
+          ],
+          "training_devices": [
+            "TRAIN-HEAD-01"
+          ],
+          "training_days": [
+            "2026-11-01"
+          ]
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-2",
+        "other_model_registered": true
+      },
+      "measurements": [
+        {
+          "measurement_id": "m2-wca",
+          "action_id": "WCA_SCREEN",
+          "specimen_id": "s3",
+          "lot_id": "HOLDOUT-PP-02",
+          "device_id": "HEAD-NEW-02",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-02",
+          "independence_group": "wet-02",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-wca-02",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m2-wca",
+          "uncertainty": 0.01,
+          "measured_value": 12
+        },
+        {
+          "measurement_id": "m2-bond",
+          "action_id": "LAP_SHEAR",
+          "specimen_id": "s4",
+          "lot_id": "HOLDOUT-PP-02",
+          "device_id": "HEAD-NEW-02",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "bond-pp-02",
+          "independence_group": "bond-02",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-bond-02",
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m2-bond",
+          "uncertainty": 0.01,
+          "measured_value": 4.2
+        },
+        {
+          "measurement_id": "m2-aged",
+          "action_id": "AGED_LAP_SHEAR",
+          "specimen_id": "s5",
+          "lot_id": "HOLDOUT-PP-02",
+          "device_id": "HEAD-NEW-02",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "aged-pp-02",
+          "independence_group": "age-02",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-aged-02",
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m2-aged",
+          "uncertainty": 0.01,
+          "measured_value": 3.9
+        }
+      ],
+      "covariance_models": [],
+      "outcomes": {
+        "wca_deg": 12,
+        "bond_strength_mpa": 4.2,
+        "aged_bond_strength_mpa": 3.9,
+        "bond_retention": 0.9285714285714285,
+        "failure_mode": "interfacial",
+        "wvtr_ratio": null,
+        "otr_ratio": null,
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "expected": {
+        "audit_disposition": "PASS",
+        "product_decision": "REJECT_WINDOW"
+      },
+      "substrate_condition": null
+    },
+    {
+      "scenario_id": "aging-reversal-reject",
+      "profile": {
+        "profile_id": "PP_ADHESIVE_A",
+        "material_family": "PP",
+        "requires_barrier_preservation": false,
+        "min_bond_strength_mpa": 5,
+        "min_aged_bond_strength_mpa": 4.5,
+        "min_retention": 0.85,
+        "max_wvtr_ratio": null,
+        "max_otr_ratio": null,
+        "acceptable_failure_modes": [
+          "cohesive",
+          "mixed"
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
+      },
+      "budget": {
+        "max_cost_units": 30,
+        "max_latency_hours": 480,
+        "max_specimens": 20
+      },
+      "selection_receipt": {
+        "receipt_id": "synthetic-selection-aging",
+        "owner": "UAP-OED-001",
+        "method": "SYNTHETIC_ADVISORY_SELECTION",
+        "objective": "DECISION_RELEVANT_EVIDENCE",
+        "selected_action_ids": [
+          "WCA_SCREEN",
+          "LAP_SHEAR",
+          "AGED_LAP_SHEAR"
+        ],
+        "training_group_manifest": {
+          "manifest_id": "synthetic-groups-3",
+          "training_lots": [
+            "TRAIN-PP-01"
+          ],
+          "training_devices": [
+            "TRAIN-HEAD-01"
+          ],
+          "training_days": [
+            "2026-11-01"
+          ]
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-3",
+        "other_model_registered": true
+      },
+      "measurements": [
+        {
+          "measurement_id": "m3-wca",
+          "action_id": "WCA_SCREEN",
+          "specimen_id": "s6",
+          "lot_id": "HOLDOUT-PP-03",
+          "device_id": "HEAD-NEW-03",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-03",
+          "independence_group": "wet-03",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-wca-03",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m3-wca",
+          "uncertainty": 0.01,
+          "measured_value": 15
+        },
+        {
+          "measurement_id": "m3-bond",
+          "action_id": "LAP_SHEAR",
+          "specimen_id": "s7",
+          "lot_id": "HOLDOUT-PP-03",
+          "device_id": "HEAD-NEW-03",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "bond-pp-03",
+          "independence_group": "bond-03",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-bond-03",
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m3-bond",
+          "uncertainty": 0.01,
+          "measured_value": 6.2
+        },
+        {
+          "measurement_id": "m3-aged",
+          "action_id": "AGED_LAP_SHEAR",
+          "specimen_id": "s8",
+          "lot_id": "HOLDOUT-PP-03",
+          "device_id": "HEAD-NEW-03",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "aged-pp-03",
+          "independence_group": "age-03",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-aged-03",
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m3-aged",
+          "uncertainty": 0.01,
+          "measured_value": 4
+        }
+      ],
+      "covariance_models": [],
+      "outcomes": {
+        "wca_deg": 15,
+        "bond_strength_mpa": 6.2,
+        "aged_bond_strength_mpa": 4,
+        "bond_retention": 0.6451612903225806,
+        "failure_mode": "interfacial",
+        "wvtr_ratio": null,
+        "otr_ratio": null,
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "expected": {
+        "audit_disposition": "PASS",
+        "product_decision": "REJECT_WINDOW"
+      },
+      "substrate_condition": null
+    },
+    {
+      "scenario_id": "packaging-barrier-tradeoff-reject",
+      "profile": {
+        "profile_id": "LDPE_BARRIER_ADHESIVE_A",
+        "material_family": "LDPE",
+        "requires_barrier_preservation": true,
+        "min_bond_strength_mpa": 5,
+        "min_aged_bond_strength_mpa": 4.5,
+        "min_retention": 0.85,
+        "max_wvtr_ratio": 1.05,
+        "max_otr_ratio": 1.05,
+        "acceptable_failure_modes": [
+          "cohesive",
+          "mixed"
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
+      },
+      "budget": {
+        "max_cost_units": 60,
+        "max_latency_hours": 480,
+        "max_specimens": 40
+      },
+      "selection_receipt": {
+        "receipt_id": "synthetic-selection-barrier",
+        "owner": "UAP-OED-001",
+        "method": "SYNTHETIC_ADVISORY_SELECTION",
+        "objective": "DECISION_RELEVANT_EVIDENCE",
+        "selected_action_ids": [
+          "WCA_SCREEN",
+          "FTIR_CHEMISTRY",
+          "LAP_SHEAR",
+          "AGED_LAP_SHEAR",
+          "WVTR",
+          "OTR"
+        ],
+        "training_group_manifest": {
+          "manifest_id": "synthetic-groups-4",
+          "training_lots": [
+            "TRAIN-LDPE-01"
+          ],
+          "training_devices": [
+            "TRAIN-HEAD-01"
+          ],
+          "training_days": [
+            "2026-11-01"
+          ]
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-4",
+        "other_model_registered": true
+      },
+      "measurements": [
+        {
+          "measurement_id": "m4-wca",
+          "action_id": "WCA_SCREEN",
+          "specimen_id": "s9",
+          "lot_id": "HOLDOUT-LDPE-01",
+          "device_id": "HEAD-NEW-04",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-ldpe-04",
+          "independence_group": "wet-04",
+          "covariance_model_id": "cov-ldpe-prep-04",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-wca-04",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m4-wca",
+          "uncertainty": 0.01,
+          "measured_value": 13
+        },
+        {
+          "measurement_id": "m4-ftir",
+          "action_id": "FTIR_CHEMISTRY",
+          "specimen_id": "s10",
+          "lot_id": "HOLDOUT-LDPE-01",
+          "device_id": "HEAD-NEW-04",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-ldpe-04",
+          "independence_group": "chem-04",
+          "covariance_model_id": "cov-ldpe-prep-04",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-ftir-04",
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-calibration-m4-ftir",
+          "uncertainty": 0.01,
+          "measured_value": 0.5
+        },
+        {
+          "measurement_id": "m4-bond",
+          "action_id": "LAP_SHEAR",
+          "specimen_id": "s11",
+          "lot_id": "HOLDOUT-LDPE-01",
+          "device_id": "HEAD-NEW-04",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "bond-ldpe-04",
+          "independence_group": "bond-04",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-bond-04",
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m4-bond",
+          "uncertainty": 0.01,
+          "measured_value": 6.3
+        },
+        {
+          "measurement_id": "m4-aged",
+          "action_id": "AGED_LAP_SHEAR",
+          "specimen_id": "s12",
+          "lot_id": "HOLDOUT-LDPE-01",
+          "device_id": "HEAD-NEW-04",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "aged-ldpe-04",
+          "independence_group": "age-04",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-aged-04",
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m4-aged",
+          "uncertainty": 0.01,
+          "measured_value": 5.4
+        },
+        {
+          "measurement_id": "m4-wvtr",
+          "action_id": "WVTR",
+          "specimen_id": "s13",
+          "lot_id": "HOLDOUT-LDPE-01",
+          "device_id": "HEAD-NEW-04",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "barrier-ldpe-04",
+          "independence_group": "wvtr-04",
+          "covariance_model_id": "cov-barrier-04",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-wvtr-04",
+          "quantity": "water_vapour_transmission_ratio",
+          "unit": "ratio",
+          "calibration_record_id": "synthetic-calibration-m4-wvtr",
+          "uncertainty": 0.01,
+          "measured_value": 1.6
+        },
+        {
+          "measurement_id": "m4-otr",
+          "action_id": "OTR",
+          "specimen_id": "s14",
+          "lot_id": "HOLDOUT-LDPE-01",
+          "device_id": "HEAD-NEW-04",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "barrier-ldpe-04",
+          "independence_group": "otr-04",
+          "covariance_model_id": "cov-barrier-04",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-otr-04",
+          "quantity": "oxygen_transmission_ratio",
+          "unit": "ratio",
+          "calibration_record_id": "synthetic-calibration-m4-otr",
+          "uncertainty": 0.01,
+          "measured_value": 1.45
+        }
+      ],
+      "covariance_models": [
+        {
+          "model_id": "cov-ldpe-prep-04",
+          "evidence_class": "SYNTHETIC",
+          "receipt_id": "synthetic-covariance-receipt-04",
+          "measurement_ids": [
+            "m4-wca",
+            "m4-ftir"
+          ]
+        },
+        {
+          "model_id": "cov-barrier-04",
+          "evidence_class": "SYNTHETIC",
+          "receipt_id": "synthetic-covariance-receipt-barrier-04",
+          "measurement_ids": [
+            "m4-wvtr",
+            "m4-otr"
+          ]
+        }
+      ],
+      "outcomes": {
+        "wca_deg": 13,
+        "bond_strength_mpa": 6.3,
+        "aged_bond_strength_mpa": 5.4,
+        "bond_retention": 0.8571428571428572,
+        "failure_mode": "cohesive",
+        "wvtr_ratio": 1.6,
+        "otr_ratio": 1.45,
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "expected": {
+        "audit_disposition": "PASS",
+        "product_decision": "REJECT_WINDOW"
+      },
+      "substrate_condition": null
+    },
+    {
+      "scenario_id": "durable-multifidelity-accept-synthetic",
+      "profile": {
+        "profile_id": "PP_ADHESIVE_A",
+        "material_family": "PP",
+        "requires_barrier_preservation": false,
+        "min_bond_strength_mpa": 5,
+        "min_aged_bond_strength_mpa": 4.5,
+        "min_retention": 0.85,
+        "max_wvtr_ratio": null,
+        "max_otr_ratio": null,
+        "acceptable_failure_modes": [
+          "cohesive",
+          "mixed"
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
+      },
+      "budget": {
+        "max_cost_units": 40,
+        "max_latency_hours": 480,
+        "max_specimens": 30
+      },
+      "selection_receipt": {
+        "receipt_id": "synthetic-selection-durable",
+        "owner": "UAP-OED-001",
+        "method": "SYNTHETIC_ADVISORY_SELECTION",
+        "objective": "ROBUST_DECISION_EVIDENCE",
+        "selected_action_ids": [
+          "WCA_SCREEN",
+          "FTIR_CHEMISTRY",
+          "LAP_SHEAR",
+          "AGED_LAP_SHEAR"
+        ],
+        "training_group_manifest": {
+          "manifest_id": "synthetic-groups-5",
+          "training_lots": [
+            "TRAIN-PP-01",
+            "TRAIN-PP-02"
+          ],
+          "training_devices": [
+            "TRAIN-HEAD-01"
+          ],
+          "training_days": [
+            "2026-11-01",
+            "2026-11-02"
+          ]
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-5",
+        "other_model_registered": true
+      },
+      "measurements": [
+        {
+          "measurement_id": "m5-wca",
+          "action_id": "WCA_SCREEN",
+          "specimen_id": "s15",
+          "lot_id": "HOLDOUT-PP-04",
+          "device_id": "HEAD-NEW-05",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-05",
+          "independence_group": "wet-05",
+          "covariance_model_id": "cov-prep-05",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-wca-05",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m5-wca",
+          "uncertainty": 0.01,
+          "measured_value": 18
+        },
+        {
+          "measurement_id": "m5-ftir",
+          "action_id": "FTIR_CHEMISTRY",
+          "specimen_id": "s16",
+          "lot_id": "HOLDOUT-PP-04",
+          "device_id": "HEAD-NEW-05",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-05",
+          "independence_group": "chem-05",
+          "covariance_model_id": "cov-prep-05",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-ftir-05",
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-calibration-m5-ftir",
+          "uncertainty": 0.01,
+          "measured_value": 0.5
+        },
+        {
+          "measurement_id": "m5-bond",
+          "action_id": "LAP_SHEAR",
+          "specimen_id": "s17",
+          "lot_id": "HOLDOUT-PP-04",
+          "device_id": "HEAD-NEW-05",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "bond-pp-05",
+          "independence_group": "bond-05",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-bond-05",
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m5-bond",
+          "uncertainty": 0.01,
+          "measured_value": 6.2
+        },
+        {
+          "measurement_id": "m5-aged",
+          "action_id": "AGED_LAP_SHEAR",
+          "specimen_id": "s18",
+          "lot_id": "HOLDOUT-PP-04",
+          "device_id": "HEAD-NEW-05",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "aged-pp-05",
+          "independence_group": "age-05",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-aged-05",
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m5-aged",
+          "uncertainty": 0.01,
+          "measured_value": 5.5
+        }
+      ],
+      "covariance_models": [
+        {
+          "model_id": "cov-prep-05",
+          "evidence_class": "SYNTHETIC",
+          "receipt_id": "synthetic-covariance-receipt-05",
+          "measurement_ids": [
+            "m5-wca",
+            "m5-ftir"
+          ]
+        }
+      ],
+      "outcomes": {
+        "wca_deg": 18,
+        "bond_strength_mpa": 6.2,
+        "aged_bond_strength_mpa": 5.5,
+        "bond_retention": 0.8870967741935484,
+        "failure_mode": "cohesive",
+        "wvtr_ratio": null,
+        "otr_ratio": null,
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "expected": {
+        "audit_disposition": "PASS",
+        "product_decision": "ACCEPT_WINDOW"
+      },
+      "substrate_condition": null
+    },
+    {
+      "scenario_id": "unmodelled-shared-preparation-abstain",
+      "profile": {
+        "profile_id": "PP_ADHESIVE_A",
+        "material_family": "PP",
+        "requires_barrier_preservation": false,
+        "min_bond_strength_mpa": 5,
+        "min_aged_bond_strength_mpa": 4.5,
+        "min_retention": 0.85,
+        "max_wvtr_ratio": null,
+        "max_otr_ratio": null,
+        "acceptable_failure_modes": [
+          "cohesive",
+          "mixed"
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
+      },
+      "budget": {
+        "max_cost_units": 40,
+        "max_latency_hours": 480,
+        "max_specimens": 30
+      },
+      "selection_receipt": {
+        "receipt_id": "synthetic-selection-unmodelled-common-mode",
+        "owner": "UAP-OED-001",
+        "method": "SYNTHETIC_ADVISORY_SELECTION",
+        "objective": "ROBUST_DECISION_EVIDENCE",
+        "selected_action_ids": [
+          "WCA_SCREEN",
+          "FTIR_CHEMISTRY",
+          "LAP_SHEAR",
+          "AGED_LAP_SHEAR"
+        ],
+        "training_group_manifest": {
+          "manifest_id": "synthetic-groups-6",
+          "training_lots": [
+            "TRAIN-PP-01"
+          ],
+          "training_devices": [
+            "TRAIN-HEAD-01"
+          ],
+          "training_days": [
+            "2026-11-01"
+          ]
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-6",
+        "other_model_registered": true
+      },
+      "measurements": [
+        {
+          "measurement_id": "m6-wca",
+          "action_id": "WCA_SCREEN",
+          "specimen_id": "s19",
+          "lot_id": "HOLDOUT-PP-05",
+          "device_id": "HEAD-NEW-06",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-common-06",
+          "independence_group": "shared-prep-06",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-wca-06",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m6-wca",
+          "uncertainty": 0.01,
+          "measured_value": 19
+        },
+        {
+          "measurement_id": "m6-ftir",
+          "action_id": "FTIR_CHEMISTRY",
+          "specimen_id": "s20",
+          "lot_id": "HOLDOUT-PP-05",
+          "device_id": "HEAD-NEW-06",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-common-06",
+          "independence_group": "shared-prep-06",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-ftir-06",
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-calibration-m6-ftir",
+          "uncertainty": 0.01,
+          "measured_value": 0.5
+        },
+        {
+          "measurement_id": "m6-bond",
+          "action_id": "LAP_SHEAR",
+          "specimen_id": "s21",
+          "lot_id": "HOLDOUT-PP-05",
+          "device_id": "HEAD-NEW-06",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "bond-pp-06",
+          "independence_group": "bond-06",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-bond-06",
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m6-bond",
+          "uncertainty": 0.01,
+          "measured_value": 6
+        },
+        {
+          "measurement_id": "m6-aged",
+          "action_id": "AGED_LAP_SHEAR",
+          "specimen_id": "s22",
+          "lot_id": "HOLDOUT-PP-05",
+          "device_id": "HEAD-NEW-06",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "aged-pp-06",
+          "independence_group": "age-06",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-aged-06",
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m6-aged",
+          "uncertainty": 0.01,
+          "measured_value": 5.4
+        }
+      ],
+      "covariance_models": [],
+      "outcomes": {
+        "wca_deg": 19,
+        "bond_strength_mpa": 6,
+        "aged_bond_strength_mpa": 5.4,
+        "bond_retention": 0.9,
+        "failure_mode": "cohesive",
+        "wvtr_ratio": null,
+        "otr_ratio": null,
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "expected": {
+        "audit_disposition": "BLOCKED",
+        "product_decision": "ABSTAIN"
+      },
+      "substrate_condition": null
+    },
+    {
+      "scenario_id": "training-group-overlap-blocked",
+      "profile": {
+        "profile_id": "PP_ADHESIVE_A",
+        "material_family": "PP",
+        "requires_barrier_preservation": false,
+        "min_bond_strength_mpa": 5,
+        "min_aged_bond_strength_mpa": 4.5,
+        "min_retention": 0.85,
+        "max_wvtr_ratio": null,
+        "max_otr_ratio": null,
+        "acceptable_failure_modes": [
+          "cohesive",
+          "mixed"
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
+      },
+      "budget": {
+        "max_cost_units": 40,
+        "max_latency_hours": 480,
+        "max_specimens": 30
+      },
+      "selection_receipt": {
+        "receipt_id": "synthetic-selection-group-overlap",
+        "owner": "UAP-OED-001",
+        "method": "SYNTHETIC_ADVISORY_SELECTION",
+        "objective": "ROBUST_DECISION_EVIDENCE",
+        "selected_action_ids": [
+          "WCA_SCREEN",
+          "FTIR_CHEMISTRY",
+          "LAP_SHEAR",
+          "AGED_LAP_SHEAR"
+        ],
+        "training_group_manifest": {
+          "manifest_id": "synthetic-groups-7",
+          "training_lots": [
+            "HOLDOUT-PP-06"
+          ],
+          "training_devices": [
+            "TRAIN-HEAD-01"
+          ],
+          "training_days": [
+            "2026-11-01"
+          ]
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-7",
+        "other_model_registered": true
+      },
+      "measurements": [
+        {
+          "measurement_id": "m7-wca",
+          "action_id": "WCA_SCREEN",
+          "specimen_id": "s23",
+          "lot_id": "HOLDOUT-PP-06",
+          "device_id": "HEAD-NEW-07",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-07",
+          "independence_group": "wet-07",
+          "covariance_model_id": "cov-prep-07",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-wca-07",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m7-wca",
+          "uncertainty": 0.01,
+          "measured_value": 18
+        },
+        {
+          "measurement_id": "m7-ftir",
+          "action_id": "FTIR_CHEMISTRY",
+          "specimen_id": "s24",
+          "lot_id": "HOLDOUT-PP-06",
+          "device_id": "HEAD-NEW-07",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-07",
+          "independence_group": "chem-07",
+          "covariance_model_id": "cov-prep-07",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-ftir-07",
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-calibration-m7-ftir",
+          "uncertainty": 0.01,
+          "measured_value": 0.5
+        },
+        {
+          "measurement_id": "m7-bond",
+          "action_id": "LAP_SHEAR",
+          "specimen_id": "s25",
+          "lot_id": "HOLDOUT-PP-06",
+          "device_id": "HEAD-NEW-07",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "bond-pp-07",
+          "independence_group": "bond-07",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-bond-07",
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m7-bond",
+          "uncertainty": 0.01,
+          "measured_value": 6
+        },
+        {
+          "measurement_id": "m7-aged",
+          "action_id": "AGED_LAP_SHEAR",
+          "specimen_id": "s26",
+          "lot_id": "HOLDOUT-PP-06",
+          "device_id": "HEAD-NEW-07",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "aged-pp-07",
+          "independence_group": "age-07",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-aged-07",
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m7-aged",
+          "uncertainty": 0.01,
+          "measured_value": 5.3
+        }
+      ],
+      "covariance_models": [
+        {
+          "model_id": "cov-prep-07",
+          "evidence_class": "SYNTHETIC",
+          "receipt_id": "synthetic-covariance-receipt-07",
+          "measurement_ids": [
+            "m7-wca",
+            "m7-ftir"
+          ]
+        }
+      ],
+      "outcomes": {
+        "wca_deg": 18,
+        "bond_strength_mpa": 6,
+        "aged_bond_strength_mpa": 5.3,
+        "bond_retention": 0.8833333333333333,
+        "failure_mode": "cohesive",
+        "wvtr_ratio": null,
+        "otr_ratio": null,
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "expected": {
+        "audit_disposition": "REJECTED",
+        "product_decision": "ABSTAIN"
+      },
+      "substrate_condition": null
+    },
+    {
+      "scenario_id": "over-budget-proposal-rejected",
+      "profile": {
+        "profile_id": "PP_ADHESIVE_A",
+        "material_family": "PP",
+        "requires_barrier_preservation": false,
+        "min_bond_strength_mpa": 5,
+        "min_aged_bond_strength_mpa": 4.5,
+        "min_retention": 0.85,
+        "max_wvtr_ratio": null,
+        "max_otr_ratio": null,
+        "acceptable_failure_modes": [
+          "cohesive",
+          "mixed"
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
+      },
+      "budget": {
+        "max_cost_units": 10,
+        "max_latency_hours": 48,
+        "max_specimens": 5
+      },
+      "selection_receipt": {
+        "receipt_id": "synthetic-selection-overbudget",
+        "owner": "UAP-OED-001",
+        "method": "SYNTHETIC_ADVISORY_SELECTION",
+        "objective": "COST_NORMALIZED_INFORMATION_GAIN",
+        "selected_action_ids": [
+          "WCA_SCREEN",
+          "LAP_SHEAR",
+          "AGED_LAP_SHEAR"
+        ],
+        "training_group_manifest": {
+          "manifest_id": "synthetic-groups-8",
+          "training_lots": [
+            "TRAIN-PP-01"
+          ],
+          "training_devices": [
+            "TRAIN-HEAD-01"
+          ],
+          "training_days": [
+            "2026-11-01"
+          ]
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-8",
+        "other_model_registered": true
+      },
+      "measurements": [],
+      "covariance_models": [],
+      "outcomes": {
+        "wca_deg": null,
+        "bond_strength_mpa": null,
+        "aged_bond_strength_mpa": null,
+        "bond_retention": null,
+        "failure_mode": null,
+        "wvtr_ratio": null,
+        "otr_ratio": null,
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "expected": {
+        "audit_disposition": "REJECTED",
+        "product_decision": "ABSTAIN"
+      },
+      "substrate_condition": null
+    },
+    {
+      "scenario_id": "inadmissible-action-abstain",
+      "profile": {
+        "profile_id": "PP_ADHESIVE_A",
+        "material_family": "PP",
+        "requires_barrier_preservation": false,
+        "min_bond_strength_mpa": 5,
+        "min_aged_bond_strength_mpa": 4.5,
+        "min_retention": 0.85,
+        "max_wvtr_ratio": null,
+        "max_otr_ratio": null,
+        "acceptable_failure_modes": [
+          "cohesive",
+          "mixed"
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
+      },
+      "budget": {
+        "max_cost_units": 40,
+        "max_latency_hours": 480,
+        "max_specimens": 30
+      },
+      "selection_receipt": {
+        "receipt_id": "synthetic-selection-inadmissible",
+        "owner": "UAP-OED-001",
+        "method": "SYNTHETIC_ADVISORY_SELECTION",
+        "objective": "ROBUST_DECISION_EVIDENCE",
+        "selected_action_ids": [
+          "WCA_SCREEN",
+          "FTIR_CHEMISTRY",
+          "UNAPPROVED_CHEMICAL_ACTIVATION",
+          "LAP_SHEAR",
+          "AGED_LAP_SHEAR"
+        ],
+        "training_group_manifest": {
+          "manifest_id": "synthetic-groups-9",
+          "training_lots": [
+            "TRAIN-PP-01"
+          ],
+          "training_devices": [
+            "TRAIN-HEAD-01"
+          ],
+          "training_days": [
+            "2026-11-01",
+            "2026-11-02"
+          ]
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-9",
+        "other_model_registered": true
+      },
+      "measurements": [
+        {
+          "measurement_id": "m9-wca",
+          "action_id": "WCA_SCREEN",
+          "specimen_id": "s28",
+          "lot_id": "HOLDOUT-PP-08",
+          "device_id": "HEAD-NEW-08",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-08",
+          "independence_group": "wet-08",
+          "covariance_model_id": "cov-prep-08",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-wca-08",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m9-wca",
+          "uncertainty": 0.01,
+          "measured_value": 18
+        },
+        {
+          "measurement_id": "m9-ftir",
+          "action_id": "FTIR_CHEMISTRY",
+          "specimen_id": "s29",
+          "lot_id": "HOLDOUT-PP-08",
+          "device_id": "HEAD-NEW-08",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-08",
+          "independence_group": "chem-08",
+          "covariance_model_id": "cov-prep-08",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-ftir-08",
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-calibration-m9-ftir",
+          "uncertainty": 0.01,
+          "measured_value": 0.5
+        },
+        {
+          "measurement_id": "m9-bond",
+          "action_id": "LAP_SHEAR",
+          "specimen_id": "s30",
+          "lot_id": "HOLDOUT-PP-08",
+          "device_id": "HEAD-NEW-08",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "bond-pp-08",
+          "independence_group": "bond-08",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-bond-08",
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m9-bond",
+          "uncertainty": 0.01,
+          "measured_value": 6.2
+        },
+        {
+          "measurement_id": "m9-aged",
+          "action_id": "AGED_LAP_SHEAR",
+          "specimen_id": "s31",
+          "lot_id": "HOLDOUT-PP-08",
+          "device_id": "HEAD-NEW-08",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "aged-pp-08",
+          "independence_group": "age-08",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-aged-08",
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m9-aged",
+          "uncertainty": 0.01,
+          "measured_value": 5.5
+        },
+        {
+          "measurement_id": "m9-unapproved",
+          "action_id": "UNAPPROVED_CHEMICAL_ACTIVATION",
+          "specimen_id": "s32",
+          "lot_id": "HOLDOUT-PP-08",
+          "device_id": "HEAD-NEW-08",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-08",
+          "independence_group": "chem-08",
+          "covariance_model_id": "cov-prep-08",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-unapproved-08",
+          "quantity": "unapproved_chemistry_signal",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-calibration-m9-unapproved",
+          "uncertainty": 0.01,
+          "measured_value": 1
+        }
+      ],
+      "covariance_models": [
+        {
+          "model_id": "cov-prep-08",
+          "evidence_class": "SYNTHETIC",
+          "receipt_id": "synthetic-covariance-receipt-08",
+          "measurement_ids": [
+            "m9-wca",
+            "m9-ftir",
+            "m9-unapproved"
+          ]
+        }
+      ],
+      "outcomes": {
+        "wca_deg": 18,
+        "bond_strength_mpa": 6.2,
+        "aged_bond_strength_mpa": 5.5,
+        "bond_retention": 0.8870967741935484,
+        "failure_mode": "cohesive",
+        "wvtr_ratio": null,
+        "otr_ratio": null,
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "expected": {
+        "audit_disposition": "REJECTED",
+        "product_decision": "ABSTAIN"
+      },
+      "substrate_condition": null
+    },
+    {
+      "scenario_id": "model-family-inadequate-abstain",
+      "profile": {
+        "profile_id": "PP_ADHESIVE_A",
+        "material_family": "PP",
+        "requires_barrier_preservation": false,
+        "min_bond_strength_mpa": 5,
+        "min_aged_bond_strength_mpa": 4.5,
+        "min_retention": 0.85,
+        "max_wvtr_ratio": null,
+        "max_otr_ratio": null,
+        "acceptable_failure_modes": [
+          "cohesive",
+          "mixed"
+        ],
+        "requires_moisture_measurement": false,
+        "maximum_moisture_measurement_age_hours": null
+      },
+      "budget": {
+        "max_cost_units": 40,
+        "max_latency_hours": 480,
+        "max_specimens": 30
+      },
+      "selection_receipt": {
+        "receipt_id": "synthetic-selection-inadequate-model",
+        "owner": "UAP-OED-001",
+        "method": "SYNTHETIC_ADVISORY_SELECTION",
+        "objective": "ROBUST_DECISION_EVIDENCE",
+        "selected_action_ids": [
+          "WCA_SCREEN",
+          "FTIR_CHEMISTRY",
+          "LAP_SHEAR",
+          "AGED_LAP_SHEAR"
+        ],
+        "training_group_manifest": {
+          "manifest_id": "synthetic-groups-10",
+          "training_lots": [
+            "TRAIN-PP-01",
+            "TRAIN-PP-02"
+          ],
+          "training_devices": [
+            "TRAIN-HEAD-01"
+          ],
+          "training_days": [
+            "2026-11-01",
+            "2026-11-02"
+          ]
+        },
+        "model_adequacy_status": "INADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-inadequate-10",
+        "other_model_registered": true
+      },
+      "measurements": [
+        {
+          "measurement_id": "m10-wca",
+          "action_id": "WCA_SCREEN",
+          "specimen_id": "s40",
+          "lot_id": "HOLDOUT-PP-09",
+          "device_id": "HEAD-NEW-09",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-09",
+          "independence_group": "wet-09",
+          "covariance_model_id": "cov-prep-10",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-wca-10",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m10-wca",
+          "uncertainty": 0.01,
+          "measured_value": 18
+        },
+        {
+          "measurement_id": "m10-ftir",
+          "action_id": "FTIR_CHEMISTRY",
+          "specimen_id": "s41",
+          "lot_id": "HOLDOUT-PP-09",
+          "device_id": "HEAD-NEW-09",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-09",
+          "independence_group": "chem-09",
+          "covariance_model_id": "cov-prep-10",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-ftir-10",
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-calibration-m10-ftir",
+          "uncertainty": 0.01,
+          "measured_value": 0.5
+        },
+        {
+          "measurement_id": "m10-bond",
+          "action_id": "LAP_SHEAR",
+          "specimen_id": "s42",
+          "lot_id": "HOLDOUT-PP-09",
+          "device_id": "HEAD-NEW-09",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "bond-pp-09",
+          "independence_group": "bond-09",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-bond-10",
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m10-bond",
+          "uncertainty": 0.01,
+          "measured_value": 6.2
+        },
+        {
+          "measurement_id": "m10-aged",
+          "action_id": "AGED_LAP_SHEAR",
+          "specimen_id": "s43",
+          "lot_id": "HOLDOUT-PP-09",
+          "device_id": "HEAD-NEW-09",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "aged-pp-09",
+          "independence_group": "age-09",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-aged-10",
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m10-aged",
+          "uncertainty": 0.01,
+          "measured_value": 5.5
+        }
+      ],
+      "covariance_models": [
+        {
+          "model_id": "cov-prep-10",
+          "evidence_class": "SYNTHETIC",
+          "receipt_id": "synthetic-covariance-receipt-10",
+          "measurement_ids": [
+            "m10-wca",
+            "m10-ftir"
+          ]
+        }
+      ],
+      "outcomes": {
+        "wca_deg": 18,
+        "bond_strength_mpa": 6.2,
+        "aged_bond_strength_mpa": 5.5,
+        "bond_retention": 0.8870967741935484,
+        "failure_mode": "cohesive",
+        "wvtr_ratio": null,
+        "otr_ratio": null,
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "expected": {
+        "audit_disposition": "BLOCKED",
+        "product_decision": "ABSTAIN"
+      },
+      "substrate_condition": null
+    },
+    {
+      "scenario_id": "pa6-missing-moisture-state-abstain",
+      "profile": {
+        "profile_id": "PA6_PUR_ADHESIVE_A",
+        "material_family": "PA6",
+        "requires_barrier_preservation": false,
+        "requires_moisture_measurement": true,
+        "maximum_moisture_measurement_age_hours": 12,
+        "min_bond_strength_mpa": 5,
+        "min_aged_bond_strength_mpa": 4.5,
+        "min_retention": 0.85,
+        "max_wvtr_ratio": null,
+        "max_otr_ratio": null,
+        "acceptable_failure_modes": [
+          "cohesive",
+          "mixed"
+        ]
+      },
+      "budget": {
+        "max_cost_units": 50,
+        "max_latency_hours": 480,
+        "max_specimens": 35
+      },
+      "selection_receipt": {
+        "receipt_id": "synthetic-pa6-selection-pa6-missing-moisture-state-abstain",
+        "owner": "UAP-OED-001",
+        "method": "SYNTHETIC_ADVISORY_SELECTION",
+        "objective": "ROBUST_DECISION_EVIDENCE",
+        "selected_action_ids": [
+          "WCA_SCREEN",
+          "FTIR_CHEMISTRY",
+          "MOISTURE_CONTENT",
+          "LAP_SHEAR",
+          "AGED_LAP_SHEAR"
+        ],
+        "training_group_manifest": {
+          "manifest_id": "synthetic-pa6-training-groups-v1",
+          "training_lots": [
+            "TRAIN-PA6-01",
+            "TRAIN-PA6-02"
+          ],
+          "training_devices": [
+            "TRAIN-PA6-HEAD-01"
+          ],
+          "training_days": [
+            "2026-11-01",
+            "2026-11-02"
+          ]
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-pa6-adequacy-pa6-missing-moisture-state-abstain",
+        "other_model_registered": true
+      },
+      "measurements": [
+        {
+          "measurement_id": "pa6-missing-moisture-state-abstain-wca_screen",
+          "action_id": "WCA_SCREEN",
+          "specimen_id": "pa6-missing-moisture-state-abstain-spec-1",
+          "lot_id": "HOLDOUT-PA6-pa6-missing-moisture-state-abstain",
+          "device_id": "PA6-HEAD-pa6-missing-moisture-state-abstain",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pa6-missing-moisture-state-abstain",
+          "independence_group": "wet-pa6-missing-moisture-state-abstain",
+          "covariance_model_id": null,
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-cal-pa6-missing-moisture-state-abstain-WCA_SCREEN",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-wca_screen",
+          "measured_value": 15
+        },
+        {
+          "measurement_id": "pa6-missing-moisture-state-abstain-ftir_chemistry",
+          "action_id": "FTIR_CHEMISTRY",
+          "specimen_id": "pa6-missing-moisture-state-abstain-spec-2",
+          "lot_id": "HOLDOUT-PA6-pa6-missing-moisture-state-abstain",
+          "device_id": "PA6-HEAD-pa6-missing-moisture-state-abstain",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pa6-missing-moisture-state-abstain",
+          "independence_group": "chem-pa6-missing-moisture-state-abstain",
+          "covariance_model_id": null,
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-cal-pa6-missing-moisture-state-abstain-FTIR_CHEMISTRY",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-ftir_chemistry",
+          "measured_value": 0.5
+        },
+        {
+          "measurement_id": "pa6-missing-moisture-state-abstain-moisture_content",
+          "action_id": "MOISTURE_CONTENT",
+          "specimen_id": "pa6-missing-moisture-state-abstain-spec-3",
+          "lot_id": "HOLDOUT-PA6-pa6-missing-moisture-state-abstain",
+          "device_id": "PA6-HEAD-pa6-missing-moisture-state-abstain",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "moisture-pa6-missing-moisture-state-abstain",
+          "independence_group": "moisture-pa6-missing-moisture-state-abstain",
+          "covariance_model_id": null,
+          "quantity": "moisture_content",
+          "unit": "wt_pct",
+          "calibration_record_id": "synthetic-cal-pa6-missing-moisture-state-abstain-MOISTURE_CONTENT",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-moisture_content",
+          "measured_value": null
+        },
+        {
+          "measurement_id": "pa6-missing-moisture-state-abstain-lap_shear",
+          "action_id": "LAP_SHEAR",
+          "specimen_id": "pa6-missing-moisture-state-abstain-spec-4",
+          "lot_id": "HOLDOUT-PA6-pa6-missing-moisture-state-abstain",
+          "device_id": "PA6-HEAD-pa6-missing-moisture-state-abstain",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "bond-pa6-missing-moisture-state-abstain",
+          "independence_group": "bond-pa6-missing-moisture-state-abstain",
+          "covariance_model_id": null,
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-cal-pa6-missing-moisture-state-abstain-LAP_SHEAR",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-lap_shear",
+          "measured_value": 6
+        },
+        {
+          "measurement_id": "pa6-missing-moisture-state-abstain-aged_lap_shear",
+          "action_id": "AGED_LAP_SHEAR",
+          "specimen_id": "pa6-missing-moisture-state-abstain-spec-5",
+          "lot_id": "HOLDOUT-PA6-pa6-missing-moisture-state-abstain",
+          "device_id": "PA6-HEAD-pa6-missing-moisture-state-abstain",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "aging-pa6-missing-moisture-state-abstain",
+          "independence_group": "aging-pa6-missing-moisture-state-abstain",
+          "covariance_model_id": null,
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-cal-pa6-missing-moisture-state-abstain-AGED_LAP_SHEAR",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-aged_lap_shear",
+          "measured_value": 5.5
+        }
+      ],
+      "covariance_models": [],
+      "outcomes": {
+        "wca_deg": 15,
+        "bond_strength_mpa": 6,
+        "aged_bond_strength_mpa": 5.5,
+        "bond_retention": 0.9166666666666666,
+        "failure_mode": "cohesive",
+        "wvtr_ratio": null,
+        "otr_ratio": null,
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "expected": {
+        "audit_disposition": "BLOCKED",
+        "product_decision": "ABSTAIN"
+      },
+      "substrate_condition": null
+    },
+    {
+      "scenario_id": "pa6-saturated-state-low-wca-reject",
+      "profile": {
+        "profile_id": "PA6_PUR_ADHESIVE_A",
+        "material_family": "PA6",
+        "requires_barrier_preservation": false,
+        "requires_moisture_measurement": true,
+        "maximum_moisture_measurement_age_hours": 12,
+        "min_bond_strength_mpa": 5,
+        "min_aged_bond_strength_mpa": 4.5,
+        "min_retention": 0.85,
+        "max_wvtr_ratio": null,
+        "max_otr_ratio": null,
+        "acceptable_failure_modes": [
+          "cohesive",
+          "mixed"
+        ]
+      },
+      "budget": {
+        "max_cost_units": 50,
+        "max_latency_hours": 480,
+        "max_specimens": 35
+      },
+      "selection_receipt": {
+        "receipt_id": "synthetic-pa6-selection-pa6-saturated-state-low-wca-reject",
+        "owner": "UAP-OED-001",
+        "method": "SYNTHETIC_ADVISORY_SELECTION",
+        "objective": "ROBUST_DECISION_EVIDENCE",
+        "selected_action_ids": [
+          "WCA_SCREEN",
+          "FTIR_CHEMISTRY",
+          "MOISTURE_CONTENT",
+          "LAP_SHEAR",
+          "AGED_LAP_SHEAR"
+        ],
+        "training_group_manifest": {
+          "manifest_id": "synthetic-pa6-training-groups-v1",
+          "training_lots": [
+            "TRAIN-PA6-01",
+            "TRAIN-PA6-02"
+          ],
+          "training_devices": [
+            "TRAIN-PA6-HEAD-01"
+          ],
+          "training_days": [
+            "2026-11-01",
+            "2026-11-02"
+          ]
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-pa6-adequacy-pa6-saturated-state-low-wca-reject",
+        "other_model_registered": true
+      },
+      "measurements": [
+        {
+          "measurement_id": "pa6-saturated-state-low-wca-reject-wca_screen",
+          "action_id": "WCA_SCREEN",
+          "specimen_id": "pa6-saturated-state-low-wca-reject-spec-1",
+          "lot_id": "HOLDOUT-PA6-pa6-saturated-state-low-wca-reject",
+          "device_id": "PA6-HEAD-pa6-saturated-state-low-wca-reject",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pa6-saturated-state-low-wca-reject",
+          "independence_group": "wet-pa6-saturated-state-low-wca-reject",
+          "covariance_model_id": "cov-pa6-prep-v1",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-WCA_SCREEN",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-wca_screen",
+          "measured_value": 15
+        },
+        {
+          "measurement_id": "pa6-saturated-state-low-wca-reject-ftir_chemistry",
+          "action_id": "FTIR_CHEMISTRY",
+          "specimen_id": "pa6-saturated-state-low-wca-reject-spec-2",
+          "lot_id": "HOLDOUT-PA6-pa6-saturated-state-low-wca-reject",
+          "device_id": "PA6-HEAD-pa6-saturated-state-low-wca-reject",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pa6-saturated-state-low-wca-reject",
+          "independence_group": "chem-pa6-saturated-state-low-wca-reject",
+          "covariance_model_id": "cov-pa6-prep-v1",
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-FTIR_CHEMISTRY",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-ftir_chemistry",
+          "measured_value": 0.5
+        },
+        {
+          "measurement_id": "pa6-saturated-state-low-wca-reject-moisture_content",
+          "action_id": "MOISTURE_CONTENT",
+          "specimen_id": "pa6-saturated-state-low-wca-reject-spec-3",
+          "lot_id": "HOLDOUT-PA6-pa6-saturated-state-low-wca-reject",
+          "device_id": "PA6-HEAD-pa6-saturated-state-low-wca-reject",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "moisture-pa6-saturated-state-low-wca-reject",
+          "independence_group": "moisture-pa6-saturated-state-low-wca-reject",
+          "covariance_model_id": null,
+          "quantity": "moisture_content",
+          "unit": "wt_pct",
+          "calibration_record_id": "synthetic-moisture-calibration-pa6-saturated-state-low-wca-reject",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-moisture_content",
+          "measured_value": 3
+        },
+        {
+          "measurement_id": "pa6-saturated-state-low-wca-reject-lap_shear",
+          "action_id": "LAP_SHEAR",
+          "specimen_id": "pa6-saturated-state-low-wca-reject-spec-4",
+          "lot_id": "HOLDOUT-PA6-pa6-saturated-state-low-wca-reject",
+          "device_id": "PA6-HEAD-pa6-saturated-state-low-wca-reject",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "bond-pa6-saturated-state-low-wca-reject",
+          "independence_group": "bond-pa6-saturated-state-low-wca-reject",
+          "covariance_model_id": null,
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-LAP_SHEAR",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-lap_shear",
+          "measured_value": 4.2
+        },
+        {
+          "measurement_id": "pa6-saturated-state-low-wca-reject-aged_lap_shear",
+          "action_id": "AGED_LAP_SHEAR",
+          "specimen_id": "pa6-saturated-state-low-wca-reject-spec-5",
+          "lot_id": "HOLDOUT-PA6-pa6-saturated-state-low-wca-reject",
+          "device_id": "PA6-HEAD-pa6-saturated-state-low-wca-reject",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "aging-pa6-saturated-state-low-wca-reject",
+          "independence_group": "aging-pa6-saturated-state-low-wca-reject",
+          "covariance_model_id": null,
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-AGED_LAP_SHEAR",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.01,
+          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-aged_lap_shear",
+          "measured_value": 3.4
+        }
+      ],
+      "covariance_models": [
+        {
+          "model_id": "cov-pa6-prep-v1",
+          "evidence_class": "SYNTHETIC",
+          "receipt_id": "synthetic-pa6-preparation-covariance-v1",
+          "measurement_ids": [
+            "pa6-saturated-state-low-wca-reject-wca_screen",
+            "pa6-saturated-state-low-wca-reject-ftir_chemistry"
+          ]
+        }
+      ],
+      "outcomes": {
+        "wca_deg": 15,
+        "bond_strength_mpa": 4.2,
+        "aged_bond_strength_mpa": 3.4,
+        "bond_retention": 0.8095238095238094,
+        "failure_mode": "interfacial",
+        "wvtr_ratio": null,
+        "otr_ratio": null,
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "expected": {
+        "audit_disposition": "PASS",
+        "product_decision": "REJECT_WINDOW"
+      },
+      "substrate_condition": {
+        "condition_id": "synthetic-condition-pa6-saturated-state-low-wca-reject",
+        "conditioning_protocol_id": "SYNTHETIC_PA6_MOISTURE_CONDITIONING_V1",
+        "moisture_content_wt_pct": 3,
+        "moisture_measurement_method": "GRAVIMETRIC",
+        "moisture_measurement_receipt_id": "synthetic-moisture-receipt-pa6-saturated-state-low-wca-reject",
+        "moisture_calibration_record_id": "synthetic-moisture-calibration-pa6-saturated-state-low-wca-reject",
+        "measured_at_unix_ms": 1794524400000,
+        "plasma_run_at_unix_ms": 1794528000000,
+        "conditioning_temperature_c": 23,
+        "conditioning_relative_humidity_pct": 50,
+        "condition_evidence_digest": "sha256:synthetic-pa6-condition-pa6-saturated-state-low-wca-reject",
+        "moisture_measurement_id": "pa6-saturated-state-low-wca-reject-moisture_content",
+        "sample_lineage_ref": "synthetic:MAT-013:pa6-saturated-state-low-wca-reject",
+        "material_interface_ref": "synthetic:MAT-INTERFACE-001:pa6-saturated-state-low-wca-reject"
+      }
+    }
+  ]
+}

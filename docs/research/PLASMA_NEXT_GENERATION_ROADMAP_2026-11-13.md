@@ -239,7 +239,7 @@ A new child, [PLASMA-VM-001 #11847](https://github.com/Luminous-Dynamics/symthae
 
 The S0 contract binds run/device/configuration, substrate and adhesive lot, calibrated OES/power/flow/temperature signals, exact grid-to-accepted-bond energy boundary, specimen identity and downstream adhesion/failure-mode label. Its synthetic evaluator tests stale/uncalibrated/misaligned telemetry, OOD material, incomplete energy, missing labels and high-confidence false accepts. It is explicitly advisory/shadow-only; no automatic quality release or physical actuation is introduced.
 
-This complements (and does not duplicate) PLASMA-ML-GENERALIZATION-001: ML-GENERALIZATION owns grouped source/lab/device/material split and literature model transfer; VM owns the joined production run-to-specimen telemetry/outcome contract and quality-value benchmark. The ten synthetic scenario expectations replayed 10/10 in an independent source-side check; 13 Rust tests are authored but uncompiled/unexecuted.
+This complements (and does not duplicate) PLASMA-ML-GENERALIZATION-001: ML-GENERALIZATION owns grouped source/lab/device/material split and literature model transfer; VM owns the joined production run-to-specimen telemetry/outcome contract and quality-value benchmark. The sixteen synthetic scenario expectations replayed 16/16 in an independent source-side check; 20 Rust tests are authored but uncompiled/unexecuted.
 
 
 ## 9. New atmospheric-plasma surface-modification review — 2026 crosswalk
@@ -247,3 +247,33 @@ This complements (and does not duplicate) PLASMA-ML-GENERALIZATION-001: ML-GENER
 The July 2026 open-access review *Recent advances in the field of surface modification using atmospheric pressure plasma* surveys discharge types, gas atmosphere, frequency/excitation, electrode geometry and surface-treatment families including grafting, deposition, etching, cleaning and activation. Use it as a broad process taxonomy / literature map, not a matched performance leaderboard: https://doi.org/10.1016/j.nxmate.2026.102318.
 
 This reinforces a necessary portfolio rule: process families that share "atmospheric plasma" in their name may have different discharge physics, chemistry, energy boundaries and product endpoints. Keep them as separate evidence strata until equivalence is demonstrated.
+
+
+### P0 enabler — decision-focused multifidelity experiment design
+
+[PLASMA-OED-001 #11907](https://github.com/Luminous-Dynamics/symthaea/issues/11907) / draft [PR #11910](https://github.com/Luminous-Dynamics/symthaea/pull/11910) defines the plasma-specific application adapter to UAP-OED and OLI-EXPERIMENT.
+
+This is **not another optimizer**. UAP-OED-001 owns action selection and the small-set oracle; UAP-OED-002 owns target utility after nuisance marginalization; UAP-OED-003 owns selected-set covariance; OLI owns model adequacy and OTHER. PLASMA-OED owns the plasma measurement ladder, substrate-state requirements, physical endpoints and product-decision semantics.
+
+The objective is minimum cost/latency/sample use to a defensible decision, not minimum WCA or nominal information gain:
+- F0 wettability/process screens;
+- F1 chemistry/topography and material-state observations such as moisture content;
+- F2 destructive bond strength and failure locus;
+- F3 delayed/aged bond strength and retention;
+- F4 material-function preservation such as WVTR/OTR.
+
+The 9-action catalogue includes a moisture-content action. The 12 synthetic cases include proxy-only abstention, WCA/bond disagreement, aging reversal, packaging barrier loss, durable synthetic evidence, shared-preparation covariance omission, held-out group overlap, budget overflow, inadmissible action, model inadequacy, missing PA6 moisture state and a measured saturated-PA6 low-WCA/weak-bond challenge.
+
+A 2024 PA6 study found that dry material (<0.1 wt% water) and saturated material (3 wt%) showed no significant difference in macroscopic surface energy/contact angle, but saturated PA6 had roughly half the lap-shear strength. The S0 evaluator now binds required moisture content to a selected MOISTURE_CONTENT action, calibration identity, conditioning protocol, temperature/RH, evidence digest and a pre-plasma timestamp; missing or stale evidence forces abstention. The substrate condition also carries canonical `sample_lineage_ref` and `material_interface_ref` references to MAT-013 #4344 and MAT-INTERFACE-001 #6227. The plasma profile does not create a second materials/conditioning registry. The PA6 fixture numbers and MAT references are synthetic placeholders, not a reproduction of the study.
+
+The 2026 PE aging study reports that most WCA recovery occurred in the first 24 h, then slowed toward a 3–6 day plateau. Its aging data track WCA, not bond strength. A useful follow-on DOE hypothesis is immediate/0 h, 1 h, 4 h, 24 h, 72 h, 6 d and 18 d paired WCA and destructive bond outcomes, with 30/60 d points where treated-part storage is part of the production workflow. These are proposed time points, not a universal aging law.
+
+A specific 2024 polyolefin primer study reports long storage stability for its particular primer formulation in some profiles, while plasma-treated additive-bearing PE partially lost adhesion after 30 days. A June 2026 acrylate-joint paper also reports that plasma alone was insufficient for long-term water resistance in its tested system, while plasma plus an adhesion promoter improved retained strength. The physical benchmark should compare the best applicable incumbent/primer, plasma-only, primer-only and combined promoter arms where admissible, stratified by additive package and lot. Do not generalize one primer formulation to all polymers.
+
+Independent source-side replay matched 12/12 audit dispositions and product decisions (5 PASS, 4 BLOCKED, 3 REJECTED). Twenty-one Rust tests are authored but not compiled/executed here. The selected action lists and PA6 values are synthetic placeholders; **no generic optimizer was executed and no EVSI gain, laboratory saving or physical product improvement is claimed**.
+
+A concrete selector-composition example is now in draft [PR #11922](https://github.com/Luminous-Dynamics/symthaea/pull/11922), stacked on the UAP Observatory implementation [PR #10802](https://github.com/Luminous-Dynamics/symthaea/pull/10802). It compares independent-row and selected-set covariance UAP selectors against their exact small-set oracles, and reports expected/worst-case target/joint EIG plus per-scenario diagnostics. The full integration research note is `docs/research/PLASMA_UAP_OED_INTEGRATION_V0_1.md`. Its source-side matrix replay is synthetic; the Rust example remains uncompiled/unexecuted.
+
+The comparison explicitly reuses GoBOED as a decision-focused BOED comparator, REA robust finite-likelihood EIG/CVaR/ranking stability (#10105), CTGP-ROBUST #11262, REA decision-aware EVSI #10109 and open-world adequacy #11181. It maps the physical test path to ASTM D6105, D3163, D5868, D2093, D1151, D1183 and D4896 identifiers without claiming standards compliance.
+
+Competitive comparisons must use fixed campaigns, random feasible sequences, contact-angle-first heuristics, nominal/multifidelity UAP-OED, target-marginal selection, covariance-aware selection and robust decision-value/EVSI selection at the same budget. Report false accepts, false rejects, abstention, cost-to-decision, sample use, worst-lot/device/day regret and exact-oracle gap separately.
