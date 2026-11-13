@@ -30,6 +30,7 @@ enum ReferenceSignalKind {
     PrimeMoverAcceleration,
     StructuralVibration,
     ShaftTorsion,
+    HydrophonePressure,
 }
 
 #[derive(Debug, Deserialize)]
@@ -39,6 +40,7 @@ struct Case {
     case_id: String,
     evidence_kind: EvidenceKind,
     source: SourceEvidence,
+    cross_spectral_convention: String,
     reference_channel: Channel,
     hydrophone_channel: Channel,
     acquisition: AcquisitionEvidence,
@@ -94,6 +96,7 @@ struct AcquisitionEvidence {
 #[serde(deny_unknown_fields)]
 struct SpectralBin {
     bin_id: String,
+    fft_bin_index: u64,
     center_frequency_hz: f64,
     reference_auto_psd: f64,
     hydrophone_auto_psd_upa2_per_hz: f64,
@@ -110,6 +113,8 @@ struct AuditReport {
     evidence_kind: &'static str,
     operating_condition_id: String,
     operating_point_receipt_sha256: String,
+    cross_spectral_convention: &'static str,
+    frequency_resolution_hz: f64,
     service_fingerprint_sha256: String,
     environment_fingerprint_sha256: String,
     timebase_receipt_sha256: String,
@@ -147,20 +152,21 @@ struct ChannelReceipt {
 #[derive(Debug, Serialize)]
 struct BinReport {
     bin_id: String,
+    fft_bin_index: u64,
     center_frequency_hz: f64,
     reference_auto_psd: f64,
     hydrophone_auto_psd_upa2_per_hz: f64,
     cross_spectral_real: f64,
     cross_spectral_imag: f64,
-    cross_spectral_phase_rad: f64,
+    cross_spectral_phase_rad: Option<f64>,
     magnitude_squared_coherence: f64,
     coherent_hydrophone_psd_upa2_per_hz: f64,
     residual_hydrophone_psd_upa2_per_hz: f64,
     coherent_fraction: f64,
     residual_fraction: f64,
     total_level_db_re_1upa2_per_hz: f64,
-    coherent_level_db_re_1upa2_per_hz: f64,
-    residual_level_db_re_1upa2_per_hz: f64,
+    coherent_level_db_re_1upa2_per_hz: Option<f64>,
+    residual_level_db_re_1upa2_per_hz: Option<f64>,
     coherence_threshold: f64,
     disposition: &'static str,
 }
@@ -181,6 +187,7 @@ fn signal_kind_name(value: &ReferenceSignalKind) -> &'static str {
         ReferenceSignalKind::PrimeMoverAcceleration => "prime_mover_acceleration",
         ReferenceSignalKind::StructuralVibration => "structural_vibration",
         ReferenceSignalKind::ShaftTorsion => "shaft_torsion",
+        ReferenceSignalKind::HydrophonePressure => "hydrophone_pressure",
     }
 }
 
@@ -272,10 +279,11 @@ fn validate_case(case: &Case) -> Vec<String> {
     if !case.acquisition.alignment_offset_s.is_finite()
         || !finite_positive(case.acquisition.alignment_expanded_uncertainty_s)
         || !finite_positive(case.acquisition.maximum_alignment_uncertainty_s)
-        || case.acquisition.alignment_expanded_uncertainty_s
-            > case.acquisition.maximum_alignment_uncertainty_s
     {
-        errors.push("channel alignment must have finite offset and expanded uncertainty within the predeclared maximum".to_string());
+        errors.push("channel alignment must have finite offset and positive finite uncertainty/tolerance".to_string());
+    }
+    if case.cross_spectral_convention != "reference_times_conjugate_hydrophone" {
+        errors.push("cross_spectral_convention must be reference_times_conjugate_hydrophone".to_string());
     }
     if case.minimum_average_count < 2
         || !case.minimum_coherence.is_finite()
@@ -291,6 +299,12 @@ fn validate_case(case: &Case) -> Vec<String> {
     let hydrophone = &case.hydrophone_channel;
     if reference.instrument_id == hydrophone.instrument_id {
         errors.push("reference and hydrophone instrument IDs must be distinct".to_string());
+    }
+    if reference.signal_kind == ReferenceSignalKind::HydrophonePressure {
+        errors.push("reference channel must be a vibration/shaft reference, not another hydrophone pressure channel".to_string());
+    }
+    if hydrophone.signal_kind != ReferenceSignalKind::HydrophonePressure {
+        errors.push("hydrophone channel signal_kind must be hydrophone_pressure".to_string());
     }
     if reference.sample_rate_hz != hydrophone.sample_rate_hz
         || reference.total_sample_count != hydrophone.total_sample_count
@@ -317,7 +331,9 @@ fn validate_case(case: &Case) -> Vec<String> {
         if bin.bin_id.trim().is_empty() || !bin_ids.insert(bin.bin_id.clone()) {
             errors.push("bin IDs must be non-empty and unique".to_string());
         }
-        if !finite_positive(bin.center_frequency_hz)
+        if bin.fft_bin_index == 0
+            || bin.fft_bin_index > reference.fft_length_samples / 2
+            || !finite_positive(bin.center_frequency_hz)
             || !finite_positive(bin.reference_auto_psd)
             || !finite_positive(bin.hydrophone_auto_psd_upa2_per_hz)
             || !bin.cross_spectral_real.is_finite()
@@ -333,6 +349,12 @@ fn validate_case(case: &Case) -> Vec<String> {
         previous_frequency = Some(bin.center_frequency_hz);
         if bin.center_frequency_hz > reference.sample_rate_hz / 2.0 {
             errors.push(format!("bin {} exceeds the Nyquist frequency", bin.bin_id));
+        }
+        let expected_frequency = bin.fft_bin_index as f64 * reference.sample_rate_hz
+            / reference.fft_length_samples as f64;
+        let frequency_tolerance = (reference.sample_rate_hz / reference.fft_length_samples as f64) * 1.0e-9;
+        if (bin.center_frequency_hz - expected_frequency).abs() > frequency_tolerance {
+            errors.push(format!("bin {} centre frequency does not match its declared FFT-bin index", bin.bin_id));
         }
     }
     errors
@@ -375,15 +397,19 @@ fn compute_bin(bin: &SpectralBin, threshold: f64) -> Result<BinReport, String> {
         hydrophone_auto_psd_upa2_per_hz: bin.hydrophone_auto_psd_upa2_per_hz,
         cross_spectral_real: bin.cross_spectral_real,
         cross_spectral_imag: bin.cross_spectral_imag,
-        cross_spectral_phase_rad: bin.cross_spectral_imag.atan2(bin.cross_spectral_real),
+        cross_spectral_phase_rad: if cross_magnitude_squared > 0.0 {
+            Some(bin.cross_spectral_imag.atan2(bin.cross_spectral_real))
+        } else {
+            None
+        },
         magnitude_squared_coherence: coherence,
         coherent_hydrophone_psd_upa2_per_hz: coherent_psd,
         residual_hydrophone_psd_upa2_per_hz: residual_psd,
         coherent_fraction,
         residual_fraction,
         total_level_db_re_1upa2_per_hz: to_level(bin.hydrophone_auto_psd_upa2_per_hz),
-        coherent_level_db_re_1upa2_per_hz: if coherent_psd > 0.0 { to_level(coherent_psd) } else { f64::NEG_INFINITY },
-        residual_level_db_re_1upa2_per_hz: if residual_psd > 0.0 { to_level(residual_psd) } else { f64::NEG_INFINITY },
+        coherent_level_db_re_1upa2_per_hz: (coherent_psd > 0.0).then(|| to_level(coherent_psd)),
+        residual_level_db_re_1upa2_per_hz: (residual_psd > 0.0).then(|| to_level(residual_psd)),
         coherence_threshold: threshold,
         disposition,
     })
@@ -409,9 +435,14 @@ fn audit(case: &Case) -> AuditReport {
     let evidence_eligible = case.evidence_kind == EvidenceKind::Measured
         && case.source.rights_status == RightsStatus::PublicOrPermitted
         && case.source.independently_reviewed;
+    let alignment_eligible = case.acquisition.alignment_expanded_uncertainty_s
+        <= case.acquisition.maximum_alignment_uncertainty_s;
+    if !alignment_eligible {
+        reasons.push("channel alignment uncertainty exceeds the predeclared maximum".to_string());
+    }
     let disposition = if !validation_errors.is_empty() || spectral_matrix_invalid {
         "INVALID"
-    } else if !evidence_eligible {
+    } else if !alignment_eligible || !evidence_eligible {
         "INCOMPLETE"
     } else {
         "COHERENCE_SCREENED"
@@ -531,6 +562,7 @@ mod tests {
                 rights_status: RightsStatus::PublicOrPermitted,
                 independently_reviewed: true,
             },
+            cross_spectral_convention: "reference_times_conjugate_hydrophone".to_string(),
             reference_channel: channel(
                 "shaft-accelerometer-1",
                 ReferenceSignalKind::ShaftAcceleration,
@@ -539,7 +571,7 @@ mod tests {
             ),
             hydrophone_channel: channel(
                 "hydrophone-1",
-                ReferenceSignalKind::StructuralVibration,
+                ReferenceSignalKind::HydrophonePressure,
                 "uPa",
                 'e',
             ),
@@ -559,7 +591,8 @@ mod tests {
             bins: vec![
                 SpectralBin {
                     bin_id: "100Hz".to_string(),
-                    center_frequency_hz: 100.0,
+                    fft_bin_index: 9,
+                    center_frequency_hz: 105.46875,
                     reference_auto_psd: 4.0,
                     hydrophone_auto_psd_upa2_per_hz: 19.0,
                     cross_spectral_real: 8.0,
@@ -567,7 +600,8 @@ mod tests {
                 },
                 SpectralBin {
                     bin_id: "200Hz".to_string(),
-                    center_frequency_hz: 200.0,
+                    fft_bin_index: 17,
+                    center_frequency_hz: 199.21875,
                     reference_auto_psd: 4.0,
                     hydrophone_auto_psd_upa2_per_hz: 10.0,
                     cross_spectral_real: 0.0,
@@ -595,7 +629,7 @@ mod tests {
         let report = audit(&input);
         assert!((report.bins[0].magnitude_squared_coherence - 16.0 / 19.0).abs() < 1.0e-12);
         assert!((report.bins[0].coherent_hydrophone_psd_upa2_per_hz - 16.0).abs() < 1.0e-12);
-        assert!((report.bins[0].cross_spectral_phase_rad - std::f64::consts::FRAC_PI_2).abs() < 1.0e-12);
+        assert!((report.bins[0].cross_spectral_phase_rad.unwrap() - std::f64::consts::FRAC_PI_2).abs() < 1.0e-12);
     }
 
     #[test]
@@ -639,6 +673,33 @@ mod tests {
     fn synchronization_outside_the_declared_tolerance_is_invalid() {
         let mut input = case();
         input.acquisition.alignment_expanded_uncertainty_s = 0.002;
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn zero_cross_spectrum_has_no_phase_or_coherent_level_and_serializes() {
+        let mut input = case();
+        input.bins[0].cross_spectral_real = 0.0;
+        input.bins[0].cross_spectral_imag = 0.0;
+        let report = audit(&input);
+        assert_eq!(report.bins[0].cross_spectral_phase_rad, None);
+        assert_eq!(report.bins[0].coherent_level_db_re_1upa2_per_hz, None);
+        assert_eq!(report.bins[0].coherent_fraction, 0.0);
+        assert!(serde_json::to_string(&report).is_ok());
+    }
+
+    #[test]
+    fn alignment_beyond_tolerance_is_incomplete_not_invalid() {
+        let mut input = case();
+        input.acquisition.alignment_expanded_uncertainty_s = 0.002;
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn cross_spectral_convention_must_be_declared() {
+        let mut input = case();
+        input.cross_spectral_convention = "unknown".to_string();
         assert_eq!(audit(&input).disposition, "INVALID");
     }
 
