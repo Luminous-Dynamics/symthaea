@@ -70,6 +70,7 @@
       "required": [
         "status",
         "license_url",
+        "license_text_local_path",
         "license_text_sha256",
         "reviewed_by",
         "reviewed_at_utc",
@@ -121,6 +122,13 @@
         },
         "notes": {
           "type": "string"
+        },
+        "license_text_local_path": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
         }
       }
     },
