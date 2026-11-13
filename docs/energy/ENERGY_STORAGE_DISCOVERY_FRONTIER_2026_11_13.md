@@ -28,6 +28,7 @@ Compose with the existing owners; do not build duplicate solvers or data systems
 | Process–structure–property–performance | MAT-PSPP [#6224](https://github.com/Luminous-Dynamics/symthaea/issues/6224) | Manufacturing lineage and process-window evidence |
 | Interface identity / uncertainty | MAT-INTERFACE [#6227](https://github.com/Luminous-Dynamics/symthaea/issues/6227), MAT-UQ [#6225](https://github.com/Luminous-Dynamics/symthaea/issues/6225) | Interface-conditioned observations and uncertainty |
 | Capacitor device qualification | [CAPACITOR-DEVICE-DISCOVERY-001 #11841](https://github.com/Luminous-Dynamics/symthaea/issues/11841) | New complete-device EDLC / zinc-ion hybrid-capacitor lane |
+| Aircraft energy-system integration | Symtropy [AERO-ENERGY-CO-DESIGN-001 #3885](https://github.com/Luminous-Dynamics/symtropy/issues/3885) | Existing mission-level comparison includes battery + supercapacitor hybrid storage; consume this owner rather than creating a competing system benchmark |
 
 The battery programme also has separate thermal-propagation, practical solid-state and interlaboratory evidence slices. Their synthetic software qualification must not be described as physical battery qualification.
 
@@ -133,6 +134,10 @@ Treat this as a research device, not a commercial-ready chemistry. Establish the
 - Sodium-ion: focus on cold-weather, stationary, local supply and application-specific niches rather than trying to immediately exceed leading LFP cell energy density.
 - Zinc/iron/organic flow and aqueous batteries: target safe stationary use and full installed-system economics, not just active-material capacity.
 - Structural batteries: long-horizon research with coupled mechanical/electrochemical qualification.
+
+### System integration owner
+
+The battery + supercapacitor hybrid system comparison already has a system-level home in Symtropy [AERO-ENERGY-CO-DESIGN-001 #3885](https://github.com/Luminous-Dynamics/symtropy/issues/3885), which compares battery + supercapacitor storage as one aircraft energy architecture among several alternatives. The new Symthaea capacitor work owns device/material/process evidence; the existing Symtropy work owns mission-level integration, power topology and system service. Do not duplicate that aircraft benchmark.
 
 ### Fourth: pilot manufacturing capability
 
