@@ -42,11 +42,19 @@ jobs:
       - name: Resolve and record exact dependency graph for this run
         run: |
           cargo generate-lockfile --manifest-path tools/airroad-iqc-clarabel-smoke/Cargo.toml
-          cargo tree --manifest-path tools/airroad-iqc-clarabel-smoke/Cargo.toml --locked -e normal > "$RUNNER_TEMP/airroad-cargo-tree.txt"
+          cargo tree \
+            --manifest-path tools/airroad-iqc-clarabel-smoke/Cargo.toml \
+            --locked -e normal > "$RUNNER_TEMP/airroad-cargo-tree.txt"
       - name: Run feasible and infeasible analytic SDP tests
-        run: cargo test --manifest-path tools/airroad-iqc-clarabel-smoke/Cargo.toml --locked --all-targets
+        run: |
+          cargo test \
+            --manifest-path tools/airroad-iqc-clarabel-smoke/Cargo.toml \
+            --locked --all-targets
       - name: Run isolated solver-smoke Clippy
-        run: cargo clippy --manifest-path tools/airroad-iqc-clarabel-smoke/Cargo.toml --locked --all-targets -- -D warnings
+        run: |
+          cargo clippy \
+            --manifest-path tools/airroad-iqc-clarabel-smoke/Cargo.toml \
+            --locked --all-targets -- -D warnings
       - name: Upload solver resolution receipt
         uses: actions/upload-artifact@v4
         with:
