@@ -442,5 +442,45 @@
     "Synthetic exact polynomial and deterministic zero-noise midpoint observation policy only.",
     "Bernstein convex-hull coefficients provide interval upper bounds; samples are not treated as universal upper bounds.",
     "No physical excitation safety, actual FRF regularity, robust stability or aircraft certification is established."
-  ]
+  ],
+  "counterfactuals": {
+    "reverse_tie_break": "highest_lower_endpoint",
+    "unapproved_midpoint": {
+      "omega": {
+        "numerator": "1",
+        "denominator": "4"
+      },
+      "approved": false
+    },
+    "stale_model_identity": "sha256:stale-model",
+    "stale_calibration_identity": "sha256:stale-calibration",
+    "wrong_frequency_unit": "Hz",
+    "overstated_gap_partition": [
+      {
+        "lower": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "upper": {
+          "numerator": "1",
+          "denominator": "4"
+        }
+      },
+      {
+        "lower": {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        "upper": {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      }
+    ],
+    "too_small_target": {
+      "numerator": "1",
+      "denominator": "5"
+    },
+    "statistical_uncertainty_semantics": "uncalibrated_statistical_confidence_interval"
+  }
 }
