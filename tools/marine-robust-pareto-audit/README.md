@@ -24,6 +24,12 @@ The synthetic fixture must return INCOMPLETE and must not qualify a candidate fo
 - Dominance requires certainty on every objective and strict separation on at least one. A confirmed trade-off is retained; overlapping/touching intervals do not create a ranking.
 - The output is pairwise relations plus a robust nondominated set with uncertainty status. No single weighted score is generated.
 
+## Integrated marine evidence profile
+
+The included scenario now requires external non-compensable receipts for organism release, in-water cleaning authorization and captured waste, acoustic scale-transfer review, source-state contrast, cavitation intermittency, vibration–hydrophone coherence and shaft-rotation-synchronous modulation. These seven receipts supplement—not replace—the numeric acoustic limit and cargo-service/objective intervals.
+
+The synthetic fixture marks each of these external receipts unresolved, and the dedicated workflow asserts that neither synthetic candidate enters the robust frontier. A receipt may be marked satisfied only when the exact audit contract, requirement reference and reviewed receipt digest match. A completed software audit is still not a physical performance or ecological-effect claim; the relevant measurement result and gate threshold must be separately declared.
+
 ## Marine environmental evidence gates
 
 The scenario can require exact external audit contract/receipt pairs as non-compensable gates. The integrated example now registers:
