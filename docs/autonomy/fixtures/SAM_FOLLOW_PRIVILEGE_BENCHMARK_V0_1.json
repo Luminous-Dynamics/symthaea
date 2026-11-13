@@ -1,0 +1,107 @@
+{
+  "schema_id": "luminous.sam.follow-privilege-benchmark",
+  "schema_version": "0.1.0",
+  "benchmark_status": "specification_only",
+  "claim_ceiling": "specification_only_no_trials_no_performance_or_safety_claim",
+  "benchmark": {
+    "benchmark_id": "sam-follow-privilege-separation-v0.1",
+    "title": "SAM Follow Privilege-Separation Benchmark v0.1",
+    "tracking_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11258",
+    "arms": [
+      {
+        "arm_id": "A",
+        "name": "legacy_privileged",
+        "observation_profile": "simulation_20d_with_sim_peer_channels",
+        "teacher_blending": "factorial",
+        "teacher_supervision": "factorial",
+        "learning_updates": "enabled",
+        "evaluator_truth": "available",
+        "eligibility": "eligible_simulation",
+        "description": "Existing simulated Follow curriculum; each privilege path is measured independently."
+      },
+      {
+        "arm_id": "B",
+        "name": "masked_observation_teacher",
+        "observation_profile": "simulation_20d_peer_channels_masked",
+        "teacher_blending": "factorial",
+        "teacher_supervision": "factorial",
+        "learning_updates": "enabled",
+        "evaluator_truth": "available",
+        "eligibility": "eligible_simulation",
+        "description": "Simulator peer sidecar masked from student input; teacher blend and supervision remain separate factors."
+      },
+      {
+        "arm_id": "C",
+        "name": "no_teacher_frozen",
+        "observation_profile": "simulation_20d_with_sim_peer_channels",
+        "teacher_blending": "disabled",
+        "teacher_supervision": "disabled",
+        "learning_updates": "disabled",
+        "evaluator_truth": "post_commit_only",
+        "eligibility": "eligible_simulation",
+        "description": "No teacher action in policy or gradients; no optimizer/replay/exploration updates. Student may still receive explicitly declared simulated 20D inputs; recurrent/FEP inference state may evolve."
+      },
+      {
+        "arm_id": "D",
+        "name": "local_perception_follow",
+        "observation_profile": "local_sensor_only",
+        "teacher_blending": "factorial",
+        "teacher_supervision": "factorial",
+        "learning_updates": "factorial",
+        "evaluator_truth": "post_commit_only",
+        "eligibility": "blocked_until_scene_admission",
+        "description": "Blocked until local metric tracked-actor evidence is admitted under SAM scene contract #11109."
+      },
+      {
+        "arm_id": "E",
+        "name": "cooperative_advisory",
+        "observation_profile": "local_sensor_plus_remote_advisory",
+        "teacher_blending": "disabled",
+        "teacher_supervision": "disabled",
+        "learning_updates": "factorial",
+        "evaluator_truth": "post_commit_only",
+        "eligibility": "non_authoritative_only",
+        "description": "Remote V2X claims remain separate from local tracks and never confer actuator authority."
+      }
+    ],
+    "metrics": [
+      "oracle_observation_leakage_rate",
+      "teacher_blend_rate",
+      "teacher_supervision_rate",
+      "evaluator_to_policy_contamination_rate",
+      "frozen_parameter_digest_invariance",
+      "recurrent_state_evolution_rate",
+      "follow_target_availability_rate",
+      "stale_target_rate",
+      "gap_error_p50",
+      "gap_error_p90",
+      "gap_error_p95",
+      "gap_error_worst_family",
+      "minimum_separation",
+      "minimum_ttc",
+      "contact_count",
+      "avoidability_classification",
+      "route_progress",
+      "intervention_rate",
+      "no_admissible_target_rate",
+      "false_intervention_rate",
+      "runtime_p50_ms",
+      "runtime_p95_ms",
+      "runtime_p99_ms",
+      "deadline_miss_rate"
+    ],
+    "negative_controls": [
+      "oracle_sidecar_mutation_invariant_under_local_only_profile",
+      "v2x_mutation_does_not_change_local_track",
+      "post_commit_shadow_teacher_cannot_change_committed_action",
+      "zero_blend_with_bptt_remains_supervised",
+      "unused_teacher_is_reference_only",
+      "frozen_weights_distinct_from_recurrent_state_evolution",
+      "disabled_teacher_update_replay_exploration_preserve_digests",
+      "missing_or_stale_target_has_no_peer_fallback",
+      "wrong_frame_scenario_future_or_stale_oracle_rejected",
+      "csv_header_row_width_integrity"
+    ]
+  },
+  "trials": []
+}
