@@ -423,6 +423,321 @@ impl U1MpsTensor {
     }
 }
 
+
+
+/// One admissible U(1) tensor block for a fixed left charge and physical state.
+///
+/// The represented entries obey right_charge = left_charge + physical.
+/// Values are row-major over left_indices × right_indices.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1ChargeTensorBlock {
+    left_charge: i32,
+    physical: usize,
+    right_charge: i32,
+    left_indices: Vec<usize>,
+    right_indices: Vec<usize>,
+    values: Vec<Complex64>,
+}
+
+/// Experimental true block-sparse backing for a rank-3 qubit U(1) tensor.
+///
+/// Unlike U1MpsTensor, this representation allocates no values for forbidden
+/// charge triples. It deliberately lives beside the production dense-backed
+/// tensor until block-aware contractions and sweeps are independently qualified.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1BlockSparseTensor {
+    left_charges: Vec<i32>,
+    right_charges: Vec<i32>,
+    blocks: Vec<U1ChargeTensorBlock>,
+    dense_slot_count: usize,
+    stored_complex_entries: usize,
+    dense_input_charge_leakage_max: f64,
+    dense_input_charge_leakage_weight: f64,
+}
+
+impl U1BlockSparseTensor {
+    /// Build true block-sparse storage from a dense row-major [left,physical,right] tensor.
+    ///
+    /// Forbidden entries at or below tolerance are dropped and reported in the
+    /// leakage receipt. A forbidden entry above tolerance fails closed.
+    pub fn from_dense(
+        left_charges: Vec<i32>,
+        right_charges: Vec<i32>,
+        dense_data: &[Complex64],
+        tolerance: f64,
+    ) -> Result<Self, U1MpsError> {
+        if left_charges.is_empty() {
+            return Err(U1MpsError::EmptyBond {
+                site: 0,
+                side: "left",
+            });
+        }
+        if right_charges.is_empty() {
+            return Err(U1MpsError::EmptyBond {
+                site: 0,
+                side: "right",
+            });
+        }
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+
+        let left_dimension = left_charges.len();
+        let right_dimension = right_charges.len();
+        let dense_slot_count = left_dimension
+            .checked_mul(2)
+            .and_then(|value| value.checked_mul(right_dimension))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        if dense_data.len() != dense_slot_count {
+            return Err(U1MpsError::EntryCount {
+                expected: dense_slot_count,
+                actual: dense_data.len(),
+            });
+        }
+
+        let mut dense_input_charge_leakage_max: f64 = 0.0;
+        let mut dense_input_charge_leakage_weight = 0.0;
+        for left in 0..left_dimension {
+            for physical in 0..2 {
+                for right in 0..right_dimension {
+                    let index = (left * 2 + physical) * right_dimension + right;
+                    let value = dense_data[index];
+                    if !value.re.is_finite() || !value.im.is_finite() {
+                        return Err(U1MpsError::NonFiniteTensorEntry { site: 0, index });
+                    }
+                    if right_charges[right] != left_charges[left] + physical as i32 {
+                        let amplitude = value.norm();
+                        if amplitude > dense_input_charge_leakage_max {
+                            dense_input_charge_leakage_max = amplitude;
+                        }
+                        dense_input_charge_leakage_weight += value.norm_sqr();
+                    }
+                }
+            }
+        }
+        if dense_input_charge_leakage_max > tolerance {
+            let mut witness = None;
+            'outer: for left in 0..left_dimension {
+                for physical in 0..2 {
+                    for right in 0..right_dimension {
+                        if right_charges[right] != left_charges[left] + physical as i32 {
+                            let index = (left * 2 + physical) * right_dimension + right;
+                            let amplitude = dense_data[index].norm();
+                            if amplitude == dense_input_charge_leakage_max {
+                                witness = Some((left, physical, right));
+                                break 'outer;
+                            }
+                        }
+                    }
+                }
+            }
+            if let Some((left, physical, right)) = witness {
+                return Err(U1MpsError::ChargeSelectionRule {
+                    site: 0,
+                    left_charge: left_charges[left],
+                    physical,
+                    right_charge: right_charges[right],
+                    amplitude: dense_input_charge_leakage_max,
+                    tolerance,
+                });
+            }
+        }
+
+        let mut unique_left_charges = left_charges.clone();
+        unique_left_charges.sort_unstable();
+        unique_left_charges.dedup();
+        let mut blocks = Vec::new();
+        let mut stored_complex_entries = 0_usize;
+
+        for left_charge in unique_left_charges {
+            let left_indices = left_charges
+                .iter()
+                .enumerate()
+                .filter_map(|(index, charge)| (*charge == left_charge).then_some(index))
+                .collect::<Vec<_>>();
+            if left_indices.is_empty() {
+                continue;
+            }
+            for physical in 0..2 {
+                let Some(right_charge) = left_charge.checked_add(physical as i32) else {
+                    continue;
+                };
+                let right_indices = right_charges
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, charge)| (*charge == right_charge).then_some(index))
+                    .collect::<Vec<_>>();
+                if right_indices.is_empty() {
+                    continue;
+                }
+                let block_entries = left_indices
+                    .len()
+                    .checked_mul(right_indices.len())
+                    .ok_or(U1MpsError::DimensionOverflow)?;
+                let next_stored_entries = stored_complex_entries
+                    .checked_add(block_entries)
+                    .ok_or(U1MpsError::DimensionOverflow)?;
+                let mut values = Vec::with_capacity(block_entries);
+                for &left in &left_indices {
+                    for &right in &right_indices {
+                        let index = (left * 2 + physical) * right_dimension + right;
+                        values.push(dense_data[index]);
+                    }
+                }
+                blocks.push(U1ChargeTensorBlock {
+                    left_charge,
+                    physical,
+                    right_charge,
+                    left_indices: left_indices.clone(),
+                    right_indices,
+                    values,
+                });
+                stored_complex_entries = next_stored_entries;
+            }
+        }
+
+        Ok(Self {
+            left_charges,
+            right_charges,
+            blocks,
+            dense_slot_count,
+            stored_complex_entries,
+            dense_input_charge_leakage_max,
+            dense_input_charge_leakage_weight,
+        })
+    }
+
+    pub fn from_dense_tensor(
+        tensor: &U1MpsTensor,
+        tolerance: f64,
+    ) -> Result<Self, U1MpsError> {
+        Self::from_dense(
+            tensor.left_charges.clone(),
+            tensor.right_charges.clone(),
+            &tensor.data,
+            tolerance,
+        )
+    }
+
+    pub fn left_charges(&self) -> &[i32] {
+        &self.left_charges
+    }
+
+    pub fn right_charges(&self) -> &[i32] {
+        &self.right_charges
+    }
+
+    pub fn left_dimension(&self) -> usize {
+        self.left_charges.len()
+    }
+
+    pub fn right_dimension(&self) -> usize {
+        self.right_charges.len()
+    }
+
+    pub fn blocks(&self) -> &[U1ChargeTensorBlock] {
+        &self.blocks
+    }
+
+    pub fn block_count(&self) -> usize {
+        self.blocks.len()
+    }
+
+    pub fn dense_slot_count(&self) -> usize {
+        self.dense_slot_count
+    }
+
+    pub fn stored_complex_entries(&self) -> usize {
+        self.stored_complex_entries
+    }
+
+    pub fn occupancy_ratio(&self) -> f64 {
+        if self.dense_slot_count == 0 {
+            0.0
+        } else {
+            self.stored_complex_entries as f64 / self.dense_slot_count as f64
+        }
+    }
+
+    /// Lower bound for live payload + explicit index storage; excludes Vec capacity
+    /// slack and allocator metadata, so it is not a resident-memory measurement.
+    pub fn storage_bytes_lower_bound(&self) -> usize {
+        let value_bytes = self
+            .stored_complex_entries
+            .saturating_mul(core::mem::size_of::<Complex64>());
+        let index_count = self
+            .blocks
+            .iter()
+            .map(|block| block.left_indices.len() + block.right_indices.len())
+            .sum::<usize>();
+        let index_bytes = index_count.saturating_mul(core::mem::size_of::<usize>());
+        let charge_bytes = (self.left_charges.len() + self.right_charges.len())
+            .saturating_mul(core::mem::size_of::<i32>());
+        let block_metadata = self.blocks.len() * core::mem::size_of::<U1ChargeTensorBlock>();
+        value_bytes
+            .saturating_add(index_bytes)
+            .saturating_add(charge_bytes)
+            .saturating_add(block_metadata)
+    }
+
+    pub fn dense_input_charge_leakage_max(&self) -> f64 {
+        self.dense_input_charge_leakage_max
+    }
+
+    pub fn dense_input_charge_leakage_weight(&self) -> f64 {
+        self.dense_input_charge_leakage_weight
+    }
+
+    /// Fetch one tensor element. Forbidden charge triples are implicit exact zero.
+    pub fn get(&self, left: usize, physical: usize, right: usize) -> Complex64 {
+        if left >= self.left_dimension() || right >= self.right_dimension() || physical >= 2 {
+            return Complex64::new(0.0, 0.0);
+        }
+        let left_charge = self.left_charges[left];
+        let right_charge = self.right_charges[right];
+        if right_charge != left_charge + physical as i32 {
+            return Complex64::new(0.0, 0.0);
+        }
+        let Some(block) = self.blocks.iter().find(|block| {
+            block.left_charge == left_charge
+                && block.physical == physical
+                && block.right_charge == right_charge
+        }) else {
+            return Complex64::new(0.0, 0.0);
+        };
+        let Ok(local_left) = block.left_indices.binary_search(&left) else {
+            return Complex64::new(0.0, 0.0);
+        };
+        let Ok(local_right) = block.right_indices.binary_search(&right) else {
+            return Complex64::new(0.0, 0.0);
+        };
+        block.values[local_left * block.right_indices.len() + local_right]
+    }
+
+    pub fn to_dense_data(&self) -> Result<Vec<Complex64>, U1MpsError> {
+        let mut dense = vec![Complex64::new(0.0, 0.0); self.dense_slot_count];
+        for block in &self.blocks {
+            for (local_left, &left) in block.left_indices.iter().enumerate() {
+                for (local_right, &right) in block.right_indices.iter().enumerate() {
+                    let dense_index = (left * 2 + block.physical) * self.right_dimension() + right;
+                    let block_index = local_left * block.right_indices.len() + local_right;
+                    dense[dense_index] = block.values[block_index];
+                }
+            }
+        }
+        Ok(dense)
+    }
+
+    pub fn to_dense_tensor(&self) -> Result<U1MpsTensor, U1MpsError> {
+        U1MpsTensor::new(
+            self.left_charges.clone(),
+            self.right_charges.clone(),
+            self.to_dense_data()?,
+        )
+    }
+}
+
+
 /// A complex open-boundary MPS with exact U(1) prefix-charge labels.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ComplexU1Mps {
