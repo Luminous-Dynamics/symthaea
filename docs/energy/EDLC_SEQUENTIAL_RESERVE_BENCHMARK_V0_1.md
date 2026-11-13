@@ -73,6 +73,8 @@ For event (k) on device (i):
 
 The service gate is conjunctive across delivered Wh, minimum sustained W, response latency, minimum terminal voltage and temperature rise. The recovery gate is conjunctive across readiness-probe pass, time-to-readiness deadline, available idle window, auxiliary-energy budget and source-replenishment budget.
 
+The first call is judged against the initial-standby auxiliary/replenishment budget; it has no preceding inter-call recovery gate, so recovery is reported as not applicable rather than counted as a recovery success. Every later call must pass a separately reported inter-call readiness gate and the per-interval energy budget.
+
 For a fully measured sequence:
 
 `sequence_pass(i) = AND_k event_pass(i,k)`
@@ -116,7 +118,7 @@ cargo run -p xtask -- edlc-sequential-reserve-audit
 cargo test -p xtask edlc_sequential_reserve
 ```
 
-The command and 14 authored unit tests are committed to the research branch. Neither command is claimed to have run in this environment.
+The command and 16 authored unit tests are committed to the research branch. Neither command is claimed to have run in this environment.
 
 ## 5. Literature and industry position
 
