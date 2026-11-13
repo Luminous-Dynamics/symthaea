@@ -140,6 +140,7 @@ The S0 fixture contains 19 synthetic records:
 | UNKNOWN_OUTCOME_AS_CENSOR | BLOCKED | Unknown outcome is not valid censoring |
 | INFORMATIVE_POLICY_CENSOR | BLOCKED | Policy/resource stopping cannot be assumed non-informative |
 | ZERO_EVENT_TAIL | REJECTED | Unsupported median/q90 life assertion |
+| NONZERO_EVENT_QUANTILE_NO_ESTIMATOR | BLOCKED | Events exist, but S0 has no qualified estimator/curve receipt for a numerical quantile |
 | DUPLICATE_SPECIMEN | REJECTED | Repeated specimen identity inflates independent count |
 | MIXED_CLOCKS | REJECTED | Clock type and analysis claim disagree |
 | ACCELERATED_OUTSIDE_RANGE | BLOCKED | Prediction exceeds observed stress/time support |
@@ -279,3 +280,8 @@ Source: [PubMed record](https://pubmed.ncbi.nlm.nih.gov/40572857/).
 | Mechanism-stratified / discrepancy-aware transfer | Held-out stress and material regimes | Whether one acceleration relationship remains valid | Requires sufficient failure-mode and stress coverage |
 
 The same raw cohort must not be used to tune the acceleration model, choose its failure mode and claim independent validation. Preserve training, calibration and blinded confirmation by whole specimens/lots/days/stress regimes.
+
+
+## S0 quantile claim ceiling
+
+The S0 contract intentionally has no life-quantile estimator. A caller cannot make a median or q90 admissible by supplying a boolean such as "quantile supported". A numeric quantile claim on a zero-event cohort is REJECTED as non-identifiable; a claim on a nonzero-event cohort is BLOCKED pending a qualified survival estimator and source-bound curve receipt. This prevents the contract auditor from accepting its own unverified assertion as statistical evidence.
