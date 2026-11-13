@@ -1,0 +1,253 @@
+{
+  "schema_version": "luminous.industry-capability-register.v0.1",
+  "snapshot_date": "2026-11-12",
+  "purpose": "Source-indexed public capability inventory for benchmark planning; not a certification, procurement assessment, or comparative performance result.",
+  "evidence_classes": [
+    "vendor_documentation",
+    "vendor_announcement",
+    "regulatory_filing",
+    "standards_initiative",
+    "independent_research"
+  ],
+  "entries": [
+    {
+      "company": "NVIDIA",
+      "product_or_portfolio": "NeMo Agent Toolkit migration portfolio",
+      "product_version": null,
+      "status_as_reported": "NeMo Agent Toolkit deprecated October 2026; EOL by end of 2026. Migration guide identifies NeMo Relay, NeMo Helix, and NeMo Fabric as successor components.",
+      "capability_domains": [
+        "agent observability",
+        "middleware",
+        "governance",
+        "evaluation",
+        "optimization",
+        "hardening",
+        "agent harness execution"
+      ],
+      "relevant_benchmark_profiles": [
+        "software_engineering",
+        "agent_security",
+        "datacentre_operations",
+        "physical_spatial_operations"
+      ],
+      "evidence_class": "vendor_documentation",
+      "claim_notes": [
+        "Migration guide describes Relay for observability, middleware and governance; Helix for evaluation, optimization and hardening; Fabric for a consistent agent-harness execution interface.",
+        "Exact product maturity, deployment availability, licensing and feature parity must be checked before adapter implementation."
+      ],
+      "limitations": [
+        "The deprecated toolkit must not be treated as a new integration target.",
+        "No independent comparative performance result is implied.",
+        "Does not establish that NVIDIA hardware, CUDA, semiconductor design or manufacturing can be replaced."
+      ],
+      "sources": [
+        "https://docs.nvidia.com/nemo/agent-toolkit/latest/resources/migration-guide.html"
+      ]
+    },
+    {
+      "company": "Google / Google DeepMind",
+      "product_or_portfolio": "Gemini Robotics 2.5 and Gemini 4 Argon robotics research capabilities",
+      "product_version": "Gemini Robotics 2.5 announced 2026-11-10",
+      "status_as_reported": "Announced and rolling out to robotics partners.",
+      "capability_domains": [
+        "vision-language-action",
+        "robotic manipulation",
+        "embodied reasoning",
+        "simulation-assisted robotics research",
+        "robotics safety evaluation"
+      ],
+      "relevant_benchmark_profiles": [
+        "physical_spatial_operations"
+      ],
+      "evidence_class": "vendor_announcement",
+      "claim_notes": [
+        "Google reports evaluation across more than 200 tasks.",
+        "Google reports a 96% success rate for a specific Apptronik Apollo 2 automotive-kitting proof of concept on Mercedes-Benz production lines.",
+        "Google reports task-dependent success improvements and safety-steerability improvements in its evaluation setup."
+      ],
+      "limitations": [
+        "All performance figures are provider-reported and task/setup-specific.",
+        "A partner proof of concept is not a fleet-wide reliability or safety certification.",
+        "Not directly comparable to text-only agents or enterprise workflow platforms."
+      ],
+      "sources": [
+        "https://deepmind.google/blog/gemini-robotics-2-5-accelerates-real-world-physical-intelligence/"
+      ]
+    },
+    {
+      "company": "Microsoft",
+      "product_or_portfolio": "Microsoft Foundry agent tracing and evaluation",
+      "product_version": "Build 2026 public-preview announcement; point release not specified",
+      "status_as_reported": "Foundry tracing and evaluations were announced as generally available; the Build 2026 expansion to any-framework integrations via OpenTelemetry was described as public preview.",
+      "capability_domains": [
+        "agent tracing",
+        "evaluation",
+        "monitoring",
+        "optimization",
+        "OpenTelemetry interoperability"
+      ],
+      "relevant_benchmark_profiles": [
+        "software_engineering",
+        "engineering_change",
+        "agent_security"
+      ],
+      "evidence_class": "vendor_announcement",
+      "claim_notes": [
+        "Microsoft describes tracing, evaluation, monitoring and optimization across agents built with Microsoft Agent Framework, LangChain, LangGraph, OpenAI SDK and custom frameworks via OpenTelemetry."
+      ],
+      "limitations": [
+        "Preview status and supported regions/features must be rechecked before use.",
+        "Telemetry coverage does not by itself prove semantic effect truth or independent reconstruction.",
+        "No claim is made that Foundry replaces PLM/MBSE, physical engineering, or all enterprise applications."
+      ],
+      "sources": [
+        "https://devblogs.microsoft.com/foundry/build-2026-from-observability-to-roi-for-ai-agents-on-any-framework/"
+      ]
+    },
+    {
+      "company": "Amazon Web Services",
+      "product_or_portfolio": "Amazon Bedrock AgentCore",
+      "product_version": "AgentCore Evaluations GA 2026-03-31; Guardrails in AgentCore Policy announced 2026-06-17",
+      "status_as_reported": "Evaluations generally available; policy Guardrails announced for selected AWS regions.",
+      "capability_domains": [
+        "agent identity",
+        "gateway",
+        "policy enforcement",
+        "guardrails",
+        "online and on-demand evaluation",
+        "observability"
+      ],
+      "relevant_benchmark_profiles": [
+        "software_engineering",
+        "agent_security",
+        "engineering_change"
+      ],
+      "evidence_class": "vendor_announcement",
+      "claim_notes": [
+        "AWS describes 13 built-in evaluators for response quality, safety, task completion and tool use, plus ground-truth and custom evaluators.",
+        "AWS describes Guardrails in AgentCore Policy for evaluating actions and gateway calls, with results logged through observability."
+      ],
+      "limitations": [
+        "Region availability must be checked for each capability.",
+        "AWS product-specific policy/evaluation should be included as a competitive baseline, not treated as absent.",
+        "Provider telemetry and policy outputs still require independent task/effect adjudication in Luminous comparisons."
+      ],
+      "sources": [
+        "https://aws.amazon.com/about-aws/whats-new/2026/03/agentcore-evaluations-generally-available/",
+        "https://aws.amazon.com/about-aws/whats-new/2026/06/amazon-bedrock-agentcore-policy-guardrails-generally-available/"
+      ]
+    },
+    {
+      "company": "Broadcom",
+      "product_or_portfolio": "Semiconductor solutions and infrastructure software portfolio",
+      "product_version": "FY2026 Q3 results released 2026-09-02",
+      "status_as_reported": "Public company portfolio; not a single agent-orchestration product.",
+      "capability_domains": [
+        "semiconductor solutions",
+        "AI networking and connectivity",
+        "infrastructure software",
+        "private-cloud software"
+      ],
+      "relevant_benchmark_profiles": [
+        "datacentre_operations",
+        "engineering_change"
+      ],
+      "evidence_class": "vendor_announcement",
+      "claim_notes": [
+        "Broadcom's Q3 FY2026 announcement identifies the company as a provider of semiconductor and infrastructure software solutions and reports $29.6B quarterly revenue, up 86% year over year."
+      ],
+      "limitations": [
+        "Revenue growth is not a technical performance benchmark.",
+        "A portfolio/company-level comparison is not equivalent to comparing one agent product.",
+        "No claim that Luminous can replace custom silicon, semiconductor manufacturing, or VMware is made."
+      ],
+      "sources": [
+        "https://investors.broadcom.com/news-releases/news-release-details/broadcom-inc-announces-third-quarter-fiscal-year-2026-financial"
+      ]
+    },
+    {
+      "company": "SpaceX",
+      "product_or_portfolio": "Space, Connectivity and Super Intelligence operating portfolio",
+      "product_version": "Q3 2026 SEC-filed results",
+      "status_as_reported": "Operating company and industrial reference case; not a plug-compatible enterprise agent platform.",
+      "capability_domains": [
+        "launch systems",
+        "satellite connectivity",
+        "AI compute infrastructure",
+        "large-scale industrial operations"
+      ],
+      "relevant_benchmark_profiles": [
+        "engineering_change",
+        "datacentre_operations",
+        "physical_spatial_operations"
+      ],
+      "evidence_class": "regulatory_filing",
+      "claim_notes": [
+        "The Q3 2026 filing reports Space, Connectivity and Super Intelligence segments and 1.7 GW nameplate compute as of 2026-09-30."
+      ],
+      "limitations": [
+        "SEC-filed company information is not evidence of Luminous/SpaceX technical interoperability.",
+        "Use SpaceX as an engineering and infrastructure reference case, not as a directly comparable software vendor.",
+        "Rocket, satellite and manufacturing capability depends on physical facilities, capital, qualified personnel and flight/field evidence."
+      ],
+      "sources": [
+        "https://www.sec.gov/Archives/edgar/data/1181412/000162828026066482/spaceexplorationtechnologi.htm"
+      ]
+    },
+    {
+      "company": "NIST",
+      "product_or_portfolio": "AI Agent Standards Initiative",
+      "product_version": "Announced 2026-02-17",
+      "status_as_reported": "Standards and research initiative; not a completed certification regime.",
+      "capability_domains": [
+        "agent identity and authentication research",
+        "secure agent interoperability",
+        "standards coordination",
+        "security evaluation"
+      ],
+      "relevant_benchmark_profiles": [
+        "agent_security",
+        "software_engineering",
+        "engineering_change"
+      ],
+      "evidence_class": "standards_initiative",
+      "claim_notes": [
+        "NIST's stated focus includes fostering interoperable and secure AI agents, industry-led standards and research into authentication and identity infrastructure."
+      ],
+      "limitations": [
+        "The initiative is not itself a technical conformance standard or product certification.",
+        "Map Luminous interfaces to emerging standards as they stabilize; do not claim compliance from conceptual similarity."
+      ],
+      "sources": [
+        "https://www.nist.gov/news-events/news/2026/02/announcing-ai-agent-standards-initiative-interoperable-and-secure",
+        "https://www.nist.gov/super-intelligence/si-agent-standards-initiative"
+      ]
+    },
+    {
+      "company": "Independent research",
+      "product_or_portfolio": "Robot manipulation benchmark audit",
+      "product_version": "arXiv:2606.04233, 2026-06-02",
+      "status_as_reported": "Published research preprint.",
+      "capability_domains": [
+        "benchmark validity",
+        "robot manipulation evaluation",
+        "statistical significance",
+        "generalization"
+      ],
+      "relevant_benchmark_profiles": [
+        "physical_spatial_operations"
+      ],
+      "evidence_class": "independent_research",
+      "claim_notes": [
+        "The authors identify shortcut solvability, weak statistical significance, benchmark overfitting and data-source dependence as failure modes in manipulation evaluation, and audit LIBERO, CALVIN, SimplerEnv, RoboCasa and RoboTwin 2.0."
+      ],
+      "limitations": [
+        "A benchmark audit is not a physical-robot performance result.",
+        "Use the diagnostics as methodological checks; inspect the paper and released artefacts before adopting its conclusions."
+      ],
+      "sources": [
+        "https://arxiv.org/abs/2606.04233"
+      ]
+    }
+  ]
+}
