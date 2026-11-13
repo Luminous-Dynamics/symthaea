@@ -673,10 +673,12 @@ mod tests {
     }
 
     #[test]
-    fn synchronization_outside_the_declared_tolerance_is_invalid() {
+    fn synchronization_outside_the_declared_tolerance_is_incomplete() {
         let mut input = case();
         input.acquisition.alignment_expanded_uncertainty_s = 0.002;
-        assert_eq!(audit(&input).disposition, "INVALID");
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert!(report.reasons.iter().any(|reason| reason.contains("alignment uncertainty")));
     }
 
     #[test]
