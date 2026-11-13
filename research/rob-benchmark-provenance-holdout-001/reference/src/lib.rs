@@ -1020,7 +1020,11 @@ mod tests {
             },
         ];
         let assignments = [
-            (SourceDimension::CollectionSite, "site-train", Partition::Training),
+            (
+                SourceDimension::CollectionSite,
+                "site-train",
+                Partition::Training,
+            ),
             (
                 SourceDimension::CollectionSite,
                 "site-calibration",
