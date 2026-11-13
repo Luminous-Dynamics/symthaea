@@ -294,3 +294,27 @@ jobs:
 
       - name: Enforce lockfile immutability
         run: git diff --exit-code -- Cargo.lock
+
+  cargo-1-100-unused-dependency-census:
+    name: Advisory Cargo 1.100 unused-dependency census (core packages)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    continue-on-error: true
+    steps:
+      - name: Checkout exact qualification merge tree
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install exact stable Rust and Cargo 1.100.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.100.0 --profile minimal
+          [[ "$(rustup run 1.100.0 rustc --version)" == "rustc 1.100.0 "* ]]
+          [[ "$(rustup run 1.100.0 cargo --version)" == "cargo 1.100.0 "* ]]
+          rustup run 1.100.0 rustc -Vv
+          rustup run 1.100.0 cargo -Vv
+
+      - name: Audit unused direct dependencies on a disposable source snapshot
+        run: bash scripts/audit-cargo-unused-dependencies.sh 1.100.0 1.100.0
