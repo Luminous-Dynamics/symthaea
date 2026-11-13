@@ -171,13 +171,26 @@ The new abelian_mps module establishes a generic charge-vector contract without 
 
 This is a structural tensor contract and deterministic block planner, not yet a generic multi-charge SVD, truncation ledger, TEBD executor, or non-Abelian fusion implementation. The next step is to reuse the charge-block plan in a generic sector-wise SVD, then port the truncation receipts and the error-ledger machinery without weakening the scalar-U(1) qualification gates.
 
+## Exact U(1)^K charge-block two-site SVD
+
+The block planner now feeds an exact generic two-site split:
+
+- Contract the adjacent site tensors using their shared virtual charge-vector bond.
+- For each intermediate K-vector charge, assemble only the rows with \(q_M=q_L+q_{s_1}\) and columns with \(q_M=q_R-q_{s_2}\).
+- Run an independent complex SVD within each matching block; no singular vector can mix distinct charge vectors.
+- Omit exactly-zero singular directions as nullspace and retain every positive singular value, however small.
+- Rebuild two charge-labelled site tensors and report total/retained SVD dimensions, exact-zero count, rank by intermediate charge vector, and max/L2 reconstruction residual.
+- No bond cap, positive cutoff, normalization or renormalization is applied.
+
+Known-answer controls reconstruct a two-component \((N,2S^z)\) sector, preserve a \(10^{-18}\) positive Schmidt component, and reject zero states and mismatched virtual charge vectors. This is the first generic U(1)^K numerical decomposition, but it remains a two-site exact primitive: generic multi-charge truncation receipts, canonicalization, TEBD, Hamiltonian gates and matched performance are not yet implemented.
+
 ## Explicit limitations
 
 This increment does **not** yet implement:
 - A formal Trotter error theorem or commutator-norm bound; the new step-doubling quantity is an asymptotic Richardson estimate calibrated against known-answer cases, not a rigorous bound.
 - Adaptive time-step control driven by a separately allocated total-error budget.
 - Higher-order Suzuki compositions (fourth and above) or a Trotter-versus-truncation global error budget.
-- Nonlocal MPO evolution, periodic-boundary MPS and long-range Hamiltonian compression. The new U(1)^K module currently provides validation/block planning only; generic multi-charge SVD/TEBD and non-Abelian sectors are still unimplemented.
+- Nonlocal MPO evolution, periodic-boundary MPS and long-range Hamiltonian compression. The new U(1)^K module now provides exact two-site charge-block SVD and reconstruction receipts. Generic multi-charge truncation, canonicalization, TEBD/Hamiltonian evolution and non-Abelian sectors are still unimplemented.
 - Outward-rounded/interval arithmetic for a formal floating-point proof of every residual; current receipts are numerically qualified in f64 and must be checked against dense known-answer oracles.
 - N=16–64 scaling and matched Quimb/ITensor performance evidence.
 
