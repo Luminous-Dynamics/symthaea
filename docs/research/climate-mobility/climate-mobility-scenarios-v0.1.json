@@ -168,7 +168,8 @@
     "The expected outcomes test arithmetic and contract behavior only. They do not establish potable-water safety, housing habitability or receiving-place suitability.",
     "The fixture does not assign probabilities to pathways and does not infer climate attribution.",
     "The service-floor example is synthetic-only: its arbitrary threshold is not a real minimum service standard, and its partial coverage cannot support a full-scope floor verdict.",
-    "No observation-valid-time window, assessment timestamp, or freshness budget is supplied; the executable service-floor evaluator therefore returns Indeterminate regardless of the synthetic threshold or interval."
+    "No observation-valid-time window, assessment timestamp, or freshness budget is supplied; the executable service-floor evaluator therefore returns Indeterminate regardless of the synthetic threshold or interval.",
+    "No versioned freshness-policy reference is supplied; the executable service-floor evaluator therefore remains Indeterminate even if valid-time fields were populated."
   ],
   "claim_ceiling": "Synthetic arithmetic and schema behavior only; not a real city assessment, migration forecast, engineering validation or relocation recommendation.",
   "service_floor_assessments": [
@@ -200,7 +201,8 @@
       "observation_valid_from_unix_seconds": null,
       "observation_valid_to_unix_seconds": null,
       "assessed_at_unix_seconds": null,
-      "max_observation_age_seconds": null
+      "max_observation_age_seconds": null,
+      "freshness_policy_ref": null
     }
   ]
 }
