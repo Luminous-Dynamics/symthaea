@@ -1,0 +1,995 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "PLASMA-VM-001",
+  "evidence_class": "SYNTHETIC",
+  "synthetic_only": true,
+  "physical_measurements": false,
+  "model_is_trained": false,
+  "automatic_quality_release": false,
+  "physical_actuation_authorized": false,
+  "claim_ceiling": "The fixture validates telemetry/outcome linkage, calibration and timing gates, energy-boundary completeness, domain abstention, and false-accept detection only. It contains no measured plasma telemetry, bond data, trained model or manufacturing-quality result.",
+  "service_profile": {
+    "profile_id": "PP_GRADE_A_ADHESIVE_A",
+    "substrate_grade": "SYNTHETIC_PP_GRADE_A",
+    "adhesive_system": "SYNTHETIC_ADHESIVE_A",
+    "bond_test_method": "ISO_4587_2003",
+    "acceptance_threshold_mpa": 5,
+    "prediction_interval_coverage_target": 0.9
+  },
+  "allowed_material_profiles": [
+    "PP_GRADE_A_ADHESIVE_A",
+    "PETG_GRADE_B_ADHESIVE_B"
+  ],
+  "required_sensors": [
+    "oes_relative",
+    "forward_power",
+    "process_gas_flow",
+    "head_temperature"
+  ],
+  "maximum_sensor_time_offset_ms": 2000,
+  "required_calibration_status": "QUALIFIED",
+  "required_energy_subsystems": [
+    "power_conversion",
+    "gas_supply",
+    "cooling",
+    "extraction",
+    "motion",
+    "controls",
+    "standby_startup"
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "aligned-heldout-valid",
+      "service_profile_id": "PP_GRADE_A_ADHESIVE_A",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-aligned-heldout-valid",
+      "specimen_id": "specimen-aligned-heldout-valid",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 250,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-oes_relative"
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-forward_power"
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-process_gas_flow"
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-head_temperature"
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true
+      },
+      "downstream_outcome": {
+        "specimen_id": "specimen-aligned-heldout-valid",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 6.2,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          5.4,
+          6.9
+        ],
+        "probability_of_meeting_acceptance": 0.96,
+        "predicted_disposition": "IN_SPEC",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_holdout_verified": true
+      },
+      "material_in_model_domain": true,
+      "expected_disposition": "PASS"
+    },
+    {
+      "scenario_id": "confident-false-accept",
+      "service_profile_id": "PP_GRADE_A_ADHESIVE_A",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-confident-false-accept",
+      "specimen_id": "specimen-confident-false-accept",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 250,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-confident-false-accept-oes_relative"
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-confident-false-accept-forward_power"
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-confident-false-accept-process_gas_flow"
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-confident-false-accept-head_temperature"
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true
+      },
+      "downstream_outcome": {
+        "specimen_id": "specimen-confident-false-accept",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 4.2,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          5.4,
+          6.5
+        ],
+        "probability_of_meeting_acceptance": 0.99,
+        "predicted_disposition": "IN_SPEC",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_holdout_verified": true
+      },
+      "material_in_model_domain": true,
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "scenario_id": "uncalibrated-oes",
+      "service_profile_id": "PP_GRADE_A_ADHESIVE_A",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-uncalibrated-oes",
+      "specimen_id": "specimen-uncalibrated-oes",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 250,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "UNKNOWN",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-uncalibrated-oes-oes_relative"
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "UNKNOWN",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-uncalibrated-oes-forward_power"
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "UNKNOWN",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-uncalibrated-oes-process_gas_flow"
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "UNKNOWN",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-uncalibrated-oes-head_temperature"
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true
+      },
+      "downstream_outcome": {
+        "specimen_id": "specimen-uncalibrated-oes",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 6.2,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          5.4,
+          6.9
+        ],
+        "probability_of_meeting_acceptance": 0.96,
+        "predicted_disposition": "IN_SPEC",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_holdout_verified": true
+      },
+      "material_in_model_domain": true,
+      "expected_disposition": "BLOCKED"
+    },
+    {
+      "scenario_id": "stale-sensor-clock",
+      "service_profile_id": "PP_GRADE_A_ADHESIVE_A",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-stale-sensor-clock",
+      "specimen_id": "specimen-stale-sensor-clock",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 12000,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-stale-sensor-clock-oes_relative"
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 12000,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-stale-sensor-clock-forward_power"
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 12000,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-stale-sensor-clock-process_gas_flow"
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 12000,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-stale-sensor-clock-head_temperature"
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true
+      },
+      "downstream_outcome": {
+        "specimen_id": "specimen-stale-sensor-clock",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 6.2,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          5.4,
+          6.9
+        ],
+        "probability_of_meeting_acceptance": 0.96,
+        "predicted_disposition": "IN_SPEC",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_holdout_verified": true
+      },
+      "material_in_model_domain": true,
+      "expected_disposition": "BLOCKED"
+    },
+    {
+      "scenario_id": "configuration-mismatch",
+      "service_profile_id": "PP_GRADE_A_ADHESIVE_A",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-configuration-mismatch",
+      "specimen_id": "specimen-configuration-mismatch",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 250,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-old",
+          "raw_trace_digest": "sha256:trace-configuration-mismatch-oes_relative"
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-old",
+          "raw_trace_digest": "sha256:trace-configuration-mismatch-forward_power"
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-old",
+          "raw_trace_digest": "sha256:trace-configuration-mismatch-process_gas_flow"
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-old",
+          "raw_trace_digest": "sha256:trace-configuration-mismatch-head_temperature"
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true
+      },
+      "downstream_outcome": {
+        "specimen_id": "specimen-configuration-mismatch",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 6.2,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          5.4,
+          6.9
+        ],
+        "probability_of_meeting_acceptance": 0.96,
+        "predicted_disposition": "IN_SPEC",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_holdout_verified": true
+      },
+      "material_in_model_domain": true,
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "scenario_id": "specimen-outcome-mismatch",
+      "service_profile_id": "PP_GRADE_A_ADHESIVE_A",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-specimen-outcome-mismatch",
+      "specimen_id": "specimen-specimen-outcome-mismatch",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 250,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-specimen-outcome-mismatch-oes_relative"
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-specimen-outcome-mismatch-forward_power"
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-specimen-outcome-mismatch-process_gas_flow"
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-specimen-outcome-mismatch-head_temperature"
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true
+      },
+      "downstream_outcome": {
+        "specimen_id": "different-specimen",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 6.2,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          5.4,
+          6.9
+        ],
+        "probability_of_meeting_acceptance": 0.96,
+        "predicted_disposition": "IN_SPEC",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_holdout_verified": true
+      },
+      "material_in_model_domain": true,
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "scenario_id": "unsupported-material-profile",
+      "service_profile_id": "UNSEEN_CFRP_RESIN_ADHESIVE",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-unsupported-material-profile",
+      "specimen_id": "specimen-unsupported-material-profile",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 250,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-unsupported-material-profile-oes_relative"
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-unsupported-material-profile-forward_power"
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-unsupported-material-profile-process_gas_flow"
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-unsupported-material-profile-head_temperature"
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true
+      },
+      "downstream_outcome": {
+        "specimen_id": "specimen-unsupported-material-profile",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 6.2,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          5.4,
+          6.9
+        ],
+        "probability_of_meeting_acceptance": 0.96,
+        "predicted_disposition": "IN_SPEC",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_holdout_verified": true
+      },
+      "material_in_model_domain": false,
+      "expected_disposition": "BLOCKED"
+    },
+    {
+      "scenario_id": "incomplete-energy-boundary",
+      "service_profile_id": "PP_GRADE_A_ADHESIVE_A",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-incomplete-energy-boundary",
+      "specimen_id": "specimen-incomplete-energy-boundary",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 250,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-incomplete-energy-boundary-oes_relative"
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-incomplete-energy-boundary-forward_power"
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-incomplete-energy-boundary-process_gas_flow"
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-incomplete-energy-boundary-head_temperature"
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": false
+      },
+      "downstream_outcome": {
+        "specimen_id": "specimen-incomplete-energy-boundary",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 6.2,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          5.4,
+          6.9
+        ],
+        "probability_of_meeting_acceptance": 0.96,
+        "predicted_disposition": "IN_SPEC",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_holdout_verified": true
+      },
+      "material_in_model_domain": true,
+      "expected_disposition": "BLOCKED"
+    },
+    {
+      "scenario_id": "missing-downstream-outcome",
+      "service_profile_id": "PP_GRADE_A_ADHESIVE_A",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-missing-downstream-outcome",
+      "specimen_id": "specimen-missing-downstream-outcome",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 250,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-missing-downstream-outcome-oes_relative"
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-missing-downstream-outcome-forward_power"
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-missing-downstream-outcome-process_gas_flow"
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-missing-downstream-outcome-head_temperature"
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true
+      },
+      "downstream_outcome": null,
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          5.4,
+          6.9
+        ],
+        "probability_of_meeting_acceptance": 0.96,
+        "predicted_disposition": "IN_SPEC",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_holdout_verified": true
+      },
+      "material_in_model_domain": true,
+      "expected_disposition": "BLOCKED"
+    },
+    {
+      "scenario_id": "model-holdout-unverified",
+      "service_profile_id": "PP_GRADE_A_ADHESIVE_A",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-model-holdout-unverified",
+      "specimen_id": "specimen-model-holdout-unverified",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 250,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-model-holdout-unverified-oes_relative"
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-model-holdout-unverified-forward_power"
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-model-holdout-unverified-process_gas_flow"
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-model-holdout-unverified-head_temperature"
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true
+      },
+      "downstream_outcome": {
+        "specimen_id": "specimen-model-holdout-unverified",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 6.2,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          5.4,
+          6.9
+        ],
+        "probability_of_meeting_acceptance": 0.96,
+        "predicted_disposition": "IN_SPEC",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_holdout_verified": false
+      },
+      "material_in_model_domain": true,
+      "expected_disposition": "BLOCKED"
+    }
+  ]
+}
