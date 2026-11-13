@@ -645,10 +645,10 @@ fn validate_arm(manifest: &HoldoutManifest, arm: &ArmManifest) -> Result<(), Hol
     Ok(())
 }
 
-fn validate_cases(
+fn validate_cases<'a>(
     validated: &ValidatedManifest,
-    cases: &[PairedCase],
-) -> Result<BTreeMap<GroupKey, Vec<&PairedCase>>, HoldoutAuditError> {
+    cases: &'a [PairedCase],
+) -> Result<BTreeMap<GroupKey, Vec<&'a PairedCase>>, HoldoutAuditError> {
     if cases.is_empty() {
         return Err(HoldoutAuditError::NoPairedCases);
     }
