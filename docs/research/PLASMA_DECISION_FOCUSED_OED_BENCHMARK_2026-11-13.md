@@ -54,7 +54,7 @@ For a material profile susceptible to hydrophobic recovery, the PE aging study g
 
 A useful *initial DOE grid* for a production-buffer profile is: as soon as practicable after treatment, 1 h, 4 h, 24 h, 72 h, 6 d and 18 d. Add 30 d / 60 d where pretreatment-to-assembly storage is a realistic workflow. This is a proposed sampling grid, not a universal aging law; the material/adhesive/storage profile and variance pilot should determine final points and replicate counts.
 
-For hygroscopic substrates such as PA6, the pre-plasma material state must be part of the evidence identity: measured moisture content, conditioning protocol, temperature/RH, measurement method/calibration, sample identity and elapsed time from measurement to plasma. A nominal polymer grade plus contact angle is insufficient. For additive-bearing PE/PP, additive package/grade/lot also belongs in the material-state identity.
+For hygroscopic substrates such as PA6, the pre-plasma material state must be part of the evidence identity. The application adapter carries `sample_lineage_ref` and `material_interface_ref` that resolve through MAT-013 #4344 and MAT-INTERFACE-001 #6227; it does not define a second sample or interface registry: measured moisture content, conditioning protocol, temperature/RH, measurement method/calibration, sample identity and elapsed time from measurement to plasma. A nominal polymer grade plus contact angle is insufficient. For additive-bearing PE/PP, additive package/grade/lot also belongs in the material-state identity.
 
 ## 4. Frozen rival mechanism families
 
@@ -80,6 +80,8 @@ This benchmark is a thin plasma-domain profile:
 - PLASMA-ML-GENERALIZATION-001 #11839 owns group splits and preprocessing lineage.
 - PLASMA-VM-001 #11847 owns calibrated telemetry/run/specimen/outcome linkage.
 - PLASMA-SURFACE-001 #11795 owns physical acceptance thresholds and the bondability endpoint.
+- MAT-013 #4344 owns physical sample/batch lineage, conditioning and provenance-complete characterization/test links.
+- MAT-INTERFACE-001 #6227 owns material-interface identity, surface preparation/state evolution and moisture/chemical exposure semantics.
 
 No duplicate generic optimizer, covariance engine, calibration registry, evidence receipt or materials ontology is introduced.
 
@@ -204,7 +206,10 @@ The twelve scenarios freeze:
 
 Independent source-side JavaScript replay of the exact fetched JSON matched **12/12** audit dispositions and product decisions. In addition to action catalogue membership, cost/latency/specimen closure, calibration and raw-trace identity, lot/device/day group disjointness, covariance receipts, mandatory endpoints, model adequacy / OTHER, and bond/aging/barrier floors, it checks that a hygroscopic material's measured moisture content is tied to a selected moisture-observation action, calibration receipt and timestamp that is fresh at plasma-run time.
 
-Nineteen Rust unit tests are authored. The authoring environment has no Cargo, rustc or rustfmt, so this module has not been compiled, formatted, linted or executed. No hosted CI result is claimed.
+Nineteen Rust unit tests are authored.
+
+The PA6 substrate-condition adapter now requires exact MAT-013 sample-lineage and MAT-INTERFACE subject references in addition to the condition protocol, moisture measurement receipt/calibration, environment, timestamp and digest. Synthetic refs in the fixture are placeholders only; physical promotion must resolve the canonical sample and interface subjects. A missing canonical reference is BLOCKED / ABSTAIN.
+ The authoring environment has no Cargo, rustc or rustfmt, so this module has not been compiled, formatted, linted or executed. No hosted CI result is claimed.
 
 
 The final evaluator hardening also:
