@@ -256,6 +256,7 @@ struct Band {
     propagation_method_id: String,
     propagation_method_revision: String,
     expanded_uncertainty_db: f64,
+    expanded_uncertainty_confidence_level: f64,
     evidence_sha256: String,
 }
 
@@ -563,7 +564,11 @@ fn validate_campaign(c: &Campaign, case: &Case, errors: &mut Vec<String>) {
         if !finite_positive(band.center_frequency_hz)
             || band.site_cutoff_frequency_hz.is_some_and(|v| !finite_positive(v))
             || band.propagation_method_id.trim().is_empty() || band.propagation_method_revision.trim().is_empty()
-            || !finite_positive(band.expanded_uncertainty_db) || !is_sha256(&band.evidence_sha256)
+            || !finite_positive(band.expanded_uncertainty_db)
+            || !band.expanded_uncertainty_confidence_level.is_finite()
+            || band.expanded_uncertainty_confidence_level <= 0.0
+            || band.expanded_uncertainty_confidence_level >= 1.0
+            || !is_sha256(&band.evidence_sha256)
         { errors.push(format!("{} / {}: invalid band/propagation evidence", c.campaign_id, band.band_id)); }
     }
 }
@@ -750,6 +755,9 @@ fn site_comparisons(case: &Case, reports: &[CampaignReport]) -> Vec<SiteComparis
                 b_band_map.get(id).is_some_and(|band_b| {
                     band_a.quantity == band_b.quantity
                         && (band_a.center_frequency_hz - band_b.center_frequency_hz).abs() <= 1.0e-6
+                        && band_a.propagation_method_id == band_b.propagation_method_id
+                        && band_a.propagation_method_revision == band_b.propagation_method_revision
+                        && (band_a.expanded_uncertainty_confidence_level - band_b.expanded_uncertainty_confidence_level).abs() <= 1.0e-9
                 })
             });
             if !same_band_quantity_contract {
@@ -929,8 +937,8 @@ mod tests {
             in_situ_post_recovery_calibration_sha256:digest('b'),
             runs,
             bands:vec![
-                Band{band_id:"rnl-100hz".to_string(),quantity:AcousticQuantity::RadiatedNoiseLevel,center_frequency_hz:100.0,site_cutoff_frequency_hz:Some(20.0),propagation_method_id:"iso-17208-3".to_string(),propagation_method_revision:"2025".to_string(),expanded_uncertainty_db:2.2,evidence_sha256:digest('c')},
-                Band{band_id:"sl-1000hz".to_string(),quantity:AcousticQuantity::SourceLevel,center_frequency_hz:1000.0,site_cutoff_frequency_hz:Some(20.0),propagation_method_id:"iso-17208-3".to_string(),propagation_method_revision:"2025".to_string(),expanded_uncertainty_db:2.2,evidence_sha256:digest('d')},
+                Band{band_id:"rnl-100hz".to_string(),quantity:AcousticQuantity::RadiatedNoiseLevel,center_frequency_hz:100.0,site_cutoff_frequency_hz:Some(20.0),propagation_method_id:"iso-17208-3".to_string(),propagation_method_revision:"2025".to_string(),expanded_uncertainty_db:2.2,expanded_uncertainty_confidence_level:0.95,evidence_sha256:digest('c')},
+                Band{band_id:"sl-1000hz".to_string(),quantity:AcousticQuantity::SourceLevel,center_frequency_hz:1000.0,site_cutoff_frequency_hz:Some(20.0),propagation_method_id:"iso-17208-3".to_string(),propagation_method_revision:"2025".to_string(),expanded_uncertainty_db:2.2,expanded_uncertainty_confidence_level:0.95,evidence_sha256:digest('d')},
             ],
         }
     }
@@ -980,6 +988,32 @@ mod tests {
     #[test] fn cross_site_substrate_difference_is_incomparable_without_transfer(){let mut x=case();measured(&mut x);let mut b=x.campaigns[0].clone();b.campaign_id="campaign-2".to_string();b.site.site_id="site-rock".to_string();for s in &mut b.site.seabed_samples{s.substrate=Substrate::Rock;s.sound_speed_m_s=2200.0;}x.campaigns.push(b);let r=audit(&x);assert_eq!(r.site_comparisons[0].result,"INCOMPARABLE");}
     #[test] fn reviewed_per_band_transfer_receipt_is_preserved_not_recalculated(){let mut x=case();measured(&mut x);let mut b=x.campaigns[0].clone();b.campaign_id="campaign-2".to_string();b.site.site_id="site-rock".to_string();for s in &mut b.site.seabed_samples{s.substrate=Substrate::Rock;s.sound_speed_m_s=2200.0;}x.campaigns.push(b);x.propagation_transfer_receipts.push(PropagationTransferReceipt{from_site_id:"site-sand".to_string(),to_site_id:"site-rock".to_string(),contract_id:"urn-prop-transfer-v1".to_string(),receipt_sha256:digest('e'),independently_reviewed:true,per_band_validated:true,validated_band_ids:vec!["rnl-100hz".to_string(),"sl-1000hz".to_string()]});let r=audit(&x);assert_eq!(r.site_comparisons[0].result,"TRANSFER_RECEIPT_PRESENT_NOT_VALIDATED_HERE");}
     #[test] fn cross_site_vessel_or_service_mismatch_stays_incomparable_even_with_transfer(){let mut x=case();measured(&mut x);let mut b=x.campaigns[0].clone();b.campaign_id="campaign-2".to_string();b.site.site_id="site-rock".to_string();b.vessel.vessel_id="other-vessel".to_string();x.campaigns.push(b);x.propagation_transfer_receipts.push(PropagationTransferReceipt{from_site_id:"site-sand".to_string(),to_site_id:"site-rock".to_string(),contract_id:"urn-prop-transfer-v1".to_string(),receipt_sha256:digest('e'),independently_reviewed:true,per_band_validated:true,validated_band_ids:vec!["rnl-100hz".to_string(),"sl-1000hz".to_string()]});assert_eq!(audit(&x).site_comparisons[0].result,"INCOMPARABLE");}
+    #[test]
+    fn depth_uncertainty_straddling_deep_shallow_boundary_is_incomplete() {
+        let mut input = case();
+        measured(&mut input);
+        for sample in &mut input.campaigns[0].site.water_depth_samples {
+            sample.depth_m = 151.0;
+            sample.expanded_uncertainty_m = 2.0;
+        }
+        let report = audit(&input);
+        assert_eq!(report.campaign_reports[0].depth_category, "boundary_undefined");
+        assert_eq!(report.disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn cross_site_method_revision_mismatch_blocks_comparison() {
+        let mut input = case();
+        measured(&mut input);
+        let mut second = input.campaigns[0].clone();
+        second.campaign_id = "campaign-2".to_string();
+        second.site.site_id = "site-2".to_string();
+        second.bands[0].propagation_method_revision = "other-revision".to_string();
+        input.campaigns.push(second);
+        assert_eq!(audit(&input).site_comparisons[0].same_band_quantity_contract, false);
+        assert_eq!(audit(&input).site_comparisons[0].result, "INCOMPARABLE");
+    }
+
     #[test] fn invalid_digest_is_rejected(){let mut x=case();x.campaigns[0].site.bathymetry_source_sha256="bad".to_string();assert_eq!(audit(&x).disposition,"INVALID");}
     #[test] fn duplicate_run_ids_are_invalid(){let mut x=case();x.campaigns[0].runs[1].run_id=x.campaigns[0].runs[0].run_id.clone();assert_eq!(audit(&x).disposition,"INVALID");}
     #[test] fn no_blind_free_field_correction_is_emitted(){let r=audit(&case());assert!(r.claim_ceiling.contains("no_iso_conformity_source_level_solver_propagation_correction"));}
