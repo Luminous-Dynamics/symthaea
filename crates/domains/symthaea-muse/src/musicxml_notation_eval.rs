@@ -361,9 +361,12 @@ fn validate_graph(
         .len()
         .saturating_add(graph.notation_events.auxiliary_events.len())
         .saturating_add(graph.notation_events.cursor_moves.len());
-    let total = note_count
-        .saturating_add(other_count)
-        .saturating_add(graph.map.measures.len());
+    // Measure spans count toward the resource budget, but they do not carry
+    // notation-event source ordinals. Keep these cardinalities distinct:
+    // source_order is contiguous across note/attribute/auxiliary/cursor events
+    // only, while measures are separately bounded structural units.
+    let source_event_count = note_count.saturating_add(other_count);
+    let total = source_event_count.saturating_add(graph.map.measures.len());
     if total > config.maximum_events_per_part {
         return Err(MusicXmlNotationEvaluationErrorV1::EventBudgetExceeded {
             side: side.into(),
@@ -374,7 +377,16 @@ fn validate_graph(
 
     let mut orders = BTreeSet::new();
     for event in &graph.notation_events.note_events {
-        if event.part_id != graph.part_id
+        let invalid_pitch_alter = match &event.kind {
+            MusicXmlNotationEventKindV1::Pitched(pitch) => pitch
+                .alter
+                .as_deref()
+                .is_some_and(|alter| canonical_decimal(alter).is_none()),
+            MusicXmlNotationEventKindV1::Rest { .. }
+            | MusicXmlNotationEventKindV1::Unpitched { .. } => false,
+        };
+        if invalid_pitch_alter
+            || event.part_id != graph.part_id
             || event.source_measure_index >= graph.map.measures.len()
             || !orders.insert(event.source_order)
             || !rational_is_canonical(event.score_offset)
@@ -470,7 +482,7 @@ fn validate_graph(
     .iter()
     .all(|family| family.windows(2).all(|pair| pair[0] < pair[1]));
     if !family_order_is_strict
-        || orders.len() != total
+        || orders.len() != source_event_count
         || orders.iter().copied().enumerate().any(|(expected, observed)| expected != observed)
     {
         return Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure {
@@ -1420,6 +1432,23 @@ mod tests {
             evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()),
             Err(MusicXmlNotationEvaluationErrorV1::PartIdentityMismatch)
         );
+    }
+
+
+    #[test]
+    fn malformed_written_pitch_alteration_refuses_evaluation() {
+        let reference = graph(fixture_xml());
+        let prediction = graph(&fixture_xml().replace(
+            "<step>C</step><alter>0</alter><octave>4</octave>",
+            "<step>C</step><alter>sharpish</alter><octave>4</octave>",
+        ));
+        assert!(matches!(
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()),
+            Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure {
+                side,
+                ..
+            }) if side == "prediction"
+        ));
     }
 
     #[test]
