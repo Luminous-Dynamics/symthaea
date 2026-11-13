@@ -58,6 +58,8 @@ Zinc-ion hybrid supercapacitors are attractive because they can combine zinc-bas
 
 A 13 November 2026 review of aqueous zinc-ion batteries quantifies why mass boundaries matter: one representative value changes from 119.8 Wh/kg on an active-material basis to 33.6 Wh/kg on a whole-cell basis. It also reports that practical 1.0–2.7 Ah pouch devices commonly occupy roughly 68–79.5 Wh/L and 120–390 cycles under the reviewed material constraints. These are zinc-battery references, **not direct ZIHSC SOTA values**.
 
+A useful longer-range parameter envelope comes from Wu et al., *Advanced Science* (6 November 2024): a representative ZIHC model indicates that >30 Wh kg⁻¹ cell energy density requires simultaneous ranges such as 10–20 mg cm⁻² carbon loading, >100 mAh g⁻¹ carbon specific capacity, N/P <20 and electrolyte-to-carbon mass ratio E/C <5. **The model explicitly excludes stainless casing, springs and current-collecting plates**, so >30 Wh kg⁻¹ is not a measured complete packaged-device result. We use these values to shape a long-range design space only; all omitted component mass/volume must be restored in physical comparisons. [Source](https://doi.org/10.1002/advs.202408997).
+
 ### 2.4 Experiment automation
 
 The 10 November 2026 DOE/Lawrence Berkeley report on AutoBot describes exploring more than 5,000 halide-perovskite synthesis combinations while physically testing fewer than 1% and selecting informative experiments. This is a method comparator from perovskite materials, not a battery result.
