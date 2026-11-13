@@ -1,0 +1,28 @@
+{
+  "schema_version": "luminous.synthetic-market-data.v1",
+  "source_id": "synthetic-public-market-v1",
+  "provenance_family_id": "synthetic-market-family-v1",
+  "observations": [
+    {
+      "observation_id": "SYN-EQ-A-20260102-CLOSE",
+      "instrument_id": "SYN-EQ-A",
+      "event_time": "2026-01-02T16:00:00Z",
+      "known_at": "2026-01-02T16:00:05Z",
+      "price_minor_units": 10000,
+      "currency": "USD",
+      "period": "2026-01-02",
+      "kind": "synthetic_close"
+    },
+    {
+      "observation_id": "SYN-EQ-B-20260102-CLOSE",
+      "instrument_id": "SYN-EQ-B",
+      "event_time": "2026-01-02T16:00:00Z",
+      "known_at": "2026-01-02T16:00:05Z",
+      "price_minor_units": 5000,
+      "currency": "USD",
+      "period": "2026-01-02",
+      "kind": "synthetic_close"
+    }
+  ],
+  "note": "Prices are fictional minor-unit values; not real market data or a performance result."
+}
