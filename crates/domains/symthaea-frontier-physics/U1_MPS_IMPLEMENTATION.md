@@ -146,16 +146,30 @@ The real-time layer connects local physics to the already-qualified gate/split/c
 
 Known-answer tests cover the analytic two-site XY exponential, rejection of non-Hermitian or charge-changing Hamiltonians, exact two-site forward/reverse evolution, and second-order convergence of a three-site XY chain against its analytic solution. For second-order Strang, halving \(\Delta t\) should reduce the global discretization error by approximately four in the asymptotic regime.
 
+## Step-doubling and Hamiltonian-projection diagnostics
+
+The follow-up adds a transfer-environment MPS distance and a step-doubling diagnostic:
+
+- One coarse Strang step of size \(dt\) is compared with two fine steps of size \(dt/2\).
+- The coarse/fine state-vector difference is computed from MPS norms and the cross-state transfer contraction; no dense expansion is needed.
+- For a second-order method, the asymptotic Richardson estimate for the fine solution uses the factor \(1/(2^2-1)=1/3\).
+- The reported estimate includes the coarse and fine canonical-gauge truncation upper bounds as contamination terms. It is explicitly an *asymptotic estimator*, not a formal Trotter theorem; its calibration gate is the exact three-site XY solution and cubic single-step defect scaling.
+- Each result reports the measured defect, separate coarse/fine truncation bounds, and whether all gauge receipts qualified. A missing gauge qualification suppresses the Richardson estimate.
+- Every bond Hamiltonian also reports its Hermiticity residual, charge-leakage residual and Frobenius projection residual. The analytic exponential uses the explicit Hermitian, charge-block projection, with the single-excitation coupling symmetrized before exponentiation.
+
+This gives a three-part input ledger: Hamiltonian projection residual, MPS truncation/canonicalization residual, and Strang step-doubling defect. These are not yet a single formal physical error certificate: the Richardson estimate remains asymptotic and the floating-point residuals are f64 measurements, not interval-arithmetic enclosures.
+
 ## Explicit limitations
 
 This increment does **not** yet implement:
-- An independent Trotter error estimator (step-doubling, commutator bound, or embedded integrator) or adaptive time-step control.
+- A formal Trotter error theorem or commutator-norm bound; the new step-doubling quantity is an asymptotic Richardson estimate calibrated against known-answer cases, not a rigorous bound.
+- Adaptive time-step control driven by a separately allocated total-error budget.
 - Higher-order Suzuki compositions (fourth and above) or a Trotter-versus-truncation global error budget.
 - Nonlocal MPO evolution, periodic-boundary MPS, long-range Hamiltonian compression, or multi-symmetry \(U(1)^k\)/non-Abelian sectors.
 - Outward-rounded/interval arithmetic for a formal floating-point proof of every residual; current receipts are numerically qualified in f64 and must be checked against dense known-answer oracles.
 - N=16–64 scaling and matched Quimb/ITensor performance evidence.
 
-The next steps are: (1) add step-doubling and energy/observable drift receipts; (2) allocate an explicit total error budget between Trotter, truncation and floating-point contributions; (3) benchmark matched circuits and Hamiltonians against Quimb and ITensor; (4) generalize charge labels to multiple commuting conserved quantities; (5) explore a hybrid TEBD / two-site TDVP / Krylov path when entanglement growth makes fixed-bond TEBD inefficient.
+The next steps are: (1) calibrate the step-doubling estimate over longer runs and add energy/local-observable drift receipts; (2) allocate an explicit total-error budget among Hamiltonian projection, Trotter, truncation and floating-point contributions; (3) compare matched workloads against Quimb and ITensor; (4) generalize charge labels to multiple commuting conserved quantities; (5) explore hybrid TEBD / two-site TDVP / Krylov evolution when entanglement growth makes fixed-bond TEBD inefficient.
 
 ## Competitive benchmark policy
 
