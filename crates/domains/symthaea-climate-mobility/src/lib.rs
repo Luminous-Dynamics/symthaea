@@ -533,8 +533,11 @@ pub fn evaluate_service_floor(
         qualification: input.qualification,
     };
 
-    if input.evidence_class == EvidenceClass::Unknown
-        || input.qualification == AssessmentQualification::Unknown
+    if matches!(input.evidence_class, EvidenceClass::Unknown | EvidenceClass::Synthetic)
+        || matches!(
+            input.qualification,
+            AssessmentQualification::Unknown | AssessmentQualification::ContractOnly
+        )
         || input.floor_profile_revision.as_deref().is_none_or(|value| value.trim().is_empty())
         || input.floor_authority_ref.as_deref().is_none_or(|value| value.trim().is_empty())
         || input.observation_ref.as_deref().is_none_or(|value| value.trim().is_empty())
@@ -1050,6 +1053,21 @@ mod tests {
                 area_id: "unrelated".to_owned(),
             })
         );
+    }
+ 
+    #[test]
+    fn synthetic_or_contract_only_floor_evidence_never_becomes_a_real_floor_outcome() {
+        let mut input = service_floor(Some(100), Some(100), Some(30), Some(35));
+        input.evidence_class = EvidenceClass::Synthetic;
+        input.qualification = AssessmentQualification::ContractOnly;
+        let result = evaluate_service_floor(&input).expect("synthetic floor evidence abstains");
+        assert_eq!(result.outcome, ServiceFloorOutcome::Indeterminate);
+
+        input.evidence_class = EvidenceClass::Observed;
+        input.qualification = AssessmentQualification::ContractOnly;
+        let contract_only =
+            evaluate_service_floor(&input).expect("contract-only floor evidence abstains");
+        assert_eq!(contract_only.outcome, ServiceFloorOutcome::Indeterminate);
     }
 
 }
