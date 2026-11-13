@@ -27,6 +27,8 @@ Inputs:
 - prediction MusicXmlPartNotationGraphV1;
 - explicit rational position and duration tolerances plus work budgets.
 
+The evaluator also rejects a written pitch alteration that is not a valid finite decimal lexeme. It normalizes valid decimal strings as exact reduced rationals, so `0`, `0.0` and `0.000` are equivalent, while malformed values do not receive a lexical-equality pass.
+
 The evaluator refuses when either side has:
 - a non-Supported explicit measure map;
 - a non-Supported notation-event layer;
@@ -101,7 +103,7 @@ The hashes establish content consistency, not the identity of the parser, truth 
 
 ## Tests authored
 
-18 focused tests currently cover:
+19 focused tests currently cover:
 - identical graph yields perfect independent dimensions, including onset, duration, note, auxiliary, attribute and cursor outputs;
 - wrong pitch spelling does not suppress note-event presence;
 - equivalent decimal alteration lexemes compare numerically exactly, including implicit natural versus explicit zero;
@@ -149,4 +151,4 @@ The opportunity is not to maximize one score. It is to make score-transcription 
 - Tests are authored but not compiled or executed.
 - No local cargo, rustc or rustfmt toolchain is available in the authoring environment.
 - No exact-head CI pass, vendor benchmark reproduction, annotated-holdout result, human correction-time study, MIREX MV2H parity or SOTA win is claimed.
-- The focused workflow is configured to run the notation evaluator tests, but its first execution still depends on the workflow definition landing on the base/default branch and a subsequent matching event.
+- The focused workflow `.github/workflows/muse-musicxml-notation.yml` is already present on this PR's target base branch. It includes the evaluator module path and a dedicated test command; the first exact-head execution is still pending and must be observed rather than inferred.
