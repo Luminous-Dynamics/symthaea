@@ -2750,6 +2750,16 @@ fn summarize_imported_notation_structure(
             let mut measure_count = 0usize;
             let mut barline_event_count = 0usize;
             let mut non_controlling_measure_count = 0usize;
+            let mut notation_event_count = 0usize;
+            let mut notation_supported_part_count = 0usize;
+            let mut notation_unknown_part_count = 0usize;
+            let mut rest_event_count = 0usize;
+            let mut grace_note_count = 0usize;
+            let mut tuplet_notation_count = 0usize;
+            let mut sound_tie_count = 0usize;
+            let mut visual_tie_count = 0usize;
+            let mut voice_assignment_count = 0usize;
+            let mut staff_assignment_count = 0usize;
             for graph in &graphs {
                 match &graph.map.status {
                     symthaea_muse::barline_eval::MeasureMapStatus::Supported => {
@@ -2757,10 +2767,39 @@ fn summarize_imported_notation_structure(
                     }
                     _ => unavailable_part_ids.push(graph.part_id.clone()),
                 }
+                match &graph.notation_events.status {
+                    symthaea_muse::musicxml_notation_events::MusicXmlNotationEventsStatusV1::Supported => {
+                        notation_supported_part_count += 1;
+                    }
+                    symthaea_muse::musicxml_notation_events::MusicXmlNotationEventsStatusV1::Unknown { .. } => {
+                        notation_unknown_part_count += 1;
+                    }
+                }
                 measure_count += graph.map.measures.len();
                 barline_event_count += graph.barline_events.len();
                 non_controlling_measure_count +=
                     graph.non_controlling_measure_indices.len();
+                notation_event_count += graph.notation_events.note_events.len();
+                for event in &graph.notation_events.note_events {
+                    if matches!(
+                        event.kind,
+                        symthaea_muse::musicxml_notation_events::MusicXmlNotationEventKindV1::Rest { .. }
+                    ) {
+                        rest_event_count += 1;
+                    }
+                    if event.is_grace {
+                        grace_note_count += 1;
+                    }
+                    tuplet_notation_count += event.tuplet_notations.len();
+                    sound_tie_count += event.sound_ties.len();
+                    visual_tie_count += event.visual_ties.len();
+                    if event.voice.is_some() {
+                        voice_assignment_count += 1;
+                    }
+                    if event.staff.is_some() {
+                        staff_assignment_count += 1;
+                    }
+                }
             }
             let unknown_part_count = part_count.saturating_sub(supported_part_count);
             let status = if unknown_part_count == 0 && part_count > 0 {
@@ -2789,6 +2828,16 @@ fn summarize_imported_notation_structure(
                     measure_count,
                     barline_event_count,
                     non_controlling_measure_count,
+                    notation_event_count,
+                    notation_supported_part_count,
+                    notation_unknown_part_count,
+                    rest_event_count,
+                    grace_note_count,
+                    tuplet_notation_count,
+                    sound_tie_count,
+                    visual_tie_count,
+                    voice_assignment_count,
+                    staff_assignment_count,
                     unavailable_part_ids,
                     explanation,
                 },
@@ -2841,6 +2890,16 @@ fn summarize_imported_notation_structure(
                     measure_count,
                     barline_event_count,
                     non_controlling_measure_count,
+                    notation_event_count: 0,
+                    notation_supported_part_count: 0,
+                    notation_unknown_part_count: 0,
+                    rest_event_count: 0,
+                    grace_note_count: 0,
+                    tuplet_notation_count: 0,
+                    sound_tie_count: 0,
+                    visual_tie_count: 0,
+                    voice_assignment_count: 0,
+                    staff_assignment_count: 0,
                     unavailable_part_ids,
                     explanation: None,
                 },
@@ -2862,6 +2921,16 @@ fn summarize_imported_notation_structure(
                 measure_count: 0,
                 barline_event_count: 0,
                 non_controlling_measure_count: 0,
+                notation_event_count: 0,
+                notation_supported_part_count: 0,
+                notation_unknown_part_count: 0,
+                rest_event_count: 0,
+                grace_note_count: 0,
+                tuplet_notation_count: 0,
+                sound_tie_count: 0,
+                visual_tie_count: 0,
+                voice_assignment_count: 0,
+                staff_assignment_count: 0,
                 unavailable_part_ids: Vec::new(),
                 explanation: Some(reason),
             },
@@ -2882,6 +2951,16 @@ fn summarize_imported_notation_structure(
                 measure_count: 0,
                 barline_event_count: 0,
                 non_controlling_measure_count: 0,
+                notation_event_count: 0,
+                notation_supported_part_count: 0,
+                notation_unknown_part_count: 0,
+                rest_event_count: 0,
+                grace_note_count: 0,
+                tuplet_notation_count: 0,
+                sound_tie_count: 0,
+                visual_tie_count: 0,
+                voice_assignment_count: 0,
+                staff_assignment_count: 0,
                 unavailable_part_ids: Vec::new(),
                 explanation: Some(reason),
             },
