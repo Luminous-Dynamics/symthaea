@@ -28,6 +28,15 @@ pub struct MusicXmlSourceNodeV1 {
     pub attributes: Vec<(String, String)>,
     pub text: Option<String>,
     pub children: Vec<MusicXmlSourceNodeV1>,
+    /// Ordered mixed content (text and child elements) so extensions such as
+    /// lyrics, words and unknown annotation markup do not lose text position.
+    pub content: Vec<MusicXmlSourceContentV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum MusicXmlSourceContentV1 {
+    Text(String),
+    Element(MusicXmlSourceNodeV1),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -141,9 +150,12 @@ pub struct MusicXmlCursorMoveV1 {
     pub measure_number: Option<String>,
     pub part_id: String,
     pub direction: String,
+    pub voice: Option<String>,
+    pub staff: Option<String>,
     pub score_offset_before: RationalBeat,
     pub duration: RationalBeat,
     pub score_offset_after: RationalBeat,
+    pub source: MusicXmlSourceNodeV1,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -198,7 +210,7 @@ pub fn is_legacy_missing_notation_events(
 struct ChordAnchor {
     source_order: usize,
     onset: RationalBeat,
-    duration: RationalBeat,
+    duration: Option<RationalBeat>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -367,8 +379,10 @@ fn parse_part_events(
                             "chord member has no immediately preceding base note".into(),
                         )
                     })?;
-                    if let Some(duration) = performed_duration {
-                        if duration.compare_exact(anchor.duration) == std::cmp::Ordering::Greater {
+                    if let (Some(duration), Some(base_duration)) =
+                        (performed_duration, anchor.duration)
+                    {
+                        if duration.compare_exact(base_duration) == std::cmp::Ordering::Greater {
                             return Err(ParseEventError::Unknown(
                                 "chord-member duration exceeds its base note".into(),
                             ));
@@ -487,15 +501,11 @@ fn parse_part_events(
                 let this_order = source_order;
                 source_order = next_order(source_order)?;
                 if !is_chord_member {
-                    chord_anchor = if !is_grace {
-                        performed_duration.map(|duration| ChordAnchor {
-                            source_order: this_order,
-                            onset: note_onset,
-                            duration,
-                        })
-                    } else {
-                        None
-                    };
+                    chord_anchor = Some(ChordAnchor {
+                        source_order: this_order,
+                        onset: note_onset,
+                        duration: performed_duration,
+                    });
                     if !is_grace {
                         if let Some(duration) = performed_duration {
                             cursor = cursor
@@ -541,6 +551,8 @@ fn parse_part_events(
                     measure_number: measure_number.clone(),
                     part_id: part_id.to_string(),
                     direction: if element.has_tag_name("backup") { "backup" } else { "forward" }.into(),
+                    voice: child_text(element, "voice"),
+                    staff: child_text(element, "staff"),
                     score_offset_before: measure_start
                         .checked_add(before)
                         .map_err(|_| ParseEventError::Unknown("cursor move offset overflow".into()))?,
@@ -548,6 +560,7 @@ fn parse_part_events(
                     score_offset_after: measure_start
                         .checked_add(cursor)
                         .map_err(|_| ParseEventError::Unknown("cursor move offset overflow".into()))?,
+                    source: source_node(element, 0, &mut source_tree_nodes)?,
                 });
                 source_order = next_order(source_order)?;
             } else {
@@ -658,8 +671,18 @@ fn source_node(
         ));
     }
     let mut children = Vec::new();
-    for child in node.children().filter(|child| child.is_element()) {
-        children.push(source_node(child, depth + 1, total_nodes)?);
+    let mut content = Vec::new();
+    for child in node.children() {
+        if child.is_element() {
+            let parsed = source_node(child, depth + 1, total_nodes)?;
+            children.push(parsed.clone());
+            content.push(MusicXmlSourceContentV1::Element(parsed));
+        } else if let Some(value) = child.text() {
+            // Preserve exact text-node whitespace and its position relative
+            // to nested XML elements. The convenience `text` field below
+            // remains trimmed for simple leaf lookups.
+            content.push(MusicXmlSourceContentV1::Text(value.to_string()));
+        }
     }
     Ok(MusicXmlSourceNodeV1 {
         element: node.tag_name().name().to_string(),
@@ -669,6 +692,7 @@ fn source_node(
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty()),
         children,
+        content,
     })
 }
 
@@ -936,3 +960,54 @@ mod tests {
         ));
     }
 }
+
+    #[test]
+    fn grace_chord_members_share_onset_without_inventing_duration() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><grace slash="yes"/><pitch><step>C</step><octave>5</octave></pitch><voice>1</voice></note>
+            <note><grace slash="yes"/><chord/><pitch><step>E</step><octave>5</octave></pitch><voice>1</voice></note>
+            <note><pitch><step>G</step><octave>5</octave></pitch><duration>16</duration><voice>1</voice></note>
+        </measure></part></score-partwise>"#;
+        let events = parse(xml);
+        supported(&events);
+        assert_eq!(events.note_events.len(), 3);
+        assert!(events.note_events[0].is_grace);
+        assert!(events.note_events[1].is_grace);
+        assert!(events.note_events[1].is_chord_member);
+        assert_eq!(events.note_events[1].score_offset, events.note_events[0].score_offset);
+        assert_eq!(events.note_events[1].chord_anchor_source_order, Some(2));
+        assert_eq!(events.note_events[2].score_offset, RationalBeat::new(0, 1).unwrap());
+    }
+
+    #[test]
+    fn opaque_mixed_content_retains_text_element_order() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration>
+                <other-notation>before<future-code value="x"/>after</other-notation>
+            </note>
+        </measure></part></score-partwise>"#;
+        let events = parse(xml);
+        supported(&events);
+        let other = events.note_events[0].source_note.children.iter()
+            .find(|node| node.element == "other-notation").unwrap();
+        assert!(matches!(&other.content[0], MusicXmlSourceContentV1::Text(value) if value == "before"));
+        assert!(matches!(&other.content[1], MusicXmlSourceContentV1::Element(node) if node.element == "future-code"));
+        assert!(matches!(&other.content[2], MusicXmlSourceContentV1::Text(value) if value == "after"));
+    }
+
+    #[test]
+    fn forward_cursor_move_keeps_voice_and_staff_identity() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <forward><duration>8</duration><voice>2</voice><staff>2</staff></forward>
+        </measure></part></score-partwise>"#;
+        let events = parse(xml);
+        supported(&events);
+        assert_eq!(events.cursor_moves.len(), 1);
+        assert_eq!(events.cursor_moves[0].voice.as_deref(), Some("2"));
+        assert_eq!(events.cursor_moves[0].staff.as_deref(), Some("2"));
+        assert_eq!(events.cursor_moves[0].source.element, "forward");
+    }
+
