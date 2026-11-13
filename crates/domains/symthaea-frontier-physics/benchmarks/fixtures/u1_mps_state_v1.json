@@ -6,7 +6,7 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "Complex U1 MPS state representation, charge-block dense factorization, U1 two-site gates, exact two-site split, and explicit truncation/error-ledger source are authored. Exact-head Rust 1.96 validation pending.",
+  "execution_status": "U1 MPS core, dense factorization, two-site gates, exact charge-block split, global-cap/cutoff compression, local truncation ledger and deterministic even/odd TEBD layer are source-authored. The truncation branch exact-head harness is being refreshed after naming the ledger local-only.",
   "claim_ceiling": "No TEBD circuit scheduler, nonlocal MPO gates, large-N scaling or quantum advantage claim. Approximation diagnostics are local two-site split receipts only.",
   "conventions": {
     "physical_dimension": 2,
@@ -165,18 +165,22 @@
     "truncation_ledger": {
       "type": "U1MpsTruncationLedger",
       "method": "record(two_site_truncation_diagnostics)",
-      "bound": "sum_j sqrt(discarded_weight_j)",
+      "bound": "sum_j sqrt(discarded_weight_j), in local two-site tensor Frobenius norm",
       "assumptions": [
-        "interleaved gates are unitary",
-        "each truncation is an orthogonal Schmidt projection",
-        "no nonlinear normalization between truncations"
+        "each local split is an orthogonal Schmidt projection",
+        "interleaved gates are unitary for a global-state interpretation",
+        "no nonlinear normalization between truncations",
+        "a global state-vector bound additionally requires mixed-canonical orthonormal exterior left/right block bases at every truncated bond"
       ],
       "fields": [
         "gate_count",
         "accumulated_discarded_weight",
-        "cumulative_l2_error_upper_bound",
-        "maximum_single_gate_relative_discarded_weight"
-      ]
+        "cumulative_local_l2_error_bound",
+        "maximum_single_gate_relative_discarded_weight",
+        "global_state_error_bound_qualified"
+      ],
+      "global_state_error_bound_qualified": false,
+      "qualification_gate": "Require a canonical-gauge receipt verifying exterior left/right block isometries at every compressed bond before interpreting the ledger as a global state-vector L2 bound."
     }
   },
   "known_answers": [
@@ -264,14 +268,15 @@
     {
       "id": "MPS-2",
       "name": "Global charge-aware truncation and conservative ledger",
-      "status": "source_authored_runner_pending",
+      "status": "local_truncation_receipts_source_authored",
       "acceptance": [
         "relative cutoff semantics frozen as sigma_i >= r*sigma_max",
         "global max bond across charge sectors",
         "separate cutoff and bond-cap discarded weights",
         "pre/post norm and no implicit renormalization",
         "per-charge retained rank",
-        "cumulative L2 bound sum sqrt(discarded weight) under unitary/orthogonal-projection assumptions"
+        "local Frobenius projection ledger",
+        "global state-vector L2 interpretation remains disabled without canonical-gauge receipt"
       ]
     },
     {
@@ -297,12 +302,14 @@
     },
     {
       "id": "MPS-4",
-      "name": "Matched dense and external implementation benchmarks",
+      "name": "Mixed-canonical gauge proof and globally qualified truncation",
       "status": "planned",
       "acceptance": [
-        "N=8,10,12 dense overlaps",
-        "same gates/seeds/checkpoints as Quimb or ITensor",
-        "matched accuracy before cost comparison"
+        "left/right charge-block isometry residuals per site",
+        "mixed-canonical center identified at each split bond",
+        "orthonormal exterior block basis certificate",
+        "global state-vector L2 bound verified against dense oracle on N<=12",
+        "no normalization between gates or explicit normalization receipt"
       ]
     },
     {
@@ -343,8 +350,9 @@
     "per-charge bond cap mistakenly applied instead of global cap",
     "cutoff weight conflated with bond-cap discarded weight",
     "implicit renormalization changes amplitudes without receipt",
-    "cumulative L2 ledger reports root-sum-square instead of triangle-inequality sum",
-    "apply unitary-gate ledger bound across an unreported non-unitary operation"
+    "apply unitary-gate ledger bound across an unreported non-unitary operation",
+    "interpret local Frobenius projection ledger as global state-vector error without mixed-canonical exterior-isometry receipt",
+    "set global state-error qualification true when left or right exterior isometry residual exceeds tolerance"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -383,7 +391,11 @@
     "post_truncation_norm_squared",
     "renormalization_factor_not_applied",
     "bond_cap_binding",
-    "cumulative_l2_error_upper_bound"
+    "cumulative_local_l2_error_bound",
+    "global_state_error_bound_qualified",
+    "canonical_gauge_receipt_id",
+    "left_exterior_isometry_residual",
+    "right_exterior_isometry_residual"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
