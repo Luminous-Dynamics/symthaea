@@ -172,7 +172,7 @@ struct Expected {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum AuditDispositionInput {
+pub enum AuditDispositionInput {
     Pass,
     Blocked,
     Rejected,
@@ -180,7 +180,7 @@ enum AuditDispositionInput {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
-enum ProductDecisionInput {
+pub enum ProductDecisionInput {
     AcceptWindow,
     RejectWindow,
     Abstain,
@@ -449,6 +449,14 @@ fn evaluate_scenario(
         }
         if !selected_ids.contains(measurement.action_id.as_str()) {
             rejected.push(format!("measurement {} references an unselected action", measurement.measurement_id));
+        }
+        if let Some(action) = actions.get(&measurement.action_id) {
+            if measurement.quantity != action.quantity || measurement.unit != action.unit {
+                rejected.push(format!(
+                    "measurement {} quantity/unit differs from its frozen action contract",
+                    measurement.measurement_id
+                ));
+            }
         }
         if measurement.specimen_id.trim().is_empty()
             || measurement.lot_id.trim().is_empty()
