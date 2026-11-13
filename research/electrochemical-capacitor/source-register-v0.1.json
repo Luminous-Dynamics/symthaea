@@ -60,8 +60,8 @@
       "publisher": "IEC",
       "published": "2025-02-13",
       "evidence_class": "international_standard",
-      "permitted_use": "EDLC power-application performance, leakage-current measurement and quality-assessment reference; publicly searchable excerpt specifies 20 °C ± 2 °C, rated voltage through protective resistor ≤1 000 Ω, ≥12 h pre-discharge and 24 h electrification unless otherwise agreed; use the controlled normative standard and applicable detail specification for physical testing",
-      "prohibited_inference": "A 24 h leakage-current test is not multi-month calendar life, voltage-hold lifetime or independent device qualification; requirements depend on the applicable detail specification and product/application boundary"
+      "permitted_use": "EDLC power-application performance, leakage-current measurement and maintain-voltage quality-assessment reference. Publicly searchable excerpts specify leakage at 20 °C ± 2 °C with rated voltage through a protective resistor ≤1 000 Ω, ≥12 h pre-discharge and 24 h electrification unless otherwise agreed; the separate 5.11 maintain-voltage test references IEC 62391-1:2022 6.4 and specifies ≥12 h pre-discharge, rated-voltage charging for 8 h, then a 24 h retention-voltage measurement unless otherwise agreed. Use the controlled normative standard and applicable detail specification for physical testing.",
+      "prohibited_inference": "These are standardized leakage and retention-voltage procedures, not a multi-month application standby-life guarantee or post-standby delivered-energy qualification; requirements depend on the applicable detail specification and product/application boundary."
     },
     {
       "id": "UL-810A-2026",
@@ -220,6 +220,28 @@
       "evidence_class": "peer_reviewed_literature",
       "permitted_use": "Research comparator for continuous-carbon-fibre prepreg 3D-printed load-bearing ZIHC framework; publisher abstract reports 2.4x areal capacitance over conventional LIG electrodes and PP/PVA semi-solid electrolyte ionic conductivity increasing from 0.5 to 4.2 mS cm-1 after supercritical foaming",
       "prohibited_inference": "Abstract does not provide complete structural design allowables, stiffness/strength/fatigue, complete-device Wh/kg or Wh/L, full component mass, coupled mechanical-electrochemical ageing, independent-lab replication or commercial readiness. Review supporting information and request data under appropriate rights; do not infer structural credit or complete assembly mass savings from the abstract."
+    },
+    {
+      "id": "EATON-XLR51-2019",
+      "title": "XLR-51 51 V, 188 F Rugged Supercapacitor Module — Technical Data 10765",
+      "url": "https://www.eaton.com/content/dam/eaton/products/electronic-components/resources/data-sheet/eaton-xlr-51-supercapacitor-module-data-sheet.pdf",
+      "publisher": "Eaton",
+      "published": "2019-07",
+      "evidence_class": "vendor_datasheet",
+      "permitted_use": "Vendor comparator: 188 F, 51.3 V maximum working voltage, 8 mA nominal leakage at 20 °C after 72 h charge and hold, 1 500 h life test at +65 °C/51.3 Vdc and 1 000 000-cycle test under the stated conditions.",
+      "prohibited_inference": "Not independent measurement or a post-standby delivered-energy result. The 72 h charge-and-hold leakage endpoint is not equivalent to unpowered long-duration standby or application service; retain the datasheet's voltage, temperature, rest and cycling conditions."
+    },
+    {
+      "id": "SELF-DISCHARGE-MECHANISMS-REVIEW-2026",
+      "title": "How to Tackle the Killer of Supercapacitors: Self-Discharge",
+      "url": "https://onlinelibrary.wiley.com/doi/10.1002/tcr.70230",
+      "doi": "10.1002/tcr.70230",
+      "publisher": "The Chemical Record",
+      "authors": "Wu et al.",
+      "published": "2026-09-02",
+      "evidence_class": "peer_reviewed_review",
+      "permitted_use": "Mechanism map for ohmic leakage, parasitic Faradaic reactions and charge redistribution; informs orthogonal diagnostics and mechanism-identifiability experiments.",
+      "prohibited_inference": "Review article with no generated dataset; does not establish a new device result, uniquely identify mechanisms from voltage decay alone, or demonstrate a Luminous mitigation."
     }
   ]
 }
