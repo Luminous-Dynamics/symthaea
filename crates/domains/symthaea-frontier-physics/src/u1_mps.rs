@@ -244,6 +244,10 @@ pub struct ComplexU1Mps {
     tensors: Vec<U1MpsTensor>,
     total_charge: i32,
     selection_rule_residual: f64,
+    dense_input_charge_leakage_max: f64,
+    dense_input_charge_leakage_weight: f64,
+    dense_reconstruction_max_residual: Option<f64>,
+    dense_reconstruction_l2_residual: Option<f64>,
 }
 
 impl ComplexU1Mps {
@@ -310,6 +314,10 @@ impl ComplexU1Mps {
             tensors,
             total_charge,
             selection_rule_residual,
+            dense_input_charge_leakage_max: 0.0,
+            dense_input_charge_leakage_weight: 0.0,
+            dense_reconstruction_max_residual: None,
+            dense_reconstruction_l2_residual: None,
         })
     }
 
@@ -350,6 +358,22 @@ impl ComplexU1Mps {
 
     pub fn selection_rule_residual(&self) -> f64 {
         self.selection_rule_residual
+    }
+
+    pub fn dense_input_charge_leakage_max(&self) -> f64 {
+        self.dense_input_charge_leakage_max
+    }
+
+    pub fn dense_input_charge_leakage_weight(&self) -> f64 {
+        self.dense_input_charge_leakage_weight
+    }
+
+    pub fn dense_reconstruction_max_residual(&self) -> Option<f64> {
+        self.dense_reconstruction_max_residual
+    }
+
+    pub fn dense_reconstruction_l2_residual(&self) -> Option<f64> {
+        self.dense_reconstruction_l2_residual
     }
 
     pub fn maximum_bond_dimension(&self) -> usize {
@@ -439,12 +463,16 @@ impl ComplexU1Mps {
                 actual: amplitudes.len(),
             });
         }
+        let mut dense_input_charge_leakage_max: f64 = 0.0;
+        let mut dense_input_charge_leakage_weight = 0.0;
         for (index, amplitude) in amplitudes.iter().enumerate() {
             if !amplitude.re.is_finite() || !amplitude.im.is_finite() {
                 return Err(U1MpsError::NonFiniteTensorEntry { site: 0, index });
             }
             if (index.count_ones() as i32) != total_charge {
                 let forbidden = amplitude.norm();
+                dense_input_charge_leakage_max = dense_input_charge_leakage_max.max(forbidden);
+                dense_input_charge_leakage_weight += forbidden * forbidden;
                 if forbidden > tolerance {
                     return Err(U1MpsError::DenseChargeLeakage {
                         basis_index: index,
@@ -619,7 +647,20 @@ impl ComplexU1Mps {
         let last = U1MpsTensor::new(left_charges, vec![total_charge], last_data)?;
         tensors.push(last);
 
-        Self::new(tensors, total_charge, tolerance)
+        let mut state = Self::new(tensors, total_charge, tolerance)?;
+        state.dense_input_charge_leakage_max = dense_input_charge_leakage_max;
+        state.dense_input_charge_leakage_weight = dense_input_charge_leakage_weight;
+        let reconstructed = state.to_dense(site_count)?;
+        let mut maximum_residual: f64 = 0.0;
+        let mut residual_squared = 0.0;
+        for (actual, expected) in reconstructed.iter().zip(amplitudes.iter()) {
+            let residual = (*actual - *expected).norm();
+            maximum_residual = maximum_residual.max(residual);
+            residual_squared += residual * residual;
+        }
+        state.dense_reconstruction_max_residual = Some(maximum_residual);
+        state.dense_reconstruction_l2_residual = Some(residual_squared.sqrt());
+        Ok(state)
     }
 
     /// Compute the MPS norm by contracting the double-layer transfer matrices.
