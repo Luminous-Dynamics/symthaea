@@ -79,7 +79,7 @@ EOF
 done
 
 grep -hE 'warning: unused workspace dependency `' "$WORK"/*-unused-dependencies.log \
-  | sed -E 's/.*`([^\`]+)`.*/\1/' \
+  | awk -F'`' '/warning: unused workspace dependency `/ {print $2}' \
   | sort -u > "$WORK/unused-workspace-dependencies.txt" || true
 TOTAL_WORKSPACE_WARNINGS="$(wc -l < "$WORK/unused-workspace-dependencies.txt" | tr -d ' ')"
 echo "unused_workspace_dependency_names:"
