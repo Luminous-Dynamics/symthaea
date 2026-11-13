@@ -1,0 +1,93 @@
+{
+  "schema": "symmetry-action-representation-fixtures/v1",
+  "fixture_id": "SO2_NONORTHOGONAL_RATIONAL_BASIS_001",
+  "claim_scope": "scalar_expression_invariance",
+  "purpose": "Freeze one geometric SO(2) action and scalar-function family under a rational non-orthogonal coordinate change. This is an analytic reference fixture, not a benchmark score.",
+  "canonical_representation": {
+    "coordinate_names": ["x", "y"],
+    "generator": [[0, -1], [1, 0]],
+    "metric": [[1, 0], [0, 1]],
+    "metric_skew_identity": "A^T G + G A = 0"
+  },
+  "coordinate_change": {
+    "coordinate_names": ["X", "Y"],
+    "matrix_D_rational": [["2", "1"], ["1/2", "3/2"]],
+    "determinant_rational": "5/2",
+    "inverse_D_rational": [["3/5", "-2/5"], ["-1/5", "4/5"]],
+    "convention": "x_prime = D * x"
+  },
+  "transformed_representation": {
+    "generator_rational": [["1", "-2"], ["1", "-1"]],
+    "metric_rational": [["2/5", "-2/5"], ["-2/5", "4/5"]],
+    "generator_rule": "A_prime = D * A * inverse(D)",
+    "metric_rule": "G_prime = inverse(D)^T * G * inverse(D)",
+    "metric_skew_identity": "A_prime^T * G_prime + G_prime * A_prime = 0",
+    "metric_spd": true
+  },
+  "frozen_state": {
+    "canonical_rational": ["7/10", "13/10"],
+    "transformed_rational": ["27/10", "23/10"]
+  },
+  "scalar_family": {
+    "canonical_expression": "f_epsilon(x,y) = x^2 + (1+epsilon) * y^2",
+    "transformed_expression": "f_prime_epsilon(X,Y) = (3X/5 - 2Y/5)^2 + (1+epsilon) * (-X/5 + 4Y/5)^2",
+    "gradient_convention": "p is a covector row; under x_prime = D*x, p_prime = p*inverse(D)",
+    "epsilon_values": ["0", "1", "1/10000", "1/100"]
+  },
+  "expected_metric_squared_cosine": [
+    {
+      "epsilon": "0",
+      "canonical_at_frozen_state": 5.975715972552062e-34,
+      "transformed_at_frozen_state": 1.503905118969971e-32,
+      "classification": "exact_invariant",
+      "interpretation": "The mathematical residual is exactly zero; displayed values are floating-point roundoff."
+    },
+    {
+      "epsilon": "1",
+      "canonical_at_frozen_state": 0.05239481176842771,
+      "transformed_at_frozen_state": 0.05239481176842768,
+      "classification": "not_invariant",
+      "interpretation": "The nonzero residual is representation-consistent."
+    },
+    {
+      "epsilon": "1/10000",
+      "canonical_at_frozen_state": 1.742217868867048e-9,
+      "transformed_at_frozen_state": 1.74221786885477e-9,
+      "classification": "near_symmetry_calibration_negative",
+      "interpretation": "This single-point residual is below a 1e-6 illustrative threshold; do not treat that threshold as a universal exact-symmetry boundary."
+    },
+    {
+      "epsilon": "1/100",
+      "canonical_at_frozen_state": 1.715752954630857e-5,
+      "transformed_at_frozen_state": 1.715752954630751e-5,
+      "classification": "near_symmetry_calibration_negative",
+      "interpretation": "This single-point residual is above a 1e-6 illustrative threshold."
+    }
+  ],
+  "analytic_residual": {
+    "expression": "rho^2(x,y) = epsilon^2*x^2*y^2 / ((x^2 + (1+epsilon)^2*y^2)*(x^2+y^2))",
+    "supremum_for_epsilon_greater_than_minus_one": "epsilon^2 / (2+epsilon)^2",
+    "warning": "The supremum formula calibrates the mathematical detection margin. A finite sample set may observe a smaller maximum."
+  },
+  "negative_controls": [
+    {
+      "control_id": "WRONG_METRIC_IDENTITY",
+      "metric_rational": [["1", "0"], ["0", "1"]],
+      "expected": "reject_metric_incompatible_generator",
+      "reason": "The conjugated generator is not skew under the identity metric.",
+      "frobenius_norm_of_metric_skew_defect": "sqrt(10)"
+    }
+  ],
+  "evidence_boundary": {
+    "exact_polynomial_lane": "When the supported polynomial fragment is available, epsilon=0 must yield an exact zero Lie-derivative identity and epsilon!=0 must not.",
+    "sampled_lane": "Finite-difference results remain sampled evidence. Report per-generator counts, residuals, skipped states, seed, sample domain and threshold.",
+    "not_established": [
+      "vector-field equivariance",
+      "conservation by an independently supplied ODE or SDE",
+      "a Noether momentum map",
+      "general nonlinear group actions",
+      "empirical false-positive rates",
+      "Rust execution or CI qualification"
+    ]
+  }
+}
