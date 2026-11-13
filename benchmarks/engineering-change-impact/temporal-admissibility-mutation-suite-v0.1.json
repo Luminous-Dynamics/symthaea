@@ -1,0 +1,118 @@
+{
+  "schema_version": "luminous.eng-change-gold-temporal-mutation-suite.v0.1",
+  "status": "test_vectors_not_gold_labels",
+  "data_class": "synthetic_schema_and_evaluator_test_vectors",
+  "target_schema": "benchmarks/engineering-change-impact/gold-record-v1.1.schema.json",
+  "evaluator_boundary": "Structural outcomes are schema-test expectations; chronology, exact-reference, rights and independence outcomes require the independent semantic evaluator.",
+  "positive_controls": [
+    {
+      "id": "TEMP-GOLD-POS-001",
+      "intent": "Known target T and decision frontier K; exact source version and captured digest; source availability, ingestion and materialization before K; context inclusion bound to exact run manifest; rights permitted at decision and replay; two distinct synthetic assessor records with matching labels.",
+      "expected_structural_result": "valid",
+      "expected_semantic_result": "must_be_adjudicated_from_frozen_test_evidence",
+      "status": "synthetic_only"
+    }
+  ],
+  "structural_negative_controls": [
+    {
+      "id": "TEMP-GOLD-NEG-001",
+      "mutation": "Set target_world_time.state=unknown but retain target_world_time.instant.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-002",
+      "mutation": "Set a validity bound state=unknown while retaining an instant.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-003",
+      "mutation": "Set source_version.bytes_state=captured without artifact_digest or byte_capture_evidence_ref.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-004",
+      "mutation": "Claim system_availability=available while acquisition_ingestion is not observed.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-005",
+      "mutation": "Claim run_context_presence=included while run_context_inclusion is not included and bound to a run manifest.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-006",
+      "mutation": "Claim rights_at_decision=permitted while the rights assessment is prohibited or unknown.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-007",
+      "mutation": "Include temporal_admissibility but omit temporal_admissibility_label from either assessor record.",
+      "expected": "schema_reject"
+    },
+    {
+      "id": "TEMP-GOLD-NEG-008",
+      "mutation": "Claim source_availability=admissible while both source_publication and issuer_availability are unknown/not established.",
+      "expected": "schema_reject"
+    }
+  ],
+  "semantic_negative_controls": [
+    {
+      "id": "TEMP-GOLD-SEM-001",
+      "mutation": "Move source_publication/issuer_availability after K while leaving outcome=admissible.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-002",
+      "mutation": "Move acquisition_ingestion or required derived_materialization after K while leaving system_availability=available.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-003",
+      "mutation": "Use a run manifest that does not contain the exact evidence_ref, version_ref and artifact_digest.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-004",
+      "mutation": "Record correction or supersession relation materialization after K but use it to rewrite the K projection.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-005",
+      "mutation": "Rights grant begins after K but outcome asserts permitted_at_decision.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-006",
+      "mutation": "Rights are revoked before replay/query but outcome asserts permitted_at_replay.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-007",
+      "mutation": "Clock uncertainty spans K but outcome asserts a definite before/after relation without qualified bound proof.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-008",
+      "mutation": "Two assessor records use the same person under different assessor_ref strings.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-009",
+      "mutation": "Assessor temporal labels disagree while temporal_adjudication.state=consensus.",
+      "expected": "semantic_reject"
+    },
+    {
+      "id": "TEMP-GOLD-SEM-010",
+      "mutation": "Modify the temporal object after sealing without a superseding adjudication and new seal.",
+      "expected": "semantic_reject"
+    }
+  ],
+  "invariants": [
+    "V1_non_temporal_records_remain_valid_under_the_pinned_V1_schema",
+    "V1_1_records_use_the_V1_1_schema_id_and_schema_version",
+    "absence_of_temporal_admissibility_is_not_temporal_pass",
+    "all_existing_ten_engineering_dispositions_remain_unchanged",
+    "all_temporal_admissibility_fields_are_inside_the_sealed_gold_record",
+    "schema_validity_does_not_prove_timestamp_truth_source_truth_assessor_independence_or_authority"
+  ]
+}
