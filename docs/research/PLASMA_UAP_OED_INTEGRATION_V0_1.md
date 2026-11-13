@@ -115,11 +115,39 @@ This should be a thin, versioned evidence envelope around the generic report—n
 
 
 
+
+
+### 4.1 Concrete selector composition and exact known-answer replay
+
+The Rust example is registered as `plasma_multifidelity_design` in the UAP Observatory crate manifest. It calls both the independent-row and correlated selected-set UAP APIs plus their exhaustive small-set oracles. It also emits the ownership chain, application-profile ID, policy ID, scenario/candidate/covariance manifest IDs, Git blob IDs for the exact generic API files, standard-family identifiers and an explicit no-authority claim.
+
+Independent dense-matrix replay of the exact hard-coded arrays gives:
+
+| Selector | Selected action IDs | Cost | Target EIG (nats) | Mandatory F2/F3/moisture coverage |
+|---|---|---:|---:|---|
+| Independent greedy | WCA_SCREEN; MOISTURE_CONTENT; FTIR_CHEMISTRY; AGED_LAP_SHEAR | 20 | 5.279431608 | Missing LAP_SHEAR |
+| Independent exhaustive | WCA_SCREEN; MOISTURE_CONTENT; LAP_SHEAR; AGED_LAP_SHEAR | 25 | 5.618701237 | Complete |
+| Correlated greedy | WCA_SCREEN; MOISTURE_CONTENT; LAP_SHEAR; AGED_LAP_SHEAR | 25 | 5.705573945 | Complete |
+| Correlated exhaustive | WCA_SCREEN; MOISTURE_CONTENT; LAP_SHEAR; AGED_LAP_SHEAR | 25 | 5.705573945 | Complete |
+
+The independently computed covariance eigenvalues are 0.05, 0.70, 1.00, 1.30 and 1.95, so the frozen covariance is positive definite. The high WCA/FTIR preparation correlation (ρ=0.95) makes the two proxies partly redundant. The correlated selector therefore does not spend its remaining budget on FTIR; it selects the missing initial lap-shear endpoint instead.
+
+The independent greedy selector's gap to its own exact oracle is 0.339269630 nats. The correlated greedy selector matches its exact oracle for this specific five-action fixture. This is a *known-answer synthetic composition result*, not an industry benchmark win. A different covariance/prior/scenario can reverse the comparison.
+
+The example asserts these selected IDs, exact-oracle relationships and endpoint-coverage dispositions. It fails loudly if the frozen source code produces a different result when it is eventually run with the parent UAP implementation.
+
+The output IDs identify the exact generic source blobs used:
+- budgeted design: `ed3d0286e706eaee9bb670e7e5e62f8ff01894b8`;
+- correlated design: `4aebc5e80afe3b2258db04b441cda072c4edde1d`;
+- UAP crate API: `aafaffcbc7d9aa1cef462ace453d2d173136b8d8`.
+
+The candidate rows, priors, covariance and costs are embedded in the versioned Rust example. The Git blob ID of the complete example itself is tracked by the branch/PR, not self-reported by the example. No optimizer output, model-adequacy receipt, empirical covariance or physical evidence is fabricated.
+
 ## 8. Current research frontier and matched baselines
 
 ### 8.1 Goal-oriented design is now a direct SOTA comparator
 
-Go et al., *Goal-driven Bayesian Optimal Experimental Design for Robust Decision-Making Under Model Uncertainty* (arXiv preprint, 25 May 2026; arXiv:2605.26093), couples a Bayesian posterior surrogate to a robust downstream decision layer. Its central lesson is that uncertainty in parameter directions irrelevant to the decision can waste experiment budget. It evaluates source localization, epidemic control and pharmacokinetic control; it is not a plasma/materials benchmark.
+GoBOED (Go et al.), *Goal-driven Bayesian Optimal Experimental Design for Robust Decision-Making Under Model Uncertainty* (arXiv preprint, 25 May 2026; arXiv:2605.26093), couples a Bayesian posterior surrogate to a robust downstream decision layer. Its central lesson is that uncertainty in parameter directions irrelevant to the decision can waste experiment budget. It evaluates source localization, epidemic control and pharmacokinetic control; it is not a plasma/materials benchmark.
 
 The fair plasma comparison is therefore:
 - nominal target-marginal EIG using UAP-OED-002;
