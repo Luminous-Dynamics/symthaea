@@ -214,6 +214,8 @@ struct WindowEvidenceRef {
     window_id: String,
     acoustic_trace_sha256: String,
     cavitation_observation_sha256: String,
+    cavitation_annotation_raw: Option<bool>,
+    cavitation_state_for_conditioning: Option<bool>,
     start_time_s: f64,
     end_time_s: f64,
     acoustic_cavitation_alignment_offset_s: f64,
@@ -736,6 +738,8 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
             window_id: window.window_id.clone(),
             acoustic_trace_sha256: window.acoustic_trace_sha256.clone(),
             cavitation_observation_sha256: window.cavitation_observation_sha256.clone(),
+            cavitation_annotation_raw: window.cavitation_present,
+            cavitation_state_for_conditioning: if alignment_eligible { window.cavitation_present } else { None },
             start_time_s: window.start_time_s,
             end_time_s: window.end_time_s,
             acoustic_cavitation_alignment_offset_s: window.acoustic_cavitation_alignment_offset_s,
@@ -1816,6 +1820,26 @@ mod tests {
         let mut input = case();
         input.runs[0].calibration_certificate_sha256 = digest('8');
         assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn window_receipt_preserves_raw_cavitation_label_and_conditioning_eligibility_separately() {
+        let mut input = case();
+        input.runs[0].windows[0].cavitation_present = Some(true);
+        input.runs[0].windows[0].acoustic_cavitation_alignment_offset_s = 0.02;
+        let report = audit(&input);
+        let receipt = &report.run_reports[0].window_evidence[0];
+        assert_eq!(receipt.cavitation_annotation_raw, Some(true));
+        assert_eq!(receipt.cavitation_state_for_conditioning, None);
+        assert!(!receipt.acoustic_cavitation_alignment_eligible);
+
+        let mut input = case();
+        input.runs[0].windows[0].cavitation_present = Some(true);
+        let report = audit(&input);
+        let receipt = &report.run_reports[0].window_evidence[0];
+        assert_eq!(receipt.cavitation_annotation_raw, Some(true));
+        assert_eq!(receipt.cavitation_state_for_conditioning, Some(true));
+        assert!(receipt.acoustic_cavitation_alignment_eligible);
     }
 
     #[test]
