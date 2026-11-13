@@ -335,6 +335,20 @@ fn evaluate_scenario(scenario: &Scenario, fixture: &Fixture) -> ScenarioResult {
     if !required_channels.is_subset(&observed_channels) {
         blocked.push("one or more required calibrated sensor channels are missing".to_owned());
     }
+    for (transform_id, calibration_channel) in [
+        ("machine-to-article", "machine-to-article-transform"),
+        ("article-to-surface", "article-to-surface-transform"),
+    ] {
+        let transform = transform_map.get(transform_id);
+        let calibration = calibrations.get(calibration_channel);
+        match (transform, calibration) {
+            (Some(transform), Some(calibration))
+                if transform.calibration_record_id == calibration.calibration_record_id => {}
+            _ => rejected.push(format!(
+                "transform {transform_id} does not bind to its run calibration record"
+            )),
+        }
+    }
 
     let mut required_regions = BTreeSet::new();
     for id in &scenario.required_region_ids {
@@ -440,7 +454,7 @@ fn evaluate_scenario(scenario: &Scenario, fixture: &Fixture) -> ScenarioResult {
     }
     let missing: Vec<_> = required_regions
         .iter()
-        .filter(|id| !region_map.contains_key(**id))
+        .filter(|id| !region_map.contains_key(*id))
         .copied()
         .collect();
     if !missing.is_empty() {
@@ -589,6 +603,19 @@ mod tests {
     #[test]
     fn expired_calibration_blocks_map() {
         assert_eq!(result_for(&report(), "expired-calibration").disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn transform_calibration_must_match_run_calibration_record() {
+        let value: serde_json::Value = serde_json::from_str(FIXTURE).expect("fixture JSON");
+        let mut changed = value;
+        changed["scenarios"][0]["transform_receipts"][0]["calibration_record_id"] =
+            serde_json::json!("unmatched-transform-calibration");
+        let report = audit_fixture_json(&changed.to_string()).expect("mutated fixture parses");
+        assert_eq!(
+            report.results[0].disposition,
+            Disposition::Rejected
+        );
     }
 
     #[test]
