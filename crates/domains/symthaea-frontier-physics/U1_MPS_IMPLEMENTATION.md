@@ -117,17 +117,27 @@ The canonical-gauge branch adds charge-block left and right sweeps and a measure
 
 For a site's left-isometry matrix \(A\), the receipt measures \(\|A^\dagger A-I\|_F=r\), which implies \(\|A\|_2\le\sqrt{1+r}\). The corresponding right-isometry bound is obtained from \(\|AA^\dagger-I\|_F\). Products of these per-site bounds provide a conservative upper bound for the exterior block maps. The local discarded Schmidt norm can then be multiplied by the left/right exterior operator-norm product to obtain a global projection-error contribution, provided the gate is unitary and the gauge receipt passes. Canonicalization's own state-reconstruction residual must also be included in the ledger.
 
-This receipt is an independent check of the canonical form, not a declaration that an arbitrary MPS was already canonical. The next integration step is to make TEBD call this method immediately before each local truncation and promote the global error flag only when every receipt and contribution passes.
+This receipt is an independent check of the canonical form, not a declaration that an arbitrary MPS was already canonical. The TEBD layer now calls this method immediately before each local gate/truncation, then keeps the canonicalization receipt adjacent to that gate's truncation and gate-quality measurements.
+
+The global error ledger separates three contributions per gate:
+
+1. **Canonicalization representation drift:** the measured cross-MPS state-reconstruction L2 residual.
+2. **Gate quality:** a polar-unitary correction bound derived from the Frobenius residual \(\|G^\dagger G-I\|_F\), plus a charge-off-block bound \(\sqrt{10}\,r_Q\) for the ten forbidden entries in a two-qubit \(4\times4\) gate, each multiplied by the pre-gate state norm.
+3. **Schmidt projection:** \(\sqrt{w_\mathrm{discarded}}\) multiplied by the measured product of left/right exterior operator-norm upper bounds.
+
+The per-gate contributions are accumulated by the triangle inequality, and the global flag remains false as soon as a gauge receipt or gate-quality check fails. No post-truncation renormalization is performed. The bound applies to the circuit formed by the closest charge-conserving unitary represented by each accepted gate matrix; gate defect contributions make the distinction from the supplied floating-point matrix explicit. It still excludes Trotter/discretization error because the layer executor is not yet a Hamiltonian time-stepper.
+
+
 
 ## Explicit limitations
 
-This increment does **not** yet implement:
-- Second-order even/odd/even or odd/even/odd Trotter time-stepper and Hamiltonian gate generation.
-- Mixed-canonical gauge sweeps with machine-checkable exterior-isometry receipts.
-- Global circuit-level state-vector and reduced-state error bounds.
-- Nonlocal MPO evolution, adaptive time stepping and any N=16–64 scaling or matched Quimb/ITensor performance claim.
+This increment now includes charge-block mixed-canonical sweeps, measured exterior-isometry receipts, gate-quality checks, and a global circuit L2 error ledger for the deterministic nearest-neighbour parity-layer executor. It does **not** yet implement:
+- Hamiltonian-to-gate exponentiation or a second-order even/odd/even (or odd/even/odd) Strang time-stepper.
+- Trotter/discretization error accounting or adaptive time-step control.
+- Nonlocal MPO gate application.
+- N=16–64 scale-out or matched Quimb/ITensor/cuQuantum performance evidence.
 
-Those are the next stages. The implementation should add them in this order: Hamiltonian-to-gate generation and Strang layer composition, mixed-canonical sweeps and gauge receipts, global circuit-level error qualification, then controlled scaling against Quimb and ITensor.
+The next stages are Hamiltonian-to-gate generation and Strang layer composition, Trotter-error qualification, nonlocal MPO support, and controlled accuracy-matched performance comparisons.
 
 ## Competitive benchmark policy
 
@@ -140,4 +150,4 @@ Primary external references:
 
 ## Claim ceiling
 
-A passing version of these increments would establish validated complex U(1)-sector-labelled MPS storage, charge-block dense-to-MPS factorization with explicit leakage/reconstruction receipts, small-N dense expansion and norm contraction. It now includes a deterministic nearest-neighbour layer executor, but it does not yet establish a complete TEBD time-stepper, globally certified circuit error, an efficient large-scale tensor-network simulator, black-hole evaporation, Hawking radiation, gravitational backreaction or quantum advantage.
+A passing exact-head harness would establish validated complex U(1)-sector-labelled MPS storage, charge-block dense factorization, local gates, exact and approximate charge-block splits, deterministic parity-layer execution, mixed-canonical gauge receipts and a gate-quality-aware global L2 bound for those layer operations. It would not establish a full time-evolution solver, Trotter accuracy, nonlocal MPO scaling, black-hole evaporation, Hawking radiation, gravitational backreaction or quantum advantage.
