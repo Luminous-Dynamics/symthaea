@@ -5,7 +5,7 @@
 //! splits. This checks provenance and leakage boundaries; it does not train
 //! a model, reproduce literature metrics, or predict a physical outcome.
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
@@ -298,7 +298,7 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioResult {
         if let Some(group) = group_value(observation, &scenario.holdout_dimension) {
             if !group.trim().is_empty() {
                 if let Some(previous_fold) = group_folds.insert(group.to_owned(), fold.clone()) {
-                    if previous_fold != *fold {
+                    if previous_fold != fold.as_str() {
                         rejected.push(format!(
                             "group {group} crosses TRAIN/TEST for {}",
                             scenario.holdout_dimension
@@ -483,10 +483,10 @@ mod tests {
         audit_fixture_json(&value.to_string()).expect("mutated fixture remains valid JSON")
     }
 
-    fn scenario_mut(
-        value: &mut serde_json::Value,
+    fn scenario_mut<'a>(
+        value: &'a mut serde_json::Value,
         scenario_id: &str,
-    ) -> &mut serde_json::Value {
+    ) -> &'a mut serde_json::Value {
         value["scenarios"]
             .as_array_mut()
             .expect("scenarios array")
