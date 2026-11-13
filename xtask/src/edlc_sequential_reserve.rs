@@ -758,12 +758,19 @@ mod tests {
         value["device_sequences"][1]["status"] = json!("invalid");
         value["device_sequences"][1]["failure_reason"] = json!("instrument sync lost");
         value["device_sequences"][1]["events"] = json!([]);
+        let mut censored = value["device_sequences"][0].clone();
+        censored["physical_device_serial"] = json!("C");
+        censored["status"] = json!("censored");
+        censored["failure_reason"] = json!("sequence interrupted");
+        censored["events"] = json!([]);
+        value["device_sequences"].as_array_mut().unwrap().push(censored);
         value["expected"]["sequence_pass_rate"] = json!(1.0);
         value["expected"]["sequence_passes"] = json!(1);
         value["expected"]["valid_sequences"] = json!(1);
         let fixture: Fixture = serde_json::from_value(value).unwrap();
         let report = audit_fixture(&fixture).unwrap();
         assert_eq!(report.invalid_sequences, 1);
+        assert_eq!(report.censored_sequences, 1);
         assert_eq!(report.valid_sequences, 1);
         assert_eq!(report.sequence_pass_rate, 1.0);
     }
