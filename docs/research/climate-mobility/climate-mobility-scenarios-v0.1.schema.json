@@ -309,8 +309,8 @@
           },
           "expected_outcome": {
             "enum": [
-              "meets_floor",
-              "breaches_floor",
+              "capacity_sufficient",
+              "capacity_shortfall",
               "indeterminate"
             ]
           },
