@@ -1126,11 +1126,13 @@ mod tests {
         key: InteractionKey,
         partition: Partition,
     ) -> InteractionAssignment {
+        let assignment_receipt_digest =
+            format!("receipt-{interaction_id}-{key:?}-{partition:?}");
         InteractionAssignment {
             interaction_id: interaction_id.into(),
             key,
             partition,
-            assignment_receipt_digest: format!("receipt-{interaction_id}-{:?}", partition),
+            assignment_receipt_digest,
         }
     }
 
