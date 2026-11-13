@@ -220,18 +220,6 @@
       "evidence_class": "peer_reviewed_literature",
       "permitted_use": "Research comparator for continuous-carbon-fibre prepreg 3D-printed load-bearing ZIHC framework; publisher abstract reports 2.4x areal capacitance over conventional LIG electrodes and PP/PVA semi-solid electrolyte ionic conductivity increasing from 0.5 to 4.2 mS cm-1 after supercritical foaming",
       "prohibited_inference": "Abstract does not provide complete structural design allowables, stiffness/strength/fatigue, complete-device Wh/kg or Wh/L, full component mass, coupled mechanical-electrochemical ageing, independent-lab replication or commercial readiness. Review supporting information and request data under appropriate rights; do not infer structural credit or complete assembly mass savings from the abstract."
-    },
-    {
-      "id": "ZERO-EXCESS-SODIUM-REVIEW-2026-11",
-      "title": "Zero-excess sodium-metal batteries for post-lithium energy storage",
-      "url": "https://www.nature.com/articles/s44359-026-00234-6",
-      "doi": "10.1038/s44359-026-00234-6",
-      "publisher": "Nature Reviews Clean Technology",
-      "authors": "Zhao, Guo, Srinivasan et al.",
-      "published": "2026-11-11",
-      "evidence_class": "peer_reviewed_review",
-      "permitted_use": "Review-level frontier and inventory constraint comparator: cell-level demonstrations >200 Wh kg-1; ≥3 mAh cm-2 cathode areal loading and ≤2 g Ah-1 electrolyte identified as practical conditions; 80% capacity over 1000 cycles requires average Coulombic efficiency around ≥99.98% under the review's inventory assumptions",
-      "prohibited_inference": "Not evidence that a general zero-excess sodium-metal cell has achieved 1000 cycles at those conditions; retain exact cell-level boundary and assumptions. Coulombic-efficiency arithmetic is not a complete ageing model or proof of full-cell life, manufacturability, safety, lower system cost or pack-level energy density."
     }
   ]
 }
