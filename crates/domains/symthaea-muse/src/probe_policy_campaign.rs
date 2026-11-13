@@ -66,7 +66,7 @@ impl InteractionFamily {
     fn split(self) -> CampaignSplit {
         match self {
             Self::PureThirdOrder => CampaignSplit::HeldOutInteractionFamily,
-            Self::SharedRouteDisjoint => CampaignSplit::HeldOutRoutingTopology,
+            Self::IncompleteRouting => CampaignSplit::HeldOutRoutingTopology,
             _ => CampaignSplit::Development,
         }
     }
@@ -268,6 +268,31 @@ fn canonical_digest<T: Serialize>(value: &T) -> Result<String, ProbePolicyCampai
     Ok(format!("{:x}", hasher.finalize()))
 }
 
+fn family_seed(family: InteractionFamily) -> u64 {
+    match family {
+        InteractionFamily::AdditiveNull => 1,
+        InteractionFamily::SparsePairwise => 2,
+        InteractionFamily::Saturation => 3,
+        InteractionFamily::PureThirdOrder => 4,
+        InteractionFamily::LinearFirTail => 5,
+        InteractionFamily::DenseOverlap => 6,
+        InteractionFamily::ClusteredOverlap => 7,
+        InteractionFamily::SharedRouteDisjoint => 8,
+        InteractionFamily::UnderstatedSupport => 9,
+        InteractionFamily::IncompleteRouting => 10,
+    }
+}
+
+fn scope_seed(scope: CampaignScope) -> u64 {
+    match scope {
+        CampaignScope::Development => 1,
+        CampaignScope::HeldOutInteractionFamily => 2,
+        CampaignScope::HeldOutRoutingTopology => 3,
+        CampaignScope::AllFixtures => 4,
+        CampaignScope::Family(family) => 100 + family_seed(family),
+    }
+}
+
 fn validate_config(config: &ProbePolicyCampaignConfig) -> Result<(), ProbePolicyCampaignError> {
     if config.families.is_empty() {
         return Err(ProbePolicyCampaignError::InvalidConfig("at least one family is required"));
@@ -340,42 +365,50 @@ fn active_interval(
 ) -> (usize, usize) {
     let edge = 8usize;
     let usable = frame_count.saturating_sub(edge * 2);
-    let slot = (usable / event_count.max(1)).max(8);
+    let slot = (usable / event_count.max(1)).max(4);
+    let clamp_interval = |start: usize, end: usize| {
+        let start = start.min(frame_count.saturating_sub(1));
+        let end = end.max(start + 1).min(frame_count);
+        (start, end)
+    };
     match family {
         InteractionFamily::AdditiveNull | InteractionFamily::SharedRouteDisjoint => {
             let start = edge + event_index * slot;
-            (start.min(frame_count - 8), (start + slot / 2).min(frame_count))
+            clamp_interval(start, start + (slot / 2).max(2))
         }
         InteractionFamily::SparsePairwise
         | InteractionFamily::UnderstatedSupport
-        | InteractionFamily::IncompleteRouting => match event_index {
-            0 => (edge, edge + slot * 3),
-            1 => (edge + slot * 2, edge + slot * 4),
-            _ => {
-                let start = edge + slot * 4 + (event_index - 2) * (slot / 2);
-                (start.min(frame_count - 8), (start + slot / 3).min(frame_count))
-            }
-        },
+        | InteractionFamily::IncompleteRouting => {
+            let (start, end) = match event_index {
+                0 => (edge, edge + slot * 3),
+                1 => (edge + slot * 2, edge + slot * 4),
+                _ => {
+                    let start = edge + slot * 4 + (event_index - 2) * slot;
+                    (start, start + (slot / 3).max(2))
+                }
+            };
+            clamp_interval(start, end)
+        }
         InteractionFamily::Saturation | InteractionFamily::DenseOverlap => {
-            (edge, frame_count - edge)
+            clamp_interval(edge, frame_count - edge)
         }
         InteractionFamily::PureThirdOrder if event_index < 3 => {
-            (edge + slot, frame_count - edge - slot)
+            clamp_interval(edge, frame_count / 2)
         }
         InteractionFamily::PureThirdOrder => {
-            let start = frame_count - edge - (event_index - 2) * (slot / 2);
-            (start.min(frame_count - 8), (start + slot / 3).min(frame_count))
+            let start = frame_count / 2 + (event_index - 3) * slot;
+            clamp_interval(start, start + (slot / 2).max(2))
         }
         InteractionFamily::LinearFirTail => {
             let start = edge + event_index * slot;
-            (start.min(frame_count - 8), (start + slot / 3).min(frame_count))
+            clamp_interval(start, start + (slot / 3).max(2))
         }
         InteractionFamily::ClusteredOverlap => {
             let split = event_count.div_ceil(2);
             if event_index < split {
-                (edge, frame_count / 2)
+                clamp_interval(edge, frame_count / 2)
             } else {
-                (frame_count / 2, frame_count - edge)
+                clamp_interval(frame_count / 2, frame_count - edge)
             }
         }
     }
@@ -450,7 +483,7 @@ fn generate_fixture(
     let mut seed = SplitMix64(
         (composition_index as u64)
             .wrapping_mul(0x9E37_79B9_7F4A_7C15)
-            ^ (family as u64).wrapping_mul(0xD1B5_4A32_D192_ED03)
+            ^ family_seed(family).wrapping_mul(0xD1B5_4A32_D192_ED03)
             ^ 0x4d45_4c26_2026_1113,
     );
 
@@ -627,7 +660,7 @@ fn paired_summary(
     let (lower, upper) = bootstrap_interval(
         &cluster_means,
         bootstrap_replicates,
-        bootstrap_seed ^ (scope as u64).rotate_left(11) ^ (baseline_policy as u64),
+        bootstrap_seed ^ scope_seed(scope).rotate_left(11) ^ (baseline_policy as u64),
     );
     PairedClusterSummary {
         scope,
@@ -735,8 +768,6 @@ pub fn build_probe_policy_campaign(
                 &config.metric_config,
             )
             .map_err(ProbePolicyCampaignError::PolicyComparison)?;
-            let possible_pair_count = generated.events.len() * (generated.events.len() - 1) / 2;
-            let _ = possible_pair_count;
             let global_order_two_harsanyi_count = oracle
                 .dividends
                 .iter()
@@ -908,7 +939,7 @@ mod tests {
                 && fixture.split == CampaignSplit::HeldOutInteractionFamily
         }));
         assert!(report.fixtures.iter().any(|fixture| {
-            fixture.family == InteractionFamily::SharedRouteDisjoint
+            fixture.family == InteractionFamily::IncompleteRouting
                 && fixture.split == CampaignSplit::HeldOutRoutingTopology
         }));
     }
@@ -946,7 +977,7 @@ mod tests {
         let config = small_config();
         let fixture = generate_fixture(InteractionFamily::IncompleteRouting, 0, &config).unwrap();
         assert!(fixture.supports.iter().any(|support| !support.routing_complete));
-        assert_eq!(InteractionFamily::IncompleteRouting.split(), CampaignSplit::Development);
+        assert_eq!(InteractionFamily::IncompleteRouting.split(), CampaignSplit::HeldOutRoutingTopology);
         let unknown_scope = fixture.supports.iter().filter(|support| !support.routing_complete).count();
         assert_eq!(unknown_scope, fixture.events.len());
     }
