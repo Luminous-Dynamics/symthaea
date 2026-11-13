@@ -13,6 +13,7 @@ This is a fixed-horizon endpoint-risk DGP. It is not a time-to-event survival es
 - [#11880 anticipatory reflexes](https://github.com/Luminous-Dynamics/symthaea/issues/11880)
 - [#11938 intervention/censoring semantics](https://github.com/Luminous-Dynamics/symthaea/issues/11938)
 - [#11954 known-truth DGP](https://github.com/Luminous-Dynamics/symthaea/issues/11954)
+- [#11963 MNAR bounds and sensitivity](https://github.com/Luminous-Dynamics/symthaea/issues/11963)
 - [#9690 censor-aware forecast methodology](https://github.com/Luminous-Dynamics/symthaea/issues/9690)
 - [#6226 experiment design](https://github.com/Luminous-Dynamics/symthaea/issues/6226)
 - [#4814 JointLab](https://github.com/Luminous-Dynamics/symthaea/issues/4814)
@@ -25,16 +26,23 @@ Policy-facing observations contain only the assigned policy's endpoint, when obs
 
 The oracle-known observation-probability calculation is a diagnostic ceiling only, not a fitted or operational estimator. Statistical censor-aware forecast methods remain owned by #9690.
 
-## Local package
+## Runnable source
 
-The MCR² v17 reference package contains the deterministic generator, strict observed/oracle JSON schemas, sample artifacts, report and 15 unit tests.
+The repository now includes the executable Python reference in [reference/](reference/), including:
+- deterministic DGP and report evaluator;
+- runner and 15-test regression suite;
+- strict observed-policy and evaluator-only oracle schemas;
+- frozen scenario configuration.
+
+Run from the repository root:
 
 ~~~bash
+cd research/rob-counterfactual-dgp-v0-1/reference
 python3 run_benchmark.py
 python3 -m unittest discover -v
 ~~~
 
-Default configuration: 10,000 matched blocks per scenario (20,000 assigned episodes), seed 20261113, fixed horizon 20 synthetic time units.
+The generator and tests use only the Python standard library. To create full observed/oracle JSONL data, run the benchmark with --write-data. Validate samples with a Draft 2020-12 JSON Schema validator.
 
 ## Claim boundary
 
