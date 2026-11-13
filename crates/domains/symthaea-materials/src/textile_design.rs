@@ -158,7 +158,7 @@ pub enum DesignAuditDisposition {
 }
 
 /// Stable reasons for an incomplete or blocked static design audit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum DesignAuditReason {
     /// Product identifier is absent.
     MissingProductIdentity,
