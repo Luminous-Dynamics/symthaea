@@ -143,11 +143,16 @@ fn evaluate_case(case: &Value) -> Result<&'static str> {
     } else {
         if clock != "UNDER_LOAD_SERVICE"
             || !matches!(modality, "SUSTAINED_LOAD" | "PERIODIC_INSPECTION")
-            || !matches!(
-                terminal,
-                "EVENT" | "RIGHT_CENSORED" | "INTERVAL_CENSORED" | "COMPETING_EVENT"
-            )
         {
+            return Ok("REJECTED");
+        }
+        if matches!(terminal, "UNKNOWN" | "INVALID") {
+            return Ok("BLOCKED");
+        }
+        if !matches!(
+            terminal,
+            "EVENT" | "RIGHT_CENSORED" | "INTERVAL_CENSORED" | "COMPETING_EVENT"
+        ) {
             return Ok("REJECTED");
         }
 
