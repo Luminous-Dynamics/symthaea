@@ -3647,7 +3647,10 @@ mod tests {
         assert!((result.output_norm_squared - 1.0).abs() <= 1.0e-10);
         assert_eq!(result.truncation_ledger.gate_count, 2);
         assert_eq!(result.gate_truncations.len(), 2);
-        assert!(!result.global_l2_bound_qualified);
+        assert_eq!(result.canonical_gauge_receipts.len(), 2);
+        assert!(result.global_l2_bound_qualified);
+        assert!(result.truncation_ledger.global_state_error_bound_qualified);
+        assert!(result.truncation_ledger.cumulative_global_l2_error_upper_bound.is_some());
 
         let dense = result.state.to_dense(8).unwrap();
         assert!((dense[5] - Complex64::new(1.0, 0.0)).norm() <= 1.0e-10);
@@ -3678,7 +3681,8 @@ mod tests {
         assert_eq!(result.output_total_charge, 1);
         assert!((result.output_norm_squared - result.input_norm_squared).abs() <= 1.0e-10);
         assert!(result.gate_truncations[0].discarded_weight <= 1.0e-12);
-        assert!(!result.global_l2_bound_qualified);
+        assert_eq!(result.canonical_gauge_receipts.len(), 1);
+        assert!(result.global_l2_bound_qualified);
         let dense = result.state.to_dense(4).unwrap();
         assert!((dense[1] - Complex64::new(1.0, 0.0)).norm() <= 1.0e-10);
     }
@@ -3848,6 +3852,79 @@ mod tests {
         for (actual, expected) in after.iter().zip(before.iter()) {
             assert!((*actual - *expected).norm() <= 1.0e-14);
         }
+    }
+
+
+    #[test]
+    fn canonical_gauge_weighted_ledger_promotes_local_discard_to_global_bound() {
+        let dense = vec![
+            complex_zero(),
+            Complex64::new(0.8, 0.0),
+            Complex64::new(0.6, 0.0),
+            complex_zero(),
+        ];
+        let mut state =
+            ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12).unwrap();
+        let receipt = state.canonicalize_for_bond(0, 1.0e-10).unwrap();
+        assert!(receipt.qualifies(1.0e-10));
+
+        let pair =
+            U1TwoSiteState::from_adjacent_tensors(&state.tensors()[0], &state.tensors()[1], 1.0e-12)
+                .unwrap();
+        let compressed = pair
+            .split_truncated(U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 1,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        assert!((compressed.discarded_weight - 0.36).abs() <= 1.0e-10);
+
+        let mut ledger = U1MpsTruncationLedger::default();
+        ledger
+            .record_with_gauge(&compressed, &receipt, 1.0e-10)
+            .unwrap();
+        let expected = receipt.state_reconstruction_l2_residual
+            + receipt.exterior_operator_norm_product_upper_bound() * 0.6;
+        assert!(ledger.global_state_error_bound_qualified);
+        assert!((ledger.cumulative_global_l2_error_upper_bound.unwrap() - expected).abs() <= 1.0e-10);
+        assert!((ledger.cumulative_canonicalization_l2_error
+            - receipt.state_reconstruction_l2_residual)
+            .abs()
+            <= 1.0e-14);
+    }
+
+    #[test]
+    fn one_failed_gauge_receipt_permanently_invalidates_layer_global_bound() {
+        let dense = vec![
+            complex_zero(),
+            Complex64::new(0.8, 0.0),
+            Complex64::new(0.6, 0.0),
+            complex_zero(),
+        ];
+        let mut state =
+            ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12).unwrap();
+        let mut receipt = state.canonicalize_for_bond(0, 1.0e-10).unwrap();
+        assert!(receipt.qualifies(1.0e-10));
+        receipt.qualified = false;
+
+        let pair =
+            U1TwoSiteState::from_adjacent_tensors(&state.tensors()[0], &state.tensors()[1], 1.0e-12)
+                .unwrap();
+        let compressed = pair
+            .split_truncated(U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 1,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        let mut ledger = U1MpsTruncationLedger::default();
+        ledger
+            .record_with_gauge(&compressed, &receipt, 1.0e-10)
+            .unwrap();
+        assert!(!ledger.global_state_error_bound_qualified);
+        assert!(ledger.cumulative_global_l2_error_upper_bound.is_none());
+        assert!((ledger.cumulative_local_l2_error_bound - 0.6).abs() <= 1.0e-10);
     }
 
 }
