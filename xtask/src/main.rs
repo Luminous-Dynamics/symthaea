@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
+mod plasma_region_truth;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -21,7 +22,7 @@ enum Commands {
         registry: PathBuf,
     },
 
-    /// Crate truth registry: join `cargo metadata` with `docs/crate-status.toml`.
+    /// Crate truth registry: join cargo metadata with docs/crate-status.toml.
     /// A crate's existence does not imply endorsement.
     CrateStatus {
         /// Emit the generated markdown inventory instead of checking.
@@ -35,6 +36,11 @@ enum Commands {
         strict: bool,
         #[arg(long, default_value = "docs/crate-status.toml")]
         registry: PathBuf,
+    },
+    /// Audit measurement support, registration, and evidence class in the frozen plasma fixture.
+    PlasmaRegionTruthAudit {
+        #[arg(long, default_value = "data/research/plasma_region_truth_fixture_v0_1.json")]
+        fixture: PathBuf,
     },
     RhnSweep {
         #[arg(long, default_value = "1024")]
@@ -147,6 +153,18 @@ fn main() -> anyhow::Result<()> {
             } else {
                 crate_status::check(&root, &registry_path, require_classified, strict)?;
             }
+        }
+        Commands::PlasmaRegionTruthAudit { fixture } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask always lives one level below the workspace root")
+                .to_path_buf();
+            let fixture_path = if fixture.is_absolute() {
+                fixture
+            } else {
+                root.join(fixture)
+            };
+            plasma_region_truth::run_audit(&fixture_path)?;
         }
     }
     Ok(())
