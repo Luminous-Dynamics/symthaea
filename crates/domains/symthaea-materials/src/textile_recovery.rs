@@ -1664,15 +1664,15 @@ mod tests {
                 ("ineligible", Some("UseSafetyNotPassed"))
             }
             "ROUTE-004-REPAIR-ACCEPTED" => {
-                repair_requires_repairable_condition_physical_trial_and_item_acceptance();
+                repair_requires_repairable_condition_physical_trial_and_repair_acceptance();
                 ("eligible", None)
             }
             "ROUTE-005-COMPONENT-RECOVERY" => {
-                component_recovery_requires_mass_closure_and_item_acceptance();
+                component_recovery_requires_mass_closure_and_acceptance();
                 ("eligible", None)
             }
             "ROUTE-006-MECHANICAL-ACCEPTED" => {
-                mechanical_recycling_requires_composition_fibre_length_trial_and_item_acceptance();
+                mechanical_recycling_requires_composition_fibre_length_trial_and_acceptance();
                 ("eligible", None)
             }
             "ROUTE-007-MODEL-COMPOSITION" => {
@@ -1696,7 +1696,7 @@ mod tests {
                 ("ineligible", Some("InvalidFibreLengthDistribution"))
             }
             "ROUTE-012-CHEMICAL-ACCEPTED" => {
-                chemical_route_requires_compatibility_trial_and_downstream_item_acceptance();
+                chemical_route_requires_compatibility_trial_and_downstream_acceptance();
                 ("eligible", None)
             }
             "ROUTE-013-CHEMICAL-COMPATIBILITY-MISSING" => {
@@ -1756,7 +1756,7 @@ mod tests {
                 ("insufficient_evidence", Some("UseSafetyUnknown"))
             }
             "ROUTE-027-DOWNCYCLING-ACCEPTED" => {
-                downcycling_requires_physical_trial_mass_balance_and_receiver_item_acceptance();
+                downcycling_requires_physical_trial_mass_balance_and_receiver_acceptance();
                 ("eligible", None)
             }
             "ROUTE-028-DESIGN-REVISION-BOUND" => {
