@@ -2782,7 +2782,7 @@ fn summarize_imported_notation_structure(
                 notation_event_count += graph.notation_events.note_events.len();
                 for event in &graph.notation_events.note_events {
                     if matches!(
-                        event.kind,
+                        &event.kind,
                         symthaea_muse::musicxml_notation_events::MusicXmlNotationEventKindV1::Rest { .. }
                     ) {
                         rest_event_count += 1;
