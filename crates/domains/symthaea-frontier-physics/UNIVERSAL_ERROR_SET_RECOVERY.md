@@ -1,6 +1,6 @@
 # Universal error-set recovery and decoder reuse
 
-**Status:** the exact three-qubit bit-flip baseline passed Rust 1.96 (153/153) at `50404c09…`. The general complex QEC-matrix constructor and exact-KL projection passed formatting, Clippy and the frontier-physics suite at `870ab5bf…` (157 passed, 0 failed). The Hellinger square-root metric, environment-leakage diamond norm and approximate universal error-set Petz recovery remain unimplemented.
+**Status:** the exact three-qubit bit-flip baseline passed Rust 1.96 (153/153) at `50404c09…`. The general complex QEC-matrix constructor passed at `870ab5bf…` (157/157). The support-aware QEC square root, closed-form Hellinger metric and strongly-controlled Petz Bures bound are now source-authored; validation of the latest branch head is pending. The environment-leakage diamond norm and general error-set Petz recovery channel remain unimplemented.
 
 ## Why this is a distinct paradigm
 
@@ -129,6 +129,34 @@ It reports code-isometry, Hermiticity and absolute/relative KL-projection residu
 The exact-head Rust 1.96 audit passed formatting, Clippy and **157/157** frontier-physics crate tests at `870ab5bf2728f542e9ac64e2236b80795b9cb7` (workflow 43380572096). Five new tests exercise the exact repetition-code error set, a phase-error negative control, duplicated errors, invalid code/operator shapes and non-finite input.
 
 This is UR-1 and part of UR-2. The QEC matrix is a Gram matrix and hence PSD in exact arithmetic, but this implementation does not yet return a floating-point minimum-eigenvalue certificate. It also does not validate channel CPTP constraints or compute either approximate-recovery metric.
+
+
+## Support-aware square root, Hellinger metric and strongly controlled Petz bound
+
+The new implementation uses nalgebra's complex Hermitian eigensolver and returns a receipt containing the minimum/maximum eigenvalue, numerical support rank, Hermiticity residual and square-root reconstruction residual.
+
+The policy is fail-closed:
+- Materially negative eigenvalues are rejected.
+- Negative eigenvalues within the declared relative roundoff tolerance may be mapped to zero.
+- Positive eigenvalues are never floored, including values below the support-rank threshold. The support threshold is a reported numerical-rank diagnostic, not a matrix regularizer.
+- A small accepted Hermiticity residual is projected to its Hermitian part only for eigensolving; the original residual remains reported and reconstruction is checked against the original input.
+
+The average-case Hellinger function implements the closed form from arXiv:2608.28962v2, Eq. (8):
+\[
+\zeta_H^2=\frac{\operatorname{tr}(A_{\rm QEC})}{K}
+-\frac{\left\|\operatorname{tr}_K\sqrt{A_{\rm QEC}}\right\|_2^2}{K^2}.
+\]
+
+The strongly E-controlled worst-case Petz bound uses Theorem 11:
+\[
+d_{\rm wc}\leq \frac{1}{\sqrt2}
+\left\|\sqrt{A_{\rm QEC}}-
+I_K\otimes\frac{1}{\sqrt K}\sqrt{\operatorname{tr}_K(A_{\rm QEC})}
+\right\|_\infty.
+\]
+Before returning this bound, the implementation checks the coefficient matrix Frobenius/Schatten-2 norm \(\|C\|_2\leq1+\epsilon\), constructs the Kraus operators \(F_\alpha=\sum_k C_{\alpha k}E_k\), and verifies \(\sum_\alpha F_\alpha^\dagger F_\alpha=I\) to the declared tolerance. Complete positivity follows from the supplied Kraus form. This is distinct from computing the environment-leakage diamond norm.
+
+New authored tests cover rank-deficient PSD support, preservation of a small positive eigenvalue, rejection of non-Hermitian/materially indefinite inputs, zero Hellinger for the exact-KL repetition-code family, positive Hellinger for a phase-error negative control, zero Theorem-11 bound for an exact-KL strongly controlled TP family, rejection of coefficients outside the Schatten-2 ball, and rejection of a coefficient-induced non-TP channel. Exact-head Rust validation is pending; these are not yet described as passed.
 
 ## The larger research programme
 
