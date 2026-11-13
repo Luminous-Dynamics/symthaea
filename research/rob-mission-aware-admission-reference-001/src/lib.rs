@@ -421,7 +421,6 @@ fn eligibility(request: &InferenceRequest) -> Result<(), RejectReason> {
         .deadline_slack_ticks
         .ok_or(RejectReason::UnknownTimingBound)?;
     let decision_slack = decision_sufficiency_slack(request)?;
-    let available_slack = buffer_slack.min(deadline_slack).min(decision_slack);
     let result_and_guard = p99
         .checked_add(request.local_projection_dispatch_guard_ticks)
         .ok_or(RejectReason::ResultReturnsTooLate)?;
@@ -913,6 +912,136 @@ mod tests {
         let selected = select_static_active_episodes(&candidates, &[], 0).unwrap();
         assert!(selected.active_robot_ids.is_empty());
         assert_eq!(selected.deferred_robot_ids, vec!["r1", "r2"]);
+    }
+
+    #[test]
+    fn unknown_or_missing_decision_horizon_blocks_remote_admission() {
+        let mut missing = request("q1", "r1");
+        missing.decision_sufficiency = None;
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[missing]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::UnknownDecisionSufficiency)
+        );
+
+        let mut unknown = request("q2", "r2");
+        unknown
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .disposition = DecisionSufficiencyDisposition::Unknown;
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[unknown]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::UnknownDecisionSufficiency)
+        );
+    }
+
+    #[test]
+    fn insufficient_or_rejected_decision_horizon_blocks_remote_admission() {
+        let mut insufficient = request("q1", "r1");
+        insufficient
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .disposition = DecisionSufficiencyDisposition::Insufficient;
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[insufficient]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::DecisionAlreadyInsufficient)
+        );
+
+        let mut rejected = request("q2", "r2");
+        rejected
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .disposition = DecisionSufficiencyDisposition::Rejected;
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[rejected]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::RejectedDecisionSufficiencyEvidence)
+        );
+    }
+
+    #[test]
+    fn decision_horizon_must_bind_exact_decision_action_epoch_model_and_domain() {
+        let mut audit = request("q1", "r1");
+        audit.selected_action_id = Some("different-action".into());
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::DecisionSufficiencyBindingMismatch)
+        );
+    }
+
+    #[test]
+    fn remote_result_must_return_before_decision_sufficiency_expires() {
+        let mut audit = request("q1", "r1");
+        audit
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .remaining_sufficient_ticks = Some(1);
+        // The buffer and task deadline each have ten ticks of slack, but the
+        // calibrated decision horizon has only one tick remaining.
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::DecisionResultReturnsTooLate)
+        );
+    }
+
+    #[test]
+    fn exact_decision_horizon_boundary_is_inclusive() {
+        let mut audit = request("q1", "r1");
+        audit.p99_return_ticks = Some(2);
+        audit.local_projection_dispatch_guard_ticks = 1;
+        audit
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .remaining_sufficient_ticks = Some(3);
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        assert_eq!(report.admitted_request_ids, vec!["q1"]);
+    }
+
+    #[test]
+    fn action_buffer_and_task_deadline_remain_independent_tighter_bounds() {
+        let mut buffer_limited = request("q1", "r1");
+        buffer_limited.action_buffer_slack_ticks = Some(1);
+        let report = admit_batch(
+            SchedulerPolicy::Luminous,
+            &cursor(),
+            budget(),
+            &[buffer_limited],
+        )
+        .unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::ResultReturnsTooLate)
+        );
+
+        let mut deadline_limited = request("q2", "r2");
+        deadline_limited.deadline_slack_ticks = Some(1);
+        let report = admit_batch(
+            SchedulerPolicy::Luminous,
+            &cursor(),
+            budget(),
+            &[deadline_limited],
+        )
+        .unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::ResultReturnsTooLate)
+        );
     }
 
     #[test]
