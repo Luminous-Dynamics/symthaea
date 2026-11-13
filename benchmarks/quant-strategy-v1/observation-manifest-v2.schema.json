@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/quant-strategy-v1/observation-manifest-v2.schema.json",
+  "title": "Luminous Quant Observation Manifest v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "manifest_id",
+    "principal_id",
+    "rights_profile_id",
+    "evaluation_mode",
+    "decision_frontier",
+    "observations",
+    "qualification"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "luminous.quant-observation-manifest.v2"
+    },
+    "manifest_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "principal_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "rights_profile_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "evaluation_mode": {
+      "enum": [
+        "historical_reconstruction",
+        "prospective_streaming",
+        "development_only"
+      ]
+    },
+    "decision_frontier": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observation_id",
+          "instrument_ref",
+          "event_time",
+          "value",
+          "unit",
+          "period_start",
+          "period_end",
+          "evidence"
+        ],
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "instrument_ref": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "event_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "value": {
+            "type": [
+              "string",
+              "integer",
+              "number"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "period_start": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "period_end": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "evidence": {
+            "$ref": "../financial-agent-v1/evidence-v2.schema.json"
+          }
+        }
+      }
+    },
+    "qualification": {
+      "enum": [
+        "synthetic_development_only",
+        "historical_confirmation",
+        "prospective_shadow"
+      ]
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  }
+}

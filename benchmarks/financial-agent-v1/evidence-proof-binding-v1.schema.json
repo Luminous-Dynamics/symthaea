@@ -1,0 +1,374 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/financial-agent-v1/evidence-proof-binding-v1.schema.json",
+  "title": "Luminous Financial Evidence Proof Binding v1",
+  "description": "Canonical, domain-separated preimages for evidence availability and rights attestations.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/availability"
+    },
+    {
+      "$ref": "#/$defs/rights"
+    }
+  ],
+  "$defs": {
+    "availabilityInterval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "earliest_possible_at",
+        "latest_possible_at",
+        "bounds",
+        "time_basis"
+      ],
+      "properties": {
+        "earliest_possible_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "latest_possible_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "bounds": {
+          "const": "inclusive"
+        },
+        "time_basis": {
+          "enum": [
+            "utc_instants",
+            "source_calendar_converted_with_declared_timezone"
+          ]
+        },
+        "source_timezone": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "source_date": {
+          "type": "string",
+          "format": "date"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "time_basis": {
+                "const": "source_calendar_converted_with_declared_timezone"
+              }
+            },
+            "required": [
+              "time_basis"
+            ]
+          },
+          "then": {
+            "required": [
+              "source_timezone",
+              "source_date"
+            ]
+          }
+        }
+      ]
+    },
+    "common": {
+      "type": "object",
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "source_record_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "source_version_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "principal_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "rights_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      },
+      "required": [
+        "evidence_id",
+        "source_id",
+        "source_record_id",
+        "source_version_id",
+        "content_sha256",
+        "principal_id",
+        "rights_profile_id"
+      ]
+    },
+    "availability": {
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "precision": {
+                "const": "exact_instant"
+              }
+            },
+            "required": [
+              "precision"
+            ]
+          },
+          "then": {
+            "properties": {
+              "known_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "interval": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "precision": {
+                "const": "bounded_interval"
+              }
+            },
+            "required": [
+              "precision"
+            ]
+          },
+          "then": {
+            "properties": {
+              "known_at": {
+                "type": "null"
+              },
+              "interval": {
+                "$ref": "#/$defs/availabilityInterval"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "precision": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "precision"
+            ]
+          },
+          "then": {
+            "properties": {
+              "known_at": {
+                "type": "null"
+              },
+              "interval": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "binding_type",
+        "domain",
+        "binding_version",
+        "evidence_id",
+        "source_id",
+        "source_record_id",
+        "source_version_id",
+        "content_sha256",
+        "principal_id",
+        "rights_profile_id",
+        "precision",
+        "known_at",
+        "interval",
+        "retrieved_at"
+      ],
+      "properties": {
+        "binding_type": {
+          "const": "availability"
+        },
+        "domain": {
+          "const": "luminous.financial.availability-proof-binding.v1"
+        },
+        "binding_version": {
+          "const": "1"
+        },
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "source_record_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "source_version_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "principal_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "rights_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "precision": {
+          "enum": [
+            "exact_instant",
+            "bounded_interval",
+            "unknown"
+          ]
+        },
+        "known_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "interval": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/availabilityInterval"
+            }
+          ]
+        },
+        "retrieved_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "rights": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/common"
+        }
+      ],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "binding_type",
+        "domain",
+        "binding_version",
+        "evidence_id",
+        "source_id",
+        "source_record_id",
+        "source_version_id",
+        "content_sha256",
+        "principal_id",
+        "rights_profile_id",
+        "disposition",
+        "valid_from",
+        "valid_until"
+      ],
+      "properties": {
+        "binding_type": {
+          "const": "rights"
+        },
+        "domain": {
+          "const": "luminous.financial.rights-proof-binding.v1"
+        },
+        "binding_version": {
+          "const": "1"
+        },
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "source_record_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "source_version_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "principal_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "rights_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "disposition": {
+          "enum": [
+            "authorized",
+            "not_authorized",
+            "unknown"
+          ]
+        },
+        "valid_from": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "valid_until": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}
