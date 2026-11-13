@@ -98,6 +98,32 @@ def valid_isolating_interval(
     )
 
 
+
+def claim_identity_matches(
+    expected_model: str,
+    candidate_model: str,
+    expected_unit: str,
+    candidate_unit: str,
+    expected_entry: tuple[int, int],
+    candidate_entry: tuple[int, int],
+) -> bool:
+    return (
+        expected_model == candidate_model
+        and expected_unit == candidate_unit
+        and expected_entry == candidate_entry
+    )
+
+
+def positive_separation_admissible(
+    omega_lo: Fraction, omega_hi: Fraction
+) -> bool:
+    if omega_lo < 0 or omega_hi <= omega_lo:
+        return False
+    return not interval_has_zero(
+        omega_lo, omega_hi, (Fraction(1), Fraction(2), Fraction(4))
+    )
+
+
 def main() -> None:
     data = json.loads(FIXTURE.read_text(encoding="utf-8"))
     assert data["schema"] == "luminous.airroad.mimo_continuous_rational_discrepancy_envelope.v0_1"
@@ -119,6 +145,9 @@ def main() -> None:
     x_lo, x_hi = q(band["x_lower"]), q(band["x_upper"])
     assert (omega_lo, omega_hi) == (Fraction(5, 2), Fraction(7, 2))
     assert (x_lo, x_hi) == (omega_lo**2, omega_hi**2)
+    # The common derivative denominator is positive on this whole interval.
+    assert x_lo > 4 and x_hi < 16
+    assert positive_separation_admissible(omega_lo, omega_hi)
 
     # Derive the stationary polynomial from the rational function. Do not
     # trust the coefficient declaration in the fixture.
@@ -195,7 +224,27 @@ def main() -> None:
     # uniform separation statement must be rejected.
     zero_band = (Fraction(3, 2), Fraction(5, 2))
     assert interval_has_zero(*zero_band, roots=(Fraction(1), Fraction(2), Fraction(4)))
-    assert not interval_has_zero(omega_lo, omega_hi, roots=(Fraction(1), Fraction(2), Fraction(4)))
+    assert not positive_separation_admissible(*zero_band)
+    assert positive_separation_admissible(omega_lo, omega_hi)
+
+    # Stale model, frequency units and port row/column identities fail closed.
+    expected_entry = (0, 1)
+    assert claim_identity_matches(
+        data["model_set_identity"], data["model_set_identity"],
+        data["frequency_unit"], "rad_per_second", expected_entry, expected_entry
+    )
+    assert not claim_identity_matches(
+        data["model_set_identity"], "sha256:stale-model",
+        data["frequency_unit"], "rad_per_second", expected_entry, expected_entry
+    )
+    assert not claim_identity_matches(
+        data["model_set_identity"], data["model_set_identity"],
+        data["frequency_unit"], "Hz", expected_entry, expected_entry
+    )
+    assert not claim_identity_matches(
+        data["model_set_identity"], data["model_set_identity"],
+        data["frequency_unit"], "rad_per_second", expected_entry, (1, 0)
+    )
 
     # Hostile root brackets and identities are checked against actual rules.
     bad_root = (Fraction(1016, 100), Fraction(1017, 100))
