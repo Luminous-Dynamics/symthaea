@@ -1,0 +1,207 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "EDLC-SEQUENTIAL-RESERVE-KNOWN-ANSWER-001",
+  "evidence_class": "synthetic_sequential_reserve_replay",
+  "claim_ceiling": "SYNTHETIC_SEQUENCE_AND_RECOVERY_GATE_ARITHMETIC_ONLY_NOT_PHYSICAL_DEVICE_RELIABILITY",
+  "assumptions": [
+    "Every serial and measurement is synthetic; no physical device, cell, module, waveform, laboratory or manufacturer is represented.",
+    "All three synthetic device sequences follow the same frozen event order, load-profile identities and idle windows.",
+    "The first event follows a 168-hour initial open-circuit standby interval; later idle windows are recovery windows after the previous event.",
+    "A later event passes only if both its application-load service contract and its preceding recovery contract pass.",
+    "A device sequence passes only if all events pass; repeated events from one serial are correlated observations, not independent devices.",
+    "A readiness probe that passes while the actual application event fails is reported as a false-ready event.",
+    "The sequence pass fraction is synthetic arithmetic and is not an application availability probability or lifetime estimate."
+  ],
+  "protocol": {
+    "protocol_id": "SYNTHETIC-SEQUENTIAL-RESERVE-001",
+    "sequence_profile_id": "SYNTHETIC-3-CALL-RESERVE-PROFILE-V0",
+    "standby_mode": "open_circuit",
+    "physical_boundary": "complete_device",
+    "initial_standby_hours": 168,
+    "event_order_frozen_before_evaluation": true,
+    "external_replenishment_boundary": "measured_at_source_side_for_each_idle_interval"
+  },
+  "requirements": {
+    "minimum_delivered_energy_wh": 0.8,
+    "minimum_sustained_power_w": 1,
+    "maximum_response_latency_s": 0.8,
+    "minimum_application_voltage_v": 1,
+    "maximum_temperature_rise_c": 10,
+    "maximum_standby_auxiliary_energy_wh": 0.1,
+    "maximum_external_replenishment_energy_wh_per_interval": 0.02,
+    "maximum_time_to_restored_readiness_hours": 4
+  },
+  "device_sequences": [
+    {
+      "physical_device_serial": "SYNTH-SEQ-001",
+      "status": "measured",
+      "events": [
+        {
+          "event_index": 1,
+          "event_id": "CALL-01",
+          "load_profile_id": "SYNTH-LOAD-PULSE-A-V0",
+          "preceding_idle_window_hours": 168,
+          "readiness_probe_status": "not_applicable",
+          "time_to_restored_readiness_hours": null,
+          "external_replenishment_energy_wh": 0,
+          "standby_auxiliary_energy_wh": 0.06,
+          "delivered_energy_wh": 1.05,
+          "minimum_sustained_power_w": 1.4,
+          "response_latency_s": 0.4,
+          "minimum_application_voltage_v": 1.08,
+          "temperature_rise_c": 4
+        },
+        {
+          "event_index": 2,
+          "event_id": "CALL-02",
+          "load_profile_id": "SYNTH-LOAD-PULSE-B-V0",
+          "preceding_idle_window_hours": 6,
+          "readiness_probe_status": "passed",
+          "time_to_restored_readiness_hours": 2.5,
+          "external_replenishment_energy_wh": 0,
+          "standby_auxiliary_energy_wh": 0.02,
+          "delivered_energy_wh": 0.92,
+          "minimum_sustained_power_w": 1.2,
+          "response_latency_s": 0.5,
+          "minimum_application_voltage_v": 1.04,
+          "temperature_rise_c": 5
+        },
+        {
+          "event_index": 3,
+          "event_id": "CALL-03",
+          "load_profile_id": "SYNTH-LOAD-PULSE-C-V0",
+          "preceding_idle_window_hours": 24,
+          "readiness_probe_status": "passed",
+          "time_to_restored_readiness_hours": 3.5,
+          "external_replenishment_energy_wh": 0,
+          "standby_auxiliary_energy_wh": 0.03,
+          "delivered_energy_wh": 0.88,
+          "minimum_sustained_power_w": 1.1,
+          "response_latency_s": 0.6,
+          "minimum_application_voltage_v": 1.02,
+          "temperature_rise_c": 6
+        }
+      ]
+    },
+    {
+      "physical_device_serial": "SYNTH-SEQ-002",
+      "status": "measured",
+      "events": [
+        {
+          "event_index": 1,
+          "event_id": "CALL-01",
+          "load_profile_id": "SYNTH-LOAD-PULSE-A-V0",
+          "preceding_idle_window_hours": 168,
+          "readiness_probe_status": "not_applicable",
+          "time_to_restored_readiness_hours": null,
+          "external_replenishment_energy_wh": 0,
+          "standby_auxiliary_energy_wh": 0.06,
+          "delivered_energy_wh": 1.02,
+          "minimum_sustained_power_w": 1.3,
+          "response_latency_s": 0.45,
+          "minimum_application_voltage_v": 1.07,
+          "temperature_rise_c": 4.5
+        },
+        {
+          "event_index": 2,
+          "event_id": "CALL-02",
+          "load_profile_id": "SYNTH-LOAD-PULSE-B-V0",
+          "preceding_idle_window_hours": 6,
+          "readiness_probe_status": "passed",
+          "time_to_restored_readiness_hours": 5,
+          "external_replenishment_energy_wh": 0,
+          "standby_auxiliary_energy_wh": 0.02,
+          "delivered_energy_wh": 0.9,
+          "minimum_sustained_power_w": 1.15,
+          "response_latency_s": 0.55,
+          "minimum_application_voltage_v": 1.03,
+          "temperature_rise_c": 5.5
+        },
+        {
+          "event_index": 3,
+          "event_id": "CALL-03",
+          "load_profile_id": "SYNTH-LOAD-PULSE-C-V0",
+          "preceding_idle_window_hours": 24,
+          "readiness_probe_status": "passed",
+          "time_to_restored_readiness_hours": 5.5,
+          "external_replenishment_energy_wh": 0,
+          "standby_auxiliary_energy_wh": 0.03,
+          "delivered_energy_wh": 0.9,
+          "minimum_sustained_power_w": 1.1,
+          "response_latency_s": 0.6,
+          "minimum_application_voltage_v": 1.02,
+          "temperature_rise_c": 6
+        }
+      ]
+    },
+    {
+      "physical_device_serial": "SYNTH-SEQ-003",
+      "status": "measured",
+      "events": [
+        {
+          "event_index": 1,
+          "event_id": "CALL-01",
+          "load_profile_id": "SYNTH-LOAD-PULSE-A-V0",
+          "preceding_idle_window_hours": 168,
+          "readiness_probe_status": "not_applicable",
+          "time_to_restored_readiness_hours": null,
+          "external_replenishment_energy_wh": 0,
+          "standby_auxiliary_energy_wh": 0.06,
+          "delivered_energy_wh": 1.01,
+          "minimum_sustained_power_w": 1.2,
+          "response_latency_s": 0.5,
+          "minimum_application_voltage_v": 1.05,
+          "temperature_rise_c": 4.8
+        },
+        {
+          "event_index": 2,
+          "event_id": "CALL-02",
+          "load_profile_id": "SYNTH-LOAD-PULSE-B-V0",
+          "preceding_idle_window_hours": 6,
+          "readiness_probe_status": "passed",
+          "time_to_restored_readiness_hours": 3,
+          "external_replenishment_energy_wh": 0,
+          "standby_auxiliary_energy_wh": 0.02,
+          "delivered_energy_wh": 0.9,
+          "minimum_sustained_power_w": 1.1,
+          "response_latency_s": 0.55,
+          "minimum_application_voltage_v": 1.03,
+          "temperature_rise_c": 5.5
+        },
+        {
+          "event_index": 3,
+          "event_id": "CALL-03",
+          "load_profile_id": "SYNTH-LOAD-PULSE-C-V0",
+          "preceding_idle_window_hours": 24,
+          "readiness_probe_status": "passed",
+          "time_to_restored_readiness_hours": 2,
+          "external_replenishment_energy_wh": 0,
+          "standby_auxiliary_energy_wh": 0.03,
+          "delivered_energy_wh": 0.65,
+          "minimum_sustained_power_w": 1.1,
+          "response_latency_s": 0.6,
+          "minimum_application_voltage_v": 1.02,
+          "temperature_rise_c": 6
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "sequence_pass_rate": 0.3333333333333333,
+    "sequence_passes": 1,
+    "valid_sequences": 3,
+    "false_ready_events": 1,
+    "method": "non_compensatory_all_events_and_recovery_gates_per_device_sequence"
+  },
+  "negative_controls": [
+    "A device that passes event one but fails any later event must fail its complete sequence.",
+    "A readiness restoration time beyond the predeclared deadline must fail the recovery gate even when the next load event itself passes.",
+    "A readiness probe that passes while the actual application event fails must increment false_ready_events and fail the sequence.",
+    "External source replenishment in open-circuit mode is a protocol-integrity error, not reserve energy.",
+    "External replenishment above the declared per-interval budget must fail the recovery gate.",
+    "Auxiliary standby energy above its declared budget must fail the recovery gate.",
+    "Event order, load-profile identity and preceding idle windows must be identical across measured device sequences.",
+    "Repeated events on one serial are not independent devices and must not inflate the sequence sample size.",
+    "Invalid and censored sequences remain reported and are excluded from the valid-sequence denominator."
+  ]
+}
