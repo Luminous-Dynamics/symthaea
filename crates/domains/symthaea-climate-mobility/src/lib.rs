@@ -452,6 +452,7 @@ pub struct ServiceFloorAssessment {
     pub unit: String,
     pub floor_profile_revision: Option<String>,
     pub floor_authority_ref: Option<String>,
+    pub freshness_policy_ref: Option<String>,
     pub observation_ref: Option<String>,
     /// Inclusive observation valid-time window, Unix seconds.
     pub observation_valid_from_unix_seconds: Option<i64>,
@@ -557,6 +558,7 @@ pub fn evaluate_service_floor(
         )
         || input.floor_profile_revision.as_deref().is_none_or(|value| value.trim().is_empty())
         || input.floor_authority_ref.as_deref().is_none_or(|value| value.trim().is_empty())
+        || input.freshness_policy_ref.as_deref().is_none_or(|value| value.trim().is_empty())
         || input.observation_ref.as_deref().is_none_or(|value| value.trim().is_empty())
     {
         return Ok(indeterminate());
@@ -928,6 +930,7 @@ mod tests {
             unit: "L/person/day".to_owned(),
             floor_profile_revision: Some("local-profile-v1".to_owned()),
             floor_authority_ref: Some("authority-profile-ref".to_owned()),
+            freshness_policy_ref: Some("freshness-policy-v1".to_owned()),
             observation_ref: Some("observation-bundle-ref".to_owned()),
             observation_valid_from_unix_seconds: Some(1_000),
             observation_valid_to_unix_seconds: Some(1_100),
@@ -1128,6 +1131,16 @@ mod tests {
         let contract_only =
             evaluate_service_floor(&input).expect("contract-only floor evidence abstains");
         assert_eq!(contract_only.outcome, ServiceFloorOutcome::Indeterminate);
+    }
+
+
+    #[test]
+    fn missing_freshness_policy_reference_is_indeterminate() {
+        let mut input = service_floor(Some(100), Some(100), Some(30), Some(35));
+        input.freshness_policy_ref = None;
+        let result = evaluate_service_floor(&input)
+            .expect("missing freshness policy reference abstains");
+        assert_eq!(result.outcome, ServiceFloorOutcome::Indeterminate);
     }
 
     #[test]
