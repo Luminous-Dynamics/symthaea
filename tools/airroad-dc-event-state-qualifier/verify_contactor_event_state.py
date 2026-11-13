@@ -68,7 +68,7 @@ def main() -> None:
     post = data["post_event_mode"]
     expected = data["expected_enclosures"]
 
-    assert pre["event_id"] == event["event_id"] if "event_id" in event else True
+    assert pre["event_id"] == event["event_id"]
     assert pre["configuration_digest"] == event["configuration_digest"]
     assert pre["topology_digest"] == event["topology_before_digest"]
     assert event["topology_before_digest"] != event["topology_after_digest"]
@@ -147,6 +147,7 @@ def main() -> None:
     decay_l = (Fraction(1) - e_l2[1], Fraction(1) - e_l2[0])
     decay_c = (Fraction(1) - e_c2[1], Fraction(1) - e_c2[0])
     e_comm = scale(mul(square_nonnegative(i_event), decay_l), r_comm / (2 * k_l))
+    assert e_comm == read_pair(expected["commutation_resistor_energy_j"])
     e_fault = scale(mul(square_nonnegative(v_event), decay_c), Fraction(1, 1) / (2 * k_c * r_fault))
     e_initial_total = add(e_l_initial, e_c_initial)
     e_final_plus_loss = add(add(e_l_final, e_c_final), add(e_comm, e_fault))
@@ -155,10 +156,10 @@ def main() -> None:
     # Silent reset controls: zeroing either state erases its stored energy.
     zero_state = (Fraction(0), Fraction(0))
     reset_i_initial = add(scale(square_nonnegative(zero_state), L / 2), e_c_initial)
-    reset_i_accounted = add(add(e_c_final, e_comm), e_fault)
+    reset_i_accounted = add(e_c_final, e_fault)
     assert not overlap(reset_i_initial, reset_i_accounted)
     reset_v_initial = add(e_l_initial, scale(square_nonnegative(zero_state), C / 2))
-    reset_v_accounted = add(add(e_l_final, e_comm), e_fault)
+    reset_v_accounted = add(e_l_final, e_comm)
     assert not overlap(reset_v_initial, reset_v_accounted)
 
     controls = {item["id"]: item["expected"] for item in data["negative_controls"]}
