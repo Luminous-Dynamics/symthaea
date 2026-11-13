@@ -1895,15 +1895,17 @@ mod tests {
     }
 
     #[test]
-    fn trailing_unaligned_active_annotation_is_gap_censored_not_run_end_censored() {
+    fn trailing_unaligned_active_annotation_does_not_claim_run_end_censor() {
         let mut input = case();
         let last = input.runs[0].windows.last_mut().unwrap();
         last.acoustic_cavitation_alignment_expanded_uncertainty_s = 0.02;
         last.cavitation_present = Some(true);
         let report = audit(&input);
         let run = &report.run_reports[0];
-        assert_eq!(run.right_censored_active_window_segments, Some(0));
-        assert_eq!(run.right_censored_active_window_segments_at_gaps, Some(1));
+        assert_eq!(run.excluded_alignment_unresolved, 1);
+        assert_eq!(run.cavitation_window_presence_fraction, None);
+        assert_eq!(run.right_censored_active_window_segments, None);
+        assert_eq!(report.disposition, "INCOMPLETE");
     }
 
     #[test]
