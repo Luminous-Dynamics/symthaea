@@ -184,6 +184,18 @@
       "evidence_class": "vendor_datasheet",
       "permitted_use": "Commercial EDLC module specification: 54 V, 188 F, 76.14 Wh maximum stored energy, 16 kg, 13.5 L, 3.0 mOhm 10 ms ESR and 3.4 mOhm 1 s ESR, 162.6 kW 1 s ESR-based power figure, integrated balancing/monitoring and CAN",
       "prohibited_inference": "Vendor specifications, not independent usable-energy measurements; retain 54 V rated-energy basis and do not transfer cycle-life conditions stated for 51 V or 48 V variants to the 54 V variant"
+    },
+    {
+      "id": "ZIHSC-FOUR-PARAMETERS-2024",
+      "title": "Zinc Ion Hybrid Capacitors: Four Essential Parameters Determining Device Energy Density",
+      "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC11672303/",
+      "doi": "10.1002/advs.202408997",
+      "publisher": "Advanced Science",
+      "authors": "Wu et al.",
+      "published": "2024-11-06",
+      "evidence_class": "peer_reviewed_perspective_and_device_model",
+      "permitted_use": "Model-informed parameter envelope: carbon loading 10–20 mg cm-2, carbon specific capacity >100 mAh g-1, N/P <20 and E/C <5 are jointly needed in the representative model to approach >30 Wh kg-1 cell energy density",
+      "prohibited_inference": "The representative model explicitly excludes stainless casing, springs and current-collecting plates; >30 Wh kg-1 is not a measured complete packaged-device result or direct SOTA claim"
     }
   ]
 }
