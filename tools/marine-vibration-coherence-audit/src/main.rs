@@ -147,6 +147,8 @@ struct AuditReport {
     shared_timebase_id: String,
     sample_rate_hz: f64,
     sample_count: u64,
+    pressure_window_start_s: f64,
+    pressure_window_end_s: f64,
     estimator_id: String,
     estimator_version: String,
     cross_spectrum_convention: String,
@@ -626,6 +628,8 @@ fn audit(case: &Case) -> AuditReport {
         shared_timebase_id: case.pressure_channel.timebase_id.clone(),
         sample_rate_hz: case.pressure_channel.sample_rate_hz,
         sample_count: case.pressure_channel.sample_count,
+        pressure_window_start_s: case.pressure_channel.window_start_s,
+        pressure_window_end_s: case.pressure_channel.window_end_s,
         estimator_id: case.estimator.estimator_id.clone(),
         estimator_version: case.estimator.estimator_version.clone(),
         cross_spectrum_convention: case.cross_spectrum_convention.clone(),
@@ -784,6 +788,20 @@ mod tests {
                 band("band-200", 200.0, 4.0, 9.0, 0.0, 3.0),
             ],
         }
+    }
+
+    #[test]
+    fn report_receipt_preserves_exact_pressure_window_boundaries() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        input.pressure_channel.window_start_s = 12.5;
+        input.pressure_channel.window_end_s = 13.5;
+        input.vibration_channel.window_start_s = 12.5;
+        input.vibration_channel.window_end_s = 13.5;
+        let report = audit(&input);
+        assert_eq!(report.pressure_window_start_s, 12.5);
+        assert_eq!(report.pressure_window_end_s, 13.5);
+        assert_eq!(report.pressure_raw_trace_sha256, input.pressure_channel.raw_trace_sha256);
     }
 
     #[test]
