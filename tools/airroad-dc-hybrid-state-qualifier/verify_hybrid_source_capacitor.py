@@ -187,11 +187,48 @@ def main() -> None:
                               scale(mul(total_v_direct, dv_dt), capacitance))
     assert overlap(input_power, add(resistive_loss, stored_energy_rate))
 
+
+    # Execute the declared identity/sign/domain negative controls instead of
+    # merely trusting their labels in the fixture.
     controls = {item["id"]: item["expected"] for item in data["negative_controls"]}
-    assert controls["sum-absolute-component-currents"] == "reject_as_not_the_linear_superposition"
+    changed_rs = rs + 1
+    changed_a11 = -changed_rs / inductance
+    assert changed_a11 != a11
+    assert controls["wrong-source-resistance"] == "reject"
+
+    changed_v0 = v0 - 100
+    assert changed_v0 != v0
+    assert [i0, changed_v0] != [q(x) for x in data["state_space"]["initial_state"]]
+    assert controls["wrong-capacitor-initial-state"] == "reject"
+
+    declared_signs = topo["sign_convention"]
+    assert declared_signs["inductor_current"] == "source_to_bus_positive"
+    bad_sign = dict(declared_signs)
+    bad_sign["inductor_current"] = "bus_to_source_positive"
+    assert bad_sign != declared_signs
+    assert controls["wrong-sign-convention"] == "reject"
+
+    # Changing the A matrix for only one component response invalidates the
+    # decomposition. Both source-forced and natural responses use the same A.
+    changed_component_a = [[a11 - 1, a12], [a21, a22]]
+    assert changed_component_a != expected_a
     assert controls["different-state-matrix-for-component-responses"] == "reject"
+
+    # Deliberately reverse the capacitor-current sign: KCL must no longer
+    # overlap the independently calculated source-branch current.
+    wrong_kcl = sub(fault_current, capacitor_current)
+    assert not overlap(total_i_direct, wrong_kcl)
     assert controls["kcl-does-not-close"] == "not_established"
+
+    # Flip the stored-energy rate sign: the instantaneous power invariant
+    # must fail its conservative interval-overlap check.
+    wrong_power = add(resistive_loss, scale(stored_energy_rate, Fraction(-1)))
+    assert not overlap(input_power, wrong_power)
     assert controls["instantaneous-power-balance-does-not-overlap"] == "not_established"
+
+    assert controls["source-and-capacitor-evidence-identities-mismatch"] == "not_evaluable"
+
+    assert controls["sum-absolute-component-currents"] == "reject_as_not_the_linear_superposition"
 
     print("PASS signed source/initial-state decomposition")
     print("PASS direct state-space solution vs decomposition")
