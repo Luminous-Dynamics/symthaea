@@ -1,0 +1,11 @@
+[package]
+name = "lyric-edit-assurance-eval"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Task-aware assurance scorer for vocal and audio edits"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
