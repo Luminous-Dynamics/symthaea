@@ -348,7 +348,7 @@ fn evaluate_scenario(scenario: &Scenario, fixture: &Fixture) -> ScenarioResult {
                 manifest.grouping_dimensions.iter().map(String::as_str).collect();
             let required: BTreeSet<_> =
                 fixture.required_holdout_dimensions.iter().map(String::as_str).collect();
-            if declared != required {
+            if declared.len() != manifest.grouping_dimensions.len() || declared != required {
                 blocked.push("training-group manifest does not cover the required holdout dimensions".to_owned());
             }
             if manifest.training_material_lot_ids.is_empty()
@@ -522,6 +522,8 @@ fn evaluate_scenario(scenario: &Scenario, fixture: &Fixture) -> ScenarioResult {
                 && measurement.calibration_status == fixture.required_calibration_status
                 && measurement.calibration_valid_from_unix_ms <= scenario.run_timestamp_unix_ms
                 && measurement.calibration_valid_until_unix_ms >= scenario.run_timestamp_unix_ms
+                && measurement.uncertainty_kwh.is_finite()
+                && measurement.uncertainty_kwh >= 0.0
         });
 
     let outcome = match &scenario.downstream_outcome {
@@ -666,10 +668,6 @@ mod tests {
     const FIXTURE: &str = include_str!(
         "../../data/research/plasma_virtual_metrology_fixture_v0_1.json"
     );
-
-    fn run(value: &serde_json::Value) -> AuditReport {
-        audit_fixture_json(&value.to_string()).expect("mutated virtual-metrology fixture parses")
-    }
 
     fn result_for<'a>(report: &'a AuditReport, id: &str) -> &'a ScenarioResult {
         report.results.iter().find(|x| x.scenario_id == id).expect("scenario exists")
