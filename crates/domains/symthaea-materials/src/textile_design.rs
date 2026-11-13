@@ -183,6 +183,8 @@ pub enum DesignAuditReason {
     ReplaceableComponentMissingInstructions,
     /// Repair intent has no replaceable component.
     RepairIntentWithoutReplaceablePart,
+    /// Disassembly/component-recovery intent has no declared joints.
+    DisassemblyIntentWithoutJoints,
     /// A reversible joint has no accessible product zone.
     ReversibleJointMissingAccess,
     /// A reversible joint has no operation/method.
@@ -318,6 +320,10 @@ pub fn audit_textile_design(dossier: &TextileDesignDossier) -> DesignAudit {
         .intents
         .contains(&DesignIntent::MaterialTraceable);
     let has_repair_intent = dossier.intents.contains(&DesignIntent::Repairable);
+
+    if has_disassembly_intent && dossier.joints.is_empty() {
+        reasons.insert(DesignAuditReason::DisassemblyIntentWithoutJoints);
+    }
 
     for joint in &dossier.joints {
         if !nonempty(&joint.joint_id) || !joint_ids.insert(joint.joint_id.as_str()) {
@@ -569,6 +575,37 @@ mod tests {
         assert!(result
             .reasons
             .contains(&DesignAuditReason::CyclicDisassemblyDependencies));
+    }
+
+    #[test]
+    fn disassembly_intent_requires_joint_topology() {
+        let mut dossier = valid_dossier();
+        dossier.joints.clear();
+        let result = audit_textile_design(&dossier);
+        assert_eq!(result.disposition, DesignAuditDisposition::Incomplete);
+        assert!(result
+            .reasons
+            .contains(&DesignAuditReason::DisassemblyIntentWithoutJoints));
+    }
+
+    #[test]
+    fn replaceable_component_requires_instructions() {
+        let mut dossier = valid_dossier();
+        dossier.components[1].replacement_instructions_ref = None;
+        let result = audit_textile_design(&dossier);
+        assert_eq!(result.disposition, DesignAuditDisposition::Incomplete);
+        assert!(result
+            .reasons
+            .contains(&DesignAuditReason::ReplaceableComponentMissingInstructions));
+    }
+
+    #[test]
+    fn unknown_joining_method_is_not_promoted_to_reversible_design() {
+        let mut dossier = valid_dossier();
+        dossier.joints[0].joining_method = JoiningMethod::Unknown;
+        let result = audit_textile_design(&dossier);
+        assert_eq!(result.disposition, DesignAuditDisposition::Incomplete);
+        assert!(result.reasons.contains(&DesignAuditReason::JoiningMethodUnknown));
     }
 
     #[test]
