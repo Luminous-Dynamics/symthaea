@@ -1,0 +1,1923 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/neuroscience/CONNECTOME_INTERVENTION_BENCHMARK_RUN.schema.json",
+  "title": "Connectome intervention benchmark run manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "status",
+    "evidence_tier",
+    "claim_ceiling",
+    "dataset",
+    "connectome",
+    "observation_model",
+    "split_protocol",
+    "intervention_protocol",
+    "models",
+    "baseline_matrix",
+    "metric_contract",
+    "uncertainty",
+    "artifacts",
+    "direct_effect_support",
+    "causal_inference_baselines"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128
+    },
+    "status": {
+      "enum": [
+        "PLANNED",
+        "INCOMPLETE_REQUIRES_ARTIFACTS",
+        "EXECUTED_AUDITABLE"
+      ]
+    },
+    "evidence_tier": {
+      "enum": [
+        "T0_SYNTHETIC",
+        "T1_OBSERVATIONAL",
+        "T2_IN_SILICO_INTERVENTION",
+        "T3_MEASURED_BIOLOGICAL_INTERVENTION",
+        "T4_PROSPECTIVE_EXPERIMENT_SELECTION"
+      ]
+    },
+    "claim_ceiling": {
+      "enum": [
+        "SYNTHETIC_ONLY",
+        "OBSERVATIONAL_PREDICTION_ONLY",
+        "MODEL_INTERVENTION_ONLY",
+        "BIOLOGICAL_INTERVENTION_PREDICTION",
+        "PROSPECTIVE_EXPERIMENTAL_VALIDATION"
+      ]
+    },
+    "dataset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "source_uri",
+        "dataset_manifest_sha256",
+        "independent_unit",
+        "outcome_type",
+        "data_level",
+        "aggregation_scope",
+        "evaluation_eligibility",
+        "generator_family",
+        "dgp_scenario_id",
+        "instrument_assignment_level",
+        "oracle_state"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "dataset_manifest_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "independent_unit": {
+          "enum": [
+            "animal",
+            "animal_session",
+            "session",
+            "specimen",
+            "subject",
+            "other"
+          ]
+        },
+        "outcome_type": {
+          "enum": [
+            "latent_activity",
+            "calcium_fluorescence",
+            "electrophysiology",
+            "behaviour",
+            "mixed",
+            "other"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        },
+        "data_level": {
+          "enum": [
+            "raw_trial_or_session",
+            "animal_aggregated",
+            "cross_animal_aggregated",
+            "derived_summary_matrix",
+            "metadata_only",
+            "unknown"
+          ]
+        },
+        "aggregation_scope": {
+          "enum": [
+            "trial",
+            "animal_session",
+            "animal",
+            "multiple_animals",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "evaluation_eligibility": {
+          "enum": [
+            "animal_session_heldout_outcome",
+            "animal_heldout_outcome",
+            "training_input_after_leakage_audit",
+            "exploratory_summary_only",
+            "not_yet_verified"
+          ]
+        },
+        "generator_family": {
+          "enum": [
+            "connectome_cluster_iv_dgp_v1",
+            "biological_dataset",
+            "other",
+            "unknown"
+          ]
+        },
+        "dgp_scenario_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "instrument_assignment_level": {
+          "enum": [
+            "within_cluster",
+            "cluster_level",
+            "not_applicable",
+            "unknown"
+          ]
+        },
+        "oracle_state": {
+          "enum": [
+            "NOT_CREATED",
+            "SEALED",
+            "RELEASED_AFTER_FREEZE",
+            "NOT_APPLICABLE"
+          ]
+        }
+      }
+    },
+    "connectome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "source_uri",
+        "structural_digest_sha256",
+        "edge_semantics",
+        "uncertainty_recorded"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "source_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "structural_digest_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "annotation_digest_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "edge_semantics": {
+          "enum": [
+            "chemical_synapse",
+            "gap_junction",
+            "typed_mixed",
+            "anatomical_plus_non_synaptic_channels",
+            "other"
+          ]
+        },
+        "uncertainty_recorded": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "observation_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "separate_from_latent_dynamics",
+        "parameters_sha256",
+        "scoring_space"
+      ],
+      "properties": {
+        "family": {
+          "enum": [
+            "calcium_indicator",
+            "electrophysiology_filter",
+            "behavioural_measurement",
+            "identity",
+            "other"
+          ]
+        },
+        "separate_from_latent_dynamics": {
+          "const": true
+        },
+        "parameters_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "scoring_space": {
+          "enum": [
+            "measured_observation",
+            "latent_activity_with_independent_measurement_model",
+            "both_separately"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "split_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategies",
+        "split_unit",
+        "split_digest_sha256",
+        "preprocessing_fit_scope",
+        "random_cell_time_split"
+      ],
+      "properties": {
+        "strategies": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "leave_animal_session_out",
+              "leave_target_neuron_out",
+              "leave_perturbation_combination_out",
+              "temporal_forward_holdout",
+              "state_context_holdout",
+              "dose_duration_order_holdout",
+              "cross_species_holdout",
+              "other"
+            ]
+          }
+        },
+        "split_unit": {
+          "enum": [
+            "animal",
+            "animal_session",
+            "session",
+            "target_neuron",
+            "specimen",
+            "other"
+          ]
+        },
+        "split_digest_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "preprocessing_fit_scope": {
+          "const": "train_only"
+        },
+        "random_cell_time_split": {
+          "const": false
+        },
+        "train_ids_artifact_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "test_ids_artifact_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "exclusion_log_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "intervention_protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paired_treatment_control",
+        "control_arm_count",
+        "target_holdout",
+        "factorial_interactions",
+        "pulse_order_holdout",
+        "protocol_digest_sha256"
+      ],
+      "properties": {
+        "paired_treatment_control": {
+          "type": "boolean"
+        },
+        "control_arm_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "target_holdout": {
+          "type": "boolean"
+        },
+        "factorial_interactions": {
+          "type": "boolean"
+        },
+        "pulse_order_holdout": {
+          "type": "boolean"
+        },
+        "protocol_digest_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "control_types": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "sham",
+              "no_stimulation",
+              "vehicle",
+              "wild_type",
+              "actuator_negative",
+              "other"
+            ]
+          }
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "models": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model_id",
+          "family",
+          "role",
+          "parameter_count",
+          "tuning_budget",
+          "status"
+        ],
+        "properties": {
+          "model_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "enum": [
+              "mean_sham_null",
+              "direct_structural_propagation",
+              "non_graph_var_lds_glm",
+              "activity_only_nonlinear_state_space",
+              "fixed_connectome_shared_cell_type_parameters",
+              "candidate_connectome_dynamics",
+              "capacity_matched_activity_only",
+              "degree_type_preserving_rewire",
+              "edge_sign_weight_null",
+              "common_input_latent_confound",
+              "other"
+            ]
+          },
+          "role": {
+            "enum": [
+              "candidate",
+              "baseline",
+              "negative_control"
+            ]
+          },
+          "parameter_count": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "tuning_budget": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": [
+              "PLANNED",
+              "NOT_RUN",
+              "RUN_COMPLETE",
+              "FAILED",
+              "NOT_APPLICABLE"
+            ]
+          },
+          "not_applicable_reason": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "baseline_matrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sham_mean",
+        "non_graph_linear",
+        "activity_only_nonlinear",
+        "cell_type_tied_connectome",
+        "capacity_matched_activity_only",
+        "degree_type_preserving_rewire",
+        "edge_sign_weight_null",
+        "common_input_confound"
+      ],
+      "properties": {
+        "sham_mean": {
+          "const": true
+        },
+        "non_graph_linear": {
+          "const": true
+        },
+        "activity_only_nonlinear": {
+          "const": true
+        },
+        "cell_type_tied_connectome": {
+          "const": true
+        },
+        "capacity_matched_activity_only": {
+          "const": true
+        },
+        "degree_type_preserving_rewire": {
+          "const": true
+        },
+        "edge_sign_weight_null": {
+          "const": true
+        },
+        "common_input_confound": {
+          "const": true
+        }
+      }
+    },
+    "metric_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_ids",
+        "definitions_sha256",
+        "primary_metric_ids"
+      ],
+      "properties": {
+        "metric_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "trajectory_rmse",
+              "trajectory_mae",
+              "trajectory_crps",
+              "predictive_log_score",
+              "treatment_control_effect_rmse",
+              "response_sign_accuracy",
+              "false_response_rate",
+              "onset_latency_error",
+              "peak_amplitude_error",
+              "recovery_time_error",
+              "interaction_trace_error",
+              "mechanism_macro_f1",
+              "mechanism_abstention_rate",
+              "interval_coverage_50",
+              "interval_coverage_80",
+              "interval_coverage_95",
+              "interval_width",
+              "anatomy_incremental_gain",
+              "eig_per_experiment",
+              "decision_regret",
+              "sample_efficiency",
+              "missingness_degradation",
+              "inference_latency",
+              "training_wall_time",
+              "peak_memory"
+            ]
+          }
+        },
+        "definitions_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "primary_metric_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "independent_unit",
+        "interval_method",
+        "bootstrap_replicates",
+        "coverage_levels"
+      ],
+      "properties": {
+        "independent_unit": {
+          "enum": [
+            "animal",
+            "animal_session",
+            "session",
+            "specimen",
+            "subject",
+            "other"
+          ]
+        },
+        "interval_method": {
+          "enum": [
+            "cluster_bootstrap",
+            "hierarchical_model",
+            "randomization_inference",
+            "other"
+          ]
+        },
+        "bootstrap_replicates": {
+          "type": "integer",
+          "minimum": 100
+        },
+        "coverage_levels": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              0.5,
+              0.8,
+              0.95
+            ]
+          }
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_manifest_sha256",
+        "connectome_sha256",
+        "split_manifest_sha256",
+        "model_predictions_sha256",
+        "metric_report_sha256",
+        "evaluator_sha256",
+        "observed_csv_sha256",
+        "public_data_manifest_sha256",
+        "dgp_oracle_sha256",
+        "prediction_freeze_receipt_sha256"
+      ],
+      "properties": {
+        "dataset_manifest_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "connectome_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "split_manifest_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "model_predictions_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "sealed_outcomes_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "metric_report_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "evaluator_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "environment_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "reproduction_config_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "observed_csv_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "public_data_manifest_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "dgp_oracle_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "prediction_freeze_receipt_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    },
+    "direct_effect_support": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "method",
+        "support_basis",
+        "bound_g",
+        "nominal_confidence_level",
+        "f_critical_value",
+        "control_type",
+        "control_cohort_id",
+        "control_artifact_sha256",
+        "normalized_gram_sha256",
+        "target_normalized_gram_sha256",
+        "transport_multiplier",
+        "applied_bound_g",
+        "prespecified_before_unblind",
+        "transportability_proven",
+        "notes",
+        "sensitivity_ladder_g"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "NOT_USED",
+            "INCOMPLETE_REQUIRES_ARTIFACTS",
+            "CONTROL_BOUND_CALIBRATED",
+            "SENSITIVITY_ONLY"
+          ]
+        },
+        "method": {
+          "enum": [
+            "matched_opsin_free_light_on",
+            "matched_fluorophore_light_on",
+            "expert_registered_sensitivity",
+            "physical_calibration",
+            "not_applicable"
+          ]
+        },
+        "support_basis": {
+          "enum": [
+            "sample_normalized_gram",
+            "population_rms",
+            "unknown"
+          ]
+        },
+        "bound_g": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "nominal_confidence_level": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "f_critical_value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "control_type": {
+          "enum": [
+            "opsin_free_light_on",
+            "fluorophore_only_light_on",
+            "opsin_expressing_light_off",
+            "sham_no_light",
+            "other",
+            "not_applicable"
+          ]
+        },
+        "control_cohort_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "control_artifact_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "normalized_gram_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "target_normalized_gram_sha256": {
+          "$ref": "#/$defs/nullableSha256"
+        },
+        "transport_multiplier": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "applied_bound_g": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "prespecified_before_unblind": {
+          "type": "boolean"
+        },
+        "transportability_proven": {
+          "const": false
+        },
+        "notes": {
+          "type": "string"
+        },
+        "sensitivity_ladder_g": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "number",
+            "minimum": 0
+          },
+          "description": "Full prespecified, strictly increasing sequence of sample-RMS direct-effect bounds g. The primary bound_g must be included. The independent evaluator checks ordering."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "CONTROL_BOUND_CALIBRATED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "method": {
+                "enum": [
+                  "matched_opsin_free_light_on",
+                  "matched_fluorophore_light_on"
+                ]
+              },
+              "support_basis": {
+                "const": "sample_normalized_gram"
+              },
+              "bound_g": {
+                "type": "number",
+                "minimum": 0
+              },
+              "nominal_confidence_level": {
+                "type": "number",
+                "exclusiveMinimum": 0,
+                "exclusiveMaximum": 1
+              },
+              "f_critical_value": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "control_type": {
+                "enum": [
+                  "opsin_free_light_on",
+                  "fluorophore_only_light_on"
+                ]
+              },
+              "control_cohort_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "control_artifact_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "normalized_gram_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "target_normalized_gram_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "transport_multiplier": {
+                "type": "number",
+                "minimum": 1
+              },
+              "applied_bound_g": {
+                "type": "number",
+                "minimum": 0
+              },
+              "prespecified_before_unblind": {
+                "const": true
+              },
+              "transportability_proven": {
+                "const": false
+              },
+              "sensitivity_ladder_g": {
+                "type": "array",
+                "minItems": 2,
+                "uniqueItems": true,
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "NOT_USED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "method": {
+                "const": "not_applicable"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "SENSITIVITY_ONLY"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "prespecified_before_unblind": {
+                "const": true
+              },
+              "sensitivity_ladder_g": {
+                "type": "array",
+                "minItems": 2,
+                "uniqueItems": true,
+                "items": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "causal_inference_baselines": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "analysis_regime",
+        "clusteriv_020",
+        "stata19_weakrobust",
+        "wang_zhang_2024_wild_ar",
+        "randomization_itt",
+        "independent_row_par_reference",
+        "clustered_iv_dgp"
+      ],
+      "properties": {
+        "analysis_regime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "independent_cluster_count",
+            "randomized_assignment_unit_count",
+            "instrument_count",
+            "endogenous_regressor_count",
+            "cluster_structure",
+            "cluster_count_and_leverage_reported"
+          ],
+          "properties": {
+            "independent_cluster_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "randomized_assignment_unit_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "instrument_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "endogenous_regressor_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "cluster_structure": {
+              "enum": [
+                "one_way",
+                "multi_way",
+                "within_animal_repeated_blocks",
+                "cluster_level_randomization",
+                "independent_rows_only",
+                "unknown"
+              ]
+            },
+            "cluster_count_and_leverage_reported": {
+              "type": "boolean"
+            }
+          }
+        },
+        "clusteriv_020": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "package_version",
+            "variance_estimators",
+            "cjar_calibrations",
+            "cjar_confidence_set_topology_reported",
+            "cjs_confidence_set_topology_reported",
+            "effective_first_stage_reported",
+            "cluster_leverage_reported",
+            "one_way_cluster_scope_acknowledged",
+            "single_endogenous_regressor_scope_acknowledged",
+            "not_run_or_not_applicable_reason",
+            "cjar_test_side",
+            "cjar_confidence_set_shapes",
+            "cjs_confidence_set_shapes",
+            "confidence_set_endpoint_matrix_preserved",
+            "f_cj_reported",
+            "f_eff_reported",
+            "maxlev_reported",
+            "crossfit_nonpositive_variance_convention_recorded"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "REGISTERED_NOT_RUN",
+                "EXECUTED",
+                "NOT_APPLICABLE"
+              ]
+            },
+            "package_version": {
+              "const": "0.2.0"
+            },
+            "variance_estimators": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "plain",
+                  "crossfit"
+                ]
+              }
+            },
+            "cjar_calibrations": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "chisq",
+                  "normal"
+                ]
+              }
+            },
+            "cjar_confidence_set_topology_reported": {
+              "type": "boolean"
+            },
+            "cjs_confidence_set_topology_reported": {
+              "type": "boolean"
+            },
+            "effective_first_stage_reported": {
+              "type": "boolean"
+            },
+            "cluster_leverage_reported": {
+              "type": "boolean"
+            },
+            "one_way_cluster_scope_acknowledged": {
+              "const": true
+            },
+            "single_endogenous_regressor_scope_acknowledged": {
+              "const": true
+            },
+            "not_run_or_not_applicable_reason": {
+              "type": "string"
+            },
+            "cjar_test_side": {
+              "const": "upper_tail_one_sided"
+            },
+            "cjar_confidence_set_shapes": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "bounded",
+                  "ray",
+                  "two_rays",
+                  "whole_line",
+                  "empty"
+                ]
+              }
+            },
+            "cjs_confidence_set_shapes": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "bounded",
+                  "ray",
+                  "two_rays",
+                  "whole_line",
+                  "empty"
+                ]
+              }
+            },
+            "confidence_set_endpoint_matrix_preserved": {
+              "type": "boolean"
+            },
+            "f_cj_reported": {
+              "type": "boolean"
+            },
+            "f_eff_reported": {
+              "type": "boolean"
+            },
+            "maxlev_reported": {
+              "type": "boolean"
+            },
+            "crossfit_nonpositive_variance_convention_recorded": {
+              "type": "boolean"
+            }
+          }
+        },
+        "stata19_weakrobust": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "stata_version",
+            "tests",
+            "vce_modes",
+            "confidence_set_topology_reported",
+            "simulation_replications",
+            "not_run_or_not_applicable_reason",
+            "clr_simulation_seed",
+            "ci_grid_points",
+            "confidence_set_shapes"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "REGISTERED_NOT_RUN",
+                "EXECUTED",
+                "NOT_APPLICABLE"
+              ]
+            },
+            "stata_version": {
+              "const": "19"
+            },
+            "tests": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "AR",
+                  "CLR"
+                ]
+              }
+            },
+            "vce_modes": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "robust",
+                  "cluster",
+                  "HAC"
+                ]
+              }
+            },
+            "confidence_set_topology_reported": {
+              "type": "boolean"
+            },
+            "simulation_replications": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "not_run_or_not_applicable_reason": {
+              "type": "string"
+            },
+            "clr_simulation_seed": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "ci_grid_points": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "confidence_set_shapes": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "finite_interval",
+                  "disconnected_union",
+                  "unbounded",
+                  "empty",
+                  "real_line"
+                ]
+              }
+            }
+          }
+        },
+        "wang_zhang_2024_wild_ar": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "paper_doi",
+            "bootstrap_replications",
+            "seed",
+            "fixed_cluster_asymptotic_regime_acknowledged",
+            "weak_iv_ar_used",
+            "not_run_or_not_applicable_reason"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "REGISTERED_NOT_RUN",
+                "EXECUTED",
+                "NOT_APPLICABLE"
+              ]
+            },
+            "paper_doi": {
+              "const": "10.1016/j.jeconom.2024.105727"
+            },
+            "bootstrap_replications": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "seed": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "fixed_cluster_asymptotic_regime_acknowledged": {
+              "type": "boolean"
+            },
+            "weak_iv_ar_used": {
+              "type": "boolean"
+            },
+            "not_run_or_not_applicable_reason": {
+              "type": "string"
+            }
+          }
+        },
+        "randomization_itt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "estimand",
+            "assignment_mechanism",
+            "assignment_unit_count",
+            "independent_cluster_count",
+            "allocation_count",
+            "exact_p_value_reported",
+            "claim_ceiling",
+            "not_run_or_not_applicable_reason"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "REGISTERED_NOT_RUN",
+                "EXECUTED",
+                "NOT_APPLICABLE"
+              ]
+            },
+            "estimand": {
+              "enum": [
+                "assignment_ITT_only",
+                "not_applicable"
+              ]
+            },
+            "assignment_mechanism": {
+              "enum": [
+                "uniform_complete_randomization_within_strata",
+                "other_registered_mechanism",
+                "unknown"
+              ]
+            },
+            "assignment_unit_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "independent_cluster_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "allocation_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "exact_p_value_reported": {
+              "type": "boolean"
+            },
+            "claim_ceiling": {
+              "enum": [
+                "FINITE_SAMPLE_RANDOMIZATION_SHARP_NULL_ONLY",
+                "NOT_APPLICABLE",
+                "NOT_VALIDATED"
+              ]
+            },
+            "not_run_or_not_applicable_reason": {
+              "type": "string"
+            }
+          }
+        },
+        "independent_row_par_reference": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "conditional_gaussian_assumption_acknowledged",
+            "homoskedastic_assumption_acknowledged",
+            "independent_rows_assumption_acknowledged",
+            "not_for_clustered_inference_acknowledged",
+            "full_g_sensitivity_ladder_reported",
+            "not_run_or_not_applicable_reason"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "REGISTERED_NOT_RUN",
+                "EXECUTED",
+                "NOT_APPLICABLE"
+              ]
+            },
+            "conditional_gaussian_assumption_acknowledged": {
+              "type": "boolean"
+            },
+            "homoskedastic_assumption_acknowledged": {
+              "type": "boolean"
+            },
+            "independent_rows_assumption_acknowledged": {
+              "type": "boolean"
+            },
+            "not_for_clustered_inference_acknowledged": {
+              "const": true
+            },
+            "full_g_sensitivity_ladder_reported": {
+              "type": "boolean"
+            },
+            "not_run_or_not_applicable_reason": {
+              "type": "string"
+            }
+          }
+        },
+        "clustered_iv_dgp": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "scenario_id",
+            "generator_algorithm",
+            "seed",
+            "instrument_assignment_level",
+            "independent_cluster_count",
+            "assignment_unit_count",
+            "instrument_count",
+            "structural_beta",
+            "first_stage_coefficients",
+            "direct_effect_coefficients",
+            "registered_direct_effect_rms_bound",
+            "realized_direct_effect_sample_rms",
+            "direct_effect_support_status",
+            "dataset_csv_sha256",
+            "manifest_sha256",
+            "cluster_sizes_sha256",
+            "known_truth_released_before_estimation",
+            "not_run_or_not_applicable_reason"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "REGISTERED_NOT_RUN",
+                "GENERATED",
+                "NOT_APPLICABLE"
+              ]
+            },
+            "scenario_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "generator_algorithm": {
+              "const": "splitmix64-box-muller-cos-open01-v2"
+            },
+            "seed": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "instrument_assignment_level": {
+              "enum": [
+                "within_cluster",
+                "cluster_level",
+                "unknown",
+                "not_applicable"
+              ]
+            },
+            "independent_cluster_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "assignment_unit_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "instrument_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "structural_beta": {
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "first_stage_coefficients": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "direct_effect_coefficients": {
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "registered_direct_effect_rms_bound": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "realized_direct_effect_sample_rms": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "direct_effect_support_status": {
+              "enum": [
+                "IN_BOUND",
+                "OUT_OF_BOUND",
+                "UNREGISTERED",
+                "UNKNOWN",
+                "NOT_APPLICABLE"
+              ]
+            },
+            "dataset_csv_sha256": {
+              "$ref": "#/$defs/nullableSha256"
+            },
+            "manifest_sha256": {
+              "$ref": "#/$defs/nullableSha256"
+            },
+            "cluster_sizes_sha256": {
+              "$ref": "#/$defs/nullableSha256"
+            },
+            "known_truth_released_before_estimation": {
+              "type": "boolean"
+            },
+            "not_run_or_not_applicable_reason": {
+              "type": "string"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "GENERATED"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "scenario_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "seed": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "instrument_assignment_level": {
+                    "enum": [
+                      "within_cluster",
+                      "cluster_level"
+                    ]
+                  },
+                  "independent_cluster_count": {
+                    "type": "integer",
+                    "minimum": 2
+                  },
+                  "assignment_unit_count": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "instrument_count": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "structural_beta": {
+                    "type": "number"
+                  },
+                  "first_stage_coefficients": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  "direct_effect_coefficients": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "number"
+                    }
+                  },
+                  "realized_direct_effect_sample_rms": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "direct_effect_support_status": {
+                    "enum": [
+                      "IN_BOUND",
+                      "OUT_OF_BOUND",
+                      "UNREGISTERED"
+                    ]
+                  },
+                  "dataset_csv_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "manifest_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "cluster_sizes_sha256": {
+                    "$ref": "#/$defs/sha256"
+                  },
+                  "known_truth_released_before_estimation": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "REGISTERED_NOT_RUN"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "seed": {
+                    "type": "null"
+                  },
+                  "independent_cluster_count": {
+                    "type": "null"
+                  },
+                  "assignment_unit_count": {
+                    "type": "null"
+                  },
+                  "instrument_count": {
+                    "type": "null"
+                  },
+                  "structural_beta": {
+                    "type": "null"
+                  },
+                  "first_stage_coefficients": {
+                    "maxItems": 0
+                  },
+                  "direct_effect_coefficients": {
+                    "maxItems": 0
+                  },
+                  "realized_direct_effect_sample_rms": {
+                    "type": "null"
+                  },
+                  "direct_effect_support_status": {
+                    "const": "UNKNOWN"
+                  },
+                  "dataset_csv_sha256": {
+                    "type": "null"
+                  },
+                  "manifest_sha256": {
+                    "type": "null"
+                  },
+                  "cluster_sizes_sha256": {
+                    "type": "null"
+                  },
+                  "known_truth_released_before_estimation": {
+                    "const": false
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "nullableSha256": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "T0_SYNTHETIC"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "SYNTHETIC_ONLY"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "T1_OBSERVATIONAL"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "OBSERVATIONAL_PREDICTION_ONLY"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "T2_IN_SILICO_INTERVENTION"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "MODEL_INTERVENTION_ONLY"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "T3_MEASURED_BIOLOGICAL_INTERVENTION"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "BIOLOGICAL_INTERVENTION_PREDICTION"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "const": "T4_PROSPECTIVE_EXPERIMENT_SELECTION"
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "claim_ceiling": {
+            "const": "PROSPECTIVE_EXPERIMENTAL_VALIDATION"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_tier": {
+            "enum": [
+              "T3_MEASURED_BIOLOGICAL_INTERVENTION",
+              "T4_PROSPECTIVE_EXPERIMENT_SELECTION"
+            ]
+          }
+        },
+        "required": [
+          "evidence_tier"
+        ]
+      },
+      "then": {
+        "properties": {
+          "intervention_protocol": {
+            "properties": {
+              "control_arm_count": {
+                "minimum": 1
+              },
+              "paired_treatment_control": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "EXECUTED_AUDITABLE"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "artifacts": {
+            "properties": {
+              "dataset_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "connectome_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "split_manifest_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "model_predictions_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "sealed_outcomes_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "metric_report_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "evaluator_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "environment_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            },
+            "required": [
+              "sealed_outcomes_sha256",
+              "environment_sha256"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "data_level": {
+            "enum": [
+              "cross_animal_aggregated",
+              "derived_summary_matrix"
+            ]
+          }
+        },
+        "required": [
+          "data_level"
+        ]
+      },
+      "then": {
+        "properties": {
+          "evaluation_eligibility": {
+            "const": "exploratory_summary_only"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "dataset": {
+            "properties": {
+              "generator_family": {
+                "const": "connectome_cluster_iv_dgp_v1"
+              }
+            },
+            "required": [
+              "generator_family"
+            ]
+          }
+        },
+        "required": [
+          "dataset"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dataset": {
+            "properties": {
+              "dgp_scenario_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "instrument_assignment_level": {
+                "enum": [
+                  "within_cluster",
+                  "cluster_level"
+                ]
+              },
+              "oracle_state": {
+                "enum": [
+                  "NOT_CREATED",
+                  "SEALED",
+                  "RELEASED_AFTER_FREEZE"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "dataset": {
+            "properties": {
+              "dgp_scenario_id": {
+                "type": "null"
+              },
+              "instrument_assignment_level": {
+                "const": "not_applicable"
+              },
+              "oracle_state": {
+                "const": "NOT_APPLICABLE"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "dataset": {
+            "properties": {
+              "oracle_state": {
+                "const": "RELEASED_AFTER_FREEZE"
+              }
+            },
+            "required": [
+              "oracle_state"
+            ]
+          }
+        },
+        "required": [
+          "dataset"
+        ]
+      },
+      "then": {
+        "properties": {
+          "artifacts": {
+            "properties": {
+              "dgp_oracle_sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "prediction_freeze_receipt_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
