@@ -427,11 +427,6 @@ fn validate(case: &Case) -> Vec<String> {
     {
         errors.push("calibration condition requires gas-content or cavitation-susceptibility evidence".to_string());
     }
-    if case.condition.gas_content_mg_l.is_none()
-        && case.condition.cavitation_susceptibility_alpha.is_none()
-    {
-        errors.push("calibration requires gas-content or cavitation-susceptibility evidence".to_string());
-    }
     if case.condition.free_surface_present != case.condition.free_surface_distance_m.is_some() {
         errors.push("free-surface presence and distance evidence must agree".to_string());
     }
@@ -450,11 +445,8 @@ fn validate(case: &Case) -> Vec<String> {
     {
         errors.push("still-water/other calibration conditions require additional transferability uncertainty".to_string());
     }
-    for (label, value) in [
-        ("receiver position uncertainty", case.receiver.position_uncertainty_m),
-        ("projector source basis extra uncertainty", case.projector.source_basis_additional_u95_db.max(1.0e-12)),
-    ] {
-        if !finite_positive(value) { errors.push(format!("{label} must be positive")); }
+    if !finite_positive(case.receiver.position_uncertainty_m) {
+        errors.push("receiver position uncertainty must be positive".to_string());
     }
     if !case.receiver.x_m.is_finite() || !case.receiver.y_m.is_finite() || !case.receiver.z_m.is_finite()
         || !case.receiver.orientation_yaw_deg.is_finite()
@@ -488,9 +480,16 @@ fn validate(case: &Case) -> Vec<String> {
         }
     }
     let mut position_ids = BTreeSet::new();
+    let mut position_coordinates = BTreeSet::new();
+    let mut raw_input_trace_ids = BTreeSet::new();
+    let mut raw_output_trace_ids = BTreeSet::new();
     for position in &case.positions {
         if position.position_id.trim().is_empty() || !position_ids.insert(position.position_id.clone()) {
             errors.push("source position IDs must be unique and non-empty".to_string());
+        }
+        let coordinate_key = (position.x_m.to_bits(), position.y_m.to_bits(), position.z_m.to_bits());
+        if !position_coordinates.insert(coordinate_key) {
+            errors.push(format!("position {} duplicates another measured coordinate", position.position_id));
         }
         if !position.x_m.is_finite() || !position.y_m.is_finite() || !position.z_m.is_finite()
             || !finite_positive(position.position_uncertainty_m)
@@ -520,6 +519,11 @@ fn validate(case: &Case) -> Vec<String> {
                 if !is_sha256(digest) {
                     errors.push(format!("position {} repeat {}: {label} digest is invalid", position.position_id, repeat.repeat_id));
                 }
+            }
+            if !raw_input_trace_ids.insert(repeat.raw_input_trace_sha256.clone())
+                || !raw_output_trace_ids.insert(repeat.raw_output_trace_sha256.clone())
+            {
+                errors.push(format!("position {} repeat {} reuses a raw source or receiver trace digest", position.position_id, repeat.repeat_id));
             }
             let mut repeat_bands = BTreeSet::new();
             for measurement in &repeat.bands {
@@ -555,7 +559,7 @@ fn validate(case: &Case) -> Vec<String> {
         }
         if let Some(first) = frequencies.first() {
             if frequencies.iter().any(|frequency| {
-                (frequency - first).abs() / first > 1.0e-6
+                (*frequency - *first).abs() / *first > 1.0e-6
             }) {
                 errors.push(format!("band {band} frequency changes across positions/repeats"));
             }
@@ -1101,6 +1105,8 @@ mod tests {
         assert_eq!(report.source_projector_id, "synthetic-projector");
         assert_eq!(report.coordinate_frame_id, "propeller-disc-frame");
         assert_eq!(report.condition_fingerprint_sha256, digest('d'));
+        assert_eq!(report.position_summaries[0].repeat_evidence.len(), 2);
+        assert!(is_sha256(&report.position_summaries[0].repeat_evidence[0].raw_input_trace_sha256));
     }
 
     #[test]
@@ -1150,6 +1156,14 @@ mod tests {
         assert_eq!(report.distinct_azimuth_sectors, 1);
         assert_eq!(report.minimum_position_count_met, false);
         assert_eq!(report.disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn duplicated_raw_acoustic_trace_digest_is_invalid() {
+        let mut input = case();
+        input.positions[0].repeats[1].raw_output_trace_sha256 =
+            input.positions[0].repeats[0].raw_output_trace_sha256.clone();
+        assert_eq!(audit(&input).disposition, "INVALID");
     }
 
     #[test]
