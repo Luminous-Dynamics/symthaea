@@ -141,6 +141,15 @@ pub enum U1MpsError {
         residual: f64,
         tolerance: f64,
     },
+    InvalidTeBDTimeStep(f64),
+    InvalidHamiltonianParameter(&'static str),
+    HamiltonianBondOutOfRange {
+        bond_index: usize,
+        site_count: usize,
+    },
+    DuplicateTeBDHamiltonianBond {
+        bond_index: usize,
+    },
 }
 
 impl core::fmt::Display for U1MpsError {
@@ -288,6 +297,23 @@ impl core::fmt::Display for U1MpsError {
             Self::CanonicalGaugeNotQualified { residual, tolerance } => write!(
                 f,
                 "canonical gauge residual {residual} exceeds qualification tolerance {tolerance}"
+            ),
+            Self::InvalidTeBDTimeStep(value) => {
+                write!(f, "TEBD time step must be finite, got {value}")
+            }
+            Self::InvalidHamiltonianParameter(name) => {
+                write!(f, "two-site Hamiltonian parameter {name} is non-finite")
+            }
+            Self::HamiltonianBondOutOfRange {
+                bond_index,
+                site_count,
+            } => write!(
+                f,
+                "Hamiltonian term bond {bond_index} is out of range for {site_count} sites"
+            ),
+            Self::DuplicateTeBDHamiltonianBond { bond_index } => write!(
+                f,
+                "Hamiltonian contains more than one local term for bond {bond_index}"
             ),
             Self::DenseChargeLeakage {
                 basis_index,
@@ -2739,6 +2765,293 @@ impl U1TeBDLayer {
         })
     }
 }
+
+
+
+/// A nearest-neighbour, number-conserving two-qubit Hamiltonian.
+///
+/// H = mu_left n_left + mu_right n_right + V n_left n_right
+///     + h |01><10| + conj(h) |10><01|.
+///
+/// Basis order is |00>, |01>, |10>, |11>. The complex hopping amplitude
+/// supports a Peierls phase while preserving total U(1) excitation number.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1TwoSiteHamiltonian {
+    pub mu_left: f64,
+    pub mu_right: f64,
+    pub density_interaction: f64,
+    pub hopping: Complex64,
+}
+
+impl U1TwoSiteHamiltonian {
+    pub fn new(
+        mu_left: f64,
+        mu_right: f64,
+        density_interaction: f64,
+        hopping: Complex64,
+    ) -> Result<Self, U1MpsError> {
+        if !mu_left.is_finite() {
+            return Err(U1MpsError::InvalidHamiltonianParameter("mu_left"));
+        }
+        if !mu_right.is_finite() {
+            return Err(U1MpsError::InvalidHamiltonianParameter("mu_right"));
+        }
+        if !density_interaction.is_finite() {
+            return Err(U1MpsError::InvalidHamiltonianParameter("density_interaction"));
+        }
+        if !hopping.re.is_finite() || !hopping.im.is_finite() {
+            return Err(U1MpsError::InvalidHamiltonianParameter("hopping"));
+        }
+        Ok(Self {
+            mu_left,
+            mu_right,
+            density_interaction,
+            hopping,
+        })
+    }
+
+    /// Generate exp(-i * dt * H) analytically in the conserved charge blocks.
+    pub fn to_gate(
+        self,
+        time_step: f64,
+        tolerance: f64,
+    ) -> Result<U1TwoSiteGate, U1MpsError> {
+        if !time_step.is_finite() {
+            return Err(U1MpsError::InvalidTeBDTimeStep(time_step));
+        }
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+
+        let mut matrix = [[Complex64::new(0.0, 0.0); 4]; 4];
+        matrix[0][0] = Complex64::new(1.0, 0.0);
+
+        let mean = 0.5 * (self.mu_left + self.mu_right);
+        let half_difference = 0.5 * (self.mu_right - self.mu_left);
+        let radius = (half_difference * half_difference + self.hopping.norm_sqr()).sqrt();
+        let angle = time_step * radius;
+        let cosine = angle.cos();
+        let sine_over_radius = if radius > f64::EPSILON {
+            angle.sin() / radius
+        } else {
+            time_step
+        };
+        let mean_phase = Complex64::new((time_step * mean).cos(), -(time_step * mean).sin());
+        let minus_i = Complex64::new(0.0, -1.0);
+
+        matrix[1][1] = mean_phase
+            * Complex64::new(cosine, -sine_over_radius * half_difference);
+        matrix[2][2] = mean_phase
+            * Complex64::new(cosine, sine_over_radius * half_difference);
+        matrix[1][2] = mean_phase * minus_i * sine_over_radius * self.hopping;
+        matrix[2][1] = mean_phase * minus_i * sine_over_radius * self.hopping.conj();
+
+        let double_occupancy_energy =
+            self.mu_left + self.mu_right + self.density_interaction;
+        matrix[3][3] = Complex64::new(
+            (time_step * double_occupancy_energy).cos(),
+            -(time_step * double_occupancy_energy).sin(),
+        );
+
+        U1TwoSiteGate::new(matrix, tolerance)
+    }
+}
+
+/// A local Hamiltonian term attached to a nearest-neighbour bond.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1TeBDHamiltonianTerm {
+    pub bond_index: usize,
+    pub hamiltonian: U1TwoSiteHamiltonian,
+}
+
+/// Diagnostics for one parity layer inside a Strang step.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDStageReceipt {
+    pub parity: u8,
+    pub time_step_scale: f64,
+    pub bond_indices: Vec<usize>,
+    pub gate_truncations: Vec<U1TwoSiteTruncationDiagnostics>,
+    pub canonical_gauge_receipts: Vec<U1CanonicalGaugeReceipt>,
+    pub local_l2_error_bound: f64,
+    pub global_l2_error_bound: Option<f64>,
+    pub global_l2_bound_qualified: bool,
+    pub input_norm_squared: f64,
+    pub output_norm_squared: f64,
+}
+
+/// One second-order even/odd/even Strang TEBD time step.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDStepResult {
+    pub state: ComplexU1Mps,
+    pub time_step: f64,
+    pub stages: Vec<U1TeBDStageReceipt>,
+    pub input_total_charge: i32,
+    pub output_total_charge: i32,
+    pub input_norm_squared: f64,
+    pub output_norm_squared: f64,
+    pub total_local_l2_error_bound: f64,
+    /// Compression error relative to this same Strang-discretized circuit.
+    /// Does not include Trotter time-discretization error.
+    pub total_global_l2_error_bound: Option<f64>,
+    pub global_l2_bound_qualified: bool,
+}
+
+/// Deterministic second-order Strang TEBD integrator for nearest-neighbour
+/// U(1)-conserving two-site Hamiltonians.
+///
+/// The composition is exp(-i dt H_even / 2) exp(-i dt H_odd)
+/// exp(-i dt H_even / 2). Same-parity bond terms are disjoint and commute.
+/// The global L2 bound tracks MPS truncation/gauge error relative to this
+/// discrete Strang circuit; Hamiltonian time-discretization error is measured
+/// separately through time-step refinement.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDStrangStepper {
+    site_count: usize,
+    terms: Vec<U1TeBDHamiltonianTerm>,
+}
+
+impl U1TeBDStrangStepper {
+    pub fn new(
+        site_count: usize,
+        mut terms: Vec<U1TeBDHamiltonianTerm>,
+    ) -> Result<Self, U1MpsError> {
+        if site_count == 0 {
+            return Err(U1MpsError::EmptyChain);
+        }
+        for term in &terms {
+            if term.bond_index >= site_count.saturating_sub(1) {
+                return Err(U1MpsError::HamiltonianBondOutOfRange {
+                    bond_index: term.bond_index,
+                    site_count,
+                });
+            }
+        }
+        terms.sort_by_key(|term| term.bond_index);
+        for pair in terms.windows(2) {
+            if pair[0].bond_index == pair[1].bond_index {
+                return Err(U1MpsError::DuplicateTeBDHamiltonianBond {
+                    bond_index: pair[0].bond_index,
+                });
+            }
+        }
+        Ok(Self { site_count, terms })
+    }
+
+    pub const fn site_count(&self) -> usize {
+        self.site_count
+    }
+
+    pub fn terms(&self) -> &[U1TeBDHamiltonianTerm] {
+        &self.terms
+    }
+
+    fn apply_stage(
+        &self,
+        input: &ComplexU1Mps,
+        parity: u8,
+        time_step: f64,
+        time_step_scale: f64,
+        policy: U1TwoSiteTruncationPolicy,
+    ) -> Result<(ComplexU1Mps, U1TeBDStageReceipt), U1MpsError> {
+        let stage_time = time_step * time_step_scale;
+        let mut gates = Vec::new();
+        for term in self.terms.iter().filter(|term| term.bond_index % 2 == parity as usize) {
+            let gate = term.hamiltonian.to_gate(stage_time, policy.tolerance)?;
+            gates.push(U1TeBDGate::new(term.bond_index, gate));
+        }
+        let layer = U1TeBDLayer::new(self.site_count, parity, gates)?;
+        let result = layer.apply(input, policy)?;
+        let global_l2_error_bound = if result.global_l2_bound_qualified {
+            Some(
+                result
+                    .truncation_ledger
+                    .cumulative_global_l2_error_upper_bound
+                    .unwrap_or(0.0),
+            )
+        } else {
+            None
+        };
+        let receipt = U1TeBDStageReceipt {
+            parity,
+            time_step_scale,
+            bond_indices: result.bond_indices,
+            gate_truncations: result.gate_truncations,
+            canonical_gauge_receipts: result.canonical_gauge_receipts,
+            local_l2_error_bound: result.truncation_ledger.cumulative_local_l2_error_bound,
+            global_l2_error_bound,
+            global_l2_bound_qualified: result.global_l2_bound_qualified,
+            input_norm_squared: result.input_norm_squared,
+            output_norm_squared: result.output_norm_squared,
+        };
+        Ok((result.state, receipt))
+    }
+
+    /// Execute one symmetric even-half / odd-full / even-half time step.
+    pub fn step(
+        &self,
+        input: &ComplexU1Mps,
+        time_step: f64,
+        policy: U1TwoSiteTruncationPolicy,
+    ) -> Result<U1TeBDStepResult, U1MpsError> {
+        if !time_step.is_finite() {
+            return Err(U1MpsError::InvalidTeBDTimeStep(time_step));
+        }
+        if input.site_count() != self.site_count {
+            return Err(U1MpsError::TeBDLayerSiteCountMismatch {
+                layer_sites: self.site_count,
+                state_sites: input.site_count(),
+            });
+        }
+        let input_norm_squared = input.norm_squared(policy.tolerance)?;
+        let input_total_charge = input.total_charge;
+        let mut state = input.clone();
+        let mut stages = Vec::with_capacity(3);
+
+        for (parity, scale) in [(0_u8, 0.5_f64), (1_u8, 1.0_f64), (0_u8, 0.5_f64)] {
+            let (next_state, stage) =
+                self.apply_stage(&state, parity, time_step, scale, policy)?;
+            state = next_state;
+            stages.push(stage);
+        }
+
+        let output_norm_squared = state.norm_squared(policy.tolerance)?;
+        let mut total_local_l2_error_bound = 0.0;
+        let mut total_global_l2_error_bound = Some(0.0);
+        let mut global_l2_bound_qualified = true;
+        for stage in &stages {
+            total_local_l2_error_bound += stage.local_l2_error_bound;
+            if stage.global_l2_bound_qualified {
+                total_global_l2_error_bound = total_global_l2_error_bound.map(|current| {
+                    current + stage.global_l2_error_bound.unwrap_or(0.0)
+                });
+            } else {
+                global_l2_bound_qualified = false;
+                total_global_l2_error_bound = None;
+            }
+        }
+        if !total_local_l2_error_bound.is_finite()
+            || total_global_l2_error_bound.is_some_and(|value| !value.is_finite())
+        {
+            return Err(U1MpsError::NonFiniteContraction(
+                "Strang TEBD cumulative error ledger",
+            ));
+        }
+
+        Ok(U1TeBDStepResult {
+            state,
+            time_step,
+            stages,
+            input_total_charge,
+            output_total_charge: state.total_charge(),
+            input_norm_squared,
+            output_norm_squared,
+            total_local_l2_error_bound,
+            total_global_l2_error_bound,
+            global_l2_bound_qualified,
+        })
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
