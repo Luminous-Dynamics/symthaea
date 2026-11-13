@@ -46,7 +46,9 @@ def candidate_score(candidate: dict, model: dict) -> tuple[Fraction, bool] | Non
     domain = model["valid_angular_frequency_domain_rad_s"]
     if not (q(domain["lower"]) <= omega <= q(domain["upper"])):
         return None
-    if not candidate["approved_under_protocol"]:
+    if candidate.get("approved_under_protocol") is not True:
+        return None
+    if "cost" not in candidate:
         return None
     cost = q(candidate["cost"])
     if cost <= 0:
@@ -70,7 +72,9 @@ def candidate_score(candidate: dict, model: dict) -> tuple[Fraction, bool] | Non
 
 
 def select(candidates: list[dict], model: dict) -> str | None:
-    ids = [candidate["candidate_id"] for candidate in candidates]
+    ids = [candidate.get("candidate_id", "") for candidate in candidates]
+    if any(not isinstance(item, str) or not item.strip() for item in ids):
+        raise ValueError("missing or empty candidate ID")
     if len(ids) != len(set(ids)):
         raise ValueError("duplicate candidate IDs")
     ranked: list[tuple[Fraction, str]] = []
@@ -113,6 +117,9 @@ def main() -> None:
     assert scores["omega-2-full-mimo"][0] == 0
     assert scores["omega-4-full-mimo"][0] == 0
     assert scores["omega-3-full-mimo"][0] > 0
+    expected_separation = q(data["expected"]["off_grid_model_separation_squared"])
+    assert scores["omega-3-full-mimo"][0] == expected_separation
+    assert expected_separation == Fraction(612500000, 410338673)
 
     # Without the only off-grid discriminator, no candidate should be forced.
     no_three = [
@@ -127,6 +134,10 @@ def main() -> None:
     wide = data["counterfactuals"]["uncertainty_overlap"]
     out_of_domain = data["counterfactuals"]["out_of_domain"]
     unapproved = data["counterfactuals"]["not_approved"]
+    missing_cost = dict(data["counterfactuals"]["wrong_driven_port"])
+    missing_cost.pop("cost")
+    zero_cost = dict(data["counterfactuals"]["wrong_driven_port"])
+    zero_cost["cost"] = {"numerator": "0", "denominator": "1"}
 
     assert candidate_score(diagonal, model) == (Fraction(0), False)
     assert candidate_score(wrong_drive, model) == (Fraction(0), False)
@@ -134,6 +145,8 @@ def main() -> None:
     assert candidate_score(wide, model)[1] is False
     assert candidate_score(out_of_domain, model) is None
     assert candidate_score(unapproved, model) is None
+    assert candidate_score(missing_cost, model) is None
+    assert candidate_score(zero_cost, model) is None
 
     # Duplicate candidate identity is rejected, not made input-order dependent.
     try:
