@@ -36,7 +36,9 @@ pub struct MusicXmlSourceNodeV1 {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MusicXmlSourceContentV1 {
     Text(String),
-    Element(MusicXmlSourceNodeV1),
+    /// Index into the owning node's `children` vector; avoids duplicating
+    /// nested source trees in the bounded representation.
+    ElementIndex(usize),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -674,9 +676,9 @@ fn source_node(
     let mut content = Vec::new();
     for child in node.children() {
         if child.is_element() {
-            let parsed = source_node(child, depth + 1, total_nodes)?;
-            children.push(parsed.clone());
-            content.push(MusicXmlSourceContentV1::Element(parsed));
+            let child_index = children.len();
+            children.push(source_node(child, depth + 1, total_nodes)?);
+            content.push(MusicXmlSourceContentV1::ElementIndex(child_index));
         } else if let Some(value) = child.text() {
             // Preserve exact text-node whitespace and its position relative
             // to nested XML elements. The convenience `text` field below
@@ -993,7 +995,8 @@ mod tests {
         let other = events.note_events[0].source_note.children.iter()
             .find(|node| node.element == "other-notation").unwrap();
         assert!(matches!(&other.content[0], MusicXmlSourceContentV1::Text(value) if value == "before"));
-        assert!(matches!(&other.content[1], MusicXmlSourceContentV1::Element(node) if node.element == "future-code"));
+        assert!(matches!(&other.content[1], MusicXmlSourceContentV1::ElementIndex(0)));
+        assert_eq!(other.children[0].element, "future-code");
         assert!(matches!(&other.content[2], MusicXmlSourceContentV1::Text(value) if value == "after"));
     }
 
