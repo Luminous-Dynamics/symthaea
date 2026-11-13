@@ -77,6 +77,16 @@ For prognostics, compare:
 
 Hold out complete designs/lots and at least one temperature or standby stratum. Report prediction interval coverage, calibration, worst-group error, false-pass rate at the application service threshold and abstention. Do not extrapolate beyond the validated time/temperature/voltage domain.
 
+## Mission-weighted standby-to-service transition
+
+A follow-on qualification layer is tracked in [EDLC-MISSION-READINESS-001 #11953](https://github.com/Luminous-Dynamics/symthaea/issues/11953). The objective is to measure whether the reserve can meet an application event when called, not merely its terminal voltage or stored energy at the end of standby.
+
+For each declared dwell / event stratum, freeze the load waveform and record synchronized application-terminal voltage/current/time, minimum sustained power across the service window, delivered Wh, response latency, cutoff voltage, thermal rise, standby auxiliary energy and any external replenishment energy. The service pass is conjunctive: every declared threshold must pass on the same physical device. Peak sampled W does not substitute for sustained W. Energy surplus cannot compensate for excessive latency, cutoff or thermal failure.
+
+Mission event weights must come from application logs, contractual profiles or clearly labelled assumptions. Keep weights, stratum outcomes and worst-stratum results visible. A weighted point estimate is descriptive, not a simultaneous confidence bound; report per-stratum uncertainty. Use independent randomized cohorts across dwell intervals unless prior history is explicitly modeled. Do not reuse serials across nominally independent dwell cohorts.
+
+A synthetic mission-readiness fixture and Rust audit now exist in the public research branch. They demonstrate profile-weight arithmetic, unique-serial checks, no external replenishment for open-circuit standby, conjunctive pass/fail rules and per-stratum Wilson lower bounds. They are software-only, synthetic and not physical evidence.
+
 ## Partner capability requested
 
 - Calibrated EDLC cycler and leakage-current measurement chain.
@@ -119,5 +129,6 @@ A leakage test or arithmetic fixture proves no long-term standby life, safety, p
 
 - EDLC reference parent: https://github.com/Luminous-Dynamics/symthaea/issues/11852
 - Focused standby experiment: https://github.com/Luminous-Dynamics/symthaea/issues/11908
+- Mission-readiness qualification: https://github.com/Luminous-Dynamics/symthaea/issues/11953
 - Capacitor discovery parent: https://github.com/Luminous-Dynamics/symthaea/issues/11841
 - Benchmark draft: https://github.com/Luminous-Dynamics/symthaea/pull/11844
