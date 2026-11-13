@@ -1596,7 +1596,7 @@ mod tests {
 
     #[test]
     fn dense_fixed_charge_factorization_preserves_tiny_positive_schmidt_weight() {
-        let tiny = 1.0e-18;
+        let tiny: f64 = 1.0e-18;
         let large = (1.0 - tiny * tiny).sqrt();
         let mut dense = vec![Complex64::new(0.0, 0.0); 4];
         dense[1] = Complex64::new(large, 0.0);
