@@ -101,6 +101,29 @@ Do not automatically re-use one specimen for every dwell: discharge/recharge and
 
 A 2026 review distinguishes three major self-discharge contributions: ohmic leakage, parasitic Faradaic reactions and charge redistribution. Voltage decay alone may not identify which mechanism dominates. Treat mechanism attribution as a hypothesis tested by orthogonal observations, not as a label inferred from a single fitted curve. Reuse the existing leakage, ESR/ESL and frequency-resolved impedance work rather than duplicating it; add matched open-circuit and regulated-hold histories, current transients, temperature/initial-voltage/history strata within rated limits, and post-standby load delivery. Fit competing models on training devices/lots and assess mechanism discrimination and service prediction on held-out lots; report non-identifiability and abstain where the observations cannot distinguish mechanisms.
 
+### Mission-weighted standby-to-service readiness
+
+Child experiment: [EDLC-MISSION-READINESS-001 #11953](https://github.com/Luminous-Dynamics/symthaea/issues/11953). A standby reserve is useful only if it can satisfy the actual load when called. This section qualifies the transition from an idle state to the application event, rather than a voltage or energy snapshot alone.
+
+A mission stratum is a frozen tuple of standby mode, dwell duration, temperature and voltage history, prior conditioning, event waveform, service duration and application acceptance requirements. Keep open-circuit standby and regulated-voltage-hold in separate profiles; the latter records external source replenishment and is not autonomous reserve. The physical boundary (device, module or installed system) is separately declared. Event-arrival weights must originate from application logs, contractual mission requirements, or an explicitly labelled engineering assumption. They sum to one and are frozen before evaluation; there is no universal event-arrival distribution.
+
+For each unique physical device, a service event passes only if all of the following hold on that same device:
+- application-terminal delivered energy meets the declared Wh requirement;
+- minimum sustained power over the load waveform meets the declared W requirement (peak sampled power is insufficient);
+- start / wake / converter response latency meets the declared maximum;
+- minimum application-terminal voltage remains above cutoff and voltage sag stays within bounds;
+- temperature rise remains within the application limit;
+- standby auxiliary energy remains within its budget;
+- external replenishment energy remains within the declared allowance.
+
+These are conjunctive requirements. Excess Wh cannot compensate for insufficient sustained W, excessive response latency, voltage collapse or thermal failure. Record the actual synchronized voltage/current/time and load waveform. At installed-system boundary meter the application terminals, standby auxiliary draw and conversion losses. During regulated hold meter source-side V/I and integrated hold energy; do not count source replenishment as initial stored energy.
+
+For stratum j with frozen event weight w_j and observed service-pass fraction p_j, report the descriptive mission-weighted point estimate R_mission = Σ w_j p_j. Always publish every per-stratum result, the worst stratum and lower-tail delivered energy alongside the weighted figure. Report per-stratum one-sided Wilson lower confidence bounds; these are not a simultaneous confidence bound for the weighted total. A joint bound requires an explicitly justified multiplicity method. Invalid/censored outcomes remain visible and are not silently converted to passes.
+
+Do not reuse the same device across different dwell cohorts unless a preregistered repeated-measures design explicitly models the complete prior history. Otherwise use randomized independent physical devices per stratum. Repeated cycles and reads are not independent specimens. Select confirmatory sample sizes from a pilot variance estimate and power analysis.
+
+A synthetic known-answer scorecard is available at `fixtures/energy/electrochemical-capacitor/mission_readiness_known_answer_v0_1.json`. It uses invented 24 h / 7 d / 30 d weights of 0.2 / 0.3 / 0.5 and 15 synthetic serials to exercise conjunction and weighted arithmetic; its expected 0.54 mission pass rate is not a physical estimate or application probability. The existing `xtask` exposes `edlc-mission-readiness-audit` and 12 authored negative-control tests. It checks profile weight provenance, weight sum, unique serials across dwell strata, no replenishment during open-circuit standby, all pass criteria, per-stratum rates and one-sided Wilson lower bounds. The audit is authored but has not been compiled or executed in this environment.
+
 ## Explicit mass and volume denominator contract
 
 Every record carries measured `mass_kg`, measured `volume_l`, a denominator basis, and explicit included/excluded component lists. A `complete` denominator must include positive and negative electrodes, electrolyte, separator, current collectors, binder/additives, tabs, seals and case, with both mass and volume present. Module records additionally include busbars, module enclosure and monitoring/balancing; installed-system records additionally include power conversion, thermal management, protection, wiring, system enclosure and controls. Vendor modules with only a reported mass remain partial until the complete denominator is known. The denominator basis must match the exact declared boundary (complete-device weighed, module measured, or installed-system measured). Evaluation eligibility requires measured energy-density and power-density metrics at that exact same boundary—not a metric transferred upward or downward—plus raw-data and evidence-package digests and a unique physical device serial. Dielectric capacitors are retained as a separate taxonomy entry but cannot be promoted by this electrochemical-device v0.1 audit; they need their own device and standards contract. Synthetic in-memory test records exercise this rule but are not physical observations.
@@ -262,9 +285,11 @@ cargo run -p xtask -- electrochemical-capacitor-audit
 cargo test -p xtask electrochemical_capacitor
 cargo run -p xtask -- edlc-standby-service-audit
 cargo test -p xtask edlc_standby_service
+cargo run -p xtask -- edlc-mission-readiness-audit
+cargo test -p xtask edlc_mission_readiness
 ```
 
-The existing capacitor command checks schema/fixture structure, canonical identifiers, device and metric categories, units/voltage-window sanity, evidence-class/status alignment, digest syntax, duplicate physical serials, source-register uniqueness and fail-closed promotion rules. The new standby command enforces the synthetic fixture's strict data contract, recomputes trapezoidal leakage charge and terminal V×I discharge energy, checks peak sampled power and rejects unit, chronology, sign, expected-value or claim-ceiling violations. Neither command is a complete JSON Schema evaluator, physical instrument authenticator or lifetime model. Rust compilation, formatting, tests and hosted CI remain pending until a Rust toolchain/runner is available.
+The existing capacitor command checks schema/fixture structure, canonical identifiers, device and metric categories, units/voltage-window sanity, evidence-class/status alignment, digest syntax, duplicate physical serials, source-register uniqueness and fail-closed promotion rules. The standby command enforces its synthetic trace contract, recomputes trapezoidal leakage charge and terminal V×I discharge energy, checks peak sampled power and rejects unit, chronology, sign, expected-value or claim-ceiling violations. The mission-readiness command checks event-weight provenance and normalization, unique serials across strata, operating-mode separation, conjunctive Wh/W/latency/voltage/thermal/auxiliary-energy requirements, descriptive weighted pass rates and per-stratum one-sided Wilson lower bounds. These audits are not complete JSON Schema evaluators, physical instrument authenticators or lifetime models. Rust compilation, formatting, tests and hosted CI remain pending until a Rust toolchain/runner is available.
 
 ## Claim ceiling
 
