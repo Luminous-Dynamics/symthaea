@@ -67,6 +67,10 @@ Each value carries units, boundary, voltage window, current/power profile, tempe
 
 Do not state “cycle life” without the voltage window, current profile, temperature, rest, end-of-life threshold and treatment of failed/invalid devices.
 
+## Explicit mass and volume denominator contract
+
+Every record carries measured `mass_kg`, measured `volume_l`, a denominator basis, and explicit included/excluded component lists. A `complete` denominator must include positive and negative electrodes, electrolyte, separator, current collectors, binder/additives, tabs, seals and case, with both mass and volume present. Vendor modules with only a reported mass remain partial until the complete denominator is known. Evaluation eligibility additionally requires measured device-bound energy-density and power-density metrics, raw-data and evidence-package digests, and a unique physical device serial. Synthetic in-memory test records exercise this rule but are not physical observations.
+
 ## ZIHSC-specific evidence
 
 In addition to the common vector, report:
