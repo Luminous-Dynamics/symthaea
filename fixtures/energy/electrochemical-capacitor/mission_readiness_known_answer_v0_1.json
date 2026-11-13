@@ -8,7 +8,8 @@
     "Each standby stratum uses five independent synthetic device serials; no serial is reused across dwell strata.",
     "The event-arrival weights are invented solely to exercise the weighted arithmetic and are not field probabilities.",
     "A measured device passes only when every declared energy, sustained-power, response, voltage, thermal, auxiliary-energy and replenishment requirement passes.",
-    "The point estimate is the weighted sum of per-stratum measured service-pass fractions; it is not a simultaneous confidence bound."
+    "The point estimate is the weighted sum of per-stratum measured service-pass fractions; it is not a simultaneous confidence bound.",
+    "Each synthetic mission stratum has a distinct synthetic load_profile_id; no raw application waveform or physical terminal trace is included."
   ],
   "protocol": {
     "protocol_id": "SYNTHETIC-OPEN-CIRCUIT-MISSION-001",
@@ -87,7 +88,8 @@
           "standby_auxiliary_energy_wh": 0.05,
           "external_replenishment_energy_wh": 0
         }
-      ]
+      ],
+      "load_profile_id": "SYNTHETIC-LOAD-PROFILE-24H-V0"
     },
     {
       "stratum_id": "7d",
@@ -158,7 +160,8 @@
           "standby_auxiliary_energy_wh": 0.05,
           "external_replenishment_energy_wh": 0
         }
-      ]
+      ],
+      "load_profile_id": "SYNTHETIC-LOAD-PROFILE-7D-V0"
     },
     {
       "stratum_id": "30d",
@@ -229,7 +232,8 @@
           "standby_auxiliary_energy_wh": 0.07,
           "external_replenishment_energy_wh": 0
         }
-      ]
+      ],
+      "load_profile_id": "SYNTHETIC-LOAD-PROFILE-30D-V0"
     }
   ],
   "expected": {
