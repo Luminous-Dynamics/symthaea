@@ -1,4 +1,4 @@
-name: U1 MPS dense charge-block factorization audit
+name: U1 dense-to-MPS source harness
 
 on:
   push:
@@ -6,32 +6,24 @@ on:
       - research/u1-mps-dense-factorization-20261113
     paths:
       - crates/domains/symthaea-frontier-physics/src/u1_mps.rs
-      - crates/domains/symthaea-frontier-physics/src/lib.rs
-      - crates/domains/symthaea-frontier-physics/Cargo.toml
-      - Cargo.toml
-      - Cargo.lock
       - .github/workflows/u1-mps-dense-factorization.yml
   pull_request:
     branches:
       - research/u1-mps-state-20261113
     paths:
       - crates/domains/symthaea-frontier-physics/src/u1_mps.rs
-      - crates/domains/symthaea-frontier-physics/src/lib.rs
-      - crates/domains/symthaea-frontier-physics/Cargo.toml
-      - Cargo.toml
-      - Cargo.lock
       - .github/workflows/u1-mps-dense-factorization.yml
 
 permissions:
   contents: read
 
 concurrency:
-  group: u1-mps-dense-factorization-${{ github.event.pull_request.number || github.ref }}
+  group: u1-mps-dense-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
-  test:
-    name: U1 dense-to-MPS charge-block SVD (Linux, Rust 1.96.0)
+  source-harness:
+    name: Rust 1.96 standalone source validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,9 +32,25 @@ jobs:
         with:
           toolchain: 1.96.0
           components: clippy, rustfmt
-      - name: Check formatting
-        run: cargo fmt --manifest-path crates/domains/symthaea-frontier-physics/Cargo.toml -- --check
-      - name: Run Clippy
-        run: cargo clippy --locked --manifest-path crates/domains/symthaea-frontier-physics/Cargo.toml --all-targets -- -D warnings
-      - name: Run crate tests
-        run: cargo test --locked --manifest-path crates/domains/symthaea-frontier-physics/Cargo.toml --lib
+      - name: Check formatting without workspace metadata
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-frontier-physics/src/u1_mps.rs
+      - name: Compile, lint and test the exact source in an isolated harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          harness="$(mktemp -d)"
+          trap 'rm -rf "$harness"' EXIT
+          mkdir -p "$harness/src"
+          cp crates/domains/symthaea-frontier-physics/src/u1_mps.rs "$harness/src/lib.rs"
+          cat > "$harness/Cargo.toml" <<'EOF'
+          [package]
+          name = "u1-mps-dense-validation"
+          version = "0.1.0"
+          edition = "2024"
+
+          [dependencies]
+          num-complex = "=0.4.6"
+          nalgebra = "=0.34.2"
+          EOF
+          cargo clippy --manifest-path "$harness/Cargo.toml" --all-targets -- -D warnings
+          cargo test --manifest-path "$harness/Cargo.toml" --lib
