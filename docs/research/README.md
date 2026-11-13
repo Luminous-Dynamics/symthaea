@@ -339,3 +339,5 @@ Open an issue on GitHub for research discussions.
 - [Engineering lifecycle / PLM competitor register](ENGINEERING_LIFECYCLE_COMPETITOR_REGISTER_2026-11-13.md) — Siemens, Aras, PTC and IBM documented capabilities and limits.
 - [Engineering change experiment preregistration](ENG_CHANGE_EXPERIMENT_PREREGISTRATION_V0_1_2026-11-13.md) — ten comparison arms, gold adjudication, hard gates, full cost and statistical precision planning.
 - [Engineering lifecycle applicability matrix](INDUSTRY_STACK_APPLICABILITY_MATRIX_2026-11-12.json) — conditional applicability by workload and system boundary.
+
+- [Decision-time evidence admissibility overlay](ENGINEERING_CHANGE_DECISION_TIME_ADMISSIBILITY_OVERLAY_V0_1_2026-11-13.md) — valid-at-T vs available-by-K controls, actual retrieval/context evidence, and nine temporal challenge blueprints.
