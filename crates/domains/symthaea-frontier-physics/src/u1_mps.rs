@@ -137,6 +137,10 @@ pub enum U1MpsError {
         layer_sites: usize,
         state_sites: usize,
     },
+    CanonicalGaugeNotQualified {
+        residual: f64,
+        tolerance: f64,
+    },
 }
 
 impl core::fmt::Display for U1MpsError {
@@ -281,6 +285,10 @@ impl core::fmt::Display for U1MpsError {
                 f,
                 "TEBD layer was built for {layer_sites} sites, state has {state_sites}"
             ),
+            Self::CanonicalGaugeNotQualified { residual, tolerance } => write!(
+                f,
+                "canonical gauge residual {residual} exceeds qualification tolerance {tolerance}"
+            ),
             Self::DenseChargeLeakage {
                 basis_index,
                 amplitude,
@@ -401,6 +409,115 @@ pub struct ComplexU1Mps {
     dense_reconstruction_l2_residual: Option<f64>,
     dense_svd_rank_by_charge_and_cut: Option<Vec<Vec<(i32, usize)>>>,
 }
+
+
+
+/// Measured mixed-canonical gauge receipt for a two-site center at a bond.
+///
+/// Sites [0,bond) are left-isometric and sites (bond+1,N) are right-isometric.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1CanonicalGaugeReceipt {
+    pub bond: usize,
+    pub site_count: usize,
+    pub total_charge: i32,
+    pub left_isometry_residuals: Vec<(usize, f64)>,
+    pub right_isometry_residuals: Vec<(usize, f64)>,
+    pub maximum_left_isometry_residual: f64,
+    pub maximum_right_isometry_residual: f64,
+    pub left_exterior_operator_norm_upper_bound: f64,
+    pub right_exterior_operator_norm_upper_bound: f64,
+    pub factorization_max_residual: f64,
+    pub factorization_l2_residual: f64,
+    pub exact_zero_singular_values_omitted: usize,
+    pub selection_rule_residual: f64,
+    pub input_norm_squared: f64,
+    pub output_norm_squared: f64,
+    pub relative_norm_drift: f64,
+    pub qualified: bool,
+}
+
+impl U1CanonicalGaugeReceipt {
+    pub fn qualifies(&self, tolerance: f64) -> bool {
+        tolerance.is_finite()
+            && tolerance > 0.0
+            && self.qualified
+            && self.maximum_left_isometry_residual <= tolerance
+            && self.maximum_right_isometry_residual <= tolerance
+            && self.factorization_max_residual <= tolerance
+            && self.relative_norm_drift <= tolerance
+            && self.selection_rule_residual <= tolerance
+            && self.left_exterior_operator_norm_upper_bound.is_finite()
+            && self.right_exterior_operator_norm_upper_bound.is_finite()
+    }
+
+    pub fn exterior_operator_norm_product_upper_bound(&self) -> f64 {
+        self.left_exterior_operator_norm_upper_bound
+            * self.right_exterior_operator_norm_upper_bound
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct CanonicalizationStats {
+    max_residual: f64,
+    residual_squared: f64,
+    exact_zero_singular_values_omitted: usize,
+}
+
+
+fn left_isometry_residual(tensor: &U1MpsTensor) -> Result<f64, U1MpsError> {
+    let dimension = tensor.right_dimension();
+    let mut squared = 0.0;
+    for row in 0..dimension {
+        for column in 0..dimension {
+            let mut gram = Complex64::new(0.0, 0.0);
+            for left in 0..tensor.left_dimension() {
+                for physical in 0..2 {
+                    gram += tensor.get(left, physical, row).conj()
+                        * tensor.get(left, physical, column);
+                }
+            }
+            let expected = if row == column {
+                Complex64::new(1.0, 0.0)
+            } else {
+                Complex64::new(0.0, 0.0)
+            };
+            squared += (gram - expected).norm_sqr();
+        }
+    }
+    let residual = squared.sqrt();
+    if !residual.is_finite() {
+        return Err(U1MpsError::NonFiniteContraction("left-canonical isometry residual"));
+    }
+    Ok(residual)
+}
+
+fn right_isometry_residual(tensor: &U1MpsTensor) -> Result<f64, U1MpsError> {
+    let dimension = tensor.left_dimension();
+    let mut squared = 0.0;
+    for row in 0..dimension {
+        for column in 0..dimension {
+            let mut gram = Complex64::new(0.0, 0.0);
+            for physical in 0..2 {
+                for right in 0..tensor.right_dimension() {
+                    gram += tensor.get(row, physical, right)
+                        * tensor.get(column, physical, right).conj();
+                }
+            }
+            let expected = if row == column {
+                Complex64::new(1.0, 0.0)
+            } else {
+                Complex64::new(0.0, 0.0)
+            };
+            squared += (gram - expected).norm_sqr();
+        }
+    }
+    let residual = squared.sqrt();
+    if !residual.is_finite() {
+        return Err(U1MpsError::NonFiniteContraction("right-canonical isometry residual"));
+    }
+    Ok(residual)
+}
+
 
 impl ComplexU1Mps {
     /// Validate a complete open-boundary MPS and its charge-selection rules.
