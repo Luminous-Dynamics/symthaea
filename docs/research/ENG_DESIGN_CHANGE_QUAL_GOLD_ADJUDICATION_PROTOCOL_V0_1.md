@@ -299,7 +299,7 @@ Use V1.1 whenever a case is graded against a decision-time evidence frontier. Ab
 ### Typed temporal record
 
 V1.1 binds:
-- target world time T, including explicit Known / Unknown / NotApplicable;
+- target world time T, including explicit Known / Unknown / NotApplicable, plus a separate `evidence_validity_at_target_time` outcome;
 - decision frontier K, its inclusive/exclusive boundary and frontier identity;
 - declared principal and rights profile;
 - exact source-version identity separately from raw-byte capture state/digest;
@@ -310,6 +310,8 @@ V1.1 binds:
 - an independently recorded temporal label from every assessor and a distinct temporal adjudication state.
 
 A schema-valid observation is not automatically timely. The evaluator must compare observed instants against K under the declared boundary convention, verify that each observation binds the exact source version and principal, check the required chain of acquisition/materialization/context evidence, and retain unknown or unverifiable states. JSON Schema cannot establish that a timestamp is truthful, that its evidence reference resolves, that a source existed then, or that assessors were independent.
+
+The temporal outcome separately records `evidence_validity_at_target_time` as `valid`, `invalid`, `indeterminate`, `not_applicable` or `not_assessed`. An Unknown target time cannot be adjudicated as valid/invalid by the V1.1 schema. This is independent of whether the evidence source was available by K: a source may have been available at the decision frontier while not being valid for target time T, or valid at T while unavailable to the decision process by K.
 
 ### Adjudicator requirements
 
