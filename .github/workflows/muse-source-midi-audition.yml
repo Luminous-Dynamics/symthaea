@@ -1,0 +1,85 @@
+name: Muse Source MIDI Audition Provenance
+
+on:
+  push:
+    branches:
+      - "research/muse-mir-017-*"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse-protocol/**"
+      - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
+      - "crates/domains/symthaea-muse/src/symbolic_import.rs"
+      - "crates/domains/symthaea-muse-ui/src/add_music_page.rs"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse-ui/Cargo.toml"
+      - ".github/workflows/muse-source-midi-audition.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse-protocol/**"
+      - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
+      - "crates/domains/symthaea-muse/src/symbolic_import.rs"
+      - "crates/domains/symthaea-muse-ui/src/add_music_page.rs"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse-ui/Cargo.toml"
+      - ".github/workflows/muse-source-midi-audition.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-source-midi-audition-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: exact-head-source-midi-audition
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'exact_head=%s\n' "$actual"
+
+      - name: Resolve Cargo workspace
+        run: cargo metadata --locked --no-deps --format-version 1 > /tmp/muse-source-midi-workspace.json
+
+      - name: Check protocol formatting
+        run: cargo fmt --manifest-path crates/domains/symthaea-muse-protocol/Cargo.toml -- --check
+
+      - name: Check Muse formatting
+        run: cargo fmt --manifest-path crates/domains/symthaea-muse/Cargo.toml -- --check
+
+      - name: Run protocol serialization compatibility tests
+        run: cargo test --locked --manifest-path crates/domains/symthaea-muse-protocol/Cargo.toml
+
+      - name: Run source MIDI and WAV integrity tests
+        run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features studio --bin muse_studio imported_audio_provenance_tests
+
+      - name: Check Leptos UI for wasm32
+        run: cargo check --locked --target wasm32-unknown-unknown --manifest-path crates/domains/symthaea-muse-ui/Cargo.toml
+
+      - name: Run Clippy on Muse Studio
+        run: cargo clippy --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features studio --bin muse_studio --tests -- -D warnings
+
+      - name: Run Clippy on protocol types
+        run: cargo clippy --locked --manifest-path crates/domains/symthaea-muse-protocol/Cargo.toml --all-targets -- -D warnings
