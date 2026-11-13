@@ -141,8 +141,7 @@ fn has_measured_density_metric(
     metrics.iter().any(|metric| {
         let name = metric["name"]
             .as_str()
-            .map(normalized_metric_name)
-            .unwrap_or_default();
+            .map_or_else(String::new, normalized_metric_name);
         let unit = metric["unit"]
             .as_str()
             .unwrap_or_default()
@@ -576,6 +575,8 @@ pub fn audit(root: &Path) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used)]
+
     use super::*;
     use serde_json::json;
     use std::path::PathBuf;
