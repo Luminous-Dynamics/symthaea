@@ -296,6 +296,14 @@ fn validate_config(config: &ProbePolicyCampaignConfig) -> Result<(), ProbePolicy
     if config.families.is_empty() {
         return Err(ProbePolicyCampaignError::InvalidConfig("at least one family is required"));
     }
+    if !config.families.contains(&InteractionFamily::PureThirdOrder)
+        || !config.families.contains(&InteractionFamily::IncompleteRouting)
+        || !config.families.iter().any(|family| family.split() == CampaignSplit::Development)
+    {
+        return Err(ProbePolicyCampaignError::InvalidConfig(
+            "campaign must include development, held-out interaction-family and held-out routing-topology strata",
+        ));
+    }
     if config.compositions_per_family < 7 || config.compositions_per_family > 64 {
         return Err(ProbePolicyCampaignError::InvalidConfig(
             "compositions_per_family must be in 7..=64 to cover event-count strata",
@@ -341,6 +349,11 @@ fn validate_config(config: &ProbePolicyCampaignConfig) -> Result<(), ProbePolicy
         if !seeds.insert(*seed) {
             return Err(ProbePolicyCampaignError::DuplicateSeed);
         }
+    }
+    if config.pair_budgets.windows(2).any(|window| window[0] >= window[1]) {
+        return Err(ProbePolicyCampaignError::InvalidConfig(
+            "pair_budgets must be strictly increasing",
+        ));
     }
     let mut budgets = BTreeSet::new();
     for budget in &config.pair_budgets {
@@ -973,7 +986,7 @@ mod tests {
                     assert_eq!(event.samples.len(), config.frame_count);
                 }
                 for support in &fixture.supports {
-                    assert_eq!(support.source_event_index < fixture.events.len(), true);
+                    assert!(support.source_event_index < fixture.events.len());
                     for interval in &support.acoustic_support {
                         assert!(interval.start_frame < interval.end_frame);
                         assert!(interval.end_frame <= config.frame_count as u64 + 4);
