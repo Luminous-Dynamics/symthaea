@@ -7,6 +7,16 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Whether optional compute extends a still-sufficient decision or replaces it
+/// after the selected decision has become insufficient.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DecisionAdmissionMode {
+    /// The remote result is intended to improve/continue the current decision.
+    PreserveCurrentDecision,
+    /// The result is a replacement plan; the local fallback carries the robot meanwhile.
+    ReplanWithLocalFallback,
+}
+
 /// Qualification state of the selected decision's remaining sufficiency horizon.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DecisionSufficiencyDisposition {
@@ -64,6 +74,8 @@ pub struct InferenceRequest {
     pub decision_loss_model_digest: Option<String>,
     /// Candidate action-domain digest used to qualify the selected decision.
     pub decision_action_domain_digest: Option<String>,
+    /// How the request relates to the currently selected decision.
+    pub decision_admission_mode: DecisionAdmissionMode,
     /// Calibrated decision-sufficiency receipt from #11650 / #11659.
     pub decision_sufficiency: Option<DecisionSufficiencyReceipt>,
     /// Versioned loss scale for this request's EVSI.
@@ -314,7 +326,7 @@ pub struct AdmissionReport {
     pub actuation_authorized: bool,
 }
 
-fn decision_sufficiency_slack(request: &InferenceRequest) -> Result<u64, RejectReason> {
+fn decision_sufficiency_slack(request: &InferenceRequest) -> Result<Option<u64>, RejectReason> {
     let decision_id = request
         .decision_id
         .as_deref()
@@ -353,10 +365,23 @@ fn decision_sufficiency_slack(request: &InferenceRequest) -> Result<u64, RejectR
         .as_ref()
         .ok_or(RejectReason::UnknownDecisionSufficiency)?;
 
-    match receipt.disposition {
-        DecisionSufficiencyDisposition::Qualified => {}
+    let remaining_sufficient_ticks = match receipt.disposition {
+        DecisionSufficiencyDisposition::Qualified => {
+            let remaining = receipt
+                .remaining_sufficient_ticks
+                .ok_or(RejectReason::UnknownDecisionSufficiency)?;
+            if remaining == 0 {
+                return Err(RejectReason::DecisionAlreadyInsufficient);
+            }
+            Some(remaining)
+        }
         DecisionSufficiencyDisposition::Insufficient => {
-            return Err(RejectReason::DecisionAlreadyInsufficient);
+            if request.decision_admission_mode == DecisionAdmissionMode::PreserveCurrentDecision {
+                return Err(RejectReason::DecisionAlreadyInsufficient);
+            }
+            // This is a replacement plan, not an extension of the old action.
+            // Local fallback and current timing bounds bridge the inference interval.
+            None
         }
         DecisionSufficiencyDisposition::Unknown => {
             return Err(RejectReason::UnknownDecisionSufficiency);
@@ -364,7 +389,7 @@ fn decision_sufficiency_slack(request: &InferenceRequest) -> Result<u64, RejectR
         DecisionSufficiencyDisposition::Rejected => {
             return Err(RejectReason::RejectedDecisionSufficiencyEvidence);
         }
-    }
+    };
 
     let receipt_digest = receipt
         .receipt_digest
@@ -382,13 +407,7 @@ fn decision_sufficiency_slack(request: &InferenceRequest) -> Result<u64, RejectR
         return Err(RejectReason::DecisionSufficiencyBindingMismatch);
     }
 
-    let remaining = receipt
-        .remaining_sufficient_ticks
-        .ok_or(RejectReason::UnknownDecisionSufficiency)?;
-    if remaining == 0 {
-        return Err(RejectReason::DecisionAlreadyInsufficient);
-    }
-    Ok(remaining)
+    Ok(remaining_sufficient_ticks)
 }
 
 fn eligibility(request: &InferenceRequest) -> Result<(), RejectReason> {
@@ -425,7 +444,7 @@ fn eligibility(request: &InferenceRequest) -> Result<(), RejectReason> {
     if result_and_guard > buffer_slack.min(deadline_slack) {
         return Err(RejectReason::ResultReturnsTooLate);
     }
-    if result_and_guard > decision_slack {
+    if decision_slack.is_some_and(|slack| result_and_guard > slack) {
         return Err(RejectReason::DecisionResultReturnsTooLate);
     }
 
@@ -819,6 +838,7 @@ mod tests {
             current_control_tick: Some(100),
             decision_loss_model_digest: Some("loss-model-v1".into()),
             decision_action_domain_digest: Some("action-domain-v1".into()),
+            decision_admission_mode: DecisionAdmissionMode::PreserveCurrentDecision,
             decision_sufficiency: Some(DecisionSufficiencyReceipt {
                 disposition: DecisionSufficiencyDisposition::Qualified,
                 receipt_digest: Some(format!("sufficiency-receipt-{id}")),
@@ -987,6 +1007,61 @@ mod tests {
         // The buffer and task deadline each have ten ticks of slack, but the
         // calibrated decision horizon has only one tick remaining.
         let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::DecisionResultReturnsTooLate)
+        );
+    }
+
+    #[test]
+    fn explicit_replan_can_use_local_fallback_after_current_decision_becomes_insufficient() {
+        let mut audit = request("q1", "r1");
+        audit.decision_admission_mode = DecisionAdmissionMode::ReplanWithLocalFallback;
+        audit
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .disposition = DecisionSufficiencyDisposition::Insufficient;
+        audit
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .remaining_sufficient_ticks = None;
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        assert_eq!(report.admitted_request_ids, vec!["q1"]);
+        assert!(!report.actuation_authorized);
+    }
+
+    #[test]
+    fn replan_without_local_fallback_is_rejected() {
+        let mut audit = request("q1", "r1");
+        audit.decision_admission_mode = DecisionAdmissionMode::ReplanWithLocalFallback;
+        audit
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .disposition = DecisionSufficiencyDisposition::Insufficient;
+        audit.local_fallback_ready = false;
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::NoLocalFallback)
+        );
+    }
+
+    #[test]
+    fn replacement_mode_still_respects_a_still_valid_decision_horizon() {
+        let mut audit = request("q1", "r1");
+        audit.decision_admission_mode = DecisionAdmissionMode::ReplanWithLocalFallback;
+        audit
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .remaining_sufficient_ticks = Some(1);
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
         assert_eq!(
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::DecisionResultReturnsTooLate)
