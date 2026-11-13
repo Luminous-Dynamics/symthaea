@@ -138,12 +138,12 @@ pub fn simulate_three_qubit_bit_flip_universal_recovery(
                 for error_column in 0..ERROR_COUNT {
                     let after_column = maps[error_column][CODEWORDS[logical_column]];
                     let after_row = maps[error_row][after_column];
-                    let actual = if after_row == CODEWORDS[logical_row] {
+                    let actual: f64 = if after_row == CODEWORDS[logical_row] {
                         1.0
                     } else {
                         0.0
                     };
-                    let expected = if error_row == error_column && logical_row == logical_column {
+                    let expected: f64 = if error_row == error_column && logical_row == logical_column {
                         1.0
                     } else {
                         0.0
