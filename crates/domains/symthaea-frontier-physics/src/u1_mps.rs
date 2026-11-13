@@ -722,6 +722,198 @@ fn left_canonicalize_site(
 }
 
 
+
+
+fn right_canonicalize_site(
+    tensors: &mut [U1MpsTensor],
+    site: usize,
+    tolerance: f64,
+) -> Result<CanonicalizationStats, U1MpsError> {
+    if site == 0 || site >= tensors.len() {
+        return Err(U1MpsError::TwoSiteShapeMismatch);
+    }
+    if tensors[site - 1].right_charges != tensors[site].left_charges {
+        return Err(U1MpsError::TwoSiteBondMismatch);
+    }
+
+    struct Block {
+        charge: i32,
+        rows: Vec<usize>,
+        columns: Vec<(usize, usize)>,
+        u: DMatrix<Complex64>,
+        v_t: DMatrix<Complex64>,
+        singular_values: Vec<f64>,
+    }
+
+    let previous = &tensors[site - 1];
+    let current = &tensors[site];
+    let old_left_dimension = current.left_dimension();
+    let mut row_groups: Vec<(i32, Vec<usize>)> = Vec::new();
+    for left in 0..old_left_dimension {
+        let charge = current.left_charges[left];
+        if let Some((_, rows)) = row_groups.iter_mut().find(|(q, _)| *q == charge) {
+            rows.push(left);
+        } else {
+            row_groups.push((charge, vec![left]));
+        }
+    }
+
+    let max_dimension = old_left_dimension.max(current.right_dimension().saturating_mul(2));
+    let max_iterations =
+        10_000usize.max(64usize.saturating_mul(max_dimension.saturating_mul(max_dimension)));
+    let mut blocks = Vec::new();
+    let mut stats = CanonicalizationStats::default();
+
+    for (charge, rows) in row_groups {
+        let mut columns = Vec::new();
+        for physical in 0..2 {
+            for right in 0..current.right_dimension() {
+                if current.right_charges[right] == charge + physical as i32 {
+                    columns.push((physical, right));
+                }
+            }
+        }
+        if rows.is_empty() || columns.is_empty() {
+            continue;
+        }
+
+        let mut block = DMatrix::<Complex64>::zeros(rows.len(), columns.len());
+        for (row_index, &left) in rows.iter().enumerate() {
+            for (column_index, &(physical, right)) in columns.iter().enumerate() {
+                block[(row_index, column_index)] = current.get(left, physical, right);
+            }
+        }
+
+        let row_count = block.nrows();
+        let column_count = block.ncols();
+        let decomposition = block.try_svd(true, true, tolerance, max_iterations).ok_or(
+            U1MpsError::SvdFailed {
+                rows: row_count,
+                columns: column_count,
+            },
+        )?;
+        let u = decomposition.u.ok_or(U1MpsError::SvdFailed {
+            rows: row_count,
+            columns: column_count,
+        })?;
+        let v_t = decomposition.v_t.ok_or(U1MpsError::SvdFailed {
+            rows: row_count,
+            columns: column_count,
+        })?;
+
+        let mut kept = Vec::new();
+        for (index, value) in decomposition.singular_values.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "right-canonical singular value",
+                ));
+            }
+            if *value > 0.0 {
+                kept.push(index);
+            } else {
+                stats.exact_zero_singular_values_omitted += 1;
+            }
+        }
+        if kept.is_empty() {
+            continue;
+        }
+
+        let kept_u =
+            DMatrix::<Complex64>::from_fn(rows.len(), kept.len(), |row, column| u[(row, kept[column])]);
+        let kept_v_t =
+            DMatrix::<Complex64>::from_fn(kept.len(), columns.len(), |row, column| v_t[(kept[row], column)]);
+        let singular_values = kept
+            .iter()
+            .map(|&index| decomposition.singular_values[index])
+            .collect::<Vec<_>>();
+
+        for row in 0..rows.len() {
+            for column in 0..columns.len() {
+                let mut reconstructed = Complex64::new(0.0, 0.0);
+                for mode in 0..kept.len() {
+                    reconstructed +=
+                        kept_u[(row, mode)] * singular_values[mode] * kept_v_t[(mode, column)];
+                }
+                let residual = (reconstructed - block[(row, column)]).norm();
+                stats.max_residual = stats.max_residual.max(residual);
+                stats.residual_squared += residual * residual;
+            }
+        }
+
+        blocks.push(Block {
+            charge,
+            rows,
+            columns,
+            u: kept_u,
+            v_t: kept_v_t,
+            singular_values,
+        });
+    }
+
+    let new_dimension = blocks.iter().try_fold(0_usize, |sum, block| {
+        sum.checked_add(block.singular_values.len())
+            .ok_or(U1MpsError::DimensionOverflow)
+    })?;
+    if new_dimension == 0 {
+        return Err(U1MpsError::ZeroDenseState);
+    }
+
+    let previous_left_dimension = previous.left_dimension();
+    let previous_right_dimension = previous.right_dimension();
+    let current_right_dimension = current.right_dimension();
+    let previous_entries = previous_left_dimension
+        .checked_mul(2)
+        .and_then(|value| value.checked_mul(new_dimension))
+        .ok_or(U1MpsError::DimensionOverflow)?;
+    let current_entries = new_dimension
+        .checked_mul(2)
+        .and_then(|value| value.checked_mul(current_right_dimension))
+        .ok_or(U1MpsError::DimensionOverflow)?;
+    let mut previous_data = vec![Complex64::new(0.0, 0.0); previous_entries];
+    let mut current_data = vec![Complex64::new(0.0, 0.0); current_entries];
+    let mut new_left_charges = Vec::with_capacity(new_dimension);
+    let mut offset = 0;
+
+    for block in blocks {
+        let rank = block.singular_values.len();
+        new_left_charges.extend(core::iter::repeat_n(block.charge, rank));
+        for mode in 0..rank {
+            let new_left = offset + mode;
+            for (column_index, &(physical, right)) in block.columns.iter().enumerate() {
+                let index = (new_left * 2 + physical) * current_right_dimension + right;
+                current_data[index] = block.v_t[(mode, column_index)];
+            }
+            for (row_index, &old_left) in block.rows.iter().enumerate() {
+                let transfer = block.u[(row_index, mode)] * block.singular_values[mode];
+                for previous_left in 0..previous_left_dimension {
+                    for previous_physical in 0..2 {
+                        let index =
+                            (previous_left * 2 + previous_physical) * new_dimension + new_left;
+                        previous_data[index] +=
+                            previous.get(previous_left, previous_physical, old_left) * transfer;
+                    }
+                }
+            }
+        }
+        offset += rank;
+    }
+
+    let new_previous = U1MpsTensor::new(
+        previous.left_charges.clone(),
+        new_left_charges.clone(),
+        previous_data,
+    )?;
+    let new_current = U1MpsTensor::new(
+        new_left_charges,
+        current.right_charges.clone(),
+        current_data,
+    )?;
+    tensors[site - 1] = new_previous;
+    tensors[site] = new_current;
+    Ok(stats)
+}
+
+
 impl ComplexU1Mps {
     /// Validate a complete open-boundary MPS and its charge-selection rules.
     pub fn new(
