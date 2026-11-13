@@ -155,3 +155,27 @@ Synthetic contracts validate data/evaluator behavior only. They do not predict a
 - Kim et al. (2026), CFRP / arc-sprayed zinc plasma pretreatment: https://doi.org/10.1016/j.compositesa.2026.109797
 - Jorde et al. (2026), plasma-sprayed coatings on polymeric substrates: https://doi.org/10.1177/02670844261423805
 - ASTM C633-24: https://store.astm.org/standards/c633
+
+
+## 11. Aerospace lightning-protection boundary — current standards crosswalk
+
+A conductive coating is only one part of a composite lightning-protection design. The 2026 CFRP/zinc adhesion result must not be represented as LSP compliance.
+
+Relevant framework references:
+- **SAE ARP5412C**, Aircraft Lightning Environment and Related Test Waveforms, revised 1 October 2024. It defines standardized lightning environments and waveforms used in aircraft protection assessments and is intended to be applied with aircraft zoning and test methods. https://saemobilus.sae.org/standards/arp5412c-aircraft-lightning-environment-related-test-waveforms
+- **SAE ARP5416B**, Aircraft Lightning Test Methods, revised 25 March 2025 on the SAE catalogue. It describes direct-effects and indirect-effects test methods. It expressly does not set design criteria or specify which items must be tested; acceptable damage and pass/fail criteria must be approved by the responsible airworthiness authority for the individual case. https://saemobilus.sae.org/standards/arp5416b-aircraft-lightning-test-methods
+- **FAA AC 20-107B with Change 1**, Composite Aircraft Structure, discusses the need for lightning-protection design features for composite aircraft structures and says lightning-protection effectiveness should be demonstrated by tests or analysis supported by tests. https://www.faa.gov/documentLibrary/media/Advisory_Circular/AC_20-107B_with_change_1.pdf
+
+This is a standards crosswalk for research planning, not a compliance interpretation. The complete aircraft/component zone, design basis, bonding/joint details, test article representativeness, waveforms, measurement chain and authority-approved acceptance criteria must be established by the aircraft certification programme.
+
+### Coating pull-off method caution
+
+ASTM D4541-22 is a portable pull-off coating test whose published scope is coatings on metal substrates; ASTM says results depend on apparatus, glue, fixture size, cure, pull rate and environmental conditions, and are limited by glue/cohesive failure. It must not be silently substituted for the CFRP/zinc source paper's unverified test method. https://store.astm.org/standards/d4541
+
+ASTM C633-24 remains the more directly relevant thermal-spray adhesion/cohesion comparator, subject to specimen applicability and its own limitations. Neither test substitutes for electrical continuity, current-carrying capability, LSP direct-effects testing or residual structural assessment.
+
+## 12. New interface-design hypothesis
+
+The published study suggests two distinguishable mechanisms: argon-associated epoxy recession/fibre exposure and air-plasma-associated polar functionalization. A new research hypothesis is whether a carefully characterized **sequential or spatially selective interface treatment** can combine useful mechanical interlocking and chemical affinity while keeping resin recession and laminate damage below the application-specific limit.
+
+This is an experiment-selection hypothesis, not a recommended process recipe. It must be tested against air-only, argon-only, conventional preparation and untreated controls under identical coating deposition, coating thickness and failure analysis. The interaction term must be preregistered; a combined sequence must not be credited with synergy unless the independent comparison and uncertainty support it.
