@@ -10,9 +10,9 @@ This first slice provides:
 - origin/destination area identity and role checks;
 - floor assessments bound to the exact scenario pathway and origin/destination area;
 - arithmetic-only aggregate capacity sufficiency/shortfall evaluation;
-- a separate non-compensatory service-floor evaluator using versioned floor references, observation bounds, explicit scope coverage, an observation-valid-time window and a declared freshness budget;
+- a separate non-compensatory service-floor evaluator using versioned floor references, observation bounds, explicit scope coverage, an observation-valid-time window and a freshness budget bound to a named versioned policy;
 - full-coverage MeetsFloor / BreachedFloor results, partial-coverage ObservedBreach reporting, and Indeterminate for incomplete evidence or threshold-crossing intervals;
-- fail-closed indeterminate results for missing inputs, unknown/synthetic evidence, contract-only qualification, missing observation timing or stale evidence;
+- fail-closed indeterminate results for missing inputs, unknown/synthetic evidence, contract-only qualification, missing observation timing/policy references or stale evidence;
 - prohibition of recommendation/decision authority in the scenario record.
 
 It does not ingest the JSON fixture, parse GeoJSON, model hydraulics, forecast movement, decide which authority may set a floor, determine rights or issue operational commands. The service-floor result only checks a supplied, versioned threshold against supplied evidence and coverage. It is not a legal determination, certification, water-safety assessment or destination-suitability assessment.
