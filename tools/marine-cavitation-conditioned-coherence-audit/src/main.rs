@@ -774,27 +774,27 @@ fn audit(case: &Case) -> AuditReport {
     let present_runs = band_reports.iter().map(|band| band.independent_runs_with_present_group).min().unwrap_or(0);
     let absent_runs = band_reports.iter().map(|band| band.independent_runs_with_absent_group).min().unwrap_or(0);
     if present_runs < case.minimum_runs_per_group {
-        reasons.push("too few independent runs contain the required cavitation-present window cohort".to_string());
+        reasons.push("INCOMPLETE: too few independent runs contain the required cavitation-present window cohort".to_string());
     }
     if absent_runs < case.minimum_runs_per_group {
-        reasons.push("too few independent runs contain the required cavitation-absent window cohort".to_string());
+        reasons.push("INCOMPLETE: too few independent runs contain the required cavitation-absent window cohort".to_string());
     }
     for run in &run_reports {
         for band in &run.run_band_summaries {
             if band.cavitation_present.window_count < case.minimum_windows_per_group_per_run {
-                reasons.push(format!("run {} band {} has too few cavitation-present windows", run.run_id, band.band_id));
+                reasons.push(format!("INCOMPLETE: run {} band {} has too few cavitation-present windows", run.run_id, band.band_id));
             }
             if band.cavitation_absent.window_count < case.minimum_windows_per_group_per_run {
-                reasons.push(format!("run {} band {} has too few cavitation-absent windows", run.run_id, band.band_id));
+                reasons.push(format!("INCOMPLETE: run {} band {} has too few cavitation-absent windows", run.run_id, band.band_id));
             }
         }
     }
     if shared_timebase_ids.len() > 1 {
-        reasons.push("coherence reports do not share one common sample clock identity across the joined campaign".to_string());
+        reasons.push("INCOMPARABLE: coherence reports do not share one common sample clock identity across the joined campaign".to_string());
     }
     let alignment_unknown = run_reports.iter().any(|run| run.cavitation_unknown_windows > 0);
     if alignment_unknown {
-        reasons.push("unresolved or missing cavitation annotations remain unconditioned and prevent a complete two-cohort comparison".to_string());
+        reasons.push("INCOMPLETE: unresolved or missing cavitation annotations remain unconditioned and prevent a complete two-cohort comparison".to_string());
     }
 
     let has_incomparable = reasons.iter().any(|reason| reason.starts_with("INCOMPARABLE:"));
@@ -882,8 +882,8 @@ mod tests {
         std::iter::repeat_n(character, 64).collect()
     }
 
-    fn intermittency_window(index: usize, state: Option<bool>) -> IntermittencyWindow {
-        let seed = index + 1;
+    fn intermittency_window(run_index: usize, index: usize, state: Option<bool>) -> IntermittencyWindow {
+        let seed = run_index * 100 + index + 1;
         IntermittencyWindow {
             window_id: format!("window-{index}"),
             acoustic_trace_sha256: format!("{seed:064x}"),
@@ -962,7 +962,7 @@ mod tests {
         for run_index in 0..2 {
             let run_id = format!("run-{}", run_index + 1);
             let windows: Vec<_> = (0..4)
-                .map(|index| intermittency_window(index, Some(index % 2 == 0)))
+                .map(|index| intermittency_window(run_index, index, Some(index % 2 == 0)))
                 .collect();
             let run = IntermittencyRun {
                 run_id: run_id.clone(),
@@ -981,7 +981,7 @@ mod tests {
                 coherence_windows.push(CoherenceWindowInput {
                     run_id: run_id.clone(),
                     window_id: window.window_id.clone(),
-                    coherence_report_sha256: digest(char::from_u32(65 + index as u32).unwrap()),
+                    coherence_report_sha256: format!("{:064x}", 50_000 + run_index * 100 + index),
                     coherence_report: report,
                 });
             }
@@ -1031,9 +1031,213 @@ mod tests {
         assert!(report.reasons.iter().any(|reason| reason.contains("synthetic")));
     }
 
+
     #[test]
     fn present_and_absent_cohorts_are_conditioned_separately() {
         let mut input = case();
         input.evidence_kind = EvidenceKind::Measured;
         input.source.rights_status = RightsStatus::PublicOrPermitted;
-        input.intermitte
+        let report = audit(&input);
+        assert_eq!(report.disposition, "CONDITIONED_SUMMARY_ONLY");
+        assert_eq!(report.run_reports.len(), 2);
+        for run in &report.run_reports {
+            assert_eq!(run.cavitation_present_windows, 2);
+            assert_eq!(run.cavitation_absent_windows, 2);
+            assert_eq!(run.cavitation_unknown_windows, 0);
+            let band = &run.run_band_summaries[0];
+            assert!((band.cavitation_present.mean_coherence_magnitude_squared.unwrap() - 0.8).abs() < 1e-12);
+            assert!((band.cavitation_absent.mean_coherence_magnitude_squared.unwrap() - 0.2).abs() < 1e-12);
+            assert!((band.present_minus_absent_mean_coherence.unwrap() - 0.6).abs() < 1e-12);
+            assert!((band.cavitation_present.mean_coherent_pressure_psd_pa2_per_hz.unwrap() - 8.0).abs() < 1e-12);
+            assert!((band.cavitation_absent.mean_residual_pressure_psd_pa2_per_hz.unwrap() - 8.0).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn independent_run_means_are_equal_weighted_not_window_weighted() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        input.source.rights_status = RightsStatus::PublicOrPermitted;
+        for item in &mut input.coherence_windows {
+            if item.run_id == "run-2" {
+                let state = input.intermittency_report.run_reports[1].window_evidence.iter()
+                    .find(|window| window.window_id == item.window_id)
+                    .and_then(|window| window.cavitation_state_for_conditioning);
+                for band in &mut item.coherence_report.band_reports {
+                    band.coherence_magnitude_squared = if state == Some(true) { 0.4 } else { 0.1 };
+                }
+            }
+        }
+        let report = audit(&input);
+        assert_eq!(report.disposition, "CONDITIONED_SUMMARY_ONLY");
+        let band = &report.band_reports[0];
+        assert!((band.equal_run_weighted_present_mean_coherence.unwrap() - 0.6).abs() < 1e-12);
+        assert!((band.equal_run_weighted_absent_mean_coherence.unwrap() - 0.15).abs() < 1e-12);
+        assert!((band.equal_run_weighted_present_minus_absent_coherence.unwrap() - 0.45).abs() < 1e-12);
+        assert_eq!(band.independent_runs_with_present_group, 2);
+        assert_eq!(band.independent_runs_with_absent_group, 2);
+    }
+
+    #[test]
+    fn unknown_cavitation_state_is_never_promoted_to_absent() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        input.source.rights_status = RightsStatus::PublicOrPermitted;
+        let target = &mut input.intermittency_report.run_reports[0].window_evidence[0];
+        target.cavitation_annotation_raw = None;
+        target.cavitation_state_for_conditioning = None;
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(report.run_reports[0].cavitation_unknown_windows, 1);
+        assert_eq!(report.run_reports[0].cavitation_absent_windows, 1);
+        assert_eq!(report.run_reports[0].cavitation_present_windows, 2);
+    }
+
+    #[test]
+    fn misaligned_raw_positive_annotation_remains_unknown_for_cohorting() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        input.source.rights_status = RightsStatus::PublicOrPermitted;
+        let window = &mut input.intermittency_report.run_reports[0].window_evidence[0];
+        window.acoustic_cavitation_alignment_eligible = false;
+        window.acoustic_cavitation_alignment_offset_s = 0.02;
+        window.cavitation_annotation_raw = Some(true);
+        window.cavitation_state_for_conditioning = None;
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(report.run_reports[0].cavitation_unknown_windows, 1);
+        let receipt = &report.run_reports[0].joined_window_receipts[0];
+        assert_eq!(receipt.cavitation_annotation_raw, Some(true));
+        assert_eq!(receipt.cavitation_state_for_conditioning, None);
+        assert!(!receipt.alignment_eligible);
+    }
+
+    #[test]
+    fn exact_pressure_trace_mismatch_is_invalid() {
+        let mut input = case();
+        input.coherence_windows[0].coherence_report.pressure_raw_trace_sha256 = digest('z');
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn exact_time_window_mismatch_is_invalid() {
+        let mut input = case();
+        input.coherence_windows[0].coherence_report.pressure_window_end_s += 0.01;
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn service_environment_or_timebase_mismatch_is_incomparable() {
+        let mut input = case();
+        input.coherence_windows[0].coherence_report.service_fingerprint_sha256 = digest('x');
+        assert_eq!(audit(&input).disposition, "INCOMPARABLE");
+        let mut input = case();
+        input.coherence_windows[0].coherence_report.timebase_binding_receipt_sha256 = digest('x');
+        assert_eq!(audit(&input).disposition, "INCOMPARABLE");
+    }
+
+    #[test]
+    fn phase_unresolved_reports_still_support_magnitude_coherence_summary() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        input.source.rights_status = RightsStatus::PublicOrPermitted;
+        for window in &mut input.coherence_windows {
+            window.coherence_report.disposition = MAGNITUDE_ONLY.to_string();
+            for band in &mut window.coherence_report.band_reports {
+                band.phase_status = "phase_unresolved".to_string();
+            }
+        }
+        let report = audit(&input);
+        assert_eq!(report.disposition, "CONDITIONED_SUMMARY_ONLY");
+        assert!(report.run_reports.iter().all(|run| run.phase_unresolved_windows == 4));
+    }
+
+    #[test]
+    fn uncertainty_unresolved_band_is_incomplete() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        input.source.rights_status = RightsStatus::PublicOrPermitted;
+        input.coherence_windows[0].coherence_report.band_reports[0].uncertainty_status =
+            "coherent_residual_interval_unresolved".to_string();
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn frequency_grid_mismatch_is_incomparable() {
+        let mut input = case();
+        input.coherence_windows[0].coherence_report.band_reports[0].frequency_hz = 101.0;
+        assert_eq!(audit(&input).disposition, "INCOMPARABLE");
+    }
+
+    #[test]
+    fn duplicate_coherence_report_digest_is_invalid() {
+        let mut input = case();
+        input.coherence_windows[1].coherence_report_sha256 =
+            input.coherence_windows[0].coherence_report_sha256.clone();
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn insufficient_independent_runs_is_incomplete() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        input.source.rights_status = RightsStatus::PublicOrPermitted;
+        input.intermittency_report.run_reports.truncate(1);
+        input.coherence_windows.retain(|window| window.run_id == "run-1");
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn missing_per_window_uncertainty_bounds_is_incomplete() {
+        let mut input = case();
+        input.coherence_windows[0].coherence_report.band_reports[0]
+            .vibration_reference_coherent_pressure_psd_lower_bound = None;
+        assert_eq!(audit(&input).disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn a_window_is_joined_exactly_once() {
+        let mut input = case();
+        input.coherence_windows.push(input.coherence_windows[0].clone());
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn input_window_permutation_preserves_run_and_band_summaries() {
+        let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
+        input.source.rights_status = RightsStatus::PublicOrPermitted;
+        let first = audit(&input);
+        input.coherence_windows.reverse();
+        input.intermittency_report.run_reports.reverse();
+        for run in &mut input.intermittency_report.run_reports {
+            run.window_evidence.reverse();
+        }
+        let second = audit(&input);
+        assert_eq!(first.disposition, second.disposition);
+        assert_eq!(first.run_reports.len(), second.run_reports.len());
+        assert_eq!(first.band_reports[0].equal_run_weighted_present_mean_coherence,
+            second.band_reports[0].equal_run_weighted_present_mean_coherence);
+        assert_eq!(first.band_reports[0].equal_run_weighted_absent_mean_coherence,
+            second.band_reports[0].equal_run_weighted_absent_mean_coherence);
+    }
+
+    #[test]
+    fn coherence_one_does_not_promote_a_unique_source_claim() {
+        let mut input = case();
+        input.coherence_windows[0].coherence_report.band_reports[0].coherence_magnitude_squared = 1.0;
+        let report = audit(&input);
+        assert!(report.claim_ceiling.contains("no_unique_source"));
+    }
+
+    #[test]
+    fn source_and_receipt_digests_are_preserved() {
+        let report = audit(&case());
+        assert_eq!(report.intermittency_receipt_sha256, digest('2'));
+        assert_eq!(report.source_data_sha256, digest('1'));
+        assert_eq!(report.run_reports[0].joined_window_receipts[0].coherence_report_sha256,
+            format!("{:064x}", 50_000));
+    }
+}
