@@ -387,7 +387,7 @@ fn dependency_report(alias: &str, config: &Value, ws: &Workspace, manifests: &[M
         }
     }
     if inheriting.is_empty() && external.is_empty() {
-        reasons.push("No same-name declaration was found in scanned manifests; generated or external build contexts remain outside this observation.".into());
+        reasons.push("No same-name declaration was found in scanned manifests; this is not proof of global non-use because generated or external build contexts remain outside this observation.".into());
     }
     inheriting.sort_by(|a, b| a.manifest.cmp(&b.manifest).then(a.section.cmp(&b.section)));
     external.sort_by(|a, b| a.manifest.cmp(&b.manifest).then(a.section.cmp(&b.section)));
