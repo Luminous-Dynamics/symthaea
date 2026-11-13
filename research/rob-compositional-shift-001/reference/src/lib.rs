@@ -207,6 +207,8 @@ pub enum CompositionalAuditError {
         interaction_id: String,
         key: InteractionKey,
     },
+    /// One assignment receipt is reused for distinct joint interaction cells.
+    ReusedInteractionAssignmentReceipt(String),
     /// Assignment receipt is missing.
     MissingInteractionAssignmentReceipt {
         interaction_id: String,
@@ -568,6 +570,7 @@ fn validate_manifest(
     }
 
     let mut partitions = BTreeMap::new();
+    let mut assignment_receipt_cells: BTreeMap<String, CellKey> = BTreeMap::new();
     let mut cells_by_spec: BTreeMap<String, BTreeMap<Partition, Vec<InteractionKey>>> =
         BTreeMap::new();
     for assignment in &manifest.assignments {
@@ -588,12 +591,32 @@ fn validate_manifest(
             },
         )?;
         let cell_key = (assignment.interaction_id.clone(), key.clone());
-        if partitions.insert(cell_key, assignment.partition).is_some() {
+        if partitions.contains_key(&cell_key) {
             return Err(CompositionalAuditError::DuplicateInteractionCell {
                 interaction_id: assignment.interaction_id.clone(),
                 key,
             });
         }
+        match assignment_receipt_cells.get(&assignment.assignment_receipt_digest) {
+            Some(existing_cell) if existing_cell != &cell_key => {
+                return Err(CompositionalAuditError::ReusedInteractionAssignmentReceipt(
+                    assignment.assignment_receipt_digest.clone(),
+                ));
+            }
+            Some(_) => {
+                return Err(CompositionalAuditError::DuplicateInteractionCell {
+                    interaction_id: assignment.interaction_id.clone(),
+                    key,
+                });
+            }
+            None => {
+                assignment_receipt_cells.insert(
+                    assignment.assignment_receipt_digest.clone(),
+                    cell_key.clone(),
+                );
+            }
+        }
+        partitions.insert(cell_key, assignment.partition);
         cells_by_spec
             .entry(assignment.interaction_id.clone())
             .or_default()
@@ -1368,6 +1391,18 @@ mod tests {
         assert!(matches!(
             audit_compositional_shift(&audit),
             Err(CompositionalAuditError::InvalidInteractionDimensionCount { .. })
+        ));
+    }
+
+    #[test]
+    fn one_assignment_receipt_cannot_be_reused_for_two_joint_cells() {
+        let mut audit = input();
+        audit.manifest.assignments[1].assignment_receipt_digest =
+            audit.manifest.assignments[0].assignment_receipt_digest.clone();
+        assert!(matches!(
+            audit_compositional_shift(&audit),
+            Err(CompositionalAuditError::ReusedInteractionAssignmentReceipt(receipt))
+                if receipt == audit.manifest.assignments[0].assignment_receipt_digest
         ));
     }
 
