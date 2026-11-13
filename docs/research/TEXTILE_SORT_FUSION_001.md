@@ -155,7 +155,7 @@ This prevents multiple views/replicates of one physical item from leaking across
 
 ## 5. Current synthetic tests
 
-Before corpus integration, the module contained 16 Rust unit tests. The latest change adds an unknown-category/presentation negative control and an executable corpus-binding test (18 test functions total). The 15-case synthetic corpus is now loaded by Rust tests; each case invokes its mapped regression and checks the declared disposition/reason. The Rust unit tests cover:
+Before corpus integration, the module contained 16 Rust unit tests. The latest change adds an unknown-category/presentation negative control and an executable corpus-binding test (18 test functions total). The 15-case synthetic corpus is now loaded by Rust tests; each case invokes its mapped regression and checks the declared disposition/reason. The Rust unit tests cover the 16 original contract cases plus two new regressions: unknown visual category/presentation abstention and the executable 15-case corpus-to-test mapping (18 test functions total). The original cases cover:
 1. valid current-calibration composition admission;
 2. expired calibration abstention;
 3. revoked calibration rejection;
@@ -170,7 +170,8 @@ Before corpus integration, the module contained 16 Rust unit tests. The latest c
 12. visual confidence below a declared threshold;
 13. garment-identity split leakage;
 14. physical-specimen replicate leakage;
-15. valid grouped replicate/fold assignment.
+15. valid grouped replicate/fold assignment;
+16. unknown visual category or presentation state abstention.
 
 A separate synthetic fixture corpus is provided at:
 - `docs/research/fixtures/textile_sort_fusion_v0_1/sensor_cases.schema.json`
@@ -187,11 +188,27 @@ TexSortML:
 - report per-class macro-F1, balanced accuracy, precision/recall, confusion and confidence calibration at each presentation stage;
 - compare matched model parameter counts, FLOPs, resolution, training data and inference budget.
 
+The September 2026 paper's directly fine-tuned ViT baseline reports **85.94% Stage-3 accuracy** and **83.04% Stage-3 macro-F1** across the most disordered garment presentation. It records 95.23% Stage-1 accuracy, but Stage 1 is not the deployment-defining condition. The weak Zipper/Sweat Jacket class and the single-facility sample source are explicit limitations.
+
+| TexSortML benchmark gate | Published anchor | Proposed stretch objective (not achieved) |
+|---|---:|---:|
+| Same grouped five-fold reproduction | ViT Stage 3: 85.94% accuracy / 83.04% macro-F1 | Reproduce both within ±1.0 pp before claiming a model improvement |
+| Most-disordered Stage 3 | 85.94% accuracy / 83.04% macro-F1 | ≥88.0% accuracy and ≥85.5% macro-F1 on the identical split, taxonomy and compute budget |
+| Weakest-class performance | Zipper/Sweat Jacket is the weakest class; 17 garments | At least +5 pp worst-class recall without reducing overall macro-F1; report garment-level confidence intervals |
+| Domain transfer | Single facility / one camera setup; external-facility transfer untested | A separate multi-facility held-out test, with no facility overlap in train/validation; freeze targets after first independent facility dataset |
+| Open-set operation | Not established by the published top-1 task | ≤1% false acceptance of unknown categories/material states at a separately reported ≥90% accepted coverage on a preregistered unknown set |
+
+These targets are deliberately above the published benchmark but modest enough to make a clean reproduction the first gate. An improvement is not accepted if it comes from more training data, larger compute, leakage, taxonomy changes or easier evaluation examples unless those changes are reported as separate experimental arms.
+
 NIR-SORT:
 - group all replicates by physical specimen;
 - stratify by instrument (benchtop vs each handheld instrument);
 - compare raw/normalized spectra and simple classical baselines (PCA + SVM, PLS-DA where methodologically appropriate) with a version-pinned learned baseline;
-- preserve preprocessing, method, reference composition measurement and calibration identity.
+- preserve preprocessing, method, reference composition measurement and calibration identity;
+- reproduce instrument-specific baselines before cross-instrument fusion;
+- report blend-fraction MAE in percentage points, per-fibre precision/recall, prediction-interval coverage and specimen-grouped confidence intervals.
+
+The NIR-SORT 2.0 custom-blend specimens and Handheld_F / Standoff_Q profiles create a ratio-generalization and instrument-transfer challenge. The objective is not just to classify broad fibre labels: estimate composition with bounded uncertainty, preserve unknown fractions and evaluate entire held-out specimens/instruments. A proposed stretch gate is to reduce the composition-error increase on held-out instruments by at least 50% relative to a simple instrument-naive baseline, while maintaining nominal 90% prediction-interval coverage within a predeclared tolerance. Freeze exact tolerances after establishing source reference uncertainty; no performance value is claimed yet.
 
 Do not pool the visual and spectral scores into one leaderboard.
 
@@ -251,7 +268,8 @@ Freeze after baseline reproduction and measurement repeatability:
 - zero silent imputation of missing/saturated/out-of-domain spectra;
 - report selective coverage and risk; choose an operating point with a frozen false-accept ceiling;
 - improve macro-F1 and worst-class recall against compute-matched baselines without increasing unknown-material false acceptance;
-- demonstrate reduced instrument-transfer degradation on held-out specimens;
+- demonstrate reduced instrument-transfer degradation on held-out specimens, with a preregistered instrument-held-out split;
+- compare physical line arms against Fibersort + Trimclean on matched lots, including residual trim, damage, retained textile length/fines, throughput, labour, utilities and downstream accepted grade;
 - 100% of actual physical output lots linked to sort and recovery receipts before material recovery claims.
 
 These targets are challenge goals, not predictions or results. Freeze thresholds only after the data protocol, class taxonomy, held-out split and source measurement quality are established.
