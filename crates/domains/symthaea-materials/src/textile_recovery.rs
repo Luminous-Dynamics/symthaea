@@ -1233,7 +1233,7 @@ mod tests {
                 None,
             ),
         });
-        bundle.downstream_acceptance = Some(item_acceptance());
+        bundle.downstream_acceptance = Some(acceptance_for("LOT-01", "VIS-01"));
         let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &policy());
         assert_eq!(result.disposition, RouteDisposition::InsufficientEvidence);
         assert!(result.reasons.contains(&RouteReason::MissingConditionInspection));
