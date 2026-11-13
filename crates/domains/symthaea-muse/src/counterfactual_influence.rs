@@ -398,6 +398,55 @@ pub fn verify_renderer_audio_binding_for_score(
     )
 }
 
+/// Production-facing verifier for operation-specific counterfactual Score maps.
+///
+/// The expected pitch inventory is derived from the exact typed source Score.
+/// For Remove, the declared source event is absent. For Transpose, the source
+/// event remains present and its MIDI pitch must equal the baseline pitch plus
+/// the signed semitone delta; all other source events remain unchanged.
+/// Integer semitone transposition is not fine tuning or cent-level correction.
+#[cfg(feature = "theory")]
+pub fn verify_renderer_audio_binding_for_score_intervention(
+    receipt: &RendererExecutionReceipt,
+    inputs: RendererReceiptInputs<'_>,
+    performed_event_map_bytes: &[u8],
+    score: &symthaea_music_theory::Score,
+    source_event_id: &str,
+    intervention: &EventIntervention,
+    audio: &AudioView<'_>,
+) -> Result<VerifiedRendererAudioBinding, CounterfactualInfluenceError> {
+    let serialized_score = serde_json::to_vec(score)
+        .map_err(|_| CounterfactualInfluenceError::SerializationFailure)?;
+    if inputs.score_bytes != serialized_score.as_slice()
+        || receipt.score_sha256 != sha256_hex(&serialized_score)
+    {
+        return Err(CounterfactualInfluenceError::RendererReceiptInvalid);
+    }
+    let source_index = parse_score_event_index(source_event_id)
+        .ok_or(CounterfactualInfluenceError::InvalidEventId)?;
+    let baseline_pitches: Vec<u8> = score
+        .events()
+        .iter()
+        .map(|event| event.pitch.midi())
+        .collect();
+    let expected_counterfactual =
+        counterfactual_primary_pitches(&baseline_pitches, source_index, intervention)?;
+    let excluded_source_event_index = match intervention {
+        EventIntervention::Remove => Some(source_index),
+        EventIntervention::Transpose { .. } => None,
+        _ => return Err(CounterfactualInfluenceError::InvalidIntervention),
+    };
+    verify_renderer_audio_binding(
+        receipt,
+        inputs,
+        performed_event_map_bytes,
+        expected_counterfactual.len(),
+        &expected_counterfactual,
+        excluded_source_event_index,
+        audio,
+    )
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InfluenceWindowMeasurement {
     pub start_frame: usize,
