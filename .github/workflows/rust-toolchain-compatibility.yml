@@ -1,0 +1,321 @@
+name: Rust toolchain compatibility qualification
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/core/symthaea-core/**"
+      - "crates/core/symthaea-fep/**"
+      - ".github/workflows/rust-toolchain-compatibility.yml"
+      - "scripts/audit-cargo-unused-dependencies.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-toolchain-compatibility-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  baseline-1-96:
+    name: Existing pinned baseline (Rust 1.96.0)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install exact baseline toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record and verify exact compiler and Cargo identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc +1.96.0 -Vv | tee rustc-version.txt
+          cargo +1.96.0 -Vv | tee cargo-version.txt
+          grep -F 'rustc 1.96.0 ' rustc-version.txt
+          grep -F 'cargo 1.96.0 ' cargo-version.txt
+
+      - name: Validate workspace metadata without resolving new dependencies
+        run: cargo +1.96.0 metadata --locked --format-version 1 --no-deps > /dev/null
+
+      - name: Format selected core packages
+        run: cargo +1.96.0 fmt --check --package symthaea-core --package symthaea-fep
+
+      - name: Compile selected core library targets
+        id: compile
+        run: |
+          cargo +1.96.0 check --locked --package symthaea-core --lib
+          cargo +1.96.0 check --locked --package symthaea-fep --lib
+      - name: Diagnose lockfile drift in disposable source snapshot
+        if: failure() && steps.compile.outcome == 'failure'
+        shell: bash
+        env:
+          TOOLCHAIN: "1.96.0"
+        run: |
+          set -Eeuo pipefail
+          SNAPSHOT="$RUNNER_TEMP/symthaea-lock-diagnosis"
+          mkdir -p "$SNAPSHOT"
+          git archive HEAD | tar -x -C "$SNAPSHOT"
+          ORIGINAL="$GITHUB_WORKSPACE/Cargo.lock"
+          GENERATED="$SNAPSHOT/Cargo.lock"
+          set +e
+          cargo +"$TOOLCHAIN" metadata --manifest-path "$SNAPSHOT/Cargo.toml" --format-version 1 > "$RUNNER_TEMP/unlocked-metadata.json" 2> "$RUNNER_TEMP/unlocked-metadata.stderr"
+          status=$?
+          set -e
+          if [[ $status -eq 0 ]]; then
+            cargo +"$TOOLCHAIN" metadata --manifest-path "$SNAPSHOT/Cargo.toml" --locked --format-version 1 > /dev/null
+          fi
+          {
+            echo "## Disposable Cargo.lock diagnosis (Rust $TOOLCHAIN)"
+            echo
+            echo "- command exit: $status"
+            echo "- original SHA-256: $(sha256sum "$ORIGINAL" | awk '{print $1}')"
+            echo "- generated SHA-256: $(sha256sum "$GENERATED" | awk '{print $1}')"
+            echo "- locked metadata on generated snapshot: $([[ $status -eq 0 ]] && echo PASS || echo NOT_RUN_OR_FAILED)"
+            echo
+            echo "The checked-out Cargo.lock was not modified. This unlocked resolution occurred only in a temporary Git archive snapshot."
+            echo
+            echo "Cargo diagnostics:"
+            tail -n 120 "$RUNNER_TEMP/unlocked-metadata.stderr" || true
+            echo
+            echo "Cargo-generated lockfile delta:"
+            diff -u "$ORIGINAL" "$GENERATED" | head -n 320 || true
+          } >> "$GITHUB_STEP_SUMMARY"
+          diff -u "$ORIGINAL" "$GENERATED" | head -n 320 || true
+          test "$(sha256sum "$ORIGINAL" | awk '{print $1}')" = "$(sha256sum "$GITHUB_WORKSPACE/Cargo.lock" | awk '{print $1}')"
+
+
+      - name: Run selected core library tests
+        run: |
+          cargo +1.96.0 test --locked --package symthaea-core --lib
+          cargo +1.96.0 test --locked --package symthaea-fep --lib
+
+      - name: Run selected Clippy checks
+        run: |
+          cargo +1.96.0 clippy --locked --package symthaea-core --lib
+          cargo +1.96.0 clippy --locked --package symthaea-fep --lib
+
+      - name: Build selected API documentation
+        run: cargo +1.96.0 doc --locked --no-deps --package symthaea-core --package symthaea-fep
+
+      - name: Enforce lockfile immutability
+        run: git diff --exit-code -- Cargo.lock
+
+  candidate-1-99:
+    name: Candidate compatibility (Rust 1.99.1)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install exact candidate toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: "1.99.1"
+          components: rustfmt, clippy
+
+      - name: Record and verify exact compiler and Cargo identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc +1.99.1 -Vv | tee rustc-version.txt
+          cargo +1.99.1 -Vv | tee cargo-version.txt
+          grep -F 'rustc 1.99.1 ' rustc-version.txt
+          grep -F 'cargo 1.99.1 ' cargo-version.txt
+
+      - name: Validate workspace metadata without resolving new dependencies
+        run: cargo +1.99.1 metadata --locked --format-version 1 --no-deps > /dev/null
+
+      - name: Format selected core packages
+        run: cargo +1.99.1 fmt --check --package symthaea-core --package symthaea-fep
+
+      - name: Compile selected core library targets
+        id: compile
+        run: |
+          cargo +1.99.1 check --locked --package symthaea-core --lib
+          cargo +1.99.1 check --locked --package symthaea-fep --lib
+      - name: Diagnose lockfile drift in disposable source snapshot
+        if: failure() && steps.compile.outcome == 'failure'
+        shell: bash
+        env:
+          TOOLCHAIN: "1.99.1"
+        run: |
+          set -Eeuo pipefail
+          SNAPSHOT="$RUNNER_TEMP/symthaea-lock-diagnosis"
+          mkdir -p "$SNAPSHOT"
+          git archive HEAD | tar -x -C "$SNAPSHOT"
+          ORIGINAL="$GITHUB_WORKSPACE/Cargo.lock"
+          GENERATED="$SNAPSHOT/Cargo.lock"
+          set +e
+          cargo +"$TOOLCHAIN" metadata --manifest-path "$SNAPSHOT/Cargo.toml" --format-version 1 > "$RUNNER_TEMP/unlocked-metadata.json" 2> "$RUNNER_TEMP/unlocked-metadata.stderr"
+          status=$?
+          set -e
+          if [[ $status -eq 0 ]]; then
+            cargo +"$TOOLCHAIN" metadata --manifest-path "$SNAPSHOT/Cargo.toml" --locked --format-version 1 > /dev/null
+          fi
+          {
+            echo "## Disposable Cargo.lock diagnosis (Rust $TOOLCHAIN)"
+            echo
+            echo "- command exit: $status"
+            echo "- original SHA-256: $(sha256sum "$ORIGINAL" | awk '{print $1}')"
+            echo "- generated SHA-256: $(sha256sum "$GENERATED" | awk '{print $1}')"
+            echo "- locked metadata on generated snapshot: $([[ $status -eq 0 ]] && echo PASS || echo NOT_RUN_OR_FAILED)"
+            echo
+            echo "The checked-out Cargo.lock was not modified. This unlocked resolution occurred only in a temporary Git archive snapshot."
+            echo
+            echo "Cargo diagnostics:"
+            tail -n 120 "$RUNNER_TEMP/unlocked-metadata.stderr" || true
+            echo
+            echo "Cargo-generated lockfile delta:"
+            diff -u "$ORIGINAL" "$GENERATED" | head -n 320 || true
+          } >> "$GITHUB_STEP_SUMMARY"
+          diff -u "$ORIGINAL" "$GENERATED" | head -n 320 || true
+          test "$(sha256sum "$ORIGINAL" | awk '{print $1}')" = "$(sha256sum "$GITHUB_WORKSPACE/Cargo.lock" | awk '{print $1}')"
+
+
+      - name: Run selected core library tests
+        run: |
+          cargo +1.99.1 test --locked --package symthaea-core --lib
+          cargo +1.99.1 test --locked --package symthaea-fep --lib
+
+      - name: Run selected Clippy checks
+        run: |
+          cargo +1.99.1 clippy --locked --package symthaea-core --lib
+          cargo +1.99.1 clippy --locked --package symthaea-fep --lib
+
+      - name: Build selected API documentation
+        run: cargo +1.99.1 doc --locked --no-deps --package symthaea-core --package symthaea-fep
+
+      - name: Enforce lockfile immutability
+        run: git diff --exit-code -- Cargo.lock
+
+  candidate-1-100:
+    name: Candidate compatibility (Rust 1.100.0)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install exact candidate toolchain
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8
+        with:
+          toolchain: "1.100.0"
+          components: rustfmt, clippy
+
+      - name: Record and verify exact compiler and Cargo identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc +1.100.0 -Vv | tee rustc-version.txt
+          cargo +1.100.0 -Vv | tee cargo-version.txt
+          grep -F 'rustc 1.100.0 ' rustc-version.txt
+          grep -F 'cargo 1.100.0 ' cargo-version.txt
+
+      - name: Validate workspace metadata without resolving new dependencies
+        run: cargo +1.100.0 metadata --locked --format-version 1 --no-deps > /dev/null
+
+      - name: Format selected core packages
+        run: cargo +1.100.0 fmt --check --package symthaea-core --package symthaea-fep
+
+      - name: Compile selected core library targets
+        id: compile
+        run: |
+          cargo +1.100.0 check --locked --package symthaea-core --lib
+          cargo +1.100.0 check --locked --package symthaea-fep --lib
+      - name: Diagnose lockfile drift in disposable source snapshot
+        if: failure() && steps.compile.outcome == 'failure'
+        shell: bash
+        env:
+          TOOLCHAIN: "1.100.0"
+        run: |
+          set -Eeuo pipefail
+          SNAPSHOT="$RUNNER_TEMP/symthaea-lock-diagnosis"
+          mkdir -p "$SNAPSHOT"
+          git archive HEAD | tar -x -C "$SNAPSHOT"
+          ORIGINAL="$GITHUB_WORKSPACE/Cargo.lock"
+          GENERATED="$SNAPSHOT/Cargo.lock"
+          set +e
+          cargo +"$TOOLCHAIN" metadata --manifest-path "$SNAPSHOT/Cargo.toml" --format-version 1 > "$RUNNER_TEMP/unlocked-metadata.json" 2> "$RUNNER_TEMP/unlocked-metadata.stderr"
+          status=$?
+          set -e
+          if [[ $status -eq 0 ]]; then
+            cargo +"$TOOLCHAIN" metadata --manifest-path "$SNAPSHOT/Cargo.toml" --locked --format-version 1 > /dev/null
+          fi
+          {
+            echo "## Disposable Cargo.lock diagnosis (Rust $TOOLCHAIN)"
+            echo
+            echo "- command exit: $status"
+            echo "- original SHA-256: $(sha256sum "$ORIGINAL" | awk '{print $1}')"
+            echo "- generated SHA-256: $(sha256sum "$GENERATED" | awk '{print $1}')"
+            echo "- locked metadata on generated snapshot: $([[ $status -eq 0 ]] && echo PASS || echo NOT_RUN_OR_FAILED)"
+            echo
+            echo "The checked-out Cargo.lock was not modified. This unlocked resolution occurred only in a temporary Git archive snapshot."
+            echo
+            echo "Cargo diagnostics:"
+            tail -n 120 "$RUNNER_TEMP/unlocked-metadata.stderr" || true
+            echo
+            echo "Cargo-generated lockfile delta:"
+            diff -u "$ORIGINAL" "$GENERATED" | head -n 320 || true
+          } >> "$GITHUB_STEP_SUMMARY"
+          diff -u "$ORIGINAL" "$GENERATED" | head -n 320 || true
+          test "$(sha256sum "$ORIGINAL" | awk '{print $1}')" = "$(sha256sum "$GITHUB_WORKSPACE/Cargo.lock" | awk '{print $1}')"
+
+
+      - name: Run selected core library tests
+        run: |
+          cargo +1.100.0 test --locked --package symthaea-core --lib
+          cargo +1.100.0 test --locked --package symthaea-fep --lib
+
+      - name: Run selected Clippy checks
+        run: |
+          cargo +1.100.0 clippy --locked --package symthaea-core --lib
+          cargo +1.100.0 clippy --locked --package symthaea-fep --lib
+
+      - name: Build selected API documentation
+        run: cargo +1.100.0 doc --locked --no-deps --package symthaea-core --package symthaea-fep
+
+      - name: Enforce lockfile immutability
+        run: git diff --exit-code -- Cargo.lock
+
+  cargo-1-100-unused-dependency-census:
+    name: Advisory Cargo 1.100 unused-dependency census (core packages)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    continue-on-error: true
+    steps:
+      - name: Checkout exact qualification merge tree
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install exact stable Rust and Cargo 1.100.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install 1.100.0 --profile minimal
+          [[ "$(rustup run 1.100.0 rustc --version)" == "rustc 1.100.0 "* ]]
+          [[ "$(rustup run 1.100.0 cargo --version)" == "cargo 1.100.0 "* ]]
+          rustup run 1.100.0 rustc -Vv
+          rustup run 1.100.0 cargo -Vv
+
+      - name: Audit unused direct dependencies on a disposable source snapshot
+        run: bash scripts/audit-cargo-unused-dependencies.sh 1.100.0 1.100.0

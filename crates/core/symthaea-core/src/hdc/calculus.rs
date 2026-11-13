@@ -1162,7 +1162,7 @@ pub fn exponential_integral(x: f64) -> f64 {
     if x.abs() < 1e-15 {
         return f64::NEG_INFINITY;
     }
-    let euler_gamma = 0.5772156649015329;
+    let euler_gamma = std::f64::consts::EULER_GAMMA;
 
     if x.abs() < 40.0 {
         // Series: Ei(x) = γ + ln|x| + Σ_{n=1}^∞ x^n / (n·n!)
