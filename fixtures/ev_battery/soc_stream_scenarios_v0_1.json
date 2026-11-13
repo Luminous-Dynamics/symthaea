@@ -1,0 +1,305 @@
+{
+  "corpus_version": "ev-soc-stream-corpus/0.1",
+  "cases": [
+    {
+      "case_id": "positive-current-charge",
+      "config": {
+        "schema_version": "ev-soc-stream-config/0.1",
+        "identity": {
+          "vehicle_ref": "synthetic-vehicle-001",
+          "pack_ref": "synthetic-pack-001",
+          "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sensor_calibration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "capacity_reference_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "current_bias_calibration_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "parameter_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "initial_soc": 0.5,
+        "initial_soc_bound": 0.00002,
+        "capacity_ah": 1,
+        "capacity_uncertainty_ah": 0.01,
+        "current_bias_a": 0,
+        "current_bias_uncertainty_a": 0,
+        "current_measurement_uncertainty_a": 0.02,
+        "charge_efficiency": 0.99,
+        "discharge_efficiency": 0.995,
+        "voltage_min_v": 2.5,
+        "voltage_max_v": 4.3,
+        "temperature_min_c": -20,
+        "temperature_max_c": 45
+      },
+      "initial_timestamp_ms": 0,
+      "truth_initial_soc": 0.5,
+      "truth_capacity_ah": 1,
+      "samples": [
+        {
+          "sample": {
+            "timestamp_ms": 1000,
+            "current_a": 1,
+            "voltage_v": 3.7,
+            "temperature_c": 25,
+            "current_valid": true,
+            "voltage_valid": true,
+            "temperature_valid": true
+          },
+          "truth_current_a": 1,
+          "truth_soc": 0.500275
+        }
+      ],
+      "expected_disposition": "estimated",
+      "expected_final_soc": 0.500275,
+      "expected_tolerance": 1e-12,
+      "expected_abstention_reason": null
+    },
+    {
+      "case_id": "negative-current-discharge",
+      "config": {
+        "schema_version": "ev-soc-stream-config/0.1",
+        "identity": {
+          "vehicle_ref": "synthetic-vehicle-002",
+          "pack_ref": "synthetic-pack-002",
+          "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sensor_calibration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "capacity_reference_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "current_bias_calibration_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "parameter_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "initial_soc": 0.6,
+        "initial_soc_bound": 0.00002,
+        "capacity_ah": 2,
+        "capacity_uncertainty_ah": 0.02,
+        "current_bias_a": 0,
+        "current_bias_uncertainty_a": 0,
+        "current_measurement_uncertainty_a": 0.01,
+        "charge_efficiency": 0.99,
+        "discharge_efficiency": 0.995,
+        "voltage_min_v": 2.5,
+        "voltage_max_v": 4.3,
+        "temperature_min_c": -20,
+        "temperature_max_c": 45
+      },
+      "initial_timestamp_ms": 0,
+      "truth_initial_soc": 0.6,
+      "truth_capacity_ah": 2,
+      "samples": [
+        {
+          "sample": {
+            "timestamp_ms": 1000,
+            "current_a": -2,
+            "voltage_v": 3.7,
+            "temperature_c": 26,
+            "current_valid": true,
+            "voltage_valid": true,
+            "temperature_valid": true
+          },
+          "truth_current_a": -2,
+          "truth_soc": 0.5997208263534338
+        }
+      ],
+      "expected_disposition": "estimated",
+      "expected_final_soc": 0.5997208263534338,
+      "expected_tolerance": 1e-12,
+      "expected_abstention_reason": null
+    },
+    {
+      "case_id": "independent-current-bias-calibration",
+      "config": {
+        "schema_version": "ev-soc-stream-config/0.1",
+        "identity": {
+          "vehicle_ref": "synthetic-vehicle-003",
+          "pack_ref": "synthetic-pack-003",
+          "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sensor_calibration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "capacity_reference_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "current_bias_calibration_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "parameter_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "initial_soc": 0.7,
+        "initial_soc_bound": 0.00002,
+        "capacity_ah": 1.2,
+        "capacity_uncertainty_ah": 0.005,
+        "current_bias_a": 0.1,
+        "current_bias_uncertainty_a": 0.02,
+        "current_measurement_uncertainty_a": 0.01,
+        "charge_efficiency": 0.99,
+        "discharge_efficiency": 0.995,
+        "voltage_min_v": 2.5,
+        "voltage_max_v": 4.3,
+        "temperature_min_c": -20,
+        "temperature_max_c": 45
+      },
+      "initial_timestamp_ms": 0,
+      "truth_initial_soc": 0.7,
+      "truth_capacity_ah": 1.2,
+      "samples": [
+        {
+          "sample": {
+            "timestamp_ms": 1000,
+            "current_a": 0.1,
+            "voltage_v": 3.7,
+            "temperature_c": 25,
+            "current_valid": true,
+            "voltage_valid": true,
+            "temperature_valid": true
+          },
+          "truth_current_a": 0,
+          "truth_soc": 0.7
+        }
+      ],
+      "expected_disposition": "estimated",
+      "expected_final_soc": 0.7,
+      "expected_tolerance": 1e-12,
+      "expected_abstention_reason": null
+    },
+    {
+      "case_id": "invalid-current-sensor-abstains",
+      "config": {
+        "schema_version": "ev-soc-stream-config/0.1",
+        "identity": {
+          "vehicle_ref": "synthetic-vehicle-004",
+          "pack_ref": "synthetic-pack-004",
+          "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sensor_calibration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "capacity_reference_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "current_bias_calibration_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "parameter_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "initial_soc": 0.8,
+        "initial_soc_bound": 0.00002,
+        "capacity_ah": 1,
+        "capacity_uncertainty_ah": 0.01,
+        "current_bias_a": 0,
+        "current_bias_uncertainty_a": 0.01,
+        "current_measurement_uncertainty_a": 0.01,
+        "charge_efficiency": 0.99,
+        "discharge_efficiency": 0.995,
+        "voltage_min_v": 2.5,
+        "voltage_max_v": 4.3,
+        "temperature_min_c": -20,
+        "temperature_max_c": 45
+      },
+      "initial_timestamp_ms": 0,
+      "truth_initial_soc": 0.8,
+      "truth_capacity_ah": 1,
+      "samples": [
+        {
+          "sample": {
+            "timestamp_ms": 1000,
+            "current_a": 0,
+            "voltage_v": 3.7,
+            "temperature_c": 25,
+            "current_valid": false,
+            "voltage_valid": true,
+            "temperature_valid": true
+          },
+          "truth_current_a": 0,
+          "truth_soc": null
+        }
+      ],
+      "expected_disposition": "abstain",
+      "expected_final_soc": null,
+      "expected_tolerance": null,
+      "expected_abstention_reason": "CURRENT_SENSOR_INVALID"
+    },
+    {
+      "case_id": "temperature-out-of-domain-abstains",
+      "config": {
+        "schema_version": "ev-soc-stream-config/0.1",
+        "identity": {
+          "vehicle_ref": "synthetic-vehicle-005",
+          "pack_ref": "synthetic-pack-005",
+          "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sensor_calibration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "capacity_reference_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "current_bias_calibration_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "parameter_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "initial_soc": 0.4,
+        "initial_soc_bound": 0.00002,
+        "capacity_ah": 1,
+        "capacity_uncertainty_ah": 0.01,
+        "current_bias_a": 0,
+        "current_bias_uncertainty_a": 0,
+        "current_measurement_uncertainty_a": 0.01,
+        "charge_efficiency": 0.99,
+        "discharge_efficiency": 0.995,
+        "voltage_min_v": 2.5,
+        "voltage_max_v": 4.3,
+        "temperature_min_c": -20,
+        "temperature_max_c": 45
+      },
+      "initial_timestamp_ms": 0,
+      "truth_initial_soc": 0.4,
+      "truth_capacity_ah": 1,
+      "samples": [
+        {
+          "sample": {
+            "timestamp_ms": 1000,
+            "current_a": 0.5,
+            "voltage_v": 3.7,
+            "temperature_c": 55,
+            "current_valid": true,
+            "voltage_valid": true,
+            "temperature_valid": true
+          },
+          "truth_current_a": 0.5,
+          "truth_soc": null
+        }
+      ],
+      "expected_disposition": "abstain",
+      "expected_final_soc": null,
+      "expected_tolerance": null,
+      "expected_abstention_reason": "TEMPERATURE_OUT_OF_DOMAIN"
+    },
+    {
+      "case_id": "timestamp-gap-abstains",
+      "config": {
+        "schema_version": "ev-soc-stream-config/0.1",
+        "identity": {
+          "vehicle_ref": "synthetic-vehicle-006",
+          "pack_ref": "synthetic-pack-006",
+          "configuration_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "sensor_calibration_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "capacity_reference_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "current_bias_calibration_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "parameter_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "initial_soc": 0.5,
+        "initial_soc_bound": 0.00002,
+        "capacity_ah": 1,
+        "capacity_uncertainty_ah": 0.01,
+        "current_bias_a": 0,
+        "current_bias_uncertainty_a": 0,
+        "current_measurement_uncertainty_a": 0.01,
+        "charge_efficiency": 0.99,
+        "discharge_efficiency": 0.995,
+        "voltage_min_v": 2.5,
+        "voltage_max_v": 4.3,
+        "temperature_min_c": -20,
+        "temperature_max_c": 45
+      },
+      "initial_timestamp_ms": 0,
+      "truth_initial_soc": 0.5,
+      "truth_capacity_ah": 1,
+      "samples": [
+        {
+          "sample": {
+            "timestamp_ms": 2000,
+            "current_a": 0,
+            "voltage_v": 3.7,
+            "temperature_c": 25,
+            "current_valid": true,
+            "voltage_valid": true,
+            "temperature_valid": true
+          },
+          "truth_current_a": 0,
+          "truth_soc": null
+        }
+      ],
+      "expected_disposition": "abstain",
+      "expected_final_soc": null,
+      "expected_tolerance": null,
+      "expected_abstention_reason": "SAMPLE_INTERVAL_NOT_1HZ"
+    }
+  ]
+}
