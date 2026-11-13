@@ -1467,6 +1467,80 @@ mod tests {
     }
 
     #[test]
+    fn paired_comparison_requires_the_same_scheduled_robot_time_denominator() {
+        let mut audit = input();
+        audit.clusters[0].candidate.available_robot_minutes = 30;
+        assert_eq!(
+            compare_work_and_terminal_capability(&audit),
+            Err(CapabilityRetentionError::ScheduledRobotTimeMismatch(
+                "cluster-A".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn downtime_is_reported_separately_from_accepted_work_and_robot_time() {
+        let mut audit = input();
+        audit.clusters[0].candidate.nonproductive_downtime_minutes = 12;
+        let report = compare_work_and_terminal_capability(&audit).unwrap();
+        assert_eq!(
+            report.clusters[0].candidate_nonproductive_downtime_minutes,
+            12
+        );
+        assert_eq!(report.clusters[0].candidate_work_rate_milli_per_hour, 8_000);
+    }
+
+    #[test]
+    fn downtime_cannot_exceed_the_scheduled_robot_time() {
+        let mut audit = input();
+        audit.clusters[0].candidate.nonproductive_downtime_minutes = 61;
+        assert!(matches!(
+            compare_work_and_terminal_capability(&audit),
+            Err(CapabilityRetentionError::InvalidTimeAccounting {
+                arm_id,
+                cluster_id
+            }) if arm_id == "candidate" && cluster_id == "cluster-A"
+        ));
+    }
+
+    #[test]
+    fn work_outcome_receipt_is_required() {
+        let mut audit = input();
+        audit.clusters[0].candidate.work_outcome_receipt_digest.clear();
+        assert!(matches!(
+            compare_work_and_terminal_capability(&audit),
+            Err(CapabilityRetentionError::MissingClusterReceipt(cluster))
+                if cluster == "cluster-A"
+        ));
+    }
+
+    #[test]
+    fn starting_physical_state_must_match_between_arms() {
+        let mut audit = input();
+        audit.clusters[0].candidate.option_set.predecessor_state_digest =
+            "different-physical-start".into();
+        assert_eq!(
+            compare_work_and_terminal_capability(&audit),
+            Err(CapabilityRetentionError::StartingPhysicalStateMismatch(
+                "cluster-A".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn qualified_option_count_must_match_the_recovery_reserve_vector() {
+        let mut audit = input();
+        audit.clusters[0].candidate.reserves[2].terminal_lower_bound = Some(1);
+        assert_eq!(
+            compare_work_and_terminal_capability(&audit),
+            Err(CapabilityRetentionError::OptionSetReserveCountMismatch {
+                arm_id: "candidate".into(),
+                cluster_id: "cluster-A".into()
+            })
+        );
+    }
+
+    #[test]
     fn canonical_cluster_order_does_not_change_the_report() {
         let mut audit = input();
         let mut second = audit.clusters[0].clone();
@@ -1485,6 +1559,7 @@ mod tests {
     #[test]
     fn work_rate_uses_scheduled_available_robot_minutes_not_powered_on_time() {
         let mut audit = input();
+        audit.clusters[0].baseline.available_robot_minutes = 30;
         audit.clusters[0].candidate.available_robot_minutes = 30;
         let report = compare_work_and_terminal_capability(&audit).unwrap();
         assert_eq!(
