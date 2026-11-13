@@ -86,18 +86,18 @@ The Rust example is registered as `plasma_multifidelity_design` in the UAP Obser
 
 Independent dense-matrix replay of the exact hard-coded arrays gives:
 
-| Selector | Selected action IDs | Cost | Target EIG (nats) | Mandatory F2/F3/moisture coverage |
-|---|---|---:|---:|---|
-| Independent greedy | WCA_SCREEN; MOISTURE_CONTENT; FTIR_CHEMISTRY; AGED_LAP_SHEAR | 20 | 5.279431608 | Missing LAP_SHEAR |
-| Independent exhaustive | WCA_SCREEN; MOISTURE_CONTENT; LAP_SHEAR; AGED_LAP_SHEAR | 25 | 5.618701237 | Complete |
-| Correlated greedy | WCA_SCREEN; MOISTURE_CONTENT; LAP_SHEAR; AGED_LAP_SHEAR | 25 | 5.705573945 | Complete |
-| Correlated exhaustive | WCA_SCREEN; MOISTURE_CONTENT; LAP_SHEAR; AGED_LAP_SHEAR | 25 | 5.705573945 | Complete |
+| Selector | Selected action IDs | Cost | Expected target EIG (nats) | Worst-case target EIG (nats) | Mandatory F2/F3/moisture coverage |
+|---|---|---:|---:|---:|---|
+| Independent greedy | WCA_SCREEN; MOISTURE_CONTENT; FTIR_CHEMISTRY; AGED_LAP_SHEAR | 20 | 5.279431608 | 5.118105451 | Missing LAP_SHEAR |
+| Independent exhaustive | WCA_SCREEN; MOISTURE_CONTENT; LAP_SHEAR; AGED_LAP_SHEAR | 25 | 5.618701237 | 5.516601804 | Complete |
+| Correlated greedy | WCA_SCREEN; MOISTURE_CONTENT; LAP_SHEAR; AGED_LAP_SHEAR | 25 | 5.705573945 | 5.610620059 | Complete |
+| Correlated exhaustive | WCA_SCREEN; MOISTURE_CONTENT; LAP_SHEAR; AGED_LAP_SHEAR | 25 | 5.705573945 | 5.610620059 | Complete |
 
 The independently computed covariance eigenvalues are 0.05, 0.70, 1.00, 1.30 and 1.95, so the frozen covariance is positive definite. The high WCA/FTIR preparation correlation (ρ=0.95) makes the two proxies partly redundant. The correlated selector therefore does not spend its remaining budget on FTIR; it selects the missing initial lap-shear endpoint instead.
 
 The independent greedy selector's gap to its own exact oracle is 0.339269630 nats. The correlated greedy selector matches its exact oracle for this specific five-action fixture. This is a *known-answer synthetic composition result*, not an industry benchmark win. A different covariance/prior/scenario can reverse the comparison.
 
-The example asserts these selected IDs, exact-oracle relationships and endpoint-coverage dispositions. It fails loudly if the frozen source code produces a different result when it is eventually run with the parent UAP implementation.
+The example prints expected and worst-case target EIG, expected and worst-case joint EIG, and per-scenario target/joint EIG plus data-only rank/nullity. It asserts these selected IDs, exact-oracle relationships and endpoint-coverage dispositions. It fails loudly if the frozen source code produces a different result when it is eventually run with the parent UAP implementation.
 
 The output IDs identify the exact generic source blobs used:
 - budgeted design: `ed3d0286e706eaee9bb670e7e5e62f8ff01894b8`;
