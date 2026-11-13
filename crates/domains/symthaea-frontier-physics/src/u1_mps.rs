@@ -447,6 +447,7 @@ impl U1CanonicalGaugeReceipt {
             && self.factorization_max_residual.is_finite()
             && self.factorization_max_residual <= tolerance
             && self.factorization_l2_residual.is_finite()
+            && self.factorization_l2_residual <= tolerance
             && self.state_reconstruction_l2_residual.is_finite()
             && self.state_reconstruction_l2_residual <= tolerance
             && self.relative_norm_drift.is_finite()
@@ -457,6 +458,22 @@ impl U1CanonicalGaugeReceipt {
             && self.left_exterior_operator_norm_upper_bound >= 1.0
             && self.right_exterior_operator_norm_upper_bound.is_finite()
             && self.right_exterior_operator_norm_upper_bound >= 1.0
+            && self.exterior_operator_norm_product_upper_bound().is_finite()
+            && self.left_isometry_residuals.iter().all(|(site, residual)| {
+                *site < self.bond && residual.is_finite() && *residual <= tolerance
+            })
+            && self.right_isometry_residuals.iter().all(|(site, residual)| {
+                *site > self.bond + 1
+                    && *site < self.site_count
+                    && residual.is_finite()
+                    && *residual <= tolerance
+            })
+            && self.left_isometry_residuals.len() == self.bond
+            && self.right_isometry_residuals.len() == self.site_count.saturating_sub(self.bond + 2)
+            && self.input_norm_squared.is_finite()
+            && self.input_norm_squared > 0.0
+            && self.output_norm_squared.is_finite()
+            && self.output_norm_squared > 0.0
     }
 
     pub fn exterior_operator_norm_product_upper_bound(&self) -> f64 {
@@ -1105,6 +1122,7 @@ impl ComplexU1Mps {
         let qualified = maximum_left_isometry_residual <= tolerance
             && maximum_right_isometry_residual <= tolerance
             && factorization_stats.max_residual <= tolerance
+            && factorization_l2_residual <= tolerance
             && state_reconstruction_l2_residual <= tolerance
             && relative_norm_drift <= tolerance
             && candidate.selection_rule_residual <= tolerance
