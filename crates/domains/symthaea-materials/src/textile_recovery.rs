@@ -444,6 +444,11 @@ pub struct RouteAssessment {
     pub evidence_ids: Vec<String>,
 }
 
+/// Checks whether an identifier is non-empty after trimming.
+fn nonempty(value: &str) -> bool {
+    !value.trim().is_empty()
+}
+
 fn valid_sha256(value: &str) -> bool {
     value.len() == 64
         && value
