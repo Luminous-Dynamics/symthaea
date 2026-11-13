@@ -23,6 +23,9 @@ exclude = [
     # The public checkout currently exposes this glob-matched directory without a Cargo manifest.
     # Exclude it explicitly so targeted package metadata can be resolved; remove once it is a crate.
     "crates/core/symthaea",
+    # Source-only prototypes with no Cargo.toml are not workspace packages yet.
+    "crates/core/symthaea-iit",
+    "crates/core/symthaea-observation-attestation",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
