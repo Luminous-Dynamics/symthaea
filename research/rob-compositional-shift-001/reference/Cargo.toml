@@ -1,0 +1,14 @@
+[package]
+name = "rob-compositional-shift"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]
+rob-benchmark-provenance-holdout = { path = "../../rob-benchmark-provenance-holdout-001/reference" }
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
