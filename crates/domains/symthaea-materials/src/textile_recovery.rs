@@ -1509,6 +1509,18 @@ mod tests {
                 downcycling_requires_physical_trial_mass_balance_and_receiver_acceptance();
                 ("eligible", None)
             }
+            "ROUTE-028-DESIGN-REVISION-BOUND" => {
+                design_linked_component_trial_binds_exact_revision_and_specimen();
+                ("eligible", None)
+            }
+            "ROUTE-029-DESIGN-DOSSIER-DIGEST-INVALID" => {
+                malformed_design_revision_binding_blocks_component_claim();
+                ("ineligible", Some("InvalidDesignRevisionBinding"))
+            }
+            "ROUTE-030-DESIGN-SPECIMEN-MISMATCH" => {
+                design_conformity_must_bind_the_same_physical_sample_as_the_trial();
+                ("ineligible", Some("InvalidDesignRevisionBinding"))
+            }
             other => panic!("unknown textile recovery corpus case: {other}"),
         }
     }
@@ -1530,12 +1542,12 @@ mod tests {
         assert_eq!(corpus["schema_version"], "0.1.0");
         assert_eq!(corpus["corpus_id"], "TEXTILE-ROUTE-CASES-001");
         assert_eq!(corpus["fixture_class"], "synthetic");
-        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(27));
+        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(30));
 
         let cases = corpus["cases"]
             .as_array()
             .expect("recovery cases must be an array");
-        assert_eq!(cases.len(), 27, "review route corpus case count changes");
+        assert_eq!(cases.len(), 30, "review route corpus case count changes");
         let mut seen = BTreeSet::new();
         for case in cases {
             let case_id = case["case_id"]
@@ -1555,7 +1567,7 @@ mod tests {
             assert_eq!(disposition, expected_disposition, "case {case_id} disposition");
             assert_eq!(reason, expected_reason, "case {case_id} reason");
         }
-        assert_eq!(seen.len(), 27);
+        assert_eq!(seen.len(), 30);
     }
 
     #[test]
