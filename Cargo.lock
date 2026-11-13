@@ -19491,6 +19491,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-oli-bench"
+version = "0.1.0"
+dependencies = [
+ "csv",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "symthaea-openfoam-bridge"
 version = "0.1.0"
 dependencies = [
