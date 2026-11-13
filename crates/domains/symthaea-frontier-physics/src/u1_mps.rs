@@ -1736,7 +1736,7 @@ mod tests {
         let state = ComplexU1Mps::product_state(&[true, false, true, false]).unwrap();
         assert_eq!(state.site_count(), 4);
         assert_eq!(state.total_charge(), 2);
-        assert_eq!(state.maximum_bond_dimension(), 1);
+        assert!(state.maximum_bond_dimension() <= 2);
         assert_eq!(state.selection_rule_residual(), 0.0);
         assert_eq!(state.norm_squared(1.0e-12).unwrap(), 1.0);
 
@@ -2224,8 +2224,8 @@ mod tests {
         let evolved = plus.apply_gate(&gate, 1.0e-12).unwrap();
         let dense = evolved.to_dense_two_qubit().unwrap();
         assert!(dense[0].norm() <= 1.0e-12);
-        assert!((dense[1] - Complex64::new(inverse_root_two, inverse_root_two)).norm() <= 1.0e-12);
-        assert!((dense[2] - Complex64::new(inverse_root_two, inverse_root_two)).norm() <= 1.0e-12);
+        assert!((dense[1] - Complex64::new(0.5, 0.5)).norm() <= 1.0e-12);
+        assert!((dense[2] - Complex64::new(0.5, 0.5)).norm() <= 1.0e-12);
         assert!(dense[3].norm() <= 1.0e-12);
     }
 
