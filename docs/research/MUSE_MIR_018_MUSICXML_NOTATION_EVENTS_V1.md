@@ -65,7 +65,7 @@ Other measure-level elements are not silently discarded. Directions (including d
 
 A signed `<offset>` is converted from divisions into exact rational quarter-note beats relative to the current measure cursor. The resulting position must remain inside the explicit measure span; malformed, overflowing or out-of-measure offsets withhold the complete event layer as Unknown. These are source-preservation events, not a claim that every direction or harmony element is executable during playback.
 
-Opaque source subtrees preserve ordered element children, attributes and ordered mixed text/element content. This is a structural source representation, not a byte-for-byte lexical XML archive: namespace prefixes, comments and insignificant lexical formatting are not promised as preserved. The original uploaded XML remains the authoritative byte artifact.
+Opaque source subtrees preserve ordered element children, attributes and trimmed text content. The current typed tree does not preserve the lexical interleaving of text nodes around child elements, comments, processing instructions, namespace prefixes or insignificant formatting. It is a structured semantic view, not a lossless XML serializer. The original uploaded XML remains the authoritative byte artifact.
 
 ### Fail-closed and compatibility behavior
 
