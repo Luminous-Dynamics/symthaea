@@ -63,19 +63,37 @@ Catalog: https://catalog.data.gov/dataset/near-infrared-spectra-of-origin-define
 Paper: https://doi.org/10.1038/s41597-026-07434-6
 Record DOI: https://doi.org/10.18126/61v0-rf98
 
-The catalog describes 113 physical textile specimens:
+The NIST catalog describes 113 fabric specimens:
 - 70 known-provenance fabrics with known fibre content and varied dyes/finishes;
 - 20 known-provenance undyed blends;
 - 11 post-consumer textiles;
 - 12 pre-consumer textiles.
 
-Nominally seven NIR replicates per specimen are described, using:
+The accompanying Scientific Data paper describes NIR-SORT versions 1.0 and 2.0, a sample library of 113 fabrics and 61 fibre specimens, with experimental metadata, machine exports and example post-processed data. Keep the fabric and fibre specimen populations distinct in the intake manifest; do not treat them as 174 independent garment specimens.
+
+Nominally seven NIR replicates per fabric specimen are described, using:
 - a benchtop instrument covering 833–2500 nm;
 - two handheld instrument ranges covering 1550–1950 nm.
 
 The catalog lists approximately 193 MB spectroscopy data and 10.6 GB microscopy data. Start with spectroscopy; microscopy is a later opt-in lane. Verify repository and file-level rights/attribution before copying, downloading in CI or redistributing any data.
 
-### 3.3 Task separation
+### 3.3 Existing industrial sorting and trim-removal baseline
+
+Do not frame the research gap as “industry has no trim removal.” Valvan publicly describes a commercial textile sorting sequence with:
+- **Fibersort:** NIR-based fibre/blend prediction plus RGB colour sorting;
+- **Trimclean:** a downstream system described as extracting trims including zippers, buttons and labels from fibre-sorted material.
+
+The supplier positions Trimclean as a way to improve feedstock purity for textile-to-textile recycling. This makes Fibersort + Trimclean a direct incumbent baseline for any proposed sensing-to-disassembly line. Supplier descriptions establish advertised capabilities, not independently reproduced yield, damage, purity, uptime or operating-cost results.
+
+A 2025 Refashion technical-monitoring comparison also lists NIR/hyperspectral systems including Pellenc ST Mistral+ CONNECT and TOMRA AUTOSORT, alongside Fibersort. Its capacity figures are context-specific and should not be treated as directly comparable without common feedstock, presentation, purity and uptime definitions.
+
+The September 2026 AI literature review's finding that only one study in its 173-paper corpus addressed attachment removal/separability is a **research-publication gap**, not proof that commercial trim-extraction machinery does not exist. Our challenge is to benchmark the full process—including unknown constructions, partial removal, textile damage, mass balance and downstream acceptance—against the installed industrial workflow, not just against a vision classifier.
+
+Primary industry sources:
+- Valvan Fibersort and Trimclean: https://www.valvan.com/en/solutions/textile-sorting-recycling
+- Refashion technical monitoring (sorting and unravelling technologies): https://media-pro.refashion.fr/2025/11/240428_synthese_veille-technos-tri-delissage_vf-en.pdf
+
+### 3.4 Task separation
 
 | Benchmark | Valid question | It does not establish |
 |---|---|---|
@@ -137,7 +155,7 @@ This prevents multiple views/replicates of one physical item from leaking across
 
 ## 5. Current synthetic tests
 
-The new module contains 15 Rust unit tests for:
+Before corpus integration, the module contained 16 Rust unit tests. The latest change adds an unknown-category/presentation negative control and an executable corpus-binding test (18 test functions total). The 15-case synthetic corpus is now loaded by Rust tests; each case invokes its mapped regression and checks the declared disposition/reason. The Rust unit tests cover:
 1. valid current-calibration composition admission;
 2. expired calibration abstention;
 3. revoked calibration rejection;
@@ -158,7 +176,7 @@ A separate synthetic fixture corpus is provided at:
 - `docs/research/fixtures/textile_sort_fusion_v0_1/sensor_cases.schema.json`
 - `docs/research/fixtures/textile_sort_fusion_v0_1/sensor_cases.example.json`
 
-The JSON corpus currently expresses 15 expected outcomes for future fixture-loading/semantic tests. It is not yet consumed by the Rust tests.
+The JSON corpus is consumed by the Rust test suite. Each synthetic case ID maps to an executable regression case; the test checks unique IDs, corpus/schema identity, expected disposition and expected reason. This proves only the fixture-to-contract regression mapping, not performance on the real NIST or TexSortML datasets.
 
 ## 6. Benchmark programme to exceed SOTA
 
