@@ -521,13 +521,13 @@ fn validate_scope(
                 *kind,
             ));
         }
-        if let ReserveApplicability::NotApplicable { reason } = applicability {
-            if reason.trim().is_empty() {
-                return Err(CapabilityRetentionError::InvalidNotApplicableReserve {
-                    arm_id: "reserve-policy".into(),
-                    kind: *kind,
-                });
-            }
+        if let ReserveApplicability::NotApplicable { reason } = applicability
+            && reason.trim().is_empty()
+        {
+            return Err(CapabilityRetentionError::InvalidNotApplicableReserve {
+                arm_id: "reserve-policy".into(),
+                kind: *kind,
+            });
         }
     }
     if kinds.is_empty()
@@ -613,14 +613,14 @@ fn validate_recovery_topology(
             ));
         }
         EvidenceDisposition::Unknown => {
-            if let Some(digest) = topology.report_digest.as_deref() {
-                if digest.trim().is_empty() {
-                    return Err(
-                        CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(
-                            arm_id.to_owned(),
-                        ),
-                    );
-                }
+            if let Some(digest) = topology.report_digest.as_deref()
+                && digest.trim().is_empty()
+            {
+                return Err(
+                    CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(
+                        arm_id.to_owned(),
+                    ),
+                );
             }
             return Ok(());
         }
@@ -684,18 +684,17 @@ fn validate_option_reserve_count(
     if summary.option_set.disposition != EvidenceDisposition::Qualified {
         return Ok(());
     }
-    if let Some(reserve) = reserves.get(&ReserveKind::RecoveryOptionCount) {
-        if reserve.disposition == EvidenceDisposition::Qualified
-            && reserve.terminal_lower_bound
-                != Some(u64::from(
-                    summary.option_set.terminal_qualified_option_count,
-                ))
-        {
-            return Err(CapabilityRetentionError::OptionSetReserveCountMismatch {
-                arm_id: arm_id.to_owned(),
-                cluster_id: cluster_id.to_owned(),
-            });
-        }
+    if let Some(reserve) = reserves.get(&ReserveKind::RecoveryOptionCount)
+        && reserve.disposition == EvidenceDisposition::Qualified
+        && reserve.terminal_lower_bound
+            != Some(u64::from(
+                summary.option_set.terminal_qualified_option_count,
+            ))
+    {
+        return Err(CapabilityRetentionError::OptionSetReserveCountMismatch {
+            arm_id: arm_id.to_owned(),
+            cluster_id: cluster_id.to_owned(),
+        });
     }
     Ok(())
 }
@@ -753,10 +752,10 @@ fn validate_reserves<'a>(
                         calibration_required: true,
                         ..
                     }
-                ) && !observation
+                ) && observation
                     .calibration_receipt_digest
                     .as_deref()
-                    .is_some_and(|value| !value.trim().is_empty())
+                    .is_none_or(|value| value.trim().is_empty())
                 {
                     return Err(CapabilityRetentionError::IncompleteQualifiedReserve {
                         arm_id: arm_id.to_owned(),
@@ -794,13 +793,13 @@ fn validate_reserves<'a>(
                 });
             }
         }
-        if let Some(calibration) = observation.calibration_receipt_digest.as_deref() {
-            if calibration.trim().is_empty() {
-                return Err(CapabilityRetentionError::IncompleteQualifiedReserve {
-                    arm_id: arm_id.to_owned(),
-                    kind: *kind,
-                });
-            }
+        if let Some(calibration) = observation.calibration_receipt_digest.as_deref()
+            && calibration.trim().is_empty()
+        {
+            return Err(CapabilityRetentionError::IncompleteQualifiedReserve {
+                arm_id: arm_id.to_owned(),
+                kind: *kind,
+            });
         }
     }
     if indexed.len() != policy_map.len() {
