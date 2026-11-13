@@ -1,0 +1,339 @@
+{
+  "schema_version": "0.1.0",
+  "campaign_id": "synthetic-facility-calibration-001",
+  "evidence_kind": "synthetic",
+  "source": {
+    "dataset_id": "synthetic-facility-tf",
+    "citation": "Synthetic known-answer fixture only; not measured data",
+    "raw_data_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "rights_status": "unknown",
+    "independently_reviewed": false
+  },
+  "facility": {
+    "facility_id": "synthetic-cavitation-tunnel",
+    "revision_id": "tunnel-rev-a",
+    "test_section_geometry_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "coordinate_frame_id": "propeller-disc-frame"
+  },
+  "condition": {
+    "condition_id": "synthetic-operating-water-condition",
+    "condition_fingerprint_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "water_state": "operating_condition",
+    "temperature_c": 20,
+    "absolute_pressure_kpa": 130,
+    "gas_content_mg_l": 8,
+    "cavitation_susceptibility_alpha": 0.6,
+    "flow_speed_m_s": 5,
+    "free_surface_present": false,
+    "free_surface_distance_m": null,
+    "condition_evidence_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "condition_transfer_additional_u95_db": 0
+  },
+  "projector": {
+    "instrument_id": "synthetic-projector",
+    "serial_or_revision": "projector-rev-1",
+    "projector_type": "broadband-omnidirectional",
+    "signal_id": "sweep-001",
+    "signal_type": "wideband-sweep",
+    "drive_chain_id": "drive-chain-1",
+    "drive_chain_calibration_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "source_level_basis": "independently_measured",
+    "source_level_basis_reference_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "source_basis_additional_u95_db": 0
+  },
+  "receiver": {
+    "hydrophone_instrument_id": "synthetic-hydrophone",
+    "hydrophone_calibration_certificate_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+    "acquisition_chain_id": "acquisition-chain-1",
+    "acquisition_chain_calibration_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+    "x_m": 0,
+    "y_m": -0.3,
+    "z_m": 0,
+    "orientation_yaw_deg": 0,
+    "orientation_pitch_deg": 0,
+    "orientation_roll_deg": 0,
+    "position_uncertainty_m": 0.001
+  },
+  "scope": "whole_propeller_disc",
+  "aggregation_method_id": "equal_weight_arithmetic_mean_db_across_positions",
+  "aggregation_method_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "aggregation_tolerance_db": 0.01,
+  "maximum_spatial_spread_db": 1,
+  "maximum_repeatability_sd_db": 0.2,
+  "minimum_repeats_per_position": 2,
+  "positions": [
+    {
+      "position_id": "position-1",
+      "x_m": -0.1,
+      "y_m": 0,
+      "z_m": 0.175,
+      "radial_position_ratio": 0.8,
+      "azimuth_deg": 0,
+      "orientation_yaw_deg": 0,
+      "orientation_pitch_deg": 0,
+      "orientation_roll_deg": 0,
+      "position_uncertainty_m": 0.001,
+      "repeats": [
+        {
+          "repeat_id": "repeat-1-1",
+          "timebase_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_input_trace_sha256": "00000000000000000000000000000000000000000000000000000000000003e8",
+          "raw_output_trace_sha256": "00000000000000000000000000000000000000000000000000000000000007d0",
+          "bands": [
+            {
+              "band_id": "band-1000hz",
+              "center_frequency_hz": 1000,
+              "input_quantity_id": "source_level_db_re_1upa2_m2",
+              "output_quantity_id": "received_spl_db_re_1upa2",
+              "bandwidth_id": "one_third_octave",
+              "spectrum_representation_id": "power_spectrum",
+              "input_source_level_db": 100,
+              "input_source_level_u95_db": 0.05,
+              "output_received_spl_db": 119.8,
+              "output_received_spl_u95_db": 0.05
+            }
+          ]
+        },
+        {
+          "repeat_id": "repeat-1-2",
+          "timebase_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_input_trace_sha256": "00000000000000000000000000000000000000000000000000000000000003e9",
+          "raw_output_trace_sha256": "00000000000000000000000000000000000000000000000000000000000007d1",
+          "bands": [
+            {
+              "band_id": "band-1000hz",
+              "center_frequency_hz": 1000,
+              "input_quantity_id": "source_level_db_re_1upa2_m2",
+              "output_quantity_id": "received_spl_db_re_1upa2",
+              "bandwidth_id": "one_third_octave",
+              "spectrum_representation_id": "power_spectrum",
+              "input_source_level_db": 100,
+              "input_source_level_u95_db": 0.05,
+              "output_received_spl_db": 119.8,
+              "output_received_spl_u95_db": 0.05
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "position_id": "position-2",
+      "x_m": -0.05,
+      "y_m": 0,
+      "z_m": 0.175,
+      "radial_position_ratio": 0.8,
+      "azimuth_deg": 72,
+      "orientation_yaw_deg": 0,
+      "orientation_pitch_deg": 0,
+      "orientation_roll_deg": 0,
+      "position_uncertainty_m": 0.001,
+      "repeats": [
+        {
+          "repeat_id": "repeat-2-1",
+          "timebase_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_input_trace_sha256": "00000000000000000000000000000000000000000000000000000000000003f2",
+          "raw_output_trace_sha256": "00000000000000000000000000000000000000000000000000000000000007da",
+          "bands": [
+            {
+              "band_id": "band-1000hz",
+              "center_frequency_hz": 1000,
+              "input_quantity_id": "source_level_db_re_1upa2_m2",
+              "output_quantity_id": "received_spl_db_re_1upa2",
+              "bandwidth_id": "one_third_octave",
+              "spectrum_representation_id": "power_spectrum",
+              "input_source_level_db": 100,
+              "input_source_level_u95_db": 0.05,
+              "output_received_spl_db": 119.9,
+              "output_received_spl_u95_db": 0.05
+            }
+          ]
+        },
+        {
+          "repeat_id": "repeat-2-2",
+          "timebase_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_input_trace_sha256": "00000000000000000000000000000000000000000000000000000000000003f3",
+          "raw_output_trace_sha256": "00000000000000000000000000000000000000000000000000000000000007db",
+          "bands": [
+            {
+              "band_id": "band-1000hz",
+              "center_frequency_hz": 1000,
+              "input_quantity_id": "source_level_db_re_1upa2_m2",
+              "output_quantity_id": "received_spl_db_re_1upa2",
+              "bandwidth_id": "one_third_octave",
+              "spectrum_representation_id": "power_spectrum",
+              "input_source_level_db": 100,
+              "input_source_level_u95_db": 0.05,
+              "output_received_spl_db": 119.9,
+              "output_received_spl_u95_db": 0.05
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "position_id": "position-3",
+      "x_m": 0,
+      "y_m": 0,
+      "z_m": 0.175,
+      "radial_position_ratio": 0.8,
+      "azimuth_deg": 144,
+      "orientation_yaw_deg": 0,
+      "orientation_pitch_deg": 0,
+      "orientation_roll_deg": 0,
+      "position_uncertainty_m": 0.001,
+      "repeats": [
+        {
+          "repeat_id": "repeat-3-1",
+          "timebase_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_input_trace_sha256": "00000000000000000000000000000000000000000000000000000000000003fc",
+          "raw_output_trace_sha256": "00000000000000000000000000000000000000000000000000000000000007e4",
+          "bands": [
+            {
+              "band_id": "band-1000hz",
+              "center_frequency_hz": 1000,
+              "input_quantity_id": "source_level_db_re_1upa2_m2",
+              "output_quantity_id": "received_spl_db_re_1upa2",
+              "bandwidth_id": "one_third_octave",
+              "spectrum_representation_id": "power_spectrum",
+              "input_source_level_db": 100,
+              "input_source_level_u95_db": 0.05,
+              "output_received_spl_db": 120,
+              "output_received_spl_u95_db": 0.05
+            }
+          ]
+        },
+        {
+          "repeat_id": "repeat-3-2",
+          "timebase_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_input_trace_sha256": "00000000000000000000000000000000000000000000000000000000000003fd",
+          "raw_output_trace_sha256": "00000000000000000000000000000000000000000000000000000000000007e5",
+          "bands": [
+            {
+              "band_id": "band-1000hz",
+              "center_frequency_hz": 1000,
+              "input_quantity_id": "source_level_db_re_1upa2_m2",
+              "output_quantity_id": "received_spl_db_re_1upa2",
+              "bandwidth_id": "one_third_octave",
+              "spectrum_representation_id": "power_spectrum",
+              "input_source_level_db": 100,
+              "input_source_level_u95_db": 0.05,
+              "output_received_spl_db": 120,
+              "output_received_spl_u95_db": 0.05
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "position_id": "position-4",
+      "x_m": 0.05,
+      "y_m": 0,
+      "z_m": 0.175,
+      "radial_position_ratio": 0.8,
+      "azimuth_deg": 216,
+      "orientation_yaw_deg": 0,
+      "orientation_pitch_deg": 0,
+      "orientation_roll_deg": 0,
+      "position_uncertainty_m": 0.001,
+      "repeats": [
+        {
+          "repeat_id": "repeat-4-1",
+          "timebase_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_input_trace_sha256": "0000000000000000000000000000000000000000000000000000000000000406",
+          "raw_output_trace_sha256": "00000000000000000000000000000000000000000000000000000000000007ee",
+          "bands": [
+            {
+              "band_id": "band-1000hz",
+              "center_frequency_hz": 1000,
+              "input_quantity_id": "source_level_db_re_1upa2_m2",
+              "output_quantity_id": "received_spl_db_re_1upa2",
+              "bandwidth_id": "one_third_octave",
+              "spectrum_representation_id": "power_spectrum",
+              "input_source_level_db": 100,
+              "input_source_level_u95_db": 0.05,
+              "output_received_spl_db": 120.1,
+              "output_received_spl_u95_db": 0.05
+            }
+          ]
+        },
+        {
+          "repeat_id": "repeat-4-2",
+          "timebase_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_input_trace_sha256": "0000000000000000000000000000000000000000000000000000000000000407",
+          "raw_output_trace_sha256": "00000000000000000000000000000000000000000000000000000000000007ef",
+          "bands": [
+            {
+              "band_id": "band-1000hz",
+              "center_frequency_hz": 1000,
+              "input_quantity_id": "source_level_db_re_1upa2_m2",
+              "output_quantity_id": "received_spl_db_re_1upa2",
+              "bandwidth_id": "one_third_octave",
+              "spectrum_representation_id": "power_spectrum",
+              "input_source_level_db": 100,
+              "input_source_level_u95_db": 0.05,
+              "output_received_spl_db": 120.1,
+              "output_received_spl_u95_db": 0.05
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "position_id": "position-5",
+      "x_m": 0.1,
+      "y_m": 0,
+      "z_m": 0.175,
+      "radial_position_ratio": 0.8,
+      "azimuth_deg": 288,
+      "orientation_yaw_deg": 0,
+      "orientation_pitch_deg": 0,
+      "orientation_roll_deg": 0,
+      "position_uncertainty_m": 0.001,
+      "repeats": [
+        {
+          "repeat_id": "repeat-5-1",
+          "timebase_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_input_trace_sha256": "0000000000000000000000000000000000000000000000000000000000000410",
+          "raw_output_trace_sha256": "00000000000000000000000000000000000000000000000000000000000007f8",
+          "bands": [
+            {
+              "band_id": "band-1000hz",
+              "center_frequency_hz": 1000,
+              "input_quantity_id": "source_level_db_re_1upa2_m2",
+              "output_quantity_id": "received_spl_db_re_1upa2",
+              "bandwidth_id": "one_third_octave",
+              "spectrum_representation_id": "power_spectrum",
+              "input_source_level_db": 100,
+              "input_source_level_u95_db": 0.05,
+              "output_received_spl_db": 120.2,
+              "output_received_spl_u95_db": 0.05
+            }
+          ]
+        },
+        {
+          "repeat_id": "repeat-5-2",
+          "timebase_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "raw_input_trace_sha256": "0000000000000000000000000000000000000000000000000000000000000411",
+          "raw_output_trace_sha256": "00000000000000000000000000000000000000000000000000000000000007f9",
+          "bands": [
+            {
+              "band_id": "band-1000hz",
+              "center_frequency_hz": 1000,
+              "input_quantity_id": "source_level_db_re_1upa2_m2",
+              "output_quantity_id": "received_spl_db_re_1upa2",
+              "bandwidth_id": "one_third_octave",
+              "spectrum_representation_id": "power_spectrum",
+              "input_source_level_db": 100,
+              "input_source_level_u95_db": 0.05,
+              "output_received_spl_db": 120.2,
+              "output_received_spl_u95_db": 0.05
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "bands": [
+    "band-1000hz"
+  ]
+}
