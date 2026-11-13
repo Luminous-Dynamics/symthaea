@@ -400,12 +400,10 @@ fn audit_fixture(fixture: &Fixture) -> Result<AuditReport> {
                     event_index: event.event_index,
                     event_id: event.event_id.clone(),
                     observed_sequences: 1,
-                    service_passes: usize::from(service_pass),
-                    recovery_passes: usize::from(recovery_pass),
-                    event_gate_passes: usize::from(event_gate_pass),
-                    false_ready_events: usize::from(
-                        !first_event && event.readiness_probe_status == "passed" && !service_pass,
-                    ),
+                    service_passes: if service_pass { 1 } else { 0 },
+                    recovery_passes: if recovery_pass { 1 } else { 0 },
+                    event_gate_passes: if event_gate_pass { 1 } else { 0 },
+                    false_ready_events: if !first_event && event.readiness_probe_status == "passed" && !service_pass { 1 } else { 0 },
                 });
             } else {
                 let report = event_reports
@@ -418,9 +416,7 @@ fn audit_fixture(fixture: &Fixture) -> Result<AuditReport> {
                 report.service_passes += usize::from(service_pass);
                 report.recovery_passes += usize::from(recovery_pass);
                 report.event_gate_passes += usize::from(event_gate_pass);
-                report.false_ready_events += usize::from(
-                    !first_event && event.readiness_probe_status == "passed" && !service_pass,
-                );
+                report.false_ready_events += if !first_event && event.readiness_probe_status == "passed" && !service_pass { 1 } else { 0 };
             }
         }
 
