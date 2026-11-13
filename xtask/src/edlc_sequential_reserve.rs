@@ -638,8 +638,8 @@ mod tests {
     #[test]
     fn sequence_requires_at_least_two_calls() {
         let mut value = fixture_value();
-        value["device_sequences"][0]["events"].as_array_mut().unwrap().pop();
-        value["device_sequences"][1]["events"].as_array_mut().unwrap().pop();
+        let _ = value["device_sequences"][0]["events"].as_array_mut().unwrap().pop();
+        let _ = value["device_sequences"][1]["events"].as_array_mut().unwrap().pop();
         let error = audit_value(value).unwrap_err().to_string();
         assert!(error.contains("at least two ordered calls"));
     }
