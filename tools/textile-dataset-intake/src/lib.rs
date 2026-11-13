@@ -7,6 +7,8 @@
 //! declared use permission, checks path containment, file size and SHA-256, and
 //! emits a deterministic receipt bound to the exact manifest and local files.
 
+pub mod nir_sort;
+
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
