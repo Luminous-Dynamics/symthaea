@@ -5,6 +5,7 @@ mod crate_status;
 mod duplicate_scan;
 mod manifest;
 mod plasma_energy_audit;
+mod plasma_surface_bondability;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -80,6 +81,16 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Offline evaluator for synthetic plasma surface bondability and preservation gates.
+    #[command(name = "plasma-surface-bondability-audit")]
+    PlasmaSurfaceBondabilityAudit {
+        #[arg(long, default_value = "data/research/plasma_surface_bondability_fixture_v0_1.json")]
+        fixture: PathBuf,
+        /// Emit stable structured JSON instead of the human-readable summary.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -140,6 +151,10 @@ fn main() -> anyhow::Result<()> {
                 &thermal_fixtures,
             )?;
             plasma_energy_audit::print_report(&report, json)?;
+        }
+        Commands::PlasmaSurfaceBondabilityAudit { fixture, json } => {
+            let report = plasma_surface_bondability::run_audit(&fixture)?;
+            plasma_surface_bondability::print_report(&report, json)?;
         }
         Commands::DuplicateScan { registry } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
