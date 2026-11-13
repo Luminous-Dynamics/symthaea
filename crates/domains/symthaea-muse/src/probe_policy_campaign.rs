@@ -817,14 +817,25 @@ fn null_scene_summaries(
             let mut composition_selection_rates = Vec::new();
             let mut composition_false_positive_burdens = Vec::new();
             for fixture in &family_fixtures {
-                let rows: Vec<_> = fixture.rows.iter().filter(|row| row.policy == policy).collect();
+                let rows: Vec<_> = fixture
+                    .rows
+                    .iter()
+                    .filter(|row| row.policy == policy)
+                    .collect();
                 evaluated_rows += rows.len();
-                let selected_rows = rows.iter().filter(|row| row.selected_pair_count > 0).count();
+                let selected_rows = rows
+                    .iter()
+                    .filter(|row| row.selected_pair_count > 0)
+                    .count();
                 rows_with_any_selected_pair += selected_rows;
-                total_false_positive_pairs +=
-                    rows.iter().map(|row| row.false_positive_count).sum::<usize>();
-                total_selected_pairs +=
-                    rows.iter().map(|row| row.selected_pair_count).sum::<usize>();
+                total_false_positive_pairs += rows
+                    .iter()
+                    .map(|row| row.false_positive_count)
+                    .sum::<usize>();
+                total_selected_pairs += rows
+                    .iter()
+                    .map(|row| row.selected_pair_count)
+                    .sum::<usize>();
                 if !rows.is_empty() {
                     let denominator = rows.len() as f64;
                     composition_selection_rates.push(selected_rows as f64 / denominator);
@@ -1151,8 +1162,7 @@ mod tests {
     #[test]
     fn linear_fir_support_includes_the_exact_convolution_tail() {
         let config = small_config();
-        let fixture =
-            generate_fixture(InteractionFamily::LinearFirTail, 6, &config).unwrap();
+        let fixture = generate_fixture(InteractionFamily::LinearFirTail, 6, &config).unwrap();
         let oracle = build_factorial_ground_truth(
             &fixture.events,
             &fixture.effect,
@@ -1160,7 +1170,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(oracle.output_frame_count, config.frame_count + 4);
-        assert_ne!(fixture.events.last().unwrap().samples[config.frame_count - 1], 0.0);
+        assert_ne!(
+            fixture.events.last().unwrap().samples[config.frame_count - 1],
+            0.0
+        );
         let last_support = fixture.supports.last().unwrap();
         assert_eq!(
             last_support.acoustic_support[0].end_frame,
@@ -1183,10 +1196,7 @@ mod tests {
             .unwrap();
         assert_eq!(summary.composition_count, 7);
         assert!(summary.evaluated_rows > summary.composition_count);
-        assert_eq!(
-            summary.bootstrap_replicates,
-            config.bootstrap_replicates
-        );
+        assert_eq!(summary.bootstrap_replicates, config.bootstrap_replicates);
         let selection_rate = summary
             .composition_macro_any_selection_rate
             .expect("at least one independent all-null composition");
