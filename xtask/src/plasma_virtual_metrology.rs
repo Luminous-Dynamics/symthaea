@@ -44,6 +44,8 @@ struct Fixture {
     energy_boundary_contract_id: String,
     required_calibration_status: String,
     required_energy_subsystems: Vec<String>,
+    required_holdout_dimensions: Vec<String>,
+    minimum_in_spec_probability: f64,
     scenarios: Vec<Scenario>,
 }
 
@@ -69,6 +71,7 @@ struct Scenario {
     process_run_id: String,
     specimen_id: String,
     configuration_digest: String,
+    run_timestamp_unix_ms: u64,
     telemetry: Vec<TelemetrySample>,
     energy: EnergyRecord,
     downstream_outcome: Option<DownstreamOutcome>,
@@ -84,9 +87,11 @@ struct TelemetrySample {
     quantity: String,
     unit: String,
     value: f64,
-    sample_offset_ms: u64,
+    sample_offset_ms: i64,
     calibration_record_id: String,
     calibration_status: String,
+    calibration_valid_from_unix_ms: u64,
+    calibration_valid_until_unix_ms: u64,
     uncertainty: f64,
     configuration_digest: String,
     raw_trace_digest: String,
@@ -98,7 +103,22 @@ struct EnergyRecord {
     energy_boundary_contract_id: String,
     complete_system_energy_kwh: f64,
     included_subsystems: Vec<String>,
+    subsystem_measurements: Vec<EnergySubsystemMeasurement>,
     complete: bool,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EnergySubsystemMeasurement {
+    subsystem_id: String,
+    energy_kwh: f64,
+    meter_id: String,
+    calibration_record_id: String,
+    calibration_status: String,
+    calibration_valid_from_unix_ms: u64,
+    calibration_valid_until_unix_ms: u64,
+    uncertainty_kwh: f64,
+    raw_trace_digest: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -121,7 +141,18 @@ struct ModelPrediction {
     probability_of_meeting_acceptance: f64,
     predicted_disposition: String,
     training_scope: String,
-    training_group_holdout_verified: bool,
+    training_group_manifest: Option<TrainingGroupManifest>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct TrainingGroupManifest {
+    manifest_id: String,
+    partition_receipt_digest: String,
+    grouping_dimensions: Vec<String>,
+    training_material_lot_ids: Vec<String>,
+    training_device_ids: Vec<String>,
+    training_production_days: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -201,6 +232,24 @@ pub fn audit_fixture_json(input: &str) -> std::result::Result<AuditReport, Strin
     }
     if fixture.required_sensors.is_empty() || fixture.required_energy_subsystems.is_empty() {
         return Err("required telemetry / energy boundary lists cannot be empty".to_owned());
+    }
+    if fixture.required_holdout_dimensions.is_empty() {
+        return Err("required holdout dimensions cannot be empty".to_owned());
+    }
+    let mut holdout_dimensions = BTreeSet::new();
+    for dimension in &fixture.required_holdout_dimensions {
+        if !matches!(
+            dimension.as_str(),
+            "material_lot_id" | "device_id" | "production_day"
+        ) || !holdout_dimensions.insert(dimension.as_str())
+        {
+            return Err("holdout dimensions are unsupported or duplicated".to_owned());
+        }
+    }
+    if !fixture.minimum_in_spec_probability.is_finite()
+        || !(0.0..=1.0).contains(&fixture.minimum_in_spec_probability)
+    {
+        return Err("minimum in-spec probability must be within [0, 1]".to_owned());
     }
     if fixture.required_calibration_status != "QUALIFIED" {
         return Err("required calibration status must be QUALIFIED".to_owned());
@@ -283,8 +332,53 @@ fn evaluate_scenario(scenario: &Scenario, fixture: &Fixture) -> ScenarioResult {
     if !scenario.material_in_model_domain {
         blocked.push("scenario explicitly marked outside model domain".to_owned());
     }
-    if !scenario.model_prediction.training_group_holdout_verified {
-        blocked.push("prediction lacks verified material/device/day holdout provenance".to_owned());
+    if scenario.run_timestamp_unix_ms == 0 {
+        blocked.push("run timestamp is missing".to_owned());
+    }
+
+    match &scenario.model_prediction.training_group_manifest {
+        None => blocked.push("prediction lacks a training-group partition manifest".to_owned()),
+        Some(manifest) => {
+            if manifest.manifest_id.trim().is_empty()
+                || manifest.partition_receipt_digest.trim().is_empty()
+            {
+                blocked.push("training-group manifest lacks identity/partition receipt".to_owned());
+            }
+            let declared: BTreeSet<_> =
+                manifest.grouping_dimensions.iter().map(String::as_str).collect();
+            let required: BTreeSet<_> =
+                fixture.required_holdout_dimensions.iter().map(String::as_str).collect();
+            if declared != required {
+                blocked.push("training-group manifest does not cover the required holdout dimensions".to_owned());
+            }
+            if manifest.training_material_lot_ids.is_empty()
+                || manifest.training_device_ids.is_empty()
+                || manifest.training_production_days.is_empty()
+            {
+                blocked.push("training-group manifest has an empty training-group axis".to_owned());
+            }
+            if manifest.training_material_lot_ids.iter().any(|x| x.trim().is_empty())
+                || manifest.training_device_ids.iter().any(|x| x.trim().is_empty())
+                || manifest.training_production_days.iter().any(|x| x.trim().is_empty())
+            {
+                blocked.push("training-group manifest contains an empty group identity".to_owned());
+            }
+            let mut lot_ids = BTreeSet::new();
+            let mut device_ids = BTreeSet::new();
+            let mut production_days = BTreeSet::new();
+            if manifest.training_material_lot_ids.iter().any(|x| !lot_ids.insert(x.as_str()))
+                || manifest.training_device_ids.iter().any(|x| !device_ids.insert(x.as_str()))
+                || manifest.training_production_days.iter().any(|x| !production_days.insert(x.as_str()))
+            {
+                rejected.push("training-group manifest contains duplicate group identities".to_owned());
+            }
+            if lot_ids.contains(scenario.material_lot_id.as_str())
+                || device_ids.contains(scenario.device_id.as_str())
+                || production_days.contains(scenario.production_day.as_str())
+            {
+                rejected.push("held-out material lot, device or production day overlaps the model training groups".to_owned());
+            }
+        }
     }
 
     let required_sensor_ids: BTreeSet<_> =
@@ -305,13 +399,19 @@ fn evaluate_scenario(scenario: &Scenario, fixture: &Fixture) -> ScenarioResult {
         {
             rejected.push(format!("sensor {} has invalid value/uncertainty", sample.sensor_id));
         }
-        if sample.sample_offset_ms > fixture.maximum_sensor_time_offset_ms {
-            blocked.push(format!("sensor {} sample is stale/outside run window", sample.sensor_id));
+        if sample.sample_offset_ms.unsigned_abs() > fixture.maximum_sensor_time_offset_ms {
+            blocked.push(format!("sensor {} sample is stale/future-dated/outside run window", sample.sensor_id));
         }
         if sample.calibration_record_id.trim().is_empty()
             || sample.calibration_status != fixture.required_calibration_status
         {
             blocked.push(format!("sensor {} lacks qualified calibration", sample.sensor_id));
+        }
+        if sample.calibration_valid_from_unix_ms > scenario.run_timestamp_unix_ms
+            || sample.calibration_valid_until_unix_ms < scenario.run_timestamp_unix_ms
+            || sample.calibration_valid_from_unix_ms > sample.calibration_valid_until_unix_ms
+        {
+            blocked.push(format!("sensor {} calibration is not valid at run time", sample.sensor_id));
         }
         if sample.configuration_digest != scenario.configuration_digest {
             rejected.push(format!("sensor {} configuration digest differs from run", sample.sensor_id));
@@ -335,9 +435,94 @@ fn evaluate_scenario(scenario: &Scenario, fixture: &Fixture) -> ScenarioResult {
     }
     let included: BTreeSet<_> = energy.included_subsystems.iter().map(String::as_str).collect();
     let required: BTreeSet<_> = fixture.required_energy_subsystems.iter().map(String::as_str).collect();
-    if !energy.complete || !required.is_subset(&included) {
+    if included.len() != energy.included_subsystems.len() {
+        rejected.push("energy boundary contains duplicate included subsystem IDs".to_owned());
+    }
+    if !required.is_subset(&included) {
         blocked.push("complete grid-to-service energy boundary is missing one or more required loads".to_owned());
     }
+    if !included.is_subset(&required) {
+        rejected.push("energy boundary contains undeclared subsystem IDs".to_owned());
+    }
+
+    let mut energy_measurements = BTreeMap::<String, &EnergySubsystemMeasurement>::new();
+    for measurement in &energy.subsystem_measurements {
+        if measurement.subsystem_id.trim().is_empty()
+            || energy_measurements
+                .insert(measurement.subsystem_id.clone(), measurement)
+                .is_some()
+        {
+            rejected.push("energy subsystem measurement ID is empty or duplicated".to_owned());
+        }
+        if !required.contains(measurement.subsystem_id.as_str()) {
+            rejected.push(format!("energy measurement {} is not in the frozen boundary", measurement.subsystem_id));
+        }
+        if !measurement.energy_kwh.is_finite()
+            || measurement.energy_kwh < 0.0
+            || !measurement.uncertainty_kwh.is_finite()
+            || measurement.uncertainty_kwh < 0.0
+        {
+            rejected.push(format!("energy measurement {} has invalid value/uncertainty", measurement.subsystem_id));
+        }
+        if measurement.meter_id.trim().is_empty()
+            || measurement.calibration_record_id.trim().is_empty()
+            || measurement.raw_trace_digest.trim().is_empty()
+            || measurement.calibration_status != fixture.required_calibration_status
+        {
+            blocked.push(format!("energy measurement {} lacks a calibrated meter/raw-trace identity", measurement.subsystem_id));
+        }
+        if measurement.calibration_valid_from_unix_ms > scenario.run_timestamp_unix_ms
+            || measurement.calibration_valid_until_unix_ms < scenario.run_timestamp_unix_ms
+            || measurement.calibration_valid_from_unix_ms > measurement.calibration_valid_until_unix_ms
+        {
+            blocked.push(format!("energy meter {} calibration is not valid at run time", measurement.subsystem_id));
+        }
+    }
+    let measured_ids: BTreeSet<_> = energy_measurements.keys().map(String::as_str).collect();
+    if !required.is_subset(&measured_ids) {
+        blocked.push("one or more required energy subsystems lack an individual meter record".to_owned());
+    }
+    if !measured_ids.is_subset(&required) {
+        rejected.push("energy measurements contain undeclared subsystem IDs".to_owned());
+    }
+
+    let mut energy_sum = 0.0_f64;
+    let mut energy_values_valid = true;
+    for subsystem in &required {
+        match energy_measurements.get(*subsystem) {
+            Some(measurement)
+                if measurement.energy_kwh.is_finite() && measurement.energy_kwh >= 0.0 =>
+            {
+                energy_sum += measurement.energy_kwh;
+            }
+            _ => energy_values_valid = false,
+        }
+    }
+    if energy_values_valid {
+        let energy_tolerance = FLOAT_EPSILON
+            * energy.complete_system_energy_kwh.abs().max(1.0);
+        if (energy_sum - energy.complete_system_energy_kwh).abs() > energy_tolerance {
+            rejected.push("energy subsystem measurements do not close to the complete-system total".to_owned());
+        }
+    }
+    if !energy.complete {
+        blocked.push("energy boundary is not declared complete".to_owned());
+    }
+    let energy_boundary_complete = energy.complete
+        && included == required
+        && measured_ids == required
+        && energy_values_valid
+        && energy_sum.is_finite()
+        && (energy_sum - energy.complete_system_energy_kwh).abs()
+            <= FLOAT_EPSILON * energy.complete_system_energy_kwh.abs().max(1.0)
+        && energy_measurements.values().all(|measurement| {
+            !measurement.meter_id.trim().is_empty()
+                && !measurement.calibration_record_id.trim().is_empty()
+                && !measurement.raw_trace_digest.trim().is_empty()
+                && measurement.calibration_status == fixture.required_calibration_status
+                && measurement.calibration_valid_from_unix_ms <= scenario.run_timestamp_unix_ms
+                && measurement.calibration_valid_until_unix_ms >= scenario.run_timestamp_unix_ms
+        });
 
     let outcome = match &scenario.downstream_outcome {
         Some(outcome) => Some(outcome),
@@ -377,11 +562,29 @@ fn evaluate_scenario(scenario: &Scenario, fixture: &Fixture) -> ScenarioResult {
         rejected.push("predicted acceptance probability is outside [0,1]".to_owned());
     }
     if prediction.predicted_bond_strength_interval_mpa.len() != 2
-        || prediction.predicted_bond_strength_interval_mpa.iter().any(|x| !x.is_finite())
+        || prediction.predicted_bond_strength_interval_mpa.iter().any(|x| !x.is_finite() || *x < 0.0)
         || prediction.predicted_bond_strength_interval_mpa[0]
             > prediction.predicted_bond_strength_interval_mpa[1]
     {
         rejected.push("predicted bond-strength interval is invalid".to_owned());
+    }
+    if prediction.predicted_disposition == "IN_SPEC"
+        && (prediction.predicted_bond_strength_interval_mpa.len() == 2
+            && prediction.predicted_bond_strength_interval_mpa[0]
+                + FLOAT_EPSILON < fixture.service_profile.acceptance_threshold_mpa
+            || prediction.probability_of_meeting_acceptance
+                + FLOAT_EPSILON < fixture.minimum_in_spec_probability)
+    {
+        rejected.push("IN_SPEC prediction violates the frozen lower-bound/probability decision rule".to_owned());
+    }
+    if prediction.predicted_disposition == "OUT_OF_SPEC"
+        && (prediction.predicted_bond_strength_interval_mpa.len() == 2
+            && prediction.predicted_bond_strength_interval_mpa[1]
+                >= fixture.service_profile.acceptance_threshold_mpa
+            || prediction.probability_of_meeting_acceptance
+                > 1.0 - fixture.minimum_in_spec_probability + FLOAT_EPSILON)
+    {
+        rejected.push("OUT_OF_SPEC prediction violates the frozen upper-bound/probability decision rule".to_owned());
     }
     if !matches!(
         prediction.predicted_disposition.as_str(),
@@ -419,8 +622,7 @@ fn evaluate_scenario(scenario: &Scenario, fixture: &Fixture) -> ScenarioResult {
         reasons,
         telemetry_samples: scenario.telemetry.len(),
         downstream_label_present: scenario.downstream_outcome.is_some(),
-        energy_boundary_complete: energy.complete
-            && required.is_subset(&included),
+        energy_boundary_complete,
         virtual_metrology_false_accept: false_accept,
     }
 }
@@ -557,6 +759,42 @@ mod tests {
             result_for(&report, "aligned-heldout-valid").disposition,
             Disposition::Rejected
         );
+    }
+
+    #[test]
+    fn training_group_overlap_is_rejected() {
+        let report = audit_fixture_json(FIXTURE).expect("fixture audit");
+        assert_eq!(result_for(&report, "training-group-overlap").disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn missing_training_group_manifest_is_blocked() {
+        let report = audit_fixture_json(FIXTURE).expect("fixture audit");
+        assert_eq!(result_for(&report, "model-holdout-unverified").disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn future_dated_sensor_sample_is_blocked() {
+        let report = audit_fixture_json(FIXTURE).expect("fixture audit");
+        assert_eq!(result_for(&report, "future-dated-sensor").disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn expired_sensor_calibration_is_blocked() {
+        let report = audit_fixture_json(FIXTURE).expect("fixture audit");
+        assert_eq!(result_for(&report, "expired-sensor-calibration").disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn missing_energy_meter_record_is_blocked() {
+        let report = audit_fixture_json(FIXTURE).expect("fixture audit");
+        assert_eq!(result_for(&report, "missing-energy-meter").disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn energy_subsystem_sum_mismatch_is_rejected() {
+        let report = audit_fixture_json(FIXTURE).expect("fixture audit");
+        assert_eq!(result_for(&report, "energy-subsystem-sum-mismatch").disposition, Disposition::Rejected);
     }
 
     #[test]
