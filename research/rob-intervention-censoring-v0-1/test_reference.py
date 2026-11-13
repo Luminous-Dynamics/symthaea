@@ -58,6 +58,22 @@ class InterventionCensoringTests(unittest.TestCase):
         self.assertFalse(result["estimable"])
         self.assertEqual(result["reason"], "assignment_not_randomized")
 
+    def test_assignment_must_precede_time_zero_and_have_receipt(self):
+        late = [from_dict({**x, "assignment_precedes_time_zero": False}) for x in RAW["randomized_policy_trials"]]
+        result = intention_to_treat_summary(late, "reactive_safe", "predictive_safe")
+        self.assertFalse(result["estimable"])
+        self.assertEqual(result["reason"], "assignment_not_pre_episode")
+        missing_receipt = [from_dict({**x, "randomization_receipt_valid": False}) for x in RAW["randomized_policy_trials"]]
+        result = intention_to_treat_summary(missing_receipt, "reactive_safe", "predictive_safe")
+        self.assertFalse(result["estimable"])
+        self.assertEqual(result["reason"], "randomization_receipt_invalid_or_missing")
+
+    def test_blocked_randomization_requires_both_arms_in_each_block(self):
+        incomplete = [from_dict({**x, "assignment_block_id": "single-block" if x["assigned_policy"] == "reactive_safe" else "other-block"}) for x in RAW["randomized_policy_trials"]]
+        result = intention_to_treat_summary(incomplete, "reactive_safe", "predictive_safe")
+        self.assertFalse(result["estimable"])
+        self.assertEqual(result["reason"], "blocked_randomization_missing_arm_within_block")
+
     def test_incomplete_followup_blocks_naive_fixed_horizon_itt(self):
         incomplete = list(TRIALS)
         incomplete[0] = from_dict({**RAW["randomized_policy_trials"][0], "policy_followup_complete": False, "policy_endpoint": None})
