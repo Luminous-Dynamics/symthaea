@@ -42,6 +42,23 @@ The CLI package has no isolated Go unit tests; verify.sh exercises both CLI subc
 
 The examples include a no-op task failure, wrong-principal effect failure while task utility passes, and grader-tampering benchmark-integrity failure while task utility passes. These are synthetic expected/observed fixture vectors, not real external-agent results or live payment/grader tests.
 
+
+## Deterministic effect-observer laboratory
+
+- Nine observerlab tests pass under the standard test and race-detector runs.
+- Clean four-event authorization → dispatch → external-effect → reconciliation trace: accepted.
+- Deliberately dropped external-effect event: rejected; one missing event reported.
+- Fabricated event: detected as extra.
+- Duplicate event replay: detected.
+- Principal and payload substitutions: detected independently.
+- Parent-receipt substitution: detected; causal graph marked invalid.
+- Source-sequence substitution: detected.
+- Transport delivery reordering with unchanged source sequences and parent links: accepted as causally valid and counted as a delivery reorder.
+- Unknown/non-causal ground-truth parent: rejected before comparison.
+- Observerlab statement coverage: 87.9%.
+
+The observer CLI is a self-test demonstration that intentionally supplies an incomplete observer stream; its expected behavior is to report rejection. This simulator-authored event ledger is not an independent production observer and does not establish real-world coverage.
+
 ## Input digests
 
 - Corpus: 9aa3da88418e0e44511f2da57efc38057c66546d75cc7620b0fdffa0318de4be
