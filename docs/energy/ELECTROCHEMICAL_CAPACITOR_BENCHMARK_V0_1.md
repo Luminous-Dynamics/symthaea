@@ -77,9 +77,23 @@ E_available(t_idle, T, V_hold, prior_history)
 
 This is distinct from nominal capacitance, open-circuit voltage retention, and cycle-life retention. Report the complete charge/hold/discharge trace; time to minimum usable voltage; leakage current versus time; open-circuit self-discharge; ESR/EIS evolution; recovery/refresh energy; and lower-tail device/lab/lot distribution. At the installed-system boundary, include converter, balancing, monitoring and protection standby draw.
 
-IEC 62391-2:2025 provides a leakage-current baseline for power-application EDLCs. Its publicly searchable excerpt specifies 20 °C ± 2 °C, rated voltage applied through a protective resistor no greater than 1 000 Ω, at least 12 h discharge before test unless otherwise agreed, and 24 h electrification unless otherwise agreed. The applicable detail specification sets the leakage-current requirement. This is a standardized leakage measurement, not a multi-month standby-life guarantee. Use the controlled standard and manufacturer detail specification for any physical testing; do not use search excerpts as a substitute for the normative document.
+IEC 62391-2:2025 provides a leakage-current baseline for power-application EDLCs. Its publicly searchable excerpt specifies 20 °C ± 2 °C, rated voltage applied through a protective resistor no greater than 1 000 Ω, at least 12 h pre-discharge unless otherwise agreed, and 24 h electrification unless otherwise agreed; the applicable detail specification sets the leakage-current requirement. The same sectional specification separately includes a maintain-voltage test (5.11) referencing IEC 62391-1:2022, 6.4: at least 12 h pre-discharge, rated-voltage charging for 8 h, and a 24 h retention-voltage measurement unless otherwise agreed. Preserve both standardized procedures as comparators, but do not treat their endpoints as multi-month standby-life or post-standby usable-energy qualification. Use the controlled standard and manufacturer detail specification for physical testing; do not use search excerpts as a substitute for the normative document.
 
 A synthetic arithmetic fixture is available at fixtures/energy/electrochemical-capacitor/standby_service_known_answer_v0_1.json. It validates trapezoidal integration of leakage charge and terminal V×I discharge energy only. It is not a physical device, a self-discharge model or lifetime evidence.
+
+### Standby modes, service availability and fair comparisons
+
+Separate three histories in the data model and leaderboard: open-circuit (unpowered) storage; regulated/constant-voltage hold with measured source replenishment; and installed-system standby with converters, balancing, BMS/sensing, communication, contactors and thermal controls. A constant-voltage hold can inject energy from an external source, so source-side V/I and integrated hold energy must be reported. It must not be credited as energy retained from the initial charge.
+
+The primary endpoint is terminal energy delivered into the frozen representative load after standby, measured as \\(E_{\mathrm{load}}=\\int V_{\mathrm{term}}(t) I_{\mathrm{load}}(t)\\,dt\\) over the declared service window and voltage cutoffs. At installed-system boundary, report energy delivered to the application load and separately meter auxiliary energy during standby and conversion/conditioning losses. Compare against a matched initial reference on the same device boundary, voltage window, load waveform and temperature. Also report usable peak/continuous power, start latency, time-to-cutoff, recovery/refresh energy and temperature rise.
+
+Do not collapse service into a single mean. Define a device-level service pass against frozen application requirements (minimum Wh, minimum W, allowed voltage sag/cutoff and maximum response time). Report pass fraction, lower-tail quantiles and a predeclared one-sided confidence bound by design, lot and laboratory; sample sizes are chosen from a pilot variance estimate and power analysis. A repeated read or cycle on one specimen is not another independent device.
+
+A public vendor benchmark illustrates endpoint differences: Eaton's XLR-51 188 F module datasheet reports 8 mA nominal leakage at 20 °C after 72 h charge and hold, alongside separate 1 500 h elevated-temperature life and 1 000 000-cycle specifications. Skeleton's current 54 V / 188 F datasheet lists 10-year uncharged storage life at room temperature and separate cycle-life conditions. These are vendor-defined endpoints, not directly comparable post-standby delivered-energy measurements. Preserve each device's conditions and do not infer the missing outcome.
+
+### Mechanism-identifiability research frontier
+
+A 2026 review distinguishes three major self-discharge contributions: ohmic leakage, parasitic Faradaic reactions and charge redistribution. Voltage decay alone may not identify which mechanism dominates. Treat mechanism attribution as a hypothesis tested by orthogonal observations, not as a label inferred from a single fitted curve. Reuse the existing leakage, ESR/ESL and frequency-resolved impedance work rather than duplicating it; add matched open-circuit and regulated-hold histories, current transients, temperature/initial-voltage/history strata within rated limits, and post-standby load delivery. Fit competing models on training devices/lots and assess mechanism discrimination and service prediction on held-out lots; report non-identifiability and abstain where the observations cannot distinguish mechanisms.
 
 ## Explicit mass and volume denominator contract
 
@@ -240,9 +254,11 @@ The workspace `xtask` exposes a dependency-free domain audit using the existing 
 ```sh
 cargo run -p xtask -- electrochemical-capacitor-audit
 cargo test -p xtask electrochemical_capacitor
+cargo run -p xtask -- edlc-standby-service-audit
+cargo test -p xtask edlc_standby_service
 ```
 
-The command checks schema/fixture structure, canonical identifiers, device and metric categories, units/voltage-window sanity, evidence-class/status alignment, digest syntax, duplicate physical serials, source-register uniqueness and the fail-closed promotion rules. It is not a complete JSON Schema evaluator and does not authenticate remote source bytes or measurements. Rust compilation, formatting, tests and hosted CI remain pending until a Rust toolchain/runner is available.
+The existing capacitor command checks schema/fixture structure, canonical identifiers, device and metric categories, units/voltage-window sanity, evidence-class/status alignment, digest syntax, duplicate physical serials, source-register uniqueness and fail-closed promotion rules. The new standby command enforces the synthetic fixture's strict data contract, recomputes trapezoidal leakage charge and terminal V×I discharge energy, checks peak sampled power and rejects unit, chronology, sign, expected-value or claim-ceiling violations. Neither command is a complete JSON Schema evaluator, physical instrument authenticator or lifetime model. Rust compilation, formatting, tests and hosted CI remain pending until a Rust toolchain/runner is available.
 
 ## Claim ceiling
 
