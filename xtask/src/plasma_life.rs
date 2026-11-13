@@ -327,7 +327,7 @@ mod tests {
     fn frozen_fixture_matches_all_expected_dispositions() {
         let counts = audit_json(FIXTURE).expect("fixture should pass its known-answer audit");
         assert_eq!(counts.get("PASS"), Some(&5));
-        assert_eq!(counts.get("BLOCKED"), Some(&5));
+        assert_eq!(counts.get("BLOCKED"), Some(&6));
         assert_eq!(counts.get("REJECTED"), Some(&8));
     }
 
@@ -390,6 +390,23 @@ mod tests {
             ("MECHANISM_SHIFT", "REJECTED"),
             ("NO_MECHANISM_EVIDENCE", "BLOCKED"),
             ("STRESS_HISTORY_GAP", "BLOCKED"),
+        ] {
+            let case = cases
+                .iter()
+                .find(|case| case["id"] == id)
+                .expect("known case");
+            assert_eq!(evaluate_case(case).expect("evaluate"), expected);
+        }
+    }
+
+
+    #[test]
+    fn life_quantile_claims_are_refused_without_a_qualified_estimator_receipt() {
+        let root: Value = serde_json::from_str(FIXTURE).expect("valid fixture");
+        let cases = root["cases"].as_array().expect("cases");
+        for (id, expected) in [
+            ("ZERO_EVENT_TAIL", "REJECTED"),
+            ("NONZERO_EVENT_QUANTILE_NO_ESTIMATOR", "BLOCKED"),
         ] {
             let case = cases
                 .iter()
