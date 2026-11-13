@@ -617,11 +617,11 @@ fn validate_option_reserve_count(
     Ok(())
 }
 
-fn validate_reserves(
+fn validate_reserves<'a>(
     arm_id: &str,
     policy: &ReservePolicy,
-    observations: &[ReserveObservation],
-) -> Result<BTreeMap<ReserveKind, &ReserveObservation>, CapabilityRetentionError> {
+    observations: &'a [ReserveObservation],
+) -> Result<BTreeMap<ReserveKind, &'a ReserveObservation>, CapabilityRetentionError> {
     let mut indexed = BTreeMap::new();
     for observation in observations {
         if indexed.insert(observation.kind, observation).is_some() {
