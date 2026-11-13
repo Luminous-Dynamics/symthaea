@@ -25,6 +25,7 @@
 //! application, charge-block SVD, TEBD, truncation or discarded-weight bounds.
 
 use nalgebra::DMatrix;
+use nalgebra::DMatrix;
 use num_complex::Complex64;
 
 /// A single-site qubit tensor with explicit integer charges on both virtual bonds.
@@ -77,6 +78,7 @@ pub enum U1MpsError {
     TwoSiteBondMismatch,
     TwoSiteShapeMismatch,
     TwoSiteDenseExpansionRequiresOpenBoundaries,
+    TwoSiteSvdFailed { rows: usize, columns: usize },
     DenseChargeLeakage { basis_index: usize, amplitude: f64, tolerance: f64 },
     SvdFailed { rows: usize, columns: usize },
 }
@@ -167,6 +169,10 @@ impl core::fmt::Display for U1MpsError {
             Self::TwoSiteDenseExpansionRequiresOpenBoundaries => {
                 write!(f, "two-site dense expansion requires one-dimensional external boundary bonds")
             }
+            Self::TwoSiteSvdFailed { rows, columns } => write!(
+                f,
+                "charge-block two-site SVD failed to converge for {rows}x{columns} block"
+            ),
             Self::DenseChargeLeakage { basis_index, amplitude, tolerance } => write!(
                 f,
                 "dense basis amplitude {basis_index} has forbidden charge-sector magnitude {amplitude}, tolerance {tolerance}"
@@ -931,6 +937,24 @@ impl U1TwoSiteGate {
     }
 }
 
+
+
+/// Receipts from an exact charge-block split of a two-site state.
+///
+/// Exactly-zero singular directions are omitted as nullspace. Every positive
+/// singular value is retained; this operation has no bond cap or cutoff.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TwoSiteSplitDiagnostics {
+    pub left_tensor: U1MpsTensor,
+    pub right_tensor: U1MpsTensor,
+    /// (intermediate charge, retained positive singular-value count).
+    pub rank_by_charge: Vec<(i32, usize)>,
+    pub retained_singular_values: usize,
+    pub exact_zero_singular_values_omitted: usize,
+    pub reconstruction_max_residual: f64,
+    pub reconstruction_l2_residual: f64,
+}
+
 impl U1TwoSiteState {
     /// Construct a checked two-site tensor with external virtual-charge labels.
     pub fn new(
@@ -1109,6 +1133,231 @@ impl U1TwoSiteState {
             output,
             tolerance,
         )
+    }
+
+
+
+    /// Split this two-site tensor into two U(1)-symmetric site tensors.
+    ///
+    /// The matrix is block-diagonalized by the intermediate prefix charge q:
+    /// rows satisfy q_left + s_first = q and columns satisfy
+    /// q_right = q + s_second. Each charge block is factorized independently.
+    ///
+    /// No bond cap, positive singular-value cutoff, normalization or
+    /// renormalization is applied. Exactly-zero singular directions are omitted;
+    /// every positive singular value is retained, however small.
+    pub fn split_exact(
+        &self,
+        tolerance: f64,
+    ) -> Result<U1TwoSiteSplitDiagnostics, U1MpsError> {
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+
+        struct ChargeBlock {
+            charge: i32,
+            rows: Vec<(usize, usize)>,
+            columns: Vec<(usize, usize)>,
+            left_vectors: DMatrix<Complex64>,
+            right_vectors_t: DMatrix<Complex64>,
+            singular_values: Vec<f64>,
+        }
+
+        let mut row_groups: Vec<(i32, Vec<(usize, usize)>)> = Vec::new();
+        for left in 0..self.left_dimension() {
+            for first_physical in 0..2 {
+                let charge = self.left_charges[left] + first_physical as i32;
+                if let Some((_, rows)) = row_groups.iter_mut().find(|(q, _)| *q == charge) {
+                    rows.push((left, first_physical));
+                } else {
+                    row_groups.push((charge, vec![(left, first_physical)]));
+                }
+            }
+        }
+
+        let max_block_dimension = self
+            .left_dimension()
+            .saturating_mul(2)
+            .max(self.right_dimension().saturating_mul(2));
+        let max_iterations = 10_000usize.max(
+            64usize.saturating_mul(max_block_dimension.saturating_mul(max_block_dimension)),
+        );
+        let mut blocks = Vec::new();
+        let mut exact_zero_singular_values_omitted = 0_usize;
+
+        for (charge, rows) in row_groups {
+            let mut columns = Vec::new();
+            for second_physical in 0..2 {
+                for right in 0..self.right_dimension() {
+                    if self.right_charges[right] == charge + second_physical as i32 {
+                        columns.push((second_physical, right));
+                    }
+                }
+            }
+            if rows.is_empty() || columns.is_empty() {
+                continue;
+            }
+
+            let mut block = DMatrix::<Complex64>::zeros(rows.len(), columns.len());
+            for (row_index, &(left, first_physical)) in rows.iter().enumerate() {
+                for (column_index, &(second_physical, right)) in columns.iter().enumerate() {
+                    let physical_pair = first_physical * 2 + second_physical;
+                    block[(row_index, column_index)] = self.get(left, physical_pair, right);
+                }
+            }
+
+            let block_rows = block.nrows();
+            let block_columns = block.ncols();
+            let decomposition = block
+                .try_svd(true, true, tolerance, max_iterations)
+                .ok_or(U1MpsError::TwoSiteSvdFailed {
+                    rows: block_rows,
+                    columns: block_columns,
+                })?;
+            let left_vectors = decomposition.u.ok_or(U1MpsError::TwoSiteSvdFailed {
+                rows: block_rows,
+                columns: block_columns,
+            })?;
+            let right_vectors_t =
+                decomposition.v_t.ok_or(U1MpsError::TwoSiteSvdFailed {
+                    rows: block_rows,
+                    columns: block_columns,
+                })?;
+
+            let mut kept_indices = Vec::new();
+            for (index, singular_value) in decomposition.singular_values.iter().enumerate() {
+                if !singular_value.is_finite() {
+                    return Err(U1MpsError::NonFiniteContraction(
+                        "two-site charge-block singular value",
+                    ));
+                }
+                if *singular_value > 0.0 {
+                    kept_indices.push(index);
+                } else {
+                    exact_zero_singular_values_omitted += 1;
+                }
+            }
+            if kept_indices.is_empty() {
+                continue;
+            }
+
+            let kept_left = DMatrix::<Complex64>::from_fn(
+                rows.len(),
+                kept_indices.len(),
+                |row, column| left_vectors[(row, kept_indices[column])],
+            );
+            let kept_right_t = DMatrix::<Complex64>::from_fn(
+                kept_indices.len(),
+                columns.len(),
+                |row, column| right_vectors_t[(kept_indices[row], column)],
+            );
+            let singular_values = kept_indices
+                .iter()
+                .map(|&index| decomposition.singular_values[index])
+                .collect();
+
+            blocks.push(ChargeBlock {
+                charge,
+                rows,
+                columns,
+                left_vectors: kept_left,
+                right_vectors_t: kept_right_t,
+                singular_values,
+            });
+        }
+
+        let total_rank = blocks.iter().try_fold(0_usize, |sum, block| {
+            sum.checked_add(block.singular_values.len())
+                .ok_or(U1MpsError::DimensionOverflow)
+        })?;
+        if total_rank == 0 {
+            return Err(U1MpsError::ZeroDenseState);
+        }
+
+        let left_entries = self
+            .left_dimension()
+            .checked_mul(2)
+            .and_then(|value| value.checked_mul(total_rank))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let right_entries = total_rank
+            .checked_mul(2)
+            .and_then(|value| value.checked_mul(self.right_dimension()))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let mut left_data = vec![Complex64::new(0.0, 0.0); left_entries];
+        let mut right_data = vec![Complex64::new(0.0, 0.0); right_entries];
+        let mut middle_charges = Vec::with_capacity(total_rank);
+        let mut rank_by_charge = Vec::with_capacity(blocks.len());
+        let mut offset = 0_usize;
+
+        for block in &blocks {
+            let rank = block.singular_values.len();
+            rank_by_charge.push((block.charge, rank));
+            middle_charges.extend(core::iter::repeat_n(block.charge, rank));
+
+            for singular_index in 0..rank {
+                let middle = offset + singular_index;
+                for (row_index, &(left, first_physical)) in block.rows.iter().enumerate() {
+                    let index = (left * 2 + first_physical) * total_rank + middle;
+                    left_data[index] = block.left_vectors[(row_index, singular_index)];
+                }
+
+                for (column_index, &(second_physical, right)) in
+                    block.columns.iter().enumerate()
+                {
+                    let index = (middle * 2 + second_physical) * self.right_dimension() + right;
+                    right_data[index] = block.singular_values[singular_index]
+                        * block.right_vectors_t[(singular_index, column_index)];
+                }
+            }
+            offset += rank;
+        }
+
+        let left_tensor = U1MpsTensor::new(
+            self.left_charges.clone(),
+            middle_charges.clone(),
+            left_data,
+        )?;
+        let right_tensor = U1MpsTensor::new(
+            middle_charges,
+            self.right_charges.clone(),
+            right_data,
+        )?;
+
+        let mut reconstruction_max_residual: f64 = 0.0;
+        let mut reconstruction_squared = 0.0;
+        for left in 0..self.left_dimension() {
+            for first_physical in 0..2 {
+                for second_physical in 0..2 {
+                    let physical_pair = first_physical * 2 + second_physical;
+                    for right in 0..self.right_dimension() {
+                        let mut reconstructed = Complex64::new(0.0, 0.0);
+                        for middle in 0..total_rank {
+                            reconstructed += left_tensor.get(left, first_physical, middle)
+                                * right_tensor.get(middle, second_physical, right);
+                        }
+                        let residual = (reconstructed - self.get(left, physical_pair, right)).norm();
+                        reconstruction_max_residual =
+                            reconstruction_max_residual.max(residual);
+                        reconstruction_squared += residual * residual;
+                    }
+                }
+            }
+        }
+        if !reconstruction_max_residual.is_finite() || !reconstruction_squared.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "two-site split reconstruction",
+            ));
+        }
+
+        Ok(U1TwoSiteSplitDiagnostics {
+            left_tensor,
+            right_tensor,
+            rank_by_charge,
+            retained_singular_values: total_rank,
+            exact_zero_singular_values_omitted,
+            reconstruction_max_residual,
+            reconstruction_l2_residual: reconstruction_squared.sqrt(),
+        })
     }
 
     /// Return the four computational-basis amplitudes for open-boundary tensors.
