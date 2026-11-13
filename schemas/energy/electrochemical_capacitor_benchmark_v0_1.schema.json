@@ -34,7 +34,8 @@
         "evidence",
         "metrics",
         "manufacturing",
-        "disposition"
+        "disposition",
+        "denominator"
       ],
       "properties": {
         "schema_version": {
@@ -349,6 +350,96 @@
             "invalid",
             "failed",
             "censored"
+          ]
+        },
+        "denominator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "mass_kg",
+            "volume_l",
+            "basis",
+            "included_components",
+            "excluded_components",
+            "status"
+          ],
+          "properties": {
+            "mass_kg": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "exclusiveMinimum": 0
+            },
+            "volume_l": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "exclusiveMinimum": 0
+            },
+            "basis": {
+              "enum": [
+                "active_material_only",
+                "electrode_basis",
+                "complete_device_weighed",
+                "module_vendor_reported",
+                "installed_system_measured",
+                "unknown"
+              ]
+            },
+            "included_components": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "excluded_components": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            },
+            "status": {
+              "enum": [
+                "complete",
+                "partial",
+                "unknown"
+              ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "status": {
+                    "const": "complete"
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "mass_kg": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "volume_l": {
+                    "type": "number",
+                    "exclusiveMinimum": 0
+                  },
+                  "included_components": {
+                    "minItems": 9
+                  }
+                }
+              }
+            }
           ]
         }
       }
