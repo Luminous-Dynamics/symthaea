@@ -73,7 +73,13 @@ pub struct SubgoalEvaluation {
     pub subgoal_id: String,
     pub outcome: SubgoalOutcome,
     pub acceptance_receipt_digest: Option<String>,
+    /// Stable identity of the accepted physical output; one output cannot be credited twice.
+    pub accepted_output_digest: Option<String>,
     pub safety_receipt_digest: Option<String>,
+    /// Number of failed/repeated attempts before this terminal outcome.
+    pub rework_attempt_count: u16,
+    /// Upstream receipt documenting the rework attempts, when non-zero.
+    pub rework_receipt_digest: Option<String>,
     pub physical_transition_receipt_digest: Option<String>,
     pub predecessor_state_digest: Option<String>,
     pub result_state_digest: Option<String>,
@@ -96,6 +102,8 @@ pub struct SubgoalProgressReport {
     pub outcome: SubgoalOutcome,
     pub independently_accepted: bool,
     pub safe_accepted: bool,
+    /// Number of separately recorded rework attempts for this subgoal.
+    pub rework_attempt_count: u16,
     pub physical_option_join_valid: bool,
     pub continuation_qualified: bool,
     pub continuation_unknown: bool,
@@ -114,6 +122,8 @@ pub struct MissionProgressReport {
     pub accepted_but_unsafe_subgoals: u16,
     pub continuation_qualified_subgoals: u16,
     pub unknown_subgoals: u16,
+    /// Sum of separately receipted rework attempts across scheduled subgoals.
+    pub total_rework_attempts: u64,
     pub longest_safe_accepted_prefix: u16,
     pub longest_continuation_qualified_prefix: u16,
     pub mandatory_safe_completion: bool,
@@ -132,6 +142,8 @@ pub enum ProgressError {
     DuplicateEvaluation(String),
     MissingEvaluation(String),
     ReceiptReused(String),
+    DuplicateAcceptedOutput(String),
+    InvalidReworkEvidence(String),
     IncompleteAcceptedOutcome(String),
     PhysicalOptionStateMismatch(String),
     ContinuationStateMismatch(String),
@@ -243,10 +255,26 @@ fn mandatory_descendants(
 
 fn validate_receipt_uniqueness(evaluations: &[SubgoalEvaluation]) -> Result<(), ProgressError> {
     let mut seen = BTreeSet::new();
+    let mut accepted_outputs = BTreeSet::new();
     for evaluation in evaluations {
         let continuation = evaluation.continuation.as_ref();
+        if matches!(
+            evaluation.outcome,
+            SubgoalOutcome::SafeAccepted | SubgoalOutcome::AcceptedButUnsafe
+        ) {
+            let output = evaluation
+                .accepted_output_digest
+                .as_deref()
+                .ok_or_else(|| ProgressError::IncompleteAcceptedOutcome(
+                    evaluation.subgoal_id.clone(),
+                ))?;
+            if !accepted_outputs.insert(output.to_owned()) {
+                return Err(ProgressError::DuplicateAcceptedOutput(output.to_owned()));
+            }
+        }
         for receipt in [
             evaluation.acceptance_receipt_digest.as_deref(),
+            evaluation.rework_receipt_digest.as_deref(),
             evaluation.safety_receipt_digest.as_deref(),
             evaluation.physical_transition_receipt_digest.as_deref(),
             evaluation.option_ledger_receipt_digest.as_deref(),
@@ -270,6 +298,12 @@ fn validate_transition(evaluation: &SubgoalEvaluation) -> Result<bool, ProgressE
         evaluation.outcome,
         SubgoalOutcome::SafeAccepted | SubgoalOutcome::AcceptedButUnsafe
     );
+    match (evaluation.rework_attempt_count, evaluation.rework_receipt_digest.as_deref()) {
+        (0, None) => {}
+        (0, Some(_)) => return Err(ProgressError::InvalidReworkEvidence(evaluation.subgoal_id.clone())),
+        (_, Some(receipt)) if !receipt.trim().is_empty() => {}
+        _ => return Err(ProgressError::InvalidReworkEvidence(evaluation.subgoal_id.clone())),
+    }
     if !accepted {
         if evaluation.continuation.is_some() {
             return Err(ProgressError::IncompleteAcceptedOutcome(evaluation.subgoal_id.clone()));
@@ -278,6 +312,7 @@ fn validate_transition(evaluation: &SubgoalEvaluation) -> Result<bool, ProgressE
     }
     let required = [
         evaluation.acceptance_receipt_digest.as_deref(),
+        evaluation.accepted_output_digest.as_deref(),
         evaluation.safety_receipt_digest.as_deref(),
         evaluation.physical_transition_receipt_digest.as_deref(),
         evaluation.predecessor_state_digest.as_deref(),
@@ -398,6 +433,7 @@ pub fn evaluate_mission_progress(
     let mut reports = Vec::with_capacity(input.mission.mission_order.len());
     let mut continuation_count = 0_u16;
     let mut continuation_unknown_count = 0_u16;
+    let mut total_rework_attempts = 0_u64;
     let mut safe_prefix = 0_u16;
     let mut continuation_prefix = 0_u16;
     let mut safe_prefix_open = true;
@@ -409,6 +445,9 @@ pub fn evaluate_mission_progress(
         let safe = evaluation.outcome == SubgoalOutcome::SafeAccepted;
         let required =
             mandatory_descendants(&input.mission, id, &mandatory, &completed_before);
+        total_rework_attempts = total_rework_attempts
+            .checked_add(u64::from(evaluation.rework_attempt_count))
+            .ok_or(ProgressError::ArithmeticOverflow)?;
         let (qualified, continuation_unknown, feasible_count) = if safe {
             validate_continuation(evaluation, &required)?
         } else {
@@ -438,6 +477,7 @@ pub fn evaluate_mission_progress(
             outcome: evaluation.outcome,
             independently_accepted: matches!(evaluation.outcome, SubgoalOutcome::SafeAccepted | SubgoalOutcome::AcceptedButUnsafe),
             safe_accepted: safe,
+            rework_attempt_count: evaluation.rework_attempt_count,
             physical_option_join_valid: matches!(evaluation.outcome, SubgoalOutcome::SafeAccepted | SubgoalOutcome::AcceptedButUnsafe),
             continuation_qualified: qualified,
             continuation_unknown,
@@ -466,6 +506,7 @@ pub fn evaluate_mission_progress(
         accepted_but_unsafe_subgoals: unsafe_count,
         continuation_qualified_subgoals: continuation_count,
         unknown_subgoals: unknown_count + continuation_unknown_count,
+        total_rework_attempts,
         longest_safe_accepted_prefix: safe_prefix,
         longest_continuation_qualified_prefix: continuation_prefix,
         mandatory_safe_completion,
@@ -525,7 +566,10 @@ mod tests {
             subgoal_id: id.into(),
             outcome,
             acceptance_receipt_digest: success.then(|| format!("accept-{id}")),
+            accepted_output_digest: success.then(|| format!("output-{id}")),
             safety_receipt_digest: success.then(|| format!("safety-{id}")),
+            rework_attempt_count: 0,
+            rework_receipt_digest: None,
             physical_transition_receipt_digest: success.then(|| format!("transition-{id}")),
             predecessor_state_digest: success.then(|| format!("state-{id}-before")),
             result_state_digest: success.then(|| format!("state-{id}-after")),
@@ -660,6 +704,39 @@ mod tests {
         let mut audit = input();
         audit.evaluations[1].acceptance_receipt_digest = audit.evaluations[0].acceptance_receipt_digest.clone();
         assert_eq!(evaluate_mission_progress(&audit), Err(ProgressError::ReceiptReused("accept-a".into())));
+    }
+
+    #[test]
+    fn repeated_accepted_output_identity_cannot_be_credited_twice() {
+        let mut audit = input();
+        audit.evaluations[1].accepted_output_digest =
+            audit.evaluations[0].accepted_output_digest.clone();
+        assert_eq!(
+            evaluate_mission_progress(&audit),
+            Err(ProgressError::DuplicateAcceptedOutput("output-a".into()))
+        );
+    }
+
+    #[test]
+    fn rework_attempts_are_reported_separately_from_accepted_subgoals() {
+        let mut audit = input();
+        audit.evaluations[0].rework_attempt_count = 3;
+        audit.evaluations[0].rework_receipt_digest = Some("rework-receipt-a".into());
+        let report = evaluate_mission_progress(&audit).unwrap();
+        assert_eq!(report.native_completed_subgoals, 2);
+        assert_eq!(report.safe_accepted_subgoals, 2);
+        assert_eq!(report.total_rework_attempts, 3);
+        assert_eq!(report.subgoals[0].rework_attempt_count, 3);
+    }
+
+    #[test]
+    fn rework_attempt_count_requires_its_own_receipt() {
+        let mut audit = input();
+        audit.evaluations[0].rework_attempt_count = 1;
+        assert_eq!(
+            evaluate_mission_progress(&audit),
+            Err(ProgressError::InvalidReworkEvidence("a".into()))
+        );
     }
 
     #[test]
