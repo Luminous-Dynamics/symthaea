@@ -4996,6 +4996,13 @@ mod tests {
         assert!(result.richardson_estimate_qualified);
         assert!(result.truncation_contamination_included);
         assert!(result.measured_step_doubling_defect_l2 > 0.0);
+        assert!(result.error_budget.truncation_global_bound_qualified);
+        assert!(result.error_budget.canonicalization_rebase_l2_residual_sum.is_some());
+        assert!(result.error_budget.schmidt_truncation_l2_upper_bound.is_some());
+        assert_eq!(result.error_budget.hamiltonian_projection_residual_sum, 0.0);
+        assert!(!result.error_budget.total_physical_error_qualified);
+        assert!(result.error_budget.total_physical_error_upper_bound.is_none());
+        assert!(!result.error_budget.unqualified_terms.is_empty());
         let estimate = result
             .richardson_fine_trotter_error_estimate
             .expect("passing gauge receipts must enable a step-doubling estimate");
@@ -5028,6 +5035,8 @@ mod tests {
 
         assert!(coarse.richardson_estimate_qualified);
         assert!(fine.richardson_estimate_qualified);
+        assert!(coarse.error_budget.total_physical_error_upper_bound.is_none());
+        assert!(fine.error_budget.total_physical_error_upper_bound.is_none());
         let ratio =
             coarse.measured_step_doubling_defect_l2 / fine.measured_step_doubling_defect_l2;
         assert!(
