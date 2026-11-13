@@ -493,18 +493,26 @@ where
 
     let mut left_match = vec![None; left.len()];
     let mut right_match = vec![None; right.len()];
+    let mut seen_left_generation = vec![0usize; left.len()];
+    let mut seen_right_generation = vec![0usize; right.len()];
+    let mut parent_right = vec![None; right.len()];
+    let mut queue = std::collections::VecDeque::new();
+    let mut generation = 0usize;
     let mut scans = 0usize;
 
     for root in 0..left.len() {
-        if left_match[root].is_some() {
+        if left_match[root].is_some() || edges[root].is_empty() {
             continue;
         }
-        let mut queue = std::collections::VecDeque::new();
-        let mut seen_left = vec![false; left.len()];
-        let mut seen_right = vec![false; right.len()];
-        let mut parent_right = vec![None; right.len()];
+        generation = generation.checked_add(1).ok_or_else(|| {
+            MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure {
+                side: "matching".into(),
+                reason: "matching generation counter overflow".into(),
+            }
+        })?;
+        queue.clear();
         queue.push_back(root);
-        seen_left[root] = true;
+        seen_left_generation[root] = generation;
         let mut free_right = None;
 
         'search: while let Some(left_index) = queue.pop_front() {
@@ -518,14 +526,14 @@ where
                         },
                     );
                 }
-                if seen_right[right_index] {
+                if seen_right_generation[right_index] == generation {
                     continue;
                 }
-                seen_right[right_index] = true;
+                seen_right_generation[right_index] = generation;
                 parent_right[right_index] = Some(left_index);
                 if let Some(next_left) = right_match[right_index] {
-                    if !seen_left[next_left] {
-                        seen_left[next_left] = true;
+                    if seen_left_generation[next_left] != generation {
+                        seen_left_generation[next_left] = generation;
                         queue.push_back(next_left);
                     }
                 } else {
