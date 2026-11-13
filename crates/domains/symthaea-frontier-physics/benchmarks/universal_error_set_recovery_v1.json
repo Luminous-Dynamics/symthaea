@@ -1,0 +1,224 @@
+{
+  "schema": "luminous.symthaea.universal_error_set_recovery.v1",
+  "programme": "UQ-RECOVERY-001",
+  "title": "Universal recovery across approximate quantum error-channel families",
+  "created": "2026-11-13",
+  "repository": "Luminous-Dynamics/symthaea",
+  "owner": "symthaea-frontier-physics",
+  "status": "exact_bit_flip_baseline_source_authored",
+  "execution_status": "source_authored_tests_pending_exact_head_runner",
+  "claim_ceiling": "The implemented baseline is exact three-qubit repetition-code correction for stochastic mixtures of {I,X0,X1,X2}. The general approximate error-set Petz theorem and its Hellinger/environment-leakage certificates are not implemented.",
+  "references": [
+    {
+      "name": "Universal recovery in approximate quantum error correction",
+      "kind": "2026 preprint",
+      "date": "2026-08-29",
+      "url": "https://arxiv.org/abs/2608.28962",
+      "role": "Universal error-set recovery, E-controlled channel families, average/worst-case guarantees."
+    },
+    {
+      "name": "Petz Recovery through a Single Polar Transformation for Approximate Quantum Error Correction",
+      "kind": "2026 preprint",
+      "date": "2026-10-14",
+      "url": "https://arxiv.org/abs/2610.20515",
+      "role": "Polar/QSVT Petz approximation without postselection; future universal decoder compilation target."
+    },
+    {
+      "name": "Optimality Condition for the Petz Map",
+      "kind": "Physical Review Letters 134, 200602",
+      "date": "2025-05-19",
+      "doi": "10.1103/PhysRevLett.134.200602",
+      "url": "https://doi.org/10.1103/PhysRevLett.134.200602",
+      "role": "Channel-specific Petz optimality criterion; distinguish from universal error-set guarantees."
+    }
+  ],
+  "mathematical_contract": {
+    "code": {
+      "dimension": 2,
+      "physical_dimension": 8,
+      "codewords": [
+        "|000>",
+        "|111>"
+      ],
+      "projector": "P=|000><000|+|111><111|"
+    },
+    "error_set": [
+      "I",
+      "X_0",
+      "X_1",
+      "X_2"
+    ],
+    "qec_matrix": "A_QEC[(i,k),(j,l)] = <c_i|E_k^dagger E_l|c_j>",
+    "exact_kl_condition": "A_QEC = I_K tensor lambda for lambda positive semidefinite",
+    "hellinger_distance": "zeta_H(E,Q) = (1/sqrt(K)) min_{lambda>=0} ||sqrt(A_QEC)-I_K tensor sqrt(lambda)||_2",
+    "environment_leakage": "zeta(E,Q) = inf_lambda ||B^E_(lambda,Q)||_diamond",
+    "environment_leakage_map": "B^E_(lambda,Q)(X)=sum_kl tr((P E_l^dagger E_k P - lambda_kl P)X)|k><l|",
+    "controlled_channel": "F_alpha = sum_k C[alpha,k] E_k",
+    "theorem_policy": "Average-case certificate uses the Knill-Laflamme Hellinger metric; worst-case certificate requires the paper's stronger E-control condition and environment-leakage metric. Verify all coefficient constraints and conventions before applying bounds."
+  },
+  "implemented_baseline": {
+    "module": "crates/domains/symthaea-frontier-physics/src/universal_recovery.rs",
+    "module_export": "crates/domains/symthaea-frontier-physics/src/lib.rs",
+    "decoder": "Fixed four-syndrome Kraus map, independent of noise probabilities",
+    "channel_family": "N_p(rho)=sum_s p_s E_s rho E_s^dagger, p in the four-simplex",
+    "observables": [
+      "qec_matrix_knill_laflamme_residual",
+      "channel_trace_preservation_residual",
+      "recovery_trace_preservation_residual",
+      "logical_recovery_residual",
+      "entanglement_fidelity"
+    ],
+    "authored_tests": [
+      "single_fixed_recovery_corrects_each_error_set_member",
+      "one_recovery_corrects_uniform_and_asymmetric_noise_mixtures",
+      "fixed_decoder_is_independent_of_the_channel_probability_vector",
+      "frozen_probability_family_has_unit_fidelity_for_every_member",
+      "invalid_probability_vectors_are_rejected_without_renormalization"
+    ],
+    "workflow": ".github/workflows/universal-error-set-recovery.yml",
+    "status": "source_authored_runner_pending",
+    "explicit_limitation": "Stochastic mixtures only; not arbitrary coherent E-controlled channel Kraus expansions and not the general approximate universal Petz map."
+  },
+  "benchmark_ladder": [
+    {
+      "id": "UR-0",
+      "name": "Exact three-qubit bit-flip control",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "exact KL matrix residual",
+        "TP recovery",
+        "logical Kraus recovery residual",
+        "64 frozen probability vectors"
+      ]
+    },
+    {
+      "id": "UR-1",
+      "name": "General finite error-set representation",
+      "status": "planned",
+      "acceptance": [
+        "explicit code isometry",
+        "finite error operators",
+        "basis and register conventions"
+      ]
+    },
+    {
+      "id": "UR-2",
+      "name": "QEC-matrix diagnostics",
+      "status": "planned",
+      "acceptance": [
+        "PSD and Hermiticity",
+        "support rank",
+        "KL projection",
+        "known-answer fixtures"
+      ]
+    },
+    {
+      "id": "UR-3",
+      "name": "Average-case error-set recovery",
+      "status": "planned",
+      "acceptance": [
+        "independent Hellinger distance",
+        "matched theorem assumptions",
+        "average-case error comparison"
+      ]
+    },
+    {
+      "id": "UR-4",
+      "name": "Worst-case error-set recovery",
+      "status": "planned",
+      "acceptance": [
+        "environment-leakage diamond norm",
+        "strong coefficient constraint",
+        "worst-case logical input"
+      ]
+    },
+    {
+      "id": "UR-5",
+      "name": "Universal versus channel-adapted decoders",
+      "status": "planned",
+      "acceptance": [
+        "common channel family",
+        "same samples and access",
+        "one shared decoder versus per-channel decoder"
+      ]
+    },
+    {
+      "id": "UR-6",
+      "name": "Universal QSVT compilation",
+      "status": "planned",
+      "acceptance": [
+        "one error-set decoder isometry",
+        "one phase sequence",
+        "no-postselection channel",
+        "combined family-level and approximation error bound"
+      ]
+    },
+    {
+      "id": "UR-7",
+      "name": "Adversarial and shift tests",
+      "status": "planned",
+      "acceptance": [
+        "coefficient-boundary channels",
+        "out-of-span rejection",
+        "worst-case inputs"
+      ]
+    },
+    {
+      "id": "UR-8",
+      "name": "Cost and scale",
+      "status": "planned",
+      "acceptance": [
+        "logical gates and depth",
+        "QSVT queries and ancillas",
+        "conditioning and support rank",
+        "runtime and memory",
+        "qualification cost"
+      ]
+    }
+  ],
+  "proposed_targets": {
+    "exact_kl_known_answer_residual": 1e-12,
+    "recovery_trace_preservation_residual": 1e-12,
+    "logical_recovery_residual": 1e-12,
+    "entanglement_fidelity_abs_error": 1e-12,
+    "universal_probability_sweep_size": 64,
+    "approximate_family": "Use theorem-derived bounds and compare them with independent small-instance recovery SDPs; do not invent an uncalibrated universal fidelity threshold."
+  },
+  "negative_controls": [
+    "per_channel_decoder_reoptimization_labelled_universal",
+    "average_channel_used_as_family_certificate",
+    "hellinger_metric_reported_as_worst_case",
+    "environment_leakage_reported_as_average_case",
+    "omit_strong_E_control_for_worst_case_theorem",
+    "change_error_set_basis_without_transforming_coefficients",
+    "silently_project_non_PSD_QEC_matrix",
+    "mismatch_decoder_access_sets",
+    "claim_QSVT_error_implies_family_correctability_without_ideal_decoder_bound"
+  ],
+  "required_receipt_fields": [
+    "source_sha",
+    "manifest_sha256",
+    "code_projector_digest",
+    "error_set_operator_digests",
+    "coefficient_matrix_digest",
+    "coefficient_norm_1",
+    "coefficient_norm_2",
+    "channel_CPTP_residual",
+    "QEC_matrix_digest",
+    "QEC_matrix_Hermiticity_residual",
+    "QEC_matrix_PSD_minimum_eigenvalue",
+    "KL_projection_residual",
+    "Hellinger_distance",
+    "environment_leakage_diamond_norm",
+    "decoder_identity_and_version",
+    "decoder_access_set",
+    "average_case_error",
+    "worst_case_error",
+    "QSVT_phase_sequence_digest",
+    "QSVT_degree",
+    "no_postselection_TP_residual",
+    "runtime",
+    "peak_memory",
+    "qualification_status"
+  ]
+}
