@@ -66,6 +66,7 @@ pub enum U1MpsError {
     ComplexNormResidual { imaginary_part: f64, tolerance: f64 },
     NegativeNormSquared(f64),
     InvalidTotalCharge { total_charge: i32, site_count: usize },
+    ZeroDenseState,
     DenseChargeLeakage { basis_index: usize, amplitude: f64, tolerance: f64 },
     SvdFailed { rows: usize, columns: usize },
 }
@@ -137,6 +138,7 @@ impl core::fmt::Display for U1MpsError {
                 f,
                 "total charge {total_charge} is invalid for a {site_count}-site qubit MPS"
             ),
+            Self::ZeroDenseState => write!(f, "the dense input has no nonzero amplitude in the declared charge sector"),
             Self::DenseChargeLeakage { basis_index, amplitude, tolerance } => write!(
                 f,
                 "dense basis amplitude {basis_index} has forbidden charge-sector magnitude {amplitude}, tolerance {tolerance}"
@@ -616,9 +618,7 @@ impl ComplexU1Mps {
                     .ok_or(U1MpsError::DimensionOverflow)
             })?;
             if next_bond_dimension == 0 {
-                return Err(U1MpsError::NonFiniteContraction(
-                    "dense-to-MPS factorization produced an empty charge support",
-                ));
+                return Err(U1MpsError::ZeroDenseState);
             }
 
             let tensor_entries = left_charges
@@ -980,6 +980,42 @@ mod tests {
         assert!((state.dense_input_charge_leakage_max() - 1.0e-13).abs() <= 1.0e-25);
         assert!((state.dense_input_charge_leakage_weight() - 1.0e-26).abs() <= 1.0e-38);
         assert!((state.dense_reconstruction_max_residual().unwrap() - 1.0e-13).abs() <= 1.0e-25);
+    }
+
+
+    #[test]
+    fn dense_fixed_charge_factorization_preserves_tiny_positive_schmidt_weight() {
+        let tiny = 1.0e-18;
+        let large = (1.0 - tiny * tiny).sqrt();
+        let mut dense = vec![Complex64::new(0.0, 0.0); 4];
+        dense[1] = Complex64::new(large, 0.0);
+        dense[2] = Complex64::new(tiny, 0.0);
+        let state = ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12).unwrap();
+        assert_eq!(state.maximum_bond_dimension(), 2);
+        let reconstructed = state.to_dense(4).unwrap();
+        assert!((reconstructed[2].re - tiny).abs() <= 1.0e-30);
+        assert!(state.dense_reconstruction_max_residual().unwrap() <= 1.0e-15);
+    }
+
+    #[test]
+    fn dense_factorization_reports_tolerated_out_of_sector_weight_and_reconstruction_error() {
+        let mut dense = vec![Complex64::new(0.0, 0.0); 4];
+        dense[1] = Complex64::new(1.0, 0.0);
+        dense[0] = Complex64::new(1.0e-13, 0.0);
+        let state = ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12).unwrap();
+        assert!((state.dense_input_charge_leakage_max() - 1.0e-13).abs() <= 1.0e-25);
+        assert!((state.dense_input_charge_leakage_weight() - 1.0e-26).abs() <= 1.0e-38);
+        assert!((state.dense_reconstruction_max_residual().unwrap() - 1.0e-13).abs() <= 1.0e-25);
+        assert!((state.dense_reconstruction_l2_residual().unwrap() - 1.0e-13).abs() <= 1.0e-25);
+    }
+
+    #[test]
+    fn dense_factorization_rejects_zero_state_instead_of_fabricating_a_bond() {
+        let dense = vec![Complex64::new(0.0, 0.0); 4];
+        assert_eq!(
+            ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12),
+            Err(U1MpsError::ZeroDenseState)
+        );
     }
 
 }
