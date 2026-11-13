@@ -146,6 +146,17 @@ pub struct MusicXmlAttributeEventV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MusicXmlAuxiliaryEventV1 {
+    pub source_order: usize,
+    pub measure_index: usize,
+    pub measure_number: Option<String>,
+    pub part_id: String,
+    pub score_offset: RationalBeat,
+    /// Raw direction/harmony/figured-bass/barline/sound/print event, etc.
+    pub source: MusicXmlSourceNodeV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlCursorMoveV1 {
     pub source_order: usize,
     pub measure_index: usize,
@@ -174,6 +185,7 @@ pub struct MusicXmlPartNotationEventsV1 {
     pub status: MusicXmlNotationEventsStatusV1,
     pub note_events: Vec<MusicXmlNotationEventV1>,
     pub attribute_events: Vec<MusicXmlAttributeEventV1>,
+    pub auxiliary_events: Vec<MusicXmlAuxiliaryEventV1>,
     pub cursor_moves: Vec<MusicXmlCursorMoveV1>,
 }
 
@@ -190,6 +202,7 @@ pub fn legacy_missing_notation_events() -> MusicXmlPartNotationEventsV1 {
         },
         note_events: Vec::new(),
         attribute_events: Vec::new(),
+        auxiliary_events: Vec::new(),
         cursor_moves: Vec::new(),
     }
 }
@@ -200,6 +213,7 @@ pub fn is_legacy_missing_notation_events(
     value.part_id.is_empty()
         && value.note_events.is_empty()
         && value.attribute_events.is_empty()
+        && value.auxiliary_events.is_empty()
         && value.cursor_moves.is_empty()
         && matches!(
             &value.status,
@@ -254,13 +268,14 @@ pub fn parse_musicxml_part_notation_events(
     measure_spans: &[MeasureSpan],
 ) -> MusicXmlPartNotationEventsV1 {
     match parse_part_events(part, part_id, measure_spans) {
-        Ok((note_events, attribute_events, cursor_moves)) => MusicXmlPartNotationEventsV1 {
+        Ok((note_events, attribute_events, auxiliary_events, cursor_moves)) => MusicXmlPartNotationEventsV1 {
             schema: MUSICXML_NOTATION_EVENTS_SCHEMA_V1.into(),
             canonicalization_version: MUSICXML_NOTATION_EVENTS_CANONICALIZATION_V1.into(),
             part_id: part_id.to_string(),
             status: MusicXmlNotationEventsStatusV1::Supported,
             note_events,
             attribute_events,
+            auxiliary_events,
             cursor_moves,
         },
         Err(error) => unknown(part_id, error.reason()),
@@ -275,6 +290,7 @@ fn parse_part_events(
     (
         Vec<MusicXmlNotationEventV1>,
         Vec<MusicXmlAttributeEventV1>,
+        Vec<MusicXmlAuxiliaryEventV1>,
         Vec<MusicXmlCursorMoveV1>,
     ),
     ParseEventError,
@@ -295,6 +311,7 @@ fn parse_part_events(
     let mut source_tree_nodes = 0usize;
     let mut note_events = Vec::new();
     let mut attribute_events = Vec::new();
+    let mut auxiliary_events = Vec::new();
     let mut cursor_moves = Vec::new();
 
     for (measure_index, measure) in measure_nodes.iter().enumerate() {
@@ -585,14 +602,58 @@ fn parse_part_events(
                 });
                 source_order = next_order(source_order)?;
             } else {
-                // Non-note children can affect chord anchoring and may carry
-                // separate semantics (directions, barlines, sound, etc.).
                 chord_anchor = None;
+                // Retain every other measure-level element at its actual
+                // cursor position. Direction/harmony offsets are signed in
+                // divisions and must not be silently rounded or discarded.
+                let offset = element
+                    .children()
+                    .find(|node| node.has_tag_name("offset"))
+                    .map(|node| {
+                        let raw = parse_i64(node.text()).ok_or_else(|| {
+                            ParseEventError::Unknown("invalid MusicXML auxiliary offset".into())
+                        })?;
+                        let magnitude = raw.checked_abs().ok_or_else(|| {
+                            ParseEventError::Unknown("MusicXML auxiliary offset overflow".into())
+                        })?;
+                        let division_value = divisions.ok_or_else(|| {
+                            ParseEventError::Unknown(
+                                "MusicXML auxiliary offset appears before explicit divisions".into(),
+                            )
+                        })?;
+                        let duration = RationalBeat::new(magnitude, division_value)
+                            .map_err(|_| ParseEventError::Unknown("auxiliary offset overflow".into()))?;
+                        Ok::<_, ParseEventError>((raw < 0, duration))
+                    })
+                    .transpose()?;
+                let mut score_offset = measure_start
+                    .checked_add(cursor)
+                    .map_err(|_| ParseEventError::Unknown("auxiliary score offset overflow".into()))?;
+                if let Some((negative, amount)) = offset {
+                    score_offset = if negative {
+                        score_offset.checked_sub(amount)
+                    } else {
+                        score_offset.checked_add(amount)
+                    }
+                    .map_err(|_| ParseEventError::Unknown(
+                        "MusicXML auxiliary offset leaves the supported score coordinate range".into()
+                    ))?;
+                }
+                let source = source_node(element, 0, &mut source_tree_nodes)?;
+                auxiliary_events.push(MusicXmlAuxiliaryEventV1 {
+                    source_order,
+                    measure_index,
+                    measure_number: measure_number.clone(),
+                    part_id: part_id.to_string(),
+                    score_offset,
+                    source,
+                });
+                source_order = next_order(source_order)?;
             }
         }
     }
 
-    Ok((note_events, attribute_events, cursor_moves))
+    Ok((note_events, attribute_events, auxiliary_events, cursor_moves))
 }
 
 fn parse_event_kind(
@@ -1066,3 +1127,25 @@ mod tests {
         assert_eq!(events.cursor_moves[0].source.element, "forward");
     }
 }
+
+    #[test]
+    fn measure_level_directions_harmony_and_sound_keep_exact_offsets_and_source_trees() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>8</duration><voice>1</voice></note>
+            <direction><direction-type><dynamics><f/></dynamics></direction-type><offset>2</offset><sound tempo="88"/></direction>
+            <harmony><root><root-step>G</root-step></root><kind>major</kind><offset>-2</offset></harmony>
+            <note><rest/><duration>8</duration></note>
+        </measure></part></score-partwise>"#;
+        let events = parse(xml);
+        supported(&events);
+        assert_eq!(events.auxiliary_events.len(), 2);
+        assert_eq!(events.auxiliary_events[0].score_offset, RationalBeat::new(3, 1).unwrap());
+        assert_eq!(events.auxiliary_events[1].score_offset, RationalBeat::new(0, 1).unwrap());
+        assert_eq!(events.auxiliary_events[0].source.element, "direction");
+        assert_eq!(events.auxiliary_events[1].source.element, "harmony");
+        assert!(events.auxiliary_events[0].source.children.iter().any(|node| node.element == "sound"));
+        assert_eq!(events.note_events.len(), 2);
+        assert_eq!(events.note_events[1].score_offset, RationalBeat::new(2, 1).unwrap());
+    }
+
