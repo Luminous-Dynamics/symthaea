@@ -1020,8 +1020,6 @@ pub struct U1TwoSiteSplitDiagnostics {
     pub reconstruction_l2_residual: f64,
 }
 
-
-
 /// Policy for an explicitly approximate U(1)-preserving two-site split.
 ///
 /// The relative cutoff keeps singular values at least this fraction of the
@@ -1443,8 +1441,6 @@ impl U1TwoSiteState {
         })
     }
 
-
-
     /// Apply an explicit relative singular-value cutoff and global bond cap.
     ///
     /// The exact charge-block split is computed first. Singular values are
@@ -1524,7 +1520,11 @@ impl U1TwoSiteState {
             .collect::<Vec<_>>();
         let mut bond_cap_discarded_weight = 0.0;
         let mut bond_cap_discarded_singular_value_count = 0;
-        for index in cutoff_eligible.iter().copied().skip(policy.max_bond_dimension) {
+        for index in cutoff_eligible
+            .iter()
+            .copied()
+            .skip(policy.max_bond_dimension)
+        {
             bond_cap_discarded_weight += singular_values[index] * singular_values[index];
             bond_cap_discarded_singular_value_count += 1;
         }
@@ -1567,11 +1567,10 @@ impl U1TwoSiteState {
             }
             for second_physical in 0..2 {
                 for right in 0..exact.right_tensor.right_dimension() {
-                    let index =
-                        (new_middle * 2 + second_physical) * exact.right_tensor.right_dimension()
-                            + right;
-                    right_data[index] =
-                        exact.right_tensor.get(old_middle, second_physical, right);
+                    let index = (new_middle * 2 + second_physical)
+                        * exact.right_tensor.right_dimension()
+                        + right;
+                    right_data[index] = exact.right_tensor.get(old_middle, second_physical, right);
                 }
             }
         }
@@ -1598,7 +1597,7 @@ impl U1TwoSiteState {
         for left in 0..self.left_dimension() {
             for first_physical in 0..2 {
                 for second_physical in 0..2 {
-                        for right in 0..self.right_dimension() {
+                    for right in 0..self.right_dimension() {
                         let mut value = Complex64::new(0.0, 0.0);
                         for middle in 0..retained_rank {
                             value += left_tensor.get(left, first_physical, middle)
@@ -1631,7 +1630,10 @@ impl U1TwoSiteState {
 
         let mut retained_rank_by_charge = Vec::new();
         for charge in retained_middle_charges.iter().copied() {
-            if !retained_rank_by_charge.iter().any(|(existing, _)| *existing == charge) {
+            if !retained_rank_by_charge
+                .iter()
+                .any(|(existing, _)| *existing == charge)
+            {
                 let count = retained_middle_charges
                     .iter()
                     .filter(|candidate| **candidate == charge)
@@ -1672,8 +1674,6 @@ impl U1TwoSiteState {
     }
 }
 
-
-
 /// Cumulative conservative L2 error ledger for unitary gates and orthogonal
 /// Schmidt projections.
 ///
@@ -1700,17 +1700,14 @@ impl U1MpsTruncationLedger {
             || !diagnostics.relative_discarded_weight.is_finite()
             || !(0.0..=1.0 + f64::EPSILON).contains(&diagnostics.relative_discarded_weight)
         {
-            return Err(U1MpsError::NonFiniteContraction(
-                "truncation ledger input",
-            ));
+            return Err(U1MpsError::NonFiniteContraction("truncation ledger input"));
         }
         let next_count = self
             .gate_count
             .checked_add(1)
             .ok_or(U1MpsError::DimensionOverflow)?;
         let next_weight = self.accumulated_discarded_weight + diagnostics.discarded_weight;
-        let next_bound =
-            self.cumulative_l2_error_upper_bound + diagnostics.discarded_weight.sqrt();
+        let next_bound = self.cumulative_l2_error_upper_bound + diagnostics.discarded_weight.sqrt();
         if !next_weight.is_finite() || !next_bound.is_finite() {
             return Err(U1MpsError::NonFiniteContraction(
                 "cumulative truncation ledger",
@@ -1726,12 +1723,11 @@ impl U1MpsTruncationLedger {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::{
-        ComplexU1Mps, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
-        U1TwoSiteGate, U1TwoSiteState, U1TwoSiteTruncationPolicy,
+        ComplexU1Mps, U1MpsError, U1MpsTensor, U1MpsTruncationLedger, U1TwoSiteGate,
+        U1TwoSiteState, U1TwoSiteTruncationPolicy,
     };
     use num_complex::Complex64;
 
@@ -2551,7 +2547,12 @@ mod tests {
         let mut state = U1TwoSiteState::new(
             vec![0],
             vec![1],
-            vec![complex_zero(), Complex64::new(1.0, 0.0), complex_zero(), complex_zero()],
+            vec![
+                complex_zero(),
+                Complex64::new(1.0, 0.0),
+                complex_zero(),
+                complex_zero(),
+            ],
             1.0e-12,
         )
         .unwrap()
@@ -2596,5 +2597,4 @@ mod tests {
             ));
         }
     }
-
 }
