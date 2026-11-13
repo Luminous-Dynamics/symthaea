@@ -108,6 +108,28 @@ Why:
 - split/preprocessing leakage and source provenance can be checked independently before original data access;
 - downstream outcomes must remain separate from contact angle.
 
+### P0 — industrial intelligence enabler: telemetry-to-product virtual metrology
+
+Issue: [PLASMA-VM-001 #11847](https://github.com/Luminous-Dynamics/symthaea/issues/11847); draft [PR #11850](https://github.com/Luminous-Dynamics/symthaea/pull/11850).
+
+The new research gap is not plasma-state monitoring: industrial PCUs already offer optical/OES, power/voltage, flow, pressure, temperature, rotation, recipe logging and fieldbus integration. The hypothesis is that joined sensor telemetry plus exact material/adhesive/lot/device context can predict downstream bond/coating outcomes on unseen lots, devices and production days.
+
+The S0 contract now checks:
+- explicit training-group manifests rather than a trusted holdout boolean;
+- run/specimen/configuration identity;
+- signed timestamp offsets and calibration validity at run time;
+- individually metered subsystem energy and complete grid-to-accepted-bond energy closure;
+- downstream outcome linkage and false-accept rejection;
+- cost-sensitive in-spec probability rules and advisory-only authority.
+
+The synthetic fixture has 16 scenarios (1 PASS, 6 REJECTED, 9 BLOCKED) with 20 authored Rust tests; independent source-side replay matched all 16 expected dispositions. Rust compilation/CI and real telemetry-to-bond model performance remain unverified. The training manifest digest is not by itself proof of a real model's training lineage; a reproducible/independently verified split receipt and physically paired run-to-specimen labels remain required.
+
+Competitive/academic context:
+- A 2026 review catalogs 105 plasma-etch virtual-metrology studies from 2012–2025, organized around sensor representation/compression and downstream prediction. It identifies sparse labels, drift, chamber transfer, uncertainty reporting and latency as open challenges. DOI: https://doi.org/10.21203/rs.3.rs-10577324/v1; structured study dataset: https://doi.org/10.48366/R1907748.
+- A September 2026 heteroscedastic-GP plasma-etch study uses nine wafer locations and reliability-based robust optimization; this is a methodology comparator, not direct evidence for atmospheric polymer activation. DOI: https://doi.org/10.1080/0305215X.2026.2711103.
+
+Luminous should compare material-only, recipe-only, telemetry-only and joined models against incumbent alarm/QC policy, and report false-accept risk, false-reject/yield effect, grouped interval coverage, worst-lot/device/day error, latency and inspection/scrap value. The model remains shadow-mode advisory; it does not release products or control the plasma source.
+
 ### P1 — high-value, longer-cycle: CFRP conductive metallization
 
 Issue: [PLASMA-CFRP-METAL-001 #11838](https://github.com/Luminous-Dynamics/symthaea/issues/11838); draft [PR #11840](https://github.com/Luminous-Dynamics/symthaea/pull/11840).
@@ -218,3 +240,10 @@ A new child, [PLASMA-VM-001 #11847](https://github.com/Luminous-Dynamics/symthae
 The S0 contract binds run/device/configuration, substrate and adhesive lot, calibrated OES/power/flow/temperature signals, exact grid-to-accepted-bond energy boundary, specimen identity and downstream adhesion/failure-mode label. Its synthetic evaluator tests stale/uncalibrated/misaligned telemetry, OOD material, incomplete energy, missing labels and high-confidence false accepts. It is explicitly advisory/shadow-only; no automatic quality release or physical actuation is introduced.
 
 This complements (and does not duplicate) PLASMA-ML-GENERALIZATION-001: ML-GENERALIZATION owns grouped source/lab/device/material split and literature model transfer; VM owns the joined production run-to-specimen telemetry/outcome contract and quality-value benchmark. The ten synthetic scenario expectations replayed 10/10 in an independent source-side check; 13 Rust tests are authored but uncompiled/unexecuted.
+
+
+## 9. New atmospheric-plasma surface-modification review — 2026 crosswalk
+
+The July 2026 open-access review *Recent advances in the field of surface modification using atmospheric pressure plasma* surveys discharge types, gas atmosphere, frequency/excitation, electrode geometry and surface-treatment families including grafting, deposition, etching, cleaning and activation. Use it as a broad process taxonomy / literature map, not a matched performance leaderboard: https://doi.org/10.1016/j.nxmate.2026.102318.
+
+This reinforces a necessary portfolio rule: process families that share "atmospheric plasma" in their name may have different discharge physics, chemistry, energy boundaries and product endpoints. Keep them as separate evidence strata until equivalence is demonstrated.
