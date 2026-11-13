@@ -189,6 +189,22 @@ pub fn AddMusicPage() -> impl IntoView {
                                         structure.measure_count,
                                         structure.barline_event_count
                                     )}</span>
+                                    <span>{format!(
+                                        "{} notation events · {} rests · {} grace notes · {} tuplets · {} sound ties · {} visual ties",
+                                        structure.notation_event_count,
+                                        structure.rest_event_count,
+                                        structure.grace_note_count,
+                                        structure.tuplet_notation_count,
+                                        structure.sound_tie_count,
+                                        structure.visual_tie_count
+                                    )}</span>
+                                    <span>{format!(
+                                        "{} parts with notation events · {} unknown · {} voice labels · {} staff labels",
+                                        structure.notation_supported_part_count,
+                                        structure.notation_unknown_part_count,
+                                        structure.voice_assignment_count,
+                                        structure.staff_assignment_count
+                                    )}</span>
                                     {structure.explanation.map(|reason| view! {
                                         <p class="muted small">{reason}</p>
                                     })}
