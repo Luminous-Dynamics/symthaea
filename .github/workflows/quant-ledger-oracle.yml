@@ -1,0 +1,32 @@
+name: Quant Ledger Oracle
+
+on:
+  pull_request:
+    paths:
+      - "benchmarks/quant-ledger-oracle/**"
+      - ".github/workflows/quant-ledger-oracle.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "benchmarks/quant-ledger-oracle/**"
+      - ".github/workflows/quant-ledger-oracle.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+      - name: Check formatting
+        working-directory: benchmarks/quant-ledger-oracle
+        run: cargo fmt -- --check
+      - name: Run accounting conformance tests
+        working-directory: benchmarks/quant-ledger-oracle
+        run: cargo test
