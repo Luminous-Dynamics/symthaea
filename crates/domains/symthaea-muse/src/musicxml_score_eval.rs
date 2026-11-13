@@ -13,7 +13,8 @@ use crate::evidence_digest::canonical_json_sha256;
 use crate::musicxml_barline_adapter::MusicXmlPartNotationGraphV1;
 use crate::musicxml_notation_events::{
     MusicXmlNotationEventKindV1, MusicXmlNotationEventV1, MusicXmlNotationEventsStatusV1,
-    MusicXmlPartNotationEventsV1, MusicXmlTieV1,
+    is_legacy_missing_notation_events, MusicXmlPartNotationEventsV1, MusicXmlTieV1,
+    MUSICXML_NOTATION_EVENTS_SCHEMA_V1,
 };
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -28,6 +29,7 @@ pub const MUSICXML_SCORE_DEFAULT_DURATION_TOLERANCE_V1: (i64, i64) = (0, 1);
 
 const MAX_PARTS_V1: usize = 256;
 const MAX_EVENTS_PER_PART_V1: usize = 20_000;
+const MAX_EVENTS_TOTAL_V1: usize = 200_000;
 const MAX_CANDIDATE_PAIRS_HARD_V1: usize = 2_000_000;
 const MAX_EDGE_SCANS_HARD_V1: usize = 10_000_000;
 const MAX_AUGMENT_DEPTH_HARD_V1: usize = 512;
@@ -70,6 +72,10 @@ pub enum MusicXmlScoreEvaluationErrorV1 {
     TooManyParts { count: usize, maximum: usize },
     DuplicatePartId { side: String, part_id: String },
     PartIdentityMismatch { graph_part_id: String, event_part_id: String },
+    EmptyScoreClockId,
+    EmptyMeasureCanonicalizationVersion,
+    EmptyNotationCanonicalizationVersion,
+    UnsupportedNotationEventSchema { part_id: String },
     ScoreClockMismatch,
     MeasureCanonicalizationMismatch,
     NotationCanonicalizationMismatch,
@@ -221,10 +227,15 @@ impl Counts {
         let precision = (self.prediction > 0)
             .then(|| self.matched as f64 / self.prediction as f64);
         let recall = (self.gold > 0).then(|| self.matched as f64 / self.gold as f64);
-        let f1 = match (precision, recall) {
-            (Some(p), Some(r)) if p + r > 0.0 => Some(2.0 * p * r / (p + r)),
-            (Some(_), Some(_)) => Some(0.0),
-            _ => None,
+        let f1 = if self.gold == 0 && self.prediction == 0 {
+            None
+        } else if self.matched == 0 {
+            Some(0.0)
+        } else {
+            match (precision, recall) {
+                (Some(p), Some(r)) if p + r > 0.0 => Some(2.0 * p * r / (p + r)),
+                _ => Some(0.0),
+            }
         };
         MusicXmlScoreMetricV1 {
             gold_count: self.gold,
@@ -320,6 +331,8 @@ pub fn evaluate_musicxml_score_graphs(
 
     let gold_by_id = index_parts(gold, "gold")?;
     let prediction_by_id = index_parts(prediction, "prediction")?;
+    validate_total_event_budget(gold)?;
+    validate_total_event_budget(prediction)?;
     let (score_clock_id, measure_canonicalization_version, notation_canonicalization_version) =
         validate_graph_authorities(gold, prediction)?;
 
@@ -702,6 +715,25 @@ fn validate_config(
     Ok(())
 }
 
+fn validate_total_event_budget(
+    graphs: &[MusicXmlPartNotationGraphV1],
+) -> Result<(), MusicXmlScoreEvaluationErrorV1> {
+    let mut total = 0usize;
+    for graph in graphs {
+        total = total
+            .checked_add(graph.notation_events.note_events.len())
+            .ok_or(MusicXmlScoreEvaluationErrorV1::ArithmeticOverflow)?;
+    }
+    if total > MAX_EVENTS_TOTAL_V1 {
+        return Err(MusicXmlScoreEvaluationErrorV1::TooManyEvents {
+            part_id: "<total>".into(),
+            count: total,
+            maximum: MAX_EVENTS_TOTAL_V1,
+        });
+    }
+    Ok(())
+}
+
 fn index_parts<'a>(
     graphs: &'a [MusicXmlPartNotationGraphV1],
     side: &str,
@@ -734,8 +766,24 @@ fn validate_graph_authorities(
     let measure_canonicalization_version = reference.map.canonicalization_version.clone();
     let notation_canonicalization_version =
         reference.notation_events.canonicalization_version.clone();
+    if score_clock_id.trim().is_empty() {
+        return Err(MusicXmlScoreEvaluationErrorV1::EmptyScoreClockId);
+    }
+    if measure_canonicalization_version.trim().is_empty() {
+        return Err(MusicXmlScoreEvaluationErrorV1::EmptyMeasureCanonicalizationVersion);
+    }
+    if notation_canonicalization_version.trim().is_empty() {
+        return Err(MusicXmlScoreEvaluationErrorV1::EmptyNotationCanonicalizationVersion);
+    }
     for graph in gold.iter().chain(prediction) {
-        if graph.notation_events.part_id != graph.part_id {
+        if graph.notation_events.schema != MUSICXML_NOTATION_EVENTS_SCHEMA_V1 {
+            return Err(MusicXmlScoreEvaluationErrorV1::UnsupportedNotationEventSchema {
+                part_id: graph.part_id.clone(),
+            });
+        }
+        if !is_legacy_missing_notation_events(&graph.notation_events)
+            && graph.notation_events.part_id != graph.part_id
+        {
             return Err(MusicXmlScoreEvaluationErrorV1::PartIdentityMismatch {
                 graph_part_id: graph.part_id.clone(),
                 event_part_id: graph.notation_events.part_id.clone(),
@@ -1180,10 +1228,22 @@ fn attribute_distance(
     prediction: &MusicXmlPartNotationEventsV1,
     maximum_cells: usize,
 ) -> Result<(usize, usize, usize), MusicXmlScoreEvaluationErrorV1> {
-    let rows = gold.attribute_events.len().checked_add(1).ok_or(
+    // MusicXML divisions is a source timing-unit encoding, not a score
+    // semantic. The exact rational event positions/durations are already
+    // compared separately, so changes in PPQ/divisions do not count as a
+    // notation attribute edit.
+    let gold_attributes: Vec<_> = gold.attribute_events
+        .iter()
+        .filter(|event| event.source.element != "divisions")
+        .collect();
+    let prediction_attributes: Vec<_> = prediction.attribute_events
+        .iter()
+        .filter(|event| event.source.element != "divisions")
+        .collect();
+    let rows = gold_attributes.len().checked_add(1).ok_or(
         MusicXmlScoreEvaluationErrorV1::ArithmeticOverflow,
     )?;
-    let columns = prediction.attribute_events.len().checked_add(1).ok_or(
+    let columns = prediction_attributes.len().checked_add(1).ok_or(
         MusicXmlScoreEvaluationErrorV1::ArithmeticOverflow,
     )?;
     let cells = rows.checked_mul(columns).ok_or(
@@ -1197,10 +1257,10 @@ fn attribute_distance(
     }
     let mut previous: Vec<usize> = (0..columns).collect();
     let mut current = vec![0usize; columns];
-    for (gold_index, gold_event) in gold.attribute_events.iter().enumerate() {
+    for (gold_index, gold_event) in gold_attributes.iter().enumerate() {
         current[0] = gold_index + 1;
         for (prediction_index, prediction_event) in
-            prediction.attribute_events.iter().enumerate()
+            prediction_attributes.iter().enumerate()
         {
             let equal = gold_event.score_offset == prediction_event.score_offset
                 && gold_event.source.element == prediction_event.source.element
@@ -1213,8 +1273,8 @@ fn attribute_distance(
         std::mem::swap(&mut previous, &mut current);
     }
     Ok((
-        gold.attribute_events.len(),
-        prediction.attribute_events.len(),
+        gold_attributes.len(),
+        prediction_attributes.len(),
         previous[columns - 1],
     ))
 }
@@ -1257,7 +1317,10 @@ fn add_unmatched_part(
         if is_gold { 0 } else { tuplets_count },
         0,
     )?;
-    let count = events.attribute_events.len();
+    let count = events.attribute_events
+        .iter()
+        .filter(|event| event.source.element != "divisions")
+        .count();
     *attribute_count = attribute_count
         .checked_add(count)
         .ok_or(MusicXmlScoreEvaluationErrorV1::ArithmeticOverflow)?;
