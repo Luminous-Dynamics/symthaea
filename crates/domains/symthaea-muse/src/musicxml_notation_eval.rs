@@ -143,7 +143,6 @@ pub enum MusicXmlNotationEvaluationErrorV1 {
     EventOutsideMeasureSpan { part_id: String, source_order: usize },
     ArithmeticOverflow,
     SerializationFailed,
-    ReportReplayMismatch,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -681,7 +680,7 @@ fn evaluate_part(
         .collect();
     let prediction_pitched: Vec<_> = prediction_notes
         .iter()
-        .filter(|event| matches!(event.kind, MusicXmlNotationEventKindV1::Pitched(_)))
+        .filter(|event| matches!(&event.kind, MusicXmlNotationEventKindV1::Pitched(_)))
         .collect();
     let gold_rests: Vec<_> = gold_notes
         .iter()
@@ -689,7 +688,7 @@ fn evaluate_part(
         .collect();
     let prediction_rests: Vec<_> = prediction_notes
         .iter()
-        .filter(|event| matches!(event.kind, MusicXmlNotationEventKindV1::Rest { .. }))
+        .filter(|event| matches!(&event.kind, MusicXmlNotationEventKindV1::Rest { .. }))
         .collect();
     let gold_unpitched: Vec<_> = gold_notes
         .iter()
@@ -697,7 +696,7 @@ fn evaluate_part(
         .collect();
     let prediction_unpitched: Vec<_> = prediction_notes
         .iter()
-        .filter(|event| matches!(event.kind, MusicXmlNotationEventKindV1::Unpitched { .. }))
+        .filter(|event| matches!(&event.kind, MusicXmlNotationEventKindV1::Unpitched { .. }))
         .collect();
 
     let mut counts = PartCounts {
@@ -792,16 +791,36 @@ fn evaluate_part(
         .iter()
         .filter(|event| has_grace_cue_chord(event))
         .count();
+    let source_order_matches: BTreeMap<usize, usize> = note_matches
+        .iter()
+        .map(|(gold_index, prediction_index)| {
+            (
+                gold_notes[*gold_index].source_order,
+                prediction_notes[*prediction_index].source_order,
+            )
+        })
+        .collect();
     let grace_cue_chord_correct = note_matches
         .iter()
         .filter(|(g, p)| {
-            has_grace_cue_chord(&gold_notes[*g])
-                && has_grace_cue_chord(&prediction_notes[*p])
-                && gold_notes[*g].is_grace == prediction_notes[*p].is_grace
-                && gold_notes[*g].is_cue == prediction_notes[*p].is_cue
-                && gold_notes[*g].is_chord_member == prediction_notes[*p].is_chord_member
-                && gold_notes[*g].chord_anchor_source_order.is_some()
-                    == prediction_notes[*p].chord_anchor_source_order.is_some()
+            let gold_event = &gold_notes[*g];
+            let prediction_event = &prediction_notes[*p];
+            let chord_anchor_matches = match (
+                gold_event.chord_anchor_source_order,
+                prediction_event.chord_anchor_source_order,
+            ) {
+                (Some(gold_anchor), Some(prediction_anchor)) => {
+                    source_order_matches.get(&gold_anchor).copied() == Some(prediction_anchor)
+                }
+                (None, None) => true,
+                _ => false,
+            };
+            has_grace_cue_chord(gold_event)
+                && has_grace_cue_chord(prediction_event)
+                && gold_event.is_grace == prediction_event.is_grace
+                && gold_event.is_cue == prediction_event.is_cue
+                && gold_event.is_chord_member == prediction_event.is_chord_member
+                && chord_anchor_matches
         })
         .count();
     counts.grace_cue_chord_semantics = metric_counts(
@@ -810,15 +829,11 @@ fn evaluate_part(
         grace_cue_chord_correct,
     );
 
-    let assigned_count = |events: &[&crate::musicxml_notation_events::MusicXmlNotationEventV1],
-                          field: fn(&crate::musicxml_notation_events::MusicXmlNotationEventV1) -> bool| {
-        events.iter().filter(|event| field(event)).count()
-    };
-    let gold_voice_count = assigned_count(&gold_notes.iter().collect::<Vec<_>>(), |event| event.voice.is_some());
-    let prediction_voice_count = assigned_count(
-        &prediction_notes.iter().collect::<Vec<_>>(),
-        |event| event.voice.is_some(),
-    );
+    let gold_voice_count = gold_notes.iter().filter(|event| event.voice.is_some()).count();
+    let prediction_voice_count = prediction_notes
+        .iter()
+        .filter(|event| event.voice.is_some())
+        .count();
     let voice_correct = note_matches
         .iter()
         .filter(|(g, p)| {
