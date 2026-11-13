@@ -4,7 +4,7 @@
 
 ## Current verified boundary
 
-The current Symthaea branch contains exact finite-dimensional density-matrix tools, unconstrained and fixed-charge Page references, seeded scrambling/transport experiments, ordinary Petz recovery, rotated-Petz recovery, and Petz-optimality diagnostics. The current operational Hayden–Preskill toy channel is small: a message qubit \(M\) and a black-hole/early-radiation qubit pair \(B,R\), scrambled by a seeded \(U(4)\). The decoder receives only \(A=E\otimes R\) (dimension four); \(B'\) is traced out and is never supplied to the decoder.
+The current Symthaea branch contains exact finite-dimensional density-matrix tools, unconstrained and fixed-charge Page references, seeded scrambling/transport experiments, ordinary Petz recovery, rotated-Petz recovery, and Petz-optimality diagnostics. The current operational Hayden–Preskill toy channel is small: a message qubit \(M\) and a black-hole/early-radiation qubit pair \(B,R\), scrambled by a seeded \(U(4)\). The decoder receives only \(A=E\otimes R\) (dimension four); \(C (remnant output)\) is traced out and is never supplied to the decoder.
 
 The rotated-Petz source explicitly states that it is a decoder-family candidate, not an optimality claim or an efficient physical circuit. The returned sample reports entanglement fidelity, modular-power and trace-preservation residuals, dimensions and Kraus count; it does not report a gate-level circuit cost.
 
@@ -18,6 +18,8 @@ A recovery channel can exist mathematically and still be infeasible to construct
 2. Exact optimal recovery on tiny instances: an SDP or an independently certified optimality theorem/bound, not a finite modular-parameter grid.
 3. Polar/QSVT approximate Petz: a gate-oriented implementation that approximates the polar sign transform.
 4. Hardware/noise-aware execution: a later, explicitly separated layer; classical simulation is never reported as a hardware result.
+
+Notation mapping for external Hayden–Preskill comparisons: our accessible E⊗R corresponds to the paper's D⊗B′_early, while our inaccessible C corresponds to its remnant output C. The existing source variable named `b_prime` denotes our C, not the paper's accessible B′_early. The QSVT benchmark must state whether an experiment is entanglement-assisted (R/B′_early available) or unassisted (no R register); these are different channels and must never be conflated.
 
 The October 14, 2026 preprint *Petz Recovery through a Single Polar Transformation for Approximate Quantum Error Correction* proposes a QSVT construction of approximate Petz recovery without postselection. It gives a channel-specific spectrum-weighted loss and an upper bound on the diamond distance between the approximate and ideal Petz encoding-recovery channels. This is a preprint, not a peer-reviewed benchmark standard: https://arxiv.org/abs/2610.20515.
 
@@ -39,12 +41,12 @@ The benchmark must verify the precise normalization and hypotheses against the p
 
 Every run must state the input/access set and the hidden environment. The decoder is given only the declared accessible radiation \(A\). It must not receive:
 
-- the remaining black-hole register \(B'\);
+- the remaining black-hole register \(C (remnant output)\);
 - the full scrambler unitary as an execution-time input unless it is explicitly provided through a declared oracle/block-encoding interface;
 - a purified global state or hidden amplitudes unavailable to the decoder;
 - simulator-only labels or seed material that would reveal the hidden environment.
 
-The simulator may use the full channel to construct a reference oracle and certify the experiment, but that reference must be sandboxed outside the decoder interface. Add negative controls that deliberately leak \(B'\), the global state or hidden random seed and require the access audit to fail.
+The simulator may use the full channel to construct a reference oracle and certify the experiment, but that reference must be sandboxed outside the decoder interface. Add negative controls that deliberately leak \(C (remnant output)\), the global state or hidden random seed and require the access audit to fail.
 
 ## QSVT-Petz implementation ladder
 
@@ -116,7 +118,7 @@ These are prospective gates to calibrate, not achieved performance:
 
 ## Negative controls
 
-- Provide the decoder with \(B'\), hidden global amplitudes or an undeclared seed.
+- Provide the decoder with \(C (remnant output)\), hidden global amplitudes or an undeclared seed.
 - Use a postselected branch while reporting a deterministic trace-preserving decoder.
 - Omit the block-encoding normalization \(\alpha\) or change it without recomputing the phase sequence.
 - Compare different seed schedules across decoder families.
