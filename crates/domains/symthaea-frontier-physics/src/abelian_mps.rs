@@ -601,13 +601,13 @@ mod tests {
         let first = AbelianChargeTensor::new(
             0,
             vec![vacuum],
-            vec![vacuum],
+            vec![up],
             vec![up],
             vec![Complex64::new(1.0, 0.0)],
             1.0e-12,
         )
         .unwrap();
-        let last_wrong = AbelianChargeTensor::new(
+        let last = AbelianChargeTensor::new(
             1,
             vec![up],
             vec![vacuum],
@@ -616,15 +616,12 @@ mod tests {
             1.0e-12,
         )
         .unwrap();
-        assert!(matches!(
-            AbelianMps::new(vec![first.clone(), last_wrong.clone()], up, 1.0e-12),
-            Ok(_)
-        ));
+        assert!(AbelianMps::new(vec![first.clone(), last.clone()], up, 1.0e-12).is_ok());
 
         let mismatched_bond = AbelianChargeTensor::new(
             1,
             vec![vacuum],
-            vec![vacuum],
+            vec![up],
             vec![up],
             vec![Complex64::new(1.0, 0.0)],
             1.0e-12,
@@ -635,18 +632,8 @@ mod tests {
             Err(AbelianChargeError::BondChargeMismatch { bond: 0 })
         ));
 
-        let wrong_boundary = AbelianChargeTensor::new(
-            1,
-            vec![up],
-            vec![vacuum],
-            vec![vacuum],
-            vec![Complex64::new(1.0, 0.0)],
-            1.0e-12,
-        )
-        .unwrap();
         assert!(matches!(
-            AbelianMps::new(vec![first, wrong_boundary], up, 1.0e-12),
+            AbelianMps::new(vec![first, last], vacuum, 1.0e-12),
             Err(AbelianChargeError::RightBoundary { .. })
         ));
-    }
-}
+    }}
