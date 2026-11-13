@@ -231,6 +231,45 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let independent_missing = missing_mandatory_actions(&independent_greedy.selected_option_ids);
     let correlated_missing = missing_mandatory_actions(&correlated_greedy.selected_option_ids);
+
+    let independent_ids: BTreeSet<_> = independent_greedy
+        .selected_option_ids
+        .iter()
+        .map(String::as_str)
+        .collect();
+    let correlated_ids: BTreeSet<_> = correlated_greedy
+        .selected_option_ids
+        .iter()
+        .map(String::as_str)
+        .collect();
+    let correlated_exact_ids: BTreeSet<_> = correlated_exact
+        .selected_option_ids
+        .iter()
+        .map(String::as_str)
+        .collect();
+
+    // Known-answer controls for this frozen synthetic profile:
+    // independent-row greedy over-credits the correlated proxy pair, while
+    // selected-set covariance retains both destructive product endpoints.
+    assert!(independent_ids.contains("FTIR_CHEMISTRY"));
+    assert!(!independent_ids.contains("LAP_SHEAR"));
+    assert!(correlated_ids.contains("LAP_SHEAR"));
+    assert!(correlated_ids.contains("AGED_LAP_SHEAR"));
+    assert!(correlated_ids.contains("MOISTURE_CONTENT"));
+    assert!(!correlated_ids.contains("FTIR_CHEMISTRY"));
+    assert_eq!(correlated_ids, correlated_exact_ids);
+    assert!(!independent_missing.is_empty());
+    assert!(correlated_missing.is_empty());
+    assert!(
+        independent_exact.expected_information_gain_nats
+            > independent_greedy.expected_information_gain_nats + 0.1
+    );
+    assert!(
+        (correlated_exact.expected_information_gain_nats
+            - correlated_greedy.expected_information_gain_nats)
+            .abs()
+            < 1.0e-10
+    );
     println!(
         "independent_product_evidence_gate={}",
         if independent_missing.is_empty() {
