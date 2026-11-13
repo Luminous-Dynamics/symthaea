@@ -24,11 +24,17 @@ func main() {
 	// observer's apparently tidy but incomplete success story.
 	log.Observations = append(log.Observations[:2], log.Observations[3:]...)
 	report, err := observerlab.Compare(gt, log)
-	if err != nil { fail(err) }
+	if err != nil {
+		fail(err)
+	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
-	if err := enc.Encode(report); err != nil { fail(err) }
-	if report.Accepted { os.Exit(1) }
+	if err := enc.Encode(report); err != nil {
+		fail(err)
+	}
+	if report.Accepted {
+		os.Exit(1)
+	}
 }
 
 func fail(err error) {
