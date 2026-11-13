@@ -1,0 +1,358 @@
+{
+  "schema": "luminous.airroad.mimo_iqc_shared_generator_adapter.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_joint_hard_generator_set",
+  "model_identity": "sha256:two-frequency-shared-calibration-generator-v0.1",
+  "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+  "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+  "acquisition_root_identity": "sha256:common-acquisition-root-v0.1",
+  "calibration_certificate_identity": "sha256:common-calibration-certificate-v0.1",
+  "frequency_unit": "rad_per_second",
+  "port_order": [
+    "bus-a",
+    "bus-b"
+  ],
+  "matrix_norm": "frobenius_norm",
+  "frequency_knots": [
+    {
+      "frequency_id": "omega-1",
+      "omega": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "nominal_matrix": [
+        [
+          {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "1",
+            "denominator": "1"
+          }
+        ]
+      ],
+      "generator_matrix": [
+        [
+          {
+            "numerator": "1",
+            "denominator": "10"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "1",
+            "denominator": "10"
+          }
+        ]
+      ],
+      "shared_coordinate_id": "theta-common-gain"
+    },
+    {
+      "frequency_id": "omega-2",
+      "omega": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "nominal_matrix": [
+        [
+          {
+            "numerator": "2",
+            "denominator": "1"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "2",
+            "denominator": "1"
+          }
+        ]
+      ],
+      "generator_matrix": [
+        [
+          {
+            "numerator": "1",
+            "denominator": "5"
+          },
+          {
+            "numerator": "0",
+            "denominator": "1"
+          }
+        ],
+        [
+          {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          {
+            "numerator": "1",
+            "denominator": "5"
+          }
+        ]
+      ],
+      "shared_coordinate_id": "theta-common-gain"
+    }
+  ],
+  "generator_coordinates": [
+    {
+      "coordinate_id": "theta-common-gain",
+      "uncertainty_semantics": "deterministic_hard_set",
+      "lower": {
+        "numerator": "-1",
+        "denominator": "1"
+      },
+      "upper": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "acquisition_root_identity": "sha256:common-acquisition-root-v0.1",
+      "calibration_certificate_identity": "sha256:common-calibration-certificate-v0.1",
+      "applies_to_frequency_ids": [
+        "omega-1",
+        "omega-2"
+      ],
+      "applies_to_matrix_elements": [
+        "G11",
+        "G12",
+        "G21",
+        "G22"
+      ]
+    }
+  ],
+  "joint_relation": {
+    "expression": "G(omega_2)-2*G(omega_1)=0",
+    "expected_matrix": [
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ]
+    ]
+  },
+  "independent_product_counterfactual": {
+    "coordinate_omega_1": "theta-1",
+    "coordinate_omega_2": "theta-2",
+    "both_domains": {
+      "lower": {
+        "numerator": "-1",
+        "denominator": "1"
+      },
+      "upper": {
+        "numerator": "1",
+        "denominator": "1"
+      }
+    },
+    "relation_diagonal_interval": {
+      "lower": {
+        "numerator": "-2",
+        "denominator": "5"
+      },
+      "upper": {
+        "numerator": "2",
+        "denominator": "5"
+      }
+    }
+  },
+  "inter_frequency_remainder": {
+    "interval": {
+      "lower": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "upper": {
+        "numerator": "2",
+        "denominator": "1"
+      }
+    },
+    "matrix_factor": [
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ]
+    ],
+    "scalar_expression": "16*(omega-1)*(2-omega)*(omega-3/2)^2",
+    "transformed_coordinate": "x=omega-1",
+    "transformed_scalar_expression": "16*x*(1-x)*(x-1/2)^2",
+    "frobenius_norm_factor_squared": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "certified_frobenius_radius": {
+      "numerator": "1",
+      "denominator": "4"
+    },
+    "proof_reference": "sha256:airroad-generator-remainder-11919-v0.1"
+  },
+  "piecewise_generator": {
+    "nominal_interpolant": "(1-alpha)*Gbar_1+alpha*Gbar_2",
+    "shared_generator_interpolant": "(1-alpha)*G_1+alpha*G_2",
+    "alpha_expression": "omega-1",
+    "shared_coordinate_id": "theta-common-gain",
+    "additive_remainder_ball_radius": {
+      "numerator": "1",
+      "denominator": "4"
+    },
+    "additive_remainder_ball_norm": "frobenius_norm"
+  },
+  "expected": {
+    "shared_coordinate_dimension": 1,
+    "independent_coordinate_dimension": 2,
+    "joint_relation_exact": true,
+    "independent_relation_interval": {
+      "lower": {
+        "numerator": "-2",
+        "denominator": "5"
+      },
+      "upper": {
+        "numerator": "2",
+        "denominator": "5"
+      }
+    },
+    "remainder_radius": {
+      "numerator": "1",
+      "denominator": "4"
+    },
+    "combined_object_scope": "frequency_interval_1_to_2_joint_shared_generator_plus_remainder_ball"
+  },
+  "counterfactuals": {
+    "second_frequency_coordinate_id": "theta-independent-at-omega-2",
+    "incomplete_record_matrix_element": "G22",
+    "statistical_semantics": "uncalibrated_statistical_covariance",
+    "understated_remainder_radius": {
+      "numerator": "1",
+      "denominator": "5"
+    },
+    "interval_gap": [
+      {
+        "lower": {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        "upper": {
+          "numerator": "3",
+          "denominator": "2"
+        }
+      },
+      {
+        "lower": {
+          "numerator": "7",
+          "denominator": "4"
+        },
+        "upper": {
+          "numerator": "2",
+          "denominator": "1"
+        }
+      }
+    ],
+    "stale_calibration_identity": "sha256:stale-calibration-certificate",
+    "stale_topology_identity": "sha256:stale-topology"
+  },
+  "negative_controls": [
+    {
+      "id": "same-coordinate-id-at-both-knots",
+      "expected": "joint-affine-relation-exact"
+    },
+    {
+      "id": "different-coordinate-ids-same-domain",
+      "expected": "do-not-claim-shared"
+    },
+    {
+      "id": "incomplete-matrix-element-scope",
+      "expected": "not-evaluable"
+    },
+    {
+      "id": "statistical-covariance-as-hard-set",
+      "expected": "reject-claim-class"
+    },
+    {
+      "id": "independent-product-as-shared-joint-set",
+      "expected": "reject"
+    },
+    {
+      "id": "understated-inter-frequency-radius",
+      "expected": "reject"
+    },
+    {
+      "id": "frequency-interval-gap",
+      "expected": "not-established"
+    },
+    {
+      "id": "stale-calibration-or-topology",
+      "expected": "not-evaluable"
+    },
+    {
+      "id": "sampled-maximum-as-supremum",
+      "expected": "reject"
+    },
+    {
+      "id": "generator-artifact-labelled-iqc-pass",
+      "expected": "reject-claim-class"
+    },
+    {
+      "id": "unknown-cross-frequency-dependency",
+      "expected": "preserve-unknown"
+    }
+  ],
+  "claim_ceiling": [
+    "Synthetic two-frequency shared hard-generator set and exact inter-frequency remainder.",
+    "No IQC synthesis or robust-stability theorem is run by this adapter.",
+    "No physical FRF calibration, aircraft robust stability, flight safety or certification is established."
+  ]
+}
