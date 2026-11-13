@@ -1,0 +1,1245 @@
+//! Bounded reference calculations for port and marine energy-system economics.
+//!
+//! This crate is not a reactor model, grid solver, naval architecture package,
+//! nuclear safety analysis tool, investment model, or project cost estimator.
+//! It implements transparent arithmetic and evidence-contract checks only.
+
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValidationError {
+    pub field: String,
+    pub message: String,
+}
+
+impl ValidationError {
+    fn new(field: impl Into<String>, message: impl Into<String>) -> Self {
+        Self {
+            field: field.into(),
+            message: message.into(),
+        }
+    }
+}
+
+impl std::fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.field, self.message)
+    }
+}
+
+impl std::error::Error for ValidationError {}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct PortReferenceDataset {
+    pub dataset_id: String,
+    pub schema_version: String,
+    pub country: String,
+    pub source_class: String,
+    pub sources: Vec<SourceReference>,
+    pub shore_power_demand_estimates: Vec<ShorePowerDemandRow>,
+    pub estimated_spare_port_intake_capacity: Vec<SpareCapacityRow>,
+    pub spare_capacity_estimation: SpareCapacityFormula,
+    pub prohibited_inferences: Vec<String>,
+    pub required_next_evidence: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SourceReference {
+    pub source_id: String,
+    pub method: Vec<String>,
+    pub limitations: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ShorePowerDemandRow {
+    pub port: String,
+    pub average_maximum_mw: f64,
+    pub absolute_maximum_mw: f64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SpareCapacityRow {
+    pub rank: u32,
+    pub port: String,
+    pub spare_mva: f64,
+    pub spare_mw: f64,
+    pub connection_risk_label: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SpareCapacityFormula {
+    pub formula: String,
+    pub assumed_power_factor: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PortDatasetReport {
+    pub dataset_id: String,
+    pub source_class: String,
+    pub source_count: usize,
+    pub shore_power_row_count: usize,
+    pub spare_capacity_row_count: usize,
+    pub conversion_checks: usize,
+    pub validation_status: String,
+}
+
+pub fn validate_port_reference(
+    dataset: &PortReferenceDataset,
+) -> Result<PortDatasetReport, Vec<ValidationError>> {
+    let mut errors = Vec::new();
+
+    if dataset.dataset_id.trim().is_empty() {
+        errors.push(ValidationError::new("dataset_id", "must not be empty"));
+    }
+    if dataset.schema_version != "1.0.0" {
+        errors.push(ValidationError::new(
+            "schema_version",
+            "must match the frozen 1.0.0 reference-data contract",
+        ));
+    }
+    if dataset.country != "South Africa" {
+        errors.push(ValidationError::new(
+            "country",
+            "this verifier is scoped to the South African eight-port reference corpus",
+        ));
+    }
+    if dataset.source_class != "PUBLISHED_ESTIMATE" {
+        errors.push(ValidationError::new(
+            "source_class",
+            "must remain PUBLISHED_ESTIMATE; do not promote estimates to observations",
+        ));
+    }
+    if dataset.shore_power_demand_estimates.len() != 8 {
+        errors.push(ValidationError::new(
+            "shore_power_demand_estimates",
+            "expected exactly eight rows in the frozen South African reference corpus",
+        ));
+    }
+    if dataset.estimated_spare_port_intake_capacity.len() != 8 {
+        errors.push(ValidationError::new(
+            "estimated_spare_port_intake_capacity",
+            "expected exactly eight rows in the frozen South African reference corpus",
+        ));
+    }
+    if dataset.prohibited_inferences.is_empty() {
+        errors.push(ValidationError::new(
+            "prohibited_inferences",
+            "must preserve explicit non-inference rules",
+        ));
+    }
+    if dataset.required_next_evidence.is_empty()
+        || dataset.required_next_evidence.iter().any(|item| item.trim().is_empty())
+    {
+        errors.push(ValidationError::new(
+            "required_next_evidence",
+            "must contain non-empty evidence requirements",
+        ));
+    }
+    if dataset.prohibited_inferences.iter().any(|item| item.trim().is_empty()) {
+        errors.push(ValidationError::new(
+            "prohibited_inferences",
+            "must not contain blank non-inference rules",
+        ));
+    }
+
+    let mut demand_ports = BTreeSet::new();
+    for (index, row) in dataset.shore_power_demand_estimates.iter().enumerate() {
+        let field = format!("shore_power_demand_estimates[{index}]");
+        if row.port.trim().is_empty() {
+            errors.push(ValidationError::new(field.clone(), "port must not be empty"));
+        }
+        if !demand_ports.insert(row.port.trim().to_ascii_lowercase()) {
+            errors.push(ValidationError::new(field.clone(), "duplicate port identifier"));
+        }
+        if !row.average_maximum_mw.is_finite()
+            || !row.absolute_maximum_mw.is_finite()
+            || row.average_maximum_mw < 0.0
+            || row.absolute_maximum_mw < 0.0
+        {
+            errors.push(ValidationError::new(
+                field.clone(),
+                "demand values must be finite and nonnegative",
+            ));
+        } else if row.absolute_maximum_mw < row.average_maximum_mw {
+            errors.push(ValidationError::new(
+                field.clone(),
+                "absolute maximum must be greater than or equal to average maximum",
+            ));
+        }
+    }
+
+    let mut capacity_ports = BTreeSet::new();
+    let mut ranks = BTreeSet::new();
+    let risk_labels = ["LOW", "MEDIUM", "HIGH"];
+    let mut conversion_checks = 0usize;
+    for (index, row) in dataset
+        .estimated_spare_port_intake_capacity
+        .iter()
+        .enumerate()
+    {
+        let field = format!("estimated_spare_port_intake_capacity[{index}]");
+        if row.port.trim().is_empty() {
+            errors.push(ValidationError::new(field.clone(), "port must not be empty"));
+        }
+        if !capacity_ports.insert(row.port.trim().to_ascii_lowercase()) {
+            errors.push(ValidationError::new(field.clone(), "duplicate port identifier"));
+        }
+        if !ranks.insert(row.rank) {
+            errors.push(ValidationError::new(field.clone(), "duplicate rank"));
+        }
+        if !row.spare_mva.is_finite()
+            || !row.spare_mw.is_finite()
+            || row.spare_mva < 0.0
+            || row.spare_mw < 0.0
+        {
+            errors.push(ValidationError::new(
+                field.clone(),
+                "spare capacity values must be finite and nonnegative",
+            ));
+        } else if (row.spare_mw - 0.9 * row.spare_mva).abs() > 1e-9 {
+            errors.push(ValidationError::new(
+                field.clone(),
+                "spare MW must equal 0.9 times spare MVA under the source's stated conversion",
+            ));
+        } else {
+            conversion_checks += 1;
+        }
+        if !risk_labels.contains(&row.connection_risk_label.as_str()) {
+            errors.push(ValidationError::new(
+                field.clone(),
+                "connection_risk_label must be LOW, MEDIUM or HIGH",
+            ));
+        }
+    }
+
+    if ranks.len() != 8 || !(1..=8).all(|rank| ranks.contains(&rank)) {
+        errors.push(ValidationError::new(
+            "estimated_spare_port_intake_capacity.rank",
+            "ranks must contain each value from 1 through 8 exactly once",
+        ));
+    }
+
+    const EXPECTED_FORMULA: &str =
+        "0.9 * (firm_supply_mva - notified_maximum_demand_mva)";
+    if dataset.spare_capacity_estimation.formula != EXPECTED_FORMULA {
+        errors.push(ValidationError::new(
+            "spare_capacity_estimation.formula",
+            "formula does not match the frozen source methodology",
+        ));
+    }
+    if !dataset
+        .spare_capacity_estimation
+        .assumed_power_factor
+        .is_finite()
+        || (dataset.spare_capacity_estimation.assumed_power_factor - 0.9).abs() > 1e-12
+    {
+        errors.push(ValidationError::new(
+            "spare_capacity_estimation.assumed_power_factor",
+            "must preserve the source's stated 0.9 assumption",
+        ));
+    }
+
+    let mut source_ids = BTreeSet::new();
+    for (index, source) in dataset.sources.iter().enumerate() {
+        let field = format!("sources[{index}]");
+        let normalized_id = source.source_id.trim().to_ascii_lowercase();
+        if normalized_id.is_empty() {
+            errors.push(ValidationError::new(
+                format!("{field}.source_id"),
+                "source identifier must not be empty",
+            ));
+        } else if !source_ids.insert(normalized_id) {
+            errors.push(ValidationError::new(
+                format!("{field}.source_id"),
+                "duplicate source identifier",
+            ));
+        }
+        if source.method.is_empty() || source.method.iter().any(|item| item.trim().is_empty()) {
+            errors.push(ValidationError::new(
+                format!("{field}.method"),
+                "source method must contain non-empty entries",
+            ));
+        }
+        if source.limitations.is_empty()
+            || source.limitations.iter().any(|item| item.trim().is_empty())
+        {
+            errors.push(ValidationError::new(
+                format!("{field}.limitations"),
+                "source limitations must contain non-empty entries",
+            ));
+        }
+    }
+    for required in [
+        "CSIR-PTX-SHOREPOWER-2025",
+        "CSIR-PTX-PORT-CONNECTION-2025",
+    ] {
+        if !dataset.sources.iter().any(|source| source.source_id == required) {
+            errors.push(ValidationError::new(
+                "sources",
+                format!("missing required source record {required}"),
+            ));
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(PortDatasetReport {
+            dataset_id: dataset.dataset_id.clone(),
+            source_class: dataset.source_class.clone(),
+            source_count: dataset.sources.len(),
+            shore_power_row_count: dataset.shore_power_demand_estimates.len(),
+            spare_capacity_row_count: dataset.estimated_spare_port_intake_capacity.len(),
+            conversion_checks,
+            validation_status: "STRUCTURALLY_VALIDATED_SOURCE_DATA_ONLY".to_string(),
+        })
+    } else {
+        Err(errors)
+    }
+}
+
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MarineRegistryReport {
+    pub registry_id: String,
+    pub anchor_count: usize,
+    pub reconciliation_dimension_count: usize,
+    pub ucl_model_details_present: bool,
+    pub lr_public_summary_details_present: bool,
+    pub validation_status: String,
+}
+
+/// Validates the structure and required evidence dimensions of the frozen
+/// UCL/LR maritime economics registry. It does not validate the truth of claims
+/// or reproduce the external studies' full numerical models.
+pub fn validate_marine_economic_registry(
+    input: &str,
+) -> Result<MarineRegistryReport, Vec<ValidationError>> {
+    use serde_json::Value;
+
+    let value: Value = match serde_json::from_str(input) {
+        Ok(value) => value,
+        Err(error) => {
+            return Err(vec![ValidationError::new(
+                "registry",
+                format!("invalid JSON: {error}"),
+            )]);
+        }
+    };
+    let mut errors = Vec::new();
+
+    if value.get("registry_id").and_then(Value::as_str)
+        != Some("NUCL-MAR-ECONOMIC-REFERENCE-CASES")
+    {
+        errors.push(ValidationError::new(
+            "registry_id",
+            "must identify the frozen marine economics reference registry",
+        ));
+    }
+    if value.get("schema_version").and_then(Value::as_str) != Some("1.0.0") {
+        errors.push(ValidationError::new(
+            "schema_version",
+            "must match the frozen 1.0.0 registry contract",
+        ));
+    }
+
+    let anchors = match value.get("anchors").and_then(Value::as_array) {
+        Some(anchors) => anchors,
+        None => {
+            errors.push(ValidationError::new(
+                "anchors",
+                "must be an array of source-bounded evidence anchors",
+            ));
+            return Err(errors);
+        }
+    };
+    if anchors.len() != 8 {
+        errors.push(ValidationError::new(
+            "anchors",
+            "expected the eight frozen literature, policy and readiness anchors",
+        ));
+    }
+
+    let mut anchor_ids = BTreeSet::new();
+    for (index, anchor) in anchors.iter().enumerate() {
+        let field = format!("anchors[{index}]");
+        let anchor_id = anchor
+            .get("anchor_id")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim();
+        if anchor_id.is_empty() {
+            errors.push(ValidationError::new(
+                format!("{field}.anchor_id"),
+                "must not be empty",
+            ));
+        } else if !anchor_ids.insert(anchor_id.to_ascii_lowercase()) {
+            errors.push(ValidationError::new(
+                format!("{field}.anchor_id"),
+                "duplicate anchor identity",
+            ));
+        }
+        for key in ["source_class", "published_at", "title", "publisher"] {
+            if anchor
+                .get(key)
+                .and_then(Value::as_str)
+                .is_none_or(|item| item.trim().is_empty())
+            {
+                errors.push(ValidationError::new(
+                    format!("{field}.{key}"),
+                    "must be a non-empty source descriptor",
+                ));
+            }
+        }
+        let source_url = anchor
+            .get("source_url")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        if !(source_url.starts_with("https://") || source_url.starts_with("http://")) {
+            errors.push(ValidationError::new(
+                format!("{field}.source_url"),
+                "must be an explicit HTTP(S) source locator",
+            ));
+        }
+        if anchor
+            .get("public_summary_findings")
+            .and_then(Value::as_array)
+            .is_none_or(|items| items.is_empty() || items.iter().any(|item| {
+                item.as_str().is_none_or(|text| text.trim().is_empty())
+            }))
+        {
+            errors.push(ValidationError::new(
+                format!("{field}.public_summary_findings"),
+                "must contain non-empty source-bounded findings",
+            ));
+        }
+        if anchor
+            .get("inference_limits")
+            .and_then(Value::as_array)
+            .is_none_or(|items| items.is_empty() || items.iter().any(|item| {
+                item.as_str().is_none_or(|text| text.trim().is_empty())
+            }))
+        {
+            errors.push(ValidationError::new(
+                format!("{field}.inference_limits"),
+                "must preserve non-empty inference limits",
+            ));
+        }
+    }
+
+    let required_anchor = |id: &str| {
+        anchors.iter().find(|anchor| {
+            anchor.get("anchor_id").and_then(Value::as_str) == Some(id)
+        })
+    };
+    let ucl = required_anchor("UCL-MERCHANT-TCO-2026");
+    let lr = required_anchor("LR-LUCID-CONTAINERSHIP-2026");
+    if ucl.is_none() {
+        errors.push(ValidationError::new(
+            "anchors",
+            "missing UCL merchant-shipping TCO anchor",
+        ));
+    }
+    if lr.is_none() {
+        errors.push(ValidationError::new(
+            "anchors",
+            "missing Lloyd's Register containership anchor",
+        ));
+    }
+
+    let has_number_path = |root: Option<&Value>, path: &[&str]| {
+        let mut current = match root {
+            Some(root) => root,
+            None => return false,
+        };
+        for segment in path {
+            current = match current.get(*segment) {
+                Some(next) => next,
+                None => return false,
+            };
+        }
+        current.as_f64().is_some()
+    };
+    let ucl_details_present = ucl.is_some_and(|anchor| {
+        has_number_path(Some(anchor), &["published_model_details", "vessel_class", "teu_min"])
+            && has_number_path(Some(anchor), &["published_model_details", "reference_operation", "speed_knots"])
+            && has_number_path(Some(anchor), &["published_model_details", "nuclear_installed_electrical_power_kwe", "low_speed_14_85_knots"])
+            && has_number_path(Some(anchor), &["published_model_details", "nuclear_installed_electrical_power_kwe", "high_speed_25_knots"])
+            && has_number_path(Some(anchor), &["published_model_details", "reactor_capex_usd_per_kwe", "low_noak"])
+            && has_number_path(Some(anchor), &["published_model_details", "reactor_capex_usd_per_kwe", "high_foak"])
+    });
+    if !ucl_details_present {
+        errors.push(ValidationError::new(
+            "UCL-MERCHANT-TCO-2026.published_model_details",
+            "must preserve vessel, operating, installed-power and low/high reactor-CAPEX inputs",
+        ));
+    }
+
+    let lr_details_present = lr.is_some_and(|anchor| {
+        has_number_path(Some(anchor), &["public_summary_details", "vessel_teu"])
+            && has_number_path(Some(anchor), &["public_summary_details", "nuclear_speed_knots"])
+            && has_number_path(Some(anchor), &["public_summary_details", "modeled_max_annual_cargo_capacity_increase_percent"])
+            && has_number_path(Some(anchor), &["public_summary_details", "modeled_max_additional_container_space_percent"])
+    });
+    if !lr_details_present {
+        errors.push(ValidationError::new(
+            "LR-LUCID-CONTAINERSHIP-2026.public_summary_details",
+            "must preserve the public vessel, speed, capacity and cargo-space assumptions",
+        ));
+    }
+
+    let dimensions = match value.get("reconciliation_matrix").and_then(Value::as_array) {
+        Some(dimensions) => dimensions,
+        None => {
+            errors.push(ValidationError::new(
+                "reconciliation_matrix",
+                "must be an array of explicit UCL/LR comparison dimensions",
+            ));
+            return Err(errors);
+        }
+    };
+    if dimensions.len() < 7 {
+        errors.push(ValidationError::new(
+            "reconciliation_matrix",
+            "must retain at least seven distinct comparison dimensions",
+        ));
+    }
+    let mut dimension_ids = BTreeSet::new();
+    for (index, dimension) in dimensions.iter().enumerate() {
+        let field = format!("reconciliation_matrix[{index}]");
+        let id = dimension
+            .get("dimension")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .trim()
+            .to_ascii_lowercase();
+        if id.is_empty() || !dimension_ids.insert(id) {
+            errors.push(ValidationError::new(
+                format!("{field}.dimension"),
+                "must be non-empty and unique",
+            ));
+        }
+        for key in ["ucl", "lr", "status"] {
+            if dimension
+                .get(key)
+                .and_then(Value::as_str)
+                .is_none_or(|item| item.trim().is_empty())
+            {
+                errors.push(ValidationError::new(
+                    format!("{field}.{key}"),
+                    "must declare both study scope and the reconciliation status",
+                ));
+            }
+        }
+    }
+
+    for key in ["comparison_rules", "prohibited_inferences"] {
+        if value
+            .get(key)
+            .and_then(Value::as_array)
+            .is_none_or(|items| items.is_empty() || items.iter().any(|item| {
+                item.as_str().is_none_or(|text| text.trim().is_empty())
+            }))
+        {
+            errors.push(ValidationError::new(
+                key,
+                "must contain non-empty reconciliation/inference constraints",
+            ));
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(MarineRegistryReport {
+            registry_id: value
+                .get("registry_id")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string(),
+            anchor_count: anchors.len(),
+            reconciliation_dimension_count: dimensions.len(),
+            ucl_model_details_present: ucl_details_present,
+            lr_public_summary_details_present: lr_details_present,
+            validation_status: "STRUCTURALLY_VALIDATED_LITERATURE_REGISTRY_ONLY".to_string(),
+        })
+    } else {
+        Err(errors)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum PriceBasis {
+    Real { currency: String, base_year: u16 },
+    Nominal { currency: String, base_year: u16 },
+}
+
+impl PriceBasis {
+    pub fn currency(&self) -> &str {
+        match self {
+            Self::Real { currency, .. } | Self::Nominal { currency, .. } => currency,
+        }
+    }
+
+    pub fn base_year(&self) -> u16 {
+        match self {
+            Self::Real { base_year, .. } | Self::Nominal { base_year, .. } => *base_year,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnnualFlow {
+    /// Project year index. The first record must be year 0.
+    pub year_index: u32,
+    /// All lifecycle costs for this year, in the declared currency and price basis.
+    pub lifecycle_cost: f64,
+    /// Delivered service in the same year (e.g. net MWh, m3, tonne-nautical-miles).
+    pub delivered_service: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EconomicSeries {
+    pub scenario_id: String,
+    pub name: String,
+    pub input_evidence_refs: Vec<String>,
+    pub price_basis: PriceBasis,
+    pub discount_basis: PriceBasis,
+    /// A decimal rate (0.08 means 8%), expressed in discount_basis.
+    pub discount_rate: f64,
+    pub service_unit: String,
+    pub delivery_boundary: String,
+    pub annual_flows: Vec<AnnualFlow>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct LevelizedCostResult {
+    pub scenario_id: String,
+    pub name: String,
+    pub input_evidence_refs: Vec<String>,
+    pub currency: String,
+    pub base_year: u16,
+    pub price_basis: String,
+    pub service_unit: String,
+    pub delivery_boundary: String,
+    pub discounted_lifecycle_cost: f64,
+    pub discounted_delivered_service: f64,
+    pub levelized_cost_per_service_unit: f64,
+}
+
+impl EconomicSeries {
+    pub fn validate(&self) -> Result<(), ValidationError> {
+        if self.scenario_id.trim().is_empty() {
+            return Err(ValidationError::new("scenario_id", "must not be empty"));
+        }
+        if self.name.trim().is_empty() {
+            return Err(ValidationError::new("name", "must not be empty"));
+        }
+        if self.input_evidence_refs.is_empty()
+            || self
+                .input_evidence_refs
+                .iter()
+                .any(|reference| reference.trim().is_empty())
+        {
+            return Err(ValidationError::new(
+                "input_evidence_refs",
+                "at least one non-empty source or fixture reference is required",
+            ));
+        }
+        if self.price_basis.currency().trim().is_empty() {
+            return Err(ValidationError::new("price_basis.currency", "must not be empty"));
+        }
+        if self.price_basis.base_year() == 0 {
+            return Err(ValidationError::new(
+                "price_basis.base_year",
+                "must declare a non-zero price base year",
+            ));
+        }
+        if self.price_basis != self.discount_basis {
+            return Err(ValidationError::new(
+                "discount_basis",
+                "must exactly match price_basis (real cash flows require a real discount rate; nominal requires nominal)",
+            ));
+        }
+        if !self.discount_rate.is_finite() || self.discount_rate <= -1.0 {
+            return Err(ValidationError::new(
+                "discount_rate",
+                "must be finite and greater than -100%",
+            ));
+        }
+        if self.service_unit.trim().is_empty() {
+            return Err(ValidationError::new(
+                "service_unit",
+                "must declare a delivered-service unit",
+            ));
+        }
+        if self.delivery_boundary.trim().is_empty() {
+            return Err(ValidationError::new(
+                "delivery_boundary",
+                "must declare the service delivery boundary",
+            ));
+        }
+        if self.annual_flows.is_empty() {
+            return Err(ValidationError::new(
+                "annual_flows",
+                "must contain at least one annual flow",
+            ));
+        }
+        if self.annual_flows[0].year_index != 0 {
+            return Err(ValidationError::new(
+                "annual_flows[0].year_index",
+                "first flow must be project year 0",
+            ));
+        }
+
+        let mut previous_year = None;
+        let mut any_service = false;
+        for (index, flow) in self.annual_flows.iter().enumerate() {
+            let field = format!("annual_flows[{index}]");
+            if let Some(previous) = previous_year {
+                if previous.checked_add(1) != Some(flow.year_index) {
+                    return Err(ValidationError::new(
+                        field.clone(),
+                        "annual flows must be contiguous; omitted years require explicit zero-valued records",
+                    ));
+                }
+            }
+            previous_year = Some(flow.year_index);
+            if !flow.lifecycle_cost.is_finite() || flow.lifecycle_cost < 0.0 {
+                return Err(ValidationError::new(
+                    field.clone(),
+                    "lifecycle_cost must be finite and nonnegative",
+                ));
+            }
+            if !flow.delivered_service.is_finite() || flow.delivered_service < 0.0 {
+                return Err(ValidationError::new(
+                    field.clone(),
+                    "delivered_service must be finite and nonnegative",
+                ));
+            }
+            any_service |= flow.delivered_service > 0.0;
+        }
+        if !any_service {
+            return Err(ValidationError::new(
+                "annual_flows.delivered_service",
+                "discounted service denominator is zero; result is INSUFFICIENT_EVIDENCE",
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn discounted_totals(&self) -> Result<(f64, f64), ValidationError> {
+        self.validate()?;
+        let mut discounted_cost = 0.0;
+        let mut discounted_service = 0.0;
+        let discount_base = 1.0 + self.discount_rate;
+
+        for flow in &self.annual_flows {
+            let factor = discount_base.powf(f64::from(flow.year_index));
+            let cost_pv = flow.lifecycle_cost / factor;
+            let service_pv = flow.delivered_service / factor;
+            if !cost_pv.is_finite() || !service_pv.is_finite() {
+                return Err(ValidationError::new(
+                    "discounted_totals",
+                    "discounted values overflowed or became non-finite",
+                ));
+            }
+            discounted_cost += cost_pv;
+            discounted_service += service_pv;
+        }
+        if !discounted_cost.is_finite() || !discounted_service.is_finite() {
+            return Err(ValidationError::new(
+                "discounted_totals",
+                "summed discounted values are non-finite",
+            ));
+        }
+        if discounted_service <= 0.0 {
+            return Err(ValidationError::new(
+                "discounted_service",
+                "must be positive; result is INSUFFICIENT_EVIDENCE",
+            ));
+        }
+        Ok((discounted_cost, discounted_service))
+    }
+
+    pub fn levelized_cost(&self) -> Result<LevelizedCostResult, ValidationError> {
+        let (discounted_lifecycle_cost, discounted_delivered_service) =
+            self.discounted_totals()?;
+        let levelized_cost_per_service_unit =
+            discounted_lifecycle_cost / discounted_delivered_service;
+        if !levelized_cost_per_service_unit.is_finite() {
+            return Err(ValidationError::new(
+                "levelized_cost_per_service_unit",
+                "result is non-finite",
+            ));
+        }
+
+        Ok(LevelizedCostResult {
+            scenario_id: self.scenario_id.clone(),
+            name: self.name.clone(),
+            input_evidence_refs: self.input_evidence_refs.clone(),
+            currency: self.price_basis.currency().to_string(),
+            base_year: self.price_basis.base_year(),
+            price_basis: match &self.price_basis {
+                PriceBasis::Real { .. } => "REAL".to_string(),
+                PriceBasis::Nominal { .. } => "NOMINAL".to_string(),
+            },
+            service_unit: self.service_unit.clone(),
+            delivery_boundary: self.delivery_boundary.clone(),
+            discounted_lifecycle_cost,
+            discounted_delivered_service,
+            levelized_cost_per_service_unit,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum GateState {
+    Pass,
+    Fail,
+    Unknown,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GateFinding {
+    pub gate_id: String,
+    pub mandatory: bool,
+    pub state: GateState,
+    pub evidence_ref: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum GateDisposition {
+    EligibleForEconomicComparison,
+    NoGo,
+    Unknown,
+}
+
+pub fn evaluate_mandatory_gates(findings: &[GateFinding]) -> GateDisposition {
+    let mandatory: Vec<&GateFinding> = findings.iter().filter(|item| item.mandatory).collect();
+    if mandatory.is_empty() {
+        return GateDisposition::Unknown;
+    }
+    if mandatory.iter().any(|item| item.state == GateState::Fail) {
+        return GateDisposition::NoGo;
+    }
+    let mut gate_ids = BTreeSet::new();
+    if mandatory.iter().any(|item| {
+        let normalized_id = item.gate_id.trim().to_ascii_lowercase();
+        item.state == GateState::Unknown
+            || normalized_id.is_empty()
+            || !gate_ids.insert(normalized_id)
+            || item
+                .evidence_ref
+                .as_deref()
+                .is_none_or(|reference| reference.trim().is_empty())
+    }) {
+        return GateDisposition::Unknown;
+    }
+    GateDisposition::EligibleForEconomicComparison
+}
+
+/// Compare two levelized service-cost series only when their service boundary,
+/// unit, currency and price basis match and all mandatory gates explicitly pass.
+pub fn compare_eligible_series(
+    left: &EconomicSeries,
+    left_gates: &[GateFinding],
+    right: &EconomicSeries,
+    right_gates: &[GateFinding],
+) -> Result<std::cmp::Ordering, ValidationError> {
+    if evaluate_mandatory_gates(left_gates)
+        != GateDisposition::EligibleForEconomicComparison
+        || evaluate_mandatory_gates(right_gates)
+            != GateDisposition::EligibleForEconomicComparison
+    {
+        return Err(ValidationError::new(
+            "comparison",
+            "NO_GO or UNKNOWN mandatory gate blocks economic ranking",
+        ));
+    }
+    if left.price_basis != right.price_basis {
+        return Err(ValidationError::new(
+            "comparison.price_basis",
+            "currency, price basis and base year must match",
+        ));
+    }
+    if left.discount_rate.to_bits() != right.discount_rate.to_bits() {
+        return Err(ValidationError::new(
+            "comparison.discount_rate",
+            "discount rates must match for a direct matched comparison",
+        ));
+    }
+    if left.service_unit != right.service_unit {
+        return Err(ValidationError::new(
+            "comparison.service_unit",
+            "delivered-service units must match",
+        ));
+    }
+    if left.delivery_boundary != right.delivery_boundary {
+        return Err(ValidationError::new(
+            "comparison.delivery_boundary",
+            "delivery boundaries must match",
+        ));
+    }
+    if left.annual_flows.last().map(|flow| flow.year_index)
+        != right.annual_flows.last().map(|flow| flow.year_index)
+    {
+        return Err(ValidationError::new(
+            "comparison.analysis_horizon",
+            "direct comparison requires the same lifecycle analysis horizon",
+        ));
+    }
+
+    let left_cost = left.levelized_cost()?.levelized_cost_per_service_unit;
+    let right_cost = right.levelized_cost()?.levelized_cost_per_service_unit;
+    Ok(left_cost.total_cmp(&right_cost))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn real_usd_basis() -> PriceBasis {
+        PriceBasis::Real {
+            currency: "USD".to_string(),
+            base_year: 2025,
+        }
+    }
+
+    fn exact_series(name: &str) -> EconomicSeries {
+        EconomicSeries {
+            scenario_id: format!("fixture-{name}"),
+            name: name.to_string(),
+            input_evidence_refs: vec!["fixture://analytical-inputs".to_string()],
+            price_basis: real_usd_basis(),
+            discount_basis: real_usd_basis(),
+            discount_rate: 0.10,
+            service_unit: "MWh_delivered".to_string(),
+            delivery_boundary: "customer_busbar".to_string(),
+            annual_flows: vec![
+                AnnualFlow {
+                    year_index: 0,
+                    lifecycle_cost: 100.0,
+                    delivered_service: 10.0,
+                },
+                AnnualFlow {
+                    year_index: 1,
+                    lifecycle_cost: 110.0,
+                    delivered_service: 11.0,
+                },
+            ],
+        }
+    }
+
+    fn passing_gates() -> Vec<GateFinding> {
+        vec![
+            GateFinding {
+                gate_id: "legal_pathway".to_string(),
+                mandatory: true,
+                state: GateState::Pass,
+                evidence_ref: Some("fixture://legal".to_string()),
+            },
+            GateFinding {
+                gate_id: "insurance_pathway".to_string(),
+                mandatory: true,
+                state: GateState::Pass,
+                evidence_ref: Some("fixture://insurance".to_string()),
+            },
+        ]
+    }
+
+    #[test]
+    fn sa_port_reference_json_parses_and_validates() {
+        let input = include_str!("../../../research/nuclear/port-reference-evidence-sa-2025.json");
+        let dataset: PortReferenceDataset = serde_json::from_str(input).expect("valid frozen JSON");
+        let report = validate_port_reference(&dataset).expect("valid source contract");
+        assert_eq!(report.shore_power_row_count, 8);
+        assert_eq!(report.spare_capacity_row_count, 8);
+        assert_eq!(report.conversion_checks, 8);
+        assert_eq!(report.source_class, "PUBLISHED_ESTIMATE");
+    }
+
+    #[test]
+    fn port_reference_rejects_formula_drift() {
+        let input = include_str!("../../../research/nuclear/port-reference-evidence-sa-2025.json");
+        let mut dataset: PortReferenceDataset =
+            serde_json::from_str(input).expect("valid frozen JSON");
+        dataset.estimated_spare_port_intake_capacity[0].spare_mw += 0.1;
+        assert!(validate_port_reference(&dataset).is_err());
+    }
+
+
+    #[test]
+    fn marine_economic_registry_parses_and_validates() {
+        let input = include_str!("../../../research/nuclear/marine-economic-reference-cases-2026.json");
+        let report = validate_marine_economic_registry(input).expect("valid marine reference registry");
+        assert_eq!(report.anchor_count, 8);
+        assert_eq!(report.reconciliation_dimension_count, 7);
+        assert!(report.ucl_model_details_present);
+        assert!(report.lr_public_summary_details_present);
+    }
+
+    #[test]
+    fn marine_registry_rejects_duplicate_anchor_identity() {
+        let input = include_str!("../../../research/nuclear/marine-economic-reference-cases-2026.json");
+        let mut registry: serde_json::Value =
+            serde_json::from_str(input).expect("valid frozen JSON");
+        let first = registry["anchors"][0]["anchor_id"].clone();
+        registry["anchors"][1]["anchor_id"] = first;
+        let altered = serde_json::to_string(&registry).expect("serializes");
+        assert!(validate_marine_economic_registry(&altered).is_err());
+    }
+
+    #[test]
+    fn marine_registry_requires_detailed_ucl_and_lr_inputs() {
+        let input = include_str!("../../../research/nuclear/marine-economic-reference-cases-2026.json");
+        let mut registry: serde_json::Value =
+            serde_json::from_str(input).expect("valid frozen JSON");
+        registry["anchors"][0]
+            .as_object_mut()
+            .expect("anchor object")
+            .remove("published_model_details");
+        let altered = serde_json::to_string(&registry).expect("serializes");
+        assert!(validate_marine_economic_registry(&altered).is_err());
+    }
+
+    #[test]
+    fn marine_registry_requires_reconciliation_dimensions() {
+        let input = include_str!("../../../research/nuclear/marine-economic-reference-cases-2026.json");
+        let mut registry: serde_json::Value =
+            serde_json::from_str(input).expect("valid frozen JSON");
+        registry["reconciliation_matrix"] = serde_json::Value::Array(Vec::new());
+        let altered = serde_json::to_string(&registry).expect("serializes");
+        assert!(validate_marine_economic_registry(&altered).is_err());
+    }
+
+    #[test]
+    fn discounted_cost_and_service_match_hand_calculation() {
+        let series = exact_series("analytical_fixture");
+        let (cost_pv, service_pv) = series.discounted_totals().expect("valid series");
+        assert!((cost_pv - 200.0).abs() < 1e-12);
+        assert!((service_pv - 20.0).abs() < 1e-12);
+        let result = series.levelized_cost().expect("valid levelized cost");
+        assert!((result.levelized_cost_per_service_unit - 10.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn missing_scenario_provenance_is_rejected() {
+        let mut series = exact_series("missing_provenance");
+        series.input_evidence_refs.clear();
+        assert!(series.validate().is_err());
+    }
+
+    #[test]
+    fn nominal_and_real_basis_mismatch_is_rejected() {
+        let mut series = exact_series("basis_mismatch");
+        series.discount_basis = PriceBasis::Nominal {
+            currency: "USD".to_string(),
+            base_year: 2025,
+        };
+        assert!(series.validate().is_err());
+    }
+
+    #[test]
+    fn zero_service_denominator_is_rejected() {
+        let mut series = exact_series("zero_service");
+        for flow in &mut series.annual_flows {
+            flow.delivered_service = 0.0;
+        }
+        assert!(series.validate().is_err());
+    }
+
+    #[test]
+    fn negative_and_non_finite_values_are_rejected() {
+        let mut negative = exact_series("negative_cost");
+        negative.annual_flows[0].lifecycle_cost = -1.0;
+        assert!(negative.validate().is_err());
+
+        let mut non_finite = exact_series("non_finite_service");
+        non_finite.annual_flows[0].delivered_service = f64::NAN;
+        assert!(non_finite.validate().is_err());
+    }
+
+    #[test]
+    fn duplicate_or_out_of_order_years_are_rejected() {
+        let mut series = exact_series("duplicate_year");
+        series.annual_flows[1].year_index = 0;
+        assert!(series.validate().is_err());
+    }
+
+    #[test]
+    fn failed_gate_overrides_unknown_gate() {
+        let findings = vec![
+            GateFinding {
+                gate_id: "insurance".to_string(),
+                mandatory: true,
+                state: GateState::Unknown,
+                evidence_ref: None,
+            },
+            GateFinding {
+                gate_id: "port_access".to_string(),
+                mandatory: true,
+                state: GateState::Fail,
+                evidence_ref: Some("fixture://not-admitted".to_string()),
+            },
+        ];
+        assert_eq!(evaluate_mandatory_gates(&findings), GateDisposition::NoGo);
+    }
+
+    #[test]
+    fn unknown_gate_blocks_economic_ranking() {
+        let findings = vec![GateFinding {
+            gate_id: "insurance".to_string(),
+            mandatory: true,
+            state: GateState::Unknown,
+            evidence_ref: None,
+        }];
+        assert_eq!(evaluate_mandatory_gates(&findings), GateDisposition::Unknown);
+    }
+
+    #[test]
+    fn empty_mandatory_gate_set_is_unknown() {
+        let findings = vec![GateFinding {
+            gate_id: "optional_training".to_string(),
+            mandatory: false,
+            state: GateState::Pass,
+            evidence_ref: None,
+        }];
+        assert_eq!(evaluate_mandatory_gates(&findings), GateDisposition::Unknown);
+    }
+
+    #[test]
+    fn mandatory_pass_without_evidence_reference_is_unknown() {
+        let findings = vec![GateFinding {
+            gate_id: "insurance_pathway".to_string(),
+            mandatory: true,
+            state: GateState::Pass,
+            evidence_ref: None,
+        }];
+        assert_eq!(evaluate_mandatory_gates(&findings), GateDisposition::Unknown);
+    }
+
+    #[test]
+    fn direct_comparison_requires_the_same_discount_rate() {
+        let left = exact_series("left");
+        let mut right = exact_series("right");
+        right.discount_rate = 0.08;
+        let gates = passing_gates();
+        assert!(compare_eligible_series(&left, &gates, &right, &gates).is_err());
+    }
+
+
+    #[test]
+    fn comparison_requires_matching_service_scope_and_passing_gates() {
+        let left = exact_series("left");
+        let right = exact_series("right");
+        let gates = passing_gates();
+        assert_eq!(
+            compare_eligible_series(&left, &gates, &right, &gates).unwrap(),
+            std::cmp::Ordering::Equal
+        );
+
+        let mut mismatched = right.clone();
+        mismatched.service_unit = "passenger_days".to_string();
+        assert!(compare_eligible_series(&left, &gates, &mismatched, &gates).is_err());
+
+        let unknown = vec![GateFinding {
+            gate_id: "port_access".to_string(),
+            mandatory: true,
+            state: GateState::Unknown,
+            evidence_ref: None,
+        }];
+        assert!(compare_eligible_series(&left, &unknown, &right, &gates).is_err());
+    }
+
+    #[test]
+    fn cargo_and_passenger_service_units_remain_explicit() {
+        let mut cargo = exact_series("cargo");
+        cargo.service_unit = "tonne_nautical_miles".to_string();
+        let mut passenger = exact_series("passenger");
+        passenger.service_unit = "passenger_days".to_string();
+        assert_ne!(cargo.service_unit, passenger.service_unit);
+        assert!(compare_eligible_series(
+            &cargo,
+            &passing_gates(),
+            &passenger,
+            &passing_gates()
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn port_reference_rejects_duplicate_source_identifiers() {
+        let input = include_str!("../../../research/nuclear/port-reference-evidence-sa-2025.json");
+        let mut dataset: PortReferenceDataset =
+            serde_json::from_str(input).expect("valid frozen JSON");
+        let duplicate = dataset.sources[0].clone();
+        dataset.sources.push(duplicate);
+        assert!(validate_port_reference(&dataset).is_err());
+    }
+
+    #[test]
+    fn port_reference_rejects_incomplete_capacity_ranks() {
+        let input = include_str!("../../../research/nuclear/port-reference-evidence-sa-2025.json");
+        let mut dataset: PortReferenceDataset =
+            serde_json::from_str(input).expect("valid frozen JSON");
+        dataset.estimated_spare_port_intake_capacity[0].rank = 9;
+        assert!(validate_port_reference(&dataset).is_err());
+    }
+
+    #[test]
+    fn port_reference_rejects_blank_source_limitations() {
+        let input = include_str!("../../../research/nuclear/port-reference-evidence-sa-2025.json");
+        let mut dataset: PortReferenceDataset =
+            serde_json::from_str(input).expect("valid frozen JSON");
+        dataset.sources[0].limitations[0] = "   ".to_string();
+        assert!(validate_port_reference(&dataset).is_err());
+    }
+
+    #[test]
+    fn port_reference_rejects_blank_required_evidence() {
+        let input = include_str!("../../../research/nuclear/port-reference-evidence-sa-2025.json");
+        let mut dataset: PortReferenceDataset =
+            serde_json::from_str(input).expect("valid frozen JSON");
+        dataset.required_next_evidence[0] = String::new();
+        assert!(validate_port_reference(&dataset).is_err());
+    }
+
+    #[test]
+    fn zero_price_base_year_is_rejected() {
+        let mut series = exact_series("zero_base_year");
+        series.price_basis = PriceBasis::Real {
+            currency: "USD".to_string(),
+            base_year: 0,
+        };
+        series.discount_basis = series.price_basis.clone();
+        assert!(series.validate().is_err());
+    }
+
+    #[test]
+    fn omitted_annual_flow_year_is_rejected() {
+        let mut series = exact_series("missing_year");
+        series.annual_flows[1].year_index = 2;
+        assert!(series.validate().is_err());
+    }
+
+    #[test]
+    fn direct_comparison_requires_identical_lifecycle_horizon() {
+        let left = exact_series("left_horizon");
+        let mut right = exact_series("right_horizon");
+        right.annual_flows.push(AnnualFlow {
+            year_index: 2,
+            lifecycle_cost: 0.0,
+            delivered_service: 0.0,
+        });
+        let gates = passing_gates();
+        assert!(compare_eligible_series(&left, &gates, &right, &gates).is_err());
+    }
+
+    #[test]
+    fn duplicate_mandatory_gate_ids_are_unknown() {
+        let mut gates = passing_gates();
+        gates[1].gate_id = gates[0].gate_id.clone();
+        assert_eq!(evaluate_mandatory_gates(&gates), GateDisposition::Unknown);
+    }
+}
