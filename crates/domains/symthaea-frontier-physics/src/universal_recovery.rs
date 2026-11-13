@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
+#![allow(clippy::needless_range_loop)]
+// Fixed 2x8 and 8x8 contractions use explicit index loops.
+
 //! An exact error-set recovery baseline for the three-qubit repetition code.
 //!
 //! The code space is span{|000>, |111>} and the declared error set is
