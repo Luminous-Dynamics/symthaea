@@ -425,6 +425,7 @@ pub enum MusicEditScopeMismatchV1 {
     NativeMetricSet,
     SampleManifest,
     EmptyScopeField(&'static str),
+    MutableBenchmarkVersion,
     InvalidScopeDigest(&'static str),
     DuplicateNativeMetric,
     MissingNativeMetric,
@@ -444,6 +445,12 @@ pub fn compare_music_edit_scopes_v1(
 ) -> MusicEditScopeComparisonV1 {
     let mut mismatches = Vec::new();
     for scope in [left, right] {
+        if matches!(
+            scope.benchmark_version.to_ascii_lowercase().as_str(),
+            "latest" | "current" | "stable"
+        ) {
+            mismatches.push(MusicEditScopeMismatchV1::MutableBenchmarkVersion);
+        }
         for (field, value) in [
             ("benchmark_id", scope.benchmark_id.as_str()),
             ("benchmark_version", scope.benchmark_version.as_str()),
@@ -710,6 +717,19 @@ mod tests {
         let result = compare_music_edit_scopes_v1(&left, &right);
         assert!(result.directly_comparable);
         assert!(result.mismatches.is_empty());
+    }
+
+    #[test]
+    fn mutable_comparison_scope_version_is_never_directly_comparable() {
+        let mut scope = scope("smebench-test", MusicEditDatasetStratumV1::MidiSynthesized);
+        scope.benchmark_version = "latest".to_owned();
+        let result = compare_music_edit_scopes_v1(&scope, &scope);
+        assert!(!result.directly_comparable);
+        assert!(
+            result
+                .mismatches
+                .contains(&MusicEditScopeMismatchV1::MutableBenchmarkVersion)
+        );
     }
 
     #[test]
