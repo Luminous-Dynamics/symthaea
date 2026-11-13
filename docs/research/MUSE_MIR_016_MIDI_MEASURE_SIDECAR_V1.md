@@ -108,7 +108,7 @@ The Add Music page now has an optional MIDI measure-sidecar picker and a link to
 
 ## Tests authored
 
-### Adapter (11 tests)
+### Adapter (15 tests)
 
 - PPQ 96/480/960/1920 produce identical rational quarter-beat measure spans;
 - source digest mismatch;
