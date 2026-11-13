@@ -104,11 +104,14 @@ def assert_metadata(data: dict[str, Any]) -> None:
     assert data["dimension"] == 2
     assert data["port_order"] == ["p0", "p1"]
     assert data["model_identity"] == "sha256:one-sided-set-model-v0.1"
+    assert data["topology_identity"] == "sha256:two-port-topology-v0.1"
+    assert data["operating_point_identity"] == "sha256:fixed-operating-point-v0.1"
 
 
 def verify_interval(
     interval: dict[str, Any],
     knots: dict[str, dict[str, Any]],
+    metadata: dict[str, Any],
 ) -> list[list[Point]]:
     if interval["left_endpoint_semantics"] != "outgoing_plus":
         raise ValueError("left interval endpoint must use the outgoing plus set")
@@ -121,6 +124,18 @@ def verify_interval(
     right_frequency = q(right_knot["frequency"])
     if not left_frequency < right_frequency:
         raise ValueError("interval frequency endpoints are not strictly ordered")
+
+    identity_fields = (
+        "model_identity",
+        "topology_identity",
+        "operating_point_identity",
+        "frequency_unit",
+        "port_order",
+    )
+    for knot in (left_knot, right_knot):
+        for field in identity_fields:
+            if knot.get(field) != metadata.get(field):
+                raise ValueError(f"{knot['knot_id']} identity mismatch: {field}")
 
     left = resolve_endpoint(left_knot, interval["left_endpoint_semantics"])
     right = resolve_endpoint(right_knot, interval["right_endpoint_semantics"])
@@ -177,7 +192,7 @@ def verify_negative_controls(data: dict[str, Any], knots: dict[str, dict[str, An
     try:
         invalid = dict(first)
         invalid["right_endpoint_semantics"] = "outgoing_plus"
-        verify_interval(invalid, knots)
+        verify_interval(invalid, knots, data)
     except ValueError:
         pass
     else:
@@ -203,6 +218,36 @@ def verify_negative_controls(data: dict[str, Any], knots: dict[str, dict[str, An
     outgoing = resolve_endpoint(middle, "outgoing_plus")
     assert incoming != outgoing, "one-sided sets were incorrectly collapsed"
 
+    # A stale topology identity on either side of an interval is not composable.
+    stale_knots = json.loads(json.dumps(knots))
+    stale_knots["k1"]["topology_identity"] = "sha256:stale-topology"
+    try:
+        verify_interval(data["intervals"][0], stale_knots, data)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("stale topology identity was not rejected")
+
+    # Collapse the two one-sided sets: the one-sided reference must reject it.
+    collapsed_knots = json.loads(json.dumps(knots))
+    collapsed_knots["k1"]["incoming_minus"] = collapsed_knots["k1"]["outgoing_plus"]
+    try:
+        verify_one_sided_knot(data, collapsed_knots)
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("collapsed one-sided endpoint sets were not detected")
+
+    # Statistical evidence cannot be silently relabelled as a hard set.
+    statistical = dict(data)
+    statistical["uncertainty_semantics"] = "statistical_confidence_region"
+    try:
+        assert_metadata(statistical)
+    except AssertionError:
+        pass
+    else:
+        raise AssertionError("statistical-to-hard-set promotion was not rejected")
+
 
 def main() -> None:
     data = json.loads(FIXTURE.read_text(encoding="utf-8"))
@@ -222,7 +267,7 @@ def main() -> None:
     assert intervals[0]["right_knot_id"] == data["expected"]["middle_knot_id"]
 
     results = [
-        verify_interval(interval, knots)
+        verify_interval(interval, knots, data)
         for interval in intervals
     ]
     assert results[0][1] == decode_hull(data["expected"]["lambda_half_hull_i0"])
