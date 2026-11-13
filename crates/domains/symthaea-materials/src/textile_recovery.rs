@@ -1708,6 +1708,22 @@ mod tests {
                 design_conformity_must_bind_the_same_physical_sample_as_the_trial();
                 ("ineligible", Some("InvalidDesignRevisionBinding"))
             }
+            "ROUTE-031-FIBRE-LENGTH-TRIAL-MISMATCH" => {
+                fibre_length_evidence_must_bind_to_the_exact_physical_trial();
+                ("ineligible", Some("FibreLengthTrialBindingMismatch"))
+            }
+            "ROUTE-032-FIBRE-LENGTH-OUTPUT-LOT-MISMATCH" => {
+                fibre_length_evidence_must_bind_to_the_mass_balanced_accepted_output_lot();
+                ("ineligible", Some("FibreLengthTrialBindingMismatch"))
+            }
+            "ROUTE-033-RECEIVER-OUTPUT-LOT-MISMATCH" => {
+                receiving_acceptance_cannot_be_borrowed_from_another_output_lot();
+                ("ineligible", Some("DownstreamAcceptanceBindingMismatch"))
+            }
+            "ROUTE-034-RECEIVER-BASIS-TRIAL-MISMATCH" => {
+                receiving_acceptance_must_reference_the_trial_that_produced_the_output();
+                ("ineligible", Some("DownstreamAcceptanceBindingMismatch"))
+            }
             other => panic!("unknown textile recovery corpus case: {other}"),
         }
     }
@@ -1729,12 +1745,12 @@ mod tests {
         assert_eq!(corpus["schema_version"], "0.1.0");
         assert_eq!(corpus["corpus_id"], "TEXTILE-ROUTE-CASES-001");
         assert_eq!(corpus["fixture_class"], "synthetic");
-        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(30));
+        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(34));
 
         let cases = corpus["cases"]
             .as_array()
             .expect("recovery cases must be an array");
-        assert_eq!(cases.len(), 30, "review route corpus case count changes");
+        assert_eq!(cases.len(), 34, "review route corpus case count changes");
         let mut seen = BTreeSet::new();
         for case in cases {
             let case_id = case["case_id"]
@@ -1754,7 +1770,7 @@ mod tests {
             assert_eq!(disposition, expected_disposition, "case {case_id} disposition");
             assert_eq!(reason, expected_reason, "case {case_id} reason");
         }
-        assert_eq!(seen.len(), 30);
+        assert_eq!(seen.len(), 34);
     }
 
     #[test]
