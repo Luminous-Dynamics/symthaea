@@ -108,10 +108,14 @@ pub fn available() -> Option<(PathBuf, PathBuf)> {
 /// (Format 0 or 1). Format 2 contains independent sequential patterns and
 /// cannot be treated as one shared performance timeline.
 fn source_midi_bytes_supported(bytes: &[u8]) -> bool {
-    matches!(
-        midly::Smf::parse(bytes).map(|smf| smf.header.format),
-        Ok(midly::Format::SingleTrack | midly::Format::Parallel)
-    )
+    let Ok(smf) = midly::Smf::parse(bytes) else {
+        return false;
+    };
+    match smf.header.format {
+        midly::Format::SingleTrack => smf.tracks.len() == 1,
+        midly::Format::Parallel => !smf.tracks.is_empty(),
+        midly::Format::Sequential => false,
+    }
 }
 
 /// Render the exact uploaded MIDI bytes through FluidSynth without
@@ -446,6 +450,7 @@ mod tests {
             bytes
         }
         assert!(source_midi_bytes_supported(&midi(0, 1)));
+        assert!(!source_midi_bytes_supported(&midi(0, 2)));
         assert!(source_midi_bytes_supported(&midi(1, 2)));
         assert!(!source_midi_bytes_supported(&midi(2, 2)));
         assert!(!source_midi_bytes_supported(b"not a MIDI file"));
