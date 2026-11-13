@@ -288,5 +288,130 @@
       },
       "expected": "NO_DESTABILIZATION_WITNESS"
     }
-  ]
+  ],
+  "normalized_margin_reference": {
+    "parameter": "gamma",
+    "nominal_gamma": {
+      "numerator": "1",
+      "denominator": "16"
+    },
+    "one_sided_uncertainty_radius": {
+      "numerator": "1",
+      "denominator": "16"
+    },
+    "normalized_delta_domain": {
+      "lower": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "upper": {
+        "numerator": "1",
+        "denominator": "1"
+      }
+    },
+    "critical_boundary_gamma": {
+      "numerator": "1",
+      "denominator": "8"
+    },
+    "exact_normalized_robust_stability_margin": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "cases": [
+      {
+        "id": "half-margin",
+        "scale": {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        "gamma_lower": {
+          "numerator": "1",
+          "denominator": "16"
+        },
+        "gamma_upper": {
+          "numerator": "3",
+          "denominator": "32"
+        },
+        "expected": "ROBUSTLY_STABLE"
+      },
+      {
+        "id": "at-margin",
+        "scale": {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        "gamma_lower": {
+          "numerator": "1",
+          "denominator": "16"
+        },
+        "gamma_upper": {
+          "numerator": "1",
+          "denominator": "8"
+        },
+        "expected": "NOT_ESTABLISHED_MARGINAL_BOUNDARY"
+      },
+      {
+        "id": "beyond-margin",
+        "scale": {
+          "numerator": "2",
+          "denominator": "1"
+        },
+        "gamma_lower": {
+          "numerator": "1",
+          "denominator": "16"
+        },
+        "gamma_upper": {
+          "numerator": "3",
+          "denominator": "16"
+        },
+        "expected": "NOT_ESTABLISHED_WITH_DESTABILIZATION_WITNESS"
+      }
+    ],
+    "boundary_witness": {
+      "normalized_delta": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "gamma": {
+        "numerator": "1",
+        "denominator": "8"
+      },
+      "closed_loop_pole": {
+        "real": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "classification": "MARGINAL"
+    },
+    "unstable_witness_beyond_margin": {
+      "scale": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "normalized_delta": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "gamma": {
+        "numerator": "3",
+        "denominator": "16"
+      },
+      "characteristic_constant": {
+        "numerator": "-1",
+        "denominator": "2"
+      },
+      "routh_first_column_signs": [
+        "positive",
+        "positive",
+        "positive",
+        "negative"
+      ],
+      "classification": "ONE_RIGHT_HALF_PLANE_POLE"
+    }
+  }
 }
