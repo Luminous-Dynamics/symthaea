@@ -1,0 +1,46 @@
+name: SA-SING benchmark manifest validator
+
+on:
+  pull_request:
+    paths:
+      - "tools/south-african-singing-benchmark/**"
+      - "docs/research/SA_SING_BENCHMARK_V1.md"
+      - ".github/workflows/sa-sing-benchmark.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sa-sing-manifest-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "SA_SING_MANIFEST_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check SA-SING manifest validator
+        run: cargo +1.96.0 fmt --check --manifest-path tools/south-african-singing-benchmark/Cargo.toml
+
+      - name: Generate isolated lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/south-african-singing-benchmark/Cargo.toml
+
+      - name: Run modality, rights-receipt, annotation and split controls
+        run: cargo +1.96.0 test --locked --manifest-path tools/south-african-singing-benchmark/Cargo.toml
