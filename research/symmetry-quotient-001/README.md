@@ -32,6 +32,20 @@ This version does not use a cryptographic digest. The verifier receives the exac
     cargo test --locked --manifest-path research/symmetry-quotient-001/Cargo.toml
     cargo clippy --locked --manifest-path research/symmetry-quotient-001/Cargo.toml --all-targets -- -D warnings
 
+## Canonical input binding
+
+The follow-up implementation adds a versioned SHA-256 content commitment to every authorized quotient certificate:
+
+- `problem_sha256` binds every candidate identifier and exact task-semantic field;
+- `action_sha256` binds the complete finite multiplication table and permutation action;
+- `budget_sha256` binds the declared qualification/resource limits;
+- `commitment_sha256` binds the three digests, schema version and canonicalization identifier.
+
+Each component uses a separate domain prefix. Canonical encoding is compact UTF-8 JSON with recursively sorted object keys and stable array order (`luminous.canonical_json.sorted_keys_compact_utf8.v1`). The typed v1 inputs contain booleans, signed/unsigned integers, strings and arrays; no floating-point input representation is admitted.
+
+The certificate verifier recomputes the input commitments from the supplied original records and budget before replaying group, action, task-semantics, orbit, stabilizer and witness checks. A changed commitment is rejected before solution lifting. The digest is an integrity identity, not a proof, signature or physical authority.
+
+The SHA-256 implementation is RustCrypto `sha2`; serialization uses pinned Serde/serde_json dependencies. NIST SHA-256 known vectors and canonical object-key-order test vectors are part of the Rust suite. The dedicated workflow uploads the exact resolved lockfile and digest; the committed lockfile must match that artifact before final qualification.
 ## Deliberate limits
 
 This is not a general-purpose group-discovery engine. It does not cover continuous Lie groups, approximate actions, infinite domains, non-finite objectives, transformed output spaces, or physical step-map equivariance. It must abstain when its exact finite contract is incomplete or its resource budget is exceeded.
