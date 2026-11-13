@@ -122,6 +122,22 @@ pub enum U1MpsError {
         relative_cutoff: f64,
         tolerance: f64,
     },
+    InvalidTeBDParity(u8),
+    TeBDGateOutOfRange {
+        bond_index: usize,
+        site_count: usize,
+    },
+    TeBDGateWrongParity {
+        bond_index: usize,
+        parity: u8,
+    },
+    DuplicateTeBDGate {
+        bond_index: usize,
+    },
+    TeBDLayerSiteCountMismatch {
+        layer_sites: usize,
+        state_sites: usize,
+    },
 }
 
 impl core::fmt::Display for U1MpsError {
@@ -241,6 +257,33 @@ impl core::fmt::Display for U1MpsError {
             } => write!(
                 f,
                 "invalid truncation policy: max_bond={max_bond_dimension}, relative_cutoff={relative_cutoff}, tolerance={tolerance}"
+            ),
+            Self::InvalidTeBDParity(parity) => {
+                write!(f, "TEBD layer parity must be 0 or 1, got {parity}")
+            }
+            Self::TeBDGateOutOfRange {
+                bond_index,
+                site_count,
+            } => write!(
+                f,
+                "TEBD gate bond {bond_index} is out of range for {site_count} sites"
+            ),
+            Self::TeBDGateWrongParity {
+                bond_index,
+                parity,
+            } => write!(
+                f,
+                "TEBD gate bond {bond_index} does not belong to parity-{parity} layer"
+            ),
+            Self::DuplicateTeBDGate { bond_index } => {
+                write!(f, "TEBD layer contains duplicate gate on bond {bond_index}")
+            }
+            Self::TeBDLayerSiteCountMismatch {
+                layer_sites,
+                state_sites,
+            } => write!(
+                f,
+                "TEBD layer was built for {layer_sites} sites, state has {state_sites}"
             ),
             Self::DenseChargeLeakage {
                 basis_index,
@@ -1729,11 +1772,169 @@ impl U1MpsTruncationLedger {
     }
 }
 
+
+
+/// One nearest-neighbour two-site gate attached to a bond index.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDGate {
+    bond_index: usize,
+    gate: U1TwoSiteGate,
+}
+
+impl U1TeBDGate {
+    pub fn new(bond_index: usize, gate: U1TwoSiteGate) -> Self {
+        Self { bond_index, gate }
+    }
+
+    pub const fn bond_index(&self) -> usize {
+        self.bond_index
+    }
+
+    pub fn gate(&self) -> &U1TwoSiteGate {
+        &self.gate
+    }
+}
+
+/// A deterministic even- or odd-bond layer of disjoint nearest-neighbour gates.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDLayer {
+    site_count: usize,
+    parity: u8,
+    gates: Vec<U1TeBDGate>,
+}
+
+/// Result of one TEBD layer, including its output MPS and per-gate error receipts.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDLayerResult {
+    pub state: ComplexU1Mps,
+    pub parity: u8,
+    pub bond_indices: Vec<usize>,
+    pub gate_truncations: Vec<U1TwoSiteTruncationDiagnostics>,
+    pub truncation_ledger: U1MpsTruncationLedger,
+    pub input_norm_squared: f64,
+    pub output_norm_squared: f64,
+    pub input_total_charge: i32,
+    pub output_total_charge: i32,
+    pub output_selection_rule_residual: f64,
+}
+
+impl U1TeBDLayer {
+    /// Build a parity layer. The gate list is sorted by bond index and validated
+    /// for bounds, parity and uniqueness. For a fixed parity, gates are disjoint.
+    pub fn new(
+        site_count: usize,
+        parity: u8,
+        mut gates: Vec<U1TeBDGate>,
+    ) -> Result<Self, U1MpsError> {
+        if parity > 1 {
+            return Err(U1MpsError::InvalidTeBDParity(parity));
+        }
+        for gate in &gates {
+            if gate.bond_index >= site_count.saturating_sub(1) {
+                return Err(U1MpsError::TeBDGateOutOfRange {
+                    bond_index: gate.bond_index,
+                    site_count,
+                });
+            }
+            if gate.bond_index % 2 != parity as usize {
+                return Err(U1MpsError::TeBDGateWrongParity {
+                    bond_index: gate.bond_index,
+                    parity,
+                });
+            }
+        }
+        gates.sort_by_key(U1TeBDGate::bond_index);
+        for pair in gates.windows(2) {
+            if pair[0].bond_index == pair[1].bond_index {
+                return Err(U1MpsError::DuplicateTeBDGate {
+                    bond_index: pair[0].bond_index,
+                });
+            }
+        }
+        Ok(Self {
+            site_count,
+            parity,
+            gates,
+        })
+    }
+
+    pub const fn site_count(&self) -> usize {
+        self.site_count
+    }
+
+    pub const fn parity(&self) -> u8 {
+        self.parity
+    }
+
+    pub fn gates(&self) -> &[U1TeBDGate] {
+        &self.gates
+    }
+
+    pub fn bond_indices(&self) -> Vec<usize> {
+        self.gates.iter().map(U1TeBDGate::bond_index).collect()
+    }
+
+    /// Execute the layer as sorted disjoint two-site gate + truncation operations.
+    ///
+    /// No renormalization is performed. Each gate's exact unitary application,
+    /// charge-sector split and approximate compression is recorded in order.
+    /// The L2 ledger is valid under the assumptions documented by
+    /// U1MpsTruncationLedger: unitary gates and orthogonal Schmidt projections.
+    pub fn apply(
+        &self,
+        input: &ComplexU1Mps,
+        policy: U1TwoSiteTruncationPolicy,
+    ) -> Result<U1TeBDLayerResult, U1MpsError> {
+        if input.site_count() != self.site_count {
+            return Err(U1MpsError::TeBDLayerSiteCountMismatch {
+                layer_sites: self.site_count,
+                state_sites: input.site_count(),
+            });
+        }
+        let input_norm_squared = input.norm_squared(policy.tolerance)?;
+        let input_total_charge = input.total_charge;
+        let mut tensors = input.tensors.clone();
+        let mut truncation_ledger = U1MpsTruncationLedger::default();
+        let mut gate_truncations = Vec::with_capacity(self.gates.len());
+
+        for entry in &self.gates {
+            let bond = entry.bond_index;
+            let pair = U1TwoSiteState::from_adjacent_tensors(
+                &tensors[bond],
+                &tensors[bond + 1],
+                policy.tolerance,
+            )?;
+            let evolved_pair = pair.apply_gate(&entry.gate, policy.tolerance)?;
+            let truncation = evolved_pair.split_truncated(policy)?;
+            truncation_ledger.record(&truncation)?;
+            tensors[bond] = truncation.left_tensor.clone();
+            tensors[bond + 1] = truncation.right_tensor.clone();
+            gate_truncations.push(truncation);
+        }
+
+        let state = ComplexU1Mps::new(tensors, input_total_charge, policy.tolerance)?;
+        let output_norm_squared = state.norm_squared(policy.tolerance)?;
+        Ok(U1TeBDLayerResult {
+            output_selection_rule_residual: state.selection_rule_residual(),
+            output_total_charge: state.total_charge(),
+            state,
+            parity: self.parity,
+            bond_indices: self.bond_indices(),
+            gate_truncations,
+            truncation_ledger,
+            input_norm_squared,
+            output_norm_squared,
+            input_total_charge,
+        })
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::{
-        ComplexU1Mps, U1MpsError, U1MpsTensor, U1MpsTruncationLedger, U1TwoSiteGate,
-        U1TwoSiteState, U1TwoSiteTruncationPolicy,
+        ComplexU1Mps, U1MpsError, U1MpsTensor, U1MpsTruncationLedger, U1TeBDGate,
+        U1TeBDLayer, U1TwoSiteGate, U1TwoSiteState, U1TwoSiteTruncationPolicy,
     };
     use num_complex::Complex64;
 
@@ -2607,4 +2808,122 @@ mod tests {
             ));
         }
     }
+
+    #[test]
+    fn tebd_even_layer_executes_sorted_disjoint_swaps_and_preserves_charge() {
+        let input = ComplexU1Mps::product_state(&[true, false, true, false]).unwrap();
+        let layer = U1TeBDLayer::new(
+            4,
+            0,
+            vec![
+                U1TeBDGate::new(2, U1TwoSiteGate::swap()),
+                U1TeBDGate::new(0, U1TwoSiteGate::swap()),
+            ],
+        )
+        .unwrap();
+        assert_eq!(layer.bond_indices(), vec![0, 2]);
+
+        let result = layer
+            .apply(
+                &input,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 4,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-12,
+                },
+            )
+            .unwrap();
+        assert_eq!(result.input_total_charge, 2);
+        assert_eq!(result.output_total_charge, 2);
+        assert!(result.output_selection_rule_residual <= 1.0e-12);
+        assert!((result.input_norm_squared - 1.0).abs() <= 1.0e-12);
+        assert!((result.output_norm_squared - 1.0).abs() <= 1.0e-10);
+        assert_eq!(result.truncation_ledger.gate_count, 2);
+        assert_eq!(result.gate_truncations.len(), 2);
+
+        let dense = result.state.to_dense(8).unwrap();
+        assert!((dense[5] - Complex64::new(1.0, 0.0)).norm() <= 1.0e-10);
+        for (index, amplitude) in dense.iter().enumerate() {
+            if index != 5 {
+                assert!(amplitude.norm() <= 1.0e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn tebd_odd_layer_executes_one_gate_and_tracks_local_discarded_weight() {
+        let input = ComplexU1Mps::product_state(&[false, true, false]).unwrap();
+        let layer = U1TeBDLayer::new(
+            3,
+            1,
+            vec![U1TeBDGate::new(1, U1TwoSiteGate::swap())],
+        )
+        .unwrap();
+        let result = layer
+            .apply(
+                &input,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 1,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-12,
+                },
+            )
+            .unwrap();
+        assert_eq!(result.bond_indices, vec![1]);
+        assert_eq!(result.truncation_ledger.gate_count, 1);
+        assert_eq!(result.output_total_charge, 1);
+        assert!((result.output_norm_squared - result.input_norm_squared).abs() <= 1.0e-10);
+        assert!(result.gate_truncations[0].discarded_weight <= 1.0e-12);
+        let dense = result.state.to_dense(4).unwrap();
+        assert!((dense[1] - Complex64::new(1.0, 0.0)).norm() <= 1.0e-10);
+    }
+
+    #[test]
+    fn tebd_layer_rejects_bad_parity_duplicate_and_out_of_range_bonds() {
+        assert!(matches!(
+            U1TeBDLayer::new(4, 2, Vec::new()),
+            Err(U1MpsError::InvalidTeBDParity(2))
+        ));
+        assert!(matches!(
+            U1TeBDLayer::new(4, 0, vec![U1TeBDGate::new(1, U1TwoSiteGate::swap())]),
+            Err(U1MpsError::TeBDGateWrongParity { .. })
+        ));
+        assert!(matches!(
+            U1TeBDLayer::new(
+                4,
+                0,
+                vec![
+                    U1TeBDGate::new(0, U1TwoSiteGate::swap()),
+                    U1TeBDGate::new(0, U1TwoSiteGate::identity()),
+                ]
+            ),
+            Err(U1MpsError::DuplicateTeBDGate { bond_index: 0 })
+        ));
+        assert!(matches!(
+            U1TeBDLayer::new(4, 0, vec![U1TeBDGate::new(4, U1TwoSiteGate::swap())]),
+            Err(U1MpsError::TeBDGateOutOfRange { .. })
+        ));
+    }
+
+    #[test]
+    fn tebd_layer_rejects_state_with_mismatched_site_count() {
+        let input = ComplexU1Mps::product_state(&[false, true, false]).unwrap();
+        let layer =
+            U1TeBDLayer::new(4, 0, vec![U1TeBDGate::new(0, U1TwoSiteGate::swap())]).unwrap();
+        assert!(matches!(
+            layer.apply(
+                &input,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 4,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-12,
+                }
+            ),
+            Err(U1MpsError::TeBDLayerSiteCountMismatch {
+                layer_sites: 4,
+                state_sites: 3
+            })
+        ));
+    }
+
 }
