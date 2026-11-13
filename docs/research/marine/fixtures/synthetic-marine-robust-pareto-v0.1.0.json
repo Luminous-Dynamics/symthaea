@@ -25,7 +25,22 @@
       "unit": "kWh_per_1000_tonne_nm"
     },
     {
+      "metric_id": "well_to_wake_ghg_per_cargo_work",
+      "direction": "minimize",
+      "unit": "kgCO2e_per_1000_tonne_nm"
+    },
+    {
       "metric_id": "acoustic_1khz",
+      "direction": "minimize",
+      "unit": "dB_re_1uPa_at_declared_reference"
+    },
+    {
+      "metric_id": "acoustic_2_5khz",
+      "direction": "minimize",
+      "unit": "dB_re_1uPa_at_declared_reference"
+    },
+    {
+      "metric_id": "acoustic_30_80khz",
       "direction": "minimize",
       "unit": "dB_re_1uPa_at_declared_reference"
     },
@@ -33,6 +48,16 @@
       "metric_id": "lifecycle_cost",
       "direction": "minimize",
       "unit": "USD_per_1000_tonne_nm"
+    },
+    {
+      "metric_id": "maintenance_hours_per_cargo_work",
+      "direction": "minimize",
+      "unit": "hours_per_1000_tonne_nm"
+    },
+    {
+      "metric_id": "availability",
+      "direction": "maximize",
+      "unit": "fraction"
     }
   ],
   "hard_gates": [
@@ -123,6 +148,28 @@
       "required_audit_contract_id": "marine-rotation-synchronous-modulation-audit-v0.1.0",
       "requirement_reference": "measurement:rotation-synchronous-envelope-reviewed",
       "non_compensable": true
+    },
+    {
+      "gate_id": "acoustic-30-80khz-maximum",
+      "gate_class": "underwater_noise",
+      "evaluation": "metric_upper_bound",
+      "metric_id": "acoustic_30_80khz",
+      "threshold": 125,
+      "unit": "dB_re_1uPa_at_declared_reference",
+      "required_audit_contract_id": null,
+      "requirement_reference": "operator-limit:acoustic-30-80khz",
+      "non_compensable": true
+    },
+    {
+      "gate_id": "availability-minimum",
+      "gate_class": "reliability",
+      "evaluation": "metric_lower_bound",
+      "metric_id": "availability",
+      "threshold": 0.95,
+      "unit": "fraction",
+      "required_audit_contract_id": null,
+      "requirement_reference": "service-contract:minimum-availability",
+      "non_compensable": true
     }
   ],
   "candidates": [
@@ -160,6 +207,18 @@
           "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
         },
         {
+          "metric_id": "well_to_wake_ghg_per_cargo_work",
+          "value": 70,
+          "expanded_uncertainty": 0.5,
+          "confidence_level": 0.95,
+          "unit": "kgCO2e_per_1000_tonne_nm",
+          "method_id": "method-well_to_wake_ghg_per_cargo_work",
+          "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        },
+        {
           "metric_id": "acoustic_1khz",
           "value": 100,
           "expanded_uncertainty": 0.5,
@@ -172,6 +231,30 @@
           "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
         },
         {
+          "metric_id": "acoustic_2_5khz",
+          "value": 102,
+          "expanded_uncertainty": 0.5,
+          "confidence_level": 0.95,
+          "unit": "dB_re_1uPa_at_declared_reference",
+          "method_id": "method-acoustic_2_5khz",
+          "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        },
+        {
+          "metric_id": "acoustic_30_80khz",
+          "value": 115,
+          "expanded_uncertainty": 0.5,
+          "confidence_level": 0.95,
+          "unit": "dB_re_1uPa_at_declared_reference",
+          "method_id": "method-acoustic_30_80khz",
+          "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        },
+        {
           "metric_id": "lifecycle_cost",
           "value": 20,
           "expanded_uncertainty": 0.5,
@@ -181,6 +264,30 @@
           "raw_data_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
           "calibration_or_validation_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
           "timebase_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        },
+        {
+          "metric_id": "maintenance_hours_per_cargo_work",
+          "value": 6,
+          "expanded_uncertainty": 0.5,
+          "confidence_level": 0.95,
+          "unit": "hours_per_1000_tonne_nm",
+          "method_id": "method-maintenance_hours_per_cargo_work",
+          "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+        },
+        {
+          "metric_id": "availability",
+          "value": 0.98,
+          "expanded_uncertainty": 0.005,
+          "confidence_level": 0.95,
+          "unit": "fraction",
+          "method_id": "method-availability",
+          "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
           "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
         }
       ],
@@ -270,6 +377,18 @@
           "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
         },
         {
+          "metric_id": "well_to_wake_ghg_per_cargo_work",
+          "value": 75,
+          "expanded_uncertainty": 0.5,
+          "confidence_level": 0.95,
+          "unit": "kgCO2e_per_1000_tonne_nm",
+          "method_id": "method-well_to_wake_ghg_per_cargo_work",
+          "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        {
           "metric_id": "acoustic_1khz",
           "value": 98,
           "expanded_uncertainty": 0.5,
@@ -282,6 +401,30 @@
           "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
         },
         {
+          "metric_id": "acoustic_2_5khz",
+          "value": 103,
+          "expanded_uncertainty": 0.5,
+          "confidence_level": 0.95,
+          "unit": "dB_re_1uPa_at_declared_reference",
+          "method_id": "method-acoustic_2_5khz",
+          "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        {
+          "metric_id": "acoustic_30_80khz",
+          "value": 116,
+          "expanded_uncertainty": 0.5,
+          "confidence_level": 0.95,
+          "unit": "dB_re_1uPa_at_declared_reference",
+          "method_id": "method-acoustic_30_80khz",
+          "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        {
           "metric_id": "lifecycle_cost",
           "value": 21,
           "expanded_uncertainty": 0.5,
@@ -291,6 +434,30 @@
           "raw_data_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
           "calibration_or_validation_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
           "timebase_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        {
+          "metric_id": "maintenance_hours_per_cargo_work",
+          "value": 7,
+          "expanded_uncertainty": 0.5,
+          "confidence_level": 0.95,
+          "unit": "hours_per_1000_tonne_nm",
+          "method_id": "method-maintenance_hours_per_cargo_work",
+          "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+        },
+        {
+          "metric_id": "availability",
+          "value": 0.97,
+          "expanded_uncertainty": 0.005,
+          "confidence_level": 0.95,
+          "unit": "fraction",
+          "method_id": "method-availability",
+          "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
           "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
         }
       ],
