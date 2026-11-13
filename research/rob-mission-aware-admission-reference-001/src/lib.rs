@@ -986,8 +986,7 @@ mod tests {
             .remaining_sufficient_ticks = Some(1);
         // The buffer and task deadline each have ten ticks of slack, but the
         // calibrated decision horizon has only one tick remaining.
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
         assert_eq!(
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::DecisionResultReturnsTooLate)
@@ -1004,8 +1003,7 @@ mod tests {
             .as_mut()
             .unwrap()
             .remaining_sufficient_ticks = Some(3);
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
         assert_eq!(report.admitted_request_ids, vec!["q1"]);
     }
 
