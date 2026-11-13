@@ -6,7 +6,7 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "U1 MPS core, exact charge-block split, global truncation receipts, mixed-canonical gauge sweeps, and TEBD integration of gauge-weighted global error contributions are source-authored. Exact-head Rust 1.96 harness pending.",
+  "execution_status": "U1 MPS storage, charge-block split, cutoff/bond-cap compression, mixed-canonical receipts, canonical-gauge weighted global TEBD error accounting, analytic U1 two-site Hamiltonian gates and second-order Strang stepper are source-authored. Exact-head Rust 1.96 harness pending.",
   "claim_ceiling": "No TEBD circuit scheduler, nonlocal MPO gates, large-N scaling or quantum advantage claim. Approximation diagnostics are local two-site split receipts only.",
   "conventions": {
     "physical_dimension": 2,
@@ -273,6 +273,46 @@
         "global_l2_bound_qualified"
       ],
       "claim_ceiling": "The code computes a conservative candidate bound; no global error claim is qualified until the new exact-head harness and dense sequential-circuit oracle tests pass."
+    },
+    "strang_tebd": {
+      "status": "source_authored_runner_pending",
+      "api": [
+        "U1TwoSiteHamiltonian::new(mu_left,mu_right,density_interaction,hopping)",
+        "U1TwoSiteHamiltonian::to_gate(time_step,tolerance)",
+        "U1TeBDStrangStepper::new(site_count,terms)",
+        "U1TeBDStrangStepper::step(input,time_step,truncation_policy)"
+      ],
+      "two_site_hamiltonian": {
+        "basis_order": [
+          "|00>",
+          "|01>",
+          "|10>",
+          "|11>"
+        ],
+        "formula": "H = mu_left*n_left + mu_right*n_right + V*n_left*n_right + h*|01><10| + conj(h)*|10><01|",
+        "gate_generation": "Analytic charge-sector exponential: Q=0 scalar, Q=1 Hermitian 2x2 closed form, Q=2 scalar.",
+        "hopping": "Complex hopping supports a Peierls phase and preserves total U(1) charge."
+      },
+      "composition": "even-bond exp(-i*dt*H_even/2), odd-bond exp(-i*dt*H_odd), even-bond exp(-i*dt*H_even/2)",
+      "diagnostics": [
+        "three ordered stage receipts",
+        "stage parity and time-step scale",
+        "stage bond order",
+        "per-stage gauge receipts",
+        "per-stage truncation receipts",
+        "per-stage local and global compression error bounds",
+        "input/output norm and total charge",
+        "step-level accumulated local/global compression error bounds"
+      ],
+      "separation": "Global L2 field qualifies MPS compression error relative to the same Strang-discretized circuit; it does not include Trotter discretization error.",
+      "authored_tests": [
+        "two_site_hamiltonian_exponential_matches_complex_hopping_known_answer",
+        "two_site_hamiltonian_supports_complex_peierls_phase_and_rejects_invalid_data",
+        "strang_tebd_is_second_order_and_separates_truncation_error_from_trotter_error",
+        "strang_tebd_forward_then_reverse_step_recovers_input",
+        "strang_stepper_rejects_duplicate_and_out_of_range_hamiltonian_bonds"
+      ],
+      "benchmark": "Three-site one-excitation nearest-neighbour hopping chain: exact continuous-time analytic solution; compare 8 versus 16 steps at fixed total time and require global error ratio 3.5–4.5. This is a convergence control, not an industry performance claim."
     }
   },
   "known_answers": [
@@ -484,7 +524,13 @@
     "global TEBD bound omits exterior operator-norm amplification",
     "global TEBD bound remains qualified after one invalid gauge receipt",
     "gauge receipt is applied to a different bond or total-charge sector",
-    "global TEBD bound is claimed after implicit nonlinear renormalization"
+    "global TEBD bound is claimed after implicit nonlinear renormalization",
+    "Hamiltonian-to-gate matrix couples distinct total-excitation sectors",
+    "Hamiltonian exponential is non-unitary beyond tolerance",
+    "complex hopping phase is dropped or conjugated incorrectly",
+    "Strang stage sequence is not even-half/odd-full/even-half",
+    "Trotter discretization error is included in the MPS compression ledger",
+    "global compression error bound is claimed without a passing canonical-gauge receipt"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -545,7 +591,16 @@
     "tebd_gate_global_error_contribution",
     "tebd_cumulative_global_l2_error_upper_bound",
     "tebd_global_error_qualified",
-    "tebd_failed_gauge_receipt_count"
+    "tebd_failed_gauge_receipt_count",
+    "hamiltonian_bond_parameters",
+    "complex_hopping_real",
+    "complex_hopping_imag",
+    "strang_time_step",
+    "strang_stage_order",
+    "strang_stage_parity",
+    "strang_stage_time_step_scale",
+    "strang_trotter_convergence_error",
+    "strang_mps_compression_error_bound"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
