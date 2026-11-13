@@ -1,0 +1,202 @@
+{
+  "campaign_id": "ASSB-LOW-PRESSURE-001",
+  "evidence": [
+    {
+      "evidence_id": "E-HIGH",
+      "source_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evidence_class": "synthetic",
+      "admission": "admitted_for_evaluation",
+      "claim_scope": "synthetic high-pressure observation",
+      "metrology_ref": null,
+      "rights_ref": "SYNTHETIC-ONLY-NO-PRODUCTION-DATA"
+    },
+    {
+      "evidence_id": "E-LOW",
+      "source_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "evidence_class": "synthetic",
+      "admission": "admitted_for_evaluation",
+      "claim_scope": "synthetic low-pressure observation",
+      "metrology_ref": null,
+      "rights_ref": "SYNTHETIC-ONLY-NO-PRODUCTION-DATA"
+    },
+    {
+      "evidence_id": "E-SYM",
+      "source_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "evidence_class": "synthetic",
+      "admission": "admitted_for_evaluation",
+      "claim_scope": "synthetic symmetric-cell observation",
+      "metrology_ref": null,
+      "rights_ref": "SYNTHETIC-ONLY-NO-PRODUCTION-DATA"
+    }
+  ],
+  "observations": [
+    {
+      "observation_id": "HIGH-P",
+      "design": {
+        "design_id": "ASSB-SULFIDE-DESIGN-A",
+        "revision": "r1",
+        "technology_lane": "sulfide_lithium_metal",
+        "chemistry_family": "Li-metal|NMC811",
+        "electrolyte_family": "sulfide-composite",
+        "cathode_family": "NMC811",
+        "anode_configuration": "lithium-metal|porous-carbon-current-collector",
+        "cell_format": "pouch",
+        "test_level": "full_cell",
+        "areal_capacity_mah_cm2": 2.4,
+        "cathode_loading_mg_cm2": 20,
+        "electrolyte_thickness_um": 35,
+        "temperature_c": 25,
+        "current_density_ma_cm2": 0.24,
+        "voltage_window": "2.8-4.3V",
+        "cycle_protocol": "0.1C-charge-discharge-r1"
+      },
+      "pressure": {
+        "fabrication_pressure_mpa": 100,
+        "operating_pressure_mpa": 5,
+        "measurement_method": "calibrated load-cell fixture",
+        "instrument_ref": "PRESSURE-MET-01",
+        "uncertainty_mpa": 0.05
+      },
+      "mass_inventory": {
+        "cathode_active_mg": 100,
+        "anode_active_mg": 10,
+        "electrolyte_mg": 35,
+        "separator_or_support_mg": 8,
+        "current_collectors_and_tabs_mg": 18,
+        "casing_and_seals_mg": 27,
+        "declared_full_cell_mass_mg": 220,
+        "closure_tolerance_mg": 0.1,
+        "boundary_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+        "cathode_inactive_mg": 20,
+        "anode_inactive_mg": 2,
+        "declared_full_cell_volume_cm3": 1.2,
+        "volume_boundary_digest": "8888888888888888888888888888888888888888888888888888888888888888"
+      },
+      "cycles_observed": 100,
+      "outcome_status": "synthetic_outcome",
+      "event_cycle": 90,
+      "capacity_retention_permille": 950,
+      "impedance_growth_permille": 120,
+      "evidence_id": "E-HIGH",
+      "cell_id": "CELL-HIGH-P",
+      "batch_id": "BATCH-001",
+      "manufacturing_line": "PILOT-LINE-01",
+      "process_revision": "PROCESS-R1"
+    },
+    {
+      "observation_id": "LOW-P",
+      "design": {
+        "design_id": "ASSB-SULFIDE-DESIGN-A",
+        "revision": "r1",
+        "technology_lane": "sulfide_lithium_metal",
+        "chemistry_family": "Li-metal|NMC811",
+        "electrolyte_family": "sulfide-composite",
+        "cathode_family": "NMC811",
+        "anode_configuration": "lithium-metal|porous-carbon-current-collector",
+        "cell_format": "pouch",
+        "test_level": "full_cell",
+        "areal_capacity_mah_cm2": 2.4,
+        "cathode_loading_mg_cm2": 20,
+        "electrolyte_thickness_um": 35,
+        "temperature_c": 25,
+        "current_density_ma_cm2": 0.24,
+        "voltage_window": "2.8-4.3V",
+        "cycle_protocol": "0.1C-charge-discharge-r1"
+      },
+      "pressure": {
+        "fabrication_pressure_mpa": 100,
+        "operating_pressure_mpa": 0.3,
+        "measurement_method": "calibrated load-cell fixture",
+        "instrument_ref": "PRESSURE-MET-01",
+        "uncertainty_mpa": 0.05
+      },
+      "mass_inventory": {
+        "cathode_active_mg": 100,
+        "anode_active_mg": 10,
+        "electrolyte_mg": 35,
+        "separator_or_support_mg": 8,
+        "current_collectors_and_tabs_mg": 18,
+        "casing_and_seals_mg": 27,
+        "declared_full_cell_mass_mg": 220,
+        "closure_tolerance_mg": 0.1,
+        "boundary_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+        "cathode_inactive_mg": 20,
+        "anode_inactive_mg": 2,
+        "declared_full_cell_volume_cm3": 1.2,
+        "volume_boundary_digest": "8888888888888888888888888888888888888888888888888888888888888888"
+      },
+      "cycles_observed": 100,
+      "outcome_status": "synthetic_outcome",
+      "event_cycle": 90,
+      "capacity_retention_permille": 950,
+      "impedance_growth_permille": 120,
+      "evidence_id": "E-LOW",
+      "cell_id": "CELL-LOW-P",
+      "batch_id": "BATCH-001",
+      "manufacturing_line": "PILOT-LINE-01",
+      "process_revision": "PROCESS-R1"
+    },
+    {
+      "observation_id": "SYM",
+      "design": {
+        "design_id": "ASSB-SULFIDE-SYM",
+        "revision": "r1",
+        "technology_lane": "sulfide_lithium_metal",
+        "chemistry_family": "Li-metal|NMC811",
+        "electrolyte_family": "sulfide-composite",
+        "cathode_family": "NMC811",
+        "anode_configuration": "lithium-metal|porous-carbon-current-collector",
+        "cell_format": "pouch",
+        "test_level": "symmetric_cell",
+        "areal_capacity_mah_cm2": 2.4,
+        "cathode_loading_mg_cm2": 20,
+        "electrolyte_thickness_um": 35,
+        "temperature_c": 25,
+        "current_density_ma_cm2": 0.24,
+        "voltage_window": "2.8-4.3V",
+        "cycle_protocol": "0.1C-charge-discharge-r1"
+      },
+      "pressure": {
+        "fabrication_pressure_mpa": 100,
+        "operating_pressure_mpa": 5,
+        "measurement_method": "calibrated load-cell fixture",
+        "instrument_ref": "PRESSURE-MET-01",
+        "uncertainty_mpa": 0.05
+      },
+      "mass_inventory": null,
+      "cycles_observed": 100,
+      "outcome_status": "synthetic_outcome",
+      "event_cycle": 90,
+      "capacity_retention_permille": 950,
+      "impedance_growth_permille": 120,
+      "evidence_id": "E-SYM",
+      "cell_id": "CELL-SYM",
+      "batch_id": "BATCH-001",
+      "manufacturing_line": "PILOT-LINE-01",
+      "process_revision": "PROCESS-R1"
+    }
+  ],
+  "comparisons": [
+    {
+      "comparison_id": "HIGH-VS-LOW-P",
+      "baseline_observation_id": "HIGH-P",
+      "candidate_observation_id": "LOW-P",
+      "matched_axes": [
+        "technology_lane",
+        "chemistry_family",
+        "electrolyte_family",
+        "cathode_family",
+        "anode_configuration",
+        "cell_format",
+        "test_level",
+        "areal_capacity",
+        "cathode_loading",
+        "electrolyte_thickness",
+        "temperature",
+        "current_density",
+        "voltage_window",
+        "cycle_protocol"
+      ]
+    }
+  ]
+}
