@@ -1,0 +1,103 @@
+{
+  "schema_version": "0.1.0",
+  "portfolio_id": "LUMINOUS_PLASMA_NEXT_GENERATION_2026_11_13",
+  "generated_date": "2026-11-13",
+  "claim_ceiling": "RESEARCH_PORTFOLIO_MAP_NOT_A_DEVICE_QUALIFICATION_OR_SUPERIORITY_CLAIM",
+  "shared_differentiation_hypothesis": "Downstream-outcome-qualified plasma processes with material-aware transfer, complete service-boundary economics and independently reproduced evidence. Sensorization, modularity, multi-head control and routine process monitoring are existing industry capabilities.",
+  "common_proposed_targets": {
+    "lifecycle_cost_or_energy_per_accepted_service_improvement_fraction": 0.25,
+    "spatial_process_output_cv_upper_bound": 0.05,
+    "number_up_efficiency_minimum": 0.9,
+    "model_guided_experiment_budget_reduction_fraction": 0.25,
+    "held_out_validation_required": true,
+    "targets_are_achieved_results": false
+  },
+  "tracks": [
+    {
+      "id": "PLASMA-SURFACE-001",
+      "priority": "P0",
+      "issue": 11795,
+      "pr": 11815,
+      "service_unit": "accepted bonded area meeting adhesion, bondability-window and substrate-preservation criteria",
+      "sota_anchor": "Industrial inline plasma systems with process control, multi-jet automation and monitored power/flow/optics",
+      "primary_gap": "downstream bond performance prediction and transfer to new material lots/devices; lifecycle cost per accepted bonded area",
+      "evidence_ceiling": "no physical reproduction"
+    },
+    {
+      "id": "PLASMA-ML-GENERALIZATION-001",
+      "priority": "P0_ENABLER",
+      "issue": 11839,
+      "pr": 11842,
+      "service_unit": "decision quality per experimental budget",
+      "sota_anchor": "2026 stacked AdaBoost/RandomForest wettability model with reported R2 0.9079 on relative reduction",
+      "primary_gap": "study/lab/device/material holdouts, calibration, lawful raw data access and augmentation-split audit",
+      "evidence_ceiling": "synthetic split-integrity only"
+    },
+    {
+      "id": "PLASMA-CFRP-METAL-001",
+      "priority": "P1_LONG_CYCLE",
+      "issue": 11838,
+      "pr": 11840,
+      "service_unit": "accepted conductive coating area meeting adhesion, electrical continuity and laminate preservation criteria",
+      "sota_anchor": "2026 CFRP/arc-sprayed zinc plasma paper reports 4.21 ± 0.12 MPa maximum pull-off result and +84% vs untreated",
+      "primary_gap": "source test-method reconstruction, coating electrical function, substrate preservation, aging and LSP boundary",
+      "evidence_ceiling": "literature only"
+    },
+    {
+      "id": "PLASMA-ARRAY-SCALEOUT-001",
+      "priority": "P0_PLATFORM",
+      "issue": 4926,
+      "pr": 4929,
+      "repo": "symtropy",
+      "service_unit": "accepted per-cell useful process output under full array boundary",
+      "sota_anchor": "published five-cell individually ignited RF array and 43-element LTCC CAP array",
+      "primary_gap": "cross-talk coverage, expected metric calculation, shared-manifold/common-cause faults and real array qualification",
+      "evidence_ceiling": "synthetic replay"
+    },
+    {
+      "id": "PLASMA-AIR-DBD-001",
+      "priority": "P2",
+      "issue": 11804,
+      "service_unit": "post-abatement clean-air delivery at specified aerosol/organism condition",
+      "sota_anchor": "2026 GAPS report up to 4.5-log E. coli bioaerosol reduction at 12.5 L/min; approx 9 ppm preliminary outlet ozone",
+      "primary_gap": "ozone/NOx abatement, wall-plug EEO, realistic CADR and matched HEPA/UV comparison",
+      "evidence_ceiling": "source paper only"
+    },
+    {
+      "id": "PLASMA-WATER-QUAL-001",
+      "priority": "P2",
+      "issue": 11805,
+      "service_unit": "contaminant-specific conforming water volume after by-product/toxicity requirements",
+      "sota_anchor": "2026 flexible coplanar DBD reports >5-log E. coli reduction in 800 mL/5 min and 3.64e6 CFU/J source-defined metric",
+      "primary_gap": "mineralization, transformation products/toxicity, real matrix, catalyst stability, full-system energy",
+      "evidence_ceiling": "source paper / review only"
+    },
+    {
+      "id": "MICROPROP-001",
+      "priority": "SEPARATE_PHYSICS",
+      "issue": 4912,
+      "repo": "symtropy",
+      "service_unit": "mission delta-v / total impulse per full propulsion-system mass, volume and energy",
+      "sota_anchor": "NASA 2026 small-spacecraft propulsion survey and mission heritage",
+      "primary_gap": "system reliability, feed, plume, endurance and mission-level comparability",
+      "evidence_ceiling": "separate propulsion qualification"
+    }
+  ],
+  "no_longer_novel_by_itself": [
+    "modular or multi-head plasma architecture",
+    "inline treatment",
+    "optical emission / plasma glow monitoring",
+    "power, voltage, gas flow, pressure, temperature and rotation monitoring",
+    "recipe logging and fieldbus connectivity",
+    "predictive maintenance from process telemetry"
+  ],
+  "evidence_rules": {
+    "synthetic_never_becomes_measured": true,
+    "discharge_power_never_equals_wall_plug_energy": true,
+    "contact_angle_never_equals_adhesion": true,
+    "pull_off_adhesion_never_equals_lsp_compliance": true,
+    "source_reported_result_never_equals_luminous_reproduction": true,
+    "unknown_never_becomes_zero": true,
+    "all_attempts_keep_terminal_disposition": true
+  }
+}
