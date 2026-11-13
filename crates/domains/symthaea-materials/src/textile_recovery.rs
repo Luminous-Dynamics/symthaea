@@ -57,6 +57,8 @@ pub enum EvidenceKind {
     ChemicalRecyclingTrial,
     /// Physical downcycling process trial.
     DowncyclingTrial,
+    /// Physical inspection binding a specimen to a versioned design dossier.
+    DesignRevisionConformity,
     /// Acceptance/rejection decision by the downstream receiving process.
     DownstreamAcceptance,
 }
@@ -215,6 +217,21 @@ impl MassBalance {
     }
 }
 
+/// Exact design revision and specimen binding for a physical process trial.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DesignRevisionBinding {
+    /// Product ID from the static textile design dossier.
+    pub product_id: String,
+    /// Exact design revision tested.
+    pub design_revision: String,
+    /// SHA-256 digest of the exact design dossier bytes.
+    pub dossier_sha256: String,
+    /// Physical specimen/item identity used in this process trial.
+    pub specimen_id: String,
+    /// Inspection evidence that this specimen conforms to the declared design revision.
+    pub conformity_evidence: EvidenceRef,
+}
+
 /// Evidence that a route was physically trialled on identified material.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProcessTrialEvidence {
@@ -222,6 +239,8 @@ pub struct ProcessTrialEvidence {
     pub outcome: TrialOutcome,
     /// Physical process-trial artifact.
     pub evidence: EvidenceRef,
+    /// Optional exact design revision binding for a trial on a designed product.
+    pub design_binding: Option<DesignRevisionBinding>,
     /// Required mass accounting for destructive routes.
     pub mass_balance: Option<MassBalance>,
 }
@@ -364,6 +383,8 @@ pub enum RouteReason {
     ProcessTrialUnknown,
     /// Process trial evidence has the wrong role or tier.
     InvalidProcessTrialEvidence,
+    /// Design dossier/specimen/revision binding is malformed or lacks conformity evidence.
+    InvalidDesignRevisionBinding,
     /// Destructive route has no measured mass balance.
     MissingMassBalance,
     /// Mass balance does not close within measurement uncertainty/policy.
