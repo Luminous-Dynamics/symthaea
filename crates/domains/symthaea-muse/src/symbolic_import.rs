@@ -666,7 +666,8 @@ mod tests {
             parts: vec![crate::midi_measure_sidecar::MidiPartMeasureSidecarV1 {
                 part_id: "Piano".into(),
                 source_track_index: 0,
-                measures: vec![crate::midi_measure_sidecar::MidiMeasureSpanSidecarV1 {
+                measures:source_channel: None,
+                measures:measures: vec![crate::midi_measure_sidecar::MidiMeasureSpanSidecarV1 {
                     start_tick: 0,
                     end_tick: 1920,
                     kind: crate::barline_eval::MeasureKind::Regular,
@@ -720,7 +721,8 @@ mod tests {
             parts: vec![crate::midi_measure_sidecar::MidiPartMeasureSidecarV1 {
                 part_id: "Piano".into(),
                 source_track_index: 0,
-                measures: vec![crate::midi_measure_sidecar::MidiMeasureSpanSidecarV1 {
+                measures:source_channel: None,
+                measures:measures: vec![crate::midi_measure_sidecar::MidiMeasureSpanSidecarV1 {
                     start_tick: 0,
                     end_tick: 1920,
                     kind: crate::barline_eval::MeasureKind::Regular,
