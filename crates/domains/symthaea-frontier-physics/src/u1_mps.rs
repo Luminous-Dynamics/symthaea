@@ -1515,6 +1515,38 @@ impl ComplexU1Mps {
     }
 
     /// Contract the overlap <self|other> without dense expansion.
+
+    /// Compute the full-state L2 distance using norm and transfer-environment overlap.
+    ///
+    /// This avoids dense-vector expansion and is valid for finite open-boundary MPS.
+    pub fn distance_l2(
+        &self,
+        other: &Self,
+        tolerance: f64,
+    ) -> Result<f64, U1MpsError> {
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        if self.site_count() != other.site_count() {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+        let left_norm = self.norm_squared(tolerance)?;
+        let right_norm = other.norm_squared(tolerance)?;
+        let overlap = self.inner_product(other)?;
+        let scale = left_norm.max(right_norm).max(1.0);
+        if overlap.im.abs() > tolerance * scale {
+            return Err(U1MpsError::ComplexNormResidual {
+                imaginary_part: overlap.im.abs(),
+                tolerance: tolerance * scale,
+            });
+        }
+        let squared = left_norm + right_norm - 2.0 * overlap.re;
+        if squared < -tolerance * scale {
+            return Err(U1MpsError::NegativeNormSquared(squared));
+        }
+        Ok(squared.max(0.0).sqrt())
+    }
+
     pub fn inner_product(&self, other: &Self) -> Result<Complex64, U1MpsError> {
         if self.site_count() != other.site_count() {
             return Err(U1MpsError::TwoSiteShapeMismatch);
@@ -1739,6 +1771,12 @@ impl U1TwoSiteGate {
         self.charge_conservation_residual
     }
 
+    /// Frobenius residual between the supplied matrix and the block-Hermitian
+    /// U(1)-conserving Hamiltonian actually exponentiated.
+    pub fn projection_residual(&self) -> f64 {
+        self.projection_residual
+    }
+
     pub fn unitarity_residual(&self) -> f64 {
         self.unitarity_residual
     }
@@ -1782,6 +1820,7 @@ pub struct U1TwoSiteHamiltonian {
     matrix: [[Complex64; 4]; 4],
     hermiticity_residual: f64,
     charge_conservation_residual: f64,
+    projection_residual: f64,
 }
 
 impl U1TwoSiteHamiltonian {
@@ -1834,10 +1873,30 @@ impl U1TwoSiteHamiltonian {
             });
         }
 
+        let mut projected = [[Complex64::new(0.0, 0.0); 4]; 4];
+        projected[0][0] = Complex64::new(matrix[0][0].re, 0.0);
+        projected[3][3] = Complex64::new(matrix[3][3].re, 0.0);
+        projected[1][1] = Complex64::new(matrix[1][1].re, 0.0);
+        projected[2][2] = Complex64::new(matrix[2][2].re, 0.0);
+        let symmetric_coupling = 0.5 * (matrix[1][2] + matrix[2][1].conj());
+        projected[1][2] = symmetric_coupling;
+        projected[2][1] = symmetric_coupling.conj();
+        let projection_squared = (0_usize..4)
+            .flat_map(|row| (0_usize..4).map(move |column| (row, column)))
+            .map(|(row, column)| (matrix[row][column] - projected[row][column]).norm_sqr())
+            .sum::<f64>();
+        let projection_residual = projection_squared.sqrt();
+        if !projection_residual.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "two-site Hamiltonian projection residual",
+            ));
+        }
+
         Ok(Self {
             matrix,
             hermiticity_residual,
             charge_conservation_residual,
+            projection_residual,
         })
     }
 
@@ -1871,7 +1930,7 @@ impl U1TwoSiteHamiltonian {
         let h11 = self.matrix[3][3].re;
         let a = self.matrix[1][1].re;
         let d = self.matrix[2][2].re;
-        let coupling = self.matrix[1][2];
+        let coupling = 0.5 * (self.matrix[1][2] + self.matrix[2][1].conj());
         let midpoint = 0.5 * (a + d);
         let difference = 0.5 * (a - d);
         let frequency = (difference * difference + coupling.norm_sqr()).sqrt();
@@ -2910,8 +2969,53 @@ pub struct U1TeBDStrangStepper {
     site_count: usize,
     time_step: f64,
     tolerance: f64,
+    bond_hamiltonians: Vec<U1TwoSiteHamiltonian>,
     even_half_layer: U1TeBDLayer,
     odd_full_layer: U1TeBDLayer,
+}
+
+
+
+
+
+/// Error-budget receipt that keeps distinct numerical error sources separate.
+///
+/// This type intentionally does not manufacture a total physical error bound:
+/// the Richardson term is asymptotic, and f64 residuals are not interval-enclosed.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDErrorBudget {
+    pub hamiltonian_projection_residual_sum: f64,
+    pub canonicalization_rebase_l2_residual_sum: Option<f64>,
+    pub schmidt_truncation_l2_upper_bound: Option<f64>,
+    pub truncation_global_bound_qualified: bool,
+    pub measured_step_doubling_defect_l2: f64,
+    pub richardson_fine_trotter_error_estimate: Option<f64>,
+    pub richardson_estimate_qualified: bool,
+    pub total_physical_error_upper_bound: Option<f64>,
+    pub total_physical_error_qualified: bool,
+    pub unqualified_terms: Vec<&'static str>,
+}
+
+/// Richardson step-doubling diagnostic for a second-order Strang integrator.
+///
+/// measured_step_doubling_defect_l2 is the norm distance between one coarse
+/// step and two half steps. When all canonical-gauge truncation receipts qualify,
+/// the returned Richardson estimate includes the coarse and fine truncation
+/// contamination budget. It is an asymptotic estimator, not a formal Trotter
+/// theorem; it should be calibrated against exact small-chain solutions.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDStepDoublingResult {
+    pub state: ComplexU1Mps,
+    pub time_step: f64,
+    pub trotter_order: u8,
+    pub bond_hamiltonian_projection_residuals: Vec<f64>,
+    pub measured_step_doubling_defect_l2: f64,
+    pub coarse_truncation_error_upper_bound: Option<f64>,
+    pub fine_truncation_error_upper_bound: Option<f64>,
+    pub richardson_fine_trotter_error_estimate: Option<f64>,
+    pub richardson_estimate_qualified: bool,
+    pub truncation_contamination_included: bool,
+    pub error_budget: U1TeBDErrorBudget,
 }
 
 /// One second-order TEBD time step, with truncation and Trotter status separated.
@@ -2920,6 +3024,9 @@ pub struct U1TeBDStrangStepResult {
     pub state: ComplexU1Mps,
     pub time_step: f64,
     pub trotter_order: u8,
+    pub bond_hamiltonian_hermiticity_residuals: Vec<f64>,
+    pub bond_hamiltonian_charge_residuals: Vec<f64>,
+    pub bond_hamiltonian_projection_residuals: Vec<f64>,
     pub layers: Vec<U1TeBDLayerResult>,
     pub input_norm_squared: f64,
     pub output_norm_squared: f64,
@@ -2977,6 +3084,7 @@ impl U1TeBDStrangStepper {
             site_count,
             time_step,
             tolerance,
+            bond_hamiltonians,
             even_half_layer,
             odd_full_layer,
         })
@@ -2996,6 +3104,179 @@ impl U1TeBDStrangStepper {
 
     pub fn odd_full_layer(&self) -> &U1TeBDLayer {
         &self.odd_full_layer
+    }
+
+
+    /// Compare one step at dt against two steps at dt/2.
+    ///
+    /// The returned state is the two-half-step fine solution. The Richardson
+    /// estimate is (coarse_fine_defect + coarse_truncation_bound +
+    /// fine_truncation_bound) / 3, where the denominator is 2^p - 1 for
+    /// second order p=2. This is an asymptotic diagnostic, not a formal bound;
+    /// the added truncation terms prevent compression loss from being
+    /// misreported as Trotter error.
+    pub fn apply_with_step_doubling(
+        &self,
+        input: &ComplexU1Mps,
+        policy: U1TwoSiteTruncationPolicy,
+    ) -> Result<U1TeBDStepDoublingResult, U1MpsError> {
+        let coarse = self.apply(input, policy)?;
+        let half_stepper = Self::new(
+            self.bond_hamiltonians.clone(),
+            0.5 * self.time_step,
+            self.tolerance,
+        )?;
+        let fine_first = half_stepper.apply(input, policy)?;
+        let fine_second = half_stepper.apply(&fine_first.state, policy)?;
+        let defect = coarse
+            .state
+            .distance_l2(&fine_second.state, policy.tolerance)?;
+
+        let coarse_bound = coarse.global_truncation_l2_error_upper_bound;
+        let fine_bound = match (
+            fine_first.global_truncation_l2_error_upper_bound,
+            fine_second.global_truncation_l2_error_upper_bound,
+        ) {
+            (Some(first), Some(second)) => Some(first + second),
+            _ => None,
+        };
+
+        let layer_components = |layer: &U1TeBDLayerResult| -> Option<(f64, f64)> {
+            if !layer.global_l2_bound_qualified
+                || layer.gate_truncations.len() != layer.canonical_gauge_receipts.len()
+            {
+                return None;
+            }
+            let mut gauge_rebase = 0.0;
+            let mut truncation = 0.0;
+            for (diagnostics, receipt) in layer
+                .gate_truncations
+                .iter()
+                .zip(layer.canonical_gauge_receipts.iter())
+            {
+                if !receipt.qualifies(policy.tolerance) {
+                    return None;
+                }
+                gauge_rebase += receipt.state_reconstruction_l2_residual;
+                truncation += receipt.exterior_operator_norm_product_upper_bound()
+                    * diagnostics.discarded_weight.sqrt();
+            }
+            if gauge_rebase.is_finite() && truncation.is_finite() {
+                Some((gauge_rebase, truncation))
+            } else {
+                None
+            }
+        };
+
+        let aggregate_components = |layers: &[U1TeBDLayerResult]| -> Option<(f64, f64)> {
+            let mut gauge_rebase = 0.0;
+            let mut truncation = 0.0;
+            for layer in layers {
+                let (gauge, compressed) = layer_components(layer)?;
+                gauge_rebase += gauge;
+                truncation += compressed;
+            }
+            if gauge_rebase.is_finite() && truncation.is_finite() {
+                Some((gauge_rebase, truncation))
+            } else {
+                None
+            }
+        };
+
+        let coarse_components = aggregate_components(&coarse.layers);
+        let fine_first_components = aggregate_components(&fine_first.layers);
+        let fine_second_components = aggregate_components(&fine_second.layers);
+        let truncation_global_bound_qualified = coarse_components.is_some()
+            && fine_first_components.is_some()
+            && fine_second_components.is_some();
+        let canonicalization_rebase_l2_residual_sum = if truncation_global_bound_qualified {
+            Some(
+                coarse_components.unwrap_or((0.0, 0.0)).0
+                    + fine_first_components.unwrap_or((0.0, 0.0)).0
+                    + fine_second_components.unwrap_or((0.0, 0.0)).0,
+            )
+        } else {
+            None
+        };
+        let schmidt_truncation_l2_upper_bound = if truncation_global_bound_qualified {
+            Some(
+                coarse_components.unwrap_or((0.0, 0.0)).1
+                    + fine_first_components.unwrap_or((0.0, 0.0)).1
+                    + fine_second_components.unwrap_or((0.0, 0.0)).1,
+            )
+        } else {
+            None
+        };
+
+        let richardson_estimate_qualified = truncation_global_bound_qualified
+            && coarse.global_truncation_bound_qualified
+            && fine_first.global_truncation_bound_qualified
+            && fine_second.global_truncation_bound_qualified
+            && coarse_bound.is_some()
+            && fine_bound.is_some();
+
+        let richardson_fine_trotter_error_estimate = if richardson_estimate_qualified {
+            let combined = defect + coarse_bound.unwrap_or(0.0) + fine_bound.unwrap_or(0.0);
+            if !combined.is_finite() {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "step-doubling Richardson error estimate",
+                ));
+            }
+            Some(combined / 3.0)
+        } else {
+            None
+        };
+
+        let hamiltonian_projection_residual_sum = self
+            .bond_hamiltonians
+            .iter()
+            .map(U1TwoSiteHamiltonian::projection_residual)
+            .sum::<f64>();
+        if !hamiltonian_projection_residual_sum.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "Hamiltonian projection residual budget",
+            ));
+        }
+        let mut unqualified_terms = vec![
+            "Richardson step-doubling value is asymptotic, not a formal Trotter upper theorem",
+            "f64 canonicalization and gate residuals are not interval-arithmetic enclosures",
+            "Hamiltonian projection residual is measured separately, not a total-evolution error bound",
+        ];
+        if !truncation_global_bound_qualified {
+            unqualified_terms.push(
+                "one or more canonical-gauge truncation receipts failed or did not match their gate",
+            );
+        }
+        let error_budget = U1TeBDErrorBudget {
+            hamiltonian_projection_residual_sum,
+            canonicalization_rebase_l2_residual_sum,
+            schmidt_truncation_l2_upper_bound,
+            truncation_global_bound_qualified,
+            measured_step_doubling_defect_l2: defect,
+            richardson_fine_trotter_error_estimate,
+            richardson_estimate_qualified,
+            total_physical_error_upper_bound: None,
+            total_physical_error_qualified: false,
+            unqualified_terms,
+        };
+
+        Ok(U1TeBDStepDoublingResult {
+            state: fine_second.state,
+            time_step: self.time_step,
+            trotter_order: 2,
+            bond_hamiltonian_projection_residuals: self
+                .bond_hamiltonians
+                .iter()
+                .map(U1TwoSiteHamiltonian::projection_residual)
+                .collect(),
+            measured_step_doubling_defect_l2: defect,
+            coarse_truncation_error_upper_bound: coarse_bound,
+            fine_truncation_error_upper_bound: fine_bound,
+            richardson_fine_trotter_error_estimate,
+            richardson_estimate_qualified,
+            truncation_contamination_included: coarse_bound.is_some() && fine_bound.is_some(),
+            error_budget,
+        })
     }
 
     /// Execute one even-half / odd-full / even-half second-order step.
@@ -3055,6 +3336,21 @@ impl U1TeBDStrangStepper {
             state,
             time_step: self.time_step,
             trotter_order: 2,
+            bond_hamiltonian_hermiticity_residuals: self
+                .bond_hamiltonians
+                .iter()
+                .map(U1TwoSiteHamiltonian::hermiticity_residual)
+                .collect(),
+            bond_hamiltonian_charge_residuals: self
+                .bond_hamiltonians
+                .iter()
+                .map(U1TwoSiteHamiltonian::charge_conservation_residual)
+                .collect(),
+            bond_hamiltonian_projection_residuals: self
+                .bond_hamiltonians
+                .iter()
+                .map(U1TwoSiteHamiltonian::projection_residual)
+                .collect(),
             layers,
             input_norm_squared,
             output_norm_squared,
@@ -4523,6 +4819,15 @@ mod tests {
             valid.real_time_gate(f64::INFINITY, 1.0e-12),
             Err(U1MpsError::InvalidTimeStep(_))
         ));
+
+        let mut slightly_leaking = *valid.matrix();
+        slightly_leaking[0][1] = Complex64::new(1.0e-13, 0.0);
+        slightly_leaking[1][0] = Complex64::new(1.0e-13, 0.0);
+        let projected = U1TwoSiteHamiltonian::new(slightly_leaking, 1.0e-12).unwrap();
+        assert!(projected.charge_conservation_residual() > 0.0);
+        assert!((projected.projection_residual() - 2.0_f64.sqrt() * 1.0e-13).abs() <= 1.0e-26);
+        let projected_gate = projected.real_time_gate(0.2, 1.0e-12).unwrap();
+        assert_eq!(projected_gate.charge_conservation_residual(), 0.0);
     }
 
     #[test]
@@ -4550,6 +4855,10 @@ mod tests {
         assert!(!forward.trotter_error_qualified);
         assert_eq!(forward.trotter_error_bound, None);
         assert_eq!(forward.layers.len(), 3);
+        assert_eq!(forward.bond_hamiltonian_hermiticity_residuals.len(), 1);
+        assert_eq!(forward.bond_hamiltonian_charge_residuals.len(), 1);
+        assert_eq!(forward.bond_hamiltonian_projection_residuals.len(), 1);
+        assert!(forward.bond_hamiltonian_projection_residuals[0] <= 1.0e-12);
         assert!(forward.layers[1].gate_truncations.is_empty());
         assert!(forward.layers[1].global_l2_bound_qualified);
         assert_eq!(
@@ -4577,6 +4886,31 @@ mod tests {
             dense_l2_distance(&input.to_dense(2).unwrap(), &recovered.state.to_dense(2).unwrap())
                 <= 1.0e-10
         );
+    }
+
+
+
+    fn exact_three_site_xy_state(
+        coupling_left: f64,
+        coupling_right: f64,
+        time: f64,
+    ) -> Vec<Complex64> {
+        let frequency =
+            (coupling_left * coupling_left + coupling_right * coupling_right).sqrt();
+        let cosine = (frequency * time).cos();
+        let sine = (frequency * time).sin();
+        let mut exact = vec![complex_zero(); 8];
+        exact[4] = Complex64::new(
+            1.0 + (cosine - 1.0) * coupling_left * coupling_left
+                / (frequency * frequency),
+            0.0,
+        );
+        exact[2] = Complex64::new(0.0, -sine * coupling_left / frequency);
+        exact[1] = Complex64::new(
+            (cosine - 1.0) * coupling_left * coupling_right / (frequency * frequency),
+            0.0,
+        );
+        exact
     }
 
     #[test]
@@ -4635,5 +4969,81 @@ mod tests {
         assert!((3.3..=4.8).contains(&ratio_coarse), "coarse ratio={ratio_coarse}");
         assert!((3.3..=4.8).contains(&ratio_fine), "fine ratio={ratio_fine}");
     }
+
+    #[test]
+    fn step_doubling_reports_qualified_richardson_estimate_against_exact_xy_state() {
+        let coupling_left = 0.7_f64;
+        let coupling_right = 0.4_f64;
+        let time_step = 0.4_f64;
+        let initial = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let policy = U1TwoSiteTruncationPolicy {
+            max_bond_dimension: 8,
+            relative_singular_value_cutoff: 0.0,
+            tolerance: 1.0e-10,
+        };
+        let stepper = U1TeBDStrangStepper::new(
+            vec![
+                xy_exchange_hamiltonian(coupling_left),
+                xy_exchange_hamiltonian(coupling_right),
+            ],
+            time_step,
+            1.0e-12,
+        )
+        .unwrap();
+        let result = stepper.apply_with_step_doubling(&initial, policy).unwrap();
+        assert_eq!(result.time_step, time_step);
+        assert_eq!(result.trotter_order, 2);
+        assert!(result.richardson_estimate_qualified);
+        assert!(result.truncation_contamination_included);
+        assert!(result.measured_step_doubling_defect_l2 > 0.0);
+        assert!(result.error_budget.truncation_global_bound_qualified);
+        assert!(result.error_budget.canonicalization_rebase_l2_residual_sum.is_some());
+        assert!(result.error_budget.schmidt_truncation_l2_upper_bound.is_some());
+        assert_eq!(result.error_budget.hamiltonian_projection_residual_sum, 0.0);
+        assert!(!result.error_budget.total_physical_error_qualified);
+        assert!(result.error_budget.total_physical_error_upper_bound.is_none());
+        assert!(!result.error_budget.unqualified_terms.is_empty());
+        let estimate = result
+            .richardson_fine_trotter_error_estimate
+            .expect("passing gauge receipts must enable a step-doubling estimate");
+        assert!(estimate >= result.measured_step_doubling_defect_l2 / 3.0);
+
+        let exact = exact_three_site_xy_state(coupling_left, coupling_right, time_step);
+        let measured_fine_error =
+            dense_l2_distance(&result.state.to_dense(4).unwrap(), &exact);
+        assert!(measured_fine_error <= estimate + 1.0e-9);
+        assert_eq!(result.state.total_charge(), 1);
+    }
+
+    #[test]
+    fn second_order_step_doubling_defect_scales_cubically_with_single_step_dt() {
+        let couplings = vec![xy_exchange_hamiltonian(0.7), xy_exchange_hamiltonian(0.4)];
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let policy = U1TwoSiteTruncationPolicy {
+            max_bond_dimension: 8,
+            relative_singular_value_cutoff: 0.0,
+            tolerance: 1.0e-10,
+        };
+        let coarse = U1TeBDStrangStepper::new(couplings.clone(), 0.4, 1.0e-12)
+            .unwrap()
+            .apply_with_step_doubling(&input, policy)
+            .unwrap();
+        let fine = U1TeBDStrangStepper::new(couplings, 0.2, 1.0e-12)
+            .unwrap()
+            .apply_with_step_doubling(&input, policy)
+            .unwrap();
+
+        assert!(coarse.richardson_estimate_qualified);
+        assert!(fine.richardson_estimate_qualified);
+        assert!(coarse.error_budget.total_physical_error_upper_bound.is_none());
+        assert!(fine.error_budget.total_physical_error_upper_bound.is_none());
+        let ratio =
+            coarse.measured_step_doubling_defect_l2 / fine.measured_step_doubling_defect_l2;
+        assert!(
+            (6.0..=10.0).contains(&ratio),
+            "single-step halving should scale the local defect near 2^3, ratio={ratio}"
+        );
+    }
+
 
 }
