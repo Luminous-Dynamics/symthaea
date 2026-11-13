@@ -2835,17 +2835,33 @@ impl U1TwoSiteHamiltonian {
         let mut matrix = [[Complex64::new(0.0, 0.0); 4]; 4];
         matrix[0][0] = Complex64::new(1.0, 0.0);
 
-        let mean = 0.5 * (self.mu_left + self.mu_right);
-        let half_difference = 0.5 * (self.mu_right - self.mu_left);
-        let radius = (half_difference * half_difference + self.hopping.norm_sqr()).sqrt();
+        // Half-scaled sums/differences avoid overflowing before scaling.
+        let mean = 0.5 * self.mu_left + 0.5 * self.mu_right;
+        let half_difference = 0.5 * self.mu_right - 0.5 * self.mu_left;
+        let hopping_magnitude = self.hopping.re.hypot(self.hopping.im);
+        let radius = half_difference.hypot(hopping_magnitude);
         let angle = time_step * radius;
+        let mean_angle = time_step * mean;
+        if !mean.is_finite()
+            || !half_difference.is_finite()
+            || !hopping_magnitude.is_finite()
+            || !radius.is_finite()
+            || !angle.is_finite()
+            || !mean_angle.is_finite()
+        {
+            return Err(U1MpsError::InvalidHamiltonianParameter(
+                "derived one-excitation energy scale",
+            ));
+        }
         let cosine = angle.cos();
-        let sine_over_radius = if radius > f64::EPSILON {
+        // Use the exact nonzero-radius branch even for radii below machine
+        // epsilon: a large finite dt can still make dt*radius appreciable.
+        let sine_over_radius = if radius > 0.0 {
             angle.sin() / radius
         } else {
             time_step
         };
-        let mean_phase = Complex64::new((time_step * mean).cos(), -(time_step * mean).sin());
+        let mean_phase = Complex64::new(mean_angle.cos(), -mean_angle.sin());
         let minus_i = Complex64::new(0.0, -1.0);
 
         matrix[1][1] = mean_phase
@@ -2857,9 +2873,15 @@ impl U1TwoSiteHamiltonian {
 
         let double_occupancy_energy =
             self.mu_left + self.mu_right + self.density_interaction;
+        let double_occupancy_angle = time_step * double_occupancy_energy;
+        if !double_occupancy_energy.is_finite() || !double_occupancy_angle.is_finite() {
+            return Err(U1MpsError::InvalidHamiltonianParameter(
+                "derived double-occupancy energy scale",
+            ));
+        }
         matrix[3][3] = Complex64::new(
-            (time_step * double_occupancy_energy).cos(),
-            -(time_step * double_occupancy_energy).sin(),
+            double_occupancy_angle.cos(),
+            -double_occupancy_angle.sin(),
         );
 
         U1TwoSiteGate::new(matrix, tolerance)
@@ -4460,6 +4482,55 @@ mod tests {
                 }
             ),
             Err(U1MpsError::InvalidTeBDTimeStep(_))
+        ));
+    }
+
+
+    #[test]
+    fn tiny_nonzero_hamiltonian_radius_uses_stable_exact_sinc_branch() {
+        let hopping = 1.0e-20;
+        let time_step = 1.0e20;
+        let hamiltonian = U1TwoSiteHamiltonian::new(
+            0.0,
+            0.0,
+            0.0,
+            Complex64::new(hopping, 0.0),
+        )
+        .unwrap();
+        let gate = hamiltonian.to_gate(time_step, 1.0e-12).unwrap();
+        let input = U1TwoSiteState::new(
+            vec![0],
+            vec![1],
+            vec![
+                complex_zero(),
+                Complex64::new(1.0, 0.0),
+                complex_zero(),
+                complex_zero(),
+            ],
+            1.0e-12,
+        )
+        .unwrap();
+        let output = input.apply_gate(&gate, 1.0e-12).unwrap();
+        let dense = output.to_dense_two_qubit().unwrap();
+        assert!((dense[1].re - 1.0_f64.cos()).abs() <= 1.0e-12);
+        assert!((dense[2].im + 1.0_f64.sin()).abs() <= 1.0e-12);
+        assert!(gate.unitarity_residual() <= 1.0e-12);
+    }
+
+    #[test]
+    fn hamiltonian_gate_rejects_finite_inputs_whose_derived_energy_overflows() {
+        let hamiltonian = U1TwoSiteHamiltonian::new(
+            f64::MAX,
+            f64::MAX,
+            f64::MAX,
+            complex_zero(),
+        )
+        .unwrap();
+        assert!(matches!(
+            hamiltonian.to_gate(1.0, 1.0e-12),
+            Err(U1MpsError::InvalidHamiltonianParameter(
+                "derived double-occupancy energy scale"
+            ))
         ));
     }
 
