@@ -1504,6 +1504,37 @@ mod tests {
     }
 
     #[test]
+    fn unknown_product_condition_remains_insufficient() {
+        let mut bundle = empty_bundle();
+        bundle.condition = Some(condition(ProductCondition::Unknown, UseSafetyStatus::Passed));
+        bundle.downstream_acceptance = Some(acceptance());
+        let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::InsufficientEvidence);
+        assert!(result.reasons.contains(&RouteReason::ProductConditionUnknown));
+    }
+
+    #[test]
+    fn unknown_use_safety_remains_insufficient() {
+        let mut bundle = empty_bundle();
+        bundle.condition = Some(condition(ProductCondition::Wearable, UseSafetyStatus::Unknown));
+        bundle.downstream_acceptance = Some(acceptance());
+        let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::InsufficientEvidence);
+        assert!(result.reasons.contains(&RouteReason::UseSafetyUnknown));
+    }
+
+    #[test]
+    fn downcycling_requires_physical_trial_mass_balance_and_receiver_acceptance() {
+        let mut bundle = empty_bundle();
+        bundle.process_trial = Some(process_trial(EvidenceKind::DowncyclingTrial, true));
+        bundle.downstream_acceptance = Some(acceptance());
+        assert_eq!(
+            qualify_recovery_route(RecoveryRoute::Downcycling, &bundle, &policy()).disposition,
+            RouteDisposition::Eligible
+        );
+    }
+
+    #[test]
     fn invalid_policy_cannot_promote_route() {
         let mut bundle = empty_bundle();
         bundle.condition = Some(condition(ProductCondition::Wearable, UseSafetyStatus::Passed));
