@@ -65,7 +65,7 @@ Other measure-level elements are not silently discarded. Directions (including d
 
 A signed `<offset>` is converted from divisions into exact rational quarter-note beats relative to the current measure cursor. The resulting position must remain inside the explicit measure span; malformed, overflowing or out-of-measure offsets withhold the complete event layer as Unknown. These are source-preservation events, not a claim that every direction or harmony element is executable during playback.
 
-Opaque source subtrees preserve ordered element children, attributes and trimmed text content. The current typed tree does not preserve the lexical interleaving of text nodes around child elements, comments, processing instructions, namespace prefixes or insignificant formatting. It is a structured semantic view, not a lossless XML serializer. The original uploaded XML remains the authoritative byte artifact.
+Opaque source subtrees preserve ordered element children, ordered attributes, exact text-node values and the lexical interleaving of text nodes with child elements. The typed tree does not preserve comments, processing instructions, namespace prefixes, entity spelling or insignificant formatting. It is a structured semantic view, not a lossless XML serializer. The original uploaded XML remains the authoritative byte artifact.
 
 ### Fail-closed and compatibility behavior
 
@@ -73,7 +73,7 @@ Opaque source subtrees preserve ordered element children, attributes and trimmed
 - Invalid divisions/durations, cursor underflow/overflow, unresolved chord anchors, offsets outside the explicit measure span and event/source-tree budget exhaustion produce Unknown.
 - A measure map can remain Supported while its notation-event layer is Unknown; consumers must read both status values independently.
 - Existing Score importer signatures and note-only MIDI metrics are unchanged.
-- New graph commitments include note/rest events, attribute events, auxiliary events and cursor moves.
+- New graph commitments include note/rest events, attribute events, auxiliary events and cursor moves, including ordered mixed content in retained source trees.
 - Import summaries report note-event, auxiliary-event, attribute-event and cursor-move counts, plus unpitched/cue/chord/time-modification counts. The overall summary becomes partially unknown if either the measure graph or notation-event layer is unresolved.
 - Old graph JSON without the field deserializes to a legacy Unknown sentinel; serialization skips the sentinel, keeping old graph commitment shape stable.
 - Replay validation projects newly parsed graphs back to the legacy shape when validating an old receipt. New receipts compare the full event layer, so tampering is rejected.
