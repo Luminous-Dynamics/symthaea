@@ -11,8 +11,10 @@ on:
       - "tools/mel-music-edit-adapter-harness/**"
       - "benchmarks/mel/registry/synthetic-music-edit-dataset-manifest-v1.json"
       - "benchmarks/mel/registry/synthetic-music-edit-capability-matrix-v1.json"
+      - "benchmarks/mel/registry/synthetic-music-edit-comparison-scope-v1.json"
       - "benchmarks/mel/schemas/music-edit-dataset-manifest-v1.schema.json"
       - "benchmarks/mel/schemas/music-edit-capability-matrix-v1.schema.json"
+      - "benchmarks/mel/schemas/music-edit-comparison-scope-v1.schema.json"
       - ".github/workflows/mel-benchmark-registry.yml"
   workflow_dispatch:
 
@@ -113,6 +115,7 @@ jobs:
           cp tools/mel-music-edit-adapter-harness/examples/validate_fixtures.rs "$staged/examples/validate_fixtures.rs"
           cp benchmarks/mel/registry/synthetic-music-edit-dataset-manifest-v1.json "$staged/fixtures/"
           cp benchmarks/mel/registry/synthetic-music-edit-capability-matrix-v1.json "$staged/fixtures/"
+          cp benchmarks/mel/registry/synthetic-music-edit-comparison-scope-v1.json "$staged/fixtures/"
           echo "MUSE_MUSIC_EDIT_ADAPTER_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
       - name: Check adapter harness formatting
         run: cargo +1.96.0 fmt --check --manifest-path "$MUSE_MUSIC_EDIT_ADAPTER_MANIFEST"
