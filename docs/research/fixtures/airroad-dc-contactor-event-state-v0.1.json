@@ -1,0 +1,199 @@
+{
+  "schema": "luminous.airroad.dc_fault_contactor_event_state.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_analytical_reference",
+  "pre_event_reference": {
+    "source_issue": 11825,
+    "configuration_digest": "sha256:synthetic-circuit-config-v0.1",
+    "topology_digest": "sha256:source-connected-topology-v0.1",
+    "event_id": "synthetic-source-contactor-open-001",
+    "event_time_s": {
+      "numerator": "1",
+      "denominator": "4"
+    },
+    "inductor_current_a": {
+      "lower": {
+        "numerator": "35417676570294412301827991287871",
+        "denominator": "2238854161337196046103064084480"
+      },
+      "upper": {
+        "numerator": "133943213211295239456991292377272929",
+        "denominator": "8466939373784305047080678719488000"
+      }
+    },
+    "capacitor_voltage_v": {
+      "lower": {
+        "numerator": "727353481508308483417434796794934193",
+        "denominator": "1552272218527122591964791098572800"
+      },
+      "upper": {
+        "numerator": "3524866871924879577457283825333576573",
+        "denominator": "7522549982092978714906295323852800"
+      }
+    }
+  },
+  "event": {
+    "event_type": "source_contactor_open",
+    "event_time_provenance": "synthetic_fixture_only_not_device_clearing_evidence",
+    "topology_before_digest": "sha256:source-connected-topology-v0.1",
+    "topology_after_digest": "sha256:source-isolated-commutated-topology-v0.1",
+    "configuration_digest": "sha256:synthetic-circuit-config-v0.1",
+    "reset_map": "identity_on_inductor_current_and_capacitor_voltage",
+    "inductor_current_continuity": true,
+    "capacitor_voltage_continuity": true,
+    "source_isolated_after_event": true,
+    "source_terminal_current_after_event_a": {
+      "numerator": "0",
+      "denominator": "1"
+    },
+    "commutation_path": {
+      "path_id": "synthetic-L1-Rcomm1-freewheel-loop",
+      "element_type": "declared_resistive_freewheel_path",
+      "resistance_ohm": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "closes_local_inductor_current_loop": true
+    },
+    "capacitor_discharge_path": {
+      "path_id": "synthetic-C1-Rf1-bus-discharge-loop",
+      "resistance_ohm": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "remains_connected_after_source_contactor_open": true
+    }
+  },
+  "post_event_mode": {
+    "elapsed_time_s": {
+      "numerator": "1",
+      "denominator": "4"
+    },
+    "inductor_h": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "commutation_resistance_ohm": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "capacitance_f": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "fault_resistance_ohm": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "inductor_decay_rate_per_s": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "capacitor_decay_rate_per_s": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "equations": [
+      "L*di_L/dt = -R_comm*i_L",
+      "C*dv_C/dt = -v_C/R_f",
+      "i_source_terminal = 0 after ideal source isolation"
+    ]
+  },
+  "taylor_bounds": {
+    "exp_minus_one_quarter": {
+      "lower_order": 13,
+      "lower": {
+        "numerator": "15497701382858599",
+        "denominator": "19899442475827200"
+      },
+      "upper_order": 12,
+      "upper": {
+        "numerator": "1251737419384733",
+        "denominator": "1607262661509120"
+      }
+    },
+    "exp_minus_one_half": {
+      "lower_order": 13,
+      "lower": {
+        "numerator": "30940193045449",
+        "denominator": "51011754393600"
+      },
+      "upper_order": 12,
+      "upper": {
+        "numerator": "47600296993",
+        "denominator": "78479622144"
+      }
+    }
+  },
+  "expected_enclosures": {
+    "post_event_inductor_current_a": {
+      "lower": {
+        "numerator": "548892575161090315362495673816259568029496752729",
+        "denominator": "44551949595295881959483500239684754898681856000"
+      },
+      "upper": {
+        "numerator": "167661732049205778933302493187808621295215596792957",
+        "denominator": "13608595512744923943987687345940070587233730560000"
+      }
+    },
+    "post_event_capacitor_voltage_v": {
+      "lower": {
+        "numerator": "11272307056198328799810255488737466912548488429175607",
+        "denominator": "30889351719405144825241893499514763396419420160000"
+      },
+      "upper": {
+        "numerator": "4412207761937984930408465732747371131497948002660009",
+        "denominator": "12090713705554143965619829911200601175580737536000"
+      }
+    },
+    "commutation_resistor_energy_j": {
+      "lower": {
+        "numerator": "38735390266582855102265918996949407959931425658649063970237955803995933791",
+        "denominator": "786753182350276834667328783705886671427017183392696515900815636116275200"
+      },
+      "upper": {
+        "numerator": "360099554023401920848317832357352087572649164170890394528473424194784592026579363191",
+        "denominator": "7313969683564147118605207644252384336926283115535885732745909749622295756800000000"
+      }
+    }
+  },
+  "negative_controls": [
+    {
+      "id": "silent-inductor-current-reset",
+      "expected": "reject_energy_loss"
+    },
+    {
+      "id": "silent-capacitor-voltage-reset",
+      "expected": "reject_energy_loss"
+    },
+    {
+      "id": "missing-commutation-path",
+      "expected": "not_evaluable"
+    },
+    {
+      "id": "source-remains-connected-after-open-event",
+      "expected": "reject_topology"
+    },
+    {
+      "id": "pre-post-configuration-identity-mismatch",
+      "expected": "not_evaluable"
+    },
+    {
+      "id": "nominal-delay-promoted-to-device-clearing-evidence",
+      "expected": "reject"
+    },
+    {
+      "id": "event-timebase-mismatch",
+      "expected": "not_evaluable"
+    },
+    {
+      "id": "energy-balance-fails",
+      "expected": "not_established"
+    }
+  ],
+  "claim_ceiling": [
+    "Synthetic ideal source-contactor mode transition only.",
+    "Inductor current commutates through a declared resistive loop; capacitor discharges through a declared fault resistance.",
+    "No real contactor interruption, arc, current chopping, transient recovery voltage, device timing, protection rating or aircraft qualification is established."
+  ]
+}
