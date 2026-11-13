@@ -1505,6 +1505,19 @@ mod tests {
         assert_eq!(fixture["candidates"][0]["evidence_kind"], "synthetic");
         assert_eq!(fixture["candidates"][1]["evidence_kind"], "synthetic");
         assert!(fixture["candidates"][0]["metrics"][0]["operating_point_receipt_sha256"].is_string());
+        assert_eq!(fixture["objectives"].as_array().unwrap().len(), 8);
         assert_eq!(fixture["hard_gates"].as_array().unwrap().iter().filter(|gate| gate["non_compensable"] == true).count(), 10);
+        let objective_ids: BTreeSet<String> = fixture["objectives"].as_array().unwrap()
+            .iter().map(|objective| objective["metric_id"].as_str().unwrap().to_string()).collect();
+        assert_eq!(objective_ids, [
+            "energy_per_cargo_work",
+            "well_to_wake_ghg_per_cargo_work",
+            "acoustic_1khz",
+            "acoustic_2_5khz",
+            "acoustic_30_80khz",
+            "lifecycle_cost",
+            "maintenance_hours_per_cargo_work",
+            "availability",
+        ].into_iter().map(str::to_string).collect());
     }
 }
