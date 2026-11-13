@@ -283,3 +283,9 @@ The first machine-readable development corpus is committed under `docs/research/
 The two corpus files are deliberately separate: the runner must pass only the selected solver-visible case to the subject. The evaluator file is public development material, not a hidden holdout. Validation performed during authoring: all six solver cases and all six evaluator cases passed their respective Draft 2020-12 schemas and both manifest digests matched the file bytes.
 
 The fixtures are specifications and test data, not an executable benchmark result. They contain synthetic records only and prohibit production credentials, live external effects, and physical actuation. A runner must still implement matched permissive positive controls, protected arms, one-safeguard ablations, independently observed semantic effects, and benign near-neighbor tests before any containment claim is made.
+
+## Domain-specific development overlays
+
+The six public core scenarios now have an engineering/PLM overlay in [PLM_CHANGE_AGENT_SECURITY_PROFILE_V0_1.md](xstack-v0.1/PLM_CHANGE_AGENT_SECURITY_PROFILE_V0_1.md) and its machine-readable companion. The overlays map indirect prompt injection, confidentiality egress, delegation/revocation, confused-deputy role substitution, correlated reviews and stale configuration into engineering change-request / BOM / CAD / supplier-evidence workflows.
+
+This adds no core scenario family and no second authority or evidence contract. All effects remain synthetic and mock-gateway-only; the Aras and Siemens workflows are documented threat surfaces, not executed integrations.
