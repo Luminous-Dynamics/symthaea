@@ -843,6 +843,8 @@ mod tests {
         let mut observation = valid_spectral();
         let mut composition = valid_composition();
         composition.components[0].fraction_ppm = 600_000;
+        composition.components[0].lower_bound_ppm = 550_000;
+        composition.components[0].upper_bound_ppm = 650_000;
         observation.composition = Some(composition);
         let result = assess_spectral_observation(
             &observation,
