@@ -1,0 +1,88 @@
+name: MUSE MusicXML Notation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/muse-musicxml-notation.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_notation_events.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs"
+      - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
+      - "crates/domains/symthaea-muse-protocol/src/lib.rs"
+      - "crates/domains/symthaea-muse-ui/src/add_music_page.rs"
+  push:
+    branches:
+      - "research/melothaea-musicxml-notation-events-v1"
+    paths:
+      - ".github/workflows/muse-musicxml-notation.yml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_notation_events.rs"
+      - "crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs"
+      - "crates/domains/symthaea-muse/src/bin/muse_studio.rs"
+      - "crates/domains/symthaea-muse-protocol/src/lib.rs"
+      - "crates/domains/symthaea-muse-ui/src/add_music_page.rs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-musicxml-notation-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  notation:
+    name: MusicXML notation-event qualification
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+          targets: wasm32-unknown-unknown
+
+      - name: Cache Cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-muse-musicxml-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-muse-musicxml-
+
+      - name: Check formatting of touched Rust modules
+        run: |
+          rustfmt --edition 2024 --check \
+            crates/domains/symthaea-muse/src/musicxml_notation_events.rs \
+            crates/domains/symthaea-muse/src/musicxml_barline_adapter.rs \
+            crates/domains/symthaea-muse/src/bin/muse_studio.rs \
+            crates/domains/symthaea-muse/src/lib.rs \
+            crates/domains/symthaea-muse-protocol/src/lib.rs \
+            crates/domains/symthaea-muse-ui/src/add_music_page.rs
+
+      - name: Test MusicXML notation-event parser
+        run: cargo test --locked -p symthaea-muse --features theory musicxml_notation_events::tests::
+
+      - name: Test MusicXML measure/barline graph and replay
+        run: cargo test --locked -p symthaea-muse --features theory musicxml_barline_adapter::tests::
+
+      - name: Test Muse Studio graph persistence and coverage summary
+        run: cargo test --locked -p symthaea-muse --features studio --bin muse_studio notation_summary_tests::
+
+      - name: Check Add Music UI for wasm
+        run: cargo check --locked -p symthaea-muse-ui --target wasm32-unknown-unknown
