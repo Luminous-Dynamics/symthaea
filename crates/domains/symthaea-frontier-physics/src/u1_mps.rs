@@ -491,7 +491,7 @@ mod tests {
         let inverse_root_two = 1.0 / 2.0_f64.sqrt();
 
         // Site 0: left charge 0; right charges 0 and 1.
-        let mut first = vec![Complex64::new(0.0, 0.0); 1 * 2 * 2];
+        let mut first = vec![Complex64::new(0.0, 0.0); 4];
         first[0] = Complex64::new(root_two_thirds, 0.0);
         first[3] = Complex64::new(root_one_third, 0.0);
         let first = U1MpsTensor::new(vec![0], vec![0, 1], first).unwrap();
