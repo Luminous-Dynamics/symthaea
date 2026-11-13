@@ -19,8 +19,9 @@
 //! check.
 //!
 //! This first implementation provides validated complex tensors, exact
-//! product-state construction, exact small-system dense expansion, and
-//! contraction-based norm evaluation. It does not yet implement two-site gate
+//! product-state construction, charge-block dense-to-MPS SVD factorization,
+//! exact small-system dense expansion, and contraction-based norm evaluation.
+//! It does not yet implement two-site gate
 //! application, charge-block SVD, TEBD, truncation or discarded-weight bounds.
 
 use nalgebra::DMatrix;
@@ -819,4 +820,61 @@ mod tests {
             Err(U1MpsError::DenseExpansionTooLarge { .. })
         ));
     }
+
+    #[test]
+    fn dense_fixed_charge_w_state_factorizes_by_charge_blocks_without_truncation() {
+        let amplitude = 1.0 / 3.0_f64.sqrt();
+        let mut dense = vec![Complex64::new(0.0, 0.0); 8];
+        dense[1] = Complex64::new(amplitude, 0.0);
+        dense[2] = Complex64::new(amplitude, 0.0);
+        dense[4] = Complex64::new(amplitude, 0.0);
+
+        let state = ComplexU1Mps::from_dense_fixed_charge(&dense, 3, 1, 1.0e-12).unwrap();
+        assert_eq!(state.total_charge(), 1);
+        assert!(state.maximum_bond_dimension() <= 2);
+        assert!((state.norm_squared(1.0e-12).unwrap() - 1.0).abs() <= 1.0e-10);
+
+        let reconstructed = state.to_dense(4).unwrap();
+        for index in 0..dense.len() {
+            assert!(
+                (reconstructed[index] - dense[index]).norm() <= 1.0e-10,
+                "basis={index}, reconstructed={:?}, expected={:?}",
+                reconstructed[index],
+                dense[index]
+            );
+        }
+    }
+
+    #[test]
+    fn dense_fixed_charge_product_state_factorizes_exactly() {
+        let mut dense = vec![Complex64::new(0.0, 0.0); 16];
+        dense[10] = Complex64::new(0.75, -0.25);
+        let state = ComplexU1Mps::from_dense_fixed_charge(&dense, 4, 2, 1.0e-12).unwrap();
+        assert_eq!(state.total_charge(), 2);
+        assert!((state.norm_squared(1.0e-12).unwrap() - 0.625).abs() <= 1.0e-12);
+        assert_eq!(state.to_dense(8).unwrap(), dense);
+    }
+
+    #[test]
+    fn dense_fixed_charge_factorization_rejects_charge_leakage_and_bad_dimensions() {
+        let mut dense = vec![Complex64::new(0.0, 0.0); 8];
+        dense[1] = Complex64::new(1.0 / 3.0_f64.sqrt(), 0.0);
+        dense[2] = Complex64::new(1.0 / 3.0_f64.sqrt(), 0.0);
+        dense[4] = Complex64::new(1.0 / 3.0_f64.sqrt(), 0.0);
+        dense[0] = Complex64::new(1.0e-3, 0.0);
+        assert!(matches!(
+            ComplexU1Mps::from_dense_fixed_charge(&dense, 3, 1, 1.0e-6),
+            Err(U1MpsError::DenseChargeLeakage { .. })
+        ));
+
+        assert!(matches!(
+            ComplexU1Mps::from_dense_fixed_charge(&dense[..7], 3, 1, 1.0e-12),
+            Err(U1MpsError::EntryCount { .. })
+        ));
+        assert!(matches!(
+            ComplexU1Mps::from_dense_fixed_charge(&dense, 3, 4, 1.0e-12),
+            Err(U1MpsError::InvalidTotalCharge { .. })
+        ));
+    }
+
 }
