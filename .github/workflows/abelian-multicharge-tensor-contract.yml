@@ -10,7 +10,7 @@ on:
       - .github/workflows/abelian-multicharge-tensor-contract.yml
   pull_request:
     branches:
-      - research/u1-tebd-step-doubling-error-estimator-20261113
+      - research/abelian-multicharge-tensor-contract-20261113
     paths:
       - crates/domains/symthaea-frontier-physics/src/abelian_mps.rs
       - crates/domains/symthaea-frontier-physics/src/lib.rs
