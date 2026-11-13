@@ -60,17 +60,31 @@ The next branch adds a validated local gate interface in \`src/u1_mps.rs\`.
 
 The operation is deliberately **pre-SVD**. It establishes the gate convention and charge-preserving contraction, not a full MPS circuit simulator. The next work is the charge-block two-site split, followed by per-sector and global truncation accounting.
 
+
+## Charge-block two-site split
+
+The gate branch is now extended by \`U1TwoSiteState::split_exact\`, which performs the inverse side of the local-gate contraction.
+
+For each intermediate charge \(q\):
+- Rows are grouped by \((q_\ell,s_1)\) with \(q=q_\ell+s_1\).
+- Columns are grouped by \((s_2,q_r)\) with \(q_r=q+s_2\).
+- A complex SVD is performed only inside that charge block.
+- Exact-zero singular directions are omitted as nullspace; every positive singular value is retained, including very small values.
+- The returned diagnostics include rank by charge, retained rank, exact-zero count and the max/L2 residual after re-contracting the two returned site tensors.
+
+This is the exact, untruncated SVD split required to implement TEBD. It still does not impose a bond cap or approximate cutoff. The next stage is a *separate* truncating split that must return discarded squared Schmidt weight, normalization change, bond-cap saturation and a conservative error ledger; do not mix that approximation into \`split_exact\`.
+
 ## Explicit limitations
 
 This increment does **not** yet implement:
-- Charge-sector two-site SVD splitting, canonical-form sweeps and per-gate truncation receipts.
+- Approximate/truncating two-site SVD with per-gate discarded-weight receipts.
 - TEBD gate sequencing and nonlocal MPO evolution.
 - TEBD or nonlocal MPO evolution.
 - Per-truncation discarded-weight accounting.
 - Cumulative state-vector / reduced-state error bounds.
 - Any N=16–64 scaling or matched Quimb/ITensor performance claim.
 
-Those are the next stages. The implementation should add them in this order: charge-sector two-site SVD split, global singular-value truncation policy, per-gate discarded-weight ledger, cumulative state-error bounds, then controlled scaling.
+Those are the next stages. The implementation should add them in this order: global singular-value truncation policy, per-gate discarded-weight ledger, cumulative state-error bounds, canonical-form sweeps, then controlled scaling.
 
 ## Competitive benchmark policy
 
