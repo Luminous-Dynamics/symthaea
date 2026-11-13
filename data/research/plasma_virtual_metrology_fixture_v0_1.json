@@ -58,7 +58,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-oes_relative"
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "forward_power",
@@ -70,7 +72,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.7,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-forward_power"
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "process_gas_flow",
@@ -82,7 +86,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-process_gas_flow"
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "head_temperature",
@@ -94,7 +100,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-head_temperature"
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         }
       ],
       "energy": {
@@ -109,7 +117,86 @@
           "controls",
           "standby_startup"
         ],
-        "complete": true
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "meter-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-standby_startup"
+          }
+        ]
       },
       "downstream_outcome": {
         "specimen_id": "specimen-aligned-heldout-valid",
@@ -129,10 +216,30 @@
         "probability_of_meeting_acceptance": 0.96,
         "predicted_disposition": "IN_SPEC",
         "training_scope": "SYNTHETIC_FIXTURE_ONLY",
-        "training_group_holdout_verified": true
+        "training_group_manifest": {
+          "manifest_id": "synthetic-training-group-manifest-v0",
+          "partition_receipt_digest": "sha256:synthetic-group-receipt-v0",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
       },
       "material_in_model_domain": true,
-      "expected_disposition": "PASS"
+      "expected_disposition": "PASS",
+      "run_timestamp_unix_ms": 1794528000000
     },
     {
       "scenario_id": "confident-false-accept",
@@ -154,7 +261,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-confident-false-accept-oes_relative"
+          "raw_trace_digest": "sha256:trace-confident-false-accept-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "forward_power",
@@ -166,7 +275,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.7,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-confident-false-accept-forward_power"
+          "raw_trace_digest": "sha256:trace-confident-false-accept-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "process_gas_flow",
@@ -178,7 +289,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-confident-false-accept-process_gas_flow"
+          "raw_trace_digest": "sha256:trace-confident-false-accept-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "head_temperature",
@@ -190,7 +303,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-confident-false-accept-head_temperature"
+          "raw_trace_digest": "sha256:trace-confident-false-accept-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         }
       ],
       "energy": {
@@ -205,7 +320,86 @@
           "controls",
           "standby_startup"
         ],
-        "complete": true
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "meter-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-standby_startup"
+          }
+        ]
       },
       "downstream_outcome": {
         "specimen_id": "specimen-confident-false-accept",
@@ -225,10 +419,30 @@
         "probability_of_meeting_acceptance": 0.99,
         "predicted_disposition": "IN_SPEC",
         "training_scope": "SYNTHETIC_FIXTURE_ONLY",
-        "training_group_holdout_verified": true
+        "training_group_manifest": {
+          "manifest_id": "synthetic-training-group-manifest-v0",
+          "partition_receipt_digest": "sha256:synthetic-group-receipt-v0",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
       },
       "material_in_model_domain": true,
-      "expected_disposition": "REJECTED"
+      "expected_disposition": "REJECTED",
+      "run_timestamp_unix_ms": 1794528000000
     },
     {
       "scenario_id": "uncalibrated-oes",
@@ -250,7 +464,9 @@
           "calibration_status": "UNKNOWN",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-uncalibrated-oes-oes_relative"
+          "raw_trace_digest": "sha256:trace-uncalibrated-oes-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "forward_power",
@@ -262,7 +478,9 @@
           "calibration_status": "UNKNOWN",
           "uncertainty": 0.7,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-uncalibrated-oes-forward_power"
+          "raw_trace_digest": "sha256:trace-uncalibrated-oes-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "process_gas_flow",
@@ -274,7 +492,9 @@
           "calibration_status": "UNKNOWN",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-uncalibrated-oes-process_gas_flow"
+          "raw_trace_digest": "sha256:trace-uncalibrated-oes-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "head_temperature",
@@ -286,7 +506,9 @@
           "calibration_status": "UNKNOWN",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-uncalibrated-oes-head_temperature"
+          "raw_trace_digest": "sha256:trace-uncalibrated-oes-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         }
       ],
       "energy": {
@@ -301,7 +523,86 @@
           "controls",
           "standby_startup"
         ],
-        "complete": true
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "meter-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-standby_startup"
+          }
+        ]
       },
       "downstream_outcome": {
         "specimen_id": "specimen-uncalibrated-oes",
@@ -321,10 +622,30 @@
         "probability_of_meeting_acceptance": 0.96,
         "predicted_disposition": "IN_SPEC",
         "training_scope": "SYNTHETIC_FIXTURE_ONLY",
-        "training_group_holdout_verified": true
+        "training_group_manifest": {
+          "manifest_id": "synthetic-training-group-manifest-v0",
+          "partition_receipt_digest": "sha256:synthetic-group-receipt-v0",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
       },
       "material_in_model_domain": true,
-      "expected_disposition": "BLOCKED"
+      "expected_disposition": "BLOCKED",
+      "run_timestamp_unix_ms": 1794528000000
     },
     {
       "scenario_id": "stale-sensor-clock",
@@ -346,7 +667,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-stale-sensor-clock-oes_relative"
+          "raw_trace_digest": "sha256:trace-stale-sensor-clock-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "forward_power",
@@ -358,7 +681,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.7,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-stale-sensor-clock-forward_power"
+          "raw_trace_digest": "sha256:trace-stale-sensor-clock-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "process_gas_flow",
@@ -370,7 +695,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-stale-sensor-clock-process_gas_flow"
+          "raw_trace_digest": "sha256:trace-stale-sensor-clock-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "head_temperature",
@@ -382,7 +709,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-stale-sensor-clock-head_temperature"
+          "raw_trace_digest": "sha256:trace-stale-sensor-clock-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         }
       ],
       "energy": {
@@ -397,7 +726,86 @@
           "controls",
           "standby_startup"
         ],
-        "complete": true
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "meter-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-standby_startup"
+          }
+        ]
       },
       "downstream_outcome": {
         "specimen_id": "specimen-stale-sensor-clock",
@@ -417,10 +825,30 @@
         "probability_of_meeting_acceptance": 0.96,
         "predicted_disposition": "IN_SPEC",
         "training_scope": "SYNTHETIC_FIXTURE_ONLY",
-        "training_group_holdout_verified": true
+        "training_group_manifest": {
+          "manifest_id": "synthetic-training-group-manifest-v0",
+          "partition_receipt_digest": "sha256:synthetic-group-receipt-v0",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
       },
       "material_in_model_domain": true,
-      "expected_disposition": "BLOCKED"
+      "expected_disposition": "BLOCKED",
+      "run_timestamp_unix_ms": 1794528000000
     },
     {
       "scenario_id": "configuration-mismatch",
@@ -442,7 +870,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-old",
-          "raw_trace_digest": "sha256:trace-configuration-mismatch-oes_relative"
+          "raw_trace_digest": "sha256:trace-configuration-mismatch-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "forward_power",
@@ -454,7 +884,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.7,
           "configuration_digest": "sha256:cfg-old",
-          "raw_trace_digest": "sha256:trace-configuration-mismatch-forward_power"
+          "raw_trace_digest": "sha256:trace-configuration-mismatch-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "process_gas_flow",
@@ -466,7 +898,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-old",
-          "raw_trace_digest": "sha256:trace-configuration-mismatch-process_gas_flow"
+          "raw_trace_digest": "sha256:trace-configuration-mismatch-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "head_temperature",
@@ -478,7 +912,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-old",
-          "raw_trace_digest": "sha256:trace-configuration-mismatch-head_temperature"
+          "raw_trace_digest": "sha256:trace-configuration-mismatch-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         }
       ],
       "energy": {
@@ -493,7 +929,86 @@
           "controls",
           "standby_startup"
         ],
-        "complete": true
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "meter-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-standby_startup"
+          }
+        ]
       },
       "downstream_outcome": {
         "specimen_id": "specimen-configuration-mismatch",
@@ -513,10 +1028,30 @@
         "probability_of_meeting_acceptance": 0.96,
         "predicted_disposition": "IN_SPEC",
         "training_scope": "SYNTHETIC_FIXTURE_ONLY",
-        "training_group_holdout_verified": true
+        "training_group_manifest": {
+          "manifest_id": "synthetic-training-group-manifest-v0",
+          "partition_receipt_digest": "sha256:synthetic-group-receipt-v0",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
       },
       "material_in_model_domain": true,
-      "expected_disposition": "REJECTED"
+      "expected_disposition": "REJECTED",
+      "run_timestamp_unix_ms": 1794528000000
     },
     {
       "scenario_id": "specimen-outcome-mismatch",
@@ -538,7 +1073,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-specimen-outcome-mismatch-oes_relative"
+          "raw_trace_digest": "sha256:trace-specimen-outcome-mismatch-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "forward_power",
@@ -550,7 +1087,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.7,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-specimen-outcome-mismatch-forward_power"
+          "raw_trace_digest": "sha256:trace-specimen-outcome-mismatch-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "process_gas_flow",
@@ -562,7 +1101,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-specimen-outcome-mismatch-process_gas_flow"
+          "raw_trace_digest": "sha256:trace-specimen-outcome-mismatch-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "head_temperature",
@@ -574,7 +1115,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-specimen-outcome-mismatch-head_temperature"
+          "raw_trace_digest": "sha256:trace-specimen-outcome-mismatch-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         }
       ],
       "energy": {
@@ -589,7 +1132,86 @@
           "controls",
           "standby_startup"
         ],
-        "complete": true
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "meter-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-standby_startup"
+          }
+        ]
       },
       "downstream_outcome": {
         "specimen_id": "different-specimen",
@@ -609,10 +1231,30 @@
         "probability_of_meeting_acceptance": 0.96,
         "predicted_disposition": "IN_SPEC",
         "training_scope": "SYNTHETIC_FIXTURE_ONLY",
-        "training_group_holdout_verified": true
+        "training_group_manifest": {
+          "manifest_id": "synthetic-training-group-manifest-v0",
+          "partition_receipt_digest": "sha256:synthetic-group-receipt-v0",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
       },
       "material_in_model_domain": true,
-      "expected_disposition": "REJECTED"
+      "expected_disposition": "REJECTED",
+      "run_timestamp_unix_ms": 1794528000000
     },
     {
       "scenario_id": "unsupported-material-profile",
@@ -634,7 +1276,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-unsupported-material-profile-oes_relative"
+          "raw_trace_digest": "sha256:trace-unsupported-material-profile-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "forward_power",
@@ -646,7 +1290,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.7,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-unsupported-material-profile-forward_power"
+          "raw_trace_digest": "sha256:trace-unsupported-material-profile-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "process_gas_flow",
@@ -658,7 +1304,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-unsupported-material-profile-process_gas_flow"
+          "raw_trace_digest": "sha256:trace-unsupported-material-profile-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "head_temperature",
@@ -670,7 +1318,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-unsupported-material-profile-head_temperature"
+          "raw_trace_digest": "sha256:trace-unsupported-material-profile-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         }
       ],
       "energy": {
@@ -685,7 +1335,86 @@
           "controls",
           "standby_startup"
         ],
-        "complete": true
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "meter-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-standby_startup"
+          }
+        ]
       },
       "downstream_outcome": {
         "specimen_id": "specimen-unsupported-material-profile",
@@ -705,10 +1434,30 @@
         "probability_of_meeting_acceptance": 0.96,
         "predicted_disposition": "IN_SPEC",
         "training_scope": "SYNTHETIC_FIXTURE_ONLY",
-        "training_group_holdout_verified": true
+        "training_group_manifest": {
+          "manifest_id": "synthetic-training-group-manifest-v0",
+          "partition_receipt_digest": "sha256:synthetic-group-receipt-v0",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
       },
       "material_in_model_domain": false,
-      "expected_disposition": "BLOCKED"
+      "expected_disposition": "BLOCKED",
+      "run_timestamp_unix_ms": 1794528000000
     },
     {
       "scenario_id": "incomplete-energy-boundary",
@@ -730,7 +1479,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-incomplete-energy-boundary-oes_relative"
+          "raw_trace_digest": "sha256:trace-incomplete-energy-boundary-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "forward_power",
@@ -742,7 +1493,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.7,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-incomplete-energy-boundary-forward_power"
+          "raw_trace_digest": "sha256:trace-incomplete-energy-boundary-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "process_gas_flow",
@@ -754,7 +1507,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-incomplete-energy-boundary-process_gas_flow"
+          "raw_trace_digest": "sha256:trace-incomplete-energy-boundary-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "head_temperature",
@@ -766,7 +1521,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-incomplete-energy-boundary-head_temperature"
+          "raw_trace_digest": "sha256:trace-incomplete-energy-boundary-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         }
       ],
       "energy": {
@@ -781,7 +1538,86 @@
           "controls",
           "standby_startup"
         ],
-        "complete": false
+        "complete": false,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "meter-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-standby_startup"
+          }
+        ]
       },
       "downstream_outcome": {
         "specimen_id": "specimen-incomplete-energy-boundary",
@@ -801,10 +1637,30 @@
         "probability_of_meeting_acceptance": 0.96,
         "predicted_disposition": "IN_SPEC",
         "training_scope": "SYNTHETIC_FIXTURE_ONLY",
-        "training_group_holdout_verified": true
+        "training_group_manifest": {
+          "manifest_id": "synthetic-training-group-manifest-v0",
+          "partition_receipt_digest": "sha256:synthetic-group-receipt-v0",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
       },
       "material_in_model_domain": true,
-      "expected_disposition": "BLOCKED"
+      "expected_disposition": "BLOCKED",
+      "run_timestamp_unix_ms": 1794528000000
     },
     {
       "scenario_id": "missing-downstream-outcome",
@@ -826,7 +1682,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-missing-downstream-outcome-oes_relative"
+          "raw_trace_digest": "sha256:trace-missing-downstream-outcome-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "forward_power",
@@ -838,7 +1696,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.7,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-missing-downstream-outcome-forward_power"
+          "raw_trace_digest": "sha256:trace-missing-downstream-outcome-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "process_gas_flow",
@@ -850,7 +1710,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-missing-downstream-outcome-process_gas_flow"
+          "raw_trace_digest": "sha256:trace-missing-downstream-outcome-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "head_temperature",
@@ -862,7 +1724,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-missing-downstream-outcome-head_temperature"
+          "raw_trace_digest": "sha256:trace-missing-downstream-outcome-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         }
       ],
       "energy": {
@@ -877,7 +1741,86 @@
           "controls",
           "standby_startup"
         ],
-        "complete": true
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "meter-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-standby_startup"
+          }
+        ]
       },
       "downstream_outcome": null,
       "model_prediction": {
@@ -890,10 +1833,30 @@
         "probability_of_meeting_acceptance": 0.96,
         "predicted_disposition": "IN_SPEC",
         "training_scope": "SYNTHETIC_FIXTURE_ONLY",
-        "training_group_holdout_verified": true
+        "training_group_manifest": {
+          "manifest_id": "synthetic-training-group-manifest-v0",
+          "partition_receipt_digest": "sha256:synthetic-group-receipt-v0",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
       },
       "material_in_model_domain": true,
-      "expected_disposition": "BLOCKED"
+      "expected_disposition": "BLOCKED",
+      "run_timestamp_unix_ms": 1794528000000
     },
     {
       "scenario_id": "model-holdout-unverified",
@@ -915,7 +1878,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-model-holdout-unverified-oes_relative"
+          "raw_trace_digest": "sha256:trace-model-holdout-unverified-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "forward_power",
@@ -927,7 +1892,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.7,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-model-holdout-unverified-forward_power"
+          "raw_trace_digest": "sha256:trace-model-holdout-unverified-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "process_gas_flow",
@@ -939,7 +1906,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-model-holdout-unverified-process_gas_flow"
+          "raw_trace_digest": "sha256:trace-model-holdout-unverified-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         },
         {
           "sensor_id": "head_temperature",
@@ -951,7 +1920,9 @@
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.02,
           "configuration_digest": "sha256:cfg-plasma-surface-r1",
-          "raw_trace_digest": "sha256:trace-model-holdout-unverified-head_temperature"
+          "raw_trace_digest": "sha256:trace-model-holdout-unverified-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
         }
       ],
       "energy": {
@@ -966,7 +1937,86 @@
           "controls",
           "standby_startup"
         ],
-        "complete": true
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "meter-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-standby_startup"
+          }
+        ]
       },
       "downstream_outcome": {
         "specimen_id": "specimen-model-holdout-unverified",
@@ -986,11 +2036,1034 @@
         "probability_of_meeting_acceptance": 0.96,
         "predicted_disposition": "IN_SPEC",
         "training_scope": "SYNTHETIC_FIXTURE_ONLY",
-        "training_group_holdout_verified": false
+        "training_group_manifest": null
       },
       "material_in_model_domain": true,
-      "expected_disposition": "BLOCKED"
+      "expected_disposition": "BLOCKED",
+      "run_timestamp_unix_ms": 1794528000000
+    },
+    {
+      "scenario_id": "training-group-overlap",
+      "service_profile_id": "PP_GRADE_A_ADHESIVE_A",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-training-group-overlap",
+      "specimen_id": "specimen-training-group-overlap",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 250,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "meter-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-standby_startup"
+          }
+        ]
+      },
+      "downstream_outcome": {
+        "specimen_id": "specimen-training-group-overlap",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 6.2,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          5.4,
+          6.9
+        ],
+        "probability_of_meeting_acceptance": 0.96,
+        "predicted_disposition": "IN_SPEC",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_manifest": {
+          "manifest_id": "synthetic-training-group-manifest-v0",
+          "partition_receipt_digest": "sha256:synthetic-group-receipt-v0",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02",
+            "PP-LOT-2026-11-A"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
+      },
+      "material_in_model_domain": true,
+      "expected_disposition": "REJECTED",
+      "run_timestamp_unix_ms": 1794528000000
+    },
+    {
+      "scenario_id": "future-dated-sensor",
+      "service_profile_id": "PP_GRADE_A_ADHESIVE_A",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-future-dated-sensor",
+      "specimen_id": "specimen-future-dated-sensor",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": -12000,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "meter-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-standby_startup"
+          }
+        ]
+      },
+      "downstream_outcome": {
+        "specimen_id": "specimen-future-dated-sensor",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 6.2,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          5.4,
+          6.9
+        ],
+        "probability_of_meeting_acceptance": 0.96,
+        "predicted_disposition": "IN_SPEC",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_manifest": {
+          "manifest_id": "synthetic-training-group-manifest-v0",
+          "partition_receipt_digest": "sha256:synthetic-group-receipt-v0",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
+      },
+      "material_in_model_domain": true,
+      "expected_disposition": "BLOCKED",
+      "run_timestamp_unix_ms": 1794528000000
+    },
+    {
+      "scenario_id": "expired-sensor-calibration",
+      "service_profile_id": "PP_GRADE_A_ADHESIVE_A",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-expired-sensor-calibration",
+      "specimen_id": "specimen-expired-sensor-calibration",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 250,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1794527999999
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "meter-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-standby_startup"
+          }
+        ]
+      },
+      "downstream_outcome": {
+        "specimen_id": "specimen-expired-sensor-calibration",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 6.2,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          5.4,
+          6.9
+        ],
+        "probability_of_meeting_acceptance": 0.96,
+        "predicted_disposition": "IN_SPEC",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_manifest": {
+          "manifest_id": "synthetic-training-group-manifest-v0",
+          "partition_receipt_digest": "sha256:synthetic-group-receipt-v0",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
+      },
+      "material_in_model_domain": true,
+      "expected_disposition": "BLOCKED",
+      "run_timestamp_unix_ms": 1794528000000
+    },
+    {
+      "scenario_id": "missing-energy-meter",
+      "service_profile_id": "PP_GRADE_A_ADHESIVE_A",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-missing-energy-meter",
+      "specimen_id": "specimen-missing-energy-meter",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 250,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.004,
+            "meter_id": "",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-standby_startup"
+          }
+        ]
+      },
+      "downstream_outcome": {
+        "specimen_id": "specimen-missing-energy-meter",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 6.2,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          5.4,
+          6.9
+        ],
+        "probability_of_meeting_acceptance": 0.96,
+        "predicted_disposition": "IN_SPEC",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_manifest": {
+          "manifest_id": "synthetic-training-group-manifest-v0",
+          "partition_receipt_digest": "sha256:synthetic-group-receipt-v0",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
+      },
+      "material_in_model_domain": true,
+      "expected_disposition": "BLOCKED",
+      "run_timestamp_unix_ms": 1794528000000
+    },
+    {
+      "scenario_id": "energy-subsystem-sum-mismatch",
+      "service_profile_id": "PP_GRADE_A_ADHESIVE_A",
+      "material_lot_id": "PP-LOT-2026-11-A",
+      "device_id": "plasma-head-01",
+      "production_day": "2026-11-13",
+      "process_run_id": "run-energy-subsystem-sum-mismatch",
+      "specimen_id": "specimen-energy-subsystem-sum-mismatch",
+      "configuration_digest": "sha256:cfg-plasma-surface-r1",
+      "telemetry": [
+        {
+          "sensor_id": "oes_relative",
+          "quantity": "relative_intensity",
+          "unit": "a.u.",
+          "value": 0.71,
+          "sample_offset_ms": 250,
+          "calibration_record_id": "cal-oes_relative-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-oes_relative",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "forward_power",
+          "quantity": "forward_power",
+          "unit": "W",
+          "value": 84,
+          "sample_offset_ms": 350,
+          "calibration_record_id": "cal-forward_power-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.7,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-forward_power",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "process_gas_flow",
+          "quantity": "gas_flow",
+          "unit": "L_per_min",
+          "value": 6.2,
+          "sample_offset_ms": 450,
+          "calibration_record_id": "cal-process_gas_flow-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-process_gas_flow",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        },
+        {
+          "sensor_id": "head_temperature",
+          "quantity": "head_temperature",
+          "unit": "degC",
+          "value": 37.5,
+          "sample_offset_ms": 550,
+          "calibration_record_id": "cal-head_temperature-v3",
+          "calibration_status": "QUALIFIED",
+          "uncertainty": 0.02,
+          "configuration_digest": "sha256:cfg-plasma-surface-r1",
+          "raw_trace_digest": "sha256:trace-aligned-heldout-valid-head_temperature",
+          "calibration_valid_from_unix_ms": 1794000000000,
+          "calibration_valid_until_unix_ms": 1795000000000
+        }
+      ],
+      "energy": {
+        "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+        "complete_system_energy_kwh": 0.014,
+        "included_subsystems": [
+          "power_conversion",
+          "gas_supply",
+          "cooling",
+          "extraction",
+          "motion",
+          "controls",
+          "standby_startup"
+        ],
+        "complete": true,
+        "subsystem_measurements": [
+          {
+            "subsystem_id": "power_conversion",
+            "energy_kwh": 0.009000000000000001,
+            "meter_id": "meter-power_conversion",
+            "calibration_record_id": "calibration-power_conversion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-power_conversion"
+          },
+          {
+            "subsystem_id": "gas_supply",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-gas_supply",
+            "calibration_record_id": "calibration-gas_supply",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-gas_supply"
+          },
+          {
+            "subsystem_id": "cooling",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-cooling",
+            "calibration_record_id": "calibration-cooling",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-cooling"
+          },
+          {
+            "subsystem_id": "extraction",
+            "energy_kwh": 0.002,
+            "meter_id": "meter-extraction",
+            "calibration_record_id": "calibration-extraction",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-extraction"
+          },
+          {
+            "subsystem_id": "motion",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-motion",
+            "calibration_record_id": "calibration-motion",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-motion"
+          },
+          {
+            "subsystem_id": "controls",
+            "energy_kwh": 0.001,
+            "meter_id": "meter-controls",
+            "calibration_record_id": "calibration-controls",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-controls"
+          },
+          {
+            "subsystem_id": "standby_startup",
+            "energy_kwh": 0.003,
+            "meter_id": "meter-standby_startup",
+            "calibration_record_id": "calibration-standby_startup",
+            "calibration_status": "QUALIFIED",
+            "calibration_valid_from_unix_ms": 1794000000000,
+            "calibration_valid_until_unix_ms": 1795000000000,
+            "uncertainty_kwh": 0.0001,
+            "raw_trace_digest": "sha256:synthetic-energy-standby_startup"
+          }
+        ]
+      },
+      "downstream_outcome": {
+        "specimen_id": "specimen-energy-subsystem-sum-mismatch",
+        "test_method": "ISO_4587_2003",
+        "bond_strength_mpa": 6.2,
+        "failure_mode": "COHESIVE",
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "model_prediction": {
+        "model_id": "synthetic-virtual-metrology-model-v0",
+        "evidence_class": "SYNTHETIC_MODEL_PREDICTION",
+        "predicted_bond_strength_interval_mpa": [
+          5.4,
+          6.9
+        ],
+        "probability_of_meeting_acceptance": 0.96,
+        "predicted_disposition": "IN_SPEC",
+        "training_scope": "SYNTHETIC_FIXTURE_ONLY",
+        "training_group_manifest": {
+          "manifest_id": "synthetic-training-group-manifest-v0",
+          "partition_receipt_digest": "sha256:synthetic-group-receipt-v0",
+          "grouping_dimensions": [
+            "material_lot_id",
+            "device_id",
+            "production_day"
+          ],
+          "training_material_lot_ids": [
+            "PP-TRAIN-LOT-01",
+            "PP-TRAIN-LOT-02"
+          ],
+          "training_device_ids": [
+            "plasma-head-training-02"
+          ],
+          "training_production_days": [
+            "2026-11-10",
+            "2026-11-11"
+          ]
+        }
+      },
+      "material_in_model_domain": true,
+      "expected_disposition": "REJECTED",
+      "run_timestamp_unix_ms": 1794528000000
     }
   ],
-  "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1"
+  "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1",
+  "required_holdout_dimensions": [
+    "material_lot_id",
+    "device_id",
+    "production_day"
+  ],
+  "minimum_in_spec_probability": 0.95
 }
