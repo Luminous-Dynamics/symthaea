@@ -159,13 +159,25 @@ Each bond Hamiltonian also reports its Hermiticity residual, charge-leakage resi
 
 A typed error-budget receipt keeps four sources separate: Hamiltonian projection, canonicalization rebase, Schmidt truncation, and the step-doubling/Richardson estimate. It deliberately leaves the total physical error upper bound empty and its qualification flag false. The Richardson term is asymptotic, not a formal Trotter theorem; f64 residuals are not interval-enclosed. This is an evidence-carrying budget, not yet a total physical-error certificate.
 
+## Product Abelian symmetries: U(1)^K charge vectors
+
+The new abelian_mps module establishes a generic charge-vector contract without changing the validated scalar-U(1) TEBD path.
+
+- AbelianCharge<K> stores K independent integer-valued conserved quantities with checked component-wise addition and subtraction.
+- AbelianChargeTensor<K> accepts an arbitrary local physical basis, with an explicit K-vector charge for every physical state, and enforces the component-wise selection rule \(q_R=q_L+q_s\).
+- AbelianMps<K> checks charge-zero left boundary, declared total-charge right boundary, and exact adjacent virtual-charge identity.
+- AbelianChargeBlockPlan<K> partitions a two-site tensor into independent intermediate charge-vector sectors: rows use \(q_M=q_L+q_{s_1}\), columns use \(q_M=q_R-q_{s_2}\).
+- The current two-component fixture uses \((N,2S^z)\): vacuum \((0,0)\), spin-up \((1,1)\), spin-down \((1,-1)\), and double occupancy \((2,0)\).
+
+This is a structural tensor contract and deterministic block planner, not yet a generic multi-charge SVD, truncation ledger, TEBD executor, or non-Abelian fusion implementation. The next step is to reuse the charge-block plan in a generic sector-wise SVD, then port the truncation receipts and the error-ledger machinery without weakening the scalar-U(1) qualification gates.
+
 ## Explicit limitations
 
 This increment does **not** yet implement:
 - A formal Trotter error theorem or commutator-norm bound; the new step-doubling quantity is an asymptotic Richardson estimate calibrated against known-answer cases, not a rigorous bound.
 - Adaptive time-step control driven by a separately allocated total-error budget.
 - Higher-order Suzuki compositions (fourth and above) or a Trotter-versus-truncation global error budget.
-- Nonlocal MPO evolution, periodic-boundary MPS, long-range Hamiltonian compression, or multi-symmetry \(U(1)^k\)/non-Abelian sectors.
+- Nonlocal MPO evolution, periodic-boundary MPS and long-range Hamiltonian compression. The new U(1)^K module currently provides validation/block planning only; generic multi-charge SVD/TEBD and non-Abelian sectors are still unimplemented.
 - Outward-rounded/interval arithmetic for a formal floating-point proof of every residual; current receipts are numerically qualified in f64 and must be checked against dense known-answer oracles.
 - N=16–64 scaling and matched Quimb/ITensor performance evidence.
 
