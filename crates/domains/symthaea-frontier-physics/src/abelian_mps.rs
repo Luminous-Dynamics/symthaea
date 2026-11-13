@@ -485,8 +485,8 @@ mod tests {
         let left_bond = vec![vacuum, spin_up, spin_down, double];
         let mut first_data = vec![zero(); 1 * 4 * 4];
         first_data[0 * 4 + 0] = Complex64::new(1.0, 0.0);
-        first_data[0 * 4 + 1] = Complex64::new(0.5, 0.0);
-        first_data[1 * 4 + 2] = Complex64::new(0.5, 0.0);
+        first_data[1 * 4 + 1] = Complex64::new(0.5, 0.0);
+        first_data[2 * 4 + 2] = Complex64::new(0.5, 0.0);
         let first = AbelianChargeTensor::new(
             0,
             vec![vacuum],
@@ -554,7 +554,7 @@ mod tests {
             .iter()
             .map(|block| block.intermediate_charge)
             .collect::<Vec<_>>();
-        assert_eq!(charges, vec![vacuum, up, down, double]);
+        assert_eq!(charges, vec![vacuum, down, up, double]);
         for block in &plan.blocks {
             for &(left, first_physical) in &block.rows {
                 assert_eq!(
@@ -619,6 +619,20 @@ mod tests {
         assert!(matches!(
             AbelianMps::new(vec![first.clone(), last_wrong.clone()], up, 1.0e-12),
             Ok(_)
+        ));
+
+        let mismatched_bond = AbelianChargeTensor::new(
+            1,
+            vec![vacuum],
+            vec![vacuum],
+            vec![up],
+            vec![Complex64::new(1.0, 0.0)],
+            1.0e-12,
+        )
+        .unwrap();
+        assert!(matches!(
+            AbelianMps::new(vec![first.clone(), mismatched_bond], up, 1.0e-12),
+            Err(AbelianChargeError::BondChargeMismatch { bond: 0 })
         ));
 
         let wrong_boundary = AbelianChargeTensor::new(
