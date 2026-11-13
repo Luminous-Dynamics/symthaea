@@ -363,10 +363,7 @@ pub enum HoldoutAuditError {
         observed: usize,
     },
     /// Arm manifest does not match the frozen benchmark/dataset scope.
-    ArmScopeMismatch {
-        arm_id: String,
-        field: &'static str,
-    },
+    ArmScopeMismatch { arm_id: String, field: &'static str },
     /// Candidate and baseline arm identities are not distinct.
     DuplicateArmId(String),
     /// One or more required source dimensions are absent from a case.
@@ -445,17 +442,27 @@ struct ValidatedManifest {
     hidden_groups: BTreeMap<SourceDimension, BTreeSet<String>>,
 }
 
-fn validate_manifest(
-    manifest: &HoldoutManifest,
-) -> Result<ValidatedManifest, HoldoutAuditError> {
+fn validate_manifest(manifest: &HoldoutManifest) -> Result<ValidatedManifest, HoldoutAuditError> {
     for (name, value) in [
         ("benchmark_id", manifest.benchmark_id.as_str()),
         ("benchmark_version", manifest.benchmark_version.as_str()),
-        ("dataset_manifest_digest", manifest.dataset_manifest_digest.as_str()),
-        ("source_manifest_digest", manifest.source_manifest_digest.as_str()),
-        ("grouping_policy_digest", manifest.grouping_policy_digest.as_str()),
+        (
+            "dataset_manifest_digest",
+            manifest.dataset_manifest_digest.as_str(),
+        ),
+        (
+            "source_manifest_digest",
+            manifest.source_manifest_digest.as_str(),
+        ),
+        (
+            "grouping_policy_digest",
+            manifest.grouping_policy_digest.as_str(),
+        ),
         ("split_policy_digest", manifest.split_policy_digest.as_str()),
-        ("hidden_partition_digest", manifest.hidden_partition_digest.as_str()),
+        (
+            "hidden_partition_digest",
+            manifest.hidden_partition_digest.as_str(),
+        ),
     ] {
         require_nonempty(name, value)?;
     }
@@ -491,11 +498,9 @@ fn validate_manifest(
     let mut partition_counts = BTreeMap::new();
     let mut hidden_groups: BTreeMap<SourceDimension, BTreeSet<String>> = BTreeMap::new();
     for assignment in &manifest.assignments {
-        let applicability = policies
-            .get(&assignment.dimension)
-            .ok_or(HoldoutAuditError::AssignmentForUnknownDimension(
-                assignment.dimension,
-            ))?;
+        let applicability = policies.get(&assignment.dimension).ok_or(
+            HoldoutAuditError::AssignmentForUnknownDimension(assignment.dimension),
+        )?;
         if matches!(applicability, Applicability::NotApplicable { .. }) {
             return Err(HoldoutAuditError::AssignmentForNotApplicableDimension(
                 assignment.dimension,
@@ -511,7 +516,10 @@ fn validate_manifest(
             group_digest: assignment.group_digest.clone(),
         })?;
         let key = (assignment.dimension, assignment.group_digest.clone());
-        if assignments.insert(key.clone(), assignment.partition).is_some() {
+        if assignments
+            .insert(key.clone(), assignment.partition)
+            .is_some()
+        {
             return Err(HoldoutAuditError::DuplicateGroupAssignment {
                 dimension: assignment.dimension,
                 group_digest: assignment.group_digest.clone(),
@@ -574,10 +582,7 @@ fn validate_manifest(
     })
 }
 
-fn validate_arm(
-    manifest: &HoldoutManifest,
-    arm: &ArmManifest,
-) -> Result<(), HoldoutAuditError> {
+fn validate_arm(manifest: &HoldoutManifest, arm: &ArmManifest) -> Result<(), HoldoutAuditError> {
     for (field, observed, expected) in [
         (
             "benchmark_id",
@@ -649,8 +654,7 @@ fn validate_cases(
     }
     let mut case_ids = BTreeSet::new();
     let mut paired_case_manifests = BTreeSet::new();
-    let mut cluster_receipts: BTreeMap<String, (String, IndependenceDisposition)> =
-        BTreeMap::new();
+    let mut cluster_receipts: BTreeMap<String, (String, IndependenceDisposition)> = BTreeMap::new();
     let mut receipt_clusters: BTreeMap<String, String> = BTreeMap::new();
     let mut by_group: BTreeMap<GroupKey, Vec<&PairedCase>> = BTreeMap::new();
 
@@ -789,16 +793,16 @@ fn summarize_group(
         baseline_unknown += u64::from(u8::from(case.baseline_outcome.is_unknown_or_censored()));
     }
 
-    let episode_count = u64::try_from(cases.len())
-        .map_err(|_| HoldoutAuditError::ArithmeticOverflow)?;
+    let episode_count =
+        u64::try_from(cases.len()).map_err(|_| HoldoutAuditError::ArithmeticOverflow)?;
     let candidate_rate = rate_ppm(candidate_safe, episode_count)?;
     let baseline_rate = rate_ppm(baseline_safe, episode_count)?;
     let cluster_count = to_u16(cluster_ids.len())?;
     let disposition = if candidate_unknown > 0
         || baseline_unknown > 0
-        || cases.iter().any(|case| {
-            case.independence_disposition == IndependenceDisposition::Unknown
-        })
+        || cases
+            .iter()
+            .any(|case| case.independence_disposition == IndependenceDisposition::Unknown)
     {
         GroupDisposition::Inconclusive
     } else {
@@ -814,8 +818,7 @@ fn summarize_group(
         baseline_safe_successes: baseline_safe,
         candidate_safe_success_ppm: candidate_rate,
         baseline_safe_success_ppm: baseline_rate,
-        paired_safe_success_effect_ppm: i64::from(candidate_rate)
-            - i64::from(baseline_rate),
+        paired_safe_success_effect_ppm: i64::from(candidate_rate) - i64::from(baseline_rate),
         candidate_unsafe_successes: candidate_unsafe,
         baseline_unsafe_successes: baseline_unsafe,
         candidate_unknown_or_censored: candidate_unknown,
@@ -846,17 +849,13 @@ pub fn audit_source_holdouts(
             field: "task_manifest_digest",
         });
     }
-    if input.candidate.environment_manifest_digest
-        != input.baseline.environment_manifest_digest
-    {
+    if input.candidate.environment_manifest_digest != input.baseline.environment_manifest_digest {
         return Err(HoldoutAuditError::ArmScopeMismatch {
             arm_id: input.baseline.arm_id.clone(),
             field: "environment_manifest_digest",
         });
     }
-    if input.candidate.robot_configuration_digest
-        != input.baseline.robot_configuration_digest
-    {
+    if input.candidate.robot_configuration_digest != input.baseline.robot_configuration_digest {
         return Err(HoldoutAuditError::ArmScopeMismatch {
             arm_id: input.baseline.arm_id.clone(),
             field: "robot_configuration_digest",
@@ -918,10 +917,9 @@ pub fn audit_source_holdouts(
                     add_u64(&mut total_episodes, report.episode_count)?;
                     candidate_rates.push(report.candidate_safe_success_ppm);
                     worst_effect = Some(
-                        worst_effect
-                            .map_or(report.paired_safe_success_effect_ppm, |current| {
-                                current.min(report.paired_safe_success_effect_ppm)
-                            }),
+                        worst_effect.map_or(report.paired_safe_success_effect_ppm, |current| {
+                            current.min(report.paired_safe_success_effect_ppm)
+                        }),
                     );
                     if report.disposition == GroupDisposition::Inconclusive {
                         overall_inconclusive = true;
@@ -1288,7 +1286,9 @@ mod tests {
     #[test]
     fn missing_group_assignment_receipt_is_rejected() {
         let mut audit = input();
-        audit.manifest.assignments[0].assignment_receipt_digest.clear();
+        audit.manifest.assignments[0]
+            .assignment_receipt_digest
+            .clear();
         assert!(matches!(
             audit_source_holdouts(&audit),
             Err(HoldoutAuditError::MissingGroupAssignmentReceipt {
@@ -1315,10 +1315,8 @@ mod tests {
         // The manifest validator still requires a hidden group, so restore the split
         // and remove only morphology coverage from the case result.
         let _ = morphology;
-        audit.cases[0].source_groups = vec![(
-            SourceDimension::CollectionSite,
-            "site-hidden".into(),
-        )];
+        audit.cases[0].source_groups =
+            vec![(SourceDimension::CollectionSite, "site-hidden".into())];
         assert!(matches!(
             audit_source_holdouts(&audit),
             Err(HoldoutAuditError::MissingCaseSourceGroup {
