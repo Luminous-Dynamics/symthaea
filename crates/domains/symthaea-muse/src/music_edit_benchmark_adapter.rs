@@ -429,7 +429,7 @@ pub fn compare_music_edit_scopes_v1(
     right: &MusicEditComparisonScopeV1,
 ) -> MusicEditScopeComparisonV1 {
     let mut mismatches = Vec::new();
-    for (scope_name, scope) in [("left", left), ("right", right)] {
+    for scope in [left, right] {
         for (field, value) in [
             ("benchmark_id", scope.benchmark_id.as_str()),
             ("benchmark_version", scope.benchmark_version.as_str()),
