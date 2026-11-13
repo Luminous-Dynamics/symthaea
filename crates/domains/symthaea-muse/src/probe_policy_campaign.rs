@@ -179,8 +179,21 @@ pub struct NullSceneFalseDiscoverySummary {
     pub rows_with_any_selected_pair: usize,
     pub total_false_positive_pairs: usize,
     pub total_selected_pairs: usize,
-    /// Undefined when no pair was selected in any row.
+    /// Pooled pair-level FDP on all-null scenes. This is 1 whenever any pair
+    /// is selected and is therefore not a useful policy-discrimination metric
+    /// by itself; composition-macro selection and FP burden are reported too.
     pub false_discovery_rate: Option<f64>,
+    /// Equal-weight mean of each composition's fraction of rows selecting
+    /// at least one pair. Seeds/budgets remain repeated rows inside a cluster.
+    pub composition_macro_any_selection_rate: Option<f64>,
+    /// Equal-weight mean false-positive pairs per row, averaged within each
+    /// composition before averaging across independent compositions.
+    pub composition_macro_false_positive_pairs_per_row: Option<f64>,
+    pub any_selection_rate_bootstrap_95pct_lower: Option<f64>,
+    pub any_selection_rate_bootstrap_95pct_upper: Option<f64>,
+    pub false_positive_burden_bootstrap_95pct_lower: Option<f64>,
+    pub false_positive_burden_bootstrap_95pct_upper: Option<f64>,
+    pub bootstrap_replicates: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -454,7 +467,14 @@ fn active_interval(
         }
         InteractionFamily::LinearFirTail => {
             let start = edge + event_index * slot;
-            clamp_interval(start, start + (slot / 3).max(2))
+            // The final source event reaches the score boundary so the
+            // linear FIR's full L-1 sample convolution tail is observable.
+            let end = if event_index + 1 == event_count {
+                frame_count
+            } else {
+                start + (slot / 3).max(2)
+            };
+            clamp_interval(start, end)
         }
         InteractionFamily::ClusteredOverlap => {
             let split = event_count.div_ceil(2);
@@ -577,7 +597,10 @@ fn generate_fixture(
         let mut support_start = start as u64;
         let mut support_end = end as u64;
         if family == InteractionFamily::LinearFirTail {
-            support_end = (support_end + 4).min(frame_count as u64);
+            // The EVAL-020 reference renderer emits input_frames + (L - 1)
+            // output frames for an L-tap FIR. Preserve the complete tail
+            // instead of clipping the event support to the input schedule.
+            support_end += 4;
         }
         if family == InteractionFamily::UnderstatedSupport {
             // Deliberately understate the real overlap of events 0 and 1.
@@ -592,7 +615,7 @@ fn generate_fixture(
         let mut routing_complete = true;
         match family {
             InteractionFamily::SharedRouteDisjoint => {
-                routing_domains.push("master:shared-compressor".to_owned());
+                routing_domains.push("master:shared-linear-bus".to_owned());
             }
             InteractionFamily::IncompleteRouting => {
                 routing_complete = false;
@@ -765,7 +788,11 @@ fn paired_summary(
     }
 }
 
-fn null_scene_summaries(fixtures: &[CampaignFixtureResult]) -> Vec<NullSceneFalseDiscoverySummary> {
+fn null_scene_summaries(
+    fixtures: &[CampaignFixtureResult],
+    bootstrap_replicates: usize,
+    bootstrap_seed: u64,
+) -> Vec<NullSceneFalseDiscoverySummary> {
     let mut result = Vec::new();
     for family in InteractionFamily::ALL {
         let family_fixtures: Vec<&CampaignFixtureResult> = fixtures
@@ -787,20 +814,48 @@ fn null_scene_summaries(fixtures: &[CampaignFixtureResult]) -> Vec<NullSceneFals
             let mut rows_with_any_selected_pair = 0usize;
             let mut total_false_positive_pairs = 0usize;
             let mut total_selected_pairs = 0usize;
+            let mut composition_selection_rates = Vec::new();
+            let mut composition_false_positive_burdens = Vec::new();
             for fixture in &family_fixtures {
-                for row in fixture.rows.iter().filter(|row| row.policy == policy) {
-                    evaluated_rows += 1;
-                    if row.selected_pair_count > 0 {
-                        rows_with_any_selected_pair += 1;
-                    }
-                    total_false_positive_pairs += row.false_positive_count;
-                    total_selected_pairs += row.selected_pair_count;
+                let rows: Vec<_> = fixture.rows.iter().filter(|row| row.policy == policy).collect();
+                evaluated_rows += rows.len();
+                let selected_rows = rows.iter().filter(|row| row.selected_pair_count > 0).count();
+                rows_with_any_selected_pair += selected_rows;
+                total_false_positive_pairs +=
+                    rows.iter().map(|row| row.false_positive_count).sum::<usize>();
+                total_selected_pairs +=
+                    rows.iter().map(|row| row.selected_pair_count).sum::<usize>();
+                if !rows.is_empty() {
+                    let denominator = rows.len() as f64;
+                    composition_selection_rates.push(selected_rows as f64 / denominator);
+                    composition_false_positive_burdens.push(
+                        rows.iter()
+                            .map(|row| row.false_positive_count as f64)
+                            .sum::<f64>()
+                            / denominator,
+                    );
                 }
             }
+            let macro_mean = |values: &[f64]| {
+                (!values.is_empty()).then(|| values.iter().sum::<f64>() / values.len() as f64)
+            };
+            let seed = bootstrap_seed
+                ^ family_seed(family).rotate_left(17)
+                ^ (policy as u64).rotate_left(29);
+            let (selection_lower, selection_upper) = bootstrap_interval(
+                &composition_selection_rates,
+                bootstrap_replicates,
+                seed ^ 0x5345_4c45_4354,
+            );
+            let (burden_lower, burden_upper) = bootstrap_interval(
+                &composition_false_positive_burdens,
+                bootstrap_replicates,
+                seed ^ 0x4641_4c53_4550,
+            );
             result.push(NullSceneFalseDiscoverySummary {
                 family,
                 policy,
-                composition_count: family_fixtures.len(),
+                composition_count: composition_selection_rates.len(),
                 evaluated_rows,
                 rows_with_any_selected_pair,
                 total_false_positive_pairs,
@@ -810,6 +865,19 @@ fn null_scene_summaries(fixtures: &[CampaignFixtureResult]) -> Vec<NullSceneFals
                 } else {
                     Some(total_false_positive_pairs as f64 / total_selected_pairs as f64)
                 },
+                composition_macro_any_selection_rate: macro_mean(&composition_selection_rates),
+                composition_macro_false_positive_pairs_per_row: macro_mean(
+                    &composition_false_positive_burdens,
+                ),
+                any_selection_rate_bootstrap_95pct_lower: selection_lower,
+                any_selection_rate_bootstrap_95pct_upper: selection_upper,
+                false_positive_burden_bootstrap_95pct_lower: burden_lower,
+                false_positive_burden_bootstrap_95pct_upper: burden_upper,
+                bootstrap_replicates: if composition_selection_rates.len() >= 2 {
+                    bootstrap_replicates
+                } else {
+                    0
+                },
             });
         }
     }
@@ -818,7 +886,7 @@ fn null_scene_summaries(fixtures: &[CampaignFixtureResult]) -> Vec<NullSceneFals
 
 /// Build the full paired campaign from deterministic synthetic source
 /// compositions. The held-out family and routing topology are fixed by the
-/// versioned family split: PureThirdOrder and SharedRouteDisjoint.
+/// versioned family split: PureThirdOrder and IncompleteRouting.
 pub fn build_probe_policy_campaign(
     config: &ProbePolicyCampaignConfig,
 ) -> Result<ProbePolicyCampaignReport, ProbePolicyCampaignError> {
@@ -937,7 +1005,11 @@ pub fn build_probe_policy_campaign(
             ));
         }
     }
-    let null_scene_false_discovery = null_scene_summaries(&fixtures);
+    let null_scene_false_discovery = null_scene_summaries(
+        &fixtures,
+        config.bootstrap_replicates,
+        config.bootstrap_seed,
+    );
     let development_fixture_count = fixtures
         .iter()
         .filter(|fixture| fixture.split == CampaignSplit::Development)
