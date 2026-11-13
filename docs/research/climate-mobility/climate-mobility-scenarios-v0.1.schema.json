@@ -478,7 +478,11 @@
           "expected_outcome",
           "evidence_class",
           "qualification",
-          "result_scope"
+          "result_scope",
+          "observation_valid_from_unix_seconds",
+          "observation_valid_to_unix_seconds",
+          "assessed_at_unix_seconds",
+          "max_observation_age_seconds"
         ],
         "properties": {
           "assessment_id": {
@@ -593,6 +597,31 @@
           "area_id": {
             "type": "string",
             "minLength": 1
+          },
+          "observation_valid_from_unix_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "observation_valid_to_unix_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "assessed_at_unix_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "max_observation_age_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1
           }
         }
       }
