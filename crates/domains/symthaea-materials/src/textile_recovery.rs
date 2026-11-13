@@ -802,18 +802,18 @@ pub fn qualify_recovery_route(
         }
     }
 
-    let mut unique = BTreeSet::new();
-    if evidence_ids.iter().any(|evidence_id| !unique.insert(evidence_id.clone())) {
-        reasons.push(RouteReason::DuplicateEvidenceIdentity);
-    }
     assessment(route, reasons, evidence_ids)
 }
 
 fn assessment(
     route: RecoveryRoute,
-    reasons: Vec<RouteReason>,
+    mut reasons: Vec<RouteReason>,
     evidence_ids: Vec<String>,
 ) -> RouteAssessment {
+    let mut unique = BTreeSet::new();
+    if evidence_ids.iter().any(|evidence_id| !unique.insert(evidence_id.clone())) {
+        reasons.push(RouteReason::DuplicateEvidenceIdentity);
+    }
     let disposition = if reasons.is_empty() {
         RouteDisposition::Eligible
     } else if reasons.iter().any(|reason| {
@@ -1257,10 +1257,99 @@ mod tests {
         let mut bundle = empty_bundle();
         bundle.condition = Some(condition(ProductCondition::Wearable, UseSafetyStatus::Passed));
         bundle.downstream_acceptance = Some(acceptance());
-        bundle.downstream_acceptance.as_mut().unwrap().sha256 = "not-a-digest".to_owned();
+        bundle.downstream_acceptance.as_mut().unwrap().evidence.sha256 =
+            "not-a-digest".to_owned();
         let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &policy());
         assert_eq!(result.disposition, RouteDisposition::Ineligible);
         assert!(result.reasons.contains(&RouteReason::InvalidDownstreamAcceptance));
+    }
+
+    #[test]
+    fn rejected_downstream_output_is_ineligible() {
+        let mut bundle = empty_bundle();
+        bundle.condition = Some(condition(ProductCondition::Wearable, UseSafetyStatus::Passed));
+        let mut accepted = acceptance();
+        accepted.outcome = AcceptanceOutcome::Rejected;
+        bundle.downstream_acceptance = Some(accepted);
+        let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::DownstreamAcceptanceRejected));
+    }
+
+    #[test]
+    fn conditional_or_unknown_acceptance_remains_insufficient() {
+        let mut bundle = empty_bundle();
+        bundle.condition = Some(condition(ProductCondition::Wearable, UseSafetyStatus::Passed));
+        let mut accepted = acceptance();
+        accepted.outcome = AcceptanceOutcome::Conditional;
+        bundle.downstream_acceptance = Some(accepted);
+        let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::InsufficientEvidence);
+        assert!(result.reasons.contains(&RouteReason::DownstreamAcceptanceUnresolved));
+    }
+
+    #[test]
+    fn unknown_process_trial_is_insufficient_not_a_false_failure() {
+        let mut bundle = empty_bundle();
+        let mut trial = process_trial(EvidenceKind::MechanicalRecyclingTrial, true);
+        trial.outcome = TrialOutcome::Unknown;
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(trial);
+        bundle.fibre_length = Some(length());
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::InsufficientEvidence);
+        assert!(result.reasons.contains(&RouteReason::ProcessTrialUnknown));
+    }
+
+    #[test]
+    fn process_trial_mass_must_match_physical_lot_mass() {
+        let mut bundle = empty_bundle();
+        let mut trial = process_trial(EvidenceKind::MechanicalRecyclingTrial, true);
+        trial.mass_balance.as_mut().unwrap().input_mass_mg = 900_000;
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(trial);
+        bundle.fibre_length = Some(length());
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::MassBalanceInputMismatch));
+    }
+
+    #[test]
+    fn chemical_compatibility_failure_blocks_chemical_route() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.chemical_compatibility = Some(ChemicalCompatibilityEvidence {
+            outcome: TrialOutcome::Failed,
+            evidence: evidence(
+                "CHEM-COMPAT-FAIL",
+                EvidenceKind::ChemicalCompatibilityTrial,
+                EvidenceTier::PhysicalTrial,
+                "chemical-lab",
+                None,
+            ),
+        });
+        bundle.process_trial = Some(process_trial(EvidenceKind::ChemicalRecyclingTrial, true));
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::ChemicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::ChemicalCompatibilityFailed));
+    }
+
+    #[test]
+    fn evidence_ids_cannot_be_reused_across_independent_claims() {
+        let mut bundle = empty_bundle();
+        let mut accepted = acceptance();
+        accepted.evidence.evidence_id = "INV-01".to_owned();
+        bundle.condition = Some(condition(ProductCondition::Wearable, UseSafetyStatus::Passed));
+        bundle.downstream_acceptance = Some(accepted);
+        let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::DuplicateEvidenceIdentity));
     }
 
     #[test]
