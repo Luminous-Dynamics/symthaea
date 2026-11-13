@@ -30,3 +30,7 @@ path = "examples/global_ambiguity_screen.rs"
 [[example]]
 name = "correlated_experiment_design"
 path = "examples/correlated_experiment_design.rs"
+
+[[example]]
+name = "plasma_multifidelity_design"
+path = "examples/plasma_multifidelity_design.rs"
