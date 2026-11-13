@@ -4,7 +4,6 @@ use std::{env, fs, process};
 const SCHEMA_VERSION: &str = "0.1.0";
 const PRESSURE_PSD_REFERENCE_UPA2_PER_HZ: f64 = 1.0;
 const PSD_MATRIX_RELATIVE_TOLERANCE: f64 = 1.0e-12;
-const ALIGNMENT_EPSILON_S: f64 = 1.0e-12;
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -704,6 +703,28 @@ mod tests {
     fn cross_spectral_convention_must_be_declared() {
         let mut input = case();
         input.cross_spectral_convention = "unknown".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn hydrophone_channel_must_be_a_pressure_channel() {
+        let mut input = case();
+        input.hydrophone_channel.signal_kind = ReferenceSignalKind::StructuralVibration;
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn frequency_must_match_declared_fft_bin_index() {
+        let mut input = case();
+        input.bins[0].center_frequency_hz = 100.0;
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn channel_average_count_cannot_exceed_available_segment_schedule() {
+        let mut input = case();
+        input.reference_channel.average_count = 40;
+        input.hydrophone_channel.average_count = 40;
         assert_eq!(audit(&input).disposition, "INVALID");
     }
 
