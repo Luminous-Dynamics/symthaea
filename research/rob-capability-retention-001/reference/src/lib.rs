@@ -572,7 +572,7 @@ fn validate_option_set(
     arm_id: &str,
     options: &OptionSetReceipt,
 ) -> Result<(), CapabilityRetentionError> {
-    if options.disposition == EvidenceDisposition::Rejected {
+    if matches!(options.disposition, EvidenceDisposition::Rejected | EvidenceDisposition::NotApplicable) {
         return Err(CapabilityRetentionError::RejectedOptionSetEvidence(
             arm_id.to_owned(),
         ));
@@ -624,12 +624,12 @@ fn validate_reserves(
                 });
             }
             (ReserveApplicability::Required { .. }, EvidenceDisposition::Qualified) => {
-                let lower = observation.terminal_lower_bound.ok_or_else(|| {
-                    CapabilityRetentionError::IncompleteQualifiedReserve {
+                if observation.terminal_lower_bound.is_none() {
+                    return Err(CapabilityRetentionError::IncompleteQualifiedReserve {
                         arm_id: arm_id.to_owned(),
                         kind: *kind,
-                    }
-                })?;
+                    });
+                }
                 let receipt = observation
                     .source_receipt_digest
                     .as_deref()
@@ -658,12 +658,15 @@ fn validate_reserves(
                 }
             }
             (ReserveApplicability::Required { .. }, EvidenceDisposition::Unknown) => {}
+            (ReserveApplicability::Required { .. }, EvidenceDisposition::NotApplicable) => {
+                return Err(CapabilityRetentionError::ReserveApplicabilityMismatch {
+                    arm_id: arm_id.to_owned(),
+                    kind: *kind,
+                });
+            }
             (ReserveApplicability::NotApplicable { reason }, EvidenceDisposition::NotApplicable)
                 if !reason.trim().is_empty()
-                    && observation
-                        .not_applicable_reason
-                        .as_deref()
-                        .is_some_and(|value| !value.trim().is_empty()) =>
+                    && observation.not_applicable_reason.as_deref() == Some(reason.as_str()) =>
             {
                 if observation.terminal_lower_bound.is_some()
                     || observation.source_receipt_digest.is_some()
@@ -724,7 +727,7 @@ fn reserve_deltas(
                     disposition: EvidenceDisposition::NotApplicable,
                 });
             }
-            ReserveApplicability::Required { minimum_floor } => {
+            ReserveApplicability::Required { minimum_floor, .. } => {
                 let base = baseline
                     .get(kind)
                     .ok_or(CapabilityRetentionError::ReserveApplicabilityMismatch {
@@ -755,8 +758,8 @@ fn reserve_deltas(
                     candidate_lower_bound: candidate_lower,
                     candidate_minus_baseline: delta,
                     minimum_floor: Some(*minimum_floor),
-                    candidate_below_floor: candidate_lower
-                        .is_some_and(|value| value < *minimum_floor),
+                    candidate_below_floor: disposition == EvidenceDisposition::Qualified
+                        && candidate_lower.is_some_and(|value| value < *minimum_floor),
                     disposition,
                 });
             }
@@ -953,9 +956,12 @@ pub fn compare_work_and_terminal_capability(
                 && cluster.baseline.work.held_items == 0
                 && cluster.candidate.work.unknown_items == 0
                 && cluster.candidate.work.held_items == 0
-                && reserves
-                    .iter()
-                    .all(|delta| delta.disposition == EvidenceDisposition::Qualified),
+                && reserves.iter().all(|delta| {
+                    matches!(
+                        delta.disposition,
+                        EvidenceDisposition::Qualified | EvidenceDisposition::NotApplicable
+                    )
+                }),
         });
     }
 
