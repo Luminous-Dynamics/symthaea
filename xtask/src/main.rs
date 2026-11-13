@@ -4,6 +4,7 @@ use std::path::PathBuf;
 mod crate_status;
 mod duplicate_scan;
 mod electrochemical_capacitor;
+mod edlc_standby_service;
 mod manifest;
 mod rhn_sweep;
 
@@ -65,6 +66,8 @@ enum Commands {
     },
     /// Audit the electrochemical-capacitor benchmark schema, fixture and source register.
     ElectrochemicalCapacitorAudit,
+    /// Audit EDLC standby-service trace arithmetic and synthetic-evidence claim ceilings.
+    EdlcStandbyServiceAudit,
     GenerateManifest {
         #[arg(long, default_value = ".")]
         root: PathBuf,
@@ -115,6 +118,13 @@ fn main() -> anyhow::Result<()> {
                 .expect("xtask lives one level below the workspace root")
                 .to_path_buf();
             electrochemical_capacitor::audit(&root)?;
+        }
+        Commands::EdlcStandbyServiceAudit => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            edlc_standby_service::audit(&root)?;
         }
         Commands::GenerateManifest { root } => {
             let files = vec!["Cargo.toml", "src/lib.rs", "symthaea-core/Cargo.toml"];
