@@ -221,6 +221,59 @@ def main() -> None:
         print(f"PASS {case['id']}: [{lower}, {upper}] -> {actual}")
 
 
+
+    # Exact normalized robust-stability margin for one-sided real uncertainty.
+    # gamma(rho, delta) = gamma_nominal + rho * radius * delta,
+    # delta in [0, 1]. The analytic boundary is gamma = 1/8.
+    margin = data["normalized_margin_reference"]
+    gamma_nominal = q(margin["nominal_gamma"])
+    radius = q(margin["one_sided_uncertainty_radius"])
+    delta_lower = q(margin["normalized_delta_domain"]["lower"])
+    delta_upper = q(margin["normalized_delta_domain"]["upper"])
+    assert gamma_nominal == Fraction(1, 16)
+    assert radius == Fraction(1, 16)
+    assert (delta_lower, delta_upper) == (Fraction(0), Fraction(1))
+    exact_margin = (boundary - gamma_nominal) / (radius * delta_upper)
+    assert exact_margin == q(margin["exact_normalized_robust_stability_margin"])
+    assert exact_margin == 1
+
+    margin_cases = {case["id"]: case for case in margin["cases"]}
+    for case_id, expected_disposition in (
+        ("half-margin", "ROBUSTLY_STABLE"),
+        ("at-margin", "NOT_ESTABLISHED_MARGINAL_BOUNDARY"),
+        ("beyond-margin", "NOT_ESTABLISHED_WITH_DESTABILIZATION_WITNESS"),
+    ):
+        case = margin_cases[case_id]
+        scale_value = q(case["scale"])
+        gamma_min = gamma_nominal + scale_value * radius * delta_lower
+        gamma_max = gamma_nominal + scale_value * radius * delta_upper
+        assert gamma_min == q(case["gamma_lower"])
+        assert gamma_max == q(case["gamma_upper"])
+        assert case["expected"] == expected_disposition
+        if case_id == "half-margin":
+            assert gamma_max < boundary
+            assert Fraction(1) - 8 * gamma_max > 0
+        elif case_id == "at-margin":
+            assert gamma_max == boundary
+            assert Fraction(1) - 8 * gamma_max == 0
+        else:
+            assert gamma_min < boundary < gamma_max
+            witness = q(margin["unstable_witness_beyond_margin"]["gamma"])
+            assert witness == gamma_max == Fraction(3, 16)
+            a0 = Fraction(1) - 8 * witness
+            routh_s1 = (Fraction(3) * Fraction(3) - a0) / 3
+            assert a0 == Fraction(-1, 2)
+            assert routh_s1 == Fraction(19, 6) > 0
+            assert margin["unstable_witness_beyond_margin"]["routh_first_column_signs"] == [
+                "positive", "positive", "positive", "negative"
+            ]
+    boundary_witness = margin["boundary_witness"]
+    assert q(boundary_witness["normalized_delta"]) == 1
+    assert q(boundary_witness["gamma"]) == boundary
+    assert q(boundary_witness["closed_loop_pole"]["real"]) == 0
+    assert q(boundary_witness["closed_loop_pole"]["imag"]) == 0
+    assert boundary_witness["classification"] == "MARGINAL"
+
     # A destabilization witness is existential and must not be confused with
     # ROBUSTLY_UNSTABLE, which is universal over the complete parameter set.
     cases_by_id = {case["id"]: case for case in data["uncertainty_sets"]}
