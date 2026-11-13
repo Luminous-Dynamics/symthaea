@@ -35,8 +35,12 @@ jobs:
           python-version: "3.12"
       - name: Compile and execute exact policy discriminator
         run: |
-          python3 -m py_compile tools/airroad-decision-directed-measurement/verify_decision_selection.py
-          python3 tools/airroad-decision-directed-measurement/verify_decision_selection.py
+          python3 -m py_compile \
+            tools/airroad-decision-directed-measurement/verify_decision_selection.py
+          python3 \
+            tools/airroad-decision-directed-measurement/verify_decision_selection.py
       - name: Validate exact fixture JSON
         run: |
-          python3 -m json.tool docs/research/fixtures/airroad-decision-directed-measurement-v0.1.json > /dev/null
+          python3 -m json.tool \
+            docs/research/fixtures/airroad-decision-directed-measurement-v0.1.json \
+            > /dev/null
