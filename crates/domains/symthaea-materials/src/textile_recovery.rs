@@ -1352,6 +1352,153 @@ mod tests {
         assert!(result.reasons.contains(&RouteReason::DuplicateEvidenceIdentity));
     }
 
+    fn exercise_route_case(case_id: &str) -> (&'static str, Option<&'static str>) {
+        match case_id {
+            "ROUTE-001-REUSE-ACCEPTED" => {
+                reuse_requires_physical_condition_safety_and_independent_acceptance();
+                ("eligible", None)
+            }
+            "ROUTE-002-VISUAL-INFERENCE-ONLY" => {
+                visual_inference_cannot_substitute_for_human_condition_inspection();
+                ("insufficient_evidence", Some("MissingConditionInspection"))
+            }
+            "ROUTE-003-REUSE-SAFETY-FAIL" => {
+                failed_use_safety_blocks_reuse();
+                ("ineligible", Some("UseSafetyNotPassed"))
+            }
+            "ROUTE-004-REPAIR-ACCEPTED" => {
+                repair_requires_repairable_condition_physical_trial_and_acceptance();
+                ("eligible", None)
+            }
+            "ROUTE-005-COMPONENT-RECOVERY" => {
+                component_recovery_requires_mass_closure_and_acceptance();
+                ("eligible", None)
+            }
+            "ROUTE-006-MECHANICAL-ACCEPTED" => {
+                mechanical_recycling_requires_composition_fibre_length_trial_and_acceptance();
+                ("eligible", None)
+            }
+            "ROUTE-007-MODEL-COMPOSITION" => {
+                composition_prediction_without_sensor_evidence_cannot_authorize_recycling();
+                ("ineligible", Some("InvalidCompositionEvidence"))
+            }
+            "ROUTE-008-UNKNOWN-FIBRE-FRACTION" => {
+                unresolved_composition_above_policy_abstains();
+                ("insufficient_evidence", Some("UnknownFibreFractionAbovePolicy"))
+            }
+            "ROUTE-009-MISSING-FIBRE-LENGTH" => {
+                missing_fibre_length_blocks_mechanical_route();
+                ("insufficient_evidence", Some("MissingFibreLengthEvidence"))
+            }
+            "ROUTE-010-SHORT-FIBRE-OUTPUT" => {
+                short_fibre_distribution_fails_receiving_policy();
+                ("ineligible", Some("FibreLengthBelowPolicy"))
+            }
+            "ROUTE-011-MALFORMED-FIBRE-BINS" => {
+                malformed_fibre_bins_do_not_close();
+                ("ineligible", Some("InvalidFibreLengthDistribution"))
+            }
+            "ROUTE-012-CHEMICAL-ACCEPTED" => {
+                chemical_route_requires_compatibility_trial_and_downstream_acceptance();
+                ("eligible", None)
+            }
+            "ROUTE-013-CHEMICAL-COMPATIBILITY-MISSING" => {
+                missing_chemical_compatibility_is_not_inferred_from_fibre_identity();
+                ("insufficient_evidence", Some("MissingChemicalCompatibilityEvidence"))
+            }
+            "ROUTE-014-MASS-NOT-CLOSED" => {
+                unclosed_mass_balance_blocks_destructive_route();
+                ("ineligible", Some("MassBalanceNotClosed"))
+            }
+            "ROUTE-015-SELF-ISSUED-ACCEPTANCE" => {
+                acceptance_from_same_issuer_is_not_independent();
+                ("ineligible", Some("InvalidDownstreamAcceptance"))
+            }
+            "ROUTE-016-SYNTHETIC-PHYSICAL-TRIAL" => {
+                synthetic_trial_cannot_be_promoted_to_physical_trial();
+                ("ineligible", Some("InvalidProcessTrialEvidence"))
+            }
+            "ROUTE-017-CORRUPTED-DIGEST" => {
+                corrupted_evidence_digest_is_rejected();
+                ("ineligible", Some("InvalidDownstreamAcceptance"))
+            }
+            "ROUTE-018-RECEIVER-REJECTED" => {
+                rejected_downstream_output_is_ineligible();
+                ("ineligible", Some("DownstreamAcceptanceRejected"))
+            }
+            "ROUTE-019-RECEIVER-CONDITIONAL" => {
+                conditional_or_unknown_acceptance_remains_insufficient();
+                ("insufficient_evidence", Some("DownstreamAcceptanceUnresolved"))
+            }
+            "ROUTE-020-TRIAL-UNKNOWN" => {
+                unknown_process_trial_is_insufficient_not_a_false_failure();
+                ("insufficient_evidence", Some("ProcessTrialUnknown"))
+            }
+            "ROUTE-021-TRIAL-INPUT-MISMATCH" => {
+                process_trial_mass_must_match_physical_lot_mass();
+                ("ineligible", Some("MassBalanceInputMismatch"))
+            }
+            "ROUTE-022-CHEMICAL-COMPATIBILITY-FAIL" => {
+                chemical_compatibility_failure_blocks_chemical_route();
+                ("ineligible", Some("ChemicalCompatibilityFailed"))
+            }
+            "ROUTE-023-EVIDENCE-ID-DUPLICATE" => {
+                evidence_ids_cannot_be_reused_across_independent_claims();
+                ("ineligible", Some("DuplicateEvidenceIdentity"))
+            }
+            "ROUTE-024-POLICY-INVALID" => {
+                invalid_policy_cannot_promote_route();
+                ("ineligible", Some("InvalidPolicy"))
+            }
+            other => panic!("unknown textile recovery corpus case: {other}"),
+        }
+    }
+
+    #[test]
+    fn synthetic_recovery_corpus_executes_all_route_regressions() {
+        const CORPUS: &str = include_str!(
+            "../../../../docs/research/fixtures/textile_sort_fusion_v0_1/recovery_cases.example.json"
+        );
+        const SCHEMA: &str = include_str!(
+            "../../../../docs/research/fixtures/textile_sort_fusion_v0_1/recovery_cases.schema.json"
+        );
+
+        let corpus: serde_json::Value =
+            serde_json::from_str(CORPUS).expect("recovery corpus must parse as JSON");
+        let schema: serde_json::Value =
+            serde_json::from_str(SCHEMA).expect("recovery schema must parse as JSON");
+        assert_eq!(schema["properties"]["schema_version"]["const"], "0.1.0");
+        assert_eq!(corpus["schema_version"], "0.1.0");
+        assert_eq!(corpus["corpus_id"], "TEXTILE-ROUTE-CASES-001");
+        assert_eq!(corpus["fixture_class"], "synthetic");
+        assert!(schema["properties"]["cases"]["minItems"].as_u64() == Some(24));
+
+        let cases = corpus["cases"]
+            .as_array()
+            .expect("recovery cases must be an array");
+        assert_eq!(cases.len(), 24, "review route corpus case count changes");
+        let mut seen = BTreeSet::new();
+        for case in cases {
+            let case_id = case["case_id"]
+                .as_str()
+                .expect("case_id must be a string");
+            assert!(seen.insert(case_id), "duplicate recovery case {case_id}");
+            assert!(
+                case["mutation"].as_str().is_some_and(|value| !value.is_empty()),
+                "case {case_id} must describe its mutation"
+            );
+            let expected = &case["expected"];
+            let expected_disposition = expected["disposition"]
+                .as_str()
+                .expect("expected disposition must be a string");
+            let expected_reason = expected["reason"].as_str();
+            let (disposition, reason) = exercise_route_case(case_id);
+            assert_eq!(disposition, expected_disposition, "case {case_id} disposition");
+            assert_eq!(reason, expected_reason, "case {case_id} reason");
+        }
+        assert_eq!(seen.len(), 24);
+    }
+
     #[test]
     fn invalid_policy_cannot_promote_route() {
         let mut bundle = empty_bundle();
