@@ -189,6 +189,8 @@ The overlay separates world-valid-at T from available-to-the-decision-process-by
 
 A source's publication date does not prove the agent retrieved it; a service receipt does not prove an index or model incorporated it. If the evidence chain cannot establish the required temporal fact, the result remains indeterminate/unsupported. #11241 is referenced only as finance-scoped bitemporal precedent; Mycelix #5860 remains a DeSci receipt-time projection owner with its stated model/index-availability limitation.
 
+**Gold-record compatibility is a blocking prerequisite for the temporal sub-axis:** the current #10581 schema is strict and contains no structured T/K, source-availability, downstream-materialization or run-context fields. Its free-text notes are not a substitute. Temporal gold labels must wait for a versioned optional extension or a separately validated content-addressed companion record bound to the existing gold record. The ten existing engineering dispositions remain unchanged; no temporal labels or candidate scores have been created.
+
 ## 8. Execution and trust prerequisites
 
 - No untrusted repository-controlled candidates/build scripts may run until [#10064](https://github.com/Luminous-Dynamics/symthaea/issues/10064) establishes an actual OS isolation boundary. Host execution is not a sandbox.
