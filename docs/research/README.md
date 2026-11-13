@@ -341,3 +341,5 @@ Open an issue on GitHub for research discussions.
 - [Engineering lifecycle applicability matrix](INDUSTRY_STACK_APPLICABILITY_MATRIX_2026-11-12.json) — conditional applicability by workload and system boundary.
 
 - [Decision-time evidence admissibility overlay](ENGINEERING_CHANGE_DECISION_TIME_ADMISSIBILITY_OVERLAY_V0_1_2026-11-13.md) — valid-at-T vs available-by-K controls, actual retrieval/context evidence, and nine temporal challenge blueprints.
+
+- [Engineering-change benchmark frontier](ENGINEERING_CHANGE_BENCHMARK_FRONTIER_2026-11-13.md) — temporal-reasoning SOTA, PLM vendor comparison, matched diagnostic ablations and non-compensatory target hierarchy.
