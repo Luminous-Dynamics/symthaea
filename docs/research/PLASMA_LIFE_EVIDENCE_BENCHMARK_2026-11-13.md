@@ -172,7 +172,7 @@ Report independently:
 - survival or cumulative incidence at predeclared service horizons;
 - cause-specific cumulative incidence;
 - restricted mean survival time over the observed horizon;
-- median/q90 only if the observed curve identifies the quantile;
+- median/q90 only after an independently qualified estimator and source-bound curve receipt identify the quantile; S0 blocks all numerical life-quantile claims;
 - time-dependent Brier score / integrated Brier score where valid;
 - cross-sectional strength quantile error and acceptance fraction;
 - prediction interval and lower-bound coverage;
