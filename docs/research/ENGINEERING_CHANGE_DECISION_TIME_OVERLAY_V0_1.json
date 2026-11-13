@@ -1,0 +1,200 @@
+{
+  "schema_version": "luminous.eng-change-decision-time-overlay.v0.1",
+  "snapshot_date": "2026-11-13",
+  "status": "public_challenge_blueprints_only_unadjudicated_unscored",
+  "parent_benchmark": "https://github.com/Luminous-Dynamics/symthaea/issues/10543",
+  "gold_protocol": "https://github.com/Luminous-Dynamics/symthaea/issues/10581",
+  "lifecycle_reasoning_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/10600",
+  "evaluation_unit": "existing_claim_evidence_applicability_pair",
+  "temporal_coordinates": {
+    "world_valid_at": "Target time at which the represented proposition or engineering condition applies.",
+    "decision_frontier": "Exact as-of time at which the assessed workflow must stop learning.",
+    "source_publication_or_release": "Publication/availability time of the exact source version, when established.",
+    "canonical_record_or_receipt": "Time the canonical service actually committed the record or relation.",
+    "acquisition_or_ingestion": "Time the declared principal acquired the exact bytes under an access/rights profile.",
+    "derived_materialization": "Time an index, cache, embedding or retrieval surface made the exact version queryable.",
+    "run_context": "Evidence that the exact artifact/version was actually included in the evaluated run context."
+  },
+  "admissibility_assertions": [
+    "historically_source_available_by_K",
+    "actually_available_to_system_by_K",
+    "actually_included_in_run_context",
+    "world_valid_at_T",
+    "rights_permitted_at_decision_time",
+    "rights_permitted_at_replay_or_query_time"
+  ],
+  "clock_substitution_prohibited": [
+    "event_or_occurred_at_is_not_record_or_receipt_time",
+    "publication_time_is_not_acquisition_or_ingestion_time",
+    "ingestion_time_is_not_index_or_cache_visibility_time",
+    "index_visibility_is_not_run_context_inclusion",
+    "retrieval_time_is_not_historical_source_availability",
+    "valid_time_is_not_knowledge_or_decision_time"
+  ],
+  "challenge_blueprints": [
+    {
+      "id": "TDA-001",
+      "family": "late_correction",
+      "name": "Backdated correction after decision frontier",
+      "mutation": "A source correction is published/received after K but declares a valid-from date before K.",
+      "evaluator_control": "The correction cannot influence the K assessment. Replaying the old K snapshot must retain the version actually available then.",
+      "required_lineage": [
+        "exact_source_version",
+        "publication_or_release_evidence",
+        "acquisition_or_receipt_evidence",
+        "decision_frontier"
+      ],
+      "status": "blueprint_only"
+    },
+    {
+      "id": "TDA-002",
+      "family": "delayed_supplier_evidence",
+      "name": "Supplier inspection occurred earlier but evidence arrived later",
+      "mutation": "A supplier certificate asserts an inspection event before K, but the exact certificate was acquired/recorded after K.",
+      "evaluator_control": "The earlier event time does not make the later-arriving certificate available at K. Preserve the claim as unsupported/unknown as the rubric requires.",
+      "required_lineage": [
+        "asserted_event_time",
+        "exact_certificate_digest",
+        "acquisition_or_receipt_time",
+        "decision_frontier"
+      ],
+      "status": "blueprint_only"
+    },
+    {
+      "id": "TDA-003",
+      "family": "derived_materialization_lag",
+      "name": "Canonical record committed before retrieval index refresh",
+      "mutation": "An artifact is committed by K but its search/index/cache materialization occurs after K.",
+      "evaluator_control": "Do not claim the retrieval-based candidate could access the artifact before the exact derived-materialization evidence. Distinguish source availability from system visibility.",
+      "required_lineage": [
+        "canonical_record_receipt",
+        "derived_materialization_receipt",
+        "candidate_retrieval_manifest",
+        "decision_frontier"
+      ],
+      "status": "blueprint_only"
+    },
+    {
+      "id": "TDA-004",
+      "family": "future_effective_requirement",
+      "name": "Known future-effective requirement",
+      "mutation": "A requirement edition or contractual obligation is published before K but becomes effective after target time T.",
+      "evaluator_control": "It may be admissible as a known future obligation; it must not be represented as already effective at T. Keep valid time and decision knowledge separate.",
+      "required_lineage": [
+        "exact_requirement_edition",
+        "publication_or_release_evidence",
+        "validity_interval",
+        "decision_frontier"
+      ],
+      "status": "blueprint_only"
+    },
+    {
+      "id": "TDA-005",
+      "family": "late_supersession_relation",
+      "name": "Supersession relation materialized after the decision",
+      "mutation": "A later supersession relation is committed after K while its source and target nodes carry pre-K-looking timestamps.",
+      "evaluator_control": "The relation cannot retroactively change the K projection unless its own materialization history proves it existed by K.",
+      "required_lineage": [
+        "source_and_target_identity",
+        "relation_identity",
+        "relation_materialization_receipt",
+        "decision_frontier"
+      ],
+      "status": "blueprint_only"
+    },
+    {
+      "id": "TDA-006",
+      "family": "unknown_vintage_or_bound",
+      "name": "Unknown source vintage or temporal bound",
+      "mutation": "The source bytes exist but exact revision, availability time or a required validity bound is missing/ambiguous.",
+      "evaluator_control": "Do not infer a vintage, replace Unknown with Unbounded, or substitute publication/retrieval/event time. Return indeterminate/unsupported under the frozen rubric.",
+      "required_lineage": [
+        "source_artifact_digest",
+        "version_identity_if_known",
+        "explicit_unknown_bound_state",
+        "decision_frontier"
+      ],
+      "status": "blueprint_only"
+    },
+    {
+      "id": "TDA-007",
+      "family": "clock_uncertainty",
+      "name": "Overlapping timestamp uncertainty intervals",
+      "mutation": "Two source observations have clock precision/uncertainty intervals that overlap.",
+      "evaluator_control": "Do not assert strict order, precedence or causal direction from nominal timestamps alone.",
+      "required_lineage": [
+        "raw_timestamp",
+        "offset_and_precision",
+        "clock_source",
+        "uncertainty_interval"
+      ],
+      "status": "blueprint_only"
+    },
+    {
+      "id": "TDA-008",
+      "family": "rights_time_drift",
+      "name": "Historical availability versus present use rights",
+      "mutation": "An exact source was available under one rights profile, but permission changes before replay/query or derived use.",
+      "evaluator_control": "Keep rights at decision time distinct from rights at replay/query time. Historical availability does not grant current permission to retrieve or expose the artifact.",
+      "required_lineage": [
+        "exact_source_digest",
+        "rights_profile_and_validity",
+        "decision_frontier",
+        "replay_or_query_time"
+      ],
+      "status": "blueprint_only"
+    },
+    {
+      "id": "TDA-009",
+      "family": "standards_profile_revision",
+      "name": "Later standards artifact cannot replace frozen normative dependency",
+      "mutation": "A newer indexed standards artifact is available after K while the ratified source version names an earlier validator/profile dependency.",
+      "evaluator_control": "Preserve the exact versioned source set and do not silently substitute a newer schema/context/SHACL artifact into the earlier assessment.",
+      "required_lineage": [
+        "normative_source_identity",
+        "exact_artifact_urls_and_digests_when_acquired",
+        "validator_profile_revision",
+        "decision_frontier"
+      ],
+      "status": "blueprint_only"
+    }
+  ],
+  "hard_gates": [
+    "zero_future_knowledge_leakage",
+    "zero_retroactive_historical_state_rewrite",
+    "zero_clock_semantic_substitution",
+    "unknown_temporal_evidence_never_forced_to_pass",
+    "deterministic_as_of_replay_for_frozen_inputs",
+    "no_authority_or_release_mutation"
+  ],
+  "metrics": [
+    "future_knowledge_leakage_count",
+    "retroactive_rewrite_count",
+    "false_admissibility_and_false_inadmissibility_by_evidence_class",
+    "exact_source_vintage_coverage",
+    "source_available_vs_system_visible_vs_run_context_classification_accuracy",
+    "indeterminate_detection_and_forced_resolution_rate",
+    "historical_replay_equality_under_late_arrival_and_correction_permutations",
+    "clock_order_error_rate",
+    "review_and_retrieval_burden"
+  ],
+  "owner_composition": {
+    "engineering_benchmark": "Symthaea #10543 / #10581",
+    "lifecycle_as_of_reasoning": "Symthaea #10600",
+    "finance_scoped_bitemporal_reference_not_universal": "Symthaea #11241",
+    "artifact_identity_and_import_provenance": "Mycelix #3022 / #5451",
+    "unknown_vs_unbounded": "Mycelix #3046",
+    "temporal_relation_materialization": "Mycelix #4778",
+    "source_specific_chronology": "Mycelix #5687",
+    "desci_receipt_time_projection_only": "Mycelix #5860",
+    "semantic_translation_and_gs1_intake": "Mycelix #1112 / #5395 / #6105"
+  },
+  "non_claims": [
+    "No benchmark task has been adjudicated or scored.",
+    "No candidate agent or commercial vendor was executed.",
+    "A source publication date does not prove actual model retrieval or context inclusion.",
+    "A server receipt proves canonical record commitment under its trust model, not source truth or model visibility.",
+    "Temporal admissibility does not establish engineering safety, compliance, professional approval or release authority.",
+    "No new temporal ledger, evidence graph, event log, receipt schema, validator or decision authority is introduced."
+  ]
+}
