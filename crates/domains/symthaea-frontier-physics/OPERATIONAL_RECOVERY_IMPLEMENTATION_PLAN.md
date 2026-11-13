@@ -39,14 +39,14 @@ The benchmark must verify the precise normalization and hypotheses against the p
 
 ## Decoder-access firewall
 
-Every run must state the input/access set and the hidden environment. The decoder is given only the declared accessible radiation \(A\). It must not receive:
+Every run must state the input/access set and the hidden environment. For the entanglement-assisted Hayden–Preskill setup, the decoder receives exactly A=E tensor R: newly emitted output E plus the accessible early-radiation purifier R. The unassisted ablation receives E only and is a separate channel. Neither setup may receive the remaining remnant output C. It must not receive:
 
-- the remaining black-hole register \(C (remnant output)\);
+- the remaining black-hole remnant output C;
 - the full scrambler unitary as an execution-time input unless it is explicitly provided through a declared oracle/block-encoding interface;
 - a purified global state or hidden amplitudes unavailable to the decoder;
 - simulator-only labels or seed material that would reveal the hidden environment.
 
-The simulator may use the full channel to construct a reference oracle and certify the experiment, but that reference must be sandboxed outside the decoder interface. Add negative controls that deliberately leak \(C (remnant output)\), the global state or hidden random seed and require the access audit to fail.
+The simulator may use the full channel to construct a reference oracle and certify the experiment, but that reference must be sandboxed outside the decoder interface. Add negative controls that deliberately leak C, the global state or hidden random seed and require the access audit to fail.
 
 ## QSVT-Petz implementation ladder
 
