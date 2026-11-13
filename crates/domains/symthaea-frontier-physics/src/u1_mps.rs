@@ -872,6 +872,10 @@ mod tests {
 
         let state = ComplexU1Mps::from_dense_fixed_charge(&dense, 3, 1, 1.0e-12).unwrap();
         assert_eq!(state.total_charge(), 1);
+        assert_eq!(state.dense_input_charge_leakage_max(), 0.0);
+        assert_eq!(state.dense_input_charge_leakage_weight(), 0.0);
+        assert!(state.dense_reconstruction_max_residual().unwrap() <= 1.0e-10);
+        assert!(state.dense_reconstruction_l2_residual().unwrap() <= 1.0e-10);
         assert!(state.maximum_bond_dimension() <= 2);
         assert!((state.norm_squared(1.0e-12).unwrap() - 1.0).abs() <= 1.0e-10);
 
@@ -916,6 +920,22 @@ mod tests {
             ComplexU1Mps::from_dense_fixed_charge(&dense, 3, 4, 1.0e-12),
             Err(U1MpsError::InvalidTotalCharge { .. })
         ));
+    }
+
+
+    #[test]
+    fn dense_factorization_reports_tolerated_out_of_sector_input_leakage() {
+        let amplitude = 1.0 / 3.0_f64.sqrt();
+        let mut dense = vec![Complex64::new(0.0, 0.0); 8];
+        dense[1] = Complex64::new(amplitude, 0.0);
+        dense[2] = Complex64::new(amplitude, 0.0);
+        dense[4] = Complex64::new(amplitude, 0.0);
+        dense[0] = Complex64::new(1.0e-13, 0.0);
+
+        let state = ComplexU1Mps::from_dense_fixed_charge(&dense, 3, 1, 1.0e-12).unwrap();
+        assert!((state.dense_input_charge_leakage_max() - 1.0e-13).abs() <= 1.0e-25);
+        assert!((state.dense_input_charge_leakage_weight() - 1.0e-26).abs() <= 1.0e-38);
+        assert!((state.dense_reconstruction_max_residual().unwrap() - 1.0e-13).abs() <= 1.0e-25);
     }
 
 }
