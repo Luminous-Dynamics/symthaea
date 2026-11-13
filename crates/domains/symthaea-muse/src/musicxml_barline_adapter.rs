@@ -608,7 +608,22 @@ pub fn validate_musicxml_notation_graph_replay(
     score_clock_id: &str,
     supplied: &[MusicXmlPartNotationGraphV1],
 ) -> Result<bool, MusicXmlMeasureAdapterError> {
-    let replayed = parse_musicxml_part_notation_graph(bytes, source_id, score_clock_id)?;
+    let mut replayed = parse_musicxml_part_notation_graph(bytes, source_id, score_clock_id)?;
+    if replayed.len() != supplied.len() {
+        return Ok(false);
+    }
+    // Existing imports persisted the v1 graph before notation_events existed.
+    // Their deserialized sentinel means the event layer was never committed;
+    // compare the historical graph projection rather than invalidating its
+    // receipt merely because a newer parser can now extract more fields.
+    for (current, stored) in replayed.iter_mut().zip(supplied) {
+        if crate::musicxml_notation_events::is_legacy_missing_notation_events(
+            &stored.notation_events,
+        ) {
+            current.notation_events =
+                crate::musicxml_notation_events::legacy_missing_notation_events();
+        }
+    }
     Ok(replayed == supplied)
 }
 
