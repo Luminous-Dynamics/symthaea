@@ -14,7 +14,7 @@ Target applications include emergency/ride-through reserve, intermittent renewab
 
 Cycle-life tests do not fully characterize standby service. A capacitor may exhibit high capacitance retention while losing useful energy through leakage/self-discharge, suffering ESR growth, or failing to maintain the required voltage under load. A 24-hour leakage-current test is a useful standardized baseline but does not establish multi-week or multi-month standby life.
 
-IEC 62391-2:2025 provides the power-application EDLC reference. Its publicly searchable excerpt specifies 20 °C ± 2 °C, rated voltage through a protective resistor no greater than 1 000 Ω, at least 12 hours discharge before the test unless otherwise agreed, and 24-hour electrification unless otherwise agreed. The detail specification controls the applicable leakage-current requirement. The host laboratory must use the controlled normative document and the applicable manufacturer's specification.
+IEC 62391-2:2025 provides the power-application EDLC reference. Its publicly searchable leakage-current procedure specifies 20 °C ± 2 °C, rated voltage through a protective resistor no greater than 1 000 Ω, at least 12 hours discharge before the test unless otherwise agreed, and 24-hour electrification unless otherwise agreed; the applicable detail specification sets the leakage-current requirement. The same sectional specification separately includes a maintain-voltage test (5.11) referencing IEC 62391-1:2022, 6.4: at least 12 hours pre-discharge, rated-voltage charging for 8 hours, then a 24-hour retention-voltage measurement unless otherwise agreed. These are useful standardized quality-assessment procedures, but neither substitutes for measuring usable energy and power delivered into a representative load after the declared standby history. The host laboratory must use the controlled normative document and the applicable manufacturer's specification.
 
 Source: https://webstore.iec.ch/en/publication/82213
 
@@ -46,6 +46,18 @@ Longer standby windows (for example, a 168-hour diagnostic) are exploratory and 
 - Cost per delivered standby Wh/event and maintenance/replacement burden where data permit.
 
 Open-circuit voltage alone does not establish delivered energy. The discharge trace must include simultaneous terminal voltage and current over the declared load window.
+
+## Standby-mode separation and source-energy accounting
+
+Do not pool these operating histories:
+
+- **Open-circuit standby:** isolate the device from external charging; measure voltage decay and later deliverable energy under the frozen load. This is the autonomous-reserve case.
+- **Regulated/constant-voltage hold:** a source actively maintains voltage and may replenish lost charge. Record source-side V/I and integrated hold energy, current-vs-time, control duty and all balancing/monitoring draw. Do not count energy supplied during the hold as energy retained from the initial charge.
+- **Installed-system standby:** include converter quiescent draw, balancing, BMS/sensing, communications, contactors and thermal management at the declared system boundary; report external auxiliary supply separately where used.
+
+For every interval, pair the post-standby load discharge with a matched initial reference using the same voltage window and load profile. Report delivered Wh and W, cutoff/start latency, hold-source energy, auxiliary energy, recovery/refresh energy, and a service-pass outcome against application limits. The service-pass fraction and a predeclared one-sided confidence bound are more decision-relevant than the mean alone; sample counts must follow a variance/power pilot, with unique physical devices and lots—not repeated cycles—forming the independent units.
+
+A current manufacturer comparator also demonstrates why conditions must stay attached to each number: Eaton's XLR-51 188 F module datasheet reports 8 mA nominal leakage at 20 °C after 72 h charge and hold. That is a vendor leakage specification, not post-standby delivered Wh and not unpowered calendar standby. Skeleton's 54 V / 188 F datasheet reports uncharged storage life but does not provide a directly comparable charged-standby delivered-energy result. Do not rank devices by these unlike endpoints.
 
 ## Comparators
 
