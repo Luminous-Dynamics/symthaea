@@ -98,6 +98,16 @@ This is a useful practical comparator precisely because the device-level energy 
 Source: Wu et al., DOI [10.1002/advs.76823](https://doi.org/10.1002/advs.76823); [full text](https://advanced.onlinelibrary.wiley.com/doi/full/10.1002/advs.76823).
 
 
+### Additional commercial comparator — Skeleton SkelMod 54V / 188F
+
+Skeleton's 5 June 2026 datasheet specifies a 54 V / 188 F SkelMod module with 76.14 Wh maximum stored energy, 16 kg typical mass, 13.5 L volume, 3.0 mΩ rated DC 10 ms ESR, 3.4 mΩ rated DC 1 s ESR and 162.6 kW power calculated from 1 s ESR. The module includes an integrated supercapacitor management system, cell balancing, four temperature sensors and CAN communication; the datasheet also states IP65 and natural cooling.
+
+Dividing vendor-stated maximum stored energy by vendor module mass gives approximately **4.76 Wh/kg**; dividing by the vendor-stated module volume gives **5.64 Wh/L**. These are maximum-stored-energy proxies at module boundary, not independently measured usable energy or installed-system metrics. Preserve rated voltage, voltage window, test conditions and module BOM disclosure. The datasheet's cycle-life rows specify 51 V and 48 V variants/voltage windows; do not transfer those cycle-life figures to the 54 V variant.
+
+The commercial landscape therefore already includes high-power modules with integrated balancing, monitoring, communications and environmental protection. Our potential wedge is not "a capacitor with low ESR" alone. It must be a device or module that improves a declared application service—e.g. power transient support per installed mass, cost, heat, lifetime or local manufacturing constraint—against these incumbent modules.
+
+Source: [Skeleton SkelMod 51V / 54V188F data sheet](https://www.skeletontech.com/hubfs/01-DS-211229-SKELMOD-51V177F-1D.pdf?hsLang=en).
+
 ### Commercial EDLC module
 
 Eaton XLR-48 public datasheet reports:
