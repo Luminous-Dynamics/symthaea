@@ -1,0 +1,509 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/neo-observation-voi-v0/schemas/finite-case-v0.1.schema.json",
+  "title": "Symthaea NEO observation value-of-information finite-case v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "title",
+    "claim_ceiling",
+    "purpose",
+    "units",
+    "decision_model",
+    "exact_information_value_controls",
+    "correlated_observation_control",
+    "acceptance_invariants",
+    "numerical_tolerance",
+    "data_status",
+    "limitations",
+    "unknown_dependence_control"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea.neo_observation_voi.finite_case.v0.1"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_ceiling": {
+      "const": "SYNTHETIC_ANALYTIC_ORACLE_ONLY"
+    },
+    "purpose": {
+      "type": "string"
+    },
+    "units": {
+      "type": "object",
+      "required": [
+        "probability",
+        "loss",
+        "information"
+      ],
+      "properties": {
+        "probability": {
+          "type": "string"
+        },
+        "loss": {
+          "type": "string"
+        },
+        "information": {
+          "type": "string"
+        }
+      }
+    },
+    "decision_model": {
+      "type": "object",
+      "required": [
+        "latent_state",
+        "prior",
+        "actions",
+        "baseline_bayes_action",
+        "baseline_expected_bayes_risk",
+        "decision_threshold_impact_probability"
+      ],
+      "properties": {
+        "latent_state": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "string"
+          }
+        },
+        "prior": {
+          "type": "object",
+          "required": [
+            "impact_mode_probability",
+            "safe_mode_probability"
+          ],
+          "properties": {
+            "impact_mode_probability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "safe_mode_probability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "actions": {
+          "type": "object",
+          "required": [
+            "protect",
+            "no_protect"
+          ],
+          "properties": {
+            "protect": {
+              "type": "object",
+              "required": [
+                "loss_in_impact_mode",
+                "loss_in_safe_mode"
+              ],
+              "properties": {
+                "loss_in_impact_mode": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "loss_in_safe_mode": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            },
+            "no_protect": {
+              "type": "object",
+              "required": [
+                "loss_in_impact_mode",
+                "loss_in_safe_mode"
+              ],
+              "properties": {
+                "loss_in_impact_mode": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "loss_in_safe_mode": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "baseline_bayes_action": {
+          "enum": [
+            "protect",
+            "no_protect"
+          ]
+        },
+        "baseline_expected_bayes_risk": {
+          "type": "number",
+          "minimum": 0
+        },
+        "decision_threshold_impact_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "exact_information_value_controls": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "description",
+          "expected_entropy_reduction_bits",
+          "expected_post_observation_bayes_risk",
+          "expected_value_of_sample_information",
+          "expected_mutual_information_with_decision_state_bits"
+        ],
+        "properties": {
+          "candidate_id": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "nuisance_prior": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "expected_entropy_reduction_bits": {
+            "type": "number",
+            "minimum": 0
+          },
+          "expected_post_observation_bayes_risk": {
+            "type": "number",
+            "minimum": 0
+          },
+          "expected_value_of_sample_information": {
+            "type": "number",
+            "minimum": 0
+          },
+          "expected_mutual_information_with_decision_state_bits": {
+            "type": "number",
+            "minimum": 0
+          },
+          "optimal_choice": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "correlated_observation_control": {
+      "type": "object",
+      "required": [
+        "latent_observation_model",
+        "single_reading",
+        "two_readings_same_source",
+        "two_readings_independent_sources",
+        "naive_independence_failure"
+      ],
+      "properties": {
+        "latent_observation_model": {
+          "type": "object",
+          "required": [
+            "shared_calibration_bias_probability",
+            "independent_per_reading_error_probability_given_calibration_state",
+            "effective_single_reading_error_probability"
+          ],
+          "properties": {
+            "shared_calibration_bias_probability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "independent_per_reading_error_probability_given_calibration_state": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "calibration_state_good": {
+              "type": "string"
+            },
+            "calibration_state_bad": {
+              "type": "string"
+            },
+            "effective_single_reading_error_probability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "explanation": {
+              "type": "string"
+            }
+          }
+        },
+        "single_reading": {
+          "$ref": "#/$defs/reading"
+        },
+        "two_readings_same_source": {
+          "$ref": "#/$defs/pair"
+        },
+        "two_readings_independent_sources": {
+          "$ref": "#/$defs/pair"
+        },
+        "naive_independence_failure": {
+          "type": "object",
+          "required": [
+            "actual_expected_bayes_risk_for_two_same_source_readings",
+            "incorrectly_assumed_expected_bayes_risk_if_shared_bias_is_ignored",
+            "risk_underestimation",
+            "actual_evsi",
+            "incorrectly_assumed_evsi",
+            "evsi_overstatement",
+            "required_behavior"
+          ],
+          "properties": {
+            "actual_expected_bayes_risk_for_two_same_source_readings": {
+              "type": "number"
+            },
+            "incorrectly_assumed_expected_bayes_risk_if_shared_bias_is_ignored": {
+              "type": "number"
+            },
+            "risk_underestimation": {
+              "type": "number"
+            },
+            "actual_evsi": {
+              "type": "number"
+            },
+            "incorrectly_assumed_evsi": {
+              "type": "number"
+            },
+            "evsi_overstatement": {
+              "type": "number"
+            },
+            "required_behavior": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "acceptance_invariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "numerical_tolerance": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "data_status": {
+      "const": "synthetic_exact_finite_case"
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "unknown_dependence_control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mycelix_profile_schema",
+        "mycelix_profile_id",
+        "assertion_id",
+        "assessment",
+        "independent_product_permitted",
+        "joint_likelihood_available",
+        "numeric_evsi",
+        "required_behavior",
+        "rationale"
+      ],
+      "properties": {
+        "mycelix_profile_schema": {
+          "const": "mycelix.neo_evidence.source_correlation_profile.v0.1"
+        },
+        "mycelix_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assertion_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assessment": {
+          "const": "unknown"
+        },
+        "independent_product_permitted": {
+          "const": false
+        },
+        "joint_likelihood_available": {
+          "const": false
+        },
+        "numeric_evsi": {
+          "type": "null"
+        },
+        "required_behavior": {
+          "const": "ABSTAIN_DEPENDENCE_UNRESOLVED"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "$defs": {
+    "outcome": {
+      "type": "object",
+      "required": [
+        "outcome",
+        "probability",
+        "posterior_impact_probability",
+        "bayes_action",
+        "conditional_bayes_risk"
+      ],
+      "properties": {
+        "outcome": {
+          "type": "string"
+        },
+        "probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "posterior_impact_probability": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "bayes_action": {
+          "enum": [
+            "protect",
+            "no_protect"
+          ]
+        },
+        "conditional_bayes_risk": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "reading": {
+      "type": "object",
+      "required": [
+        "expected_information_gain_bits",
+        "expected_post_observation_bayes_risk",
+        "expected_value_of_sample_information",
+        "outcomes"
+      ],
+      "properties": {
+        "expected_information_gain_bits": {
+          "type": "number",
+          "minimum": 0
+        },
+        "expected_post_observation_bayes_risk": {
+          "type": "number",
+          "minimum": 0
+        },
+        "expected_value_of_sample_information": {
+          "type": "number",
+          "minimum": 0
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "required": [
+              "outcome",
+              "probability",
+              "posterior_impact_probability",
+              "bayes_action",
+              "conditional_bayes_risk"
+            ],
+            "properties": {
+              "outcome": {
+                "type": "string"
+              },
+              "probability": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "posterior_impact_probability": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "bayes_action": {
+                "enum": [
+                  "protect",
+                  "no_protect"
+                ]
+              },
+              "conditional_bayes_risk": {
+                "type": "number",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "pair": {
+      "type": "object",
+      "required": [
+        "expected_information_gain_bits",
+        "expected_post_observation_bayes_risk",
+        "expected_value_of_sample_information",
+        "outcome_table"
+      ],
+      "properties": {
+        "source_correlation_group": {
+          "type": "string"
+        },
+        "source_correlation_groups": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string"
+          }
+        },
+        "expected_information_gain_bits": {
+          "type": "number",
+          "minimum": 0
+        },
+        "expected_post_observation_bayes_risk": {
+          "type": "number",
+          "minimum": 0
+        },
+        "expected_value_of_sample_information": {
+          "type": "number",
+          "minimum": 0
+        },
+        "outcome_table": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "items": {
+            "$ref": "#/$defs/outcome"
+          }
+        }
+      }
+    }
+  }
+}

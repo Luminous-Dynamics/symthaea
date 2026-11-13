@@ -1,0 +1,76 @@
+name: NEO observation VOI finite oracle
+
+on:
+  pull_request:
+    paths:
+      - "benchmarks/neo-observation-voi-v0/cases/**"
+      - "benchmarks/neo-observation-voi-v0/schemas/**"
+      - "benchmarks/neo-observation-voi-v0/verifier/**"
+      - "benchmarks/neo-observation-voi-v0/README.md"
+  push:
+    branches: [main]
+    paths:
+      - "benchmarks/neo-observation-voi-v0/cases/**"
+      - "benchmarks/neo-observation-voi-v0/schemas/**"
+      - "benchmarks/neo-observation-voi-v0/verifier/**"
+      - "benchmarks/neo-observation-voi-v0/README.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: neo-observation-voi-v0-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'auto' }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  MANIFEST: benchmarks/neo-observation-voi-v0/verifier/Cargo.toml
+
+jobs:
+  verify:
+    name: Finite VOI oracle / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Generate isolated lockfile
+        run: cargo generate-lockfile --manifest-path ${{ env.MANIFEST }}
+
+      - name: Format check
+        run: cargo fmt --manifest-path ${{ env.MANIFEST }} -- --check
+
+      - name: Clippy
+        run: cargo clippy --manifest-path ${{ env.MANIFEST }} --locked --all-targets -- -D warnings
+
+      - name: Unit tests
+        run: cargo test --manifest-path ${{ env.MANIFEST }} --locked
+
+      - name: Produce deterministic receipt
+        shell: bash
+        run: |
+          cargo run --manifest-path "${{ env.MANIFEST }}" --locked --release > neo-voi-receipt.json
+          grep -Fq '"status": "PASS_SYNTHETIC_DECISION_ORACLE_ONLY"' neo-voi-receipt.json
+          cat neo-voi-receipt.json
+
+      - name: Upload lockfile and receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: neo-voi-v0-${{ matrix.os }}
+          path: |
+            benchmarks/neo-observation-voi-v0/verifier/Cargo.lock
+            neo-voi-receipt.json
+          if-no-files-found: warn
+          retention-days: 90
