@@ -801,8 +801,10 @@ fn validate_evaluations(
     baseline_arm_id: &str,
     candidate_arm_id: &str,
     evaluations: &[ClusterEvaluation],
-) -> Result<BTreeMap<(SourceDimension, EvaluationRegime), Vec<ClusterTransferReport>>, TransferGapError>
-{
+) -> Result<
+    BTreeMap<(SourceDimension, EvaluationRegime), Vec<ClusterTransferReport>>,
+    TransferGapError,
+> {
     if evaluations.is_empty() {
         return Err(TransferGapError::NoEvaluations);
     }
@@ -846,9 +848,7 @@ fn validate_evaluations(
             "independence_receipt_digest",
             &evaluation.independence_receipt_digest,
         )
-        .map_err(|_| TransferGapError::MissingEvaluationIdentity(
-            evaluation.cluster_id.clone(),
-        ))?;
+        .map_err(|_| TransferGapError::MissingEvaluationIdentity(evaluation.cluster_id.clone()))?;
 
         let expected_manifest = match evaluation.regime {
             EvaluationRegime::FamiliarSourceReference => &scope.familiar_reference_manifest_digest,
