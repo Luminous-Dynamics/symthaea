@@ -136,12 +136,11 @@ A single missing, mismatched or failing receipt invalidates the global bound for
 ## Explicit limitations
 
 This increment does **not** yet implement:
-- Second-order even/odd/even or odd/even/odd Trotter time-stepper and Hamiltonian gate generation.
-- Mixed-canonical gauge sweeps with machine-checkable exterior-isometry receipts.
-- Global circuit-level state-vector and reduced-state error bounds.
-- Nonlocal MPO evolution, adaptive time stepping and any N=16–64 scaling or matched Quimb/ITensor performance claim.
+- Nonlocal MPO evolution, adaptive time stepping and higher-order Suzuki compositions.
+- Independent dense-oracle qualification of the globally weighted error ledger for longer sequential circuits.
+- Any N=16–64 scaling or matched Quimb/ITensor performance claim.
 
-Those are the next stages. The implementation should add them in this order: Hamiltonian-to-gate generation and Strang layer composition, mixed-canonical sweeps and gauge receipts, global circuit-level error qualification, then controlled scaling against Quimb and ITensor.
+Those are the next stages. The implementation should add them in this order: dense-oracle qualification of multi-stage global error bounds, nonlocal MPO support, adaptive and higher-order time stepping, then controlled scaling against Quimb, ITensor and TeNPy.
 
 ## Competitive benchmark policy
 

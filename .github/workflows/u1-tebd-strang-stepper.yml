@@ -1,0 +1,56 @@
+name: U1 TEBD Strang time-stepper source harness
+
+on:
+  push:
+    branches:
+      - research/u1-tebd-strang-stepper-20261113
+    paths:
+      - crates/domains/symthaea-frontier-physics/src/u1_mps.rs
+      - .github/workflows/u1-tebd-strang-stepper.yml
+  pull_request:
+    branches:
+      - research/u1-tebd-global-error-ledger-20261113
+    paths:
+      - crates/domains/symthaea-frontier-physics/src/u1_mps.rs
+      - .github/workflows/u1-tebd-strang-stepper.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: u1-tebd-strang-stepper-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  source-harness:
+    name: Rust 1.96 U1 Strang TEBD exact-source validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-frontier-physics/src/u1_mps.rs
+      - name: Compile, lint and test exact source in an isolated harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          harness="$(mktemp -d)"
+          trap 'rm -rf "$harness"' EXIT
+          mkdir -p "$harness/src"
+          cp crates/domains/symthaea-frontier-physics/src/u1_mps.rs "$harness/src/lib.rs"
+          cat > "$harness/Cargo.toml" <<'EOF'
+          [package]
+          name = "u1-tebd-strang-stepper-validation"
+          version = "0.1.0"
+          edition = "2024"
+
+          [dependencies]
+          num-complex = "=0.4.6"
+          nalgebra = "=0.34.2"
+          EOF
+          cargo clippy --manifest-path "$harness/Cargo.toml" --all-targets -- -D warnings
+          cargo test --manifest-path "$harness/Cargo.toml" --lib
