@@ -78,7 +78,7 @@
       "expected_total_demand": 500,
       "expected_available_capacity": 520,
       "expected_shortfall": 0,
-      "expected_outcome": "meets_floor",
+      "expected_outcome": "capacity_sufficient",
       "evidence_class": "synthetic",
       "result_scope": "synthetic_contract_only",
       "source_ref_ids": [
@@ -99,7 +99,7 @@
       "expected_total_demand": 550,
       "expected_available_capacity": 520,
       "expected_shortfall": 30,
-      "expected_outcome": "breaches_floor",
+      "expected_outcome": "capacity_shortfall",
       "evidence_class": "synthetic",
       "result_scope": "synthetic_contract_only",
       "source_ref_ids": [
