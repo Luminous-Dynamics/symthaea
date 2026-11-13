@@ -365,11 +365,6 @@ fn dependency_report(alias: &str, config: &Value, ws: &Workspace, manifests: &[M
         });
         is_within(&workspace_dir, &candidate_dir) && !excluded && !nested
     });
-    if inheriting.is_empty() && malformed_in_scope {
-        classification = "UNRESOLVED_OWNERSHIP".into();
-        reasons.push("At least one manifest in this workspace scope could not be parsed; unused status is not established.".into());
-    }
-
     if inheriting.is_empty() && !external.is_empty() {
         let has_excluded = external.iter().any(|o| manifests.iter().find(|m| m.path == o.manifest)
             .is_some_and(|m| membership(m, ws).1));
@@ -386,6 +381,11 @@ fn dependency_report(alias: &str, config: &Value, ws: &Workspace, manifests: &[M
             reasons.push("Same-name declarations exist but workspace inheritance is not proven.".into());
         }
     }
+    if malformed_in_scope {
+        classification = "UNRESOLVED_OWNERSHIP".into();
+        reasons.push("At least one manifest in this workspace scope could not be parsed; the full owner set is not established.".into());
+    }
+
     if inheriting.is_empty() && external.is_empty() {
         reasons.push("No same-name declaration was found in scanned manifests; this is not proof of global non-use because generated or external build contexts remain outside this observation.".into());
     }
