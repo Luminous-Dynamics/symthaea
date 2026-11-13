@@ -1,18 +1,19 @@
 # Universal error-set recovery and decoder reuse
 
-**Status:** the exact three-qubit bit-flip error-set baseline passed the exact-head Rust 1.96 gate at `50404c09b1f7e7e79c91fa7a38b47716309b6b2e`: formatting and Clippy passed; all 153 frontier-physics crate tests passed (0 failed). The general approximate error-set Petz construction, its Hellinger/environment-leakage metrics, and universal QSVT implementation remain future work.
+**Status:** the exact three-qubit bit-flip baseline passed Rust 1.96 (153/153) at `50404c09…`. The general complex QEC-matrix constructor and exact-KL projection passed formatting, Clippy and the frontier-physics suite at `870ab5bf…` (157 passed, 0 failed). The Hellinger square-root metric, environment-leakage diamond norm and approximate universal error-set Petz recovery remain unimplemented.
 
 ## Why this is a distinct paradigm
 
 A channel-specific decoder is optimized for one noise channel. A universal error-set decoder is built once from a code space and a declared finite error set, then reused across every channel in a mathematically controlled family.
 
 The August 29, 2026 preprint *Universal recovery in approximate quantum error correction* establishes a framework in which one recovery map works uniformly across a family of approximate error channels. It introduces:
-- E-controlled channels: each channel Kraus operator lies in the span of a fixed error set, with a coefficient-matrix contraction bound.
+- E-controlled channels: each channel Kraus operator lies in the span of a fixed error set, with coefficient matrix spectral/operator norm `||C||_infinity <= 1`.
 - The Knill–Laflamme Hellinger distance, controlling average-case performance of the error-set Petz map.
-- The environment-leakage distance, controlling worst-case performance under the stronger control condition.
+- The environment-leakage distance, which controls worst-case AQEC error.
+- Strongly E-controlled channels, which additionally satisfy the paper's stronger coefficient constraint `||C||_2 <= 1`; the paper derives a direct operator-norm worst-case bound for the error-set Petz map on this subfamily.
 - A Petz recovery map constructed from the error set and code, rather than re-optimized for every channel.
 
-Reference: https://arxiv.org/abs/2608.28962 (preprint; pin the exact version and theorem assumptions before formal reproduction).
+Reference: https://arxiv.org/abs/2608.28962v2 (2026 preprint). The distinctions below follow Definitions 2, 4 and 7 and Theorem 11 of the current version; pin the arXiv version when producing external reproduction receipts.
 
 ## Mathematical objects
 
@@ -59,15 +60,37 @@ where
 \right]|k\rangle\langle l|.
 \]
 
-The source paper relates the Hellinger quantity to average-case universal recovery and the environment-leakage quantity to worst-case guarantees under stronger E-control. Do not swap these roles or report one metric as the other.
+The paper defines E-controlled channels by the spectral/operator-norm constraint \(\|C\|_\infty\leq1\), where \(F_\alpha=\sum_k C_{\alpha k}E_k\). The stronger subclass of *strongly E-controlled* channels uses \(\|C\|_2\leq1\), with the paper's Schatten-2/Hilbert–Schmidt convention. Record these as different constraints; do not replace one by the other. Every theorem application must independently verify that the resulting map is CPTP.
 
-An E-controlled channel has Kraus operators
+An important implementation shortcut is that the Hellinger quantity has a closed form:
 
 \[
-F_\alpha=\sum_k c_{\alpha k}E_k
+\zeta_H(\mathcal E,Q)
+=\sqrt{
+\frac{\operatorname{tr}(A_{\rm QEC})}{K}
+-\frac{1}{K^2}
+\left\|\operatorname{tr}_{K}\sqrt{A_{\rm QEC}}\right\|_2^2
+}.
 \]
 
-with the coefficient matrix C satisfying the paper's specified contraction condition. The strongest worst-case statement uses its stronger coefficient constraint. Every theorem application must record which norm constraint is satisfied and verify channel CPTP conditions independently.
+This removes an explicit optimization over \(\lambda\), but it still requires a support-aware positive-semidefinite square root of the QEC matrix. Do not add an arbitrary positive eigenvalue floor.
+
+For the error-set Petz map, Theorem 11 also gives a direct worst-case Bures-distance bound on strongly E-controlled channels:
+
+\[
+d_{\rm wc}\!\left(
+\mathcal R^{\rm Petz}_{\mathcal E,Q}\circ\mathcal N|_{L(Q)},I_{L(Q)}
+\right)
+\leq
+\frac{1}{\sqrt 2}
+\left\|
+\sqrt{A_{\rm QEC}}-
+I_K\otimes\frac{1}{\sqrt K}
+\sqrt{\operatorname{tr}_K(A_{\rm QEC})}
+\right\|_\infty.
+\]
+
+This operator-norm Petz bound is distinct from the environment-leakage diamond distance. Report both only when both are actually computed, and apply the Petz bound only after verifying strong E-control.
 
 ## Executable exact baseline now added
 
@@ -89,6 +112,23 @@ The code reports:
 Tests cover each one-hot error, uniform and asymmetric mixtures, a frozen 64-member probability sweep, reuse of the same decoder, and rejection of invalid probability vectors without silent normalization.
 
 **Claim ceiling:** this is an exact-KL bit-flip control for stochastic mixtures of four declared unitary errors. It is not the general approximate error-set Petz algorithm from the new paper, does not compute the Hellinger or diamond environment-leakage distances, and does not validate arbitrary E-controlled coefficient matrices.
+
+
+## General complex QEC-matrix constructor now added
+
+The new module `src/error_set_qec.rs` accepts a complex code isometry V and any finite list of square complex error operators. It constructs the QEC Gram matrix
+[
+A_{(i,k),(j,l)}=\langle E_k c_i|E_l c_j\rangle
+]
+and computes the Frobenius-orthogonal projection onto the exact-KL subspace:
+[
+\lambda_{kl}=\frac{1}{K}\sum_i A_{(i,k),(i,l)}.
+]
+It reports code-isometry, Hermiticity and absolute/relative KL-projection residuals. The projection preserves dependent error-set members and rank-deficient \(\lambda\); no basis orthogonalization or spectral flooring is performed.
+
+The exact-head Rust 1.96 audit passed formatting, Clippy and **157/157** frontier-physics crate tests at `870ab5bf2728f542e9ac64e2236b80795b9cb7` (workflow 43380572096). Five new tests exercise the exact repetition-code error set, a phase-error negative control, duplicated errors, invalid code/operator shapes and non-finite input.
+
+This is UR-1 and part of UR-2. The QEC matrix is a Gram matrix and hence PSD in exact arithmetic, but this implementation does not yet return a floating-point minimum-eigenvalue certificate. It also does not validate channel CPTP constraints or compute either approximate-recovery metric.
 
 ## The larger research programme
 
