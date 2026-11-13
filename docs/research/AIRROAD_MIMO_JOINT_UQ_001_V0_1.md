@@ -71,6 +71,24 @@ This is a valid conservative outer box, but the true correlated set is exactly Z
 
 This does not invalidate #11788. Independent hard-disc enclosures are still useful and conservative when shared dependence is not known or cannot be qualified. The joint method is admissible only when the same nuisance variable and complete record coverage are proven.
 
+
+## 4A. Applicability of a genuinely shared calibration factor
+
+The cancellation result is conditional on one and the same complex factor applying to both current and voltage records. It must not be generalized to separate voltage- and current-channel calibration chains.
+
+If the channels instead have distinct factors:
+
+    V_measured = q_v * V_physical
+    I_measured = q_i * I_physical
+
+then:
+
+    Z_measured = (q_v/q_i) * Z_physical
+
+and the ratio uncertainty remains unless q_v/q_i is itself bounded or otherwise qualified. A common clock/timebase, frequency-response correction, or probe loading effect also need not be representable as a pure multiplicative gain; each requires its own typed observation model.
+
+V0.1 is deliberately the narrow common-factor cancellation case. A real calibration record must justify exactly which channels, quantities, frequencies, operating modes and acquisition runs share the nuisance variable.
+
 ## 5. Evidence semantics
 
 V0.1 admits only deterministic hard-set semantics with:
