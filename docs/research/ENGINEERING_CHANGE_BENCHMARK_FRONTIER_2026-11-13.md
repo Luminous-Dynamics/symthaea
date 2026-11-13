@@ -149,7 +149,44 @@ A defensible claim needs a preregistered, same-task contrast where:
 
 Until those conditions hold, the accurate statement is that Luminous has a **stronger proposed assurance contract and benchmark hypothesis**, not that it has beaten Siemens, Aras, PTC, IBM or temporal-reasoning SOTA.
 
-## 8. Immediate execution sequence
+## 8. Paradigm shift: abstention should produce a decision-relevant evidence plan
+
+A system that returns `UnknownImpact` instead of guessing is safer than one that fabricates a preservation witness. But the next capability is to make uncertainty **actionable**: identify the smallest authorized observation that could change the engineering decision, estimate its decision value and cost, and stop when further evidence cannot improve the permitted choice.
+
+For an unresolved claim–evidence pair, candidate acquisition actions may include:
+- retrieve the exact source vintage or artifact bytes and capture its receipt/digest;
+- request the missing supplier certificate or inspection evidence;
+- refresh and attest the permitted retrieval/index materialization state;
+- request an independent domain assessor;
+- run a bounded numerical recalculation or physical measurement through the appropriate existing owner;
+- ask a discriminating clarification about configuration, operating envelope, lot or requirement scope.
+
+This is not a permission to fetch restricted material or to initiate a physical test. Every acquisition action must be authorized under the existing rights, identity and effect owners; a missing permission yields abstain/escalate, not a workaround.
+
+Compose the research with existing value-of-information owners rather than adding a new planner:
+- Symthaea [SE-OPT-BENCH #7803](https://github.com/Luminous-Dynamics/symthaea/issues/7803) — decision-impact experiment selection;
+- Symthaea [EV-DIAGNOSTIC-VOI #11277](https://github.com/Luminous-Dynamics/symthaea/issues/11277) — battery diagnostic tests by expected decision value;
+- Symthaea [REA-RUST-014 #10109](https://github.com/Luminous-Dynamics/symthaea/issues/10109) — robust investigation beyond information gain;
+- Symthaea [CEB-CAUSE-001 #10366](https://github.com/Luminous-Dynamics/symthaea/issues/10366) — hypothesis-driven causal debugging and experiment selection.
+
+### Prospective acquisition-policy comparison
+
+| Policy | What it tests |
+|---|---|
+| A0 — always abstain / escalate | Safe but potentially costly and slow |
+| A1 — cheapest-first | Whether naive cost minimization acquires low-value evidence |
+| A2 — entropy / information gain | Whether uncertainty reduction alone selects the right observation |
+| A3 — decision-aware EVSI | Whether expected reduction in decision loss justifies acquisition cost |
+| A4 — robust / misspecified-world EVSI | Whether the selected observation remains useful under uncertain model structure and costs |
+| A5 — qualified human workflow | Expertise, disagreement, latency and review-cost reference |
+
+Measure expected decision-regret reduction, realized decision changes, acquisition spend/time, human minutes, rights/authorization failures, unresolved fraction, unnecessary acquisition, and the value of preserving reversible options. Report calibrated prediction versus realized value; do not treat estimated EVSI as observed benefit.
+
+**Non-compensatory gates:** zero unauthorized acquisition, zero unapproved physical or production action, zero use of future evidence, and zero conversion of an observation plan into approval or release. A planner can recommend an action; the owner of that action still authorizes and verifies it.
+
+This is a high-value follow-on, not a result in the existing 24-case pilot. First qualify the V1.1 evidence record and independent gold process; then add a preregistered decision-aware acquisition comparison only where the frozen cases contain a genuine unresolved decision and an admissible observation path.
+
+## 9. Immediate execution sequence
 
 1. Complete the current-main V1.1 gold-schema review and add a qualifying Draft 2020-12 validator/evaluator once the owner accepts the contract.
 2. Obtain two qualified, independent engineering assessors; the synthetic schema fixture is not a human gold label.
