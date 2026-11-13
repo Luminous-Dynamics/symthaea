@@ -1829,6 +1829,9 @@ impl U1TeBDLayer {
         parity: u8,
         mut gates: Vec<U1TeBDGate>,
     ) -> Result<Self, U1MpsError> {
+        if site_count == 0 {
+            return Err(U1MpsError::EmptyChain);
+        }
         if parity > 1 {
             return Err(U1MpsError::InvalidTeBDParity(parity));
         }
