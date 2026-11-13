@@ -5876,7 +5876,8 @@ mod notation_summary_tests {
             parts: vec![symthaea_muse::midi_measure_sidecar::MidiPartMeasureSidecarV1 {
                 part_id: "Piano".into(),
                 source_track_index: 0,
-                measures: vec![symthaea_muse::midi_measure_sidecar::MidiMeasureSpanSidecarV1 {
+                measures:source_channel: None,
+                measures:measures: vec![symthaea_muse::midi_measure_sidecar::MidiMeasureSpanSidecarV1 {
                     start_tick: 0,
                     end_tick: 1920,
                     kind: symthaea_muse::barline_eval::MeasureKind::Regular,
