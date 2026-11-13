@@ -511,10 +511,28 @@ fn audit_schema(root: &Path) -> Result<()> {
     {
         bail!("device_sequences must reference the canonical deviceSequence schema");
     }
+    if schema["additionalProperties"] != serde_json::Value::Bool(false)
+        || schema["$defs"]["event"]["additionalProperties"] != serde_json::Value::Bool(false)
+    {
+        bail!("sequential-reserve top-level and event schemas must reject unknown fields");
+    }
     if schema["$defs"]["event"]["properties"]["load_profile_id"]["type"].as_str()
         != Some("string")
     {
         bail!("event schema must require a load_profile_id field");
+    }
+    let probe_profile_types = schema["$defs"]["event"]["properties"]["readiness_probe_profile_id"]["type"]
+        .as_array()
+        .context("readiness_probe_profile_id schema must allow a string or null")?;
+    if !probe_profile_types.iter().any(|kind| kind.as_str() == Some("string"))
+        || !probe_profile_types.iter().any(|kind| kind.as_str() == Some("null"))
+    {
+        bail!("readiness_probe_profile_id must allow string and null types");
+    }
+    if schema["$defs"]["deviceSequence"]["allOf"].as_array().map_or(true, |rules| rules.len() < 2)
+        || schema["$defs"]["event"]["allOf"].as_array().map_or(true, |rules| rules.len() < 2)
+    {
+        bail!("sequence schema must encode measured/censored and readiness-probe conditional invariants");
     }
     let top_required = schema["required"]
         .as_array()
