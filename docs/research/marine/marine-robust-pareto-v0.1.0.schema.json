@@ -136,8 +136,12 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "metric_id",
+        "bandwidth_convention",
         "direction",
+        "frequency_band_id",
+        "measurement_basis",
+        "metric_id",
+        "reference_distance_m",
         "unit"
       ],
       "properties": {
@@ -154,6 +158,43 @@
         "unit": {
           "type": "string",
           "minLength": 1
+        },
+        "measurement_basis": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "underwater_source_level",
+            null
+          ]
+        },
+        "reference_distance_m": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "frequency_band_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "bandwidth_convention": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "one_third_octave",
+            "octave",
+            "constant_bandwidth",
+            "power_spectral_density",
+            null
+          ]
         }
       }
     },
@@ -161,15 +202,19 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "gate_id",
-        "gate_class",
+        "bandwidth_convention",
         "evaluation",
+        "frequency_band_id",
+        "gate_class",
+        "gate_id",
+        "measurement_basis",
         "metric_id",
-        "threshold",
-        "unit",
+        "non_compensable",
+        "reference_distance_m",
         "required_audit_contract_id",
         "requirement_reference",
-        "non_compensable"
+        "threshold",
+        "unit"
       ],
       "properties": {
         "gate_id": {
@@ -220,6 +265,43 @@
         },
         "non_compensable": {
           "const": true
+        },
+        "measurement_basis": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "underwater_source_level",
+            null
+          ]
+        },
+        "reference_distance_m": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "frequency_band_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "bandwidth_convention": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "one_third_octave",
+            "octave",
+            "constant_bandwidth",
+            "power_spectral_density",
+            null
+          ]
         }
       }
     },
@@ -345,16 +427,20 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "metric_id",
-        "value",
-        "expanded_uncertainty",
-        "confidence_level",
-        "unit",
-        "method_id",
-        "raw_data_sha256",
+        "bandwidth_convention",
         "calibration_or_validation_sha256",
+        "confidence_level",
+        "expanded_uncertainty",
+        "frequency_band_id",
+        "measurement_basis",
+        "method_id",
+        "metric_id",
+        "operating_point_receipt_sha256",
+        "raw_data_sha256",
+        "reference_distance_m",
         "timebase_receipt_sha256",
-        "operating_point_receipt_sha256"
+        "unit",
+        "value"
       ],
       "properties": {
         "metric_id": {
@@ -392,6 +478,43 @@
         },
         "operating_point_receipt_sha256": {
           "$ref": "#/$defs/digest"
+        },
+        "measurement_basis": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "underwater_source_level",
+            null
+          ]
+        },
+        "reference_distance_m": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "frequency_band_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "bandwidth_convention": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "one_third_octave",
+            "octave",
+            "constant_bandwidth",
+            "power_spectral_density",
+            null
+          ]
         }
       }
     },
