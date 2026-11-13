@@ -3646,7 +3646,9 @@ mod tests {
         assert!((result.output_norm_squared - 1.0).abs() <= 1.0e-10);
         assert_eq!(result.truncation_ledger.gate_count, 2);
         assert_eq!(result.gate_truncations.len(), 2);
-        assert!(!result.global_l2_bound_qualified);
+        assert_eq!(result.canonical_gauge_receipts.len(), 2);
+        assert!(result.global_l2_bound_qualified);
+        assert!(result.truncation_ledger.global_state_error_bound_upper.is_some());
 
         let dense = result.state.to_dense(8).unwrap();
         assert!((dense[5] - Complex64::new(1.0, 0.0)).norm() <= 1.0e-10);
@@ -3677,7 +3679,9 @@ mod tests {
         assert_eq!(result.output_total_charge, 1);
         assert!((result.output_norm_squared - result.input_norm_squared).abs() <= 1.0e-10);
         assert!(result.gate_truncations[0].discarded_weight <= 1.0e-12);
-        assert!(!result.global_l2_bound_qualified);
+        assert_eq!(result.canonical_gauge_receipts.len(), 1);
+        assert!(result.global_l2_bound_qualified);
+        assert!(result.truncation_ledger.global_state_error_bound_upper.is_some());
         let dense = result.state.to_dense(4).unwrap();
         assert!((dense[1] - Complex64::new(1.0, 0.0)).norm() <= 1.0e-10);
     }
@@ -3942,6 +3946,74 @@ mod tests {
         for (first_value, second_value) in dense_after_first.iter().zip(dense_after_second.iter()) {
             assert!((*first_value - *second_value).norm() <= 1.0e-10);
         }
+    }
+
+
+    #[test]
+    fn tebd_global_error_bound_matches_dense_two_site_discarded_component() {
+        let mut dense = vec![complex_zero(); 4];
+        dense[1] = Complex64::new(0.8, 0.0);
+        dense[2] = Complex64::new(0.6, 0.0);
+        let input = ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12).unwrap();
+        let layer = U1TeBDLayer::new(
+            2,
+            0,
+            vec![U1TeBDGate::new(0, U1TwoSiteGate::identity())],
+        )
+        .unwrap();
+        let result = layer
+            .apply(
+                &input,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 1,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-10,
+                },
+            )
+            .unwrap();
+
+        assert!(result.global_l2_bound_qualified);
+        assert_eq!(result.canonical_gauge_receipts.len(), 1);
+        assert!(result.canonical_gauge_receipts[0].qualifies(1.0e-10));
+        assert!((result.gate_truncations[0].discarded_weight - 0.36).abs() <= 1.0e-10);
+        let certified_bound = result
+            .truncation_ledger
+            .global_state_error_bound_upper
+            .expect("qualified gauge must produce global error bound");
+        assert!((certified_bound - 0.6).abs() <= 1.0e-10);
+
+        let before = input.to_dense(4).unwrap();
+        let after = result.state.to_dense(4).unwrap();
+        let actual_error = before
+            .iter()
+            .zip(after.iter())
+            .map(|(left, right)| (*left - *right).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        assert!((actual_error - 0.6).abs() <= 1.0e-10);
+        assert!(certified_bound + 1.0e-10 >= actual_error);
+        assert!((result.output_norm_squared - 0.64).abs() <= 1.0e-10);
+    }
+
+    #[test]
+    fn tebd_global_error_bound_stays_disabled_when_any_gauge_receipt_fails() {
+        let input = canonical_w_state();
+        let mut ledger = U1MpsTruncationLedger::default();
+        let diagnostics = single_excitation_pair(0.8, 0.6)
+            .split_truncated(U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 1,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        let mut bad_receipt = input.clone();
+        let mut receipt = bad_receipt.canonicalize_for_bond(0, 1.0e-10).unwrap();
+        receipt.qualified = false;
+        ledger
+            .record_with_canonical_gauge(&diagnostics, &receipt, 1.0e-10)
+            .unwrap();
+        assert!(!ledger.global_state_error_bound_qualified);
+        assert!(ledger.global_state_error_bound_upper.is_none());
     }
 
 }
