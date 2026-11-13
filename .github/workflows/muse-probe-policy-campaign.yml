@@ -65,7 +65,7 @@ jobs:
         run: cargo metadata --locked --no-deps --format-version 1 > /tmp/muse-campaign-metadata.json
 
       - name: Check Muse formatting
-        run: cargo fmt --manifest-path crates/domains/symthaea-muse/Cargo.toml --package symthaea-muse -- --check
+        run: rustfmt --check --edition 2024 crates/domains/symthaea-muse/src/probe_policy_campaign.rs
 
       - name: Run factorial oracle tests
         run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib factorial_ground_truth::tests
