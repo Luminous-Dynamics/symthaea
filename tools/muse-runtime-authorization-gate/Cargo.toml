@@ -1,0 +1,11 @@
+[package]
+name = "muse-runtime-authorization-gate"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "One-shot content-bound execution authorization and reconciliation gate for Muse"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]

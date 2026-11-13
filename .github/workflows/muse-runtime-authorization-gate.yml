@@ -1,0 +1,46 @@
+name: Muse runtime authorization gate
+
+on:
+  pull_request:
+    paths:
+      - "tools/muse-runtime-authorization-gate/**"
+      - "docs/research/MUSE_RUNTIME_AUTHORIZATION_GATE_V1.md"
+      - ".github/workflows/muse-runtime-authorization-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  muse-runtime-authorization-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "MUSE_RUNTIME_GATE_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check runtime gate
+        run: cargo +1.96.0 fmt --check --manifest-path tools/muse-runtime-authorization-gate/Cargo.toml
+
+      - name: Generate isolated lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/muse-runtime-authorization-gate/Cargo.toml
+
+      - name: Run one-shot, state-transition and reconciliation controls
+        run: cargo +1.96.0 test --locked --manifest-path tools/muse-runtime-authorization-gate/Cargo.toml
