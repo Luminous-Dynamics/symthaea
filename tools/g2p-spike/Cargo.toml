@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-g2p-spike"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Isolated comparative G2P probe; not a production phonemizer"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+piper-plus-g2p = { version = "=0.5.3", default-features = false, features = ["english", "bundled-dicts"] }
+symthaea-muse = { path = "../../crates/domains/symthaea-muse", features = ["voice"] }
+
+[workspace]
