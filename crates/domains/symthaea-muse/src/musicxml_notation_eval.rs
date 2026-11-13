@@ -9,6 +9,7 @@
 //! dimensions independently.
 
 use crate::barline_eval::{MeasureMapStatus, RationalBeat};
+use crate::musicxml_barline_adapter::MUSICXML_BARLINE_CANONICALIZATION_V1;
 use crate::evidence_digest::canonical_json_sha256;
 use crate::musicxml_barline_adapter::MusicXmlPartNotationGraphV1;
 use crate::musicxml_notation_events::{
@@ -241,6 +242,15 @@ fn validate_graph(
     {
         return Err(MusicXmlNotationEvaluationErrorV1::NotationCanonicalizationMismatch);
     }
+    if graph.map.canonicalization_version != MUSICXML_BARLINE_CANONICALIZATION_V1 {
+        return Err(MusicXmlNotationEvaluationErrorV1::MeasureCanonicalizationMismatch);
+    }
+    if graph.map.measures.is_empty() {
+        return Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure {
+            side: side.into(),
+            reason: "supported score clock has no measure spans".into(),
+        });
+    }
     let note_count = graph.notation_events.note_events.len();
     let other_count = graph
         .notation_events
@@ -320,17 +330,17 @@ where
     F: FnMut(&A, &B) -> Result<bool, MusicXmlNotationEvaluationErrorV1>,
 {
     let mut edges = vec![Vec::<usize>::new(); left.len()];
-    let mut edge_count = 0usize;
+    let mut candidate_scans = 0usize;
     for (left_index, left_item) in left.iter().enumerate() {
         for (right_index, right_item) in right.iter().enumerate() {
+            candidate_scans = candidate_scans.saturating_add(1);
+            if candidate_scans > config.maximum_candidate_pairs {
+                return Err(MusicXmlNotationEvaluationErrorV1::CandidatePairBudgetExceeded {
+                    count: candidate_scans,
+                    maximum: config.maximum_candidate_pairs,
+                });
+            }
             if candidate(left_item, right_item)? {
-                edge_count = edge_count.saturating_add(1);
-                if edge_count > config.maximum_candidate_pairs {
-                    return Err(MusicXmlNotationEvaluationErrorV1::CandidatePairBudgetExceeded {
-                        count: edge_count,
-                        maximum: config.maximum_candidate_pairs,
-                    });
-                }
                 edges[left_index].push(right_index);
             }
         }
@@ -469,6 +479,7 @@ fn note_pair_dimensions(
         MusicXmlNotationAccuracyV1,
         MusicXmlNotationAccuracyV1,
         MusicXmlNotationErrorDistributionV1,
+        MusicXmlNotationAccuracyV1,
         MusicXmlNotationAccuracyV1,
         MusicXmlNotationAccuracyV1,
         MusicXmlNotationAccuracyV1,
