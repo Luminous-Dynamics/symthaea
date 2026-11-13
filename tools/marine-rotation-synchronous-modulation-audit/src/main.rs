@@ -289,6 +289,8 @@ fn validate_case(case: &Case) -> Vec<String> {
             let mut phase_digests = BTreeSet::new();
             let mut previous_phase: Option<f64> = None;
             let mut previous_timestamp: Option<f64> = None;
+            let mut previous_rpm: Option<f64> = None;
+            let mut previous_rpm_uncertainty: Option<f64> = None;
             for observation in &band.observations {
                 if observation.sample_id.trim().is_empty() || !sample_ids.insert(observation.sample_id.clone()) {
                     errors.push(format!("run {} band {} has empty or duplicate sample ID", run.run_id, band.band_id));
@@ -328,20 +330,17 @@ fn validate_case(case: &Case) -> Vec<String> {
                 {
                     errors.push(format!("run {} band {} timestamps are not strictly increasing", run.run_id, band.band_id));
                 }
-                if let (Some(previous_phase_value), Some(previous_time_value)) =
-                    (previous_phase, previous_timestamp)
+                if let (Some(previous_phase_value), Some(previous_time_value), Some(previous_rpm_value), Some(previous_rpm_u)) =
+                    (previous_phase, previous_timestamp, previous_rpm, previous_rpm_uncertainty)
                 {
                     let elapsed_s = observation.timestamp_s - previous_time_value;
                     let phase_delta = observation.shaft_phase_unwrapped_rad - previous_phase_value;
                     if elapsed_s > 0.0 && phase_delta > 0.0 {
                         let derived_rpm = phase_delta / elapsed_s * 60.0 / TWO_PI;
-                        let reference_rpm = (observation.measured_shaft_rpm + band.observations
-                            .iter()
-                            .find(|sample| sample.sample_id == observation.sample_id)
-                            .map(|sample| sample.measured_shaft_rpm)
-                            .unwrap_or(observation.measured_shaft_rpm)) / 2.0;
+                        let reference_rpm = (previous_rpm_value + observation.measured_shaft_rpm) / 2.0;
+                        let uncertainty = (previous_rpm_u + observation.measured_shaft_rpm_expanded_uncertainty) / 2.0;
                         let tolerance = reference_rpm * case.maximum_shaft_rpm_timebase_consistency_fraction
-                            + observation.measured_shaft_rpm_expanded_uncertainty;
+                            + uncertainty;
                         if (derived_rpm - reference_rpm).abs() > tolerance {
                             errors.push(format!("run {} band {} sample {} phase/time slope disagrees with measured shaft RPM", run.run_id, band.band_id, observation.sample_id));
                         }
@@ -349,6 +348,8 @@ fn validate_case(case: &Case) -> Vec<String> {
                 }
                 previous_phase = Some(observation.shaft_phase_unwrapped_rad);
                 previous_timestamp = Some(observation.timestamp_s);
+                previous_rpm = Some(observation.measured_shaft_rpm);
+                previous_rpm_uncertainty = Some(observation.measured_shaft_rpm_expanded_uncertainty);
             }
         }
     }
