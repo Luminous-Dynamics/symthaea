@@ -121,7 +121,12 @@
       },
       "shared_nuisance_id": "cal-chain-common-gain-001",
       "acquisition_root_id": "acquisition-run-common-001",
-      "calibration_certificate_id": "cal-certificate-common-001"
+      "calibration_certificate_id": "cal-certificate-common-001",
+      "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "rad_per_second",
+      "measurement_equation": "observed_value = shared_q * nominal_value"
     },
     {
       "record_id": "omega-1-G12",
@@ -140,7 +145,12 @@
       },
       "shared_nuisance_id": "cal-chain-common-gain-001",
       "acquisition_root_id": "acquisition-run-common-001",
-      "calibration_certificate_id": "cal-certificate-common-001"
+      "calibration_certificate_id": "cal-certificate-common-001",
+      "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "rad_per_second",
+      "measurement_equation": "observed_value = shared_q * nominal_value"
     },
     {
       "record_id": "omega-1-G21",
@@ -159,7 +169,12 @@
       },
       "shared_nuisance_id": "cal-chain-common-gain-001",
       "acquisition_root_id": "acquisition-run-common-001",
-      "calibration_certificate_id": "cal-certificate-common-001"
+      "calibration_certificate_id": "cal-certificate-common-001",
+      "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "rad_per_second",
+      "measurement_equation": "observed_value = shared_q * nominal_value"
     },
     {
       "record_id": "omega-1-G22",
@@ -178,7 +193,12 @@
       },
       "shared_nuisance_id": "cal-chain-common-gain-001",
       "acquisition_root_id": "acquisition-run-common-001",
-      "calibration_certificate_id": "cal-certificate-common-001"
+      "calibration_certificate_id": "cal-certificate-common-001",
+      "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "rad_per_second",
+      "measurement_equation": "observed_value = shared_q * nominal_value"
     },
     {
       "record_id": "omega-2-G11",
@@ -197,7 +217,12 @@
       },
       "shared_nuisance_id": "cal-chain-common-gain-001",
       "acquisition_root_id": "acquisition-run-common-001",
-      "calibration_certificate_id": "cal-certificate-common-001"
+      "calibration_certificate_id": "cal-certificate-common-001",
+      "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "rad_per_second",
+      "measurement_equation": "observed_value = shared_q * nominal_value"
     },
     {
       "record_id": "omega-2-G12",
@@ -216,7 +241,12 @@
       },
       "shared_nuisance_id": "cal-chain-common-gain-001",
       "acquisition_root_id": "acquisition-run-common-001",
-      "calibration_certificate_id": "cal-certificate-common-001"
+      "calibration_certificate_id": "cal-certificate-common-001",
+      "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "rad_per_second",
+      "measurement_equation": "observed_value = shared_q * nominal_value"
     },
     {
       "record_id": "omega-2-G21",
@@ -235,7 +265,12 @@
       },
       "shared_nuisance_id": "cal-chain-common-gain-001",
       "acquisition_root_id": "acquisition-run-common-001",
-      "calibration_certificate_id": "cal-certificate-common-001"
+      "calibration_certificate_id": "cal-certificate-common-001",
+      "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "rad_per_second",
+      "measurement_equation": "observed_value = shared_q * nominal_value"
     },
     {
       "record_id": "omega-2-G22",
@@ -254,7 +289,12 @@
       },
       "shared_nuisance_id": "cal-chain-common-gain-001",
       "acquisition_root_id": "acquisition-run-common-001",
-      "calibration_certificate_id": "cal-certificate-common-001"
+      "calibration_certificate_id": "cal-certificate-common-001",
+      "model_identity": "sha256:nominal-two-frequency-identity-scaling-v0.1",
+      "topology_identity": "sha256:two-port-bus-a-b-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "rad_per_second",
+      "measurement_equation": "observed_value = shared_q * nominal_value"
     }
   ],
   "expected": {
@@ -452,5 +492,6 @@
     "Synthetic two-frequency shared real calibration gain only.",
     "The hard-set and statistical covariance companions are separate uncertainty classes.",
     "No physical campaign calibration scope, continuous-frequency model bound or robust stability is established."
-  ]
+  ],
+  "measurement_equation": "observed_matrix(omega_k)=q_shared*nominal_matrix(omega_k)"
 }
