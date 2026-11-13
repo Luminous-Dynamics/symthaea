@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-edit-comparison-scope-v1.schema.json",
+  "title": "Melothaea music-edit benchmark comparison scope v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "benchmark_version",
+    "native_track_id",
+    "dataset_stratum",
+    "split_id",
+    "protocol_sha256",
+    "scorer_sha256",
+    "native_metric_ids",
+    "sample_manifest_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-music-edit-comparison-scope-v1"
+    },
+    "benchmark_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "benchmark_version": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "enum": [
+          "latest",
+          "current",
+          "stable"
+        ]
+      }
+    },
+    "native_track_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dataset_stratum": {
+      "enum": [
+        "midi_synthesized",
+        "real_multitrack",
+        "mmae_music_subset",
+        "mmae_full_multimodal"
+      ]
+    },
+    "split_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocol_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "scorer_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "native_metric_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "sample_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}
