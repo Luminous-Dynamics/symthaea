@@ -3,6 +3,7 @@ name: Textile Sensing Contract
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-materials/**"
       - "docs/research/TEXTILE_SORT_FUSION_001.md"
@@ -27,6 +28,7 @@ env:
 jobs:
   qualify:
     name: Textile sensing exact-head qualification
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     env:
       EXPECTED_SUBJECT_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
