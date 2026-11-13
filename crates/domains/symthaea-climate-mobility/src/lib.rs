@@ -535,9 +535,9 @@ pub fn evaluate_service_floor(
 
     if input.evidence_class == EvidenceClass::Unknown
         || input.qualification == AssessmentQualification::Unknown
-        || input.floor_profile_revision.as_deref().is_none_or(str::is_empty)
-        || input.floor_authority_ref.as_deref().is_none_or(str::is_empty)
-        || input.observation_ref.as_deref().is_none_or(str::is_empty)
+        || input.floor_profile_revision.as_deref().is_none_or(|value| value.trim().is_empty())
+        || input.floor_authority_ref.as_deref().is_none_or(|value| value.trim().is_empty())
+        || input.observation_ref.as_deref().is_none_or(|value| value.trim().is_empty())
     {
         return Ok(indeterminate());
     }
@@ -921,6 +921,10 @@ mod tests {
         input.floor_authority_ref = None;
         let first = evaluate_service_floor(&input).expect("missing authority is indeterminate");
         assert_eq!(first.outcome, ServiceFloorOutcome::Indeterminate);
+
+        input.floor_authority_ref = Some("   ".to_owned());
+        let whitespace = evaluate_service_floor(&input).expect("blank authority is indeterminate");
+        assert_eq!(whitespace.outcome, ServiceFloorOutcome::Indeterminate);
 
         input.floor_authority_ref = Some("authority-profile-ref".to_owned());
         input.observation_ref = None;
