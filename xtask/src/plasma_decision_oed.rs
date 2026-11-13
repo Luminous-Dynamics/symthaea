@@ -53,6 +53,8 @@ struct Fixture {
 struct Action {
     action_id: String,
     fidelity: String,
+    quantity: String,
+    unit: String,
     cost_units: f64,
     latency_hours: f64,
     specimens: u64,
@@ -255,6 +257,8 @@ pub fn audit_fixture_json(input: &str) -> std::result::Result<AuditReport, Strin
     for action in &fixture.action_catalog {
         if action.action_id.trim().is_empty()
             || !matches!(action.fidelity.as_str(), "F0" | "F1" | "F2" | "F3" | "F4")
+            || action.quantity.trim().is_empty()
+            || action.unit.trim().is_empty()
             || !action.cost_units.is_finite()
             || action.cost_units <= 0.0
             || !action.latency_hours.is_finite()
@@ -368,9 +372,9 @@ fn evaluate_scenario(
         rejected.push("barrier-preservation profile lacks finite positive WVTR/OTR limits".to_owned());
     }
 
-    if scenario.budget.max_cost_units.is_finite() == false
+    if !scenario.budget.max_cost_units.is_finite()
         || scenario.budget.max_cost_units < 0.0
-        || scenario.budget.max_latency_hours.is_finite() == false
+        || !scenario.budget.max_latency_hours.is_finite()
         || scenario.budget.max_latency_hours < 0.0
         || scenario.budget.max_specimens == 0
     {
@@ -582,6 +586,9 @@ fn evaluate_scenario(
     if outcomes.evidence_class != SYNTHETIC_LABEL_CLASS || outcomes.physically_measured {
         rejected.push("synthetic fixture outcomes cannot claim physical measurement".to_owned());
     }
+    if outcomes.wca_deg.is_some_and(|value| !value.is_finite() || !(0.0..=180.0).contains(&value)) {
+        rejected.push("water contact angle is outside its physical numeric domain".to_owned());
+    }
 
     let require_value = |value: Option<f64>, label: &str, blocked: &mut Vec<String>| {
         match value {
@@ -594,7 +601,20 @@ fn evaluate_scenario(
     };
     let bond = require_value(outcomes.bond_strength_mpa, "bond_strength_mpa", &mut blocked);
     let aged = require_value(outcomes.aged_bond_strength_mpa, "aged_bond_strength_mpa", &mut blocked);
-    let retention = require_value(outcomes.bond_retention, "bond_retention", &mut blocked);
+    let reported_retention = require_value(outcomes.bond_retention, "bond_retention", &mut blocked);
+    let derived_retention = match (bond, aged) {
+        (Some(initial), Some(after_aging)) if initial > 0.0 => Some(after_aging / initial),
+        (Some(_), Some(_)) => {
+            blocked.push("bond retention is undefined for a zero-strength initial bond".to_owned());
+            None
+        }
+        _ => None,
+    };
+    if let (Some(reported), Some(derived)) = (reported_retention, derived_retention) {
+        if !close_enough(reported, derived) {
+            rejected.push("declared bond retention does not reconcile with aged/initial bond strength".to_owned());
+        }
+    }
     if outcomes.failure_mode.as_deref().is_none_or(str::is_empty) {
         blocked.push("mandatory outcome failure_mode is missing".to_owned());
     }
@@ -616,8 +636,8 @@ fn evaluate_scenario(
         if aged.is_some_and(|value| value + FLOAT_EPSILON < profile.min_aged_bond_strength_mpa) {
             failures.push("aged bond strength is below the frozen application floor".to_owned());
         }
-        if retention.is_some_and(|value| value + FLOAT_EPSILON < profile.min_retention) {
-            failures.push("bond-strength retention is below the frozen application floor".to_owned());
+        if derived_retention.is_some_and(|value| value + FLOAT_EPSILON < profile.min_retention) {
+            failures.push("derived bond-strength retention is below the frozen application floor".to_owned());
         }
         if outcomes.failure_mode.as_ref().is_some_and(|mode| {
             !profile.acceptable_failure_modes.iter().any(|acceptable| acceptable == mode)
@@ -792,6 +812,27 @@ mod tests {
         let result = result_for(&report(), "model-family-inadequate-abstain");
         assert_eq!(result.audit_disposition, AuditDisposition::Blocked);
         assert_eq!(result.product_decision, ProductDecision::Abstain);
+    }
+
+    #[test]
+    fn declared_retention_must_reconcile_with_measured_strengths() {
+        let value: serde_json::Value = serde_json::from_str(FIXTURE).expect("fixture JSON");
+        let mut changed = value;
+        changed["scenarios"][4]["outcomes"]["bond_retention"] = serde_json::json!(0.99);
+        let report = audit_fixture_json(&changed.to_string()).expect("mutated fixture parses");
+        let result = result_for(&report, "durable-multifidelity-accept-synthetic");
+        assert_eq!(result.audit_disposition, AuditDisposition::Rejected);
+        assert_eq!(result.product_decision, ProductDecision::Abstain);
+    }
+
+    #[test]
+    fn action_quantity_and_unit_cannot_be_relabelled() {
+        let value: serde_json::Value = serde_json::from_str(FIXTURE).expect("fixture JSON");
+        let mut changed = value;
+        changed["scenarios"][4]["measurements"][0]["unit"] = serde_json::json!("MPa");
+        let report = audit_fixture_json(&changed.to_string()).expect("mutated fixture parses");
+        let result = result_for(&report, "durable-multifidelity-accept-synthetic");
+        assert_eq!(result.audit_disposition, AuditDisposition::Rejected);
     }
 
     #[test]
