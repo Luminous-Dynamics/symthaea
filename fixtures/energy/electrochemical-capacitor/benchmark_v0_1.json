@@ -93,7 +93,15 @@
         "yield_status": "not_measured",
         "accepted_device_cost": null
       },
-      "disposition": "candidate"
+      "disposition": "candidate",
+      "denominator": {
+        "mass_kg": 14.7,
+        "volume_l": null,
+        "basis": "module_vendor_reported",
+        "included_components": [],
+        "excluded_components": [],
+        "status": "partial"
+      }
     },
     {
       "schema_version": "0.1.0",
@@ -160,7 +168,27 @@
         "yield_status": "unknown",
         "accepted_device_cost": null
       },
-      "disposition": "blocked_missing_complete_device_boundary"
+      "disposition": "blocked_missing_complete_device_boundary",
+      "denominator": {
+        "mass_kg": null,
+        "volume_l": null,
+        "basis": "active_material_only",
+        "included_components": [
+          "active_material"
+        ],
+        "excluded_components": [
+          "positive_electrode_substrate",
+          "negative_electrode",
+          "electrolyte",
+          "separator",
+          "current_collectors",
+          "binder_additives",
+          "tabs",
+          "seals",
+          "case"
+        ],
+        "status": "partial"
+      }
     }
   ]
 }
