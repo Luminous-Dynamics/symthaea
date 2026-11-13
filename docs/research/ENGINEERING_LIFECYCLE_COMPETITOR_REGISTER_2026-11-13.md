@@ -134,3 +134,18 @@ A vendor arm is eligible only when the actual licensed system, product revision,
 This register is based on public vendor documentation only. No Siemens, Aras, PTC or IBM system was accessed, configured, licensed, integrated, run or scored. No vendor price, implementation effort or comparative result is asserted.
 
 The 24-case corpus remains unadjudicated and unscored. The next valid milestone is an independently adjudicated pilot and an instrument-qualified, matched baseline comparison—not a vendor leaderboard assembled from documentation.
+
+
+## 7. Aras platform update — InnovatorEdge AI 2.4 (2026-11-10)
+
+The competitor register now distinguishes the **Impact Analysis AI Agent v1.0.1** from the wider **InnovatorEdge AI platform 2.4** release announced on November 10, 2026. The platform update documents multiple MCP Server profiles per tenant; each profile has a distinct endpoint, Access Point, published-tool selection and enabled/disabled state. The administrator guide documents End User authentication for the Edge AI MCP Server, a cached connector tool inventory in Claude that may require manual refresh, and a beta Innovator Method tool with per-call user confirmation.
+
+This does not mean the Impact Analysis agent is version 2.4, and it is not evidence of a security defect. For a licensed comparison, record the agent release, platform release, MCP profile configuration, endpoint, Access Point, tool-set digest, enablement state, authentication mode, CIAM roles and effective Innovator permissions separately. Treat cached tool inventory as client discovery state—not authority. The mock security overlay now tests stale cached tools after disable/removal, cross-profile tool substitution, permission/Access Point drift and method invocation without the required confirmation.
+
+Sources:
+- [Aras Edge AI Release Notes](https://docs.aras.com/aras-innovatoredge-ai-book/edge-ai-release-notes)
+- [Aras InnovatorEdge AI Administrator Guide](https://docs.aras.com/aras-innovatoredge-ai-book/innovatoredge-ai-administrator-guide)
+
+## 8. Implication for the SOTA comparison
+
+The benchmark must separate **capability discovery**, **recommendation quality**, **authority at effect entry** and **observed effect**. Commercial platforms already provide AI-assisted impact analysis, governed write operations, configurable tools and human confirmation. Therefore an assistant that only adds another approval screen or MCP integration is not differentiated. The proposed Luminous advantage must be demonstrated through independently replayable decision evidence, non-anticipating source/version admissibility, claim-level evidence applicability, and an independent reconstruction of the exact effect boundary. The Aras MCP profile case is a security/authority control, not an additional engineering-change accuracy score.
