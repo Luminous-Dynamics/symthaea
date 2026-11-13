@@ -19,6 +19,7 @@ These dimensions are not collapsed into a weighted score. A payment can satisfy 
 ## Contents
 
 - model.go: versioned inputs/reports and exact-byte SHA-256 helpers.
+- RESEARCH_PROGRAMME.md: benchmark comparison, accountability crosswalk, proposed targets and execution roadmap.
 - qualify.go: fail-closed corpus, run-manifest, observation and metamorphic-relation checks.
 - cmd/mace-evalqual: offline CLI.
 - fixtures/: synthetic demonstration corpus, pinned manifest and corresponding observations.
