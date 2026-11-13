@@ -22,6 +22,9 @@ exclude = [
     "crates/core/nixward-web",
     # This directory contains an unused example only, not a workspace package.
     "crates/core/symthaea",
+    # Observation-attestation imports a removed core API; recovery is tracked
+    # separately in #9361/#7291. Do not create a placeholder manifest.
+    "crates/core/symthaea-observation-attestation",
     # IIT 4.0 parity artifacts currently contain integration-test source only;
     # restore as a crate only with an owned manifest and dependency contract.
     "crates/core/symthaea-iit",
