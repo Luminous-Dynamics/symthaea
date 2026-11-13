@@ -239,7 +239,7 @@ A new child, [PLASMA-VM-001 #11847](https://github.com/Luminous-Dynamics/symthae
 
 The S0 contract binds run/device/configuration, substrate and adhesive lot, calibrated OES/power/flow/temperature signals, exact grid-to-accepted-bond energy boundary, specimen identity and downstream adhesion/failure-mode label. Its synthetic evaluator tests stale/uncalibrated/misaligned telemetry, OOD material, incomplete energy, missing labels and high-confidence false accepts. It is explicitly advisory/shadow-only; no automatic quality release or physical actuation is introduced.
 
-This complements (and does not duplicate) PLASMA-ML-GENERALIZATION-001: ML-GENERALIZATION owns grouped source/lab/device/material split and literature model transfer; VM owns the joined production run-to-specimen telemetry/outcome contract and quality-value benchmark. The ten synthetic scenario expectations replayed 10/10 in an independent source-side check; 13 Rust tests are authored but uncompiled/unexecuted.
+This complements (and does not duplicate) PLASMA-ML-GENERALIZATION-001: ML-GENERALIZATION owns grouped source/lab/device/material split and literature model transfer; VM owns the joined production run-to-specimen telemetry/outcome contract and quality-value benchmark. The sixteen synthetic scenario expectations replayed 16/16 in an independent source-side check; 20 Rust tests are authored but uncompiled/unexecuted.
 
 
 ## 9. New atmospheric-plasma surface-modification review — 2026 crosswalk
@@ -247,3 +247,23 @@ This complements (and does not duplicate) PLASMA-ML-GENERALIZATION-001: ML-GENER
 The July 2026 open-access review *Recent advances in the field of surface modification using atmospheric pressure plasma* surveys discharge types, gas atmosphere, frequency/excitation, electrode geometry and surface-treatment families including grafting, deposition, etching, cleaning and activation. Use it as a broad process taxonomy / literature map, not a matched performance leaderboard: https://doi.org/10.1016/j.nxmate.2026.102318.
 
 This reinforces a necessary portfolio rule: process families that share "atmospheric plasma" in their name may have different discharge physics, chemistry, energy boundaries and product endpoints. Keep them as separate evidence strata until equivalence is demonstrated.
+
+
+### P0 enabler — decision-focused multifidelity experiment design
+
+[PLASMA-OED-001 #11907](https://github.com/Luminous-Dynamics/symthaea/issues/11907) / draft [PR #11910](https://github.com/Luminous-Dynamics/symthaea/pull/11910) freezes the plasma-specific application adapter for UAP-OED, OLI-EXPERIMENT and the surface-bonding programme.
+
+This is **not another optimizer**. UAP-OED-001 owns budget/fidelity action selection and the small-set exact oracle; UAP-OED-002 owns target utility after nuisance marginalization; UAP-OED-003 owns selected-set covariance/whitening; OLI owns model adequacy and OTHER. PLASMA-OED owns the application-specific F0–F4 measurement ladder, competing surface mechanisms, mandatory physical endpoints and product decision semantics.
+
+The benchmark changes the objective from minimum water contact angle or maximum nominal information gain to minimum cost/latency/sample use for a defensible decision:
+- F0 wettability/process screens;
+- F1 chemistry/topography;
+- F2 destructive bond strength and failure locus;
+- F3 delayed/aged bond strength and retention;
+- F4 material-function preservation such as WVTR/OTR.
+
+The 10 synthetic scenarios include proxy-only abstention, low-WCA/weak-bond rejection, aging reversal, packaging barrier loss, a synthetic durable-evidence case, shared-preparation covariance omission, training-group overlap, over-budget selection, inadmissible action and inadequate model family / OTHER. The Rust audit requires action quantity/unit identity, calibration record and uncertainty, group holdout, covariance receipts, derived retention closure and an adequate model family plus registered OTHER before a product decision.
+
+Independent source-side replay matched 10/10 audit dispositions and product decisions (4 PASS, 3 BLOCKED, 3 REJECTED). Fifteen Rust tests are authored, but the module is not compiled/executed here. The selected action lists are synthetic placeholders; **no generic optimizer was executed and no EVSI gain, lab saving or physical product improvement is claimed**.
+
+The key next comparison is against fixed campaigns, random feasible sequences, contact-angle-first heuristics, generic nominal/multifidelity UAP-OED, target-marginal designs, selected-set covariance-aware design and robust decision-value / EVSI selection under the same budget. Report false accept, false reject, abstention, cost-to-decision, sample use, worst-lot/device/day regret and exact-oracle gap separately.
