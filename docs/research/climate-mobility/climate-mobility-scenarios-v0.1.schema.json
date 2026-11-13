@@ -15,7 +15,8 @@
     "service_assessments",
     "source_manifest",
     "assumptions",
-    "claim_ceiling"
+    "claim_ceiling",
+    "service_floor_assessments"
   ],
   "properties": {
     "schema_version": {
@@ -453,6 +454,138 @@
     "claim_ceiling": {
       "type": "string",
       "minLength": 1
+    },
+    "service_floor_assessments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "assessment_id",
+          "service_scope_id",
+          "metric",
+          "unit",
+          "floor_profile_revision",
+          "floor_authority_ref",
+          "observation_ref",
+          "minimum_required",
+          "observed_lower_bound",
+          "observed_upper_bound",
+          "coverage_numerator",
+          "coverage_denominator",
+          "expected_outcome",
+          "evidence_class",
+          "qualification",
+          "result_scope"
+        ],
+        "properties": {
+          "assessment_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "service_scope_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metric": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "floor_profile_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "floor_authority_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "observation_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "minimum_required": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "observed_lower_bound": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "observed_upper_bound": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "coverage_numerator": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "coverage_denominator": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "expected_outcome": {
+            "enum": [
+              "meets_floor",
+              "breached_floor",
+              "observed_breach",
+              "indeterminate"
+            ]
+          },
+          "evidence_class": {
+            "enum": [
+              "synthetic",
+              "observed",
+              "estimated",
+              "modelled",
+              "calibrated",
+              "unknown"
+            ]
+          },
+          "qualification": {
+            "enum": [
+              "contract_only",
+              "reference_matched",
+              "locally_retrospective",
+              "prospective_shadow",
+              "unknown"
+            ]
+          },
+          "result_scope": {
+            "const": "synthetic_contract_only"
+          },
+          "limitations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
     }
   }
 }
