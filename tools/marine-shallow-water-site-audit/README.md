@@ -19,21 +19,21 @@ The synthetic fixture must return INCOMPLETE as physical site qualification. Exi
 ## What v0 checks
 
 - Deep/shallow classification boundary: deeper than max(150 m, 1.5 × overall ship length) is classified deep; less is shallow. Exact boundary is deliberately unresolved.
-- Bathymetry coverage along track/across array footprint and declared depth-uniformity tolerance.
-- Seabed substrate observations, local sound-speed samples, source/method/digest and declared spatial-uniformity tolerance.
-- CTD sound-speed profile with instrument, method, calibration and evidence lineage; current direction/speed and ambient background measurement.
+- Bathymetry coverage along track/across array footprint and declared depth-uniformity tolerance, propagated using declared expanded measurement bounds rather than nominal values alone. Deep/shallow classification is held unresolved whenever the depth interval crosses the boundary.
+- Seabed substrate observations and local sound-speed samples with uncertainty; spatial uniformity is screened against conservative expanded bounds.
+- CTD sound-speed profile with instrument, method, calibration and evidence lineage; CTD profile range also includes expanded uncertainty. Current direction/speed and ambient background measurement.
 - Hydrophone positions, depth/orientation, calibration frequency coverage and certificate digest; pre-deployment and post-recovery in-situ checks.
 - IACS recommendation for three hydrophones is advisory, not a universal hard requirement: one/two channels can be CONDITIONAL when other gates pass.
 - Vessel overall/acoustic ship length, acoustic reference point, GPS offset, propulsion/service/loading identity, draft, hull and propeller condition.
 - Reciprocal port/starboard runs with speed through water, shaft RPM, propulsion power, heading/aspect, CPA, data-window duration, timebase, operating point and background evidence.
-- IACS Recommendation 181's CPA recommendation (greater of 100 m or acoustic ship length) and 10 s minimum data window as advisory campaign gates.
-- Per-band site cutoff, hydrophone calibrated frequency span, propagation method/revision, expanded uncertainty and distinct quantity IDs.
+- IACS Recommendation 181's three-hydrophone preference, CPA recommendation (greater of 100 m or acoustic ship length) and 10 s minimum data window are advisory practices. When unmet without a separate hard evidence failure, the disposition is CONDITIONAL rather than INCOMPLETE.
+- Per-band site cutoff, hydrophone calibrated frequency span, propagation method/revision, expanded uncertainty/confidence level and distinct quantity IDs.
 
 ## Quantity semantics and claim boundary
 
 The tool preserves received SPL, radiated-noise level (RNL), source level (SL) and deep-water-equivalent RNL as different quantities. It never relabels one as another and does not compute any ISO 17208-3 propagation/source-level equation. No generic 20 log10(r) correction, learned seabed correction or inferred site transfer is applied.
 
-When two campaigns have different depth category, seabed substrate or seabed sound-speed class, the comparison is INCOMPARABLE unless a separately reviewed, per-band propagation-transfer receipt is supplied. A supplied receipt is only referenced; this audit does not independently validate its physics.
+When two campaigns have different depth category, seabed substrate, seabed sound-speed class or CTD sound-speed context, the comparison is INCOMPARABLE unless a separately reviewed, per-band propagation-transfer receipt is supplied. Cross-site band IDs, quantities, centre frequencies, propagation method revisions and expanded-uncertainty confidence levels must match. A supplied transfer receipt is only referenced; this audit does not independently validate its physics.
 
 ## Interpretation
 
