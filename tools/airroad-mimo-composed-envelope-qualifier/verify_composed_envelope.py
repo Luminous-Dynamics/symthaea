@@ -195,6 +195,10 @@ def main() -> None:
     for item in experiments:
         omega = q(item["omega"])
         assert omega in knots
+        assert item["model_identity"] == data["model_identity"]
+        assert item["topology_identity"] == data["topology_identity"]
+        assert item["operating_point_identity"] == data["operating_point_identity"]
+        assert item["frequency_unit"] == data["frequency_unit"]
         u = [q(value) for value in item["input_vector"]]
         y = [q(value) for value in item["observed_output_vector"]]
         nominal_y = mat_vec(g0, u)
