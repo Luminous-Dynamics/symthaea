@@ -172,7 +172,7 @@ Created [PLASMA-OED-001 #11907](https://github.com/Luminous-Dynamics/symthaea/is
 - `xtask/src/plasma_decision_oed.rs`;
 - `xtask/src/main.rs` command: `plasma-decision-oed-audit`.
 
-The nine-action catalogue represents F0–F4 measurement classes, artificial costs/latencies/sample counts, endpoint coverage and admissibility. The synthetic selection receipt points to UAP-OED-001; it is an input to the domain evaluator, **not an executed optimizer result**.
+The eight-action catalogue represents F0–F4 measurement classes, artificial costs/latencies/sample counts, endpoint coverage and admissibility. The synthetic selection receipt points to UAP-OED-001; it is an input to the domain evaluator, **not an executed optimizer result**.
 
 The ten scenarios freeze:
 - 4 audit PASS / product REJECT_WINDOW or ACCEPT_WINDOW cases;
@@ -181,6 +181,16 @@ The ten scenarios freeze:
 
 Independent source-side JavaScript replay of the exact fetched JSON matched **10/10** audit dispositions and product decisions. It checked selected-action catalogue membership, cost/latency/specimen closure, calibration and raw-trace identity, lot/device/day group disjointness, sample-preparation and independence-group covariance receipt coverage, mandatory product endpoint coverage, model adequacy / OTHER registration, and the bond/aging/barrier decision floors.
 
-Thirteen Rust unit tests are authored. The authoring environment has no Cargo, rustc or rustfmt, so this module has not been compiled, formatted, linted or executed. No hosted CI result is claimed.
+Fifteen Rust unit tests are authored. The authoring environment has no Cargo, rustc or rustfmt, so this module has not been compiled, formatted, linted or executed. No hosted CI result is claimed.
+
+
+The final evaluator hardening also:
+- binds every measurement's quantity and unit to its selected action definition;
+- requires a calibration-record identity, qualified status, uncertainty and raw-trace digest;
+- recomputes bond retention as aged bond strength divided by initial bond strength and rejects a mismatched declared ratio;
+- requires an explicit model-adequacy receipt, an ADEQUATE status and registration of an OTHER hypothesis before any ACCEPT/REJECT product decision;
+- checks common sample-preparation and independence groups against the selected-set covariance receipt.
+
+The evaluator has 15 authored Rust tests, including mutations for unit relabelling and inconsistent retention. These tests remain uncompiled and unexecuted in this environment.
 
 The fixture is synthetic-only; it does not establish a useful measurement schedule, a real EVSI ranking, physical bond performance, lab savings, a process window or experiment authority. The next integration should consume a real UAP-OED selection result and its exact source/covariance/model-adequacy receipts without copying the generic selector.
