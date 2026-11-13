@@ -14,11 +14,13 @@
 //! FluidSynth routing graph, listener preference, or production audio quality.
 
 use crate::factorial_ground_truth::{
-    FactorialGroundTruthReport, FactorialReferenceConfig, FactorialReferenceError,
-    SyntheticEffect, SyntheticEventSignal, build_factorial_ground_truth,
+    FactorialGroundTruthReport, FactorialReferenceConfig, FactorialReferenceError, SyntheticEffect,
+    SyntheticEventSignal, build_factorial_ground_truth,
 };
 use crate::interaction_probe_benchmark::InteractionProbeBenchmarkConfig;
-use crate::interaction_probe_plan::{AcousticSupportInterval, EventInteractionSupport, InteractionProbeConfig};
+use crate::interaction_probe_plan::{
+    AcousticSupportInterval, EventInteractionSupport, InteractionProbeConfig,
+};
 use crate::probe_policy_comparison::{
     ProbePolicyComparisonError, ProbePolicyComparisonRow, ProbePolicyCurveSummary,
     ProbeSelectionPolicy, compare_probe_policies,
@@ -27,10 +29,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
-pub const PROBE_POLICY_CAMPAIGN_VERSION: &str =
-    "mel-mr-eval-026-paired-multifamily-campaign-v0.1";
-const REPORT_DOMAIN: &[u8] =
-    b"luminous-dynamics-mel-mr-eval-026-paired-multifamily-campaign-v1\0";
+pub const PROBE_POLICY_CAMPAIGN_VERSION: &str = "mel-mr-eval-026-paired-multifamily-campaign-v0.1";
+const REPORT_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-026-paired-multifamily-campaign-v1\0";
 const MAX_COMPOSITIONS: usize = 512;
 const MAX_BOOTSTRAP_REPLICATES: usize = 20_000;
 
@@ -259,8 +259,8 @@ fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 fn canonical_digest<T: Serialize>(value: &T) -> Result<String, ProbePolicyCampaignError> {
-    let bytes = serde_json::to_vec(value)
-        .map_err(|_| ProbePolicyCampaignError::SerializationFailure)?;
+    let bytes =
+        serde_json::to_vec(value).map_err(|_| ProbePolicyCampaignError::SerializationFailure)?;
     let mut hasher = Sha256::new();
     hasher.update(REPORT_DOMAIN);
     hasher.update(bytes);
@@ -294,11 +294,18 @@ fn scope_seed(scope: CampaignScope) -> u64 {
 
 fn validate_config(config: &ProbePolicyCampaignConfig) -> Result<(), ProbePolicyCampaignError> {
     if config.families.is_empty() {
-        return Err(ProbePolicyCampaignError::InvalidConfig("at least one family is required"));
+        return Err(ProbePolicyCampaignError::InvalidConfig(
+            "at least one family is required",
+        ));
     }
     if !config.families.contains(&InteractionFamily::PureThirdOrder)
-        || !config.families.contains(&InteractionFamily::IncompleteRouting)
-        || !config.families.iter().any(|family| family.split() == CampaignSplit::Development)
+        || !config
+            .families
+            .contains(&InteractionFamily::IncompleteRouting)
+        || !config
+            .families
+            .iter()
+            .any(|family| family.split() == CampaignSplit::Development)
     {
         return Err(ProbePolicyCampaignError::InvalidConfig(
             "campaign must include development, held-out interaction-family and held-out routing-topology strata",
@@ -310,32 +317,46 @@ fn validate_config(config: &ProbePolicyCampaignConfig) -> Result<(), ProbePolicy
         ));
     }
     if config.frame_count < 64 || config.frame_count > 4_096 {
-        return Err(ProbePolicyCampaignError::InvalidConfig("frame_count must be in 64..=4096"));
+        return Err(ProbePolicyCampaignError::InvalidConfig(
+            "frame_count must be in 64..=4096",
+        ));
     }
     if config.factorial_config.sample_rate_hz == 0
         || config.factorial_config.spectral_window_frames < 16
         || config.factorial_config.spectral_window_frames > config.frame_count
     {
-        return Err(ProbePolicyCampaignError::InvalidConfig("invalid factorial reference config"));
+        return Err(ProbePolicyCampaignError::InvalidConfig(
+            "invalid factorial reference config",
+        ));
     }
     if config.seeds.is_empty() || config.seeds.len() > 64 {
-        return Err(ProbePolicyCampaignError::InvalidConfig("seeds must contain 1..=64 entries"));
+        return Err(ProbePolicyCampaignError::InvalidConfig(
+            "seeds must contain 1..=64 entries",
+        ));
     }
     if config.pair_budgets.is_empty() || config.pair_budgets.len() > 32 {
-        return Err(ProbePolicyCampaignError::InvalidConfig("pair_budgets must contain 1..=32 entries"));
+        return Err(ProbePolicyCampaignError::InvalidConfig(
+            "pair_budgets must contain 1..=32 entries",
+        ));
     }
     if !config.recall_target.is_finite() || (config.recall_target - 0.95).abs() > f64::EPSILON {
         return Err(ProbePolicyCampaignError::InvalidConfig(
             "recall_target is frozen at 0.95 by the EVAL-024 comparator version",
         ));
     }
-    if config.pair_budgets.iter().any(|budget| *budget > config.planner_config.pair_probe_budget) {
+    if config
+        .pair_budgets
+        .iter()
+        .any(|budget| *budget > config.planner_config.pair_probe_budget)
+    {
         return Err(ProbePolicyCampaignError::InvalidConfig(
             "every requested pair budget must fit the frozen planner_config budget",
         ));
     }
     if config.bootstrap_replicates < 100 || config.bootstrap_replicates > MAX_BOOTSTRAP_REPLICATES {
-        return Err(ProbePolicyCampaignError::InvalidConfig("bootstrap_replicates must be in 100..=20000"));
+        return Err(ProbePolicyCampaignError::InvalidConfig(
+            "bootstrap_replicates must be in 100..=20000",
+        ));
     }
 
     let mut families = BTreeSet::new();
@@ -350,7 +371,11 @@ fn validate_config(config: &ProbePolicyCampaignConfig) -> Result<(), ProbePolicy
             return Err(ProbePolicyCampaignError::DuplicateSeed);
         }
     }
-    if config.pair_budgets.windows(2).any(|window| window[0] >= window[1]) {
+    if config
+        .pair_budgets
+        .windows(2)
+        .any(|window| window[0] >= window[1])
+    {
         return Err(ProbePolicyCampaignError::InvalidConfig(
             "pair_budgets must be strictly increasing",
         ));
@@ -358,20 +383,25 @@ fn validate_config(config: &ProbePolicyCampaignConfig) -> Result<(), ProbePolicy
     let mut budgets = BTreeSet::new();
     for budget in &config.pair_budgets {
         if *budget > 28 {
-            return Err(ProbePolicyCampaignError::InvalidConfig("pair budget cannot exceed 28 for N<=8"));
+            return Err(ProbePolicyCampaignError::InvalidConfig(
+                "pair budget cannot exceed 28 for N<=8",
+            ));
         }
         if !budgets.insert(*budget) {
             return Err(ProbePolicyCampaignError::DuplicateBudget);
         }
     }
-    let fixture_count = config.families.len().saturating_mul(config.compositions_per_family);
+    let fixture_count = config
+        .families
+        .len()
+        .saturating_mul(config.compositions_per_family);
     if fixture_count > MAX_COMPOSITIONS {
         return Err(ProbePolicyCampaignError::TooManyFixtures);
     }
-    if config.families.contains(&InteractionFamily::PureThirdOrder)
-        && config.frame_count < 32
-    {
-        return Err(ProbePolicyCampaignError::InvalidConfig("third-order fixtures require >=32 frames"));
+    if config.families.contains(&InteractionFamily::PureThirdOrder) && config.frame_count < 32 {
+        return Err(ProbePolicyCampaignError::InvalidConfig(
+            "third-order fixtures require >=32 frames",
+        ));
     }
     Ok(())
 }
@@ -447,7 +477,10 @@ fn make_signal(
     composition_index: usize,
 ) -> SyntheticEventSignal {
     let mut samples = vec![0.0; frame_count];
-    let polarity = if matches!(family, InteractionFamily::Saturation | InteractionFamily::PureThirdOrder) {
+    let polarity = if matches!(
+        family,
+        InteractionFamily::Saturation | InteractionFamily::PureThirdOrder
+    ) {
         1.0
     } else if (event_index + composition_index) % 3 == 0 {
         -1.0
@@ -506,13 +539,17 @@ fn generate_fixture(
     composition_index: usize,
     config: &ProbePolicyCampaignConfig,
 ) -> Result<GeneratedFixture, ProbePolicyCampaignError> {
-    let event_count = (2 + composition_index % 7).max(if family == InteractionFamily::PureThirdOrder { 3 } else { 2 });
+    let event_count =
+        (2 + composition_index % 7).max(if family == InteractionFamily::PureThirdOrder {
+            3
+        } else {
+            2
+        });
     let frame_count = config.frame_count;
     let mut events = Vec::with_capacity(event_count);
     let mut supports = Vec::with_capacity(event_count);
     let mut seed = SplitMix64(
-        (composition_index as u64)
-            .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        (composition_index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
             ^ family_seed(family).wrapping_mul(0xD1B5_4A32_D192_ED03)
             ^ 0x4d45_4c26_2026_1113,
     );
@@ -527,7 +564,15 @@ fn generate_fixture(
         } else {
             0.18 + ((composition_index + event_index * 3) % 7) as f64 * 0.012 + jitter
         };
-        events.push(make_signal(family, event_index, frame_count, start, end, amplitude, composition_index));
+        events.push(make_signal(
+            family,
+            event_index,
+            frame_count,
+            start,
+            end,
+            amplitude,
+            composition_index,
+        ));
 
         let mut support_start = start as u64;
         let mut support_end = end as u64;
@@ -582,10 +627,10 @@ fn generate_fixture(
     }
 
     let effect = effect_for(family);
-    let source_bytes = serde_json::to_vec(&events)
-        .map_err(|_| ProbePolicyCampaignError::SerializationFailure)?;
-    let effect_bytes = serde_json::to_vec(&effect)
-        .map_err(|_| ProbePolicyCampaignError::SerializationFailure)?;
+    let source_bytes =
+        serde_json::to_vec(&events).map_err(|_| ProbePolicyCampaignError::SerializationFailure)?;
+    let effect_bytes =
+        serde_json::to_vec(&effect).map_err(|_| ProbePolicyCampaignError::SerializationFailure)?;
     let support_bytes = serde_json::to_vec(&supports)
         .map_err(|_| ProbePolicyCampaignError::SerializationFailure)?;
     Ok(GeneratedFixture {
@@ -636,8 +681,12 @@ fn bootstrap_interval(
 fn scope_matches(fixture: &CampaignFixtureResult, scope: CampaignScope) -> bool {
     match scope {
         CampaignScope::Development => fixture.split == CampaignSplit::Development,
-        CampaignScope::HeldOutInteractionFamily => fixture.split == CampaignSplit::HeldOutInteractionFamily,
-        CampaignScope::HeldOutRoutingTopology => fixture.split == CampaignSplit::HeldOutRoutingTopology,
+        CampaignScope::HeldOutInteractionFamily => {
+            fixture.split == CampaignSplit::HeldOutInteractionFamily
+        }
+        CampaignScope::HeldOutRoutingTopology => {
+            fixture.split == CampaignSplit::HeldOutRoutingTopology
+        }
         CampaignScope::AllFixtures => true,
         CampaignScope::Family(family) => fixture.family == family,
     }
@@ -653,9 +702,16 @@ fn paired_summary(
     let mut cluster_means = Vec::new();
     let mut matched_row_pair_count = 0usize;
     let mut unmatched_row_pair_count = 0usize;
-    for fixture in fixtures.iter().filter(|fixture| scope_matches(fixture, scope)) {
+    for fixture in fixtures
+        .iter()
+        .filter(|fixture| scope_matches(fixture, scope))
+    {
         let mut deltas = Vec::new();
-        for candidate in fixture.rows.iter().filter(|row| row.policy == ProbeSelectionPolicy::Eval019) {
+        for candidate in fixture
+            .rows
+            .iter()
+            .filter(|row| row.policy == ProbeSelectionPolicy::Eval019)
+        {
             let baseline = fixture.rows.iter().find(|row| {
                 row.policy == baseline_policy
                     && row.seed == candidate.seed
@@ -701,13 +757,15 @@ fn paired_summary(
         mean_composition_recall_delta: mean,
         bootstrap_95pct_lower: lower,
         bootstrap_95pct_upper: upper,
-        bootstrap_replicates: if cluster_means.len() >= 2 { bootstrap_replicates } else { 0 },
+        bootstrap_replicates: if cluster_means.len() >= 2 {
+            bootstrap_replicates
+        } else {
+            0
+        },
     }
 }
 
-fn null_scene_summaries(
-    fixtures: &[CampaignFixtureResult],
-) -> Vec<NullSceneFalseDiscoverySummary> {
+fn null_scene_summaries(fixtures: &[CampaignFixtureResult]) -> Vec<NullSceneFalseDiscoverySummary> {
     let mut result = Vec::new();
     for family in InteractionFamily::ALL {
         let family_fixtures: Vec<&CampaignFixtureResult> = fixtures
@@ -801,12 +859,22 @@ pub fn build_probe_policy_campaign(
             let global_order_two_harsanyi_count = oracle
                 .dividends
                 .iter()
-                .filter(|dividend| dividend.order == 2 && dividend.pcm_l2_norm > config.metric_config.minimum_global_order_two_harsanyi_pcm_l2_norm)
+                .filter(|dividend| {
+                    dividend.order == 2
+                        && dividend.pcm_l2_norm
+                            > config
+                                .metric_config
+                                .minimum_global_order_two_harsanyi_pcm_l2_norm
+                })
                 .count();
             let higher_order_harsanyi_count = oracle
                 .dividends
                 .iter()
-                .filter(|dividend| dividend.order >= 3 && dividend.pcm_l2_norm > config.metric_config.minimum_higher_order_pcm_l2_norm)
+                .filter(|dividend| {
+                    dividend.order >= 3
+                        && dividend.pcm_l2_norm
+                            > config.metric_config.minimum_higher_order_pcm_l2_norm
+                })
                 .count();
             let fixture_metadata = (
                 &fixture_id,
@@ -842,7 +910,10 @@ pub fn build_probe_policy_campaign(
     }
 
     let mut paired_summaries = Vec::new();
-    for baseline in [ProbeSelectionPolicy::UniformRandom, ProbeSelectionPolicy::TemporalOnly] {
+    for baseline in [
+        ProbeSelectionPolicy::UniformRandom,
+        ProbeSelectionPolicy::TemporalOnly,
+    ] {
         for scope in [
             CampaignScope::Development,
             CampaignScope::HeldOutInteractionFamily,
@@ -959,10 +1030,15 @@ mod tests {
         assert_eq!(report.held_out_interaction_family_fixture_count, 7);
         assert_eq!(report.held_out_routing_topology_fixture_count, 7);
         for family in small_config().families {
-            let family_fixtures: Vec<&CampaignFixtureResult> =
-                report.fixtures.iter().filter(|fixture| fixture.family == family).collect();
-            let event_counts: BTreeSet<usize> =
-                family_fixtures.iter().map(|fixture| fixture.event_count).collect();
+            let family_fixtures: Vec<&CampaignFixtureResult> = report
+                .fixtures
+                .iter()
+                .filter(|fixture| fixture.family == family)
+                .collect();
+            let event_counts: BTreeSet<usize> = family_fixtures
+                .iter()
+                .map(|fixture| fixture.event_count)
+                .collect();
             if family == InteractionFamily::PureThirdOrder {
                 assert_eq!(event_counts, (3..=8).collect());
             } else {
@@ -1003,10 +1079,14 @@ mod tests {
     #[test]
     fn campaign_pairs_policies_on_same_compositions_and_seeds() {
         let report = build_probe_policy_campaign(&small_config()).unwrap();
-        let primary = report.paired_summaries.iter().find(|summary| {
-            summary.scope == CampaignScope::Development
-                && summary.baseline_policy == ProbeSelectionPolicy::UniformRandom
-        }).unwrap();
+        let primary = report
+            .paired_summaries
+            .iter()
+            .find(|summary| {
+                summary.scope == CampaignScope::Development
+                    && summary.baseline_policy == ProbeSelectionPolicy::UniformRandom
+            })
+            .unwrap();
         assert!(primary.independent_composition_count >= 2);
         assert!(primary.matched_row_pair_count > 0);
         assert!(primary.bootstrap_95pct_lower.is_some());
@@ -1017,19 +1097,21 @@ mod tests {
     fn support_corruption_changes_probe_view_not_factorial_oracle_truth() {
         let config = small_config();
         let sparse = generate_fixture(InteractionFamily::SparsePairwise, 0, &config).unwrap();
-        let oracle_before = build_factorial_ground_truth(
-            &sparse.events, &sparse.effect, &config.factorial_config,
-        ).unwrap();
+        let oracle_before =
+            build_factorial_ground_truth(&sparse.events, &sparse.effect, &config.factorial_config)
+                .unwrap();
         let mut corrupted_supports = sparse.supports.clone();
         corrupted_supports[0].acoustic_support[0].end_frame =
             corrupted_supports[0].acoustic_support[0].start_frame + 1;
-        corrupted_supports[1].acoustic_support[0].start_frame =
-            corrupted_supports[1].acoustic_support[0].end_frame.saturating_sub(1);
+        corrupted_supports[1].acoustic_support[0].start_frame = corrupted_supports[1]
+            .acoustic_support[0]
+            .end_frame
+            .saturating_sub(1);
         let support_bytes = serde_json::to_vec(&corrupted_supports).unwrap();
         let corrupted_support_digest = sha256_hex(&support_bytes);
-        let oracle_after = build_factorial_ground_truth(
-            &sparse.events, &sparse.effect, &config.factorial_config,
-        ).unwrap();
+        let oracle_after =
+            build_factorial_ground_truth(&sparse.events, &sparse.effect, &config.factorial_config)
+                .unwrap();
         assert_eq!(oracle_before.input_sha256, oracle_after.input_sha256);
         assert_ne!(sparse.support_digest, corrupted_support_digest);
     }
@@ -1038,9 +1120,21 @@ mod tests {
     fn incomplete_routing_is_a_heldout_topology_and_never_claims_independence() {
         let config = small_config();
         let fixture = generate_fixture(InteractionFamily::IncompleteRouting, 0, &config).unwrap();
-        assert!(fixture.supports.iter().any(|support| !support.routing_complete));
-        assert_eq!(InteractionFamily::IncompleteRouting.split(), CampaignSplit::HeldOutRoutingTopology);
-        let unknown_scope = fixture.supports.iter().filter(|support| !support.routing_complete).count();
+        assert!(
+            fixture
+                .supports
+                .iter()
+                .any(|support| !support.routing_complete)
+        );
+        assert_eq!(
+            InteractionFamily::IncompleteRouting.split(),
+            CampaignSplit::HeldOutRoutingTopology
+        );
+        let unknown_scope = fixture
+            .supports
+            .iter()
+            .filter(|support| !support.routing_complete)
+            .count();
         assert_eq!(unknown_scope, fixture.events.len());
     }
 
