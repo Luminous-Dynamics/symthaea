@@ -9,6 +9,7 @@ on:
       - "tools/mel-benchmark-registry-harness/**"
       - "crates/domains/symthaea-muse/src/music_edit_benchmark_adapter.rs"
       - "tools/mel-music-edit-adapter-harness/**"
+      - "docs/research/MEL_MR_EVAL_030_SMEBENCH_MMAE_ADAPTER_V1_2026-11-13.md"
       - "benchmarks/mel/registry/synthetic-music-edit-dataset-manifest-v1.json"
       - "benchmarks/mel/registry/synthetic-music-edit-capability-matrix-v1.json"
       - "benchmarks/mel/registry/synthetic-music-edit-comparison-scope-v1.json"
@@ -127,3 +128,29 @@ jobs:
         run: cargo +1.96.0 run --locked --manifest-path "$MUSE_MUSIC_EDIT_ADAPTER_MANIFEST" --example validate_fixtures
       - name: Run adapter Clippy
         run: cargo +1.96.0 clippy --locked --manifest-path "$MUSE_MUSIC_EDIT_ADAPTER_MANIFEST" --all-targets -- -D warnings
+
+      - name: Record exact adapter source and fixture identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mel-music-edit-adapter-evidence"
+          mkdir -p "$evidence"
+          cp "$MUSE_MUSIC_EDIT_ADAPTER_MANIFEST" "$evidence/Cargo.toml"
+          cp "$MUSE_MUSIC_EDIT_ADAPTER_MANIFEST.lock" "$evidence/Cargo.lock"
+          sha256sum "$evidence/Cargo.toml" "$evidence/Cargo.lock" > "$evidence/cargo-identities.sha256"
+          sha256sum crates/domains/symthaea-muse/src/music_edit_benchmark_adapter.rs > "$evidence/adapter-source.sha256"
+          sha256sum benchmarks/mel/schemas/music-edit-dataset-manifest-v1.schema.json > "$evidence/dataset-schema.sha256"
+          sha256sum benchmarks/mel/schemas/music-edit-capability-matrix-v1.schema.json > "$evidence/capability-schema.sha256"
+          sha256sum benchmarks/mel/schemas/music-edit-comparison-scope-v1.schema.json > "$evidence/scope-schema.sha256"
+          sha256sum benchmarks/mel/registry/synthetic-music-edit-dataset-manifest-v1.json > "$evidence/dataset-fixture.sha256"
+          sha256sum benchmarks/mel/registry/synthetic-music-edit-capability-matrix-v1.json > "$evidence/capability-fixture.sha256"
+          sha256sum benchmarks/mel/registry/synthetic-music-edit-comparison-scope-v1.json > "$evidence/scope-fixture.sha256"
+          printf 'exact_head=%s\n' "$MUSE_MUSIC_EDIT_ADAPTER_REVISION" > "$evidence/source-identities.txt"
+
+      - name: Upload adapter evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: muse-music-edit-adapter-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-music-edit-adapter-evidence/
+          if-no-files-found: error
+          retention-days: 90
