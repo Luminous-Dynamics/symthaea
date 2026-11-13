@@ -73,9 +73,7 @@ pub struct UniversalBitFlipRecoverySample {
 ///
 /// Qubit 0 is the most-significant bit and qubit 2 is the least-significant bit.
 fn error_maps() -> [[usize; PHYSICAL_DIMENSION]; ERROR_COUNT] {
-    core::array::from_fn(|error| {
-        core::array::from_fn(|basis| basis ^ ERROR_MASKS[error])
-    })
+    core::array::from_fn(|error| core::array::from_fn(|basis| basis ^ ERROR_MASKS[error]))
 }
 
 /// Construct one fixed syndrome decoder. It is independent of all channel
@@ -145,9 +143,7 @@ pub fn simulate_three_qubit_bit_flip_universal_recovery(
                     } else {
                         0.0
                     };
-                    let expected = if error_row == error_column
-                        && logical_row == logical_column
-                    {
+                    let expected = if error_row == error_column && logical_row == logical_column {
                         1.0
                     } else {
                         0.0
@@ -212,8 +208,7 @@ pub fn simulate_three_qubit_bit_flip_universal_recovery(
             fidelity_numerator += trace * trace;
         }
     }
-    let entanglement_fidelity =
-        fidelity_numerator / (LOGICAL_DIMENSION * LOGICAL_DIMENSION) as f64;
+    let entanglement_fidelity = fidelity_numerator / (LOGICAL_DIMENSION * LOGICAL_DIMENSION) as f64;
 
     Ok(UniversalBitFlipRecoverySample {
         probabilities,
@@ -271,17 +266,13 @@ mod tests {
     #[test]
     fn fixed_decoder_is_independent_of_the_channel_probability_vector() {
         let first = three_qubit_bit_flip_recovery_kraus();
-        let _ = simulate_three_qubit_bit_flip_universal_recovery(
-            [0.80, 0.10, 0.05, 0.05],
-            TOLERANCE,
-        )
-        .unwrap();
+        let _ =
+            simulate_three_qubit_bit_flip_universal_recovery([0.80, 0.10, 0.05, 0.05], TOLERANCE)
+                .unwrap();
         let second = three_qubit_bit_flip_recovery_kraus();
-        let _ = simulate_three_qubit_bit_flip_universal_recovery(
-            [0.05, 0.15, 0.30, 0.50],
-            TOLERANCE,
-        )
-        .unwrap();
+        let _ =
+            simulate_three_qubit_bit_flip_universal_recovery([0.05, 0.15, 0.30, 0.50], TOLERANCE)
+                .unwrap();
         assert_eq!(first, second);
     }
 
@@ -306,24 +297,15 @@ mod tests {
     #[test]
     fn invalid_probability_vectors_are_rejected_without_renormalization() {
         assert!(matches!(
-            simulate_three_qubit_bit_flip_universal_recovery(
-                [0.2, 0.2, 0.2, 0.2],
-                TOLERANCE
-            ),
+            simulate_three_qubit_bit_flip_universal_recovery([0.2, 0.2, 0.2, 0.2], TOLERANCE),
             Err(UniversalRecoveryError::ProbabilitySum { .. })
         ));
         assert!(matches!(
-            simulate_three_qubit_bit_flip_universal_recovery(
-                [0.4, -0.1, 0.4, 0.3],
-                TOLERANCE
-            ),
+            simulate_three_qubit_bit_flip_universal_recovery([0.4, -0.1, 0.4, 0.3], TOLERANCE),
             Err(UniversalRecoveryError::NegativeProbability { .. })
         ));
         assert!(matches!(
-            simulate_three_qubit_bit_flip_universal_recovery(
-                [0.2, f64::NAN, 0.4, 0.4],
-                TOLERANCE
-            ),
+            simulate_three_qubit_bit_flip_universal_recovery([0.2, f64::NAN, 0.4, 0.4], TOLERANCE),
             Err(UniversalRecoveryError::NonFiniteProbability { .. })
         ));
         assert!(matches!(
