@@ -146,18 +146,18 @@ The real-time layer connects local physics to the already-qualified gate/split/c
 
 Known-answer tests cover the analytic two-site XY exponential, rejection of non-Hermitian or charge-changing Hamiltonians, exact two-site forward/reverse evolution, and second-order convergence of a three-site XY chain against its analytic solution. For second-order Strang, halving \(\Delta t\) should reduce the global discretization error by approximately four in the asymptotic regime.
 
-## Step-doubling and Hamiltonian-projection diagnostics
+## Step-doubling, Hamiltonian projection and typed error-budget diagnostics
 
-The follow-up adds a transfer-environment MPS distance and a step-doubling diagnostic:
+The step-doubling path compares one coarse Strang step at \(dt\) with two fine steps at \(dt/2\):
 
-- One coarse Strang step of size \(dt\) is compared with two fine steps of size \(dt/2\).
-- The coarse/fine state-vector difference is computed from MPS norms and the cross-state transfer contraction; no dense expansion is needed.
-- For a second-order method, the asymptotic Richardson estimate for the fine solution uses the factor \(1/(2^2-1)=1/3\).
-- The reported estimate includes the coarse and fine canonical-gauge truncation upper bounds as contamination terms. It is explicitly an *asymptotic estimator*, not a formal Trotter theorem; its calibration gate is the exact three-site XY solution and cubic single-step defect scaling.
-- Each result reports the measured defect, separate coarse/fine truncation bounds, and whether all gauge receipts qualified. A missing gauge qualification suppresses the Richardson estimate.
-- Every bond Hamiltonian also reports its Hermiticity residual, charge-leakage residual and Frobenius projection residual. The analytic exponential uses the explicit Hermitian, charge-block projection, with the single-excitation coupling symmetrized before exponentiation.
+- The coarse/fine state-vector defect is measured by transfer-environment norms and cross-state overlap; no dense expansion is needed.
+- For second-order Strang, the asymptotic Richardson estimate for the fine solution uses the factor \(1/(2^2-1)=1/3\).
+- The estimate includes both the coarse and fine canonical-gauge truncation bounds as contamination terms, rather than mislabeling compression loss as Trotter error.
+- The result carries the measured defect, separate coarse/fine truncation bounds, gauge qualification status and Richardson estimate. A missing gauge receipt suppresses the estimate.
 
-This gives a three-part input ledger: Hamiltonian projection residual, MPS truncation/canonicalization residual, and Strang step-doubling defect. These are not yet a single formal physical error certificate: the Richardson estimate remains asymptotic and the floating-point residuals are f64 measurements, not interval-arithmetic enclosures.
+Each bond Hamiltonian also reports its Hermiticity residual, charge-leakage residual and Frobenius projection residual. The analytic exponential uses the explicit Hermitian, charge-block projection, with the single-excitation coupling symmetrized before exponentiation.
+
+A typed error-budget receipt keeps four sources separate: Hamiltonian projection, canonicalization rebase, Schmidt truncation, and the step-doubling/Richardson estimate. It deliberately leaves the total physical error upper bound empty and its qualification flag false. The Richardson term is asymptotic, not a formal Trotter theorem; f64 residuals are not interval-enclosed. This is an evidence-carrying budget, not yet a total physical-error certificate.
 
 ## Explicit limitations
 
