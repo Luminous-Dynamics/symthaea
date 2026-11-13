@@ -275,6 +275,22 @@
         "disposition": "ineligible",
         "reason": "DownstreamAcceptanceBindingMismatch"
       }
+    },
+    {
+      "case_id": "ROUTE-035-RECEIVER-ISSUER-IS-PROCESS-ISSUER",
+      "mutation": "Receiver organization is the same as the originating process issuer",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "DownstreamAcceptanceNotIndependentOfBasis"
+      }
+    },
+    {
+      "case_id": "ROUTE-036-RECEIVER-VERIFIER-IS-PROCESS-ISSUER",
+      "mutation": "Independent verifier identity is the same as the originating process issuer",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "DownstreamAcceptanceNotIndependentOfBasis"
+      }
     }
   ]
 }
