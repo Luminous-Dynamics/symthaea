@@ -15,8 +15,9 @@ use std::collections::BTreeSet;
 use std::error::Error;
 
 use symthaea_uap_observatory::{
-    BudgetedDesignConfig, CorrelatedDesignScenario, CorrelatedExperimentOption, DesignScenario,
-    ExperimentOption, exhaustive_budgeted_design, exhaustive_correlated_budgeted_design,
+    BudgetedDesignConfig, BudgetedDesignReport, CorrelatedDesignScenario,
+    CorrelatedExperimentOption, DesignScenario, ExperimentOption, exhaustive_budgeted_design,
+    exhaustive_correlated_budgeted_design,
     greedy_budgeted_design, greedy_correlated_budgeted_design,
 };
 
@@ -157,14 +158,28 @@ fn missing_mandatory_actions(selected: &[String]) -> Vec<&'static str> {
         .collect()
 }
 
-fn print_selection(label: &str, selected: &[String], cost: f64, gain: f64) {
-    println!("{label}_selected={}", selected.join(";"));
-    println!("{label}_cost={cost:.6}");
-    println!("{label}_target_marginal_eig_nats={gain:.12}");
+fn print_selection(label: &str, report: &BudgetedDesignReport) {
+    println!("{label}_selected={}", report.selected_option_ids.join(";"));
+    println!("{label}_cost={:.6}", report.total_cost);
+    println!("{label}_budget={:.6}", report.budget);
+    println!("{label}_expected_target_marginal_eig_nats={:.12}", report.expected_information_gain_nats);
+    println!("{label}_worst_case_target_marginal_eig_nats={:.12}", report.worst_case_information_gain_nats);
+    println!("{label}_expected_joint_eig_nats={:.12}", report.expected_joint_information_gain_nats);
+    println!("{label}_worst_case_joint_eig_nats={:.12}", report.worst_case_joint_information_gain_nats);
     println!(
         "{label}_mandatory_missing={}",
-        missing_mandatory_actions(selected).join(";")
+        missing_mandatory_actions(&report.selected_option_ids).join(";")
     );
+    for score in &report.scenario_scores {
+        println!(
+            "{label}_scenario={},target_eig={:.12},joint_eig={:.12},data_only_rank={},nullity={}",
+            score.scenario_id,
+            score.information_gain_nats,
+            score.joint_information_gain_nats,
+            score.data_only_rank,
+            score.data_only_nullity
+        );
+    }
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -213,27 +228,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     print_selection(
         "independent_greedy",
-        &independent_greedy.selected_option_ids,
-        independent_greedy.total_cost,
-        independent_greedy.expected_information_gain_nats,
+        &independent_greedy,
     );
     print_selection(
         "correlated_greedy",
-        &correlated_greedy.selected_option_ids,
-        correlated_greedy.total_cost,
-        correlated_greedy.expected_information_gain_nats,
+        &correlated_greedy,
     );
     print_selection(
         "independent_exact",
-        &independent_exact.selected_option_ids,
-        independent_exact.total_cost,
-        independent_exact.expected_information_gain_nats,
+        &independent_exact,
     );
     print_selection(
         "correlated_exact",
-        &correlated_exact.selected_option_ids,
-        correlated_exact.total_cost,
-        correlated_exact.expected_information_gain_nats,
+        &correlated_exact,
     );
     println!(
         "independent_greedy_exact_gap_nats={:.12}",
