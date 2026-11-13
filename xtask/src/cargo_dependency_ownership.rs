@@ -356,12 +356,14 @@ fn dependency_report(alias: &str, config: &Value, ws: &Workspace, manifests: &[M
     let workspace_dir = dir_of(&ws.path);
     let malformed_in_scope = manifests.iter().filter(|m| m.parse_error.is_some()).any(|m| {
         let candidate_dir = dir_of(&m.path);
-        is_within(&workspace_dir, &candidate_dir)
-            && !workspaces.iter().any(|nested| {
-                nested.path != ws.path
-                    && dir_of(&nested.path).len() > workspace_dir.len()
-                    && is_within(&dir_of(&nested.path), &candidate_dir)
-            })
+        let excluded = relative_to_workspace(&m.path, &ws.path)
+            .is_some_and(|relative| ws.excludes.iter().any(|pattern| matches(pattern, &relative)));
+        let nested = workspaces.iter().any(|other| {
+            other.path != ws.path
+                && dir_of(&other.path).len() > workspace_dir.len()
+                && is_within(&dir_of(&other.path), &candidate_dir)
+        });
+        is_within(&workspace_dir, &candidate_dir) && !excluded && !nested
     });
     if inheriting.is_empty() && malformed_in_scope {
         classification = "UNRESOLVED_OWNERSHIP".into();
@@ -564,7 +566,7 @@ mod tests {
             path: "Cargo.toml".into(),
             package: Some("symthaea".into()),
             hash: "root-manifest".into(),
-            members: vec!["crates/*".into(), "xtask".into()],
+            members: vec!["crates/core/*".into(), "xtask".into()],
             excludes: vec!["crates/archived".into()],
             dependencies: BTreeMap::new(),
         }
