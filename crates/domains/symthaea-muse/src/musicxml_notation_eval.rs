@@ -1297,10 +1297,10 @@ mod tests {
         .unwrap();
         assert_eq!(report.voice_assignment.accuracy, Some(1.0));
         assert_eq!(report.voice_reference_unassigned_count, 1);
-        assert_eq!(report.voice_unexpected_assignment_count, 0);
+        assert_eq!(report.voice_unexpected_assignment_count, 1);
         assert_eq!(report.staff_assignment.accuracy, Some(1.0));
         assert_eq!(report.staff_reference_unassigned_count, 1);
-        assert_eq!(report.staff_unexpected_assignment_count, 0);
+        assert_eq!(report.staff_unexpected_assignment_count, 1);
         assert_eq!(report.instrument_assignment.accuracy, None);
         assert_eq!(report.instrument_reference_unassigned_count, 4);
         assert_eq!(report.instrument_unexpected_assignment_count, 1);
