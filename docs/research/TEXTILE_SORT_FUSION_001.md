@@ -196,7 +196,7 @@ A separate synthetic fixture corpus is provided at:
 
 The JSON corpus is consumed by the Rust test suite. Each synthetic case ID maps to an executable regression case; the test checks unique IDs, corpus/schema identity, expected disposition and expected reason. This proves only the fixture-to-contract regression mapping, not performance on the real NIST or TexSortML datasets.
 
-The recovery-route contract has a separate 24-case synthetic corpus:
+The recovery-route contract has a separate 27-case synthetic corpus:
 - `docs/research/fixtures/textile_sort_fusion_v0_1/recovery_cases.schema.json`
 - `docs/research/fixtures/textile_sort_fusion_v0_1/recovery_cases.example.json`
 
