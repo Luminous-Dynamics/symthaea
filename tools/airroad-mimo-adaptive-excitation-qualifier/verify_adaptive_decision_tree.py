@@ -66,6 +66,24 @@ def action_covers_crossport(action: dict) -> bool:
     )
 
 
+
+def action_admissible(action: dict, domain: dict) -> bool:
+    if action.get("approved") is not True or "cost" not in action:
+        return False
+    if q(action["cost"]) <= 0:
+        return False
+    omega = q(action["omega"])
+    return q(domain["lower"]) <= omega <= q(domain["upper"])
+
+
+def deterministic_first_action(actions: list[dict], domain: dict) -> str | None:
+    admitted = [a for a in actions if action_admissible(a, domain)]
+    if not admitted:
+        return None
+    admitted.sort(key=lambda a: a["action_id"])
+    return admitted[0]["action_id"]
+
+
 def main() -> None:
     data = json.loads(FIXTURE.read_text(encoding="utf-8"))
     assert data["schema"] == "luminous.airroad.mimo_adaptive_experiment_decision_tree.v0_1"
@@ -83,7 +101,10 @@ def main() -> None:
     assert len(actions) == len(data["candidate_actions"])
     action2, action3 = actions["action-omega-2"], actions["action-omega-3"]
     assert action_covers_crossport(action2) and action_covers_crossport(action3)
+    domain = data["model_set_valid_frequency_domain_rad_s"]
     assert action2["approved"] is True and action3["approved"] is True
+    assert action_admissible(action2, domain) and action_admissible(action3, domain)
+    assert deterministic_first_action(data["candidate_actions"], domain) == "action-omega-2"
     assert q(action2["cost"]) == q(action3["cost"]) == 1
     assert q(action2["omega"]) == 2 and q(action3["omega"]) == 3
 
@@ -179,8 +200,12 @@ def main() -> None:
 
     # Unapproved actions do not enter the candidate set.
     unapproved = data["counterfactuals"]["unapproved_action"]
+    out_of_domain = data["counterfactuals"]["out_of_domain_action"]
+    missing_cost = data["counterfactuals"]["missing_cost_action"]
     assert unapproved["approved"] is False
-    assert not (unapproved["approved"] is True)
+    assert not action_admissible(unapproved, domain)
+    assert not action_admissible(out_of_domain, domain)
+    assert not action_admissible(missing_cost, domain)
 
     # Outside all admitted prediction sets is unresolved, not nearest-model.
     outside_observation = (Fraction(100), Fraction(100))
