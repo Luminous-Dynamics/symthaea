@@ -162,3 +162,15 @@ The evaluator checks grouped train/test separation, complete split assignments, 
 Thirteen Rust unit tests are authored. The fixture contains twelve scenarios: four positive grouped-holdout controls, six rejected leakage/identity controls and two blocked evidence-completeness controls. An independent source-side JavaScript replay of the fetched JSON matched all twelve frozen dispositions.
 
 **Execution status:** the exact branch files are fetched back; the fixture parses; the independent replay matched 12/12 expected dispositions. The available authoring environment has no Cargo/Rust toolchain, so the Rust source and 13 tests remain uncompiled/unexecuted. No CI pass, original-data access, published-model reproduction or physical outcome prediction is claimed.
+
+## Reuse existing experiment-design infrastructure
+
+The experiment-selection part must not create another generic expected-information-gain / Bayesian-optimization / experiment-receipt engine.
+
+Compose with:
+- Symthaea [OLI-EXPERIMENT-001 #11446](https://github.com/Luminous-Dynamics/symthaea/issues/11446): robust experiment selection across competing hypotheses, measurement limits, model inadequacy and cost.
+- Symthaea [UAP-OED-001 #11050](https://github.com/Luminous-Dynamics/symthaea/issues/11050): budgeted multifidelity active experiment design under observability constraints.
+- Symthaea [AR-5D #9332](https://github.com/Luminous-Dynamics/symthaea/issues/9332): sealed-oracle adaptive benchmark generation and anti-contamination.
+- Symthaea [PLASMA-VV-001 #7588](https://github.com/Luminous-Dynamics/symthaea/issues/7588): plasma-specific model validity and external solver credibility.
+
+PLASMA-ML-GENERALIZATION-001 owns only plasma material/process features, source/device/material holdout policy, plasma outcome definitions and plasma-specific baselines. The general experiment selector remains with its existing owner. The decision-value benchmark should pass plasma-specific candidate/observation contracts into those existing interfaces, not create a parallel optimizer or evidence receipt schema.
