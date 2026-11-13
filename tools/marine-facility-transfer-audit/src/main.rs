@@ -169,13 +169,44 @@ struct BandMeasurement {
 struct AuditReport {
     schema_version: &'static str,
     campaign_id: String,
+    source_dataset_id: String,
+    source_data_sha256: String,
+    source_rights_status: &'static str,
     facility_id: String,
     facility_revision_id: String,
     test_section_geometry_sha256: String,
     coordinate_frame_id: String,
     condition_id: String,
     condition_fingerprint_sha256: String,
+    condition_evidence_sha256: String,
+    calibration_temperature_c: f64,
+    calibration_absolute_pressure_kpa: f64,
+    calibration_gas_content_mg_l: Option<f64>,
+    calibration_cavitation_susceptibility_alpha: Option<f64>,
+    calibration_flow_speed_m_s: f64,
+    free_surface_present: bool,
+    free_surface_distance_m: Option<f64>,
+    condition_transfer_additional_u95_db: f64,
     source_projector_id: String,
+    source_projector_serial_or_revision: String,
+    source_projector_type: String,
+    source_signal_id: String,
+    source_signal_type: String,
+    drive_chain_id: String,
+    drive_chain_calibration_sha256: String,
+    source_level_basis_reference_sha256: String,
+    source_basis_additional_u95_db: f64,
+    receiver_hydrophone_instrument_id: String,
+    receiver_hydrophone_calibration_certificate_sha256: String,
+    receiver_acquisition_chain_id: String,
+    receiver_acquisition_chain_calibration_sha256: String,
+    receiver_x_m: f64,
+    receiver_y_m: f64,
+    receiver_z_m: f64,
+    receiver_orientation_yaw_deg: f64,
+    receiver_orientation_pitch_deg: f64,
+    receiver_orientation_roll_deg: f64,
+    receiver_position_uncertainty_m: f64,
     source_level_basis: &'static str,
     calibration_water_state: &'static str,
     scope: &'static str,
@@ -185,6 +216,9 @@ struct AuditReport {
     distinct_azimuth_sectors: usize,
     outer_disc_position_count: usize,
     minimum_repeats_per_position: usize,
+    aggregation_tolerance_db: f64,
+    maximum_spatial_spread_db: f64,
+    maximum_repeatability_sd_db: f64,
     disposition: &'static str,
     band_summaries: Vec<BandSummary>,
     position_summaries: Vec<PositionSummary>,
@@ -216,6 +250,14 @@ struct BandSummary {
 }
 
 #[derive(Debug, Serialize)]
+struct RepeatEvidence {
+    repeat_id: String,
+    timebase_receipt_sha256: String,
+    raw_input_trace_sha256: String,
+    raw_output_trace_sha256: String,
+}
+
+#[derive(Debug, Serialize)]
 struct PositionSummary {
     position_id: String,
     x_m: f64,
@@ -224,6 +266,7 @@ struct PositionSummary {
     radial_position_ratio: f64,
     azimuth_deg: f64,
     repeat_count: usize,
+    repeat_evidence: Vec<RepeatEvidence>,
     band_summaries: Vec<PositionBandSummary>,
 }
 
@@ -240,7 +283,6 @@ struct PositionBandCalculation {
     mean_tf_db: f64,
     repeat_sd_db: Option<f64>,
     conservative_u95_db: f64,
-    values: Vec<f64>,
 }
 
 fn is_sha256(value: &str) -> bool {
@@ -301,7 +343,6 @@ fn calculate_position_band(position: &Position, band_id: &str) -> Option<Positio
         // Averages the declared bounds without sqrt(N) reduction. This is a
         // conservative box bound and does not assume independent repeats.
         conservative_u95_db: uncertainties.iter().sum::<f64>() / uncertainties.len() as f64,
-        values,
     })
 }
 
@@ -575,6 +616,12 @@ fn audit(case: &Case) -> AuditReport {
                 radial_position_ratio: position.radial_position_ratio,
                 azimuth_deg: position.azimuth_deg,
                 repeat_count: position.repeats.len(),
+                repeat_evidence: position.repeats.iter().map(|repeat| RepeatEvidence {
+                    repeat_id: repeat.repeat_id.clone(),
+                    timebase_receipt_sha256: repeat.timebase_receipt_sha256.clone(),
+                    raw_input_trace_sha256: repeat.raw_input_trace_sha256.clone(),
+                    raw_output_trace_sha256: repeat.raw_output_trace_sha256.clone(),
+                }).collect(),
                 band_summaries: position_bands,
             });
         }
@@ -698,13 +745,48 @@ fn audit(case: &Case) -> AuditReport {
     AuditReport {
         schema_version: SCHEMA_VERSION,
         campaign_id: case.campaign_id.clone(),
+        source_dataset_id: case.source.dataset_id.clone(),
+        source_data_sha256: case.source.raw_data_sha256.clone(),
+        source_rights_status: match case.source.rights_status {
+            RightsStatus::PublicOrPermitted => "public_or_permitted",
+            RightsStatus::Unknown => "unknown",
+            RightsStatus::Restricted => "restricted",
+        },
         facility_id: case.facility.facility_id.clone(),
         facility_revision_id: case.facility.revision_id.clone(),
         test_section_geometry_sha256: case.facility.test_section_geometry_sha256.clone(),
         coordinate_frame_id: case.facility.coordinate_frame_id.clone(),
         condition_id: case.condition.condition_id.clone(),
         condition_fingerprint_sha256: case.condition.condition_fingerprint_sha256.clone(),
+        condition_evidence_sha256: case.condition.condition_evidence_sha256.clone(),
+        calibration_temperature_c: case.condition.temperature_c,
+        calibration_absolute_pressure_kpa: case.condition.absolute_pressure_kpa,
+        calibration_gas_content_mg_l: case.condition.gas_content_mg_l,
+        calibration_cavitation_susceptibility_alpha: case.condition.cavitation_susceptibility_alpha,
+        calibration_flow_speed_m_s: case.condition.flow_speed_m_s,
+        free_surface_present: case.condition.free_surface_present,
+        free_surface_distance_m: case.condition.free_surface_distance_m,
+        condition_transfer_additional_u95_db: case.condition.condition_transfer_additional_u95_db,
         source_projector_id: case.projector.instrument_id.clone(),
+        source_projector_serial_or_revision: case.projector.serial_or_revision.clone(),
+        source_projector_type: case.projector.projector_type.clone(),
+        source_signal_id: case.projector.signal_id.clone(),
+        source_signal_type: case.projector.signal_type.clone(),
+        drive_chain_id: case.projector.drive_chain_id.clone(),
+        drive_chain_calibration_sha256: case.projector.drive_chain_calibration_sha256.clone(),
+        source_level_basis_reference_sha256: case.projector.source_level_basis_reference_sha256.clone(),
+        source_basis_additional_u95_db: case.projector.source_basis_additional_u95_db,
+        receiver_hydrophone_instrument_id: case.receiver.hydrophone_instrument_id.clone(),
+        receiver_hydrophone_calibration_certificate_sha256: case.receiver.hydrophone_calibration_certificate_sha256.clone(),
+        receiver_acquisition_chain_id: case.receiver.acquisition_chain_id.clone(),
+        receiver_acquisition_chain_calibration_sha256: case.receiver.acquisition_chain_calibration_sha256.clone(),
+        receiver_x_m: case.receiver.x_m,
+        receiver_y_m: case.receiver.y_m,
+        receiver_z_m: case.receiver.z_m,
+        receiver_orientation_yaw_deg: case.receiver.orientation_yaw_deg,
+        receiver_orientation_pitch_deg: case.receiver.orientation_pitch_deg,
+        receiver_orientation_roll_deg: case.receiver.orientation_roll_deg,
+        receiver_position_uncertainty_m: case.receiver.position_uncertainty_m,
         source_level_basis: basis_name(case.projector.source_level_basis),
         calibration_water_state: water_state_name(case.condition.water_state),
         scope: scope_name(case.scope),
@@ -714,6 +796,9 @@ fn audit(case: &Case) -> AuditReport {
         distinct_azimuth_sectors,
         outer_disc_position_count,
         minimum_repeats_per_position: case.minimum_repeats_per_position,
+        aggregation_tolerance_db: case.aggregation_tolerance_db,
+        maximum_spatial_spread_db: case.maximum_spatial_spread_db,
+        maximum_repeatability_sd_db: case.maximum_repeatability_sd_db,
         disposition,
         band_summaries,
         position_summaries,
