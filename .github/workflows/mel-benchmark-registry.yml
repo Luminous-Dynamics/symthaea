@@ -8,7 +8,6 @@ on:
       - "benchmarks/mel/registry/**"
       - "benchmarks/mel/schemas/**"
       - "tools/mel-benchmark-registry-harness/**"
-      - ".github/workflows/mel-benchmark-registry.yml"
   workflow_dispatch:
 
 permissions:
