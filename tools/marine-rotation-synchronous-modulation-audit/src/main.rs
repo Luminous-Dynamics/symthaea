@@ -4,7 +4,6 @@ use std::{env, fs, process};
 
 const SCHEMA_VERSION: &str = "0.1.0";
 const TWO_PI: f64 = std::f64::consts::TAU;
-const PHASE_MATCH_EPSILON_RAD: f64 = 1.0e-9;
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
