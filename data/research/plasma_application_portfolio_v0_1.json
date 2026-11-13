@@ -91,6 +91,16 @@
       "sota_anchor": "Industrial PCUs already provide OES/optical, power, voltage, gas flow, pressure, temperature, rotation and recipe monitoring; 2026 semiconductor-plasma reviews report virtual metrology but identify labeled data and domain transfer as barriers",
       "primary_gap": "link calibrated upstream telemetry to actual material-lot/device/day held-out bond outcomes with calibrated uncertainty, false-accept controls and exact grid-to-bond energy boundary",
       "evidence_ceiling": "synthetic contract only; no trained model or production quality release"
+    },
+    {
+      "id": "PLASMA-OED-001",
+      "priority": "P0_ENABLER",
+      "issue": 11907,
+      "pr": 11910,
+      "service_unit": "correct durable-bond product decisions per experimental cost/latency/sample budget, with explicit ACCEPT/REJECT/ABSTAIN",
+      "sota_anchor": "2026 matched gas/polymer comparison shows WCA does not always rank bond strength; 2026 PE CAP study reports surface-wettability gains with WVTR/OTR penalties; robust multifidelity OED and correlated-measurement design are active generic fields",
+      "primary_gap": "plasma-specific selection of complementary F0-F4 measurements for bond strength, aging, failure mode and substrate preservation while accounting for lot/device/day shift, shared preparation covariance and model inadequacy",
+      "evidence_ceiling": "10-scenario synthetic contract replay only; no optimizer result, EVSI improvement, physical data or laboratory savings"
     }
   ],
   "no_longer_novel_by_itself": [
