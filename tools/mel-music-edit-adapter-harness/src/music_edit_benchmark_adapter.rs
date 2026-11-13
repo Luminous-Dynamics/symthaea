@@ -197,6 +197,8 @@ pub enum MusicEditAdapterIssueV1 {
     MissingRightsEvidence,
     IntendedUseNotPermitted,
     MissingAccessEvidence,
+    DuplicatePermittedUse,
+    EmptyPermittedUses,
     EmptyRows,
     DuplicateSampleId,
     LineageCrossesSplits,
@@ -278,6 +280,18 @@ pub fn validate_music_edit_dataset_manifest_v1(
     }
     if let Some(digest) = manifest.rights.rights_evidence_sha256.as_deref() {
         validate_digest(&mut issues, "rights_evidence_sha256", digest);
+    }
+    if manifest.rights.permitted_uses.is_empty() {
+        issues.push(MusicEditAdapterIssueV1::EmptyPermittedUses);
+    }
+    let mut permitted_uses = BTreeSet::new();
+    if manifest
+        .rights
+        .permitted_uses
+        .iter()
+        .any(|usage| !permitted_uses.insert(*usage))
+    {
+        issues.push(MusicEditAdapterIssueV1::DuplicatePermittedUse);
     }
     if !manifest.rights.permitted_uses.contains(&manifest.intended_use) {
         issues.push(MusicEditAdapterIssueV1::IntendedUseNotPermitted);
@@ -647,6 +661,24 @@ mod tests {
         assert!(
             validate_music_edit_dataset_manifest_v1(&manifest)
                 .contains(&MusicEditAdapterIssueV1::MutableDatasetVersion)
+        );
+    }
+
+    #[test]
+    fn empty_and_duplicate_permitted_uses_reject() {
+        let mut manifest = manifest(vec![row("sample-1", A, MusicEditSplitV1::Development)]);
+        manifest.rights.permitted_uses.clear();
+        assert!(
+            validate_music_edit_dataset_manifest_v1(&manifest)
+                .contains(&MusicEditAdapterIssueV1::EmptyPermittedUses)
+        );
+        manifest.rights.permitted_uses = vec![
+            MusicEditPermittedUseV1::EvaluationOnly,
+            MusicEditPermittedUseV1::EvaluationOnly,
+        ];
+        assert!(
+            validate_music_edit_dataset_manifest_v1(&manifest)
+                .contains(&MusicEditAdapterIssueV1::DuplicatePermittedUse)
         );
     }
 
