@@ -9,10 +9,12 @@ This first slice provides:
 - explicit climate-attribution method requirements;
 - origin/destination area identity and role checks;
 - arithmetic-only aggregate capacity sufficiency/shortfall evaluation;
+- a separate non-compensatory service-floor evaluator using versioned floor references, observation bounds and explicit scope coverage;
+- full-coverage MeetsFloor / BreachedFloor results, partial-coverage ObservedBreach reporting, and Indeterminate for incomplete evidence or threshold-crossing intervals;
 - fail-closed indeterminate results for missing inputs, unknown evidence or unknown qualification;
 - prohibition of recommendation/decision authority in the scenario record.
 
-It does not ingest the JSON fixture, parse GeoJSON, model hydraulics, forecast movement, calculate protected minimum-service floors, determine rights or issue operational commands. The crate's capacity result is not a safety or suitability assessment.
+It does not ingest the JSON fixture, parse GeoJSON, model hydraulics, forecast movement, decide which authority may set a floor, determine rights or issue operational commands. The service-floor result only checks a supplied, versioned threshold against supplied evidence and coverage. It is not a legal determination, certification, water-safety assessment or destination-suitability assessment.
 
 ## Test
 
