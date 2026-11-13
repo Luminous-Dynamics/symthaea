@@ -503,6 +503,8 @@ pub enum TransferGapError {
     EvaluationManifestMismatch(String),
     /// A familiar reference manifest aliases training or calibration data.
     ReferenceManifestAliasesFitData,
+    /// The split owner explicitly found training/calibration overlap with evaluation data.
+    EvaluationDataOverlap,
     /// A cluster identifier is reused across familiar and hidden regimes.
     ClusterReusedAcrossRegimes(String),
     /// Cluster identity is reused with inconsistent independence receipts.
