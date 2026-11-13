@@ -358,6 +358,14 @@ Newer evidence strengthens the Johannesburg pilot rationale while reinforcing th
 - A June 2026 systematic review of 48 water digital-twin studies finds the strongest operational maturity in distribution networks, with many natural-water-system applications still conceptual/simulation-led; data integration, cybersecurity, cost-benefit evidence and social equity remain significant gaps. This motivates an explicit model → shadow → synchronised digital-twin maturity ladder rather than premature twin claims.
 
 Pilot implication: treat Johannesburg's near-term problem first as a measurable delivered-service and infrastructure-reliability problem. Mobility research should consume those qualified service trajectories as one input, while separately incorporating agency, livelihoods, housing, rights and receiving-place capacity. Do not conflate the 2026 pressure episode with a climate-attributed migration event.
+- Siriban et al., *A review and evaluation of internal migration forecasting models* (Population Studies, published online 26 May 2026; 21 Australian bilateral-flow forecasts across five method classes): https://doi.org/10.1080/00324728.2026.2645544
+- OECD, *Migration Anticipation and Preparedness* (2026), forecasters' toolkit: https://www.oecd.org/en/publications/2026/03/migration-anticipation-and-preparedness_c7c13bc4/full-report/forecasters-toolkit-choosing-the-right-model-for-the-task_af4817f2.html
+- Systematic review of 244 climate-(im)mobility studies (18 September 2026): https://link.springer.com/article/10.1007/s11111-026-00535-9
+- Qureshi et al., *A systematic literature review of digital twin applications for sustainable water systems in natural and built environment* (17 June 2026; 48 studies): https://link.springer.com/article/10.1007/s43621-026-03825-2
+- Johannesburg Water, customer notices archive (dated pages and image-backed notices; publication metadata only until media are transcribed): https://www.johannesburgwater.co.za/media/media-statement/customer-notices/
+- South African Human Rights Commission, Gauteng water-services inquiry release (2 November 2026): https://sahrc.org.za/index.php/sahrc-media/news-2/item/4568-media-statement-the-south-african-human-rights-commission-releases-an-inquiry-report-highlighting-neglected-water-and-sanitation-infrastructure-and-heavy-reliance-on-road-based-water-distribution-water-tankers-in-gauteng
+- SAnews / Department of Water and Sanitation, El Niño and water-conservation statement (3 November 2026): https://www.sanews.gov.za/south-africa/dws-urges-responsible-water-use-amid-el-ni%C3%B1o-threat
+- Johannesburg Water, urgent interventions statement (29 October 2026): https://www.johannesburgwater.co.za/blog/2026/10/29/johannesburg-water-implements-urgent-interventions-to-stabilise-severely-constrained-systems/
 
 ## References
 
