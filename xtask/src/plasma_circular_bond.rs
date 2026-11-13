@@ -103,11 +103,27 @@ fn evaluate_case(case: &Value) -> Result<&'static str> {
         }
     }
 
+    // A release claim cannot skip the independently qualified service phase.
+    if release_claim && !service_claim {
+        return Ok("REJECTED");
+    }
+
     // Release is a separate, trigger-qualified and spatially selective event.
     if release_claim {
         let declared = string(case, "declared_trigger_modality")?;
         let actual = string(case, "actual_trigger_modality")?;
-        if declared == "MANUAL_FORCE" || actual == "MANUAL_FORCE" {
+        let supported_trigger = |value: &str| {
+            matches!(
+                value,
+                "THERMAL"
+                    | "JOULE_HEAT"
+                    | "INDUCTION"
+                    | "PHOTOTHERMAL_UV"
+                    | "CHEMICAL_SOLVOLYSIS"
+                    | "MAGNETIC_HYBRID"
+            )
+        };
+        if !supported_trigger(declared) || !supported_trigger(actual) {
             return Ok("REJECTED");
         }
         if declared != actual {
@@ -145,6 +161,16 @@ fn evaluate_case(case: &Value) -> Result<&'static str> {
         let target = string(case, "target_joint_id")?;
         let protected = string_array(case, "protected_joint_ids")?;
         let released = string_array(case, "released_joint_ids")?;
+        let protected_unique: std::collections::BTreeSet<&str> =
+            protected.iter().map(String::as_str).collect();
+        let released_unique: std::collections::BTreeSet<&str> =
+            released.iter().map(String::as_str).collect();
+        if protected_unique.len() != protected.len()
+            || released_unique.len() != released.len()
+            || protected.iter().any(|joint| joint == target)
+        {
+            return Ok("REJECTED");
+        }
         if !released.iter().any(|joint| joint == target) {
             return Ok("BLOCKED");
         }
@@ -360,6 +386,25 @@ mod tests {
                 .expect("known case");
             assert_eq!(evaluate_case(case).expect("evaluate"), expected);
         }
+    }
+
+
+    #[test]
+    fn release_requires_service_qualification_and_supported_trigger_type() {
+        let root: Value = serde_json::from_str(FIXTURE).expect("valid fixture");
+        let cases = root["cases"].as_array().expect("cases");
+        let selective = cases
+            .iter()
+            .find(|case| case["id"] == "SELECTIVE_RELEASE")
+            .expect("known case");
+        let mut no_service = selective.clone();
+        no_service["service_claim"] = Value::Bool(false);
+        assert_eq!(evaluate_case(&no_service).expect("evaluate"), "REJECTED");
+
+        let mut unsupported = selective.clone();
+        unsupported["declared_trigger_modality"] = Value::String("UNKNOWN_TRIGGER".to_owned());
+        unsupported["actual_trigger_modality"] = Value::String("UNKNOWN_TRIGGER".to_owned());
+        assert_eq!(evaluate_case(&unsupported).expect("evaluate"), "REJECTED");
     }
 
     #[test]
