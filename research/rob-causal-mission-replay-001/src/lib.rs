@@ -9,6 +9,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod joint_metrology_adapter;
+pub mod wire_consumer;
 
 /// Bounded timestamp on the mission's declared monotonic clock.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
