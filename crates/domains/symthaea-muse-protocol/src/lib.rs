@@ -227,6 +227,15 @@ pub struct ImportedNotationStructureSummary {
     pub explanation: Option<String>,
 }
 
+/// Provenance of the generated audition. Source MIDI is rendered from
+/// the uploaded event stream; all other cases are reconstructed from Score.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportedAuditionKind {
+    SourceMidiPerformance,
+    ReconstructedScore,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ImportedWorkSummary {
     pub manifest: ContributionManifest,
@@ -238,16 +247,20 @@ pub struct ImportedWorkSummary {
     /// field existed still deserialize.
     #[serde(default)]
     pub audio_renderer: String,
-    /// Discloses that `audition.wav`'s TIMBRE is reconstructed, not
-    /// preserved from the source. `parse_symbolic` extracts pitch, rhythm,
-    /// tempo, meter, and voice roles into a plain `Score` -- it does not
-    /// carry the source file's own instrument/program assignments, so
-    /// there is nothing to "preserve." The audition is voiced with a fixed
-    /// instrument palette instead (currently a `Style::Classical`
-    /// string-trio pool in `theory_realize::instruments_for`); pitch,
-    /// rhythm, and voice-role assignment DO come from the source
-    /// unchanged. `#[serde(default)]` so summaries written before this
-    /// field existed still deserialize.
+    /// SHA-256 of the exact audition.wav bytes. Absent on legacy receipts.
+    #[serde(default)]
+    pub audition_sha256: Option<String>,
+    /// Distinguishes source-MIDI event rendering from reconstructed Score audio.
+    #[serde(default)]
+    pub audition_kind: Option<ImportedAuditionKind>,
+    /// Explains how the audition's instrumentation relates to its source.
+    /// Reconstructed-score auditions use a fixed instrument palette because
+    /// the note-centric Score does not retain source program assignments.
+    /// Source-MIDI auditions pass the uploaded event stream to FluidSynth,
+    /// preserving supported MIDI program/channel/controller messages, but
+    /// the selected soundfont still synthesizes the timbre; it is not the
+    /// original acoustic recording. `#[serde(default)]` preserves older
+    /// stored summaries.
     #[serde(default = "default_instrumentation_note")]
     pub instrumentation_note: String,
     /// Absent for older imports written before structural sidecars existed.
