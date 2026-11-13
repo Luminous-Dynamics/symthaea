@@ -39,6 +39,17 @@ Sources:
 
 The proposed strategy's priority-stream listing is useful for pilot design; it must not be presented as a final adopted textile regulation.
 
+#### Existing EPR coverage and the 2024 fee guideline are not the same thing as a textile scheme notice
+
+DFFE's current EPR registration page describes the identified 2020 scheme sectors as paper/packaging and some single-use products, lighting, and electrical/electronic equipment. The official South African Waste Information Centre's “Who should register” page lists those same three registration sectors. This is evidence of the currently described registration portal scope, not proof that no other notice exists anywhere in the Gazette.
+
+The official 11 November 2024 EPR Fee Guideline and Toolkit contains an illustrative international-methodology table in which the broad “Other” category includes furniture, textile fibres, wood, and examples of textile fee approaches. The document's stated purpose is to guide fee determination for products already identified under the EPR Regulations; the illustrative table is **not itself a section 18 textile product notice, a national textile PRO scheme, or proof that textile producers currently owe a specific fee**.
+
+Primary sources:
+- DFFE EPR registration information: https://www.dffe.gov.za/registration-terms-regulations-regarding-extended-producer-responsibility-2020
+- SAWIC registration sectors: https://sawic.dffe.gov.za/SAWIC/eprwhoshouldregister
+- Government Gazette 51534, GoN 5535 (11 November 2024), EPR fee guideline: https://www.gov.za/sites/default/files/gcis_document/202411/51534gon5535.pdf
+
 ### 2.3 Proposed EPR Regulations 2026 — current consultation window
 
 Government Notice 8145, published in Government Gazette 55679 on 5 November 2026, proposes replacing the 2020 EPR Regulations with a consolidated 2026 version. The official notice invites comments until **5 December 2026**. The draft says it applies to products identified under section 18(1)(a) and separately published by the Minister. The 27-page draft notice contains no textual match for “textile” or “clothing”; this alone does not establish that textiles are outside all present or future section 18 notices.
