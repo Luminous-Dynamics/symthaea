@@ -1,0 +1,41 @@
+name: AIRROAD MIMO IQC Generator Adapter Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_MIMO_IQC_GENERATOR_ADAPTER_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-iqc-generator-adapter-v0.1.json"
+      - "tools/airroad-mimo-iqc-generator-adapter-qualifier/verify_iqc_generator_adapter.py"
+      - ".github/workflows/airroad-mimo-iqc-generator-adapter-reference.yml"
+  push:
+    branches:
+      - research/airroad-mimo-iqc-generator-adapter-v0.1
+    paths:
+      - "docs/research/AIRROAD_MIMO_IQC_GENERATOR_ADAPTER_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-iqc-generator-adapter-v0.1.json"
+      - "tools/airroad-mimo-iqc-generator-adapter-qualifier/verify_iqc_generator_adapter.py"
+      - ".github/workflows/airroad-mimo-iqc-generator-adapter-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-mimo-iqc-generator-adapter-reference-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rational-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute shared-generator adapter oracle
+        run: |
+          python3 -m py_compile tools/airroad-mimo-iqc-generator-adapter-qualifier/verify_iqc_generator_adapter.py
+          python3 tools/airroad-mimo-iqc-generator-adapter-qualifier/verify_iqc_generator_adapter.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool docs/research/fixtures/airroad-mimo-iqc-generator-adapter-v0.1.json > /dev/null
