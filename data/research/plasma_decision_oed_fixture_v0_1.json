@@ -514,7 +514,7 @@
           "production_day": "2026-11-13",
           "sample_preparation_group": "barrier-ldpe-04",
           "independence_group": "wvtr-04",
-          "covariance_model_id": null,
+          "covariance_model_id": "cov-barrier-04",
           "calibration_status": "QUALIFIED",
           "raw_trace_digest": "sha256:synthetic-wvtr-04"
         },
@@ -867,7 +867,7 @@
           "production_day": "2026-11-13",
           "sample_preparation_group": "prep-pp-07",
           "independence_group": "wet-07",
-          "covariance_model_id": null,
+          "covariance_model_id": "cov-prep-07",
           "calibration_status": "QUALIFIED",
           "raw_trace_digest": "sha256:synthetic-wca-07"
         },
@@ -1057,7 +1057,7 @@
           "production_day": "2026-11-13",
           "sample_preparation_group": "prep-pp-08",
           "independence_group": "wet-08",
-          "covariance_model_id": "cov-prep-05",
+          "covariance_model_id": "cov-prep-08",
           "calibration_status": "QUALIFIED",
           "raw_trace_digest": "sha256:synthetic-wca-08"
         },
@@ -1070,7 +1070,7 @@
           "production_day": "2026-11-13",
           "sample_preparation_group": "prep-pp-08",
           "independence_group": "chem-08",
-          "covariance_model_id": "cov-prep-05",
+          "covariance_model_id": "cov-prep-08",
           "calibration_status": "QUALIFIED",
           "raw_trace_digest": "sha256:synthetic-ftir-08"
         },
