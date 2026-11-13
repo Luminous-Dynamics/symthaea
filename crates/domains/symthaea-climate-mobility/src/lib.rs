@@ -757,6 +757,7 @@ mod tests {
                 is_recommendation: true,
             }],
             assessments: Vec::new(),
+            floor_assessments: Vec::new(),
         };
         assert_eq!(
             set.validate(),
