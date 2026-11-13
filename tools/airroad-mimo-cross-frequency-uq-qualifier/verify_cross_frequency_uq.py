@@ -51,6 +51,17 @@ def complete_shared_coverage(
     )
 
 
+
+def record_identity_valid(data: dict, record: dict) -> bool:
+    return (
+        record.get("model_identity") == data.get("model_identity")
+        and record.get("topology_identity") == data.get("topology_identity")
+        and record.get("operating_point_identity") == data.get("operating_point_identity")
+        and record.get("frequency_unit") == data.get("frequency_unit")
+        and record.get("measurement_equation") == "observed_value = shared_q * nominal_value"
+    )
+
+
 def interval_sub(a: tuple[Fraction, Fraction],
                  b: tuple[Fraction, Fraction]) -> tuple[Fraction, Fraction]:
     return a[0] - b[1], a[1] - b[0]
@@ -98,6 +109,9 @@ def main() -> None:
         nuisance["acquisition_root_id"],
         nuisance["calibration_certificate_id"],
     )
+    assert data["measurement_equation"] == "observed_matrix(omega_k)=q_shared*nominal_matrix(omega_k)"
+    assert all(record_identity_valid(data, item) for item in records)
+    assert all(item["measurement_equation"] == "observed_value = shared_q * nominal_value" for item in records)
     expected_pairs = {
         (frequency_id, row, column)
         for frequency_id in ("omega-1", "omega-2")
@@ -187,6 +201,44 @@ def main() -> None:
         nuisance["acquisition_root_id"],
         nuisance["calibration_certificate_id"],
     )
+
+    second_frequency_independent = [dict(item) for item in records]
+    for item in second_frequency_independent:
+        if item["frequency_id"] == "omega-2":
+            item["shared_nuisance_id"] = "cal-chain-independent-at-knot-2"
+    assert not complete_shared_coverage(
+        second_frequency_independent,
+        nuisance["applies_to_record_ids"],
+        nuisance["nuisance_id"],
+        nuisance["acquisition_root_id"],
+        nuisance["calibration_certificate_id"],
+    )
+
+    stale_acquisition = [dict(item) for item in records]
+    stale_acquisition[0]["acquisition_root_id"] = "stale-acquisition-root"
+    assert not complete_shared_coverage(
+        stale_acquisition,
+        nuisance["applies_to_record_ids"],
+        nuisance["nuisance_id"],
+        nuisance["acquisition_root_id"],
+        nuisance["calibration_certificate_id"],
+    )
+    stale_calibration = [dict(item) for item in records]
+    stale_calibration[0]["calibration_certificate_id"] = "stale-calibration-certificate"
+    assert not complete_shared_coverage(
+        stale_calibration,
+        nuisance["applies_to_record_ids"],
+        nuisance["nuisance_id"],
+        nuisance["acquisition_root_id"],
+        nuisance["calibration_certificate_id"],
+    )
+
+    stale_model_record = dict(records[0])
+    stale_model_record["model_identity"] = "sha256:stale-model"
+    assert not record_identity_valid(data, stale_model_record)
+    wrong_unit_record = dict(records[0])
+    wrong_unit_record["frequency_unit"] = "Hz"
+    assert not record_identity_valid(data, wrong_unit_record)
 
     equal_domain_distinct_ids = {
         "omega_1": "cal-chain-1", "omega_2": "cal-chain-2",
