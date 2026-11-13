@@ -67,8 +67,15 @@ pub enum U1MpsError {
     NegativeNormSquared(f64),
     InvalidTotalCharge { total_charge: i32, site_count: usize },
     ZeroDenseState,
-    DenseChargeLeakage { basis_index: usize, amplitude: f64, tolerance: f64 },
-    SvdFailed { rows: usize, columns: usize },
+    DenseChargeLeakage {
+        basis_index: usize,
+        amplitude: f64,
+        tolerance: f64,
+    },
+    SvdFailed {
+        rows: usize,
+        columns: usize,
+    },
 }
 
 impl core::fmt::Display for U1MpsError {
@@ -101,7 +108,10 @@ impl core::fmt::Display for U1MpsError {
                 "right boundary must be one state with charge {expected_charge}, got dimension {dimension}, charge {actual_charge:?}"
             ),
             Self::BondChargeMismatch { bond } => {
-                write!(f, "right/left charge labels disagree on virtual bond {bond}")
+                write!(
+                    f,
+                    "right/left charge labels disagree on virtual bond {bond}"
+                )
             }
             Self::ChargeSelectionRule {
                 site,
@@ -134,17 +144,30 @@ impl core::fmt::Display for U1MpsError {
             Self::NegativeNormSquared(value) => {
                 write!(f, "MPS norm squared is negative: {value}")
             }
-            Self::InvalidTotalCharge { total_charge, site_count } => write!(
+            Self::InvalidTotalCharge {
+                total_charge,
+                site_count,
+            } => write!(
                 f,
                 "total charge {total_charge} is invalid for a {site_count}-site qubit MPS"
             ),
-            Self::ZeroDenseState => write!(f, "the dense input has no nonzero amplitude in the declared charge sector"),
-            Self::DenseChargeLeakage { basis_index, amplitude, tolerance } => write!(
+            Self::ZeroDenseState => write!(
+                f,
+                "the dense input has no nonzero amplitude in the declared charge sector"
+            ),
+            Self::DenseChargeLeakage {
+                basis_index,
+                amplitude,
+                tolerance,
+            } => write!(
                 f,
                 "dense basis amplitude {basis_index} has forbidden charge-sector magnitude {amplitude}, tolerance {tolerance}"
             ),
             Self::SvdFailed { rows, columns } => {
-                write!(f, "charge-block SVD failed to converge for {rows}x{columns} block")
+                write!(
+                    f,
+                    "charge-block SVD failed to converge for {rows}x{columns} block"
+                )
             }
         }
     }
@@ -427,7 +450,6 @@ impl ComplexU1Mps {
     }
 
 
-
     /// Factor an exact dense fixed-charge state into a complex U(1)-symmetric MPS.
     ///
     /// The decomposition performs a full SVD independently in each intermediate
@@ -562,12 +584,12 @@ impl ComplexU1Mps {
                 }
 
                 let (block_rows, block_columns) = (block.nrows(), block.ncols());
-                let decomposition = block
-                    .try_svd(true, true, tolerance, max_iterations)
-                    .ok_or(U1MpsError::SvdFailed {
+                let decomposition = block.try_svd(true, true, tolerance, max_iterations).ok_or(
+                    U1MpsError::SvdFailed {
                         rows: block_rows,
                         columns: block_columns,
-                    })?;
+                    },
+                )?;
                 let u = decomposition.u.ok_or(U1MpsError::SvdFailed {
                     rows: block_rows,
                     columns: block_columns,
@@ -587,9 +609,10 @@ impl ComplexU1Mps {
                 if kept_indices.is_empty() {
                     continue;
                 }
-                let kept_u = DMatrix::<Complex64>::from_fn(rows.len(), kept_indices.len(), |r, col| {
-                    u[(r, kept_indices[col])]
-                });
+                let kept_u =
+                    DMatrix::<Complex64>::from_fn(rows.len(), kept_indices.len(), |r, col| {
+                        u[(r, kept_indices[col])]
+                    });
                 let kept_v_t =
                     DMatrix::<Complex64>::from_fn(kept_indices.len(), columns.len(), |r, col| {
                         v_t[(kept_indices[r], col)]
@@ -643,8 +666,7 @@ impl ComplexU1Mps {
                 for singular_index in 0..block_rank {
                     let new_bond = offset + singular_index;
                     for (row_index, &(left, physical)) in block.rows.iter().enumerate() {
-                        let index =
-                            (left * 2 + physical) * next_bond_dimension + new_bond;
+                        let index = (left * 2 + physical) * next_bond_dimension + new_bond;
                         tensor_data[index] = block.u[(row_index, singular_index)];
                     }
                     let singular_value = block.singular_values[singular_index];
@@ -737,7 +759,10 @@ impl ComplexU1Mps {
                     }
                 }
             }
-            if next.iter().any(|value| !value.re.is_finite() || !value.im.is_finite()) {
+            if next
+                .iter()
+                .any(|value| !value.re.is_finite() || !value.im.is_finite())
+            {
                 return Err(U1MpsError::NonFiniteContraction("transfer environment"));
             }
             environment = next;
@@ -886,10 +911,7 @@ mod tests {
         let nonfinite = U1MpsTensor::new(
             vec![0],
             vec![0],
-            vec![
-                Complex64::new(f64::NAN, 0.0),
-                Complex64::new(0.0, 0.0),
-            ],
+            vec![Complex64::new(f64::NAN, 0.0), Complex64::new(0.0, 0.0)],
         )
         .unwrap();
         assert!(matches!(
@@ -966,7 +988,6 @@ mod tests {
         ));
     }
 
-
     #[test]
     fn dense_factorization_reports_tolerated_out_of_sector_input_leakage() {
         let amplitude = 1.0 / 3.0_f64.sqrt();
@@ -981,7 +1002,6 @@ mod tests {
         assert!((state.dense_input_charge_leakage_weight() - 1.0e-26).abs() <= 1.0e-38);
         assert!((state.dense_reconstruction_max_residual().unwrap() - 1.0e-13).abs() <= 1.0e-25);
     }
-
 
     #[test]
     fn dense_fixed_charge_factorization_preserves_tiny_positive_schmidt_weight() {
@@ -1017,5 +1037,4 @@ mod tests {
             Err(U1MpsError::ZeroDenseState)
         );
     }
-
 }
