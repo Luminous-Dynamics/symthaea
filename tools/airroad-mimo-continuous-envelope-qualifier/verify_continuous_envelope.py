@@ -128,6 +128,7 @@ def main() -> None:
     assert p == [Fraction(v) for v in data["exact_reduction"]["stationary_polynomial_coefficients_ascending"]]
 
     p1, p2 = p_derivative(p), p_derivative(p_derivative(p))
+    assert p_eval(p2, x_hi) == q(data["critical_root_isolation"]["second_derivative_at_band_upper"])
     assert p_eval(p2, x_hi) < 0  # p'' is increasing but still negative at upper band edge
     assert p_eval(p1, x_lo) < 0  # p' decreases over band; already negative at lower edge
     assert p_eval(p, x_lo) > 0
