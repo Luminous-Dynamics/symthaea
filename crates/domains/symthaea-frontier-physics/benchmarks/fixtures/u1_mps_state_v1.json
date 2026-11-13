@@ -6,7 +6,7 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "Scalar U(1) MPS/TEBD, canonical-gauge truncation receipts, Strang evolution and step-doubling diagnostics are source-authored with exact-head Rust validation pending. A separate generic U(1)^K charge-vector tensor/sector-block contract is source-authored; generic K-charge SVD and evolution are not yet implemented.",
+  "execution_status": "Scalar U(1) MPS/TEBD, canonical-gauge truncation receipts, Strang evolution and step-doubling diagnostics are source-authored with exact-head Rust validation pending. Generic U(1)^K charge-vector tensor validation, deterministic block planning and exact two-site sector SVD are now source-authored; generic multi-charge truncation and evolution are not implemented.",
   "claim_ceiling": "The step-doubling Richardson quantity is an asymptotic estimate, not a formal Trotter upper theorem. Hamiltonian projection, canonicalization drift, Schmidt truncation and step-doubling defect remain separate. total_physical_error_upper_bound remains None; no interval arithmetic, total physical error proof, SOTA performance or quantum-advantage claim.",
   "conventions": {
     "physical_dimension": 2,
@@ -368,14 +368,15 @@
       "rationale": "Trotter Richardson value is asymptotic, f64 residuals are not interval-enclosed, and Hamiltonian projection residual is a separate input/data correction."
     },
     "abelian_multicharge": {
-      "status": "source_authored_runner_pending",
+      "status": "source_authored_exact_block_svd_runner_pending",
       "module": "abelian_mps",
       "generic_types": [
         "AbelianCharge<const K: usize>",
         "AbelianChargeTensor<const K: usize>",
         "AbelianMps<const K: usize>",
         "AbelianChargeBlock<const K: usize>",
-        "AbelianChargeBlockPlan<const K: usize>"
+        "AbelianChargeBlockPlan<const K: usize>",
+        "AbelianTwoSiteSplit<const K: usize>"
       ],
       "invariants": [
         "component-wise checked charge addition/subtraction",
@@ -413,7 +414,26 @@
         "joint_charge_tensor_rejects_forbidden_cross_sector_amplitude",
         "joint_charge_mps_rejects_bond_mismatch_and_wrong_total_charge"
       ],
-      "claim_boundary": "Generic structural U(1)^K charge-vector tensor validation and two-site block planning only. No generic charge-block SVD, truncation, TEBD or non-Abelian fusion trees yet."
+      "claim_boundary": "Generic structural U(1)^K charge-vector tensor validation and two-site block planning only. No generic charge-block SVD, truncation, TEBD or non-Abelian fusion trees yet.",
+      "exact_two_site_svd": {
+        "api": "AbelianChargeBlockPlan<K>::split_exact(first,second,tolerance)",
+        "method": "Contract adjacent site tensors, assemble one matrix per shared intermediate K-vector charge block, and independently SVD each block.",
+        "truncation": "No cutoff or bond cap; exactly-zero singular values only are omitted, every positive value is retained.",
+        "diagnostics": [
+          "rank_by_charge",
+          "total_singular_value_count",
+          "retained_singular_value_count",
+          "exact_zero_singular_values_omitted",
+          "reconstruction_max_residual",
+          "reconstruction_l2_residual"
+        ],
+        "authored_tests": [
+          "exact_u1k_two_site_svd_reconstructs_state_and_reports_each_charge_rank",
+          "exact_u1k_two_site_svd_retains_tiny_positive_schmidt_value",
+          "exact_u1k_two_site_svd_rejects_zero_state_and_mismatched_internal_bond"
+        ],
+        "claim_boundary": "Exact two-site U(1)^K decomposition only. Generic truncation, canonical gauge receipts, TEBD and Hamiltonian evolution remain unimplemented."
+      }
     }
   },
   "known_answers": [
@@ -654,6 +674,19 @@
         "dense/small known-answer fixture for (particle_number,2Sz)",
         "generic sector-wise SVD is a later milestone, not claimed here"
       ]
+    },
+    {
+      "id": "MPS-12",
+      "name": "Exact U(1)^K charge-block two-site complex SVD",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "one independent SVD for every intermediate K-vector charge block",
+        "rank-by-full-charge-vector receipt, including zero-rank sectors",
+        "exact-zero singular directions omitted only",
+        "10^-18 positive singular value retained",
+        "two-site reconstruction max/L2 residual measured",
+        "component-wise selection rules revalidated in both output tensors"
+      ]
     }
   ],
   "negative_controls": [
@@ -718,7 +751,11 @@
     "physical basis entry satisfies one U(1) component but violates another",
     "two-site SVD planner pairs different intermediate charge vectors",
     "adjacent MPS tensors carry equal scalar sum but different charge vectors",
-    "claim generic multi-charge TEBD before sector-wise SVD and error receipts exist"
+    "claim generic multi-charge TEBD before sector-wise SVD and error receipts exist",
+    "mix singular vectors from distinct intermediate charge vectors",
+    "drop a positive multi-charge Schmidt value in exact split",
+    "omit a charge block from the block planner while it contains nonzero two-site amplitude",
+    "claim multi-charge TEBD based only on generic exact two-site SVD"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -816,7 +853,12 @@
     "abelian_selection_rule_residual",
     "abelian_virtual_charge_vectors_by_bond",
     "abelian_two_site_intermediate_charge_blocks",
-    "abelian_charge_overflow_negative_control"
+    "abelian_charge_overflow_negative_control",
+    "abelian_two_site_svd_rank_by_charge_vector",
+    "abelian_two_site_svd_total_rank",
+    "abelian_two_site_svd_exact_zero_directions_omitted",
+    "abelian_two_site_svd_reconstruction_max_residual",
+    "abelian_two_site_svd_reconstruction_l2_residual"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
