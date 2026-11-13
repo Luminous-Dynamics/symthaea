@@ -18,6 +18,7 @@ on:
   push:
     branches:
       - "research/melothaea-musicxml-notation-events-v1"
+      - "research/melothaea-corpus-qualification-v1"
     paths:
       - ".github/workflows/muse-musicxml-notation.yml"
       - "Cargo.toml"
