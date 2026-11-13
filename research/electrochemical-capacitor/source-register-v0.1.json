@@ -174,6 +174,16 @@
       "evidence_class": "peer_reviewed_literature",
       "permitted_use": "Matched research comparator for 10 mg cm-2 carbon cathode loading, approximately 16.4 N/P ratio, 38.3 mAh g-1 at 10 A g-1 over 3000 cycles, and 2.82 Wh kg-1 reported device-level energy based on 0.746 g total device weight",
       "prohibited_inference": "Not a universal ZIHSC benchmark or Luminous result; retain the paper's precise device denominator, cathode/coin/pouch distinction and test conditions"
+    },
+    {
+      "id": "SKELETON-SKELMOD-54V188F-2026",
+      "title": "SkelMod 51V / 54V188F Data Sheet",
+      "url": "https://www.skeletontech.com/hubfs/01-DS-211229-SKELMOD-51V177F-1D.pdf?hsLang=en",
+      "publisher": "Skeleton Technologies",
+      "published": "2026-06-05",
+      "evidence_class": "vendor_datasheet",
+      "permitted_use": "Commercial EDLC module specification: 54 V, 188 F, 76.14 Wh maximum stored energy, 16 kg, 13.5 L, 3.0 mOhm 10 ms ESR and 3.4 mOhm 1 s ESR, 162.6 kW 1 s ESR-based power figure, integrated balancing/monitoring and CAN",
+      "prohibited_inference": "Vendor specifications, not independent usable-energy measurements; retain 54 V rated-energy basis and do not transfer cycle-life conditions stated for 51 V or 48 V variants to the 54 V variant"
     }
   ]
 }
