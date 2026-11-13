@@ -575,4 +575,5 @@ mod tests {
             state.to_dense(1),
             Err(U1MpsError::DenseExpansionTooLarge { .. })
         ));
-    }}
+    }
+}
