@@ -1,0 +1,37 @@
+name: AIRROAD IQC Hermitian Core
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-airroad-iqc/**"
+      - ".github/workflows/airroad-iqc-hermitian-core.yml"
+  push:
+    branches:
+      - research/airroad-iqc-hermitian-core-v0.1
+    paths:
+      - "crates/domains/symthaea-airroad-iqc/**"
+      - ".github/workflows/airroad-iqc-hermitian-core.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-iqc-hermitian-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hermitian-core:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install stable Rust with required components
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Format the isolated AIRROAD crate
+        run: cargo fmt --manifest-path crates/domains/symthaea-airroad-iqc/Cargo.toml --package symthaea-airroad-iqc -- --check
+      - name: Run isolated unit tests
+        run: cargo test --manifest-path crates/domains/symthaea-airroad-iqc/Cargo.toml --package symthaea-airroad-iqc
+      - name: Run isolated Clippy
+        run: cargo clippy --manifest-path crates/domains/symthaea-airroad-iqc/Cargo.toml --package symthaea-airroad-iqc --all-targets -- -D warnings
