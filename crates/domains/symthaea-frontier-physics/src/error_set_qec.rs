@@ -599,7 +599,10 @@ fn partial_trace_code(
     if matrix.rows() != expected_dimension || matrix.columns() != expected_dimension {
         return Err(ErrorSetQecError::EmptyMatrix);
     }
-    let mut entries = vec![Complex64::new(0.0, 0.0); error_count * error_count];
+    let entry_count = error_count
+        .checked_mul(error_count)
+        .ok_or(ErrorSetQecError::DimensionOverflow)?;
+    let mut entries = vec![Complex64::new(0.0, 0.0); entry_count];
     for error_row in 0..error_count {
         for error_column in 0..error_count {
             let mut value = Complex64::new(0.0, 0.0);
@@ -711,6 +714,11 @@ fn e_controlled_channel_trace_preservation_residual(
                         * kraus[output * physical_dimension + column];
                 }
             }
+            if !value.re.is_finite() || !value.im.is_finite() {
+                return Err(ErrorSetQecError::NonFiniteDiagnostic(
+                    "coefficient-induced channel TP contraction",
+                ));
+            }
             let expected = if row == column {
                 Complex64::new(1.0, 0.0)
             } else {
@@ -748,6 +756,11 @@ pub fn compute_strongly_controlled_petz_worst_case_bound(
         });
     }
     let coefficient_frobenius_norm = coefficient_matrix.frobenius_norm();
+    if !coefficient_frobenius_norm.is_finite() {
+        return Err(ErrorSetQecError::NonFiniteDiagnostic(
+            "coefficient-matrix Frobenius norm",
+        ));
+    }
     if coefficient_frobenius_norm > 1.0 + tolerance {
         return Err(ErrorSetQecError::StrongControlNorm {
             frobenius_norm: coefficient_frobenius_norm,
