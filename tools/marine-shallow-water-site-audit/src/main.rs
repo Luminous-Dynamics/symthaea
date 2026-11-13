@@ -291,13 +291,17 @@ struct CampaignReport {
     site_revision: String,
     depth_boundary_m: f64,
     mean_water_depth_m: Option<f64>,
+    mean_water_depth_lower_m: Option<f64>,
+    mean_water_depth_upper_m: Option<f64>,
     water_depth_range_fraction: Option<f64>,
     depth_category: &'static str,
     seabed_substrates: Vec<&'static str>,
     mean_seabed_sound_speed_m_s: Option<f64>,
     seabed_sound_speed_range_fraction: Option<f64>,
+    mean_ctd_sound_speed_m_s: Option<f64>,
     ctd_sound_speed_range_fraction: Option<f64>,
     hydrophone_count: usize,
+    recommendations_unmet: Vec<String>,
     three_hydrophone_recommendation_met: bool,
     reciprocal_run_count: usize,
     port_run_count: usize,
@@ -327,6 +331,8 @@ struct SiteComparisonReport {
     same_depth_category: bool,
     same_substrate_set: bool,
     seabed_sound_speed_difference_fraction: Option<f64>,
+    ctd_sound_speed_difference_fraction: Option<f64>,
+    same_band_quantity_contract: bool,
     result: &'static str,
     transfer_receipt_sha256: Option<String>,
     reasons: Vec<String>,
@@ -346,12 +352,43 @@ fn mean(values: impl Iterator<Item=f64>) -> Option<f64> {
     let v: Vec<f64> = values.collect();
     if v.is_empty() || v.iter().any(|x| !x.is_finite()) { None } else { Some(v.iter().sum::<f64>() / v.len() as f64) }
 }
-fn range_fraction(values: &[f64]) -> Option<f64> {
-    if values.is_empty() || values.iter().any(|x| !finite_positive(*x)) { return None; }
-    let low = values.iter().copied().fold(f64::INFINITY, f64::min);
-    let high = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    let avg = values.iter().sum::<f64>() / values.len() as f64;
-    Some((high - low) / avg)
+fn mean_interval(values: &[f64], expanded: &[f64]) -> Option<(f64, f64, f64)> {
+    if values.is_empty() || values.len() != expanded.len()
+        || values.iter().any(|v| !finite_positive(*v))
+        || expanded.iter().any(|u| !finite_positive(*u))
+    { return None; }
+    let count = values.len() as f64;
+    let average = values.iter().sum::<f64>() / count;
+    let lower = values.iter().zip(expanded).map(|(v, u)| v - u).sum::<f64>() / count;
+    let upper = values.iter().zip(expanded).map(|(v, u)| v + u).sum::<f64>() / count;
+    Some((lower, average, upper))
+}
+
+fn range_fraction_with_uncertainty(values: &[f64], expanded: &[f64]) -> Option<f64> {
+    if values.is_empty() || values.len() != expanded.len()
+        || values.iter().any(|v| !finite_positive(*v))
+        || expanded.iter().any(|u| !finite_positive(*u))
+    { return None; }
+    let lower = values.iter().zip(expanded).map(|(v, u)| v - u).fold(f64::INFINITY, f64::min);
+    let upper = values.iter().zip(expanded).map(|(v, u)| v + u).fold(f64::NEG_INFINITY, f64::max);
+    let average = values.iter().sum::<f64>() / values.len() as f64;
+    Some((upper - lower) / average)
+}
+
+fn depth_category_from_interval(lower: Option<f64>, upper: Option<f64>, boundary: f64) -> &'static str {
+    match (lower, upper) {
+        (Some(low), Some(_)) if low > boundary => "deep",
+        (Some(_), Some(high)) if high < boundary => "shallow",
+        (Some(_), Some(_)) => "boundary_undefined",
+        _ => "unknown",
+    }
+}
+
+fn mean_difference_fraction(a: Option<f64>, b: Option<f64>) -> Option<f64> {
+    match (a, b) {
+        (Some(x), Some(y)) if x.max(y) > 0.0 => Some((x - y).abs() / x.max(y)),
+        _ => None,
+    }
 }
 fn depth_boundary_m(length_m: f64) -> f64 {
     DEEP_WATER_MIN_M.max(DEEP_WATER_LENGTH_MULTIPLE * length_m)
@@ -534,24 +571,31 @@ fn validate_campaign(c: &Campaign, case: &Case, errors: &mut Vec<String>) {
 fn campaign_report(c: &Campaign, case: &Case) -> CampaignReport {
     let mut reasons = Vec::new();
     let depths: Vec<f64> = c.site.water_depth_samples.iter().map(|s| s.depth_m).collect();
-    let mean_depth = mean(depths.iter().copied());
-    let depth_range = range_fraction(&depths);
+    let depth_uncertainties: Vec<f64> = c.site.water_depth_samples.iter().map(|s| s.expanded_uncertainty_m).collect();
+    let depth_interval = mean_interval(&depths, &depth_uncertainties);
+    let (depth_lower, mean_depth, depth_upper) = depth_interval
+        .map(|(lower, average, upper)| (Some(lower), Some(average), Some(upper)))
+        .unwrap_or((None, None, None));
+    let depth_range = range_fraction_with_uncertainty(&depths, &depth_uncertainties);
     let boundary = depth_boundary_m(c.vessel.overall_ship_length_m);
-    let category = depth_category(mean_depth, boundary);
+    let category = depth_category_from_interval(depth_lower, depth_upper, boundary);
     if category == "boundary_undefined" { reasons.push("mean site depth lies exactly on the ISO deep/shallow classification boundary".to_string()); }
     if depth_range.is_none_or(|v| v > case.maximum_depth_range_fraction) {
         reasons.push("bathymetry coverage is missing or water-depth variation exceeds the declared site tolerance".to_string());
     }
     let substrates: BTreeSet<Substrate> = c.site.seabed_samples.iter().map(|s| s.substrate).collect();
     let seabed_speeds: Vec<f64> = c.site.seabed_samples.iter().map(|s| s.sound_speed_m_s).collect();
+    let seabed_uncertainties: Vec<f64> = c.site.seabed_samples.iter().map(|s| s.expanded_uncertainty_m_s).collect();
     let mean_seabed_speed = mean(seabed_speeds.iter().copied());
-    let seabed_range = range_fraction(&seabed_speeds);
+    let seabed_range = range_fraction_with_uncertainty(&seabed_speeds, &seabed_uncertainties);
     if seabed_range.is_none_or(|v| v > case.maximum_seabed_sound_speed_range_fraction) {
         reasons.push("seabed sound-speed coverage is missing or spatial variation exceeds the declared tolerance".to_string());
     }
     if substrates.contains(&Substrate::Unknown) { reasons.push("one or more seabed samples have unknown substrate classification".to_string()); }
     let ctd_speeds: Vec<f64> = c.site.ctd_profile.as_ref().map(|p| p.samples.iter().map(|s| s.sound_speed_m_s).collect()).unwrap_or_default();
-    let ctd_range = range_fraction(&ctd_speeds);
+    let ctd_uncertainties: Vec<f64> = c.site.ctd_profile.as_ref().map(|p| p.samples.iter().map(|s| s.expanded_uncertainty_m_s).collect()).unwrap_or_default();
+    let mean_ctd_speed = mean(ctd_speeds.iter().copied());
+    let ctd_range = range_fraction_with_uncertainty(&ctd_speeds, &ctd_uncertainties);
     if ctd_range.is_none() || ctd_range.is_some_and(|v| v > case.maximum_ctd_sound_speed_range_fraction) {
         reasons.push("CTD/sound-speed profile is missing or exceeds the declared within-profile uniformity tolerance".to_string());
     }
@@ -563,6 +607,10 @@ fn campaign_report(c: &Campaign, case: &Case) -> CampaignReport {
     if !is_sha256(&c.in_situ_pre_deployment_calibration_sha256) || !is_sha256(&c.in_situ_post_recovery_calibration_sha256) {
         reasons.push("pre-deployment and post-recovery in-situ calibration checks are both required".to_string());
     }
+    let mut recommendations_unmet = Vec::new();
+    if c.hydrophones.len() < 3 {
+        recommendations_unmet.push("IACS recommends three hydrophones for reduced uncertainty and channel redundancy".to_string());
+    }
     let mut port = 0usize;
     let mut starboard = 0usize;
     let mut stw_values = Vec::new();
@@ -571,10 +619,10 @@ fn campaign_report(c: &Campaign, case: &Case) -> CampaignReport {
         if let Some(stw) = run.speed_through_water_knots { stw_values.push(stw); }
         else { reasons.push(format!("run {} lacks speed-through-water evidence; speed over ground is not a substitute", run.run_id)); }
         if run.data_window_duration_s < IACS_MIN_DATA_WINDOW_S {
-            reasons.push(format!("run {} data window is shorter than the IACS 10 s recommendation", run.run_id));
+            recommendations_unmet.push(format!("run {} data window is shorter than the IACS 10 s recommendation", run.run_id));
         }
         if run.cpa_distance_m + 1.0e-9 < IACS_MIN_CPA_M.max(c.vessel.acoustic_ship_length_m) {
-            reasons.push(format!("run {} CPA distance is below the IACS recommended greater of 100 m or acoustic ship length", run.run_id));
+            recommendations_unmet.push(format!("run {} CPA distance is below the IACS recommended greater of 100 m or acoustic ship length", run.run_id));
         }
     }
     if port == 0 || starboard == 0 { reasons.push("both port and starboard reciprocal aspects are required for this campaign contract".to_string()); }
@@ -600,7 +648,8 @@ fn campaign_report(c: &Campaign, case: &Case) -> CampaignReport {
         });
         let cutoff = band.site_cutoff_frequency_hz;
         let below_cutoff = cutoff.is_some_and(|v| band.center_frequency_hz < v);
-        let exclusion = if below_cutoff { Some("below_declared_site_cutoff") }
+        let exclusion = if cutoff.is_none() { Some("unknown_site_cutoff") }
+            else if below_cutoff { Some("below_declared_site_cutoff") }
             else if !hydrophone_covers { Some("outside_calibrated_hydrophone_frequency_range") }
             else { None };
         BandReport {
@@ -616,6 +665,9 @@ fn campaign_report(c: &Campaign, case: &Case) -> CampaignReport {
         }
     }).collect();
 
+    if c.bands.iter().any(|band| band.site_cutoff_frequency_hz.is_none()) {
+        reasons.push("one or more bands have an unknown site cutoff frequency".to_string());
+    }
     if band_reports.iter().all(|b| !b.eligible_for_declared_site_campaign) {
         reasons.push("no acoustic band is eligible under the declared site cutoff and sensor response".to_string());
     }
@@ -632,7 +684,7 @@ fn campaign_report(c: &Campaign, case: &Case) -> CampaignReport {
     let invalid = !validate_campaign_errors_empty(c, case);
     let disposition = if invalid { "INVALID" }
         else if hard_incomplete { "INCOMPLETE" }
-        else if !three_hydrophones { "CONDITIONAL" }
+        else if !recommendations_unmet.is_empty() { "CONDITIONAL" }
         else { "SITE_ELIGIBLE_FOR_DECLARED_MEASUREMENT" };
 
     CampaignReport {
@@ -641,13 +693,17 @@ fn campaign_report(c: &Campaign, case: &Case) -> CampaignReport {
         site_revision: c.site.site_revision.clone(),
         depth_boundary_m: boundary,
         mean_water_depth_m: mean_depth,
+        mean_water_depth_lower_m: depth_lower,
+        mean_water_depth_upper_m: depth_upper,
         water_depth_range_fraction: depth_range,
         depth_category: category,
         seabed_substrates: substrates.into_iter().map(Substrate::name).collect(),
         mean_seabed_sound_speed_m_s: mean_seabed_speed,
         seabed_sound_speed_range_fraction: seabed_range,
+        mean_ctd_sound_speed_m_s: mean_ctd_speed,
         ctd_sound_speed_range_fraction: ctd_range,
         hydrophone_count: c.hydrophones.len(),
+        recommendations_unmet,
         three_hydrophone_recommendation_met: three_hydrophones,
         reciprocal_run_count: port + starboard,
         port_run_count: port,
@@ -685,12 +741,23 @@ fn site_comparisons(case: &Case, reports: &[CampaignReport]) -> Vec<SiteComparis
             }
             let same_depth = ra.depth_category == rb.depth_category && ra.depth_category != "boundary_undefined";
             let same_substrate = ra.seabed_substrates == rb.seabed_substrates;
-            let speed_delta = match (ra.mean_seabed_sound_speed_m_s, rb.mean_seabed_sound_speed_m_s) {
-                (Some(x), Some(y)) if x.max(y) > 0.0 => Some((x - y).abs() / x.max(y)),
-                _ => None,
-            };
+            let speed_delta = mean_difference_fraction(ra.mean_seabed_sound_speed_m_s, rb.mean_seabed_sound_speed_m_s);
+            let ctd_delta = mean_difference_fraction(ra.mean_ctd_sound_speed_m_s, rb.mean_ctd_sound_speed_m_s);
+            let a_band_map: BTreeMap<&str, &Band> = a.bands.iter().map(|band| (band.band_id.as_str(), band)).collect();
+            let b_band_map: BTreeMap<&str, &Band> = b.bands.iter().map(|band| (band.band_id.as_str(), band)).collect();
+            let same_band_ids = a_band_map.keys().copied().collect::<BTreeSet<_>>() == b_band_map.keys().copied().collect::<BTreeSet<_>>();
+            let same_band_quantity_contract = same_band_ids && a_band_map.iter().all(|(id, band_a)| {
+                b_band_map.get(id).is_some_and(|band_b| {
+                    band_a.quantity == band_b.quantity
+                        && (band_a.center_frequency_hz - band_b.center_frequency_hz).abs() <= 1.0e-6
+                })
+            });
+            if !same_band_quantity_contract {
+                reasons.push("cross-site campaigns do not have identical band IDs, frequencies and acoustic quantity semantics".to_string());
+            }
             let environment_differs = !same_depth || !same_substrate
-                || speed_delta.is_none_or(|v| v > case.maximum_cross_site_seabed_sound_speed_difference_fraction);
+                || speed_delta.is_none_or(|v| v > case.maximum_cross_site_seabed_sound_speed_difference_fraction)
+                || ctd_delta.is_none_or(|v| v > case.maximum_cross_site_seabed_sound_speed_difference_fraction);
             if environment_differs {
                 reasons.push("site depth category, seabed substrate or seabed sound-speed class differs".to_string());
             }
@@ -700,10 +767,12 @@ fn site_comparisons(case: &Case, reports: &[CampaignReport]) -> Vec<SiteComparis
                 receipt.from_site_id == a.site.site_id && receipt.to_site_id == b.site.site_id
                     && receipt.independently_reviewed && receipt.per_band_validated
                     && is_sha256(&receipt.receipt_sha256)
+                    && same_band_quantity_contract
                     && all_band_ids.iter().all(|id| receipt.validated_band_ids.contains(id))
             });
-            let result = if !reasons.iter().any(|r| r.contains("vessel/service")) && !environment_differs {
-                "COMPARABLE_SITE_STRATUM"
+            let result = if !reasons.iter().any(|r| r.contains("vessel/service"))
+                && !environment_differs && same_band_quantity_contract {
+                "SAME_DECLARED_PROPAGATION_STRATUM"
             } else if transfer.is_some() && !reasons.iter().any(|r| r.contains("vessel/service")) {
                 transfer_hash = transfer.map(|r| r.receipt_sha256.clone());
                 reasons.push("propagation-transfer receipt is referenced but its physical validity is not independently recalculated by this audit".to_string());
@@ -717,6 +786,8 @@ fn site_comparisons(case: &Case, reports: &[CampaignReport]) -> Vec<SiteComparis
                 same_depth_category: same_depth,
                 same_substrate_set: same_substrate,
                 seabed_sound_speed_difference_fraction: speed_delta,
+                ctd_sound_speed_difference_fraction: ctd_delta,
+                same_band_quantity_contract,
                 result,
                 transfer_receipt_sha256: transfer_hash,
                 reasons,
@@ -900,8 +971,9 @@ mod tests {
     #[test] fn nonuniform_seabed_sound_speed_exceeds_tolerance(){let mut x=case();measured(&mut x);x.campaigns[0].site.seabed_samples[1].sound_speed_m_s=2100.0;assert_eq!(audit(&x).disposition,"INCOMPLETE");}
     #[test] fn missing_post_recovery_field_calibration_is_incomplete(){let mut x=case();measured(&mut x);x.campaigns[0].in_situ_post_recovery_calibration_sha256="missing".to_string();assert_eq!(audit(&x).disposition,"INVALID");}
     #[test] fn speed_over_ground_is_not_a_substitute_for_stw(){let mut x=case();measured(&mut x);x.campaigns[0].runs[0].speed_through_water_knots=None;assert_eq!(audit(&x).disposition,"INCOMPLETE");}
-    #[test] fn short_data_window_is_incomplete(){let mut x=case();measured(&mut x);x.campaigns[0].runs[0].data_window_duration_s=8.0;assert_eq!(audit(&x).disposition,"INCOMPLETE");}
-    #[test] fn cpa_below_iacs_recommendation_is_incomplete(){let mut x=case();measured(&mut x);x.campaigns[0].runs[0].cpa_distance_m=50.0;assert_eq!(audit(&x).disposition,"INCOMPLETE");}
+    #[test] fn short_data_window_is_conditional_advisory(){let mut x=case();measured(&mut x);x.campaigns[0].runs[0].data_window_duration_s=8.0;assert_eq!(audit(&x).disposition,"CONDITIONAL");}
+    #[test] fn cpa_below_iacs_recommendation_is_conditional_advisory(){let mut x=case();measured(&mut x);x.campaigns[0].runs[0].cpa_distance_m=50.0;assert_eq!(audit(&x).disposition,"CONDITIONAL");}
+    #[test] fn unknown_site_cutoff_is_incomplete(){let mut x=case();measured(&mut x);x.campaigns[0].bands[0].site_cutoff_frequency_hz=None;assert_eq!(audit(&x).disposition,"INCOMPLETE");}
     #[test] fn both_port_and_starboard_runs_are_required(){let mut x=case();measured(&mut x);for r in &mut x.campaigns[0].runs{r.aspect=RunAspect::Port;}assert_eq!(audit(&x).disposition,"INCOMPLETE");}
     #[test] fn quantity_ids_remain_separate_in_output(){let r=audit(&case());let b=&r.campaign_reports[0].band_reports;assert_eq!(b[0].quantity,"radiated_noise_level");assert_eq!(b[1].quantity,"source_level");}
     #[test] fn bands_below_site_cutoff_are_excluded(){let mut x=case();x.campaigns[0].bands[0].center_frequency_hz=10.0;let r=audit(&x);assert_eq!(r.campaign_reports[0].band_reports[0].eligible_for_declared_site_campaign,false);assert_eq!(r.campaign_reports[0].band_reports[0].exclusion_reason,Some("below_declared_site_cutoff"));}
