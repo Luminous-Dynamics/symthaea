@@ -1137,7 +1137,6 @@ mod tests {
         assert_eq!(events.cursor_moves[0].staff.as_deref(), Some("2"));
         assert_eq!(events.cursor_moves[0].source.element, "forward");
     }
-}
 
     #[test]
     fn measure_level_directions_harmony_and_sound_keep_exact_offsets_and_source_trees() {
@@ -1174,3 +1173,4 @@ mod tests {
         ));
     }
 
+}
