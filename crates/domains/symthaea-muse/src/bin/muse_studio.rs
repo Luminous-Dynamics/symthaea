@@ -2751,6 +2751,13 @@ fn summarize_imported_notation_structure(
             let mut barline_event_count = 0usize;
             let mut non_controlling_measure_count = 0usize;
             let mut notation_event_count = 0usize;
+            let mut notation_auxiliary_event_count = 0usize;
+            let mut notation_attribute_event_count = 0usize;
+            let mut notation_cursor_move_count = 0usize;
+            let mut unpitched_event_count = 0usize;
+            let mut cue_note_count = 0usize;
+            let mut chord_member_count = 0usize;
+            let mut time_modification_count = 0usize;
             let mut notation_supported_part_count = 0usize;
             let mut notation_unknown_part_count = 0usize;
             let mut rest_event_count = 0usize;
@@ -2780,7 +2787,25 @@ fn summarize_imported_notation_structure(
                 non_controlling_measure_count +=
                     graph.non_controlling_measure_indices.len();
                 notation_event_count += graph.notation_events.note_events.len();
+                notation_auxiliary_event_count += graph.notation_events.auxiliary_events.len();
+                notation_attribute_event_count += graph.notation_events.attribute_events.len();
+                notation_cursor_move_count += graph.notation_events.cursor_moves.len();
                 for event in &graph.notation_events.note_events {
+                    if matches!(
+                        &event.kind,
+                        symthaea_muse::musicxml_notation_events::MusicXmlNotationEventKindV1::Unpitched { .. }
+                    ) {
+                        unpitched_event_count += 1;
+                    }
+                    if event.is_cue {
+                        cue_note_count += 1;
+                    }
+                    if event.is_chord_member {
+                        chord_member_count += 1;
+                    }
+                    if event.time_modification.is_some() {
+                        time_modification_count += 1;
+                    }
                     if matches!(
                         &event.kind,
                         symthaea_muse::musicxml_notation_events::MusicXmlNotationEventKindV1::Rest { .. }
@@ -2829,6 +2854,13 @@ fn summarize_imported_notation_structure(
                     barline_event_count,
                     non_controlling_measure_count,
                     notation_event_count,
+                    notation_auxiliary_event_count,
+                    notation_attribute_event_count,
+                    notation_cursor_move_count,
+                    unpitched_event_count,
+                    cue_note_count,
+                    chord_member_count,
+                    time_modification_count,
                     notation_supported_part_count,
                     notation_unknown_part_count,
                     rest_event_count,
@@ -2891,6 +2923,13 @@ fn summarize_imported_notation_structure(
                     barline_event_count,
                     non_controlling_measure_count,
                     notation_event_count: 0,
+                    notation_auxiliary_event_count: 0,
+                    notation_attribute_event_count: 0,
+                    notation_cursor_move_count: 0,
+                    unpitched_event_count: 0,
+                    cue_note_count: 0,
+                    chord_member_count: 0,
+                    time_modification_count: 0,
                     notation_supported_part_count: 0,
                     notation_unknown_part_count: 0,
                     rest_event_count: 0,
