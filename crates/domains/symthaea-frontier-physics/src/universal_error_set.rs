@@ -133,10 +133,11 @@ impl ErrorSetCode {
         let mut entries = vec![Complex64::new(0.0, 0.0); matrix_entries];
 
         // Cache each E_k V column so all overlaps use identical code inputs.
-        let mut error_codewords = vec![
-            vec![Complex64::new(0.0, 0.0); self.physical_dimension * self.logical_dimension];
-            error_set.len()
-        ];
+        let mut error_codewords =
+            vec![
+                vec![Complex64::new(0.0, 0.0); self.physical_dimension * self.logical_dimension];
+                error_set.len()
+            ];
         for (error_index, operator) in error_set.operators.iter().enumerate() {
             for output in 0..self.physical_dimension {
                 for logical in 0..self.logical_dimension {
@@ -191,7 +192,9 @@ impl FiniteErrorSet {
         operators: Vec<Vec<Complex64>>,
     ) -> Result<Self, QuantumInformationError> {
         if physical_dimension == 0 {
-            return Err(QuantumInformationError::InvalidDimension(physical_dimension));
+            return Err(QuantumInformationError::InvalidDimension(
+                physical_dimension,
+            ));
         }
         if operators.is_empty() {
             return Err(QuantumInformationError::InvalidDimension(0));
