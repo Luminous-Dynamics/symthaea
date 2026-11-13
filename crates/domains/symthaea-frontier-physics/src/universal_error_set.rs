@@ -39,7 +39,9 @@ impl ErrorSetCode {
             return Err(QuantumInformationError::InvalidTolerance(tolerance));
         }
         if physical_dimension == 0 {
-            return Err(QuantumInformationError::InvalidDimension(physical_dimension));
+            return Err(QuantumInformationError::InvalidDimension(
+                physical_dimension,
+            ));
         }
         if logical_dimension == 0 || logical_dimension > physical_dimension {
             return Err(QuantumInformationError::InvalidDimension(logical_dimension));
@@ -143,8 +145,7 @@ impl ErrorSetCode {
                         value += operator[output * self.physical_dimension + input]
                             * self.isometry[input * self.logical_dimension + logical];
                     }
-                    error_codewords[error_index][output * self.logical_dimension + logical] =
-                        value;
+                    error_codewords[error_index][output * self.logical_dimension + logical] = value;
                 }
             }
         }
@@ -317,9 +318,8 @@ impl ErrorSetQecMatrix {
         for error_row in 0..self.error_count {
             for error_column in 0..self.error_count {
                 for logical in 0..self.logical_dimension {
-                    lambda[error_row * self.error_count + error_column] += self
-                        .get(logical, error_row, logical, error_column)
-                        .unwrap();
+                    lambda[error_row * self.error_count + error_column] +=
+                        self.get(logical, error_row, logical, error_column).unwrap();
                 }
                 lambda[error_row * self.error_count + error_column] /=
                     self.logical_dimension as f64;
@@ -451,7 +451,11 @@ mod tests {
         let qec = code.qec_matrix(&errors).unwrap();
         assert!(qec.hermiticity_residual() <= TOLERANCE);
         assert!(qec.get(1, 0, 1, 1).unwrap().im.abs() > 0.0);
-        assert!(qec.knill_laflamme_diagnostics().maximum_exact_subspace_residual > 0.0);
+        assert!(
+            qec.knill_laflamme_diagnostics()
+                .maximum_exact_subspace_residual
+                > 0.0
+        );
     }
 
     #[test]
@@ -494,13 +498,8 @@ mod tests {
             Err(QuantumInformationError::DimensionMismatch { .. })
         ));
 
-        let one_dimensional_code = ErrorSetCode::new(
-            1,
-            1,
-            vec![Complex64::new(1.0, 0.0)],
-            TOLERANCE,
-        )
-        .unwrap();
+        let one_dimensional_code =
+            ErrorSetCode::new(1, 1, vec![Complex64::new(1.0, 0.0)], TOLERANCE).unwrap();
         let too_many_errors = FiniteErrorSet::new(
             1,
             vec![vec![Complex64::new(1.0, 0.0)]; MAX_DENSE_QEC_MATRIX_DIMENSION + 1],
