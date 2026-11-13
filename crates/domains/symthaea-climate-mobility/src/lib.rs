@@ -162,6 +162,7 @@ pub enum ContractError {
     DestinationRoleMismatch { pathway_id: String, area_id: String },
     UnknownAssessmentPathway { assessment_id: String, pathway_id: String },
     UnknownAssessmentArea { assessment_id: String, area_id: String },
+    AssessmentAreaNotInPathway { assessment_id: String, pathway_id: String, area_id: String },
     RecommendationAuthorityForbidden { pathway_id: String },
     AttributionMethodRequired { pathway_id: String },
     Evaluation(EvaluationError),
@@ -360,6 +361,20 @@ impl MobilityScenarioSet {
             if !areas.contains_key(assessment.area_id.as_str()) {
                 return Err(ContractError::UnknownAssessmentArea {
                     assessment_id: assessment.id.clone(),
+                    area_id: assessment.area_id.clone(),
+                });
+            }
+            let pathway = self
+                .pathways
+                .iter()
+                .find(|pathway| pathway.id == assessment.pathway_id)
+                .expect("pathway reference was checked above");
+            let area_is_in_pathway = assessment.area_id == pathway.origin_area_id
+                || pathway.destination_area_id.as_deref() == Some(assessment.area_id.as_str());
+            if !area_is_in_pathway {
+                return Err(ContractError::AssessmentAreaNotInPathway {
+                    assessment_id: assessment.id.clone(),
+                    pathway_id: assessment.pathway_id.clone(),
                     area_id: assessment.area_id.clone(),
                 });
             }
@@ -565,4 +580,60 @@ mod tests {
             })
         );
     }
+    #[test]
+    fn assessment_area_must_belong_to_its_pathway() {
+        let set = MobilityScenarioSet {
+            areas: vec![
+                ScenarioArea {
+                    id: "origin".to_owned(),
+                    role: AreaRole::Origin,
+                    boundary_revision: None,
+                },
+                ScenarioArea {
+                    id: "destination".to_owned(),
+                    role: AreaRole::Destination,
+                    boundary_revision: None,
+                },
+                ScenarioArea {
+                    id: "unrelated".to_owned(),
+                    role: AreaRole::Destination,
+                    boundary_revision: None,
+                },
+            ],
+            pathways: vec![MobilityPathway {
+                id: "path-a".to_owned(),
+                kind: PathwayKind::VoluntaryMigration,
+                origin_area_id: "origin".to_owned(),
+                destination_area_id: Some("destination".to_owned()),
+                moved_people: Some(10),
+                climate_attribution: ClimateAttribution::NotClaimed,
+                attribution_method_id: None,
+                decision_state: DecisionState::ScenarioOnly,
+                is_recommendation: false,
+            }],
+            assessments: vec![CapacityAssessment {
+                id: "unrelated-assessment".to_owned(),
+                pathway_id: "path-a".to_owned(),
+                area_id: "unrelated".to_owned(),
+                domain: ServiceDomain::DrinkingWater,
+                metric: "reliable_potable_delivery".to_owned(),
+                unit: "L/day".to_owned(),
+                baseline_demand: Some(10),
+                incremental_demand: Some(0),
+                baseline_capacity: Some(10),
+                capacity_adjustment: Some(0),
+                evidence_class: EvidenceClass::Synthetic,
+                qualification: AssessmentQualification::ContractOnly,
+            }],
+        };
+        assert_eq!(
+            set.validate(),
+            Err(ContractError::AssessmentAreaNotInPathway {
+                assessment_id: "unrelated-assessment".to_owned(),
+                pathway_id: "path-a".to_owned(),
+                area_id: "unrelated".to_owned()
+            })
+        );
+    }
+
 }
