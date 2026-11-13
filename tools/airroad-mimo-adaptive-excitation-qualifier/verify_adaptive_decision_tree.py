@@ -84,6 +84,38 @@ def deterministic_first_action(actions: list[dict], domain: dict) -> str | None:
     return admitted[0]["action_id"]
 
 
+
+def compatible_models(observation: ComplexQ, predictions: dict[str, ComplexQ],
+                     radius: Fraction) -> list[str]:
+    return [
+        model_id for model_id, center in predictions.items()
+        if abs_squared(csub(observation, center)) <= radius**2
+    ]
+
+
+def run_adaptive_policy(
+    true_model: str,
+    first_predictions: dict[str, ComplexQ],
+    second_predictions: dict[str, ComplexQ],
+    radius: Fraction,
+) -> tuple[str | None, int, list[str]]:
+    # Synthetic exact-centre observation; real noisy outcomes are handled
+    # by the closed hard prediction disks and can return unresolved.
+    first_observation = first_predictions[true_model]
+    survivors = compatible_models(first_observation, first_predictions, radius)
+    if len(survivors) == 1:
+        return survivors[0], 1, survivors
+    if set(survivors) != {"H0", "H1"}:
+        return None, 1, survivors
+    second_observation = second_predictions[true_model]
+    survivors = compatible_models(second_observation, {
+        model: second_predictions[model] for model in survivors
+    }, radius)
+    if len(survivors) == 1:
+        return survivors[0], 2, survivors
+    return None, 2, survivors
+
+
 def main() -> None:
     data = json.loads(FIXTURE.read_text(encoding="utf-8"))
     assert data["schema"] == "luminous.airroad.mimo_adaptive_experiment_decision_tree.v0_1"
@@ -157,15 +189,25 @@ def main() -> None:
     )
     assert q(data["expected_predictions"]["action_omega_3"]["nonzero_squared_distance"]) > threshold_sq
 
-    # Decision tree: H2 is identified after A2; H0/H1 require A3.
+    # Execute the adaptive policy for all three true hypotheses using exact
+    # centre observations. The model-pair disks are already proven disjoint
+    # wherever the policy expects a unique terminal.
+    decision_results = {
+        "H0-base": run_adaptive_policy("H0", p2, p3, radius),
+        "H1-delta-three": run_adaptive_policy("H1", p2, p3, radius),
+        "H2-delta-two": run_adaptive_policy("H2", p2, p3, radius),
+    }
+    assert decision_results == {
+        "H0-base": ("H0", 2, ["H0"]),
+        "H1-delta-three": ("H1", 2, ["H1"]),
+        "H2-delta-two": ("H2", 1, ["H2"]),
+    }
     terminals = {
-        "H0-base": ("zero-at-A2", "zero-at-A3", 2),
-        "H1-delta-three": ("zero-at-A2", "delta3-at-A3", 2),
-        "H2-delta-two": ("delta2-at-A2", "stop", 1),
+        "H0-base": decision_results["H0-base"][1],
+        "H1-delta-three": decision_results["H1-delta-three"][1],
+        "H2-delta-two": decision_results["H2-delta-two"][1],
     }
     assert set(terminals) == set(models)
-    assert all(path[2] in (1, 2) for path in terminals.values())
-    assert len({model_id for model_id in terminals}) == 3
 
     # Neither single action is a complete three-model discriminator.
     only_a2_partition = ({"H0-base", "H1-delta-three"}, {"H2-delta-two"})
@@ -178,8 +220,8 @@ def main() -> None:
     assert set(prior) == set(models)
     assert sum(prior.values(), Fraction(0)) == 1
     assert all(value == Fraction(1, 3) for value in prior.values())
-    expected_n = sum((prior[mid] * terminals[mid][2] for mid in models), Fraction(0))
-    worst_n = max(path[2] for path in terminals.values())
+    expected_n = sum((prior[mid] * terminals[mid] for mid in models), Fraction(0))
+    worst_n = max(terminals.values())
     fixed_sweep = q(data["expected_policy"]["fixed_sweep_experiments"])
     saving = (fixed_sweep - expected_n) / fixed_sweep
     assert expected_n == q(data["expected_policy"]["expected_experiments"]) == Fraction(5, 3)
