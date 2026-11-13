@@ -1,0 +1,173 @@
+{
+  "schema_version": "0.1.0",
+  "programme": "PLASMA-CFRP-METAL-001",
+  "generated_date": "2026-11-13",
+  "claim_ceiling": "LITERATURE_REGISTER_ONLY_NO_LUMINOUS_REPRODUCTION_NO_LSP_QUALIFICATION",
+  "rules": {
+    "coating_adhesion_is_not_lsp_compliance": true,
+    "pull_off_standard_must_be_verified_from_source_methods": true,
+    "different_cfrp_layups_or_resins_are_comparable": false,
+    "different_pull_off_test_methods_are_poolable": false,
+    "adhesion_peak_without_failure_mode_is_sufficient": false,
+    "electrical_continuity_is_a_required_functional_outcome": true,
+    "substrate_preservation_is_a_hard_constraint": true,
+    "discharge_power_is_complete_grid_to_service_energy": false,
+    "luminous_reproduction": false
+  },
+  "evidence_classes": [
+    "PUBLISHED_LAB_EXPERIMENT",
+    "PUBLISHED_LAB_STUDY_ADJACENT"
+  ],
+  "cases": [
+    {
+      "case_id": "CFRP-ZN-ATMOSPHERIC-PLASMA-2026",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Effect of atmospheric pressure plasma treatments for enhanced adhesion of arc-sprayed zinc coatings on CFRP substrates",
+        "publisher": "Composites Part A: Applied Science and Manufacturing",
+        "volume": 206,
+        "article_number": "109797",
+        "publication_date": "2026-07",
+        "doi": "10.1016/j.compositesa.2026.109797",
+        "urls": [
+          "https://doi.org/10.1016/j.compositesa.2026.109797",
+          "https://pure.jbnu.ac.kr/en/publications/effect-of-atmospheric-pressure-plasma-treatments-for-enhanced-adh/"
+        ]
+      },
+      "process_summary": {
+        "substrate": "CFRP",
+        "coating": "arc-sprayed zinc",
+        "plasma_regime": "atmospheric-pressure air and argon plasma pretreatment",
+        "investigated_process_variables": [
+          "plasma nozzle stand-off distance",
+          "number of plasma passes"
+        ],
+        "surface_characterization": [
+          "SEM",
+          "AFM",
+          "3D profilometry",
+          "water contact angle",
+          "surface energy",
+          "FTIR",
+          "XPS"
+        ],
+        "coating_adhesion_method_as_indexed": "pull-off adhesion testing",
+        "failure_analysis": "ImageJ analysis of zinc-peeled/fractured CFRP surfaces",
+        "modelling": "cohesive-zone model"
+      },
+      "mechanisms_reported": [
+        "Argon plasma ablated some surface epoxy and exposed carbon fibres, supporting mechanical interlocking.",
+        "Air plasma generated oxygen-rich –OH / –COOH groups and increased polar surface energy; authors discuss interaction with ZnO species."
+      ],
+      "reported_observations": [
+        {
+          "metric": "maximum_pull_off_adhesion_strength",
+          "value": 4.21,
+          "uncertainty": 0.12,
+          "unit": "MPa",
+          "qualifier": "most intense air-plasma condition reported by the study"
+        },
+        {
+          "metric": "relative_adhesion_increase_vs_untreated",
+          "value": 84,
+          "unit": "percent",
+          "qualifier": "source-reported comparison"
+        },
+        {
+          "metric": "air_plasma_polar_surface_energy",
+          "value": 72.08,
+          "unit": "mJ/m2",
+          "qualifier": "source-reported"
+        },
+        {
+          "metric": "failure_mode",
+          "value": "shifted_from_adhesive_toward_predominantly_cohesive",
+          "qualifier": "source-reported qualitative characterization"
+        }
+      ],
+      "unknowns_and_blockers": [
+        "Exact CFRP manufacturer/grade, fibre/resin/layup/lot must be extracted from full methods.",
+        "Exact pull-off standard, fixture adhesive, loading rate, replicate count and specimen geometry are not established by the accessible abstract/indexed record.",
+        "Exact spray parameters, zinc wire grade/lot and coating thickness must be reconstructed from full methods.",
+        "Grid-to-coating energy, gas/extraction loads and lifecycle costs are not established by the abstract.",
+        "No LSP, aircraft qualification, certification, lightning-current performance or post-strike structural claim is established.",
+        "The reported 4.21 ± 0.12 MPa is a source-specific maximum, not a universal design allowable."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "POLYMER-METALLIZATION-APS-2026",
+      "evidence_class": "PUBLISHED_LAB_STUDY_ADJACENT",
+      "source": {
+        "title": "Characterization and evaluation of plasma-sprayed coatings on polymeric substrates",
+        "publisher": "Journal of Thermal Spray Technology",
+        "publication_date": "2026-02-18",
+        "doi": "10.1177/02670844261423805",
+        "url": "https://doi.org/10.1177/02670844261423805"
+      },
+      "reported_scope": {
+        "substrate_classes": [
+          "thermosets",
+          "thermoplastics"
+        ],
+        "coating_materials": [
+          "zinc",
+          "aluminium",
+          "copper"
+        ],
+        "focus": [
+          "metallization process parameters",
+          "pre-treatment conditions",
+          "substrate thermal properties",
+          "coating adhesion",
+          "interface characterization"
+        ]
+      },
+      "comparison_status": "ADJACENT_POLYMER_METALLIZATION_NOT_MATCHED_CFRP_REFERENCE",
+      "source_limitation": "Abstract identifies further process optimization and long-term durability as necessary; no universal coating performance is inferred.",
+      "luminous_reproduction": false
+    }
+  ],
+  "negative_controls": [
+    {
+      "control_id": "CFRP-NC-001",
+      "claim": "4.21 MPa pull-off adhesion establishes LSP compliance",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "CFRP-NC-002",
+      "claim": "assume the source pull-off test was ASTM C633 or ASTM D4541 without checking its methods",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "CFRP-NC-003",
+      "claim": "higher coating adhesion is beneficial even if resin recession/fibre damage violates laminate requirements",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "CFRP-NC-004",
+      "claim": "different CFRP resin systems/layups/lots can be pooled without stratification",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "CFRP-NC-005",
+      "claim": "contact angle or surface energy alone proves conductive coating adhesion",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "CFRP-NC-006",
+      "claim": "adhesion results establish electrical continuity or current-carrying capability",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "CFRP-NC-007",
+      "claim": "discharge power is the complete grid-to-service energy boundary",
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "control_id": "CFRP-NC-008",
+      "claim": "a CZM simulation output is a measured interface strength",
+      "expected_disposition": "REJECTED"
+    }
+  ]
+}
