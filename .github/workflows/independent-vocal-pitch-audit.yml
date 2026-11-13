@@ -1,0 +1,45 @@
+name: Independent vocal pitch audit
+
+on:
+  pull_request:
+    paths:
+      - "src/voice/singing_quality.rs"
+      - ".github/workflows/independent-vocal-pitch-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-pitch-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VOCAL_PITCH_AUDIT_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check independent pitch analyzer
+        run: rustfmt +1.96.0 --edition 2024 --check src/voice/singing_quality.rs
+
+      - name: Compile the singing library
+        run: cargo +1.96.0 check --locked -p symthaea --lib --features singing
+
+      - name: Run objective singing-quality regressions
+        run: cargo +1.96.0 test --locked -p symthaea --lib --features singing voice::singing_quality::tests -- --nocapture

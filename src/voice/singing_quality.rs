@@ -107,16 +107,10 @@ pub fn analyze_vocal_stem(performance: &VocalPerformance, stem: &VocalStem) -> V
                 .flat_map(|s| s.notes())
                 .any(|note| time >= note.start_time && time < note.start_time + note.duration);
             let expected_pitch = expected_pitch_at(performance, time);
-            // Conditional singing evaluation has the score available. Use it
-            // as the octave/continuity prior, as production pitch trackers do,
-            // while still estimating the actual local autocorrelation peak.
-            let actual = if expected_voiced {
-                expected_pitch.and_then(|pitch| {
-                    estimate_f0_near(&stem.samples[start..start + frame], rate, pitch)
-                })
-            } else {
-                estimate_f0(&stem.samples[start..start + frame], rate)
-            };
+            // The primary audit must be independent of the target score.
+            // A score-conditioned search can clip large errors to its search
+            // window and make a badly wrong note appear nearly correct.
+            let actual = estimate_f0(&stem.samples[start..start + frame], rate);
             all_frames += 1;
             if expected_voiced != actual.is_some() {
                 vuv_errors += 1;
@@ -278,34 +272,6 @@ fn contextual_clicks(samples: &[f32], sample_rate: u32) -> (usize, f32) {
     (events, max_score)
 }
 
-fn estimate_f0_near(x: &[f32], rate: u32, expected: f32) -> Option<f32> {
-    let rms = (x.iter().map(|value| value * value).sum::<f32>() / x.len().max(1) as f32).sqrt();
-    if rms < 0.003 || !expected.is_finite() || expected <= 0.0 {
-        return None;
-    }
-    let ratio = 2.0f32.powf(300.0 / 1200.0); // ±300 cents
-    let min_lag = (rate as f32 / (expected * ratio)).floor().max(1.0) as usize;
-    let max_lag = (rate as f32 / (expected / ratio)).ceil() as usize;
-    let mut best = (0usize, f64::NEG_INFINITY);
-    for lag in min_lag..=max_lag.min(x.len() / 2) {
-        let (dot, energy_a, energy_b) = x[..x.len() - lag].iter().zip(&x[lag..]).fold(
-            (0.0f64, 0.0f64, 0.0f64),
-            |(dot, a2, b2), (&a, &b)| {
-                (
-                    dot + (a * b) as f64,
-                    a2 + (a * a) as f64,
-                    b2 + (b * b) as f64,
-                )
-            },
-        );
-        let score = dot / (energy_a * energy_b).sqrt().max(1e-12);
-        if score > best.1 {
-            best = (lag, score);
-        }
-    }
-    (best.0 > 0 && best.1 >= 0.12).then(|| rate as f32 / best.0 as f32)
-}
-
 fn expected_pitch_at(performance: &VocalPerformance, time: f32) -> Option<f32> {
     let points = &performance.pitch_curve;
     if points.is_empty() {
@@ -355,13 +321,23 @@ fn onset_error_ms(samples: &[f32], rate: u32, expected_s: f32) -> Option<f32> {
     Some((actual as f32 - expected as f32).abs() * 1000.0 / rate as f32)
 }
 
+// Supported analysis range covers low bass through high soprano fundamentals.
+const MIN_TRACKED_F0_HZ: usize = 50;
+const MAX_TRACKED_F0_HZ: usize = 1200;
+
 fn estimate_f0(x: &[f32], rate: u32) -> Option<f32> {
-    let rms = (x.iter().map(|v| v * v).sum::<f32>() / x.len().max(1) as f32).sqrt();
+    if rate == 0 || x.len() < 3 {
+        return None;
+    }
+    let rms = (x.iter().map(|v| v * v).sum::<f32>() / x.len() as f32).sqrt();
     if rms < 0.003 {
         return None;
     }
-    let min_lag = rate as usize / 500;
-    let max_lag = (rate as usize / 70).min(x.len() / 2);
+    let min_lag = (rate as usize).div_ceil(MAX_TRACKED_F0_HZ).max(1);
+    let max_lag = (rate as usize / MIN_TRACKED_F0_HZ).min(x.len() / 2);
+    if min_lag > max_lag {
+        return None;
+    }
     let mut scores = Vec::with_capacity(max_lag - min_lag + 1);
     let mut best_score = 0.0f64;
     for lag in min_lag..=max_lag {
@@ -439,17 +415,8 @@ mod tests {
         assert!(metrics.median_pitch_error_cents < 15.0, "{:?}", metrics);
     }
 
-    /// `estimate_f0_near`'s octave-safety window is fixed at +/-300 cents
-    /// (line: `let ratio = 2.0f32.powf(300.0 / 1200.0)`). When the actual
-    /// pitch is further from the expected note than that, the search can
-    /// only find its best match at the window's edge -- so the reported
-    /// error saturates near the window boundary rather than reflecting the
-    /// true (potentially much larger) mistracking. This reproduces that
-    /// saturation with a sine wave synthesized nearly an octave away from
-    /// the note it is meant to represent, and confirms the reported error
-    /// sits near the window edge (~300-320 cents), not the true ~1421 cents.
     #[test]
-    fn pitch_error_saturates_at_octave_safety_window_edge() {
+    fn pitch_error_is_not_clipped_by_score_conditioning() {
         let note = symthaea_muse::Note {
             frequency: 220.0,
             start_time: 0.0,
@@ -458,7 +425,7 @@ mod tests {
         };
         let performance = VocalPerformance::from_melody("light", &[note], "en").unwrap();
         let rate = 24_000;
-        let actual_hz: f32 = 500.0; // ~1421 cents away from the 220 Hz target
+        let actual_hz: f32 = 500.0; // About 1421 cents away from the 220 Hz target.
         let samples = (0..rate / 2)
             .map(|i| (std::f32::consts::TAU * actual_hz * i as f32 / rate as f32).sin() * 0.2)
             .collect();
@@ -467,14 +434,41 @@ mod tests {
             sample_rate: rate,
             backend: "test".into(),
         };
+
         let metrics = analyze_vocal_stem(&performance, &stem);
-        let true_error_cents = 1200.0f64 * (actual_hz as f64 / note.frequency as f64).log2();
+        let true_error_cents = 1200.0f32 * (actual_hz / note.frequency).log2();
         assert!(
-            metrics.median_pitch_error_cents < 400.0
-                && metrics.median_pitch_error_cents < true_error_cents as f32 - 500.0,
-            "expected the reported error to saturate well below the true \
-             {true_error_cents:.1} cent mistracking, got {:?}",
+            metrics.median_pitch_error_cents > 1_000.0,
+            "large pitch error must remain visible; true={true_error_cents:.1}c, got {:?}",
             metrics
         );
+        assert!(!metrics.pitch_tracking_pass);
+    }
+
+    #[test]
+    fn unconditioned_f0_tracker_covers_low_bass_and_high_soprano() {
+        let rate = 24_000;
+        let duration_samples = rate as usize / 20; // 50 ms analysis frame.
+        for expected_hz in [55.0f32, 1_000.0f32] {
+            let samples = (0..duration_samples)
+                .map(|i| {
+                    (std::f32::consts::TAU * expected_hz * i as f32 / rate as f32).sin()
+                        * 0.2
+                })
+                .collect::<Vec<_>>();
+            let estimated_hz = estimate_f0(&samples, rate)
+                .unwrap_or_else(|| panic!("failed to track {expected_hz} Hz"));
+            let error_cents = 1200.0 * (estimated_hz / expected_hz).log2().abs();
+            assert!(
+                error_cents < 35.0,
+                "expected {expected_hz} Hz, estimated {estimated_hz} Hz ({error_cents:.1} cents)"
+            );
+        }
+    }
+
+    #[test]
+    fn unconditioned_f0_rejects_invalid_rate_and_short_frames() {
+        assert_eq!(estimate_f0(&[0.1, 0.2], 24_000), None);
+        assert_eq!(estimate_f0(&[0.1; 1_200], 0), None);
     }
 }
