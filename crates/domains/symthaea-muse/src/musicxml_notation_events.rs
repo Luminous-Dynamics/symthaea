@@ -788,7 +788,7 @@ mod tests {
     fn preserves_rests_grace_cue_unpitched_voice_staff_and_instruments() {
         let xml = r#"<score-partwise><part id="P1"><measure number="1">
             <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time><staves>2</staves></attributes>
-            <note><rest measure="yes"/><duration>16</duration><voice>1</voice><staff>1</staff></note>
+            <note><rest/><duration>4</duration><voice>1</voice><staff>1</staff></note>
             <note><grace slash="yes" steal-time-previous="20"/><pitch><step>D</step><alter>0.5</alter><octave>5</octave></pitch><voice>1</voice><staff>1</staff></note>
             <note><cue/><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration><instrument id="P1-I2"/><voice>2</voice><staff>2</staff></note>
             <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>8</duration><voice>2</voice><staff>2</staff></note>
@@ -798,10 +798,10 @@ mod tests {
         assert_eq!(events.note_events.len(), 4);
         assert!(matches!(
             events.note_events[0].kind,
-            MusicXmlNotationEventKindV1::Rest { measure: true, .. }
+            MusicXmlNotationEventKindV1::Rest { measure: false, .. }
         ));
         assert_eq!(events.note_events[0].score_offset, RationalBeat::new(0, 1).unwrap());
-        assert_eq!(events.note_events[0].performed_duration, Some(RationalBeat::new(4, 1).unwrap()));
+        assert_eq!(events.note_events[0].performed_duration, Some(RationalBeat::new(1, 1).unwrap()));
         assert!(events.note_events[1].is_grace);
         assert_eq!(events.note_events[1].performed_duration, None);
         assert_eq!(
@@ -828,6 +828,17 @@ mod tests {
             events.note_events[3].performed_duration,
             Some(RationalBeat::new(2, 1).unwrap())
         );
+
+        let measure_rest_xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><rest measure="yes"/><duration>16</duration></note>
+        </measure></part></score-partwise>"#;
+        let measure_rest = parse(measure_rest_xml);
+        supported(&measure_rest);
+        assert!(matches!(
+            measure_rest.note_events[0].kind,
+            MusicXmlNotationEventKindV1::Rest { measure: true, .. }
+        ));
     }
 
     #[test]
