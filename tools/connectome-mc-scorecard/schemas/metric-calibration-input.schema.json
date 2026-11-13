@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-metric-calibration-input-v1.schema.json",
+  "title": "Positive-control predictive metric calibration input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "metric_id",
+    "direction",
+    "config",
+    "observations"
+  ],
+  "properties": {
+    "metric_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "direction": {
+      "enum": [
+        "HigherIsBetter",
+        "LowerIsBetter"
+      ]
+    },
+    "config": {
+      "$ref": "#/$defs/config"
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/observation"
+      }
+    }
+  },
+  "$defs": {
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_effect_magnitude",
+        "minimum_detection_probability",
+        "maximum_null_false_positive_probability",
+        "tie_tolerance",
+        "monotonicity_tolerance",
+        "wilson_z_critical"
+      ],
+      "properties": {
+        "minimum_effect_magnitude": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "minimum_detection_probability": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "maximum_null_false_positive_probability": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "tie_tolerance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "monotonicity_tolerance": {
+          "type": "number",
+          "minimum": 0
+        },
+        "wilson_z_critical": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "effect_magnitude",
+        "replicate_id",
+        "seed",
+        "uninformative_metric_value",
+        "positive_control_metric_value",
+        "perfect_metric_value"
+      ],
+      "properties": {
+        "effect_magnitude": {
+          "type": "number",
+          "minimum": 0
+        },
+        "replicate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "uninformative_metric_value": {
+          "type": "number"
+        },
+        "positive_control_metric_value": {
+          "type": "number"
+        },
+        "perfect_metric_value": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}

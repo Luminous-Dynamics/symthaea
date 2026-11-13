@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-mc-paired-comparison-v1.schema.json",
+  "title": "Paired Monte Carlo method comparison",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "rejection_alpha",
+    "confidence_alpha",
+    "comparisons"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "connectome-mc-paired-comparison-v1"
+    },
+    "rejection_alpha": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "confidence_alpha": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "exclusiveMaximum": 1
+    },
+    "comparisons": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/comparison"
+      }
+    }
+  },
+  "$defs": {
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "baseline_method_id",
+        "candidate_method_id",
+        "structural_beta",
+        "null_is_true",
+        "rejection_alpha",
+        "rejection_difference"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseline_method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "structural_beta": {
+          "type": "number"
+        },
+        "null_is_true": {
+          "type": "boolean"
+        },
+        "rejection_alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "rejection_difference": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "planned_pairs",
+            "baseline_record_count",
+            "candidate_record_count",
+            "matched_record_pairs",
+            "complete_rejection_pairs",
+            "unknown_pairs",
+            "observed_complete_pair_mean",
+            "conservative_interval",
+            "confidence_level",
+            "hoeffding_radius"
+          ],
+          "properties": {
+            "planned_pairs": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "matched_record_pairs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "complete_rejection_pairs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unknown_pairs": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "observed_complete_pair_mean": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": -1,
+              "maximum": 1
+            },
+            "conservative_interval": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "lower",
+                "upper"
+              ],
+              "properties": {
+                "lower": {
+                  "type": "number",
+                  "minimum": -1,
+                  "maximum": 1
+                },
+                "upper": {
+                  "type": "number",
+                  "minimum": -1,
+                  "maximum": 1
+                }
+              }
+            },
+            "confidence_level": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "exclusiveMaximum": 1
+            },
+            "hoeffding_radius": {
+              "type": "number",
+              "minimum": 0
+            },
+            "baseline_record_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "candidate_record_count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    }
+  }
+}
