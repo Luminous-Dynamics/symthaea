@@ -18,7 +18,8 @@
     "reviewed_at_utc": null,
     "permitted_uses": [],
     "attribution": "National Institute of Standards and Technology (NIST); cite the dataset DOI and version.",
-    "notes": "Template only. NIST license and attribution terms are documented in source files, but no import or distribution approval is asserted by this file. Record local source files and source-provided SHA-256 values before changing status to reviewed."
+    "notes": "Template only. NIST license and attribution terms are documented in source files, but no import or distribution approval is asserted by this file. Record local source files and source-provided SHA-256 values before changing status to reviewed.",
+    "license_text_local_path": null
   },
   "files": [],
   "claim_ceiling": "Source inventory and file-integrity verification only; not model performance, calibration qualification or downstream recycling acceptance."
