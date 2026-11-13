@@ -1022,7 +1022,11 @@ mod tests {
         audit.decision_admission_mode = DecisionAdmissionMode::ReplanWithLocalFallback;
         audit.decision_sufficiency.as_mut().unwrap().disposition =
             DecisionSufficiencyDisposition::Insufficient;
-        audit.decision_sufficiency.as_mut().unwrap().remaining_sufficient_ticks = None;
+        audit
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .remaining_sufficient_ticks = None;
         let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
         assert_eq!(report.admitted_request_ids, vec!["q1"]);
         assert!(!report.actuation_authorized);
@@ -1061,8 +1065,7 @@ mod tests {
         audit.decision_sufficiency.as_mut().unwrap().disposition =
             DecisionSufficiencyDisposition::Insufficient;
         audit.local_fallback_ready = false;
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
         assert_eq!(
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::NoLocalFallback)
@@ -1073,7 +1076,11 @@ mod tests {
     fn replacement_mode_still_respects_a_still_valid_decision_horizon() {
         let mut audit = request("q1", "r1");
         audit.decision_admission_mode = DecisionAdmissionMode::ReplanWithLocalFallback;
-        audit.decision_sufficiency.as_mut().unwrap().remaining_sufficient_ticks = Some(1);
+        audit
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .remaining_sufficient_ticks = Some(1);
         let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
         assert_eq!(
             report.requests[0].disposition,
