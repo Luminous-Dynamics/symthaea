@@ -155,6 +155,17 @@ pub fn AddMusicPage() -> impl IntoView {
                 let playback_title = title.clone();
                 let analysis = work.analysis.clone();
                 let instrumentation_note = work.instrumentation_note.clone();
+                let audition_label = match work.audition_kind {
+                    symthaea_muse_protocol::ImportedAuditionKind::SourceMidiPerformance =>
+                        "Play source MIDI performance (SoundFont render)",
+                    symthaea_muse_protocol::ImportedAuditionKind::ReconstructedScore =>
+                        "Play reconstructed rendition",
+                    symthaea_muse_protocol::ImportedAuditionKind::LegacyUnverified =>
+                        "Play legacy audition (provenance unverified)",
+                };
+                let audition_integrity_note = work.audition_wav_sha256.as_ref()
+                    .map(|digest| format!("Audition WAV SHA-256 · {digest}"))
+                    .unwrap_or_else(|| "Legacy audition · WAV digest not recorded; integrity unverified".to_owned());
                 let notation_structure = work.notation_structure.clone();
                 let notation_graph_url =
                     api::imported_notation_graph_url(api::DEFAULT_BACKEND, &work_id);
@@ -213,12 +224,13 @@ pub fn AddMusicPage() -> impl IntoView {
                         <div class="import-actions">
                             <button type="button" on:click=move |_| muse.play_review_audio(
                                 api::imported_audio_url(api::DEFAULT_BACKEND, &audio_id), playback_title.clone())>
-                                "Play reconstructed rendition"
+                                {audition_label}
                             </button>
                             <A href="/liked">"Open Library"</A>
                             <A href="/atlas">"Show in private Atlas"</A>
                         </div>
                         <p class="muted small">{instrumentation_note}</p>
+                        <p class="muted small">{audition_integrity_note}</p>
                         <details>
                             <summary>"Unresolved interpretations"</summary>
                             <ul>{analysis.unresolved_interpretations.into_iter().map(|item| view! { <li>{item}</li> }).collect_view()}</ul>
