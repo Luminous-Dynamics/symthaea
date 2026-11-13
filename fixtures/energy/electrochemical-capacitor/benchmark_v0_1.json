@@ -189,6 +189,119 @@
         ],
         "status": "partial"
       }
+    },
+    {
+      "schema_version": "0.1.0",
+      "record_id": "vendor-skeleton-skelmod-54v188f-reference-2026",
+      "device_class": "edlc",
+      "design": {
+        "design_id": "skeleton-skelmod-54v188f",
+        "revision": "datasheet-2026-06-05",
+        "positive_electrode_id": "vendor-not-disclosed",
+        "negative_electrode_id": "vendor-not-disclosed",
+        "electrolyte_id": "vendor-not-disclosed",
+        "separator_id": "vendor-not-disclosed",
+        "current_collector_id": "vendor-not-disclosed",
+        "package_id": "skelmod-54v188f-module",
+        "process_id": "vendor-not-disclosed",
+        "physical_device_serial": "not-provided-in-public-datasheet",
+        "material_lot_ids": [
+          "not-disclosed"
+        ]
+      },
+      "boundary": "module",
+      "denominator": {
+        "mass_kg": 16,
+        "volume_l": 13.5,
+        "basis": "module_vendor_reported",
+        "included_components": [
+          "module_enclosure"
+        ],
+        "excluded_components": [],
+        "status": "partial"
+      },
+      "test_conditions": {
+        "protocol_id": "vendor-datasheet-conditions; metric-specific conditions retained in measurement_method",
+        "voltage_min_v": 0,
+        "voltage_max_v": 54,
+        "temperature_c": 20,
+        "current_profile_id": "vendor-rating-conditions-not-one-common-profile",
+        "fixture_id": "vendor-not-disclosed",
+        "instrument_id": "vendor-not-disclosed",
+        "calibration_id": "vendor-not-disclosed",
+        "raw_data_digest": null
+      },
+      "evidence": {
+        "evidence_id": "skeleton-skelmod-54v188f-datasheet-2026-06-05",
+        "class": "vendor",
+        "admission": "candidate",
+        "source_uri": "https://www.skeletontech.com/hubfs/01-DS-211229-SKELMOD-51V177F-1D.pdf?hsLang=en",
+        "sha256": null,
+        "independent_lab": false
+      },
+      "metrics": [
+        {
+          "name": "rated_capacitance",
+          "value": 188,
+          "unit": "F",
+          "boundary": "module",
+          "measurement_method": "vendor datasheet; measurement method and temperature per datasheet",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        },
+        {
+          "name": "maximum_stored_energy",
+          "value": 76.14,
+          "unit": "Wh",
+          "boundary": "module",
+          "measurement_method": "vendor datasheet maximum stored energy at 54 V rating",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        },
+        {
+          "name": "rated_initial_esr_10ms",
+          "value": 3,
+          "unit": "mOhm",
+          "boundary": "module",
+          "measurement_method": "vendor datasheet rated DC 10 ms ESR",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        },
+        {
+          "name": "rated_initial_esr_1s",
+          "value": 3.4,
+          "unit": "mOhm",
+          "boundary": "module",
+          "measurement_method": "vendor datasheet rated DC 1 s ESR",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        },
+        {
+          "name": "esr_based_power_1s",
+          "value": 162.6,
+          "unit": "kW",
+          "boundary": "module",
+          "measurement_method": "vendor datasheet power calculated from 1 s ESR",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        },
+        {
+          "name": "rated_voltage",
+          "value": 54,
+          "unit": "V",
+          "boundary": "module",
+          "measurement_method": "vendor datasheet",
+          "uncertainty": null,
+          "status": "vendor_reported"
+        }
+      ],
+      "manufacturing": {
+        "batch_id": "not-disclosed",
+        "process_revision": "not-disclosed",
+        "yield_status": "not_measured",
+        "accepted_device_cost": null
+      },
+      "disposition": "candidate"
     }
   ]
 }
