@@ -422,11 +422,11 @@ fn eligibility(request: &InferenceRequest) -> Result<(), RejectReason> {
     let result_and_guard = p99
         .checked_add(request.local_projection_dispatch_guard_ticks)
         .ok_or(RejectReason::ResultReturnsTooLate)?;
-    if result_and_guard > decision_slack {
-        return Err(RejectReason::DecisionResultReturnsTooLate);
-    }
     if result_and_guard > buffer_slack.min(deadline_slack) {
         return Err(RejectReason::ResultReturnsTooLate);
+    }
+    if result_and_guard > decision_slack {
+        return Err(RejectReason::DecisionResultReturnsTooLate);
     }
 
     let poma = request
@@ -829,7 +829,7 @@ mod tests {
                 loss_scale_id: "task-loss-v1".into(),
                 loss_model_digest: "loss-model-v1".into(),
                 action_domain_digest: "action-domain-v1".into(),
-                remaining_sufficient_ticks: Some(8),
+                remaining_sufficient_ticks: Some(1_000),
             }),
             loss_scale_id: Some("task-loss-v1".to_owned()),
             evsi_units: Some(10),
@@ -1297,6 +1297,7 @@ mod tests {
         let a = request("q1", "r1");
         let mut b = request("q2", "r2");
         b.loss_scale_id = Some("other-task-v1".to_owned());
+        b.decision_sufficiency.as_mut().unwrap().loss_scale_id = "other-task-v1".into();
         assert_eq!(
             admit_batch(
                 SchedulerPolicy::EvsiPerCompute,
