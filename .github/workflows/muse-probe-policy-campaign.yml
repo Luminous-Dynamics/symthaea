@@ -67,6 +67,24 @@ jobs:
       - name: Check Muse formatting
         run: rustfmt --check --edition 2024 crates/domains/symthaea-muse/src/probe_policy_campaign.rs
 
+      - name: Generate diagnostic lockfile candidate without altering committed source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/muse-campaign-lock
+          cp Cargo.lock /tmp/muse-campaign-lock/Cargo.lock.committed
+          if cargo generate-lockfile --offline; then
+            printf 'generation=success\n' > /tmp/muse-campaign-lock/status.txt
+            diff -u /tmp/muse-campaign-lock/Cargo.lock.committed Cargo.lock \
+              > /tmp/muse-campaign-lock/Cargo.lock.diff || true
+            cp Cargo.lock /tmp/muse-campaign-lock/Cargo.lock.candidate
+          else
+            status=$?
+            cp /tmp/muse-campaign-lock/Cargo.lock.committed Cargo.lock
+            printf 'generation=failed exit=%s\n' "$status" > /tmp/muse-campaign-lock/status.txt
+            exit "$status"
+          fi
+
       - name: Run factorial oracle tests
         run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib factorial_ground_truth::tests
 
@@ -75,6 +93,15 @@ jobs:
 
       - name: Run multi-family campaign tests
         run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib probe_policy_campaign::tests
+
+      - name: Upload lockfile diagnostic artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: muse-campaign-lockfile-diagnostic
+          path: /tmp/muse-campaign-lock/
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Run Clippy for Muse library and tests
         run: cargo clippy --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib --tests -- -D warnings
