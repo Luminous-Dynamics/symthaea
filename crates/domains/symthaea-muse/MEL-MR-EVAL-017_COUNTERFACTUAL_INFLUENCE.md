@@ -9,7 +9,7 @@ A performed-event MIDI map establishes what the serialized schedule says was per
 
 This work tests the following bounded proposition:
 
-> Given two exact, receipt-verified renders that differ by one declared MIDI event removal, can Muse measure the observed PCM and local spectral difference above the measured repeat-render floor, while proving that every non-target source event retained its identity, pitch, and scheduled timing?
+> Given two exact, receipt-verified renders that differ by one declared, operation-specific MIDI intervention, can Muse measure the observed PCM and local spectral difference above the measured repeat-render floor, while proving the declared target transformation and preservation of every non-target source event?
 
 It does not infer exclusive sample ownership. A measured influence interval is the support of an observed paired intervention under a declared renderer/configuration, not a claim that all samples in that interval were generated only by the removed note.
 
@@ -51,7 +51,13 @@ A black-box paired-render strategy is the reference design. Differentiable DSP m
 - The counterfactual map uses a separate `verify_for_score_excluding_and_pitches` gate: every expected source event must remain except the one explicitly removed; unknown, unresolved, duplicate, non-contiguous, or reintroduced excluded events reject.
 - The production-facing `verify_renderer_audio_binding_for_score` wrapper (feature `theory`) serializes the actual `symthaea_music_theory::Score`, requires those exact bytes to equal the receipt's Score input, and derives expected MIDI pitches directly from `Score::events()`.
 - The low-level pitch-inventory verifier is crate-private; callers cannot mint public evidence tokens from arbitrary pitch arrays.
-- For v0.1, only `EventIntervention::Remove` is admitted. Transpose, onset, duration and velocity variants remain reserved and fail closed until each has an operation-specific symbolic verifier.
+- The original Remove contract remains unchanged.
+- EVAL-036 Phase 1 now admits `Transpose { semitones }` only for non-zero signed integer semitone deltas in -127..=127, with the resulting MIDI note constrained to 0..=127.
+- The Score-facing `verify_renderer_audio_binding_for_score_intervention` derives the baseline pitch inventory from the exact typed Score, applies the declared transform itself, then verifies the parser-reconstructed counterfactual MIDI map against that transformed inventory. The caller cannot supply a self-asserted transformed pitch vector.
+- Transposition requires the target event to remain in both maps with identical descendant count/ordinals, track, channel, note-on ordinal, onset/end microseconds and frames; only the target MIDI pitch may change by the exact declared delta.
+- Every non-target event retains its identity, pitch, channel, track and scheduled interval. For transpose, note-on ordinals are also invariant; the removal-specific ordinal exception is retained only for Remove.
+- The report now has separate baseline and counterfactual expected-pitch digests. The receipt/domain version was bumped to v0.2 because the serialized report schema changed.
+- ShiftOnset, ChangeDuration, ChangeVelocity, fine tuning and instrumentation remain fail-closed. Cent-level tuning is not integer semitone transposition.
 
 ### Paired-render repeatability calibration
 
@@ -139,8 +145,16 @@ These are proposed targets, not Muse results:
 - Source module: `src/counterfactual_influence.rs`.
 - Score-event exception verifier: `src/performed_event_map.rs`.
 - Renderer receipt source: `src/renderer_execution_receipt.rs`.
-- Source-level test functions are authored, including exact MIDI lineage/receipt replay, no-op receipt reuse rejection, event removal with protected-event equality, protected-pitch rejection, renderer/schedule substitution, and malformed PCM/config rejection.
+- Twelve source-level tests are authored, including exact MIDI lineage/receipt replay, three distinct no-op controls, Remove preservation, exact +2-semitone transposition, wrong-delta rejection, non-target pitch mutation rejection, MIDI boundary/zero-delta rejection, renderer/schedule substitution, and malformed PCM/config rejection.
 - Rust tests, Cargo compilation, rustfmt, Clippy, real FluidSynth integration, calibration study and public benchmark runs have **not** been executed in this environment. GitHub workflow states must not be reported as passes unless they actually succeed at the exact head.
+
+## EVAL-036 Phase 1 — exact semitone transposition (13 November 2026)
+
+The implementation branch research/mel-mr-eval-036-note-transpose-20261113 adds the first non-removal operation-specific validator. The report's old baseline-only pitch commitment is retained and paired with a separate counterfactual target inventory commitment. Both are recomputed from the source Score and typed intervention during report replay.
+
+This supports **integer MIDI semitone transposition only**. It does not enable SMEBench's ±50-cent tuning correction, nor onset/duration/velocity edits. The operation verifier proves symbolic MIDI semantics; the acoustic influence report still measures only paired PCM differences above the exact renderer's repeatability floor.
+
+A focused Rust 1.96 workflow now checks workspace metadata, the touched module's formatting, the counterfactual test module, and Clippy. It is triggered on pushes to the EVAL-036 branch family as well as PR changes. Its result remains pending until a run at the exact head completes.
 
 ## Related work
 
