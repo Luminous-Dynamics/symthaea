@@ -149,3 +149,16 @@ The Rust-native `xtask plasma-ml-generalization-audit` validates only these inte
 - Belmekki et al. (2026), DOI: https://doi.org/10.1002/ppap.70246.
 - Publisher full text / data availability statement: https://onlinelibrary.wiley.com/doi/full/10.1002/ppap.70246.
 
+
+## Rust-native split-integrity command
+
+The synthetic fixture is checked by the Rust-native xtask command:
+
+    cargo run -p xtask -- plasma-ml-generalization-audit
+    cargo run -p xtask -- plasma-ml-generalization-audit --json
+
+The evaluator checks grouped train/test separation, complete split assignments, specimen and raw-digest identity across folds, augmentation parent lineage, train-only augmentation, train-only preprocessing fit identity, missing source/group identity and explicit claim boundaries.
+
+Thirteen Rust unit tests are authored. The fixture contains twelve scenarios: four positive grouped-holdout controls, six rejected leakage/identity controls and two blocked evidence-completeness controls. An independent source-side JavaScript replay of the fetched JSON matched all twelve frozen dispositions.
+
+**Execution status:** the exact branch files are fetched back; the fixture parses; the independent replay matched 12/12 expected dispositions. The available authoring environment has no Cargo/Rust toolchain, so the Rust source and 13 tests remain uncompiled/unexecuted. No CI pass, original-data access, published-model reproduction or physical outcome prediction is claimed.
