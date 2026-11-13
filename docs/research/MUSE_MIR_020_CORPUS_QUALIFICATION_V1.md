@@ -29,14 +29,14 @@ Sources:
 - MAESTRO v3.0.0: https://magenta.withgoogle.com/datasets/maestro
 - MIREX 2026 task: https://music-ir.org/mirex/wiki/2026:Audio-to-Score_Transcription
 
-### Important ASAP version discrepancy
+### Important ASAP count and version discrepancy
 
-Do not mix the paper, the pinned v1.1 tag and the newer default branch:
+Do not mix the paper, the pinned v1.1 tag and the newer default branch. There is also an internal inconsistency in the pinned README itself:
 - original ASAP paper: 222 scores, 1,068 performances and 520 audio performances;
-- pinned v1.1 tag (commit fad8d1e8078d0ae47ad2f280b5d022bd2de24784): 236 scores, 1,068 performances and 520 audio performances; the README identifies 29 not-aligned performances;
-- current default branch at the time of registry authoring: 236 scores, 1,067 performances and 519 audio performances; its README identifies 31 not-aligned performances.
+- pinned v1.1 tag (commit `fad8d1e8078d0ae47ad2f280b5d022bd2de24784`): README prose says 236 distinct scores, but its composer table totals 222 score records; it reports 1,068 performances and 520 audio performances, with 29 performances marked not score-aligned;
+- current default branch at the time of registry authoring: README prose says 236, its composer table totals 222, and it reports 1,067 performances / 519 audio performances / 31 not-aligned.
 
-MUSE's registration uses the immutable v1.1 tag, not the moving default branch. Preserve the three counts as distinct provenance snapshots. The exact v1.1 file manifest and sample inventory must be frozen before any score or performance count is reported.
+The registration pins immutable v1.1, not the moving default branch. The registry deliberately preserves the prose/table discrepancy rather than choosing 236 or 222. An exact acquired-file manifest and unique-work census must resolve how many unique score works and score files are actually present before any authoritative count or split is published. The 29/31 not-aligned counts remain separate by release snapshot.
 
 The pinned v1.1 README also warns that beat positions can be unresolved for pickups, rubato and complex embellishments. These are data statuses, not examples to silently discard or relabel as correct.
 
