@@ -379,6 +379,9 @@ fn decision_sufficiency_slack(request: &InferenceRequest) -> Result<Option<u64>,
             if request.decision_admission_mode == DecisionAdmissionMode::PreserveCurrentDecision {
                 return Err(RejectReason::DecisionAlreadyInsufficient);
             }
+            if receipt.remaining_sufficient_ticks.is_some() {
+                return Err(RejectReason::DecisionSufficiencyBindingMismatch);
+            }
             // This is a replacement plan, not an extension of the old action.
             // Local fallback and current timing bounds bridge the inference interval.
             None
@@ -1031,6 +1034,40 @@ mod tests {
             admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
         assert_eq!(report.admitted_request_ids, vec!["q1"]);
         assert!(!report.actuation_authorized);
+    }
+
+    #[test]
+    fn replan_does_not_bypass_unknown_decision_sufficiency() {
+        let mut audit = request("q1", "r1");
+        audit.decision_admission_mode = DecisionAdmissionMode::ReplanWithLocalFallback;
+        audit
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .disposition = DecisionSufficiencyDisposition::Unknown;
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::UnknownDecisionSufficiency)
+        );
+    }
+
+    #[test]
+    fn insufficient_replan_receipt_cannot_claim_a_positive_remaining_horizon() {
+        let mut audit = request("q1", "r1");
+        audit.decision_admission_mode = DecisionAdmissionMode::ReplanWithLocalFallback;
+        audit
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .disposition = DecisionSufficiencyDisposition::Insufficient;
+        let report =
+            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        assert_eq!(
+            report.requests[0].disposition,
+            RequestDisposition::Rejected(RejectReason::DecisionSufficiencyBindingMismatch)
+        );
     }
 
     #[test]
