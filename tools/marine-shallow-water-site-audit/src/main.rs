@@ -684,7 +684,7 @@ fn campaign_report(c: &Campaign, case: &Case) -> CampaignReport {
                 || r.contains("below") || r.contains("shorter") || r.contains("lacks")
                 || r.contains("fewer") || r.contains("both port") || r.contains("not supplied")
                 || r.contains("not a substitute") || r.contains("varies beyond")
-                || r.contains("classification boundary")
+                || r.contains("classification boundary") || r.contains("no acoustic band is eligible")
         });
     let invalid = !validate_campaign_errors_empty(c, case);
     let disposition = if invalid { "INVALID" }
@@ -1009,6 +1009,29 @@ mod tests {
         second.campaign_id = "campaign-2".to_string();
         second.site.site_id = "site-2".to_string();
         second.bands[0].propagation_method_revision = "other-revision".to_string();
+        input.campaigns.push(second);
+        assert_eq!(audit(&input).site_comparisons[0].same_band_quantity_contract, false);
+        assert_eq!(audit(&input).site_comparisons[0].result, "INCOMPARABLE");
+    }
+
+    #[test]
+    fn all_bands_below_cutoff_prevent_site_eligibility() {
+        let mut input = case();
+        measured(&mut input);
+        for band in &mut input.campaigns[0].bands {
+            band.site_cutoff_frequency_hz = Some(20_000.0);
+        }
+        assert_eq!(audit(&input).disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn cross_site_quantity_mismatch_blocks_comparison() {
+        let mut input = case();
+        measured(&mut input);
+        let mut second = input.campaigns[0].clone();
+        second.campaign_id = "campaign-2".to_string();
+        second.site.site_id = "site-2".to_string();
+        second.bands[0].quantity = AcousticQuantity::SourceLevel;
         input.campaigns.push(second);
         assert_eq!(audit(&input).site_comparisons[0].same_band_quantity_contract, false);
         assert_eq!(audit(&input).site_comparisons[0].result, "INCOMPARABLE");
