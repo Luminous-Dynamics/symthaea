@@ -195,6 +195,30 @@
         "disposition": "ineligible",
         "reason": "InvalidPolicy"
       }
+    },
+    {
+      "case_id": "ROUTE-025-CONDITION-UNKNOWN",
+      "mutation": "Physical condition remains unknown",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "ProductConditionUnknown"
+      }
+    },
+    {
+      "case_id": "ROUTE-026-USE-SAFETY-UNKNOWN",
+      "mutation": "Use safety/hygiene inspection remains unresolved",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "UseSafetyUnknown"
+      }
+    },
+    {
+      "case_id": "ROUTE-027-DOWNCYCLING-ACCEPTED",
+      "mutation": "Physical downcycling trial and receiver acceptance pass",
+      "expected": {
+        "disposition": "eligible",
+        "reason": null
+      }
     }
   ]
 }
