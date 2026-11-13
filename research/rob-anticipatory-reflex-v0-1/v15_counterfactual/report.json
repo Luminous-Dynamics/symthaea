@@ -1,0 +1,17 @@
+{
+  "arms": {
+    "evaluator_oracle": {"episodes":12,"false_interventions":1,"interventions":11,"safe_episodes":11,"safe_success_rate":0.9166666666666666,"total_compute_cost_units":0,"total_intervention_cost_units":9},
+    "no_action": {"episodes":12,"false_interventions":0,"interventions":0,"safe_episodes":2,"safe_success_rate":0.16666666666666666,"total_compute_cost_units":0,"total_intervention_cost_units":0},
+    "predictive_reflex": {"episodes":12,"false_interventions":2,"interventions":5,"safe_episodes":4,"safe_success_rate":0.3333333333333333,"total_compute_cost_units":31,"total_intervention_cost_units":15},
+    "reactive_threshold": {"episodes":12,"false_interventions":0,"interventions":9,"safe_episodes":3,"safe_success_rate":0.25,"total_compute_cost_units":0,"total_intervention_cost_units":27},
+    "shuffled_precursor_control": {"episodes":12,"false_interventions":2,"interventions":5,"safe_episodes":5,"safe_success_rate":0.4166666666666667,"total_compute_cost_units":31,"total_intervention_cost_units":15}
+  },
+  "claim_boundary":"synthetic_deterministic_reference_only",
+  "independent_unit":"scenario_episode",
+  "oracle_is_evaluator_only":true,
+  "predictive_preventable_event_interception":{"interception_rate":0.2,"preventable_events_without_action":10,"prevented_by_predictive_arm":2},
+  "predictive_vs_reactive":{"control_only_safe":0,"net_paired_safe_lift":0.08333333333333333,"paired_episodes":12,"treatment_only_safe":1},
+  "predictive_vs_sham":{"control_only_safe":1,"net_paired_safe_lift":-0.08333333333333333,"paired_episodes":12,"treatment_only_safe":0},
+  "scenario_count":12,
+  "schema_version":"mcr2-causal-reflex-report-v0.1"
+}
