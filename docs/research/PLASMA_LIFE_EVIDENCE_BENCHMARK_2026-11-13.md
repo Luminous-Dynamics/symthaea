@@ -126,7 +126,7 @@ Other combinations are blocked or rejected. This table is deliberately restricti
 
 ## 7. Frozen known-answer benchmark
 
-The S0 fixture contains 18 synthetic records:
+The S0 fixture contains 19 synthetic records:
 
 | ID | Expected | Purpose |
 |---|---|---|
