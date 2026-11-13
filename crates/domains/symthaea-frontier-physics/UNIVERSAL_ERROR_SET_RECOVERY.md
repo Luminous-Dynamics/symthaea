@@ -1,6 +1,6 @@
 # Universal error-set recovery and decoder reuse
 
-**Status:** an exact three-qubit bit-flip error-set baseline is source-authored; the exact-head runner is pending. The general approximate error-set Petz construction, its Hellinger/environment-leakage metrics, and a QSVT implementation remain future work.
+**Status:** the exact three-qubit bit-flip error-set baseline passed the exact-head Rust 1.96 gate at `50404c09b1f7e7e79c91fa7a38b47716309b6b2e`: formatting and Clippy passed; all 153 frontier-physics crate tests passed (0 failed). The general approximate error-set Petz construction, its Hellinger/environment-leakage metrics, and universal QSVT implementation remain future work.
 
 ## Why this is a distinct paradigm
 
