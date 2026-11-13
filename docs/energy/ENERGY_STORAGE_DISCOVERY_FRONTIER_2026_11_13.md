@@ -188,6 +188,16 @@ For cross-laboratory variance analysis, require at least three independent labor
 6. Freeze a low-voltage EDLC reference protocol and hybrid-buffer duty cycle before selecting prototype materials.
 7. Keep physical safety review and human authorization as mandatory gates for all laboratory execution.
 
+### 2.4 Spatially programmed zinc-ion hybrid capacitor electrodes
+
+A further high-loading comparator appeared on 5 October 2026: Meng et al., *Advanced Functional Materials*, “3D-Printed Dual-Gradient Gel Electrodes Synchronize Ion Transport and Active-Site Utilization for High-Energy Zinc-Ion Hybrid Supercapacitors” (DOI: 10.1002/adfm.78804; https://doi.org/10.1002/adfm.78804). The abstract reports a dual-gradient MXene/polypyrrole@CNT gel electrode made by stepwise multi-ink 3D printing: a macroscopic microlattice grid-spacing gradient combined with an intra-filament pore-structure gradient. It reports micro-CT verification, 71.1% capacitance retention across a 40-fold current-density increase, 98.8% retention after 15,000 cycles, and pouch-device metrics of 6.2 F cm⁻² and 0.86 mWh cm⁻² at 42.7 mg cm⁻² loading.
+
+These are source-reported areal / retention metrics for that research device. The abstract alone does not establish a complete-device gravimetric or volumetric denominator, all inactive mass, package boundary, manufacturing yield or independent-laboratory reproducibility. Do not infer Wh kg⁻¹ or Wh L⁻¹. Do not merge this gel-electrode device with the separate July 2026 carbon/Zn pouch-cell result (10 mg cm⁻² carbon cathode, N/P ≈16.4, 2.82 Wh kg⁻¹ reported device boundary).
+
+The new research question is whether an **impedance-programmed electrode** can outperform a fixed dual-gradient architecture: infer the local ionic/electronic transport and reaction-demand field, then design a spatial distribution of lattice spacing, pore connectivity, conductive network, active-site density and mechanical compliance. The gradient need not be monotonic. The field-conditioned design must be frozen before fabrication and evaluated on held-out devices/lots; unknown model domains require abstention.
+
+A focused experiment contract is [ZIHC-IMPEDANCE-FIELD-001 #11875](https://github.com/Luminous-Dynamics/symthaea/issues/11875). It complements, rather than replaces, [ZIHSC-TRANSPORT-ABLATION-001 #11853](https://github.com/Luminous-Dynamics/symthaea/issues/11853): the latter isolates electron-network and long-range pore-channel effects in carbon cathodes; the new issue evaluates spatially varying, multi-scale gradient architecture and field-conditioned inverse design. Exact numerical reproduction of the October paper is blocked until its supplementary protocol and relevant data/rights are obtained.
+
 ## Sources
 
 - IEA, *Global EV Outlook 2026*, battery deployment and chemistry context: https://www.iea.org/reports/global-ev-outlook-2026/electric-vehicle-batteries
