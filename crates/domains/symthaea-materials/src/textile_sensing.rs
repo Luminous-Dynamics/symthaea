@@ -946,6 +946,27 @@ mod tests {
     }
 
     #[test]
+    fn visual_unknown_category_or_presentation_abstains() {
+        let mut visual = valid_visual();
+        visual.category = VisualGarmentCategory::Unknown;
+        let result = assess_visual_observation(&visual, 700_000);
+        assert_eq!(result.disposition, ObservationDisposition::Unknown);
+        assert_eq!(
+            result.reason,
+            Some(VisualAssessmentReason::CategoryUnknown)
+        );
+
+        let mut visual = valid_visual();
+        visual.presentation = VisualPresentationState::Unknown;
+        let result = assess_visual_observation(&visual, 700_000);
+        assert_eq!(result.disposition, ObservationDisposition::Unknown);
+        assert_eq!(
+            result.reason,
+            Some(VisualAssessmentReason::CategoryUnknown)
+        );
+    }
+
+    #[test]
     fn visual_observation_below_declared_confidence_floor_abstains() {
         let mut visual = valid_visual();
         visual.confidence_ppm = 500_000;
@@ -1025,4 +1046,95 @@ mod tests {
         ];
         assert_eq!(validate_grouped_splits(&rows), Ok(()));
     }
+    fn exercise_corpus_case(case_id: &str) {
+        match case_id {
+            "SORT-001-CURRENT-NIR" =>
+                current_calibrated_spectrum_with_closed_composition_is_admitted(),
+            "SORT-002-EXPIRED-CALIBRATION" =>
+                expired_calibration_at_acquisition_time_abstains(),
+            "SORT-003-REVOKED-CALIBRATION" => revoked_calibration_is_rejected(),
+            "SORT-004-SATURATED-SIGNAL" => saturated_spectral_observation_abstains(),
+            "SORT-005-OUTSIDE-WAVELENGTH-PROFILE" =>
+                wavelength_range_outside_profile_abstains(),
+            "SORT-006-UNKNOWN-FIBRE-FRACTION" =>
+                unidentified_fraction_is_preserved_and_causes_abstention(),
+            "SORT-007-VISUAL-ONLY" =>
+                visual_only_observation_does_not_create_fibre_composition_evidence(),
+            "SORT-008-SUBJECT-MISMATCH" =>
+                visual_and_spectral_observations_must_bind_to_the_same_subject(),
+            "SORT-009-VISUAL-LOW-CONFIDENCE" =>
+                visual_observation_below_declared_confidence_floor_abstains(),
+            "SORT-010-VISUAL-UNKNOWN-CATEGORY" =>
+                visual_unknown_category_or_presentation_abstains(),
+            "SORT-011-GARMENT-FRAME-LEAKAGE" =>
+                garment_frames_from_one_identity_cannot_cross_partitions(),
+            "SORT-012-NIR-REPLICATE-LEAKAGE" =>
+                nir_replicates_from_one_specimen_cannot_cross_partitions(),
+            "SORT-013-COMPOSITION-FRACTION-NOT-CLOSED" =>
+                invalid_composition_total_is_rejected(),
+            "SORT-014-INSTRUMENT-MISMATCH" => mismatched_instrument_is_rejected(),
+            "SORT-015-GROUPED-SPLIT-VALID" =>
+                grouped_split_accepts_multiple_frames_or_replicates_in_one_partition(),
+            other => panic!("unknown textile sensing corpus case: {other}"),
+        }
+    }
+
+    #[test]
+    fn synthetic_corpus_drives_all_declared_contract_regression_cases() {
+        const CORPUS: &str = include_str!(
+            "../../../../docs/research/fixtures/textile_sort_fusion_v0_1/sensor_cases.example.json"
+        );
+        const SCHEMA: &str = include_str!(
+            "../../../../docs/research/fixtures/textile_sort_fusion_v0_1/sensor_cases.schema.json"
+        );
+
+        let corpus: serde_json::Value =
+            serde_json::from_str(CORPUS).expect("synthetic textile corpus must parse as JSON");
+        let schema: serde_json::Value =
+            serde_json::from_str(SCHEMA).expect("textile corpus schema must parse as JSON");
+
+        assert_eq!(corpus["schema_version"], "0.1.0");
+        assert_eq!(corpus["corpus_id"], "TEXTILE-SORT-FUSION-CASES-001");
+        assert_eq!(corpus["fixture_class"], "synthetic");
+        assert_eq!(schema["properties"]["fixture_class"]["const"], "synthetic");
+        assert_eq!(schema["properties"]["cases"]["minItems"], 10);
+
+        let cases = corpus["cases"]
+            .as_array()
+            .expect("corpus cases must be an array");
+        assert_eq!(cases.len(), 15, "corpus case count changed; review mappings");
+
+        let mut seen = BTreeSet::new();
+        for case in cases {
+            let case_id = case["case_id"]
+                .as_str()
+                .expect("every corpus case needs a string case_id");
+            assert!(seen.insert(case_id), "duplicate corpus case {case_id}");
+            assert!(
+                case["purpose"].is_null(),
+                "corpus format must use mutation/invariant fields only"
+            );
+            assert!(
+                case["mutation"].as_str().is_some_and(|value| !value.is_empty()),
+                "case {case_id} must declare its mutation"
+            );
+            assert!(
+                case["invariant"].as_str().is_some_and(|value| !value.is_empty()),
+                "case {case_id} must declare its invariant"
+            );
+            let expected = case["expected"]
+                .as_object()
+                .expect("every corpus case needs expected outcome");
+            assert!(expected.get("disposition").and_then(|v| v.as_str()).is_some());
+            assert!(expected.contains_key("reason"));
+            exercise_corpus_case(case_id);
+        }
+
+        assert_eq!(seen.len(), 15);
+        assert!(corpus["claim_ceiling"]
+            .as_str()
+            .is_some_and(|value| value.contains("Synthetic")));
+    }
+
+
 }
