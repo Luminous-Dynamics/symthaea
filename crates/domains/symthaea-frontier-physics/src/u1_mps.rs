@@ -1515,6 +1515,38 @@ impl ComplexU1Mps {
     }
 
     /// Contract the overlap <self|other> without dense expansion.
+
+    /// Compute the full-state L2 distance using norm and transfer-environment overlap.
+    ///
+    /// This avoids dense-vector expansion and is valid for finite open-boundary MPS.
+    pub fn distance_l2(
+        &self,
+        other: &Self,
+        tolerance: f64,
+    ) -> Result<f64, U1MpsError> {
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        if self.site_count() != other.site_count() {
+            return Err(U1MpsError::TwoSiteShapeMismatch);
+        }
+        let left_norm = self.norm_squared(tolerance)?;
+        let right_norm = other.norm_squared(tolerance)?;
+        let overlap = self.inner_product(other)?;
+        let scale = left_norm.max(right_norm).max(1.0);
+        if overlap.im.abs() > tolerance * scale {
+            return Err(U1MpsError::ComplexNormResidual {
+                imaginary_part: overlap.im.abs(),
+                tolerance: tolerance * scale,
+            });
+        }
+        let squared = left_norm + right_norm - 2.0 * overlap.re;
+        if squared < -tolerance * scale {
+            return Err(U1MpsError::NegativeNormSquared(squared));
+        }
+        Ok(squared.max(0.0).sqrt())
+    }
+
     pub fn inner_product(&self, other: &Self) -> Result<Complex64, U1MpsError> {
         if self.site_count() != other.site_count() {
             return Err(U1MpsError::TwoSiteShapeMismatch);
