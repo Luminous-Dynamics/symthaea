@@ -45,17 +45,21 @@ Dataset DOI: https://doi.org/10.5281/zenodo.22143896
 The 30 September 2026 paper describes:
 - 751 post-consumer garments;
 - 11 visual categories;
-- 2,253 annotated frames;
-- 3 presentation stages for each garment;
-- garment-level five-fold validation, keeping all frames for one garment in the same fold.
+- 2,253 annotated frames across three controlled handling-disorder stages;
+- garment-level five-fold cross-validation, keeping every frame for one garment in the same fold.
 
-Reported ViT accuracy is 95.23%, 91.90% and 85.94% across the three stages (9.3 percentage-point first-to-third drop). The reported ResNet-18 and ResNet-50 drops are 16.9 and 16.6 points. These numbers are paper-reported, not independently reproduced by Luminous.
+The directly fine-tuned ViT reports mean accuracy of **95.23%, 91.90% and 85.94%** across stages 1–3, a 9.3-point absolute drop. Its Stage-3 macro-F1 is **83.04%**. ResNet-50 and ResNet-18 lose 16.6 and 16.9 accuracy points respectively; their Stage-3 macro-F1 values are 72.04% and 68.53%. The comparison shows a strong task-specific ViT baseline, but the paper cautions that differences within one fold standard deviation should not be read as rankings. All these are paper-reported results, not independently reproduced by Luminous.
+
+An especially instructive negative result: the same ViT architecture with an intermediate fine-tuning stage on external second-hand clothing data reaches 94.58% Stage-1 accuracy but falls to 69.52% at Stage 2 and 68.93% at Stage 3. Its Stage-3 macro-F1 is 65.18%. The authors attribute this to a mismatch between cleaner intermediate training images and the disordered deployment-like presentation. More pretraining data is therefore not automatically better; data-domain match and handling-state coverage matter.
 
 Limitations:
-- small and class-imbalanced sample;
-- garments were sourced from collection containers and had already been pre-sorted at one facility;
-- its labels describe visual garment family/presentation, not fibre composition;
-- a very large ViT (about 305.6M parameters in the reported setup) is compared with substantially smaller ResNets, so parameter/compute-matched comparisons are required before claiming architecture superiority.
+- the 751 garments were supplied in boxes already pre-sorted by one facility; the paper states that representativeness of the incoming material flow cannot be assessed and category frequencies vary;
+- acquisition used one controlled recording station with fixed illumination/camera settings and simulated handling-disorder stages, not a multi-facility production-line transfer study;
+- labels describe visual garment family/presentation, not fibre composition, material grade, condition/safety or recovery eligibility;
+- the task uses 11 facility-informed visual categories, not a universally validated textile taxonomy;
+- the reported 305.6M-parameter ViT is much larger than the ResNet baselines; any claim of architecture superiority requires matched parameter/FLOP/latency budgets as a separate experiment.
+
+Source: https://www.mdpi.com/1424-8220/26/19/6236 (Tables 4 and A1; Sections 2.1, 2.3 and 3.4).
 
 ### 3.2 NIST NIR-SORT — fibre/composition evidence
 
@@ -230,21 +234,24 @@ When a physical route trial explicitly claims to test a declared design revision
 ### B0 — reproduce both public baselines independently
 
 TexSortML:
-- reproduce the published garment-level grouped five-fold split;
-- report per-class macro-F1, balanced accuracy, precision/recall, confusion and confidence calibration at each presentation stage;
-- compare matched model parameter counts, FLOPs, resolution, training data and inference budget.
+- reproduce the published garment-level grouped five-fold split independently;
+- report accuracy and macro-F1 separately, per-class precision/recall, balanced accuracy, confusion, confidence calibration and worst-class recall at every stage;
+- compare matched parameter counts, FLOPs, resolution, training data, inference latency and hardware;
+- preserve the 11-category taxonomy for exact reproduction, then evaluate any new taxonomy as a separate study;
+- add garment-level bootstrap confidence intervals and per-category support so small classes are not hidden by weighted averages.
 
-The September 2026 paper's directly fine-tuned ViT baseline reports **85.94% Stage-3 accuracy** and **83.04% Stage-3 macro-F1** across the most disordered garment presentation. It records 95.23% Stage-1 accuracy, but Stage 1 is not the deployment-defining condition. The weak Zipper/Sweat Jacket class and the single-facility sample source are explicit limitations.
+The directly fine-tuned ViT reports 85.94% Stage-3 accuracy and 83.04% Stage-3 macro-F1. The weaker externally fine-tuned ViT-CDSH reaches only 68.93% Stage-3 accuracy and 65.18% macro-F1. The paper's class-level appendix identifies Zipper/Sweat Jacket (17 garments) as its most difficult class. The 751-item sample is already pre-sorted at one facility, and all images use a single controlled capture setup, so these are in-domain anchors—not evidence of cross-facility operation.
 
 | TexSortML benchmark gate | Published anchor | Proposed stretch objective (not achieved) |
 |---|---:|---:|
 | Same grouped five-fold reproduction | ViT Stage 3: 85.94% accuracy / 83.04% macro-F1 | Reproduce both within ±1.0 pp before claiming a model improvement |
-| Most-disordered Stage 3 | 85.94% accuracy / 83.04% macro-F1 | ≥88.0% accuracy and ≥85.5% macro-F1 on the identical split, taxonomy and compute budget |
-| Weakest-class performance | Zipper/Sweat Jacket is the weakest class; 17 garments | At least +5 pp worst-class recall without reducing overall macro-F1; report garment-level confidence intervals |
-| Domain transfer | Single facility / one camera setup; external-facility transfer untested | A separate multi-facility held-out test, with no facility overlap in train/validation; freeze targets after first independent facility dataset |
-| Open-set operation | Not established by the published top-1 task | ≤1% false acceptance of unknown categories/material states at a separately reported ≥90% accepted coverage on a preregistered unknown set |
+| Most-disordered Stage 3 | 85.94% accuracy / 83.04% macro-F1 | ≥88.0% accuracy and ≥85.5% macro-F1 on identical split, taxonomy and compute budget |
+| Weakest-class performance | Zipper/Sweat Jacket, 17 garments | +5 pp worst-class recall without reducing overall macro-F1; report uncertainty |
+| External facility transfer | Single source facility; incoming-flow representativeness unknown | Separate facility-held-out set, no facility overlap in train/validation; targets frozen before seeing independent results |
+| Instrument/camera transfer | One controlled capture setup | Camera/lighting/conveyor-held-out assessment, separately reported |
+| Open-set operation | Not established by published top-1 task | ≤1% false acceptance of unknown states at ≥90% accepted coverage on a preregistered unknown set |
 
-These targets are deliberately above the published benchmark but modest enough to make a clean reproduction the first gate. An improvement is not accepted if it comes from more training data, larger compute, leakage, taxonomy changes or easier evaluation examples unless those changes are reported as separate experimental arms.
+Do not treat a 1-point improvement on the same 751 garments as proof of industrial superiority. First reproduce the paper, then test a genuinely independent facility/feedstock. An improvement is not accepted if it comes from leakage, larger compute, taxonomy changes or easier examples unless those are distinct declared arms.
 
 NIR-SORT:
 - group all replicates by physical specimen;
@@ -257,6 +264,34 @@ NIR-SORT:
 The NIR-SORT 2.0 custom-blend specimens and Handheld_F / Standoff_Q profiles create a ratio-generalization and instrument-transfer challenge. The objective is not just to classify broad fibre labels: estimate composition with bounded uncertainty, preserve unknown fractions and evaluate entire held-out specimens/instruments. A proposed stretch gate is to reduce the composition-error increase on held-out instruments by at least 50% relative to a simple instrument-naive baseline, while maintaining nominal 90% prediction-interval coverage within a predeclared tolerance. Freeze exact tolerances after establishing source reference uncertainty; no performance value is claimed yet.
 
 Do not pool the visual and spectral scores into one leaderboard.
+
+### B1a — active sensing and human-in-the-loop triage
+
+The next paradigm shift is from passive "predict once and route" to **choose the next observation that reduces decision risk**. A garment may be rotated for another RGB view, inspected for a hidden trim, scanned at a second NIR spot, or sent to a human when the expected value of more evidence exceeds its time/labour cost.
+
+This is not permission to make the model the authority. The model proposes the next low-risk observation; the route policy still requires its own qualified evidence and an authorized human/physical action.
+
+Benchmark:
+- freeze a budget in seconds, energy and operator minutes per incoming kg;
+- compare fixed single-view, fixed multi-view, random remeasurement, uncertainty-triggered remeasurement, expected-information-gain selection and human triage;
+- measure reduction in false routing/false acceptance at equal coverage and equal sensing/worker budget;
+- report number of remeasurements, time-to-decision, operator override rate, calibration/coverage-risk, throughput and accepted downstream kg;
+- stratify by textile construction, deformation, contamination and unknown blend.
+
+Proposed stretch target: reduce false acceptance by at least 50% relative to the fixed single-pass baseline at matched accepted coverage and no more than 10% added median decision time. This is a research target; no active-sensing policy has been implemented or tested yet.
+
+### B1b — temporal garment understanding
+
+The 2026 TexSortML release includes original videos as well as extracted frames. A separate temporal benchmark should test whether motion across a conveyor can resolve ambiguous folds, occlusions and identity continuity better than independent still frames.
+
+Require:
+- garment identity tracking with no cross-item evidence joins;
+- temporal aggregation without frame-level leakage between folds;
+- garment-level prediction/calibration and a latency bound;
+- controlled ablations: one frame, fixed frame set, event/uncertainty-triggered frames, video model;
+- compare accuracy, macro-F1, track identity switches, decision latency, compute and accepted downstream routing outcomes.
+
+Do not count multiple frames from one garment as independent sample size.
 
 ### B1 — open-set and domain shift
 
