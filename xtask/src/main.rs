@@ -5,6 +5,7 @@ mod crate_status;
 mod duplicate_scan;
 mod manifest;
 mod plasma_energy_audit;
+mod plasma_decision_oed;
 mod plasma_surface_bondability;
 mod rhn_sweep;
 
@@ -91,6 +92,16 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Offline, synthetic-only audit of plasma multifidelity experiment selection and product-decision gates.
+    #[command(name = "plasma-decision-oed-audit")]
+    PlasmaDecisionOedAudit {
+        #[arg(long, default_value = "data/research/plasma_decision_oed_fixture_v0_1.json")]
+        fixture: PathBuf,
+        /// Emit stable structured JSON instead of the human-readable summary.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -155,6 +166,10 @@ fn main() -> anyhow::Result<()> {
         Commands::PlasmaSurfaceBondabilityAudit { fixture, json } => {
             let report = plasma_surface_bondability::run_audit(&fixture)?;
             plasma_surface_bondability::print_report(&report, json)?;
+        }
+        Commands::PlasmaDecisionOedAudit { fixture, json } => {
+            let report = plasma_decision_oed::run_audit(&fixture)?;
+            plasma_decision_oed::print_report(&report, json)?;
         }
         Commands::DuplicateScan { registry } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
