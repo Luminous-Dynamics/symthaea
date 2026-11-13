@@ -639,7 +639,7 @@ fn validate_arm(
 fn validate_cases(
     validated: &ValidatedManifest,
     cases: &[PairedCase],
-) -> Result<BTreeMap<String, Vec<&PairedCase>>, HoldoutAuditError> {
+) -> Result<BTreeMap<GroupKey, Vec<&PairedCase>>, HoldoutAuditError> {
     if cases.is_empty() {
         return Err(HoldoutAuditError::NoPairedCases);
     }
@@ -755,12 +755,12 @@ fn summarize_group(
 
     for case in cases {
         cluster_ids.insert(case.cluster_id.as_str());
-        candidate_safe += u64::from(case.candidate_outcome.is_safe_success());
-        baseline_safe += u64::from(case.baseline_outcome.is_safe_success());
-        candidate_unsafe += u64::from(case.candidate_outcome.is_unsafe_success());
-        baseline_unsafe += u64::from(case.baseline_outcome.is_unsafe_success());
-        candidate_unknown += u64::from(case.candidate_outcome.is_unknown_or_censored());
-        baseline_unknown += u64::from(case.baseline_outcome.is_unknown_or_censored());
+        candidate_safe += u64::from(u8::from(case.candidate_outcome.is_safe_success()));
+        baseline_safe += u64::from(u8::from(case.baseline_outcome.is_safe_success()));
+        candidate_unsafe += u64::from(u8::from(case.candidate_outcome.is_unsafe_success()));
+        baseline_unsafe += u64::from(u8::from(case.baseline_outcome.is_unsafe_success()));
+        candidate_unknown += u64::from(u8::from(case.candidate_outcome.is_unknown_or_censored()));
+        baseline_unknown += u64::from(u8::from(case.baseline_outcome.is_unknown_or_censored()));
     }
 
     let episode_count = u64::try_from(cases.len())
