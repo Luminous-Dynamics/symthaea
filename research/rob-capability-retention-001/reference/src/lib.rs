@@ -615,9 +615,11 @@ fn validate_recovery_topology(
         EvidenceDisposition::Unknown => {
             if let Some(digest) = topology.report_digest.as_deref() {
                 if digest.trim().is_empty() {
-                    return Err(CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(
-                        arm_id.to_owned(),
-                    ));
+                    return Err(
+                        CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(
+                            arm_id.to_owned(),
+                        ),
+                    );
                 }
             }
             return Ok(());
@@ -632,9 +634,9 @@ fn validate_recovery_topology(
     let route_count = topology.recovery_route_class_count;
     let independent_count = topology.failure_domain_independent_route_count;
     if report_digest.is_none() || route_count.is_none() || independent_count.is_none() {
-        return Err(CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(
-            arm_id.to_owned(),
-        ));
+        return Err(
+            CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(arm_id.to_owned()),
+        );
     }
     if independent_count.unwrap_or(0) > route_count.unwrap_or(0) {
         return Err(CapabilityRetentionError::InconsistentRecoveryTopology(
@@ -1346,10 +1348,7 @@ mod tests {
         assert_eq!(report.clusters[0].baseline_accepted_items, 7);
         assert_eq!(report.clusters[0].candidate_accepted_items, 8);
         assert_eq!(report.clusters[0].work_rate_delta_milli_per_hour, 1_000);
-        assert_eq!(
-            report.clusters[0].baseline_terminal_option_count,
-            Some(2)
-        );
+        assert_eq!(report.clusters[0].baseline_terminal_option_count, Some(2));
         assert_eq!(
             report.clusters[0].candidate_recovery_route_class_count,
             Some(3)
@@ -1417,9 +1416,7 @@ mod tests {
             .report_digest = None;
         assert_eq!(
             compare_work_and_terminal_capability(&audit),
-            Err(CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(
-                "candidate".into()
-            ))
+            Err(CapabilityRetentionError::IncompleteQualifiedRecoveryTopology("candidate".into()))
         );
     }
 
