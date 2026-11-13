@@ -98,6 +98,19 @@
   },
   "benchmark_ladder": [
     {
+      "id": "UR-1A",
+      "name": "Generic complex QEC matrix and exact-KL subspace projection",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "validated code isometry",
+        "generic complex finite error operators",
+        "QEC matrix convention and basis ordering",
+        "Hermiticity residual",
+        "Frobenius projection to I_K tensor lambda",
+        "dense dimension cap and invalid-input rejection"
+      ]
+    },
+    {
       "id": "UR-0",
       "name": "Exact three-qubit bit-flip control",
       "status": "passed_rust_1_96",
@@ -237,5 +250,33 @@
     "runtime",
     "peak_memory",
     "qualification_status"
-  ]
+  ],
+  "generic_qec_matrix": {
+    "module": "crates/domains/symthaea-frontier-physics/src/universal_error_set.rs",
+    "module_export": "crates/domains/symthaea-frontier-physics/src/lib.rs",
+    "dense_dimension_cap": 1024,
+    "status": "source_authored_runner_pending",
+    "api": [
+      "ErrorSetCode::new",
+      "FiniteErrorSet::new",
+      "ErrorSetCode::qec_matrix",
+      "ErrorSetQecMatrix::knill_laflamme_diagnostics"
+    ],
+    "observables": [
+      "code_isometry_residual",
+      "QEC_matrix_entries",
+      "QEC_matrix_hermiticity_residual",
+      "projected_lambda",
+      "maximum_exact_KL_subspace_residual",
+      "frobenius_exact_KL_subspace_residual"
+    ],
+    "authored_tests": [
+      "generic_qec_matrix_reproduces_exact_repetition_code_kl_identity",
+      "generic_qec_matrix_handles_complex_nonunitary_error_operators",
+      "generic_qec_constructors_reject_invalid_code_and_error_matrices",
+      "generic_qec_matrix_rejects_dimension_mismatch_and_dense_limit"
+    ],
+    "workflow": ".github/workflows/universal-error-set-qec-matrix.yml",
+    "explicit_limitation": "Frobenius projection onto the exact linear KL subspace only. No PSD-constrained Hellinger minimization, environment-leakage diamond norm, general error-set Petz decoder, or QSVT compilation."
+  }
 }
