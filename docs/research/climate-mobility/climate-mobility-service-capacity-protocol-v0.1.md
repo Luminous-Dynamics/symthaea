@@ -133,7 +133,7 @@ Each service domain declares:
 - time-to-degradation and recovery;
 - evidence needed to classify a result as meets, breaches or indeterminate.
 
-An unknown threshold, missing observation or unqualified model must produce **indeterminate**, not "meets floor." Aggregate city averages cannot hide a known community-level floor breach.
+An unknown threshold, missing observation or unqualified model must produce **indeterminate**, not "meets floor." Aggregate city averages cannot hide a known community-level floor breach. The v0.1 synthetic fixture checks aggregate capacity sufficiency/shortfall only; it does not define or evaluate a protected minimum-service floor. Capacity sufficiency is not a floor-pass, safety or destination-suitability determination.
 
 ## 7. Water-security requirements
 
