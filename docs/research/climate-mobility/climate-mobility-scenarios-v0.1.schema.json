@@ -1,0 +1,458 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/climate-mobility/climate-mobility-scenarios-v0.1.schema.json",
+  "title": "Climate Mobility and Destination Service-Capacity Scenario Set v0.1",
+  "description": "A provenance-aware scenario contract. Validation of arithmetic, cross-references, evidence promotion and decision authority requires additional semantic validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "scenario_set_id",
+    "evidence_class",
+    "time_frame",
+    "areas",
+    "pathways",
+    "service_assessments",
+    "source_manifest",
+    "assumptions",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "scenario_set_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{2,95}$"
+    },
+    "evidence_class": {
+      "enum": [
+        "synthetic",
+        "observed",
+        "estimated",
+        "modelled",
+        "calibrated",
+        "unknown"
+      ]
+    },
+    "time_frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "basis",
+        "start",
+        "end",
+        "step",
+        "step_unit"
+      ],
+      "properties": {
+        "basis": {
+          "enum": [
+            "calendar",
+            "model_time",
+            "synthetic_steps"
+          ]
+        },
+        "start": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "end": {
+          "type": [
+            "string",
+            "number"
+          ]
+        },
+        "step": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "step_unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "areas": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "area_id",
+          "role",
+          "boundary_reference",
+          "boundary_revision",
+          "crs",
+          "spatial_scale",
+          "evidence_class"
+        ],
+        "properties": {
+          "area_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "enum": [
+              "origin",
+              "destination",
+              "origin_and_destination"
+            ]
+          },
+          "boundary_reference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "boundary_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "crs": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "spatial_scale": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_class": {
+            "enum": [
+              "synthetic",
+              "observed",
+              "estimated",
+              "modelled",
+              "calibrated",
+              "unknown"
+            ]
+          }
+        }
+      }
+    },
+    "pathways": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pathway_id",
+          "pathway_type",
+          "origin_area_id",
+          "destination_area_id",
+          "moved_persons",
+          "return_persons",
+          "climate_attribution",
+          "decision_state",
+          "is_recommendation",
+          "assumption_ids"
+        ],
+        "properties": {
+          "pathway_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pathway_type": {
+            "enum": [
+              "in_place_adaptation",
+              "temporary_displacement",
+              "voluntary_migration",
+              "community_led_planned_relocation",
+              "post_disaster_recovery",
+              "constrained_immobility",
+              "return"
+            ]
+          },
+          "origin_area_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destination_area_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "moved_persons": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "return_persons": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "climate_attribution": {
+            "enum": [
+              "not_claimed",
+              "observed_with_method",
+              "modelled_with_method",
+              "unknown"
+            ]
+          },
+          "decision_state": {
+            "enum": [
+              "scenario_only",
+              "community_defined",
+              "human_authorized"
+            ]
+          },
+          "is_recommendation": {
+            "const": false
+          },
+          "assumption_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "service_assessments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "assessment_id",
+          "pathway_id",
+          "area_id",
+          "domain",
+          "metric",
+          "unit",
+          "baseline_demand",
+          "incremental_demand",
+          "baseline_capacity",
+          "capacity_adjustment",
+          "expected_total_demand",
+          "expected_available_capacity",
+          "expected_shortfall",
+          "expected_outcome",
+          "evidence_class",
+          "result_scope",
+          "source_ref_ids"
+        ],
+        "properties": {
+          "assessment_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pathway_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "area_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "domain": {
+            "enum": [
+              "drinking_water",
+              "wastewater",
+              "housing",
+              "energy",
+              "health_care",
+              "transport",
+              "livelihoods",
+              "ecology",
+              "governance"
+            ]
+          },
+          "metric": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "baseline_demand": {
+            "type": "number",
+            "minimum": 0
+          },
+          "incremental_demand": {
+            "type": "number",
+            "minimum": 0
+          },
+          "baseline_capacity": {
+            "type": "number",
+            "minimum": 0
+          },
+          "capacity_adjustment": {
+            "type": "number"
+          },
+          "expected_total_demand": {
+            "type": "number",
+            "minimum": 0
+          },
+          "expected_available_capacity": {
+            "type": "number",
+            "minimum": 0
+          },
+          "expected_shortfall": {
+            "type": "number",
+            "minimum": 0
+          },
+          "expected_outcome": {
+            "enum": [
+              "meets_floor",
+              "breaches_floor",
+              "indeterminate"
+            ]
+          },
+          "evidence_class": {
+            "enum": [
+              "synthetic",
+              "observed",
+              "estimated",
+              "modelled",
+              "calibrated",
+              "unknown"
+            ]
+          },
+          "result_scope": {
+            "const": "synthetic_contract_only"
+          },
+          "source_ref_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "source_manifest": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "publisher",
+          "source_type",
+          "version",
+          "uri",
+          "content_sha256",
+          "role",
+          "evidence_class"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "publisher": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_type": {
+            "enum": [
+              "synthetic_fixture",
+              "official_observation",
+              "research_dataset",
+              "model_output",
+              "community_observation",
+              "other"
+            ]
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uri": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uri"
+          },
+          "content_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "role": {
+            "enum": [
+              "contract_arithmetic",
+              "empirical_support",
+              "methodological_context",
+              "model_input",
+              "model_output"
+            ]
+          },
+          "evidence_class": {
+            "enum": [
+              "synthetic",
+              "observed",
+              "estimated",
+              "modelled",
+              "calibrated",
+              "unknown"
+            ]
+          }
+        }
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "assumption_id",
+          "statement",
+          "evidence_class"
+        ],
+        "properties": {
+          "assumption_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "statement": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_class": {
+            "enum": [
+              "synthetic",
+              "observed",
+              "estimated",
+              "modelled",
+              "calibrated",
+              "unknown"
+            ]
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
