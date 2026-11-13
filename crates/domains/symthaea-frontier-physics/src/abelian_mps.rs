@@ -903,4 +903,157 @@ mod tests {
             Err(AbelianChargeError::RightBoundary { .. })
         ));
     }
+
+    #[test]
+    fn exact_u1k_two_site_svd_reconstructs_state_and_reports_each_charge_rank() {
+        let vacuum = q(0, 0);
+        let up = q(1, 1);
+        let down = q(1, -1);
+        let double = q(2, 0);
+        let physical = vec![vacuum, up, down, double];
+        let bond = vec![vacuum, up, down, double];
+
+        let mut first_data = vec![zero(); 16];
+        first_data[0] = Complex64::new(1.0, 0.0);
+        first_data[5] = Complex64::new(0.5, 0.0);
+        first_data[10] = Complex64::new(0.5, 0.0);
+        let first = AbelianChargeTensor::new(
+            0,
+            vec![vacuum],
+            physical.clone(),
+            bond.clone(),
+            first_data,
+            1.0e-12,
+        )
+        .unwrap();
+
+        let mut second_data = vec![zero(); 16];
+        second_data[3] = Complex64::new(1.0, 0.0);
+        second_data[6] = Complex64::new(1.0, 0.0);
+        second_data[9] = Complex64::new(1.0, 0.0);
+        second_data[12] = Complex64::new(1.0, 0.0);
+        let second = AbelianChargeTensor::new(
+            1,
+            bond,
+            physical,
+            vec![double],
+            second_data,
+            1.0e-12,
+        )
+        .unwrap();
+
+        let split =
+            AbelianChargeBlockPlan::split_exact(&first, &second, 1.0e-12).unwrap();
+        assert_eq!(
+            split.rank_by_charge,
+            vec![(vacuum, 1), (down, 1), (up, 1), (double, 0)]
+        );
+        assert_eq!(split.total_singular_value_count, 4);
+        assert_eq!(split.retained_singular_value_count, 3);
+        assert_eq!(split.exact_zero_singular_values_omitted, 1);
+        assert!(split.reconstruction_max_residual <= 1.0e-12);
+        assert!(split.reconstruction_l2_residual <= 1.0e-12);
+
+        let rebuilt =
+            AbelianMps::new(vec![split.left_tensor, split.right_tensor], double, 1.0e-12)
+                .unwrap();
+        assert_eq!(rebuilt.total_charge(), double);
+        assert_eq!(rebuilt.selection_rule_residual(), 0.0);
+    }
+
+    #[test]
+    fn exact_u1k_two_site_svd_retains_tiny_positive_schmidt_value() {
+        let vacuum = q(0, 0);
+        let up = q(1, 1);
+        let down = q(1, -1);
+        let double = q(2, 0);
+        let physical = vec![vacuum, up, down, double];
+        let bond = vec![vacuum, up, down, double];
+        let tiny: f64 = 1.0e-18;
+
+        let mut first_data = vec![zero(); 16];
+        first_data[5] = Complex64::new(1.0, 0.0);
+        first_data[10] = Complex64::new(tiny, 0.0);
+        let first = AbelianChargeTensor::new(
+            0,
+            vec![vacuum],
+            physical.clone(),
+            bond.clone(),
+            first_data,
+            1.0e-12,
+        )
+        .unwrap();
+
+        let mut second_data = vec![zero(); 16];
+        second_data[6] = Complex64::new(1.0, 0.0);
+        second_data[9] = Complex64::new(1.0, 0.0);
+        let second = AbelianChargeTensor::new(
+            1,
+            bond,
+            physical,
+            vec![double],
+            second_data,
+            1.0e-12,
+        )
+        .unwrap();
+
+        let split =
+            AbelianChargeBlockPlan::split_exact(&first, &second, 1.0e-12).unwrap();
+        assert_eq!(split.rank_by_charge, vec![(vacuum, 0), (down, 1), (up, 1), (double, 0)]);
+        assert_eq!(split.retained_singular_value_count, 2);
+        let tiny_middle = split
+            .left_tensor
+            .right_charges()
+            .iter()
+            .position(|charge| *charge == down)
+            .unwrap();
+        let tiny_amplitude = split.left_tensor.get(0, 2, tiny_middle)
+            * split.right_tensor.get(tiny_middle, 1, 0);
+        assert!((tiny_amplitude.norm() - tiny).abs() <= 1.0e-30);
+        assert!(split.reconstruction_max_residual <= 1.0e-15);
+    }
+
+    #[test]
+    fn exact_u1k_two_site_svd_rejects_zero_state_and_mismatched_internal_bond() {
+        let vacuum = q(0, 0);
+        let physical = vec![vacuum];
+        let first = AbelianChargeTensor::new(
+            0,
+            vec![vacuum],
+            physical.clone(),
+            vec![vacuum],
+            vec![zero()],
+            1.0e-12,
+        )
+        .unwrap();
+        let second = AbelianChargeTensor::new(
+            1,
+            vec![vacuum],
+            physical.clone(),
+            vec![vacuum],
+            vec![zero()],
+            1.0e-12,
+        )
+        .unwrap();
+        assert!(matches!(
+            AbelianChargeBlockPlan::split_exact(&first, &second, 1.0e-12),
+            Err(AbelianChargeError::ZeroTwoSiteState)
+        ));
+
+        let up = q(1, 1);
+        let mismatched = AbelianChargeTensor::new(
+            1,
+            vec![up],
+            physical,
+            vec![vacuum],
+            vec![zero()],
+            1.0e-12,
+        )
+        .unwrap();
+        assert!(matches!(
+            AbelianChargeBlockPlan::split_exact(&first, &mismatched, 1.0e-12),
+            Err(AbelianChargeError::BondChargeMismatch { .. })
+        ));
+    }
+
 }
