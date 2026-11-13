@@ -67,7 +67,7 @@ Auxiliary events match on element family and score position. Attribute events ma
 |---|---|
 | Note/rest/unpitched presence | Precision, recall and F1 with TP/FP/FN |
 | Matched note onset | Absolute error distribution: mean, median, p95, p99 and within-tolerance count |
-| Written pitch spelling | Exact step + octave + numeric alteration equality; decimal lexical forms such as “0” and “0.000” are normalized exactly, enharmonic spellings remain distinct |
+| Written pitch spelling | Exact step + octave + numeric alteration equality; omitted alteration and explicit zero are equivalent, decimal lexical forms such as “0” and “0.000” are normalized exactly, enharmonic spellings remain distinct |
 | Rest semantics | Measure-rest flag and display-pitch correctness |
 | Unpitched display | Display-step/display-octave correctness |
 | Duration presence | Whether both events carry a performed duration |
@@ -101,10 +101,10 @@ The hashes establish content consistency, not the identity of the parser, truth 
 
 ## Tests authored
 
-17 focused tests currently cover:
+18 focused tests currently cover:
 - identical graph yields perfect independent dimensions, including onset, duration, note, auxiliary, attribute and cursor outputs;
 - wrong pitch spelling does not suppress note-event presence;
-- equivalent decimal alteration lexemes compare numerically exactly;
+- equivalent decimal alteration lexemes compare numerically exactly, including implicit natural versus explicit zero;
 - extra chord member is a false positive without consuming a second reference note;
 - deleted event is a false negative;
 - tie, tied, time-modification and tuplet semantics remain separate dimensions;
