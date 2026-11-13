@@ -1,0 +1,117 @@
+name: Muse Probe Policy Campaign
+
+on:
+  push:
+    branches:
+      - "research/mel-mr-eval-026-*"
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/probe_policy_campaign.rs"
+      - "crates/domains/symthaea-muse/src/probe_policy_comparison.rs"
+      - "crates/domains/symthaea-muse/src/interaction_probe_plan.rs"
+      - "crates/domains/symthaea-muse/src/interaction_probe_benchmark.rs"
+      - "crates/domains/symthaea-muse/src/factorial_ground_truth.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - ".github/workflows/muse-probe-policy-campaign.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-muse/Cargo.toml"
+      - "crates/domains/symthaea-muse/src/probe_policy_campaign.rs"
+      - "crates/domains/symthaea-muse/src/probe_policy_comparison.rs"
+      - "crates/domains/symthaea-muse/src/interaction_probe_plan.rs"
+      - "crates/domains/symthaea-muse/src/interaction_probe_benchmark.rs"
+      - "crates/domains/symthaea-muse/src/factorial_ground_truth.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - ".github/workflows/muse-probe-policy-campaign.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: muse-probe-policy-campaign-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: exact-head-campaign-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'exact_head=%s\n' "$actual"
+
+      - name: Verify workspace metadata
+        run: cargo metadata --locked --no-deps --format-version 1 > /tmp/muse-campaign-metadata.json
+
+      - name: Check Muse formatting
+        run: rustfmt --check --edition 2024 crates/domains/symthaea-muse/src/probe_policy_campaign.rs
+
+      - name: Resolve minimal lockfile candidate for qualification
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/muse-campaign-lock
+          cp Cargo.lock /tmp/muse-campaign-lock/Cargo.lock.committed
+          # Full metadata resolution updates only lock entries required by the
+          # current manifests; unlike cargo generate-lockfile it does not refresh
+          # every unrelated dependency to the latest index version.
+          cargo metadata --format-version 1 > /tmp/muse-campaign-lock/workspace-metadata.json
+          cp Cargo.lock /tmp/muse-campaign-lock/Cargo.lock.candidate
+          diff -u /tmp/muse-campaign-lock/Cargo.lock.committed Cargo.lock \
+            > /tmp/muse-campaign-lock/Cargo.lock.diff || true
+          printf 'resolution=success\n' > /tmp/muse-campaign-lock/status.txt
+
+      - name: Run factorial oracle tests
+        run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib factorial_ground_truth::tests
+
+      - name: Run probe-policy comparator tests
+        run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib probe_policy_comparison::tests
+
+      - name: Run multi-family campaign tests
+        run: cargo test --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib probe_policy_campaign::tests
+
+      - name: Run Clippy for Muse library and tests
+        run: cargo clippy --locked --manifest-path crates/domains/symthaea-muse/Cargo.toml --features theory --lib --tests -- -D warnings
+
+      - name: Capture lock candidate and restore committed source
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/muse-campaign-lock
+          if [ -f /tmp/muse-campaign-lock/Cargo.lock.committed ] && [ -f Cargo.lock ]; then
+            cp Cargo.lock /tmp/muse-campaign-lock/Cargo.lock.candidate-final
+            diff -u /tmp/muse-campaign-lock/Cargo.lock.committed Cargo.lock \
+              > /tmp/muse-campaign-lock/Cargo.lock.diff-final || true
+            cp /tmp/muse-campaign-lock/Cargo.lock.committed Cargo.lock
+          fi
+
+      - name: Upload lockfile diagnostic artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: muse-campaign-lockfile-diagnostic
+          path: /tmp/muse-campaign-lock/
+          if-no-files-found: warn
+          retention-days: 7
