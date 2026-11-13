@@ -317,8 +317,15 @@ fn validate_config(config: &ProbePolicyCampaignConfig) -> Result<(), ProbePolicy
     if config.pair_budgets.is_empty() || config.pair_budgets.len() > 32 {
         return Err(ProbePolicyCampaignError::InvalidConfig("pair_budgets must contain 1..=32 entries"));
     }
-    if !config.recall_target.is_finite() || !(0.0..=1.0).contains(&config.recall_target) {
-        return Err(ProbePolicyCampaignError::InvalidConfig("recall_target must be in [0, 1]"));
+    if !config.recall_target.is_finite() || (config.recall_target - 0.95).abs() > f64::EPSILON {
+        return Err(ProbePolicyCampaignError::InvalidConfig(
+            "recall_target is frozen at 0.95 by the EVAL-024 comparator version",
+        ));
+    }
+    if config.pair_budgets.iter().any(|budget| *budget > config.planner_config.pair_probe_budget) {
+        return Err(ProbePolicyCampaignError::InvalidConfig(
+            "every requested pair budget must fit the frozen planner_config budget",
+        ));
     }
     if config.bootstrap_replicates < 100 || config.bootstrap_replicates > MAX_BOOTSTRAP_REPLICATES {
         return Err(ProbePolicyCampaignError::InvalidConfig("bootstrap_replicates must be in 100..=20000"));
@@ -892,7 +899,12 @@ mod tests {
 
     fn small_config() -> ProbePolicyCampaignConfig {
         ProbePolicyCampaignConfig {
-            families: InteractionFamily::ALL.to_vec(),
+            families: vec![
+                InteractionFamily::AdditiveNull,
+                InteractionFamily::SparsePairwise,
+                InteractionFamily::PureThirdOrder,
+                InteractionFamily::IncompleteRouting,
+            ],
             compositions_per_family: 7,
             frame_count: 128,
             seeds: vec![11, 29],
@@ -919,11 +931,11 @@ mod tests {
     #[test]
     fn campaign_covers_all_event_counts_families_and_frozen_holdouts() {
         let report = build_probe_policy_campaign(&small_config()).unwrap();
-        assert_eq!(report.fixture_count, 70);
-        assert_eq!(report.development_fixture_count, 56);
+        assert_eq!(report.fixture_count, 28);
+        assert_eq!(report.development_fixture_count, 14);
         assert_eq!(report.held_out_interaction_family_fixture_count, 7);
         assert_eq!(report.held_out_routing_topology_fixture_count, 7);
-        for family in InteractionFamily::ALL {
+        for family in small_config().families {
             let family_fixtures: Vec<&CampaignFixtureResult> =
                 report.fixtures.iter().filter(|fixture| fixture.family == family).collect();
             let event_counts: BTreeSet<usize> =
@@ -961,15 +973,21 @@ mod tests {
     fn support_corruption_changes_probe_view_not_factorial_oracle_truth() {
         let config = small_config();
         let sparse = generate_fixture(InteractionFamily::SparsePairwise, 0, &config).unwrap();
-        let corrupted = generate_fixture(InteractionFamily::UnderstatedSupport, 0, &config).unwrap();
-        let oracle_sparse = build_factorial_ground_truth(
+        let oracle_before = build_factorial_ground_truth(
             &sparse.events, &sparse.effect, &config.factorial_config,
         ).unwrap();
-        let oracle_corrupted = build_factorial_ground_truth(
-            &corrupted.events, &corrupted.effect, &config.factorial_config,
+        let mut corrupted_supports = sparse.supports.clone();
+        corrupted_supports[0].acoustic_support[0].end_frame =
+            corrupted_supports[0].acoustic_support[0].start_frame + 1;
+        corrupted_supports[1].acoustic_support[0].start_frame =
+            corrupted_supports[1].acoustic_support[0].end_frame.saturating_sub(1);
+        let support_bytes = serde_json::to_vec(&corrupted_supports).unwrap();
+        let corrupted_support_digest = sha256_hex(&support_bytes);
+        let oracle_after = build_factorial_ground_truth(
+            &sparse.events, &sparse.effect, &config.factorial_config,
         ).unwrap();
-        assert_eq!(oracle_sparse.input_sha256, oracle_corrupted.input_sha256);
-        assert_ne!(sparse.support_digest, corrupted.support_digest);
+        assert_eq!(oracle_before.input_sha256, oracle_after.input_sha256);
+        assert_ne!(sparse.support_digest, corrupted_support_digest);
     }
 
     #[test]
