@@ -57,6 +57,72 @@
       "required_audit_contract_id": "marine-biofouling-evidence-audit-v0.1",
       "requirement_reference": "permit:zero-uncontained-organism-release",
       "non_compensable": true
+    },
+    {
+      "gate_id": "cleaning-waste-authorization",
+      "gate_class": "biosecurity",
+      "evaluation": "external_audit_receipt",
+      "metric_id": null,
+      "threshold": null,
+      "unit": null,
+      "required_audit_contract_id": "marine-biofouling-evidence-audit-v0.1",
+      "requirement_reference": "permit:in-water-cleaning-authorized-and-waste-captured",
+      "non_compensable": true
+    },
+    {
+      "gate_id": "acoustic-scale-transfer-evidence",
+      "gate_class": "underwater_noise_evidence",
+      "evaluation": "external_audit_receipt",
+      "metric_id": null,
+      "threshold": null,
+      "unit": null,
+      "required_audit_contract_id": "marine-acoustic-scale-transfer-audit-v0.1.0",
+      "requirement_reference": "measurement:scale-transfer-reviewed-on-held-out-full-scale-data",
+      "non_compensable": true
+    },
+    {
+      "gate_id": "acoustic-source-identifiability",
+      "gate_class": "underwater_noise_evidence",
+      "evaluation": "external_audit_receipt",
+      "metric_id": null,
+      "threshold": null,
+      "unit": null,
+      "required_audit_contract_id": "marine-acoustic-source-contrast-audit-v0.1.0",
+      "requirement_reference": "measurement:source-state-contrast-reviewed",
+      "non_compensable": true
+    },
+    {
+      "gate_id": "cavitation-intermittency-characterization",
+      "gate_class": "underwater_noise_evidence",
+      "evaluation": "external_audit_receipt",
+      "metric_id": null,
+      "threshold": null,
+      "unit": null,
+      "required_audit_contract_id": "marine-cavitation-intermittency-audit-v0.1.0",
+      "requirement_reference": "measurement:cavitation-intermittency-distribution-reviewed",
+      "non_compensable": true
+    },
+    {
+      "gate_id": "vibration-coherence-characterization",
+      "gate_class": "underwater_noise_evidence",
+      "evaluation": "external_audit_receipt",
+      "metric_id": null,
+      "threshold": null,
+      "unit": null,
+      "required_audit_contract_id": "marine-vibration-coherence-audit-v0.1.0",
+      "requirement_reference": "measurement:vibration-coherent-pressure-component-reviewed",
+      "non_compensable": true
+    },
+    {
+      "gate_id": "rotation-synchronous-modulation",
+      "gate_class": "underwater_noise_evidence",
+      "evaluation": "external_audit_receipt",
+      "metric_id": null,
+      "threshold": null,
+      "unit": null,
+      "required_audit_contract_id": "marine-rotation-synchronous-modulation-audit-v0.1.0",
+      "requirement_reference": "measurement:rotation-synchronous-envelope-reviewed",
+      "non_compensable": true
     }
   ],
   "candidates": [
@@ -121,10 +187,52 @@
       "gate_receipts": [
         {
           "gate_id": "biosecurity-release",
-          "status": "satisfied",
+          "status": "unresolved",
           "audit_contract_id": "marine-biofouling-evidence-audit-v0.1",
           "audit_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "requirement_reference": "permit:zero-uncontained-organism-release"
+        },
+        {
+          "gate_id": "cleaning-waste-authorization",
+          "status": "unresolved",
+          "audit_contract_id": "marine-biofouling-evidence-audit-v0.1",
+          "audit_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
+          "requirement_reference": "permit:in-water-cleaning-authorized-and-waste-captured"
+        },
+        {
+          "gate_id": "acoustic-scale-transfer-evidence",
+          "status": "unresolved",
+          "audit_contract_id": "marine-acoustic-scale-transfer-audit-v0.1.0",
+          "audit_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
+          "requirement_reference": "measurement:scale-transfer-reviewed-on-held-out-full-scale-data"
+        },
+        {
+          "gate_id": "acoustic-source-identifiability",
+          "status": "unresolved",
+          "audit_contract_id": "marine-acoustic-source-contrast-audit-v0.1.0",
+          "audit_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
+          "requirement_reference": "measurement:source-state-contrast-reviewed"
+        },
+        {
+          "gate_id": "cavitation-intermittency-characterization",
+          "status": "unresolved",
+          "audit_contract_id": "marine-cavitation-intermittency-audit-v0.1.0",
+          "audit_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
+          "requirement_reference": "measurement:cavitation-intermittency-distribution-reviewed"
+        },
+        {
+          "gate_id": "vibration-coherence-characterization",
+          "status": "unresolved",
+          "audit_contract_id": "marine-vibration-coherence-audit-v0.1.0",
+          "audit_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
+          "requirement_reference": "measurement:vibration-coherent-pressure-component-reviewed"
+        },
+        {
+          "gate_id": "rotation-synchronous-modulation",
+          "status": "unresolved",
+          "audit_contract_id": "marine-rotation-synchronous-modulation-audit-v0.1.0",
+          "audit_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
+          "requirement_reference": "measurement:rotation-synchronous-envelope-reviewed"
         }
       ]
     },
@@ -189,10 +297,52 @@
       "gate_receipts": [
         {
           "gate_id": "biosecurity-release",
-          "status": "satisfied",
+          "status": "unresolved",
           "audit_contract_id": "marine-biofouling-evidence-audit-v0.1",
           "audit_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "requirement_reference": "permit:zero-uncontained-organism-release"
+        },
+        {
+          "gate_id": "cleaning-waste-authorization",
+          "status": "unresolved",
+          "audit_contract_id": "marine-biofouling-evidence-audit-v0.1",
+          "audit_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000009",
+          "requirement_reference": "permit:in-water-cleaning-authorized-and-waste-captured"
+        },
+        {
+          "gate_id": "acoustic-scale-transfer-evidence",
+          "status": "unresolved",
+          "audit_contract_id": "marine-acoustic-scale-transfer-audit-v0.1.0",
+          "audit_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
+          "requirement_reference": "measurement:scale-transfer-reviewed-on-held-out-full-scale-data"
+        },
+        {
+          "gate_id": "acoustic-source-identifiability",
+          "status": "unresolved",
+          "audit_contract_id": "marine-acoustic-source-contrast-audit-v0.1.0",
+          "audit_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000000b",
+          "requirement_reference": "measurement:source-state-contrast-reviewed"
+        },
+        {
+          "gate_id": "cavitation-intermittency-characterization",
+          "status": "unresolved",
+          "audit_contract_id": "marine-cavitation-intermittency-audit-v0.1.0",
+          "audit_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000000c",
+          "requirement_reference": "measurement:cavitation-intermittency-distribution-reviewed"
+        },
+        {
+          "gate_id": "vibration-coherence-characterization",
+          "status": "unresolved",
+          "audit_contract_id": "marine-vibration-coherence-audit-v0.1.0",
+          "audit_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000000d",
+          "requirement_reference": "measurement:vibration-coherent-pressure-component-reviewed"
+        },
+        {
+          "gate_id": "rotation-synchronous-modulation",
+          "status": "unresolved",
+          "audit_contract_id": "marine-rotation-synchronous-modulation-audit-v0.1.0",
+          "audit_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000000e",
+          "requirement_reference": "measurement:rotation-synchronous-envelope-reviewed"
         }
       ]
     }
