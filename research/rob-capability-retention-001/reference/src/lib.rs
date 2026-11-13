@@ -1274,6 +1274,16 @@ mod tests {
         ]
     }
 
+    fn topology() -> RecoveryTopologyReceipt {
+        RecoveryTopologyReceipt {
+            disposition: EvidenceDisposition::Qualified,
+            report_digest: Some("recovery-topology-report-sha256".into()),
+            recovery_route_class_count: Some(3),
+            failure_domain_independent_route_count: Some(2),
+            minimum_failure_domain_cut_set_cardinality: Some(1),
+        }
+    }
+
     fn option_set(terminal_digest: &str, count: u32) -> OptionSetReceipt {
         OptionSetReceipt {
             disposition: EvidenceDisposition::Qualified,
@@ -1283,6 +1293,7 @@ mod tests {
             starting_option_set_digest: "starting-options".into(),
             terminal_option_set_digest: terminal_digest.into(),
             terminal_qualified_option_count: count,
+            recovery_topology: topology(),
         }
     }
 
