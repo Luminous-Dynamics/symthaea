@@ -20,7 +20,9 @@ func fixture() (GroundTruth, ObservationLog) {
 func TestCleanObserverAccepted(t *testing.T) {
 	gt, log := fixture()
 	report, err := Compare(gt, log)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !report.Accepted || report.MatchedEvents != 4 || !report.ObservationComplete {
 		t.Fatalf("clean observer rejected: %+v", report)
 	}
@@ -30,7 +32,9 @@ func TestDroppedEventDetected(t *testing.T) {
 	gt, log := fixture()
 	log.Observations = append(log.Observations[:2], log.Observations[3:]...)
 	report, err := Compare(gt, log)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if report.Accepted || report.MissingEvents != 1 || report.MissingEventIDs[0] != "evt-effect" {
 		t.Fatalf("dropped event not detected: %+v", report)
 	}
@@ -41,7 +45,9 @@ func TestFabricatedEventDetected(t *testing.T) {
 	fake := Event{EventID: "evt-fake", SourceSequence: 5, Kind: "external-effect", Principal: "service:payments", Target: "payment:99", PayloadSHA256: PayloadDigest([]byte("fabricated")), Outcome: "success"}
 	log.Observations = append(log.Observations, Observation{DeliverySequence: 5, Event: fake})
 	report, err := Compare(gt, log)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if report.Accepted || report.ExtraEvents != 1 || report.ExtraEventIDs[0] != "evt-fake" {
 		t.Fatalf("fabricated event not detected: %+v", report)
 	}
@@ -51,7 +57,9 @@ func TestDuplicateReplayDetected(t *testing.T) {
 	gt, log := fixture()
 	log.Observations = append(log.Observations, Observation{DeliverySequence: 5, Event: gt.Events[2]})
 	report, err := Compare(gt, log)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if report.Accepted || report.DuplicateEvents != 1 || report.DuplicateEventIDs[0] != "evt-effect" {
 		t.Fatalf("duplicate replay not detected: %+v", report)
 	}
@@ -62,7 +70,9 @@ func TestPrincipalAndPayloadSubstitutionDetected(t *testing.T) {
 	log.Observations[2].Event.Principal = "service:attacker"
 	log.Observations[2].Event.PayloadSHA256 = PayloadDigest([]byte("different-payment"))
 	report, err := Compare(gt, log)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if report.Accepted || report.IdentityMismatches != 1 || report.PayloadMismatches != 1 {
 		t.Fatalf("principal/payload substitution not detected: %+v", report)
 	}
@@ -72,7 +82,9 @@ func TestCausalParentSubstitutionDetected(t *testing.T) {
 	gt, log := fixture()
 	log.Observations[2].Event.ParentEventIDs = []string{"evt-dispatch"}
 	report, err := Compare(gt, log)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if report.Accepted || report.ParentMismatches != 1 || report.CausalGraphValid {
 		t.Fatalf("causal parent substitution not detected: %+v", report)
 	}
@@ -85,7 +97,9 @@ func TestDeliveryReorderingDoesNotRewriteCausality(t *testing.T) {
 	log.Observations[2].DeliverySequence = 4
 	log.Observations[3].DeliverySequence = 2
 	report, err := Compare(gt, log)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !report.Accepted || report.DeliveryReorders == 0 || report.SequenceMismatches != 0 {
 		t.Fatalf("transport reorder should be recorded without falsifying source causality: %+v", report)
 	}
@@ -95,7 +109,9 @@ func TestSourceSequenceSubstitutionRejected(t *testing.T) {
 	gt, log := fixture()
 	log.Observations[2].Event.SourceSequence = 1
 	report, err := Compare(gt, log)
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if report.Accepted || report.SequenceMismatches != 1 || report.CausalGraphValid {
 		t.Fatalf("source sequence substitution not detected: %+v", report)
 	}
@@ -104,8 +120,12 @@ func TestSourceSequenceSubstitutionRejected(t *testing.T) {
 func TestGroundTruthRejectsCycleAndUnknownParent(t *testing.T) {
 	gt, _ := fixture()
 	gt.Events[0].ParentEventIDs = []string{"evt-reconcile"}
-	if err := ValidateGroundTruth(gt); err == nil { t.Fatal("causal cycle/noncausal parent accepted") }
+	if err := ValidateGroundTruth(gt); err == nil {
+		t.Fatal("causal cycle/noncausal parent accepted")
+	}
 	gt, _ = fixture()
 	gt.Events[1].ParentEventIDs = []string{"not-present"}
-	if err := ValidateGroundTruth(gt); err == nil { t.Fatal("unknown parent accepted") }
+	if err := ValidateGroundTruth(gt); err == nil {
+		t.Fatal("unknown parent accepted")
+	}
 }
