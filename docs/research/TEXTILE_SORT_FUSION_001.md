@@ -215,13 +215,15 @@ A separate synthetic fixture corpus is provided at:
 
 The JSON corpus is consumed by the Rust test suite. Each synthetic case ID maps to an executable regression case; the test checks unique IDs, corpus/schema identity, expected disposition and expected reason. This proves only the fixture-to-contract regression mapping, not performance on the real NIST or TexSortML datasets.
 
-The recovery-route contract has a separate 27-case synthetic corpus:
+The recovery-route contract has a separate 30-case synthetic corpus:
 - `docs/research/fixtures/textile_sort_fusion_v0_1/recovery_cases.schema.json`
 - `docs/research/fixtures/textile_sort_fusion_v0_1/recovery_cases.example.json`
 
 The recovery corpus is also consumed by Rust tests. It covers six route families and adversarial states including model-only composition, unresolved fibre fraction, missing/short fibre-length output, chemical compatibility fail/unknown, downstream reject/conditional, self-issued acceptance, malformed digest, duplicate evidence ID and mass-input mismatch. Its expected outcomes are bound to the route tests. No real specimen or processor acceptance is asserted.
 
 The design-for-recovery module adds a separate 13-case synthetic topology corpus, also consumed by Rust tests. It covers complete modular topology, duplicate/dangling identities, missing tools/instructions, permanent target joints, unknown construction, circular dependencies, and the distinction between recovery-target joints and permanent seams outside the declared recovery path.
+
+When a physical route trial explicitly claims to test a declared design revision, its record can carry product ID, design revision, exact dossier SHA-256, physical specimen ID and physical conformity evidence. The specimen ID must match the process trial's physical sample ID. Legacy items without a design dossier can still be assessed from their physical trial evidence; no static dossier is required for every historical garment. This prevents a dossier for one revision or sample from being attached to a different physical trial.
 
 ## 6. Benchmark programme to exceed SOTA
 
