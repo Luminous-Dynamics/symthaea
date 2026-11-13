@@ -120,7 +120,7 @@
       "expected_total_demand": 4500,
       "expected_available_capacity": 4500,
       "expected_shortfall": 0,
-      "expected_outcome": "meets_floor",
+      "expected_outcome": "capacity_sufficient",
       "evidence_class": "synthetic",
       "result_scope": "synthetic_contract_only",
       "source_ref_ids": [
