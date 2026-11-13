@@ -816,37 +816,6 @@ fn compatible_unit(axis: PropertyAxis, metric: ToleranceMetric, unit: Option<&st
         PropertyAxis::Other => unit == "normalized-feature-distance",
     }
 }
-    let Some(unit) = unit else {
-        return false;
-    };
-    match axis {
-        PropertyAxis::Pitch => matches!(unit, "semitones" | "MIDI-note"),
-        PropertyAxis::Onset | PropertyAxis::Duration => {
-            matches!(unit, "microseconds" | "milliseconds")
-        }
-        PropertyAxis::NoteCount => unit == "events",
-        PropertyAxis::Velocity => unit == "MIDI-velocity",
-        PropertyAxis::Timbre | PropertyAxis::SpectralEnvelope => {
-            unit == "normalized-feature-distance"
-        }
-        PropertyAxis::StereoImage => unit == "normalized-stereo-position",
-        PropertyAxis::Dynamics => {
-            matches!(unit, "normalized-feature-distance" | "decibels" | "MIDI-velocity")
-        }
-        PropertyAxis::AccompanimentDensity => matches!(unit, "events-per-beat" | "relative"),
-        PropertyAxis::Harmony | PropertyAxis::Rhythm | PropertyAxis::Structure => {
-            matches!(unit, "categorical" | "normalized-feature-distance")
-        }
-        PropertyAxis::Instrumentation | PropertyAxis::SourceAttribution => {
-            matches!(unit, "categorical" | "normalized-feature-distance")
-        }
-        PropertyAxis::Transients => {
-            matches!(unit, "microseconds" | "milliseconds" | "normalized-feature-distance")
-        }
-        PropertyAxis::Other => unit == "normalized-feature-distance",
-    }
-}
-
 fn valid_contract_id(id: &str) -> bool {
     id.starts_with("MEL-MR-EVAL-005-")
         && id.len() >= 20
