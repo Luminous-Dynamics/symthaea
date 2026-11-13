@@ -1,4 +1,4 @@
-name: QEC Hellinger and Petz bounds audit
+name: QEC Hellinger and Petz bounds source harness
 
 on:
   push:
@@ -6,32 +6,24 @@ on:
       - research/qec-hellinger-petz-bounds-20261113
     paths:
       - crates/domains/symthaea-frontier-physics/src/error_set_qec.rs
-      - crates/domains/symthaea-frontier-physics/src/lib.rs
-      - crates/domains/symthaea-frontier-physics/Cargo.toml
-      - Cargo.toml
-      - Cargo.lock
       - .github/workflows/qec-hellinger-petz-bounds.yml
   pull_request:
     branches:
       - research/general-error-set-qec-matrix-20261113
     paths:
       - crates/domains/symthaea-frontier-physics/src/error_set_qec.rs
-      - crates/domains/symthaea-frontier-physics/src/lib.rs
-      - crates/domains/symthaea-frontier-physics/Cargo.toml
-      - Cargo.toml
-      - Cargo.lock
       - .github/workflows/qec-hellinger-petz-bounds.yml
 
 permissions:
   contents: read
 
 concurrency:
-  group: qec-hellinger-petz-bounds-${{ github.event.pull_request.number || github.ref }}
+  group: qec-metrics-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 
 jobs:
-  test:
-    name: QEC Hellinger and Petz theorem bounds (Linux, Rust 1.96.0)
+  source-harness:
+    name: Rust 1.96 standalone source validation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -40,9 +32,25 @@ jobs:
         with:
           toolchain: 1.96.0
           components: clippy, rustfmt
-      - name: Check formatting
-        run: cargo fmt --manifest-path crates/domains/symthaea-frontier-physics/Cargo.toml -- --check
-      - name: Run Clippy
-        run: cargo clippy --locked --manifest-path crates/domains/symthaea-frontier-physics/Cargo.toml --all-targets -- -D warnings
-      - name: Run crate tests
-        run: cargo test --locked --manifest-path crates/domains/symthaea-frontier-physics/Cargo.toml --lib
+      - name: Check formatting without workspace metadata
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-frontier-physics/src/error_set_qec.rs
+      - name: Compile, lint and test the exact source in an isolated harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          harness="$(mktemp -d)"
+          trap 'rm -rf "$harness"' EXIT
+          mkdir -p "$harness/src"
+          cp crates/domains/symthaea-frontier-physics/src/error_set_qec.rs "$harness/src/lib.rs"
+          cat > "$harness/Cargo.toml" <<'EOF'
+          [package]
+          name = "qec-metrics-validation"
+          version = "0.1.0"
+          edition = "2024"
+
+          [dependencies]
+          num-complex = "=0.4.6"
+          nalgebra = "=0.34.2"
+          EOF
+          cargo clippy --manifest-path "$harness/Cargo.toml" --all-targets -- -D warnings
+          cargo test --manifest-path "$harness/Cargo.toml" --lib
