@@ -104,6 +104,21 @@ The new scheduler composes the local gate, exact charge-aware contraction, and e
 
 This is a layer executor, not yet a complete TEBD time-stepper: second-order even/odd/even or odd/even/odd Trotter composition, Hamiltonian-to-gate exponentiation, adaptive time stepping, and a global canonical-gauge error certificate remain future increments.
 
+
+## Mixed-canonical gauge qualification
+
+The canonical-gauge branch adds charge-block left and right sweeps and a measured receipt for a two-site center:
+
+- \`ComplexU1Mps::canonicalize_for_bond(bond, tolerance)\` makes sites left of the center pair left-isometric and sites right of it right-isometric.
+- Each sweep factors only charge-compatible matrix blocks; no positive singular-value cutoff or bond cap is applied.
+- \`ComplexU1Mps::inner_product\` computes the overlap between two MPS representations with different virtual bond dimensions, without dense expansion.
+- The candidate gauge is built transactionally. If factorization, validation or overlap checks fail, the original MPS is unchanged.
+- The receipt includes each exterior site's Gram-isometry residual, the maximum residuals, conservative exterior operator-norm upper bounds, factorization residuals, a state-reconstruction L2 residual computed from the cross-MPS overlap, norm drift, charge residual and a qualification bit.
+
+For a site's left-isometry matrix \(A\), the receipt measures \(\|A^\dagger A-I\|_F=r\), which implies \(\|A\|_2\le\sqrt{1+r}\). The corresponding right-isometry bound is obtained from \(\|AA^\dagger-I\|_F\). Products of these per-site bounds provide a conservative upper bound for the exterior block maps. The local discarded Schmidt norm can then be multiplied by the left/right exterior operator-norm product to obtain a global projection-error contribution, provided the gate is unitary and the gauge receipt passes. Canonicalization's own state-reconstruction residual must also be included in the ledger.
+
+This receipt is an independent check of the canonical form, not a declaration that an arbitrary MPS was already canonical. The next integration step is to make TEBD call this method immediately before each local truncation and promote the global error flag only when every receipt and contribution passes.
+
 ## Explicit limitations
 
 This increment does **not** yet implement:
