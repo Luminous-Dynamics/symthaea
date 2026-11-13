@@ -438,6 +438,7 @@ fn validate_case(case: &Case) -> Vec<String> {
     let mut coherence_case_ids = BTreeSet::new();
     let mut coherence_report_digests = BTreeSet::new();
     let mut shared_timebase_ids = BTreeSet::new();
+    let mut expected_band_signature: Option<BTreeMap<String, f64>> = None;
     let mut vibration_instruments = BTreeSet::new();
     let mut vibration_channels = BTreeSet::new();
     let mut matched_window_keys = BTreeSet::new();
@@ -466,8 +467,10 @@ fn validate_case(case: &Case) -> Vec<String> {
         if report.evidence_kind != "measured" {
             errors.push(format!("coherence report {} is not measured evidence", report.case_id));
         }
-        if report.disposition != COHERENCE_ESTIMATE_ONLY && report.disposition != MAGNITUDE_ONLY {
-            errors.push(format!("coherence report {} disposition {} does not permit magnitude-coherence conditioning", report.case_id, report.disposition));
+        if report.disposition == "UNCERTAINTY_UNRESOLVED" {
+            errors.push(format!("INCOMPLETE: coherence report {} has unresolved coherent/residual uncertainty", report.case_id));
+        } else if report.disposition != COHERENCE_ESTIMATE_ONLY && report.disposition != MAGNITUDE_ONLY {
+            errors.push(format!("INCOMPLETE: coherence report {} disposition {} does not permit magnitude-coherence conditioning", report.case_id, report.disposition));
         }
         for (name, digest) in [
             ("coherence report operating-point receipt", &report.operating_point_receipt_sha256),
@@ -498,11 +501,14 @@ fn validate_case(case: &Case) -> Vec<String> {
             || report.timebase_binding_receipt_sha256 != run.timebase_receipt_sha256
             || report.pressure_instrument_id != run.hydrophone_instrument_id
             || report.pressure_calibration_certificate_sha256 != run.calibration_certificate_sha256
-            || report.pressure_raw_trace_sha256 != window.acoustic_trace_sha256
+        {
+            errors.push(format!("INCOMPARABLE: coherence report {} differs in operating condition, service/environment, instrument calibration or shared timebase binding", report.case_id));
+        }
+        if report.pressure_raw_trace_sha256 != window.acoustic_trace_sha256
             || (report.pressure_window_start_s - window.start_time_s).abs() > WINDOW_TIME_TOLERANCE_S
             || (report.pressure_window_end_s - window.end_time_s).abs() > WINDOW_TIME_TOLERANCE_S
         {
-            errors.push(format!("coherence report {} does not match the exact intermittency window/service/instrument/timebase/trace receipt", report.case_id));
+            errors.push(format!("coherence report {} pressure raw-trace digest or exact window bounds do not match the intermittency receipt", report.case_id));
         }
         if !finite_positive(report.sample_rate_hz)
             || report.sample_count < 2
@@ -519,6 +525,23 @@ fn validate_case(case: &Case) -> Vec<String> {
         if report.band_reports.is_empty() {
             errors.push(format!("coherence report {} has no band reports", report.case_id));
         }
+        let signature: BTreeMap<String, f64> = report.band_reports.iter()
+            .map(|band| (band.band_id.clone(), band.frequency_hz))
+            .collect();
+        if signature.len() != report.band_reports.len() {
+            errors.push(format!("coherence report {} repeats a band identity", report.case_id));
+        }
+        if let Some(expected) = &expected_band_signature {
+            if expected.len() != signature.len()
+                || expected.iter().any(|(id, frequency)| {
+                    signature.get(id).is_none_or(|other| (other - frequency).abs() > FREQUENCY_TOLERANCE_HZ)
+                })
+            {
+                errors.push(format!("INCOMPARABLE: coherence report {} uses a different frequency-bin identity/grid", report.case_id));
+            }
+        } else {
+            expected_band_signature = Some(signature);
+        }
         let mut band_ids = BTreeSet::new();
         for band in &report.band_reports {
             if !band_ids.insert(band.band_id.clone()) {
@@ -526,7 +549,16 @@ fn validate_case(case: &Case) -> Vec<String> {
             }
             errors.extend(validate_coherence_band(band, &report.case_id));
             if band.uncertainty_status != UNCERTAINTY_AVAILABLE {
-                errors.push(format!("coherence report {} band {} has unresolved coherent/residual uncertainty", report.case_id, band.band_id));
+                errors.push(format!("INCOMPLETE: coherence report {} band {} has unresolved coherent/residual uncertainty", report.case_id, band.band_id));
+            }
+            if band.coherence_lower_bound.is_none()
+                || band.coherence_upper_bound.is_none()
+                || band.vibration_reference_coherent_pressure_psd_lower_bound.is_none()
+                || band.vibration_reference_coherent_pressure_psd_upper_bound.is_none()
+                || band.non_coherent_residual_pressure_psd_lower_bound.is_none()
+                || band.non_coherent_residual_pressure_psd_upper_bound.is_none()
+            {
+                errors.push(format!("INCOMPLETE: coherence report {} band {} lacks required per-window marginal uncertainty bounds", report.case_id, band.band_id));
             }
         }
     }
@@ -765,9 +797,14 @@ fn audit(case: &Case) -> AuditReport {
         reasons.push("unresolved or missing cavitation annotations remain unconditioned and prevent a complete two-cohort comparison".to_string());
     }
 
-    let disposition = if !validation_errors.is_empty() {
+    let has_incomparable = reasons.iter().any(|reason| reason.starts_with("INCOMPARABLE:"));
+    let has_incomplete_evidence = reasons.iter().any(|reason| reason.starts_with("INCOMPLETE:"));
+    let disposition = if reasons.iter().any(|reason| !reason.starts_with("INCOMPARABLE:") && !reason.starts_with("INCOMPLETE:")) {
         "INVALID"
-    } else if case.evidence_kind == EvidenceKind::Synthetic
+    } else if has_incomparable {
+        "INCOMPARABLE"
+    } else if has_incomplete_evidence
+        || case.evidence_kind == EvidenceKind::Synthetic
         || case.source.rights_status != RightsStatus::PublicOrPermitted
         || !case.source.independently_reviewed
         || reasons.iter().any(|reason| reason.contains("too few independent runs") || reason.contains("too few cavitation-") || reason.contains("unresolved or missing"))
