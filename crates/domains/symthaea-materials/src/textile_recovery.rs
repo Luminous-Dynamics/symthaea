@@ -877,6 +877,8 @@ fn assessment(
                 | RouteReason::FibreLengthBelowPolicy
                 | RouteReason::InvalidInventoryEvidence
                 | RouteReason::InvalidProcessTrialEvidence
+                | RouteReason::InvalidPhysicalTrialIdentity
+                | RouteReason::InvalidDesignRevisionBinding
                 | RouteReason::InvalidCompositionEvidence
                 | RouteReason::InvalidFibreLengthDistribution
                 | RouteReason::InvalidChemicalCompatibilityEvidence
