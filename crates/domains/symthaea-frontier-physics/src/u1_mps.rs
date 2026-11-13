@@ -2519,7 +2519,6 @@ mod tests {
         let mut norm_squared = 0.0;
         for first_physical in 0..2 {
             for second_physical in 0..2 {
-                let pair = first_physical * 2 + second_physical;
                 let mut amplitude = Complex64::new(0.0, 0.0);
                 for middle in 0..result.left_tensor.right_dimension() {
                     amplitude += result.left_tensor.get(0, first_physical, middle)
