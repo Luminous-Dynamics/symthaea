@@ -1,0 +1,78 @@
+{
+  "schema_version": "0.1.0",
+  "case_id": "synthetic-coherent-noise-known-answer-001",
+  "evidence_kind": "synthetic",
+  "source": {
+    "dataset_id": "synthetic-vibration-hydrophone-cross-spectrum",
+    "citation": "Synthetic analytic cross-spectral known-answer fixture; not measured data",
+    "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "rights_status": "unknown",
+    "independently_reviewed": false
+  },
+  "cross_spectral_convention": "reference_times_conjugate_hydrophone",
+  "reference_channel": {
+    "instrument_id": "shaft-accelerometer-1",
+    "signal_kind": "shaft_acceleration",
+    "unit": "m/s^2",
+    "location_id": "stern-shaft-accelerometer-1",
+    "orientation": "longitudinal_axis",
+    "calibration_certificate_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "raw_trace_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "sample_rate_hz": 48000,
+    "total_sample_count": 48000,
+    "segment_length_samples": 4096,
+    "fft_length_samples": 4096,
+    "overlap_fraction": 0.5,
+    "window_function": "hann",
+    "average_count": 16
+  },
+  "hydrophone_channel": {
+    "instrument_id": "hydrophone-1",
+    "signal_kind": "hydrophone_pressure",
+    "unit": "uPa",
+    "location_id": "stern-hydrophone-1",
+    "orientation": "longitudinal_axis",
+    "calibration_certificate_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+    "raw_trace_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "sample_rate_hz": 48000,
+    "total_sample_count": 48000,
+    "segment_length_samples": 4096,
+    "fft_length_samples": 4096,
+    "overlap_fraction": 0.5,
+    "window_function": "hann",
+    "average_count": 16
+  },
+  "acquisition": {
+    "timebase_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+    "alignment_receipt_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+    "alignment_offset_s": 0.0001,
+    "alignment_expanded_uncertainty_s": 0.0001,
+    "maximum_alignment_uncertainty_s": 0.001,
+    "operating_condition_id": "synthetic-J0.8-sigma-nD1"
+  },
+  "operating_point_receipt_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+  "service_fingerprint_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+  "environment_fingerprint_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+  "minimum_average_count": 8,
+  "minimum_coherence": 0.8,
+  "bins": [
+    {
+      "bin_id": "fft-bin-9",
+      "fft_bin_index": 9,
+      "center_frequency_hz": 105.46875,
+      "reference_auto_psd": 4,
+      "hydrophone_auto_psd_upa2_per_hz": 19,
+      "cross_spectral_real": 8,
+      "cross_spectral_imag": 0
+    },
+    {
+      "bin_id": "fft-bin-17",
+      "fft_bin_index": 17,
+      "center_frequency_hz": 199.21875,
+      "reference_auto_psd": 4,
+      "hydrophone_auto_psd_upa2_per_hz": 10,
+      "cross_spectral_real": 0,
+      "cross_spectral_imag": 0.1
+    }
+  ]
+}
