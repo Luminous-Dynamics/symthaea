@@ -86,8 +86,9 @@ pub enum CorpusQualificationStageV1 {
     MetadataRecorded,
     SampleDigestsDeclared,
     SplitQualified,
-    ProtocolFrozen,
     ByteVerified,
+    ProtocolFrozen,
+    ProtocolAndBytesVerified,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -255,6 +256,7 @@ pub struct CorpusQualificationReportV1 {
     pub registration_sha256: String,
     pub sample_manifest_sha256: Option<String>,
     pub protocol_sha256: Option<String>,
+    pub byte_verification_receipt_sha256: Option<String>,
     pub sample_count: usize,
     pub fold_count: usize,
     pub composer_group_count: usize,
@@ -274,6 +276,7 @@ struct QualificationReportCommitmentV1<'a> {
     registration_sha256: &'a str,
     sample_manifest_sha256: &'a Option<String>,
     protocol_sha256: &'a Option<String>,
+    byte_verification_receipt_sha256: &'a Option<String>,
     sample_count: usize,
     fold_count: usize,
     composer_group_count: usize,
@@ -624,6 +627,7 @@ pub fn qualify_corpus_track(
         registration_sha256,
         sample_manifest_sha256,
         protocol_sha256,
+        byte_verification_receipt_sha256: None,
         sample_count: manifest.map_or(0, |value| value.samples.len()),
         fold_count: manifest.map_or(0, |value| value.samples.iter().map(|sample| sample.fold_id.as_str()).collect::<BTreeSet<_>>().len()),
         composer_group_count: manifest.map_or(0, |value| value.samples.iter().filter_map(|sample| sample.composer_group_id.as_deref()).collect::<BTreeSet<_>>().len()),
@@ -648,6 +652,7 @@ pub fn qualification_report_commitment(
         registration_sha256: &report.registration_sha256,
         sample_manifest_sha256: &report.sample_manifest_sha256,
         protocol_sha256: &report.protocol_sha256,
+        byte_verification_receipt_sha256: &report.byte_verification_receipt_sha256,
         sample_count: report.sample_count,
         fold_count: report.fold_count,
         composer_group_count: report.composer_group_count,
@@ -794,29 +799,63 @@ pub fn validate_corpus_byte_verification_receipt(
     }) && seen.len() == manifest.samples.len()
 }
 
-pub fn qualify_corpus_track_with_byte_verification(
+/// Qualify a track while hashing the actual artifact bytes supplied by the
+/// caller. It returns both the report and a replayable receipt. A caller should
+/// resolve each declared relative path under a controlled corpus root and feed
+/// one input/reference pair at a time; this API never loads the whole corpus.
+pub fn qualify_corpus_track_with_artifact_bytes<'a, I>(
     registration: &CorpusRegistrationV1,
-    manifest: Option<&CorpusSampleManifestV1>,
+    manifest: &CorpusSampleManifestV1,
     protocol: Option<&CorpusProtocolFingerprintV1>,
-    receipt: Option<&CorpusByteVerificationReceiptV1>,
-) -> CorpusQualificationReportV1 {
-    let mut report = qualify_corpus_track(registration, manifest, protocol);
-    if let (Some(manifest), Some(receipt)) = (manifest, receipt) {
-        if validate_corpus_byte_verification_receipt(manifest, receipt)
-            && report.stage == CorpusQualificationStageV1::ProtocolFrozen
-        {
-            report.stage = CorpusQualificationStageV1::ByteVerified;
-            report.next_stage_requirements.retain(|item| !item.contains("byte verifier"));
-        } else {
-            report.issues.push(CorpusQualificationIssueV1::InvalidByteVerificationReceipt);
-            report.next_stage_requirements.push(
-                "Regenerate the byte-verification receipt from the exact manifest artifacts after protocol freeze".into()
-            );
-        }
+    artifacts: I,
+    verifier_build_sha256: &str,
+) -> Result<
+    (CorpusQualificationReportV1, CorpusByteVerificationReceiptV1),
+    Vec<CorpusQualificationIssueV1>,
+>
+where
+    I: IntoIterator<Item = CorpusArtifactBytesV1<'a>>,
+{
+    let mut report = qualify_corpus_track(registration, Some(manifest), protocol);
+    if !report.issues.is_empty()
+        || !matches!(
+            report.stage,
+            CorpusQualificationStageV1::SplitQualified
+                | CorpusQualificationStageV1::ProtocolFrozen
+        )
+    {
+        return Err(report.issues);
     }
+    let receipt = verify_corpus_artifact_bytes(manifest, artifacts, verifier_build_sha256)?;
+    report.byte_verification_receipt_sha256 = Some(receipt.receipt_sha256.clone());
+    report.stage = if report.stage == CorpusQualificationStageV1::ProtocolFrozen {
+        CorpusQualificationStageV1::ProtocolAndBytesVerified
+    } else {
+        CorpusQualificationStageV1::ByteVerified
+    };
+    report.next_stage_requirements.retain(|item| !item.contains("byte verifier"));
+    report.next_stage_requirements.push(
+        "Obtain independent annotation adjudication and any required legal review before public qualification".into()
+    );
     report.report_sha256 = qualification_report_commitment(&report).unwrap_or_default();
-    report
+    Ok((report, receipt))
 }
+
+/// Recompute bytes and compare the entire receipt. The manifest-only validator
+/// below checks receipt structure, but this function is the actual replay
+/// oracle: it requires the caller to supply the bytes again.
+pub fn validate_corpus_byte_verification_replay<'a, I>(
+    manifest: &CorpusSampleManifestV1,
+    receipt: &CorpusByteVerificationReceiptV1,
+    artifacts: I,
+) -> bool
+where
+    I: IntoIterator<Item = CorpusArtifactBytesV1<'a>>,
+{
+    verify_corpus_artifact_bytes(manifest, artifacts, &receipt.verifier_build_sha256)
+        .is_ok_and(|replayed| replayed == *receipt)
+}
+
 
 /// Metadata-only candidate registry. No sample bytes, SHA-256 manifests or
 /// frozen conversion/evaluation protocols are embedded here, so these entries
