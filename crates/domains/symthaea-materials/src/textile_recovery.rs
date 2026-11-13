@@ -1787,6 +1787,14 @@ mod tests {
                 receiving_acceptance_must_reference_the_trial_that_produced_the_output();
                 ("ineligible", Some("DownstreamAcceptanceBindingMismatch"))
             }
+            "ROUTE-035-RECEIVER-ISSUER-IS-PROCESS-ISSUER" => {
+                receiving_acceptance_issuer_must_differ_from_process_issuer();
+                ("ineligible", Some("DownstreamAcceptanceNotIndependentOfBasis"))
+            }
+            "ROUTE-036-RECEIVER-VERIFIER-IS-PROCESS-ISSUER" => {
+                receiving_verifier_must_differ_from_process_issuer_too();
+                ("ineligible", Some("DownstreamAcceptanceNotIndependentOfBasis"))
+            }
             other => panic!("unknown textile recovery corpus case: {other}"),
         }
     }
@@ -1808,12 +1816,12 @@ mod tests {
         assert_eq!(corpus["schema_version"], "0.1.0");
         assert_eq!(corpus["corpus_id"], "TEXTILE-ROUTE-CASES-001");
         assert_eq!(corpus["fixture_class"], "synthetic");
-        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(34));
+        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(36));
 
         let cases = corpus["cases"]
             .as_array()
             .expect("recovery cases must be an array");
-        assert_eq!(cases.len(), 34, "review route corpus case count changes");
+        assert_eq!(cases.len(), 36, "review route corpus case count changes");
         let mut seen = BTreeSet::new();
         for case in cases {
             let case_id = case["case_id"]
@@ -1833,7 +1841,7 @@ mod tests {
             assert_eq!(disposition, expected_disposition, "case {case_id} disposition");
             assert_eq!(reason, expected_reason, "case {case_id} reason");
         }
-        assert_eq!(seen.len(), 34);
+        assert_eq!(seen.len(), 36);
     }
 
     #[test]
