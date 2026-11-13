@@ -415,6 +415,17 @@ fn evaluate_scenario(scenario: &Scenario) -> ScenarioResult {
             )),
         }
     }
+    let expected_training_ids: BTreeSet<_> = assignments
+        .iter()
+        .filter(|(_, fold)| fold.as_str() == "TRAIN")
+        .map(|(observation_id, _)| observation_id.clone())
+        .collect();
+    if fit_ids != expected_training_ids {
+        blocked.push(
+            "preprocessing fit lineage does not exactly cover the declared TRAIN population"
+                .to_owned(),
+        );
+    }
 
     let (disposition, reasons) = if !rejected.is_empty() {
         (Disposition::Rejected, rejected)
@@ -594,6 +605,16 @@ mod tests {
             Disposition::Blocked
         );
     }
+
+    #[test]
+    fn partial_preprocessing_fit_population_is_blocked() {
+        let report = audit_fixture_json(FIXTURE).expect("fixture audit");
+        assert_eq!(
+            result_for(&report, "preprocessing-fit-omits-train-row").disposition,
+            Disposition::Blocked
+        );
+    }
+
 
     #[test]
     fn missing_assignment_blocks_scenario() {
