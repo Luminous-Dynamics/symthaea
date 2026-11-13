@@ -39,6 +39,21 @@ Requires Go 1.23+ and uses only the standard library.
 
 The score command exits successfully only when every registered fixture matches its expected three-dimensional result and all paired relations pass. Missing, duplicate, unregistered or mismatched observations reject before scoring.
 
+
+## Deterministic effect-observer laboratory
+
+The observerlab package adds a separate simulator event ledger and observer-stream comparator. Its synthetic trace covers authorization, dispatch, external effect and reconciliation, linked by explicit parent event IDs.
+
+Run the dropped-event demonstration:
+
+    go run ./cmd/mace-observerlab
+
+The command deliberately omits the external-effect event. Its report must identify the missing event and set accepted=false. The test suite additionally injects fabricated events, duplicates/replays, principal and payload substitutions, parent substitutions, source-sequence substitutions and transport reordering.
+
+The comparator distinguishes delivery sequence from source sequence. A reordered transport stream is recorded as a delivery diagnostic but is not rejected solely for arrival order when exact source sequence and parent references remain correct. This prevents a clock/order heuristic from replacing explicit causal evidence.
+
+This remains a simulator laboratory: ground truth is authored by the fixture and is not an independent OS or service oracle. The next step is to replace the fixture's event source with independently instrumented filesystem/process/network/API boundaries while retaining this comparator as a conformance oracle.
+
 ## Corpus contract
 
 Each corpus pins benchmark name, exact version/revision, split and task-set digest. Each fixture has a unique ID, task, family, kind and expected result vector.
