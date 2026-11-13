@@ -1613,8 +1613,7 @@ mod tests {
     #[test]
     fn training_and_calibration_manifests_must_be_distinct() {
         let mut audit = input();
-        audit.scope.calibration_manifest_digest =
-            audit.scope.training_manifest_digest.clone();
+        audit.scope.calibration_manifest_digest = audit.scope.training_manifest_digest.clone();
         assert_eq!(
             audit_transfer_gap(&audit),
             Err(TransferGapError::ReferenceManifestAliasesFitData)
