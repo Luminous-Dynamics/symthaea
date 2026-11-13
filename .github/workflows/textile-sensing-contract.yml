@@ -6,6 +6,7 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-materials/**"
+      - "tools/textile-dataset-intake/**"
       - "docs/research/TEXTILE_SORT_FUSION_001.md"
       - "docs/research/fixtures/textile_sort_fusion_v0_1/**"
       - ".github/workflows/textile-sensing-contract.yml"
@@ -63,7 +64,8 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: textile-sensing-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+            tools/textile-dataset-intake/target
+          key: textile-sensing-${{ runner.os }}-${{ hashFiles('Cargo.lock', 'tools/textile-dataset-intake/Cargo.toml') }}
           restore-keys: |
             textile-sensing-${{ runner.os }}-
 
@@ -73,8 +75,17 @@ jobs:
       - name: Check materials formatting
         run: cargo fmt --package symthaea-materials -- --check
 
-      - name: Run Clippy with warnings denied
+      - name: Run Clippy with warnings denied for materials
         run: cargo clippy -p symthaea-materials --all-targets -- -D warnings
+
+      - name: Test offline textile dataset intake
+        run: cargo test --manifest-path tools/textile-dataset-intake/Cargo.toml -- --nocapture
+
+      - name: Check textile dataset intake formatting
+        run: cargo fmt --manifest-path tools/textile-dataset-intake/Cargo.toml --all -- --check
+
+      - name: Run Clippy with warnings denied for textile intake
+        run: cargo clippy --manifest-path tools/textile-dataset-intake/Cargo.toml --all-targets -- -D warnings
 
       - name: Emit exact-subject qualification receipt
         shell: bash
@@ -95,9 +106,12 @@ jobs:
             "checks": [
               "cargo test -p symthaea-materials -- --nocapture",
               "cargo fmt --package symthaea-materials -- --check",
-              "cargo clippy -p symthaea-materials --all-targets -- -D warnings"
+              "cargo clippy -p symthaea-materials --all-targets -- -D warnings",
+              "cargo test --manifest-path tools/textile-dataset-intake/Cargo.toml -- --nocapture",
+              "cargo fmt --manifest-path tools/textile-dataset-intake/Cargo.toml --all -- --check",
+              "cargo clippy --manifest-path tools/textile-dataset-intake/Cargo.toml --all-targets -- -D warnings"
             ],
-            "claim_ceiling": "synthetic_contract_and_fixture_tests_only"
+            "claim_ceiling": "synthetic_contract_and_local_file_integrity_tests_only"
           }
           EOF
           sha256sum artifacts/textile-sensing/receipt.json \
