@@ -135,8 +135,9 @@ jobs:
           set -euo pipefail
           evidence="$RUNNER_TEMP/mel-music-edit-adapter-evidence"
           mkdir -p "$evidence"
+          harness_dir="$(dirname "$MUSE_MUSIC_EDIT_ADAPTER_MANIFEST")"
           cp "$MUSE_MUSIC_EDIT_ADAPTER_MANIFEST" "$evidence/Cargo.toml"
-          cp "$MUSE_MUSIC_EDIT_ADAPTER_MANIFEST.lock" "$evidence/Cargo.lock"
+          cp "$harness_dir/Cargo.lock" "$evidence/Cargo.lock"
           sha256sum "$evidence/Cargo.toml" "$evidence/Cargo.lock" > "$evidence/cargo-identities.sha256"
           sha256sum crates/domains/symthaea-muse/src/music_edit_benchmark_adapter.rs > "$evidence/adapter-source.sha256"
           sha256sum benchmarks/mel/schemas/music-edit-dataset-manifest-v1.schema.json > "$evidence/dataset-schema.sha256"
