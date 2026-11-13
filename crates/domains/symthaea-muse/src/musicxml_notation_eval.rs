@@ -174,6 +174,69 @@ fn exact_within(
     Ok(difference.compare_exact(tolerance) != Ordering::Greater)
 }
 
+fn gcd_i128(mut left: i128, mut right: i128) -> i128 {
+    while right != 0 {
+        let remainder = left % right;
+        left = right;
+        right = remainder;
+    }
+    left.abs().max(1)
+}
+
+/// Parse an XML decimal to a reduced exact rational; never use f64 for
+/// written-pitch alteration equality. Equivalent lexical forms (0 and 0.0)
+/// denote the same score alteration.
+fn canonical_decimal(value: &str) -> Option<(i128, i128)> {
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+    let (negative, unsigned) = if let Some(rest) = value.strip_prefix('-') {
+        (true, rest)
+    } else if let Some(rest) = value.strip_prefix('+') {
+        (false, rest)
+    } else {
+        (false, value)
+    };
+    let mut pieces = unsigned.split('.');
+    let whole = pieces.next()?;
+    let fraction = pieces.next().unwrap_or("");
+    if pieces.next().is_some()
+        || (whole.is_empty() && fraction.is_empty())
+        || !whole.bytes().all(|byte| byte.is_ascii_digit())
+        || !fraction.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    let scale = 10_i128.checked_pow(u32::try_from(fraction.len()).ok()?)?;
+    let whole_value = if whole.is_empty() { 0 } else { whole.parse::<i128>().ok()? };
+    let fraction_value = if fraction.is_empty() { 0 } else { fraction.parse::<i128>().ok()? };
+    let magnitude = whole_value.checked_mul(scale)?.checked_add(fraction_value)?;
+    let numerator = if negative { -magnitude } else { magnitude };
+    let divisor = gcd_i128(numerator, scale);
+    Some((numerator / divisor, scale / divisor))
+}
+
+fn written_pitch_equal(
+    left: &crate::musicxml_notation_events::MusicXmlWrittenPitchV1,
+    right: &crate::musicxml_notation_events::MusicXmlWrittenPitchV1,
+) -> bool {
+    if left.step != right.step || left.octave != right.octave {
+        return false;
+    }
+    match (&left.alter, &right.alter) {
+        (None, None) => true,
+        (Some(left), Some(right)) => match (
+            canonical_decimal(left),
+            canonical_decimal(right),
+        ) {
+            (Some(left), Some(right)) => left == right,
+            _ => left == right,
+        },
+        _ => false,
+    }
+}
+
 fn accuracy(samples: usize, correct: usize) -> MusicXmlNotationAccuracyV1 {
     MusicXmlNotationAccuracyV1 {
         sample_count: samples,
@@ -191,10 +254,15 @@ fn metric(
         .then_some(true_positives as f64 / prediction_count as f64);
     let recall = (reference_count > 0)
         .then_some(true_positives as f64 / reference_count as f64);
-    let f1 = match (precision, recall) {
-        (Some(p), Some(r)) if p + r > 0.0 => Some(2.0 * p * r / (p + r)),
-        (Some(_), Some(_)) => Some(0.0),
-        _ => None,
+    let f1 = if reference_count == 0 && prediction_count == 0 {
+        None
+    } else if true_positives == 0 {
+        Some(0.0)
+    } else {
+        match (precision, recall) {
+            (Some(p), Some(r)) if p + r > 0.0 => Some(2.0 * p * r / (p + r)),
+            _ => Some(0.0),
+        }
     };
     MusicXmlNotationMetricV1 {
         true_positives,
@@ -603,7 +671,7 @@ fn note_pair_dimensions(
         match (&gold.kind, &predicted.kind) {
             (MusicXmlNotationEventKindV1::Pitched(gold_pitch), MusicXmlNotationEventKindV1::Pitched(predicted_pitch)) => {
                 pitch_samples += 1;
-                if gold_pitch == predicted_pitch {
+                if written_pitch_equal(gold_pitch, predicted_pitch) {
                     pitch_correct += 1;
                 }
             }
@@ -1087,6 +1155,8 @@ mod tests {
             <note><pitch><step>D</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice><staff>1</staff><type>quarter</type></note>
             <note><rest/><duration>16</duration><voice>1</voice><staff>1</staff><type>quarter</type></note>
             <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>16</duration><voice>2</voice><staff>2</staff><type>quarter</type></note>
+            <backup><duration>16</duration></backup>
+            <forward><duration>16</duration><voice>1</voice><staff>1</staff></forward>
             <direction><direction-type><dynamics><f/></dynamics></direction-type><sound tempo="96"/></direction>
             <harmony><root><root-step>G</root-step></root><kind>major</kind></harmony>
             <barline location="right"><repeat direction="backward" times="2"/></barline>
@@ -1110,9 +1180,24 @@ mod tests {
         assert_eq!(report.written_pitch_spelling.accuracy, Some(1.0));
         assert_eq!(report.rest_semantics.accuracy, Some(1.0));
         assert_eq!(report.unpitched_display.accuracy, Some(1.0));
+        assert_eq!(report.duration_presence.accuracy, Some(1.0));
         assert_eq!(report.duration_error.mean_absolute_quarter_beats, Some(0.0));
+        assert_eq!(report.written_type_and_dots.accuracy, Some(1.0));
+        assert_eq!(report.voice_assignment.accuracy, Some(1.0));
+        assert_eq!(report.staff_assignment.accuracy, Some(1.0));
+        assert_eq!(report.instrument_assignment.accuracy, Some(1.0));
+        assert_eq!(report.sound_tie_semantics.accuracy, Some(1.0));
+        assert_eq!(report.visual_tie_semantics.accuracy, Some(1.0));
+        assert_eq!(report.time_modification.accuracy, Some(1.0));
+        assert_eq!(report.tuplet_notation.accuracy, Some(1.0));
+        assert_eq!(report.full_note_source_subtree.accuracy, Some(1.0));
+        assert_eq!(report.note_onset_error.mean_absolute_quarter_beats, Some(0.0));
         assert_eq!(report.auxiliary_event_presence.f1, Some(1.0));
+        assert_eq!(report.auxiliary_source_subtree.accuracy, Some(1.0));
         assert_eq!(report.attribute_event_presence.f1, Some(1.0));
+        assert_eq!(report.attribute_source_subtree.accuracy, Some(1.0));
+        assert_eq!(report.cursor_move_presence.f1, Some(1.0));
+        assert_eq!(report.cursor_move_semantics.accuracy, Some(1.0));
         assert_eq!(report.report_sha256.len(), 64);
     }
 
@@ -1121,7 +1206,7 @@ mod tests {
         let reference = graph(fixture_xml());
         let prediction_xml = fixture_xml().replace(
             "<step>C</step><alter>0</alter><octave>4</octave>",
-            "<step>C</step><alter>0.0</alter><octave>4</octave>",
+            "<step>C</step><alter>1</alter><octave>4</octave>",
         );
         let prediction = graph(&prediction_xml);
         let report = evaluate_musicxml_notation_graphs(
@@ -1161,11 +1246,30 @@ mod tests {
     }
 
     #[test]
+    fn decimal_pitch_alteration_lexemes_compare_by_exact_numeric_value() {
+        let reference = graph(&fixture_xml().replace(
+            "<step>C</step><alter>0</alter><octave>4</octave>",
+            "<step>C</step><alter>0</alter><octave>4</octave>",
+        ));
+        let prediction = graph(&fixture_xml().replace(
+            "<step>C</step><alter>0</alter><octave>4</octave>",
+            "<step>C</step><alter>0.000</alter><octave>4</octave>",
+        ));
+        let report = evaluate_musicxml_notation_graphs(
+            &reference,
+            &prediction,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.written_pitch_spelling.accuracy, Some(1.0));
+    }
+
+    #[test]
     fn sound_tie_visual_tie_and_tuplet_semantics_are_independent_dimensions() {
         let reference = graph(fixture_xml());
         let prediction_xml = fixture_xml().replace(
             r#"<tie type="start"/><notations><tied type="start"/></notations>"#,
-            r#"<tie type="stop"/><notations><tied type="continue"/></notations>"#,
+            r#"<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification><tie type="stop"/><notations><tied type="continue"/><tuplet type="start" number="1"/></notations>"#,
         );
         let prediction = graph(&prediction_xml);
         let report = evaluate_musicxml_notation_graphs(
@@ -1175,8 +1279,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(report.note_event_presence.f1, Some(1.0));
-        assert_eq!(report.sound_tie_semantics.accuracy, Some(0.0));
-        assert_eq!(report.visual_tie_semantics.accuracy, Some(0.0));
+        assert_eq!(report.sound_tie_semantics.accuracy, Some(0.75));
+        assert_eq!(report.visual_tie_semantics.accuracy, Some(0.75));
+        assert_eq!(report.time_modification.accuracy, Some(0.75));
+        assert_eq!(report.tuplet_notation.accuracy, Some(0.75));
     }
 
     #[test]
@@ -1274,6 +1380,28 @@ mod tests {
             evaluate_musicxml_notation_graphs(&reference,&reference,config),
             Err(MusicXmlNotationEvaluationErrorV1::CandidatePairBudgetExceeded { .. })
         ));
+    }
+
+    #[test]
+    fn deleted_event_is_a_false_negative_and_nonempty_empty_side_has_zero_f1() {
+        let reference = graph(fixture_xml());
+        let prediction_xml = fixture_xml().replace(
+            r#"<note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>16</duration><voice>2</voice><staff>2</staff><type>quarter</type></note>"#,
+            r#"<forward><duration>16</duration><voice>2</voice><staff>2</staff></forward>"#,
+        );
+        let prediction = graph(&prediction_xml);
+        let report = evaluate_musicxml_notation_graphs(
+            &reference,
+            &prediction,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.note_event_presence.false_negatives, 1);
+        assert_eq!(report.note_event_presence.false_positives, 0);
+        assert_eq!(report.note_event_presence.true_positives, 3);
+        assert_eq!(report.note_event_presence.f1, Some(0.8571428571428571));
+        assert_eq!(metric(1, 0, 0).f1, Some(0.0));
+        assert_eq!(metric(0, 0, 0).f1, None);
     }
 
     #[test]
