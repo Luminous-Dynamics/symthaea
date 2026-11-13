@@ -67,6 +67,16 @@ pub enum U1MpsError {
     NegativeNormSquared(f64),
     InvalidTotalCharge { total_charge: i32, site_count: usize },
     ZeroDenseState,
+    GateChargeLeakage {
+        output_basis: usize,
+        input_basis: usize,
+        amplitude: f64,
+        tolerance: f64,
+    },
+    GateUnitarityResidual { residual: f64, tolerance: f64 },
+    TwoSiteBondMismatch,
+    TwoSiteShapeMismatch,
+    TwoSiteDenseExpansionRequiresOpenBoundaries,
     DenseChargeLeakage { basis_index: usize, amplitude: f64, tolerance: f64 },
     SvdFailed { rows: usize, columns: usize },
 }
@@ -139,6 +149,24 @@ impl core::fmt::Display for U1MpsError {
                 "total charge {total_charge} is invalid for a {site_count}-site qubit MPS"
             ),
             Self::ZeroDenseState => write!(f, "the dense input has no nonzero amplitude in the declared charge sector"),
+            Self::GateChargeLeakage {
+                output_basis,
+                input_basis,
+                amplitude,
+                tolerance,
+            } => write!(
+                f,
+                "two-site gate couples charge {input_basis} to {output_basis} with amplitude {amplitude}, tolerance {tolerance}"
+            ),
+            Self::GateUnitarityResidual { residual, tolerance } => write!(
+                f,
+                "two-site gate unitarity residual {residual} exceeds tolerance {tolerance}"
+            ),
+            Self::TwoSiteBondMismatch => write!(f, "adjacent MPS tensors have different virtual charge labels"),
+            Self::TwoSiteShapeMismatch => write!(f, "two-site state tensor dimensions are inconsistent"),
+            Self::TwoSiteDenseExpansionRequiresOpenBoundaries => {
+                write!(f, "two-site dense expansion requires one-dimensional external boundary bonds")
+            }
             Self::DenseChargeLeakage { basis_index, amplitude, tolerance } => write!(
                 f,
                 "dense basis amplitude {basis_index} has forbidden charge-sector magnitude {amplitude}, tolerance {tolerance}"
@@ -760,6 +788,334 @@ impl ComplexU1Mps {
         Ok(norm.re.max(0.0))
     }
 }
+
+
+
+/// A validated two-qubit gate that preserves total U(1) excitation number.
+///
+/// Basis order is |00>, |01>, |10>, |11>. The matrix is row-major
+/// (output_basis, input_basis). Its only nontrivial block may be the U(2)
+/// action on {|01>,|10>}; |00> and |11> acquire independent phases.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TwoSiteGate {
+    matrix: [[Complex64; 4]; 4],
+    charge_conservation_residual: f64,
+    unitarity_residual: f64,
+}
+
+/// The exact two-site tensor obtained after contracting an MPS bond and
+/// applying one U(1)-conserving two-qubit gate.
+///
+/// Data layout is ((left * 4) + physical_pair) * right_dim + right, with
+/// physical_pair = first_qubit * 2 + second_qubit.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TwoSiteState {
+    left_charges: Vec<i32>,
+    right_charges: Vec<i32>,
+    data: Vec<Complex64>,
+    selection_rule_residual: f64,
+}
+
+impl U1TwoSiteGate {
+    /// Construct and validate a charge-conserving 4x4 unitary.
+    pub fn new(
+        matrix: [[Complex64; 4]; 4],
+        tolerance: f64,
+    ) -> Result<Self, U1MpsError> {
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        for row in 0..4 {
+            for column in 0..4 {
+                let value = matrix[row][column];
+                if !value.re.is_finite() || !value.im.is_finite() {
+                    return Err(U1MpsError::NonFiniteTensorEntry {
+                        site: 0,
+                        index: row * 4 + column,
+                    });
+                }
+            }
+        }
+
+        let mut charge_conservation_residual: f64 = 0.0;
+        for output in 0..4 {
+            for input in 0..4 {
+                if output.count_ones() != input.count_ones() {
+                    charge_conservation_residual =
+                        charge_conservation_residual.max(matrix[output][input].norm());
+                }
+            }
+        }
+        if charge_conservation_residual > tolerance {
+            let witness = (0..4)
+                .flat_map(|output| (0..4).map(move |input| (output, input)))
+                .find(|(output, input)| {
+                    output.count_ones() != input.count_ones()
+                        && matrix[*output][*input].norm() > tolerance
+                })
+                .unwrap_or((0, 0));
+            return Err(U1MpsError::GateChargeLeakage {
+                output_basis: witness.0.count_ones() as usize,
+                input_basis: witness.1.count_ones() as usize,
+                amplitude: matrix[witness.0][witness.1].norm(),
+                tolerance,
+            });
+        }
+
+        let mut unitarity_residual: f64 = 0.0;
+        for row in 0..4 {
+            for column in 0..4 {
+                let mut overlap = Complex64::new(0.0, 0.0);
+                for inner in 0..4 {
+                    overlap += matrix[inner][row].conj() * matrix[inner][column];
+                }
+                let expected = if row == column {
+                    Complex64::new(1.0, 0.0)
+                } else {
+                    Complex64::new(0.0, 0.0)
+                };
+                unitarity_residual =
+                    unitarity_residual.max((overlap - expected).norm());
+            }
+        }
+        if unitarity_residual > tolerance {
+            return Err(U1MpsError::GateUnitarityResidual {
+                residual: unitarity_residual,
+                tolerance,
+            });
+        }
+
+        Ok(Self {
+            matrix,
+            charge_conservation_residual,
+            unitarity_residual,
+        })
+    }
+
+    pub fn matrix(&self) -> &[[Complex64; 4]; 4] {
+        &self.matrix
+    }
+
+    pub fn charge_conservation_residual(&self) -> f64 {
+        self.charge_conservation_residual
+    }
+
+    pub fn unitarity_residual(&self) -> f64 {
+        self.unitarity_residual
+    }
+
+    /// Exact identity gate.
+    pub fn identity() -> Self {
+        let mut matrix = [[Complex64::new(0.0, 0.0); 4]; 4];
+        for index in 0..4 {
+            matrix[index][index] = Complex64::new(1.0, 0.0);
+        }
+        Self {
+            matrix,
+            charge_conservation_residual: 0.0,
+            unitarity_residual: 0.0,
+        }
+    }
+
+    /// Exact two-qubit SWAP, which preserves total excitation number.
+    pub fn swap() -> Self {
+        let mut matrix = [[Complex64::new(0.0, 0.0); 4]; 4];
+        matrix[0][0] = Complex64::new(1.0, 0.0);
+        matrix[1][2] = Complex64::new(1.0, 0.0);
+        matrix[2][1] = Complex64::new(1.0, 0.0);
+        matrix[3][3] = Complex64::new(1.0, 0.0);
+        Self {
+            matrix,
+            charge_conservation_residual: 0.0,
+            unitarity_residual: 0.0,
+        }
+    }
+}
+
+impl U1TwoSiteState {
+    /// Construct a checked two-site tensor with external virtual-charge labels.
+    pub fn new(
+        left_charges: Vec<i32>,
+        right_charges: Vec<i32>,
+        data: Vec<Complex64>,
+        tolerance: f64,
+    ) -> Result<Self, U1MpsError> {
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        if left_charges.is_empty() {
+            return Err(U1MpsError::EmptyBond {
+                site: 0,
+                side: "left",
+            });
+        }
+        if right_charges.is_empty() {
+            return Err(U1MpsError::EmptyBond {
+                site: 1,
+                side: "right",
+            });
+        }
+        let expected = left_charges
+            .len()
+            .checked_mul(4)
+            .and_then(|value| value.checked_mul(right_charges.len()))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        if data.len() != expected {
+            return Err(U1MpsError::EntryCount {
+                expected,
+                actual: data.len(),
+            });
+        }
+
+        let right_dimension = right_charges.len();
+        let mut selection_rule_residual: f64 = 0.0;
+        for left in 0..left_charges.len() {
+            for physical_pair in 0..4 {
+                for right in 0..right_dimension {
+                    let index = (left * 4 + physical_pair) * right_dimension + right;
+                    let value = data[index];
+                    if !value.re.is_finite() || !value.im.is_finite() {
+                        return Err(U1MpsError::NonFiniteTensorEntry { site: 0, index });
+                    }
+                    if right_charges[right]
+                        != left_charges[left] + physical_pair.count_ones() as i32
+                    {
+                        selection_rule_residual =
+                            selection_rule_residual.max(value.norm());
+                    }
+                }
+            }
+        }
+        if selection_rule_residual > tolerance {
+            return Err(U1MpsError::ChargeSelectionRule {
+                site: 0,
+                left_charge: left_charges[0],
+                physical: 0,
+                right_charge: right_charges[0],
+                amplitude: selection_rule_residual,
+                tolerance,
+            });
+        }
+        Ok(Self {
+            left_charges,
+            right_charges,
+            data,
+            selection_rule_residual,
+        })
+    }
+
+    pub fn left_charges(&self) -> &[i32] {
+        &self.left_charges
+    }
+
+    pub fn right_charges(&self) -> &[i32] {
+        &self.right_charges
+    }
+
+    pub fn left_dimension(&self) -> usize {
+        self.left_charges.len()
+    }
+
+    pub fn right_dimension(&self) -> usize {
+        self.right_charges.len()
+    }
+
+    pub fn data(&self) -> &[Complex64] {
+        &self.data
+    }
+
+    pub fn selection_rule_residual(&self) -> f64 {
+        self.selection_rule_residual
+    }
+
+    pub fn get(&self, left: usize, physical_pair: usize, right: usize) -> Complex64 {
+        self.data[(left * 4 + physical_pair) * self.right_dimension() + right]
+    }
+
+    /// Contract two adjacent site tensors into one exact two-site state.
+    pub fn from_adjacent_tensors(
+        left: &U1MpsTensor,
+        right: &U1MpsTensor,
+        tolerance: f64,
+    ) -> Result<Self, U1MpsError> {
+        if left.right_charges != right.left_charges {
+            return Err(U1MpsError::TwoSiteBondMismatch);
+        }
+        let expected = left
+            .left_dimension()
+            .checked_mul(4)
+            .and_then(|value| value.checked_mul(right.right_dimension()))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let mut data = vec![Complex64::new(0.0, 0.0); expected];
+        for left_index in 0..left.left_dimension() {
+            for first_physical in 0..2 {
+                for second_physical in 0..2 {
+                    let physical_pair = first_physical * 2 + second_physical;
+                    for right_index in 0..right.right_dimension() {
+                        let mut value = Complex64::new(0.0, 0.0);
+                        for bond in 0..left.right_dimension() {
+                            value += left.get(left_index, first_physical, bond)
+                                * right.get(bond, second_physical, right_index);
+                        }
+                        let index = (left_index * 4 + physical_pair)
+                            * right.right_dimension()
+                            + right_index;
+                        data[index] = value;
+                    }
+                }
+            }
+        }
+        Self::new(
+            left.left_charges.clone(),
+            right.right_charges.clone(),
+            data,
+            tolerance,
+        )
+    }
+
+    /// Apply a validated two-site gate without splitting or truncating the bond.
+    pub fn apply_gate(
+        &self,
+        gate: &U1TwoSiteGate,
+        tolerance: f64,
+    ) -> Result<Self, U1MpsError> {
+        let right_dimension = self.right_dimension();
+        let entries = self
+            .left_dimension()
+            .checked_mul(4)
+            .and_then(|value| value.checked_mul(right_dimension))
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        let mut output = vec![Complex64::new(0.0, 0.0); entries];
+        for left in 0..self.left_dimension() {
+            for output_pair in 0..4 {
+                for right in 0..right_dimension {
+                    let mut value = Complex64::new(0.0, 0.0);
+                    for input_pair in 0..4 {
+                        value += gate.matrix[output_pair][input_pair]
+                            * self.get(left, input_pair, right);
+                    }
+                    let index = (left * 4 + output_pair) * right_dimension + right;
+                    output[index] = value;
+                }
+            }
+        }
+        Self::new(
+            self.left_charges.clone(),
+            self.right_charges.clone(),
+            output,
+            tolerance,
+        )
+    }
+
+    /// Return the four computational-basis amplitudes for open-boundary tensors.
+    pub fn to_dense_two_qubit(&self) -> Result<[Complex64; 4], U1MpsError> {
+        if self.left_dimension() != 1 || self.right_dimension() != 1 {
+            return Err(U1MpsError::TwoSiteDenseExpansionRequiresOpenBoundaries);
+        }
+        Ok(core::array::from_fn(|index| self.get(0, index, 0)))
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
