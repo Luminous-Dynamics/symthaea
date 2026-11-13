@@ -1374,4 +1374,174 @@ mod tests {
         );
     }
 
+
+    fn single_excitation_state() -> ComplexU1Mps {
+        let amplitude = 1.0 / 2.0_f64.sqrt();
+        let dense = [
+            Complex64::new(0.0, 0.0),
+            Complex64::new(amplitude, 0.0),
+            Complex64::new(amplitude, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12).unwrap()
+    }
+
+    fn one_excitation_rotation() -> U1TwoSiteGate {
+        let mut matrix = [[Complex64::new(0.0, 0.0); 4]; 4];
+        matrix[0][0] = Complex64::new(1.0, 0.0);
+        matrix[3][3] = Complex64::new(1.0, 0.0);
+        let cosine = 1.0 / 2.0_f64.sqrt();
+        let sine = 1.0 / 2.0_f64.sqrt();
+        matrix[1][1] = Complex64::new(cosine, 0.0);
+        matrix[1][2] = Complex64::new(sine, 0.0);
+        matrix[2][1] = Complex64::new(-sine, 0.0);
+        matrix[2][2] = Complex64::new(cosine, 0.0);
+        U1TwoSiteGate::new(matrix, 1.0e-12).unwrap()
+    }
+
+    #[test]
+    fn two_site_gate_contraction_reconstructs_adjacent_mps_tensors() {
+        let state = single_excitation_state();
+        let pair = U1TwoSiteState::from_adjacent_tensors(
+            &state.tensors()[0],
+            &state.tensors()[1],
+            1.0e-12,
+        )
+        .unwrap();
+        let dense = pair.to_dense_two_qubit().unwrap();
+        assert_eq!(dense, state.to_dense(2).unwrap().try_into().unwrap());
+        assert!(pair.selection_rule_residual() <= 1.0e-12);
+    }
+
+    #[test]
+    fn u1_two_site_rotation_preserves_charge_and_matches_dense_known_answer() {
+        let state = single_excitation_state();
+        let pair = U1TwoSiteState::from_adjacent_tensors(
+            &state.tensors()[0],
+            &state.tensors()[1],
+            1.0e-12,
+        )
+        .unwrap();
+        let gate = one_excitation_rotation();
+        assert!(gate.charge_conservation_residual() <= 1.0e-12);
+        assert!(gate.unitarity_residual() <= 1.0e-12);
+
+        let output = pair.apply_gate(&gate, 1.0e-12).unwrap();
+        let dense = output.to_dense_two_qubit().unwrap();
+        assert!((dense[0].norm()).abs() <= 1.0e-12);
+        assert!((dense[1].re - 1.0).abs() <= 1.0e-12);
+        assert!(dense[2].norm() <= 1.0e-12);
+        assert!(dense[3].norm() <= 1.0e-12);
+        assert!(output.selection_rule_residual() <= 1.0e-12);
+    }
+
+    #[test]
+    fn u1_swap_gate_exchanges_single_excitation_basis_states() {
+        let dense = [
+            Complex64::new(0.0, 0.0),
+            Complex64::new(1.0, 0.0),
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        let pair = U1TwoSiteState::new(vec![0], vec![1], dense.to_vec(), 1.0e-12).unwrap();
+        let swapped = pair.apply_gate(&U1TwoSiteGate::swap(), 1.0e-12).unwrap();
+        let actual = swapped.to_dense_two_qubit().unwrap();
+        assert_eq!(actual[1], Complex64::new(0.0, 0.0));
+        assert_eq!(actual[2], Complex64::new(1.0, 0.0));
+        assert_eq!(actual[0], Complex64::new(0.0, 0.0));
+        assert_eq!(actual[3], Complex64::new(0.0, 0.0));
+    }
+
+    #[test]
+    fn gate_constructor_rejects_charge_nonconserving_and_nonunitary_matrices() {
+        let half = 1.0 / 2.0_f64.sqrt();
+        let nonconserving = [
+            [
+                Complex64::new(half, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(half, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(half, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(half, 0.0),
+            ],
+            [
+                Complex64::new(half, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(-half, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+            [
+                Complex64::new(0.0, 0.0),
+                Complex64::new(half, 0.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(-half, 0.0),
+            ],
+        ];
+        assert!(matches!(
+            U1TwoSiteGate::new(nonconserving, 1.0e-12),
+            Err(U1MpsError::GateChargeLeakage { .. })
+        ));
+
+        let mut nonunitary = U1TwoSiteGate::identity().matrix().to_owned();
+        nonunitary[3][3] = Complex64::new(0.5, 0.0);
+        assert!(matches!(
+            U1TwoSiteGate::new(nonunitary, 1.0e-12),
+            Err(U1MpsError::GateUnitarityResidual { .. })
+        ));
+    }
+
+    #[test]
+    fn adjacent_two_site_contraction_rejects_bond_charge_mismatch() {
+        let left = U1MpsTensor::new(
+            vec![0],
+            vec![0],
+            vec![Complex64::new(1.0, 0.0), Complex64::new(0.0, 0.0)],
+        )
+        .unwrap();
+        let right = U1MpsTensor::new(
+            vec![1],
+            vec![1],
+            vec![Complex64::new(0.0, 0.0), Complex64::new(1.0, 0.0)],
+        )
+        .unwrap();
+        assert!(matches!(
+            U1TwoSiteState::from_adjacent_tensors(&left, &right, 1.0e-12),
+            Err(U1MpsError::TwoSiteBondMismatch)
+        ));
+    }
+
+    #[test]
+    fn two_site_state_rejects_forbidden_pair_charge_and_bad_dense_boundary() {
+        assert!(matches!(
+            U1TwoSiteState::new(
+                vec![0],
+                vec![0],
+                vec![
+                    Complex64::new(0.0, 0.0),
+                    Complex64::new(1.0, 0.0),
+                    Complex64::new(0.0, 0.0),
+                    Complex64::new(0.0, 0.0),
+                ],
+                1.0e-12
+            ),
+            Err(U1MpsError::ChargeSelectionRule { .. })
+        ));
+
+        let non_open = U1TwoSiteState::new(
+            vec![0, 1],
+            vec![1],
+            vec![Complex64::new(0.0, 0.0); 2 * 4],
+            1.0e-12,
+        )
+        .unwrap();
+        assert!(matches!(
+            non_open.to_dense_two_qubit(),
+            Err(U1MpsError::TwoSiteDenseExpansionRequiresOpenBoundaries)
+        ));
+    }
+
 }
