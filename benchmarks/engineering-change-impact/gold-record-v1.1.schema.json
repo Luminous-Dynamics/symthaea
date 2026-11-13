@@ -1,0 +1,1687 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/engineering-change-impact/gold-record-v1.1.schema.json",
+  "title": "Engineering Change Impact Gold Record V1.1",
+  "description": "Versioned successor to V1. Adds an optional, typed decision-time evidence-admissibility assessment. The engineering disposition, assessor independence and authority boundary remain unchanged. V1 remains supported for non-temporal records; V1.1 is required when the temporal_admissibility extension is present.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "visibility",
+    "record_id",
+    "case_id",
+    "pair_id",
+    "claim_ref",
+    "evidence_ref",
+    "source_generation",
+    "target_generation",
+    "transformation_ref",
+    "source_evidence_class",
+    "dependency_contract",
+    "dependency_paths",
+    "expected_disposition",
+    "required_follow_up_obligations",
+    "criticality",
+    "rationale_codes",
+    "assessor_records",
+    "adjudication",
+    "seal_state",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "change-impact-gold-record-v1.1"
+    },
+    "visibility": {
+      "const": "evaluator_only"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pair_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_generation": {
+      "$ref": "#/$defs/generation"
+    },
+    "target_generation": {
+      "$ref": "#/$defs/generation"
+    },
+    "transformation_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "transformation_digest": {
+      "$ref": "#/$defs/sha256Digest"
+    },
+    "source_evidence_class": {
+      "enum": [
+        "synthetic",
+        "analytical",
+        "simulated",
+        "measured",
+        "calibrated",
+        "physical_test",
+        "human_review",
+        "external_approval",
+        "mixed",
+        "unknown"
+      ]
+    },
+    "dependency_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract_ref",
+        "revision"
+      ],
+      "properties": {
+        "contract_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        }
+      }
+    },
+    "dependency_paths": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/dependencyPath"
+      }
+    },
+    "equivalence_witness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "witness_ref",
+        "witness_scope",
+        "claim_coverage"
+      ],
+      "properties": {
+        "witness_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "witness_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_coverage": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "profile_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "witness_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        }
+      }
+    },
+    "expected_disposition": {
+      "$ref": "#/$defs/disposition"
+    },
+    "required_follow_up_obligations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/followUpObligation"
+      }
+    },
+    "criticality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "hard_gate"
+      ],
+      "properties": {
+        "class": {
+          "enum": [
+            "critical_noncompensatory",
+            "major",
+            "minor",
+            "diagnostic"
+          ]
+        },
+        "hard_gate": {
+          "type": "boolean"
+        },
+        "consequence_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "rationale_codes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "IDENTITY_UNCHANGED",
+          "DEPENDENCY_OUTSIDE_PROVEN_NONIMPACT_CONE",
+          "QUALIFIED_EQUIVALENCE_COVERS_CLAIM",
+          "CLAIM_DEPENDENCY_CHANGED",
+          "REQUIREMENT_REVISION_CHANGED",
+          "ASSUMPTION_DRIFT",
+          "INTERFACE_FRAME_CHANGED",
+          "MATERIAL_PROPERTY_CHANGED",
+          "LOAD_OR_DUTY_CHANGED",
+          "PROCESS_CAPABILITY_CHANGED",
+          "MEASUREMENT_PROFILE_CHANGED",
+          "CONFIGURATION_GENERATION_CHANGED",
+          "DEPENDENCY_MODEL_INCOMPLETE",
+          "CONFLICTING_REFERENCE",
+          "UNSUPPORTED_ANALYSIS_CLASS",
+          "HISTORICAL_EVIDENCE_RETAINED",
+          "NEW_EVIDENCE_REQUIRED",
+          "EXTERNAL_APPROVAL_REQUIRED"
+        ]
+      }
+    },
+    "assessor_records": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/assessorRecord"
+      },
+      "uniqueItems": true,
+      "description": "At least two assessor records are required. The evaluator must additionally enforce unique assessor_ref identities and independence; JSON Schema alone cannot establish distinct people or independent access."
+    },
+    "adjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "initial_agreement",
+        "rationale"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "pending",
+            "consensus",
+            "third_party_resolved",
+            "unknown_impact_retained",
+            "not_adjudicable"
+          ]
+        },
+        "initial_agreement": {
+          "type": "boolean"
+        },
+        "adjudicator_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resolution_rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adjudication_revision": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "seal_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "unsealed",
+            "sealed",
+            "superseded"
+          ]
+        },
+        "sealed_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "sealed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "supersedes_record_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "seal_profile": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "claim_ceiling": {
+      "const": "evaluation_label_only_no_etk_authority_or_release"
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "temporal_admissibility": {
+      "$ref": "#/$defs/temporalAdmissibility"
+    }
+  },
+  "$defs": {
+    "sha256Digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "generation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generation_ref",
+        "semantic_snapshot_digest"
+      ],
+      "properties": {
+        "generation_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "semantic_snapshot_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "source_package_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "configuration_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "disposition": {
+      "enum": [
+        "PreservedByIdentity",
+        "PreservedByQualifiedEquivalence",
+        "PreservedByExactRecalculation",
+        "RequiresApplicabilityReview",
+        "RequiresVerification",
+        "RequiresPhysicalEvidence",
+        "RequiresHumanOrExternalApproval",
+        "NotPreserved",
+        "UnknownImpact",
+        "Unsupported"
+      ]
+    },
+    "dependencyPath": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path_id",
+        "relation_ref",
+        "relation_authority",
+        "semantic_role"
+      ],
+      "properties": {
+        "path_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relation_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relation_authority": {
+          "enum": [
+            "owner_contract",
+            "fixture_local_synthetic",
+            "derived_candidate",
+            "unresolved"
+          ]
+        },
+        "semantic_role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "from_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "to_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "is_qualified_nonimpact_witness": {
+          "type": "boolean"
+        }
+      }
+    },
+    "followUpObligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "obligation_type",
+        "owner_ref",
+        "reason",
+        "mandatory"
+      ],
+      "properties": {
+        "obligation_type": {
+          "enum": [
+            "applicability_review",
+            "verification",
+            "recalculation",
+            "physical_evidence",
+            "human_or_external_approval",
+            "clarification",
+            "unsupported_disposition"
+          ]
+        },
+        "owner_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mandatory": {
+          "type": "boolean"
+        },
+        "requirement_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verification_method_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "assessorRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assessor_ref",
+        "domain_qualification",
+        "independent_disposition",
+        "rationale",
+        "supporting_refs",
+        "conflict_declared"
+      ],
+      "properties": {
+        "assessor_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "domain_qualification": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "independent_disposition": {
+          "$ref": "#/$defs/disposition"
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "supporting_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "conflict_declared": {
+          "type": "boolean"
+        },
+        "reviewed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "assessor_record_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "temporal_admissibility_label": {
+          "$ref": "#/$defs/temporalAssessorLabel"
+        }
+      },
+      "description": "A temporal_admissibility_label is required for every assessor record whenever the root temporal_admissibility object is present. The evaluator must additionally verify distinct people, blind access histories, qualification, conflicts, and cross-field chronology; JSON Schema cannot prove these facts."
+    },
+    "temporalInstant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instant",
+        "precision",
+        "clock_source",
+        "observation_ref"
+      ],
+      "properties": {
+        "instant": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "precision": {
+          "enum": [
+            "year",
+            "month",
+            "day",
+            "second",
+            "millisecond",
+            "microsecond",
+            "nanosecond",
+            "unknown"
+          ]
+        },
+        "clock_source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uncertainty_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "observation_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_assertion_only": {
+          "type": "boolean"
+        }
+      }
+    },
+    "temporalPoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "known",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "instant": {
+          "$ref": "#/$defs/temporalInstant"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "known"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "instant"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "unknown",
+                  "not_applicable"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "instant"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "temporalBound": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "known",
+            "unbounded",
+            "unknown"
+          ]
+        },
+        "instant": {
+          "$ref": "#/$defs/temporalInstant"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "known"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "instant"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "unbounded",
+                  "unknown"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "instant"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "timeObservation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "observed",
+            "unknown",
+            "not_established",
+            "not_applicable"
+          ]
+        },
+        "observation": {
+          "$ref": "#/$defs/temporalInstant"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "observed"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "observation"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "unknown",
+                  "not_established"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "unknown",
+                  "not_established",
+                  "not_applicable"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "observation"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "rightsAssessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "rights_profile_ref"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "permitted",
+            "prohibited",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "rights_profile_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assessment_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assessed_at": {
+          "$ref": "#/$defs/temporalInstant"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "permitted",
+                  "prohibited"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "assessment_ref",
+              "evidence_ref",
+              "assessed_at"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "unknown"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      ]
+    },
+    "runContextEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "included",
+            "not_included",
+            "indeterminate",
+            "not_applicable"
+          ]
+        },
+        "run_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifest_digest": {
+          "$ref": "#/$defs/sha256Digest"
+        },
+        "evidence_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_at": {
+          "$ref": "#/$defs/temporalInstant"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "included"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "run_ref",
+              "manifest_digest",
+              "evidence_ref",
+              "observed_at"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "indeterminate",
+                  "not_included"
+                ]
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "reason"
+            ]
+          }
+        }
+      ]
+    },
+    "temporalAssessorLabel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_availability",
+        "system_availability",
+        "run_context_presence",
+        "rights_at_decision",
+        "rights_at_replay",
+        "rationale",
+        "supporting_refs"
+      ],
+      "properties": {
+        "source_availability": {
+          "enum": [
+            "admissible",
+            "inadmissible",
+            "indeterminate",
+            "not_applicable"
+          ]
+        },
+        "system_availability": {
+          "enum": [
+            "available",
+            "unavailable",
+            "indeterminate",
+            "not_applicable"
+          ]
+        },
+        "run_context_presence": {
+          "enum": [
+            "included",
+            "not_included",
+            "indeterminate",
+            "not_applicable"
+          ]
+        },
+        "rights_at_decision": {
+          "enum": [
+            "permitted",
+            "prohibited",
+            "indeterminate",
+            "not_applicable"
+          ]
+        },
+        "rights_at_replay": {
+          "enum": [
+            "permitted",
+            "prohibited",
+            "indeterminate",
+            "not_applicable"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "supporting_refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "reason_codes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "SOURCE_VERSION_UNKNOWN",
+              "SOURCE_NOT_AVAILABLE_BY_K",
+              "LATE_RECEIPT",
+              "LATE_INGESTION",
+              "MATERIALIZATION_LAG",
+              "RUN_CONTEXT_NOT_PROVEN",
+              "LATE_CORRECTION",
+              "LATE_RELATION_MATERIALIZATION",
+              "UNKNOWN_VALIDITY_BOUND",
+              "CLOCK_ORDER_UNRESOLVED",
+              "RIGHTS_NOT_PERMITTED",
+              "RIGHTS_STATUS_UNKNOWN",
+              "PROFILE_VERSION_SUBSTITUTION",
+              "HISTORICAL_REPLAY_ONLY",
+              "EVIDENCE_FRONTIER_INCOMPLETE"
+            ]
+          }
+        }
+      }
+    },
+    "temporalAdjudication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "initial_agreement",
+        "rationale"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "pending",
+            "consensus",
+            "third_party_resolved",
+            "indeterminate_retained",
+            "not_adjudicable"
+          ]
+        },
+        "initial_agreement": {
+          "type": "boolean"
+        },
+        "adjudicator_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resolution_rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "third_party_resolved"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "required": [
+              "adjudicator_ref",
+              "resolution_rationale"
+            ],
+            "properties": {
+              "initial_agreement": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "consensus"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "initial_agreement": {
+                "const": true
+              }
+            }
+          }
+        }
+      ]
+    },
+    "temporalAdmissibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "target_world_time",
+        "decision_frontier",
+        "declared_principal_ref",
+        "rights_profile_ref",
+        "source_version",
+        "evidence_validity",
+        "availability",
+        "rights",
+        "outcome",
+        "temporal_adjudication",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "decision-time-evidence-admissibility-v0.1"
+        },
+        "target_world_time": {
+          "$ref": "#/$defs/temporalPoint"
+        },
+        "decision_frontier": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "instant",
+            "boundary",
+            "frontier_ref"
+          ],
+          "properties": {
+            "instant": {
+              "$ref": "#/$defs/temporalInstant"
+            },
+            "boundary": {
+              "enum": [
+                "inclusive",
+                "exclusive"
+              ]
+            },
+            "frontier_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "declared_principal_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rights_profile_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_version": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "identity_state",
+            "bytes_state"
+          ],
+          "properties": {
+            "identity_state": {
+              "enum": [
+                "known",
+                "unknown"
+              ]
+            },
+            "version_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "identity_evidence_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "bytes_state": {
+              "enum": [
+                "captured",
+                "not_captured",
+                "unknown"
+              ]
+            },
+            "artifact_digest": {
+              "$ref": "#/$defs/sha256Digest"
+            },
+            "byte_capture_evidence_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "identity_state": {
+                    "const": "known"
+                  }
+                },
+                "required": [
+                  "identity_state"
+                ]
+              },
+              "then": {
+                "required": [
+                  "version_ref",
+                  "identity_evidence_ref"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "bytes_state": {
+                    "const": "captured"
+                  }
+                },
+                "required": [
+                  "bytes_state"
+                ]
+              },
+              "then": {
+                "required": [
+                  "artifact_digest",
+                  "byte_capture_evidence_ref"
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "bytes_state": {
+                    "enum": [
+                      "not_captured",
+                      "unknown"
+                    ]
+                  }
+                },
+                "required": [
+                  "bytes_state"
+                ]
+              },
+              "then": {
+                "not": {
+                  "required": [
+                    "artifact_digest"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "evidence_validity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lower",
+            "upper"
+          ],
+          "properties": {
+            "lower": {
+              "$ref": "#/$defs/temporalBound"
+            },
+            "upper": {
+              "$ref": "#/$defs/temporalBound"
+            },
+            "interval_evidence_ref": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "availability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_publication",
+            "issuer_availability",
+            "canonical_record_receipt",
+            "acquisition_ingestion",
+            "derived_materialization",
+            "run_context_inclusion"
+          ],
+          "properties": {
+            "source_publication": {
+              "$ref": "#/$defs/timeObservation"
+            },
+            "issuer_availability": {
+              "$ref": "#/$defs/timeObservation"
+            },
+            "canonical_record_receipt": {
+              "$ref": "#/$defs/timeObservation"
+            },
+            "acquisition_ingestion": {
+              "$ref": "#/$defs/timeObservation"
+            },
+            "derived_materialization": {
+              "$ref": "#/$defs/timeObservation"
+            },
+            "run_context_inclusion": {
+              "$ref": "#/$defs/runContextEvidence"
+            }
+          }
+        },
+        "rights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "at_decision",
+            "at_replay_or_query"
+          ],
+          "properties": {
+            "at_decision": {
+              "$ref": "#/$defs/rightsAssessment"
+            },
+            "at_replay_or_query": {
+              "$ref": "#/$defs/rightsAssessment"
+            }
+          }
+        },
+        "outcome": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_availability",
+            "system_availability",
+            "run_context_presence",
+            "rights_at_decision",
+            "rights_at_replay"
+          ],
+          "properties": {
+            "source_availability": {
+              "enum": [
+                "admissible",
+                "inadmissible",
+                "indeterminate",
+                "not_applicable"
+              ]
+            },
+            "system_availability": {
+              "enum": [
+                "available",
+                "unavailable",
+                "indeterminate",
+                "not_applicable"
+              ]
+            },
+            "run_context_presence": {
+              "enum": [
+                "included",
+                "not_included",
+                "indeterminate",
+                "not_applicable"
+              ]
+            },
+            "rights_at_decision": {
+              "enum": [
+                "permitted",
+                "prohibited",
+                "indeterminate",
+                "not_applicable"
+              ]
+            },
+            "rights_at_replay": {
+              "enum": [
+                "permitted",
+                "prohibited",
+                "indeterminate",
+                "not_applicable"
+              ]
+            }
+          }
+        },
+        "temporal_adjudication": {
+          "$ref": "#/$defs/temporalAdjudication"
+        },
+        "claim_ceiling": {
+          "const": "temporal_admissibility_only_no_source_truth_or_authority"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "source_version": {
+                "properties": {
+                  "identity_state": {
+                    "const": "known"
+                  }
+                },
+                "required": [
+                  "identity_state"
+                ]
+              }
+            },
+            "required": [
+              "source_version"
+            ]
+          },
+          "then": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "source_availability": {
+                    "not": {
+                      "const": "admissible"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "source_availability": {
+                    "const": "admissible"
+                  }
+                },
+                "required": [
+                  "source_availability"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "availability": {
+                "properties": {
+                  "source_publication": {
+                    "properties": {
+                      "state": {
+                        "const": "observed"
+                      }
+                    }
+                  },
+                  "issuer_availability": {
+                    "properties": {
+                      "state": {
+                        "const": "observed"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "system_availability": {
+                    "const": "available"
+                  }
+                },
+                "required": [
+                  "system_availability"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "availability": {
+                "properties": {
+                  "acquisition_ingestion": {
+                    "properties": {
+                      "state": {
+                        "const": "observed"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "run_context_presence": {
+                    "const": "included"
+                  }
+                },
+                "required": [
+                  "run_context_presence"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "availability": {
+                "properties": {
+                  "run_context_inclusion": {
+                    "properties": {
+                      "state": {
+                        "const": "included"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "rights_at_decision": {
+                    "const": "permitted"
+                  }
+                },
+                "required": [
+                  "rights_at_decision"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "rights": {
+                "properties": {
+                  "at_decision": {
+                    "properties": {
+                      "state": {
+                        "const": "permitted"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "outcome": {
+                "properties": {
+                  "rights_at_replay": {
+                    "const": "permitted"
+                  }
+                },
+                "required": [
+                  "rights_at_replay"
+                ]
+              }
+            },
+            "required": [
+              "outcome"
+            ]
+          },
+          "then": {
+            "properties": {
+              "rights": {
+                "properties": {
+                  "at_replay_or_query": {
+                    "properties": {
+                      "state": {
+                        "const": "permitted"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "expected_disposition": {
+            "const": "PreservedByQualifiedEquivalence"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "equivalence_witness"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "criticality": {
+            "properties": {
+              "class": {
+                "const": "critical_noncompensatory"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "criticality": {
+            "properties": {
+              "hard_gate": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "seal_state": {
+            "properties": {
+              "state": {
+                "const": "sealed"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "seal_state": {
+            "required": [
+              "sealed_digest",
+              "sealed_at",
+              "seal_profile"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "adjudication": {
+            "properties": {
+              "state": {
+                "const": "third_party_resolved"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "adjudication": {
+            "required": [
+              "adjudicator_ref",
+              "resolution_rationale"
+            ],
+            "properties": {
+              "initial_agreement": {
+                "const": false
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "adjudication": {
+            "properties": {
+              "state": {
+                "const": "consensus"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "adjudication": {
+            "properties": {
+              "initial_agreement": {
+                "const": true
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "temporal_admissibility"
+        ]
+      },
+      "then": {
+        "properties": {
+          "assessor_records": {
+            "items": {
+              "required": [
+                "temporal_admissibility_label"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}
