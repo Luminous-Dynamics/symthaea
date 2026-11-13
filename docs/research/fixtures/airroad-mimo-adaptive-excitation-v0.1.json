@@ -1,0 +1,303 @@
+{
+  "schema": "luminous.airroad.mimo_adaptive_experiment_decision_tree.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_deterministic_model_discrimination",
+  "model_set_identity": "sha256:three-rational-mimo-hypotheses-v0.1",
+  "ports": [
+    "bus-a",
+    "bus-b"
+  ],
+  "model_hypotheses": [
+    {
+      "model_id": "H0-base",
+      "crossport_term": "0"
+    },
+    {
+      "model_id": "H1-delta-three",
+      "crossport_term": "Delta_3(s)",
+      "numerator_roots": [
+        1,
+        2,
+        4
+      ],
+      "denominator_power": 7,
+      "denominator_shift": 5,
+      "scale": 1000
+    },
+    {
+      "model_id": "H2-delta-two",
+      "crossport_term": "Delta_2(s)",
+      "numerator_roots": [
+        1,
+        3,
+        4
+      ],
+      "denominator_power": 7,
+      "denominator_shift": 5,
+      "scale": 1000
+    }
+  ],
+  "candidate_actions": [
+    {
+      "action_id": "action-omega-2",
+      "omega": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "driven_port_id": "bus-b",
+      "observed_port_id": "bus-a",
+      "hard_disk_radius": {
+        "numerator": "1",
+        "denominator": "10"
+      },
+      "cost": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "approved": true
+    },
+    {
+      "action_id": "action-omega-3",
+      "omega": {
+        "numerator": "3",
+        "denominator": "1"
+      },
+      "driven_port_id": "bus-b",
+      "observed_port_id": "bus-a",
+      "hard_disk_radius": {
+        "numerator": "1",
+        "denominator": "10"
+      },
+      "cost": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "approved": true
+    }
+  ],
+  "expected_predictions": {
+    "action_omega_2": {
+      "H0": {
+        "real": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "H1": {
+        "real": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "H2": {
+        "real": {
+          "numerator": "20990700000",
+          "denominator": "17249876309"
+        },
+        "imag": {
+          "numerator": "10875960000",
+          "denominator": "17249876309"
+        }
+      },
+      "nonzero_squared_distance": {
+        "numerator": "32400000000",
+        "denominator": "17249876309"
+      }
+    },
+    "action_omega_3": {
+      "H0": {
+        "real": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "H1": {
+        "real": {
+          "numerator": "-401712500",
+          "denominator": "410338673"
+        },
+        "imag": {
+          "numerator": "299932500",
+          "denominator": "410338673"
+        }
+      },
+      "H2": {
+        "real": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "nonzero_squared_distance": {
+        "numerator": "612500000",
+        "denominator": "410338673"
+      }
+    }
+  },
+  "uncertainty": {
+    "observation_set": "closed_complex_disk",
+    "common_radius": {
+      "numerator": "1",
+      "denominator": "10"
+    },
+    "guaranteed_disjoint_threshold_squared": {
+      "numerator": "1",
+      "denominator": "25"
+    },
+    "semantics": "deterministic_hard_set"
+  },
+  "prior": {
+    "H0": {
+      "numerator": "1",
+      "denominator": "3"
+    },
+    "H1": {
+      "numerator": "1",
+      "denominator": "3"
+    },
+    "H2": {
+      "numerator": "1",
+      "denominator": "3"
+    }
+  },
+  "expected_policy": {
+    "first_action": "action-omega-2",
+    "if_first_observation_is_H2_disk": {
+      "terminal_model": "H2",
+      "experiments": 1
+    },
+    "if_first_observation_is_zero_disk": {
+      "next_action": "action-omega-3"
+    },
+    "second_action_terminals": {
+      "zero_disk": "H0",
+      "Delta_3_disk": "H1"
+    },
+    "expected_experiments": {
+      "numerator": "5",
+      "denominator": "3"
+    },
+    "worst_case_experiments": {
+      "numerator": "2",
+      "denominator": "1"
+    },
+    "fixed_sweep_experiments": {
+      "numerator": "2",
+      "denominator": "1"
+    },
+    "relative_expected_saving": {
+      "numerator": "1",
+      "denominator": "6"
+    }
+  },
+  "counterfactuals": {
+    "only_action_omega_2": [
+      "action-omega-2"
+    ],
+    "only_action_omega_3": [
+      "action-omega-3"
+    ],
+    "wide_uncertainty_radius": {
+      "numerator": "1",
+      "denominator": "1"
+    },
+    "wrong_port_action": {
+      "action_id": "wrong-port",
+      "omega": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "driven_port_id": "bus-a",
+      "observed_port_id": "bus-a",
+      "hard_disk_radius": {
+        "numerator": "1",
+        "denominator": "10"
+      },
+      "cost": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "approved": true
+    },
+    "unapproved_action": {
+      "action_id": "unapproved",
+      "omega": {
+        "numerator": "2",
+        "denominator": "1"
+      },
+      "driven_port_id": "bus-b",
+      "observed_port_id": "bus-a",
+      "hard_disk_radius": {
+        "numerator": "1",
+        "denominator": "10"
+      },
+      "cost": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "approved": false
+    }
+  },
+  "negative_controls": [
+    {
+      "id": "only-action-2",
+      "expected": "H0-H1-remain-ambiguous"
+    },
+    {
+      "id": "only-action-3",
+      "expected": "H0-H2-remain-ambiguous"
+    },
+    {
+      "id": "missing-second-stage-action",
+      "expected": "unresolved-branch"
+    },
+    {
+      "id": "uncertainty-disks-overlap",
+      "expected": "not-guaranteed"
+    },
+    {
+      "id": "observation-outside-all-model-sets",
+      "expected": "unresolved"
+    },
+    {
+      "id": "unbounded-other-unresolved-hypothesis",
+      "expected": "no-complete-model-set-claim"
+    },
+    {
+      "id": "prior-omitted",
+      "expected": "worst-case-only"
+    },
+    {
+      "id": "unapproved-action",
+      "expected": "reject"
+    },
+    {
+      "id": "wrong-port",
+      "expected": "no-crossport-discrimination"
+    },
+    {
+      "id": "duplicate-action-or-model-id",
+      "expected": "reject"
+    }
+  ],
+  "claim_ceiling": [
+    "Synthetic exact-rational adaptive decision-tree reference only.",
+    "Uniform prior is used only for the 5/3 expected test-count calculation.",
+    "No calibrated probabilistic EIG or physical test authority is established."
+  ]
+}
