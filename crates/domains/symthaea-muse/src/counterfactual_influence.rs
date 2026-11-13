@@ -2269,6 +2269,60 @@ mod tests {
     }
 
     #[test]
+    fn transposition_pitch_inventory_is_exhaustive_over_midi_domain() {
+        for first_pitch in 0u8..=127 {
+            for second_pitch in 0u8..=127 {
+                let baseline = [first_pitch, second_pitch];
+                for delta in -127i16..=127 {
+                    for target_index in 0usize..2 {
+                        let transformed =
+                            i16::from(baseline[target_index]) + delta;
+                        let result = counterfactual_primary_pitches(
+                            &baseline,
+                            target_index,
+                            &EventIntervention::Transpose { semitones: delta },
+                        );
+                        if delta == 0 || !(0..=127).contains(&transformed) {
+                            assert_eq!(
+                                result.unwrap_err(),
+                                CounterfactualInfluenceError::InvalidIntervention,
+                                "pitch={baseline:?}, target={target_index}, delta={delta}"
+                            );
+                        } else {
+                            let mut expected = baseline;
+                            expected[target_index] = transformed as u8;
+                            assert_eq!(
+                                result.unwrap(),
+                                expected,
+                                "pitch={baseline:?}, target={target_index}, delta={delta}"
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        assert_eq!(
+            counterfactual_primary_pitches(
+                &[60, 64],
+                2,
+                &EventIntervention::Transpose { semitones: 1 }
+            )
+            .unwrap_err(),
+            CounterfactualInfluenceError::InvalidEventId
+        );
+        for unsupported in [
+            EventIntervention::ShiftOnset { delta_ticks: 1 },
+            EventIntervention::ChangeDuration { delta_ticks: 1 },
+            EventIntervention::ChangeVelocity { delta: 1 },
+        ] {
+            assert_eq!(
+                validate_intervention(&unsupported).unwrap_err(),
+                CounterfactualInfluenceError::InvalidIntervention
+            );
+        }
+    }
+
+    #[test]
     fn counterfactual_exclusion_does_not_authorize_a_protected_pitch_change() {
         let samples = vec![0.0f32; 128];
         let render = build_render(
