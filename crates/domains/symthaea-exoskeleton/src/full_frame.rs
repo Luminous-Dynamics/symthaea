@@ -1,17 +1,19 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Full-Frame Exoskeleton — Tier 0 Capstone.
+//! Full-frame articulated research model.
 //!
-//! A 20+ degree-of-freedom full-body exoskeleton modeling the entire
-//! human kinematic chain as articulated bodies within a symtropy PhysicsWorld.
+//! This is a simplified 20-joint rigid-body simulation scaffold. It is not a
+//! validated human biomechanics model, a complete human/exoskeleton co-dynamics
+//! model, an actuator controller, or a hardware interface.
 //!
-//! # Philosophy
+//! The synthetic human-load generator records candidate joint torques but does
+//! not currently inject those torques into the articulated physics world. Do not
+//! interpret its telemetry as a simulated wearer response.
 //!
-//! This is not just a robot — it is a "second nervous system" that shares
-//! motor authority with a human user. The defining feature: **the suit
-//! literally loses its strength when it loses its consciousness (Φ)**.
-//! No amount of hardcoded safety rules can match a machine whose force
-//! output is gated by a measurable information-integration metric.
+//! Physical forces, impulses, gravity, and contact friction remain properties of
+//! the physical plant. Experimental cognitive metrics must not scale or replace
+//! them. Physical safety admission and actuator authority require independent,
+//! platform-specific evidence and controls.
 //!
 //! # Topology: 20 Joints, 20 Degrees of Freedom
 //!
@@ -41,22 +43,13 @@
 //!
 //! Total: **20 joints, 20 DOF** (simplified from human's ~244 DOF)
 //!
-//! # Safety Architecture
+//! # Explicit limitations
 //!
-//! - **Φ ≥ 0.6 (Green)**: Full assist — suit amplifies human intent
-//! - **Φ ∈ [0.3, 0.6) (Yellow)**: Responsive — follows without amplification
-//! - **Φ ∈ [0.1, 0.3) (Orange)**: Transparent — minimal assistance, compliant
-//! - **Φ < 0.1 (Red)**: Gravity compensation only — fully backdrivable
-//!
-//! Combined with:
-//! - `MissionAuditProof` (ZKP) — cryptographically proves Φ was safe throughout
-//! - `RoboticCredential` (Ebbinghaus) — suit loses certification without periodic testing
-//! - `MoralGateInput` — ethics engine can force Red at any time
-//!
-//! # Gate Condition
-//!
-//! This module is unlocked by the Coffee Cup Gate (see
-//! `symthaea-manipulator/tests/coffee_cup_gate.rs`). All 5 gates pass.
+//! This module contains no physical-safety admission logic and no motor
+//! authority path. Its physics callback is intentionally an identity/no-op
+//! adapter: it preserves forces and impulses and leaves contact friction at
+//! the configured physical value. Passing its software tests does not qualify
+//! a wearable device, hardware adapter, or human trial.
 
 #![cfg(feature = "symtropy")]
 
@@ -99,10 +92,11 @@ pub enum FullFrameJoint {
 /// Number of joints in the full-frame suit.
 pub const NUM_FULL_FRAME_JOINTS: usize = 20;
 
-/// Human load model — treats the human as a dynamic load inside the suit.
+/// Synthetic human-load signal generator.
 ///
-/// Each segment has mass (human body part weight) and exerts gait torques
-/// that the suit must either assist or resist.
+/// It generates candidate per-joint torque traces for research. It is not a
+/// coupled articulated human model; the generated torques are currently not
+/// injected into the physics world.
 #[derive(Debug, Clone)]
 pub struct HumanLoadModel {
     /// Total human mass in kg.
@@ -116,8 +110,9 @@ pub struct HumanLoadModel {
 }
 
 impl HumanLoadModel {
-    /// Standard 75kg adult male load model.
-    pub fn standard_adult() -> Self {
+    /// Synthetic reference profile with a nominal 75 kg total mass.
+    /// This is not a population norm or a clinically representative body model.
+    pub fn reference_75kg_profile() -> Self {
         Self {
             total_mass_kg: 75.0,
             human_torques: [0.0; NUM_FULL_FRAME_JOINTS],
@@ -144,20 +139,18 @@ impl HumanLoadModel {
         }
     }
 
-    /// Total human-generated power.
-    pub fn human_power(&self) -> f64 {
+    /// Sum of absolute synthetic joint torques, in N·m.
+    /// This is not mechanical power; power requires torque multiplied by angular velocity.
+    pub fn sum_abs_joint_torque_nm(&self) -> f64 {
         self.human_torques.iter().map(|t| t.abs()).sum()
     }
 }
 
-/// Consciousness-mediated full-frame callback.
+/// Identity callback for the articulated research plant.
 ///
-/// At high Φ: all 20 joints get full exo assistance.
-/// At low Φ: suit becomes transparent — human moves freely without assist.
-pub struct FullFrameCallback {
-    pub motor_gain: f32,
-    pub stiffness: f64,
-}
+/// It deliberately does not reinterpret cognitive metrics as physical forces,
+/// motor gains, or contact-friction parameters.
+pub struct FullFrameCallback;
 
 impl PhysicsCallback<3> for FullFrameCallback {
     fn apply_trauma(&mut self, _event: &CollisionEvent<3>) {}
@@ -166,19 +159,21 @@ impl PhysicsCallback<3> for FullFrameCallback {
         _body: BodyHandle,
         force: &nalgebra::SVector<f64, 3>,
     ) -> nalgebra::SVector<f64, 3> {
-        *force * self.motor_gain as f64 * self.stiffness
+        *force
     }
     fn modulate_impulse(&self, impulse: f64, _contact: &nalgebra::SVector<f64, 3>) -> f64 {
         impulse
     }
     fn friction_multiplier(&self, _contact: &nalgebra::SVector<f64, 3>, _body: BodyHandle) -> f64 {
-        0.3 + 0.7 * self.motor_gain as f64 // More backdrivable at low Φ
+        1.0
     }
     fn on_collision(&mut self, _event: &CollisionEvent<3>) {}
     fn record_dissipation(&mut self, _energy: f64) {}
+    fn record_work(&mut self, _body: BodyHandle, _work_joules: f64) {}
 }
 
-/// Full-frame exoskeleton simulator with 20 DOF and human load model.
+/// Simplified 20-joint articulated research plant. Synthetic human torques are
+/// generated for study but are not currently coupled into the physics world.
 pub struct FullFrameSimulator {
     pub world: PhysicsWorld<3>,
     pub spine_chain: ArticulatedChain,
@@ -353,24 +348,9 @@ impl FullFrameSimulator {
             right_arm,
             left_leg,
             right_leg,
-            human: HumanLoadModel::standard_adult(),
-            callback: FullFrameCallback {
-                motor_gain: 1.0,
-                stiffness: 1.0,
-            },
+            human: HumanLoadModel::reference_75kg_profile(),
+            callback: FullFrameCallback,
         }
-    }
-
-    /// Set consciousness-mediated impedance.
-    pub fn set_consciousness(&mut self, phi: f64) {
-        let gain = match phi {
-            p if p >= 0.6 => 1.0,
-            p if p >= 0.3 => 0.6,
-            p if p >= 0.1 => 0.3,
-            _ => 0.0,
-        };
-        self.callback.motor_gain = gain;
-        self.callback.stiffness = 0.5 + 0.5 * gain as f64;
     }
 
     /// Total joint count across all chains.
@@ -412,33 +392,28 @@ mod tests {
 
     #[test]
     fn test_human_load_model() {
-        let mut model = HumanLoadModel::standard_adult();
+        let mut model = HumanLoadModel::reference_75kg_profile();
         assert_eq!(model.total_mass_kg, 75.0);
-        assert_eq!(model.human_power(), 0.0); // No torques yet
+        assert_eq!(model.sum_abs_joint_torque_nm(), 0.0); // No torques yet
 
         // Update gait and verify torques are generated
         model.update(0.1);
         assert!(
-            model.human_power() > 0.0,
+            model.sum_abs_joint_torque_nm() > 0.0,
             "Gait should generate human torques"
         );
     }
 
     #[test]
-    fn test_consciousness_tiers() {
-        let mut sim = FullFrameSimulator::new();
+    fn physical_force_and_contact_properties_are_not_cognitive_metric_outputs() {
+        let callback = FullFrameCallback;
+        let body = BodyHandle(1);
+        let force = nalgebra::SVector::<f64, 3>::new(3.0, -9.81, 2.5);
+        let contact = nalgebra::SVector::<f64, 3>::new(0.0, 0.0, 1.0);
 
-        sim.set_consciousness(0.9); // Green
-        assert_eq!(sim.callback.motor_gain, 1.0);
-
-        sim.set_consciousness(0.5); // Yellow
-        assert_eq!(sim.callback.motor_gain, 0.6);
-
-        sim.set_consciousness(0.2); // Orange
-        assert_eq!(sim.callback.motor_gain, 0.3);
-
-        sim.set_consciousness(0.05); // Red
-        assert_eq!(sim.callback.motor_gain, 0.0);
+        assert_eq!(callback.modulate_force(body, &force), force);
+        assert_eq!(callback.modulate_impulse(12.5, &contact), 12.5);
+        assert_eq!(callback.friction_multiplier(&contact, body), 1.0);
     }
 
     #[test]
@@ -482,17 +457,17 @@ mod tests {
     }
 
     #[test]
-    fn test_fatigue_reduces_human_power() {
-        let mut fresh = HumanLoadModel::standard_adult();
-        let mut tired = HumanLoadModel::standard_adult();
+    fn test_fatigue_reduces_sum_abs_joint_torque_nm() {
+        let mut fresh = HumanLoadModel::reference_75kg_profile();
+        let mut tired = HumanLoadModel::reference_75kg_profile();
         tired.fatigue = 0.8; // 80% fatigued
 
         fresh.update(0.25);
         tired.update(0.25);
 
         assert!(
-            fresh.human_power() > tired.human_power(),
-            "Fresh human should generate more power than fatigued"
+            fresh.sum_abs_joint_torque_nm() > tired.sum_abs_joint_torque_nm(),
+            "Fresh synthetic profile should generate a larger absolute torque sum than the fatigued profile"
         );
     }
 

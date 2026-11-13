@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
-description = "HDC-LTC + FEP Active Inference exoskeleton — consciousness-coupled human augmentation"
+description = "Research-stage articulated exoskeleton simulation and assistive-mobility software"
 license = "AGPL-3.0-or-later"
 
 [dependencies]

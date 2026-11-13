@@ -195,13 +195,11 @@ impl symthaea_core::embodiment::EmbodimentBridge for ExoskeletonEmbodiment {
 /// drives the limb. This is the standard safety behavior for real lower-limb
 /// gait-assist exoskeletons (fail-safe = disengage, not fail-locked).
 ///
-/// NOTE: `ExoskeletonCommand::stiffness_gain`/`damping_gain` are also zeroed
-/// at Red in `step()` below, but — verified 2026-07 — the simulator's
-/// physics never reads either field; only `joint_torques` affects dynamics.
-/// So today those two fields are command-level intent, not yet a physically
-/// enforced impedance term. Not fixed here (out of scope: would mean adding
-/// real impedance dynamics to the simulator); flagging so the doc doesn't
-/// overpromise what stiffness/damping zeroing currently does.
+/// `SimpleExoskeletonSimulator::step` applies stiffness and damping as a
+/// spring-damper impedance term in its research dynamics. The Red path zeros
+/// assistive torque, stiffness, and damping before stepping that simulator.
+/// This is a software-model property only: it does not establish the behavior
+/// of any physical actuator, transmission, brake, clutch, or wearable device.
 impl SafeFallback for ExoskeletonEmbodiment {
     fn platform_name(&self) -> &'static str {
         "exoskeleton"

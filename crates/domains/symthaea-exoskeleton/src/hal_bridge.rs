@@ -1,14 +1,16 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! HAL bridge: drive the full-frame exoskeleton through real (or mock) servos.
+//! Software-only command-shape stub for the full-frame research model.
 //!
-//! Connects `FullFrameSimulator` (20 joints) to `HalRuntime` (21-channel
-//! dual-PCA9685 output) via a joint remap. The HAL runtime handles the
-//! 50Hz servo loop, safety interlock, telemetry, and e-stop polling.
+//! The historical module name is retained for source compatibility, but this
+//! file does not instantiate a HAL runtime, open I2C, drive servos, implement
+//! an emergency stop, or authorize physical actuation. It only emits an
+//! all-zero command in a proposed 21-channel logical layout and checks that
+//! the software loop remains finite.
 //!
-//! This is the final wire: a 20-DOF consciousness-coupled exoskeleton
-//! that can drive physical hardware with the mock I2C bus letting the
-//! pipeline run hardware-free in tests and CI.
+//! A real hardware adapter requires a separately reviewed transport, calibrated
+//! actuators and sensors, independent hardware safety controls, watchdogs,
+//! acknowledgements, fault injection and hardware-in-the-loop qualification.
 
 #![cfg(feature = "hal")]
 
@@ -16,95 +18,85 @@ use symthaea_humanoid::types::HumanoidCommand;
 
 use crate::full_frame::{FullFrameSimulator, NUM_FULL_FRAME_JOINTS};
 
-/// HAL channel count (2× PCA9685 × 16 channels = 32, we use 21 for humanoid).
+/// Proposed logical command width only; no physical pinout or board mapping is
+/// implemented or validated by this research stub.
 pub const HAL_CHANNELS: usize = 21;
 
-/// Maps 20 full-frame joints to 21 HAL channels.
+/// Emit the current all-zero placeholder command.
 ///
-/// HAL channel layout (PCA9685 boards 0x40 and 0x41):
-/// - Channel 0-1:   Spine (neck, lumbar)
-/// - Channel 2-7:   Left arm (6 joints)
-/// - Channel 8-13:  Right arm (6 joints)
-/// - Channel 14-16: Left leg (3 joints)
-/// - Channel 17-19: Right leg (3 joints)
-/// - Channel 20:    Reserved (head/gripper)
-pub fn full_frame_to_humanoid_command(sim: &FullFrameSimulator) -> HumanoidCommand {
-    let mut torques = vec![0.0f32; HAL_CHANNELS];
-
-    // Current consciousness-modulated motor gain
-    let gain = sim.callback.motor_gain;
-
-    // All torques are placeholders right now; a full controller would project
-    // thought_hv → 20 joint torques. For wiring validation, we emit a safe
-    // gravity-hold pattern (zero torques) scaled by gain.
-    for t in &mut torques {
-        *t = 0.0 * gain; // Safe passive hold
+/// This function intentionally takes no simulator or cognitive input: the
+/// research plant is not an actuator-command source.
+pub fn zero_torque_humanoid_command() -> HumanoidCommand {
+    HumanoidCommand {
+        torques: vec![0.0f32; HAL_CHANNELS],
     }
-
-    HumanoidCommand { torques }
 }
 
-/// Bridge configuration.
+/// Configuration for the software-only research smoke loop.
 #[derive(Debug, Clone)]
-pub struct HalBridgeConfig {
-    /// Maximum ticks to run (None = until e-stop).
-    pub max_ticks: Option<u64>,
-    /// Whether to use real I2C (linux feature) or mock.
-    pub use_mock_i2c: bool,
+pub struct SoftwareStubConfig {
+    /// Number of simulation ticks to execute.
+    pub max_ticks: u64,
 }
 
-impl Default for HalBridgeConfig {
+impl Default for SoftwareStubConfig {
     fn default() -> Self {
-        Self {
-            max_ticks: Some(50), // Matches current full-frame stability envelope
-            use_mock_i2c: true,
-        }
+        Self { max_ticks: 50 }
     }
 }
 
-/// Summary of a HAL bridge session.
+/// Report from the software-only zero-command loop.
 #[derive(Debug, Clone, Default)]
-pub struct HalBridgeReport {
+pub struct SoftwareStubReport {
     pub ticks_executed: u64,
-    pub final_phi_gain: f32,
+    pub commands_checked: u64,
+    /// True only if every checked command had the declared width and all-zero torque.
+    pub all_commands_zero_torque: bool,
     pub simulator_finite: bool,
 }
 
-/// Run a bridged session: FullFrameSimulator stepped via HAL runtime callback.
+/// Step the simplified research plant and check the zero-torque command shape.
 ///
-/// This exercises the full wiring without requiring physical hardware.
-/// When run with `--features hal`, the mock I2C bus handles all servo writes,
-/// making this safe for CI.
-pub fn run_bridged_session(
+/// No HAL runtime or I2C device is used. The result is software smoke evidence
+/// only, not hardware, safety, biomechanics or human-subject qualification.
+pub fn run_software_stub_session(
     sim: &mut FullFrameSimulator,
-    config: HalBridgeConfig,
-) -> HalBridgeReport {
-    let mut report = HalBridgeReport::default();
+    config: SoftwareStubConfig,
+) -> SoftwareStubReport {
+    let mut report = SoftwareStubReport {
+        all_commands_zero_torque: true,
+        ..SoftwareStubReport::default()
+    };
 
-    let max = config.max_ticks.unwrap_or(50);
-    for _ in 0..max {
-        // Step the physics simulation
+    for _ in 0..config.max_ticks {
         sim.step(0.001);
-
-        // Generate HAL command from simulator state
-        let _cmd = full_frame_to_humanoid_command(sim);
-
-        // In a real HAL session, this would go through HalRuntime.tick()
-        // For now we validate the command generation and state consistency.
+        let command = zero_torque_humanoid_command();
+        report.all_commands_zero_torque &= command.torques.len() == HAL_CHANNELS
+            && command.torques.iter().all(|torque| *torque == 0.0);
+        report.commands_checked += 1;
         report.ticks_executed += 1;
     }
 
-    report.final_phi_gain = sim.callback.motor_gain;
-    // Check that at least one chain tip is still finite
-    let spine_finite = sim
-        .spine_chain
-        .links
-        .first()
-        .and_then(|&h| sim.world.body(h))
-        .map(|b| b.transform.translation.0.iter().all(|v| v.is_finite()))
-        .unwrap_or(false);
-    report.simulator_finite = spine_finite;
-
+    // Check every body and the numerical health of its rotation state.
+    // A single spine-link translation is not sufficient evidence that the
+    // complete articulated research plant remained finite.
+    report.simulator_finite = !sim.world.bodies.is_empty()
+        && sim.world.bodies.iter().all(|body| {
+            body.transform
+                .translation
+                .0
+                .iter()
+                .all(|value| value.is_finite())
+                && body.linear_velocity.iter().all(|value| value.is_finite())
+                && body.angular_velocity.is_finite()
+                && body.force_accumulator.iter().all(|value| value.is_finite())
+                && body.torque_accumulator.is_finite()
+                && body.inertia.iter().all(|value| value.is_finite())
+                && body.inv_inertia.iter().all(|value| value.is_finite())
+                && body.mass.is_finite()
+                && body.inv_mass.is_finite()
+                && body.transform.rotation.is_proper_rotation(1e-8)
+        });
     report
 }
 
@@ -113,48 +105,46 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_command_generation_matches_hal_layout() {
-        let sim = FullFrameSimulator::new();
-        let cmd = full_frame_to_humanoid_command(&sim);
-        assert_eq!(cmd.torques.len(), HAL_CHANNELS);
+    fn zero_command_has_declared_logical_width() {
+        let command = zero_torque_humanoid_command();
+        assert_eq!(command.torques.len(), HAL_CHANNELS);
         assert_eq!(HAL_CHANNELS, 21);
+        assert!(command.torques.iter().all(|torque| *torque == 0.0));
     }
 
     #[test]
-    fn test_zero_phi_produces_safe_hold() {
+    fn software_stub_loop_reports_only_zero_commands() {
         let mut sim = FullFrameSimulator::new();
-        sim.set_consciousness(0.0); // Red tier
-        let cmd = full_frame_to_humanoid_command(&sim);
-        // All torques zero when Phi below threshold
-        assert!(cmd.torques.iter().all(|&t| t == 0.0));
+        let report = run_software_stub_session(
+            &mut sim,
+            SoftwareStubConfig { max_ticks: 20 },
+        );
+        assert_eq!(report.ticks_executed, 20);
+        assert_eq!(report.commands_checked, 20);
+        assert!(report.all_commands_zero_torque);
+        assert!(report.simulator_finite);
     }
 
     #[test]
-    fn test_bridged_session_runs_to_completion() {
+    fn software_stub_detects_non_finite_state_in_any_body() {
         let mut sim = FullFrameSimulator::new();
-        let config = HalBridgeConfig::default();
-        let report = run_bridged_session(&mut sim, config);
+        let handle = sim.right_arm.links[2];
+        sim.world
+            .body_mut(handle)
+            .expect("right-arm link exists")
+            .linear_velocity[0] = f64::NAN;
 
-        assert_eq!(report.ticks_executed, 50);
-        assert!(report.simulator_finite, "Simulator should remain finite");
+        // Zero ticks isolates the reporting check from the integrator's
+        // input sanitization path.
+        let report = run_software_stub_session(
+            &mut sim,
+            SoftwareStubConfig { max_ticks: 0 },
+        );
+        assert!(!report.simulator_finite);
     }
 
     #[test]
-    fn test_bridged_session_respects_consciousness() {
-        let mut sim = FullFrameSimulator::new();
-        sim.set_consciousness(0.5); // Yellow tier
-        let config = HalBridgeConfig {
-            max_ticks: Some(20),
-            use_mock_i2c: true,
-        };
-        let report = run_bridged_session(&mut sim, config);
-        // motor_gain for phi=0.5 is 0.6 (Yellow)
-        assert_eq!(report.final_phi_gain, 0.6);
-    }
-
-    #[test]
-    fn test_full_frame_joint_count_matches_expectation() {
-        // Sanity: 20 full-frame joints, 21 HAL channels (1 reserved)
+    fn full_frame_joint_count_matches_research_model() {
         assert_eq!(NUM_FULL_FRAME_JOINTS, 20);
         assert_eq!(HAL_CHANNELS, 21);
     }
