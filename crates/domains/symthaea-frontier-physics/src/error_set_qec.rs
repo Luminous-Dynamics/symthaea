@@ -985,7 +985,7 @@ mod tests {
         let invalid_code = ComplexMatrix::from_real(2, 2, &[1.0, 0.0, 1.0, 0.0]).unwrap();
         let identity = ComplexMatrix::from_real(2, 2, &[1.0, 0.0, 0.0, 1.0]).unwrap();
         assert!(matches!(
-            compute_error_set_qec_diagnostics(&invalid_code, &[identity.clone()], 1.0e-12),
+            compute_error_set_qec_diagnostics(&invalid_code, std::slice::from_ref(&identity), 1.0e-12),
             Err(ErrorSetQecError::CodeIsometryResidual { .. })
         ));
         let code = ComplexMatrix::from_real(2, 1, &[1.0, 0.0]).unwrap();
