@@ -144,7 +144,10 @@
             "2026-11-01",
             "2026-11-02"
           ]
-        }
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-1",
+        "other_model_registered": true
       },
       "measurements": [
         {
@@ -158,7 +161,11 @@
           "independence_group": "wetting-01",
           "covariance_model_id": "cov-prep-01",
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-wca-01"
+          "raw_trace_digest": "sha256:synthetic-wca-01",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m1-wca",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m1-ftir",
@@ -171,7 +178,11 @@
           "independence_group": "chem-01",
           "covariance_model_id": "cov-prep-01",
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-ftir-01"
+          "raw_trace_digest": "sha256:synthetic-ftir-01",
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-calibration-m1-ftir",
+          "uncertainty": 0.01
         }
       ],
       "covariance_models": [
@@ -243,7 +254,10 @@
           "training_days": [
             "2026-11-01"
           ]
-        }
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-2",
+        "other_model_registered": true
       },
       "measurements": [
         {
@@ -257,7 +271,11 @@
           "independence_group": "wet-02",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-wca-02"
+          "raw_trace_digest": "sha256:synthetic-wca-02",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m2-wca",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m2-bond",
@@ -270,7 +288,11 @@
           "independence_group": "bond-02",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-bond-02"
+          "raw_trace_digest": "sha256:synthetic-bond-02",
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m2-bond",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m2-aged",
@@ -283,7 +305,11 @@
           "independence_group": "age-02",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-aged-02"
+          "raw_trace_digest": "sha256:synthetic-aged-02",
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m2-aged",
+          "uncertainty": 0.01
         }
       ],
       "covariance_models": [],
@@ -345,7 +371,10 @@
           "training_days": [
             "2026-11-01"
           ]
-        }
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-3",
+        "other_model_registered": true
       },
       "measurements": [
         {
@@ -359,7 +388,11 @@
           "independence_group": "wet-03",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-wca-03"
+          "raw_trace_digest": "sha256:synthetic-wca-03",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m3-wca",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m3-bond",
@@ -372,7 +405,11 @@
           "independence_group": "bond-03",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-bond-03"
+          "raw_trace_digest": "sha256:synthetic-bond-03",
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m3-bond",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m3-aged",
@@ -385,7 +422,11 @@
           "independence_group": "age-03",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-aged-03"
+          "raw_trace_digest": "sha256:synthetic-aged-03",
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m3-aged",
+          "uncertainty": 0.01
         }
       ],
       "covariance_models": [],
@@ -450,7 +491,10 @@
           "training_days": [
             "2026-11-01"
           ]
-        }
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-4",
+        "other_model_registered": true
       },
       "measurements": [
         {
@@ -464,7 +508,11 @@
           "independence_group": "wet-04",
           "covariance_model_id": "cov-ldpe-prep-04",
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-wca-04"
+          "raw_trace_digest": "sha256:synthetic-wca-04",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m4-wca",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m4-ftir",
@@ -477,7 +525,11 @@
           "independence_group": "chem-04",
           "covariance_model_id": "cov-ldpe-prep-04",
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-ftir-04"
+          "raw_trace_digest": "sha256:synthetic-ftir-04",
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-calibration-m4-ftir",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m4-bond",
@@ -490,7 +542,11 @@
           "independence_group": "bond-04",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-bond-04"
+          "raw_trace_digest": "sha256:synthetic-bond-04",
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m4-bond",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m4-aged",
@@ -503,7 +559,11 @@
           "independence_group": "age-04",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-aged-04"
+          "raw_trace_digest": "sha256:synthetic-aged-04",
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m4-aged",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m4-wvtr",
@@ -516,7 +576,11 @@
           "independence_group": "wvtr-04",
           "covariance_model_id": "cov-barrier-04",
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-wvtr-04"
+          "raw_trace_digest": "sha256:synthetic-wvtr-04",
+          "quantity": "water_vapour_transmission_ratio",
+          "unit": "ratio",
+          "calibration_record_id": "synthetic-calibration-m4-wvtr",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m4-otr",
@@ -529,7 +593,11 @@
           "independence_group": "otr-04",
           "covariance_model_id": "cov-barrier-04",
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-otr-04"
+          "raw_trace_digest": "sha256:synthetic-otr-04",
+          "quantity": "oxygen_transmission_ratio",
+          "unit": "ratio",
+          "calibration_record_id": "synthetic-calibration-m4-otr",
+          "uncertainty": 0.01
         }
       ],
       "covariance_models": [
@@ -613,7 +681,10 @@
             "2026-11-01",
             "2026-11-02"
           ]
-        }
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-5",
+        "other_model_registered": true
       },
       "measurements": [
         {
@@ -627,7 +698,11 @@
           "independence_group": "wet-05",
           "covariance_model_id": "cov-prep-05",
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-wca-05"
+          "raw_trace_digest": "sha256:synthetic-wca-05",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m5-wca",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m5-ftir",
@@ -640,7 +715,11 @@
           "independence_group": "chem-05",
           "covariance_model_id": "cov-prep-05",
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-ftir-05"
+          "raw_trace_digest": "sha256:synthetic-ftir-05",
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-calibration-m5-ftir",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m5-bond",
@@ -653,7 +732,11 @@
           "independence_group": "bond-05",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-bond-05"
+          "raw_trace_digest": "sha256:synthetic-bond-05",
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m5-bond",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m5-aged",
@@ -666,7 +749,11 @@
           "independence_group": "age-05",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-aged-05"
+          "raw_trace_digest": "sha256:synthetic-aged-05",
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m5-aged",
+          "uncertainty": 0.01
         }
       ],
       "covariance_models": [
@@ -739,7 +826,10 @@
           "training_days": [
             "2026-11-01"
           ]
-        }
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-6",
+        "other_model_registered": true
       },
       "measurements": [
         {
@@ -753,7 +843,11 @@
           "independence_group": "shared-prep-06",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-wca-06"
+          "raw_trace_digest": "sha256:synthetic-wca-06",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m6-wca",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m6-ftir",
@@ -766,7 +860,11 @@
           "independence_group": "shared-prep-06",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-ftir-06"
+          "raw_trace_digest": "sha256:synthetic-ftir-06",
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-calibration-m6-ftir",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m6-bond",
@@ -779,7 +877,11 @@
           "independence_group": "bond-06",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-bond-06"
+          "raw_trace_digest": "sha256:synthetic-bond-06",
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m6-bond",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m6-aged",
@@ -792,7 +894,11 @@
           "independence_group": "age-06",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-aged-06"
+          "raw_trace_digest": "sha256:synthetic-aged-06",
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m6-aged",
+          "uncertainty": 0.01
         }
       ],
       "covariance_models": [],
@@ -855,7 +961,10 @@
           "training_days": [
             "2026-11-01"
           ]
-        }
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-7",
+        "other_model_registered": true
       },
       "measurements": [
         {
@@ -869,7 +978,11 @@
           "independence_group": "wet-07",
           "covariance_model_id": "cov-prep-07",
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-wca-07"
+          "raw_trace_digest": "sha256:synthetic-wca-07",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m7-wca",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m7-ftir",
@@ -882,7 +995,11 @@
           "independence_group": "chem-07",
           "covariance_model_id": "cov-prep-07",
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-ftir-07"
+          "raw_trace_digest": "sha256:synthetic-ftir-07",
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-calibration-m7-ftir",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m7-bond",
@@ -895,7 +1012,11 @@
           "independence_group": "bond-07",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-bond-07"
+          "raw_trace_digest": "sha256:synthetic-bond-07",
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m7-bond",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m7-aged",
@@ -908,7 +1029,11 @@
           "independence_group": "age-07",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-aged-07"
+          "raw_trace_digest": "sha256:synthetic-aged-07",
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m7-aged",
+          "uncertainty": 0.01
         }
       ],
       "covariance_models": [
@@ -980,7 +1105,10 @@
           "training_days": [
             "2026-11-01"
           ]
-        }
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-8",
+        "other_model_registered": true
       },
       "measurements": [],
       "covariance_models": [],
@@ -1045,7 +1173,10 @@
             "2026-11-01",
             "2026-11-02"
           ]
-        }
+        },
+        "model_adequacy_status": "ADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-9",
+        "other_model_registered": true
       },
       "measurements": [
         {
@@ -1059,7 +1190,11 @@
           "independence_group": "wet-08",
           "covariance_model_id": "cov-prep-08",
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-wca-08"
+          "raw_trace_digest": "sha256:synthetic-wca-08",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m9-wca",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m9-ftir",
@@ -1072,7 +1207,11 @@
           "independence_group": "chem-08",
           "covariance_model_id": "cov-prep-08",
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-ftir-08"
+          "raw_trace_digest": "sha256:synthetic-ftir-08",
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-calibration-m9-ftir",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m9-bond",
@@ -1085,7 +1224,11 @@
           "independence_group": "bond-08",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-bond-08"
+          "raw_trace_digest": "sha256:synthetic-bond-08",
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m9-bond",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m9-aged",
@@ -1098,7 +1241,11 @@
           "independence_group": "age-08",
           "covariance_model_id": null,
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-aged-08"
+          "raw_trace_digest": "sha256:synthetic-aged-08",
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m9-aged",
+          "uncertainty": 0.01
         },
         {
           "measurement_id": "m9-unapproved",
@@ -1111,7 +1258,11 @@
           "independence_group": "chem-08",
           "covariance_model_id": "cov-prep-08",
           "calibration_status": "QUALIFIED",
-          "raw_trace_digest": "sha256:synthetic-unapproved-08"
+          "raw_trace_digest": "sha256:synthetic-unapproved-08",
+          "quantity": "unapproved_chemistry_signal",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-calibration-m9-unapproved",
+          "uncertainty": 0.01
         }
       ],
       "covariance_models": [
@@ -1139,6 +1290,153 @@
       },
       "expected": {
         "audit_disposition": "REJECTED",
+        "product_decision": "ABSTAIN"
+      }
+    },
+    {
+      "scenario_id": "model-family-inadequate-abstain",
+      "profile": {
+        "profile_id": "PP_ADHESIVE_A",
+        "material_family": "PP",
+        "requires_barrier_preservation": false,
+        "min_bond_strength_mpa": 5,
+        "min_aged_bond_strength_mpa": 4.5,
+        "min_retention": 0.85,
+        "max_wvtr_ratio": null,
+        "max_otr_ratio": null,
+        "acceptable_failure_modes": [
+          "cohesive",
+          "mixed"
+        ]
+      },
+      "budget": {
+        "max_cost_units": 40,
+        "max_latency_hours": 480,
+        "max_specimens": 30
+      },
+      "selection_receipt": {
+        "receipt_id": "synthetic-selection-inadequate-model",
+        "owner": "UAP-OED-001",
+        "method": "SYNTHETIC_ADVISORY_SELECTION",
+        "objective": "ROBUST_DECISION_EVIDENCE",
+        "selected_action_ids": [
+          "WCA_SCREEN",
+          "FTIR_CHEMISTRY",
+          "LAP_SHEAR",
+          "AGED_LAP_SHEAR"
+        ],
+        "training_group_manifest": {
+          "manifest_id": "synthetic-groups-10",
+          "training_lots": [
+            "TRAIN-PP-01",
+            "TRAIN-PP-02"
+          ],
+          "training_devices": [
+            "TRAIN-HEAD-01"
+          ],
+          "training_days": [
+            "2026-11-01",
+            "2026-11-02"
+          ]
+        },
+        "model_adequacy_status": "INADEQUATE",
+        "model_adequacy_receipt_id": "synthetic-adequacy-inadequate-10",
+        "other_model_registered": true
+      },
+      "measurements": [
+        {
+          "measurement_id": "m10-wca",
+          "action_id": "WCA_SCREEN",
+          "specimen_id": "s40",
+          "lot_id": "HOLDOUT-PP-09",
+          "device_id": "HEAD-NEW-09",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-09",
+          "independence_group": "wet-09",
+          "covariance_model_id": "cov-prep-10",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-wca-10",
+          "quantity": "water_contact_angle",
+          "unit": "degree",
+          "calibration_record_id": "synthetic-calibration-m10-wca",
+          "uncertainty": 0.01
+        },
+        {
+          "measurement_id": "m10-ftir",
+          "action_id": "FTIR_CHEMISTRY",
+          "specimen_id": "s41",
+          "lot_id": "HOLDOUT-PP-09",
+          "device_id": "HEAD-NEW-09",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-09",
+          "independence_group": "chem-09",
+          "covariance_model_id": "cov-prep-10",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-ftir-10",
+          "quantity": "infrared_signature",
+          "unit": "a.u.",
+          "calibration_record_id": "synthetic-calibration-m10-ftir",
+          "uncertainty": 0.01
+        },
+        {
+          "measurement_id": "m10-bond",
+          "action_id": "LAP_SHEAR",
+          "specimen_id": "s42",
+          "lot_id": "HOLDOUT-PP-09",
+          "device_id": "HEAD-NEW-09",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "bond-pp-09",
+          "independence_group": "bond-09",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-bond-10",
+          "quantity": "lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m10-bond",
+          "uncertainty": 0.01
+        },
+        {
+          "measurement_id": "m10-aged",
+          "action_id": "AGED_LAP_SHEAR",
+          "specimen_id": "s43",
+          "lot_id": "HOLDOUT-PP-09",
+          "device_id": "HEAD-NEW-09",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "aged-pp-09",
+          "independence_group": "age-09",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-aged-10",
+          "quantity": "aged_lap_shear_strength",
+          "unit": "MPa",
+          "calibration_record_id": "synthetic-calibration-m10-aged",
+          "uncertainty": 0.01
+        }
+      ],
+      "covariance_models": [
+        {
+          "model_id": "cov-prep-10",
+          "evidence_class": "SYNTHETIC",
+          "receipt_id": "synthetic-covariance-receipt-10",
+          "measurement_ids": [
+            "m10-wca",
+            "m10-ftir"
+          ]
+        }
+      ],
+      "outcomes": {
+        "wca_deg": 18,
+        "bond_strength_mpa": 6.2,
+        "aged_bond_strength_mpa": 5.5,
+        "bond_retention": 0.887,
+        "failure_mode": "cohesive",
+        "wvtr_ratio": null,
+        "otr_ratio": null,
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "expected": {
+        "audit_disposition": "BLOCKED",
         "product_decision": "ABSTAIN"
       }
     }
