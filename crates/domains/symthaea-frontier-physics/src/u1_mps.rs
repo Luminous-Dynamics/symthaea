@@ -4700,6 +4700,31 @@ mod tests {
         );
     }
 
+
+
+    fn exact_three_site_xy_state(
+        coupling_left: f64,
+        coupling_right: f64,
+        time: f64,
+    ) -> Vec<Complex64> {
+        let frequency =
+            (coupling_left * coupling_left + coupling_right * coupling_right).sqrt();
+        let cosine = (frequency * time).cos();
+        let sine = (frequency * time).sin();
+        let mut exact = vec![complex_zero(); 8];
+        exact[4] = Complex64::new(
+            1.0 + (cosine - 1.0) * coupling_left * coupling_left
+                / (frequency * frequency),
+            0.0,
+        );
+        exact[2] = Complex64::new(0.0, -sine * coupling_left / frequency);
+        exact[1] = Complex64::new(
+            (cosine - 1.0) * coupling_left * coupling_right / (frequency * frequency),
+            0.0,
+        );
+        exact
+    }
+
     #[test]
     fn three_site_xy_chain_strang_step_has_second_order_global_convergence() {
         let coupling_left = 0.7_f64;
@@ -4756,5 +4781,72 @@ mod tests {
         assert!((3.3..=4.8).contains(&ratio_coarse), "coarse ratio={ratio_coarse}");
         assert!((3.3..=4.8).contains(&ratio_fine), "fine ratio={ratio_fine}");
     }
+
+    #[test]
+    fn step_doubling_reports_qualified_richardson_estimate_against_exact_xy_state() {
+        let coupling_left = 0.7_f64;
+        let coupling_right = 0.4_f64;
+        let time_step = 0.4_f64;
+        let initial = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let policy = U1TwoSiteTruncationPolicy {
+            max_bond_dimension: 8,
+            relative_singular_value_cutoff: 0.0,
+            tolerance: 1.0e-10,
+        };
+        let stepper = U1TeBDStrangStepper::new(
+            vec![
+                xy_exchange_hamiltonian(coupling_left),
+                xy_exchange_hamiltonian(coupling_right),
+            ],
+            time_step,
+            1.0e-12,
+        )
+        .unwrap();
+        let result = stepper.apply_with_step_doubling(&initial, policy).unwrap();
+        assert_eq!(result.time_step, time_step);
+        assert_eq!(result.trotter_order, 2);
+        assert!(result.richardson_estimate_qualified);
+        assert!(result.truncation_contamination_included);
+        assert!(result.measured_step_doubling_defect_l2 > 0.0);
+        let estimate = result
+            .richardson_fine_trotter_error_estimate
+            .expect("passing gauge receipts must enable a step-doubling estimate");
+        assert!(estimate >= result.measured_step_doubling_defect_l2 / 3.0);
+
+        let exact = exact_three_site_xy_state(coupling_left, coupling_right, time_step);
+        let measured_fine_error =
+            dense_l2_distance(&result.state.to_dense(4).unwrap(), &exact);
+        assert!(measured_fine_error <= estimate + 1.0e-9);
+        assert_eq!(result.state.total_charge(), 1);
+    }
+
+    #[test]
+    fn second_order_step_doubling_defect_scales_cubically_with_single_step_dt() {
+        let couplings = vec![xy_exchange_hamiltonian(0.7), xy_exchange_hamiltonian(0.4)];
+        let input = ComplexU1Mps::product_state(&[true, false, false]).unwrap();
+        let policy = U1TwoSiteTruncationPolicy {
+            max_bond_dimension: 8,
+            relative_singular_value_cutoff: 0.0,
+            tolerance: 1.0e-10,
+        };
+        let coarse = U1TeBDStrangStepper::new(couplings.clone(), 0.4, 1.0e-12)
+            .unwrap()
+            .apply_with_step_doubling(&input, policy)
+            .unwrap();
+        let fine = U1TeBDStrangStepper::new(couplings, 0.2, 1.0e-12)
+            .unwrap()
+            .apply_with_step_doubling(&input, policy)
+            .unwrap();
+
+        assert!(coarse.richardson_estimate_qualified);
+        assert!(fine.richardson_estimate_qualified);
+        let ratio =
+            coarse.measured_step_doubling_defect_l2 / fine.measured_step_doubling_defect_l2;
+        assert!(
+            (6.0..=10.0).contains(&ratio),
+            "single-step halving should scale the local defect near 2^3, ratio={ratio}"
+        );
+    }
+
 
 }
