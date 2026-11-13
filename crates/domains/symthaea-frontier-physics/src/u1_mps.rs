@@ -1771,6 +1771,12 @@ impl U1TwoSiteGate {
         self.charge_conservation_residual
     }
 
+    /// Frobenius residual between the supplied matrix and the block-Hermitian
+    /// U(1)-conserving Hamiltonian actually exponentiated.
+    pub fn projection_residual(&self) -> f64 {
+        self.projection_residual
+    }
+
     pub fn unitarity_residual(&self) -> f64 {
         self.unitarity_residual
     }
@@ -1814,6 +1820,7 @@ pub struct U1TwoSiteHamiltonian {
     matrix: [[Complex64; 4]; 4],
     hermiticity_residual: f64,
     charge_conservation_residual: f64,
+    projection_residual: f64,
 }
 
 impl U1TwoSiteHamiltonian {
@@ -1866,10 +1873,30 @@ impl U1TwoSiteHamiltonian {
             });
         }
 
+        let mut projected = [[Complex64::new(0.0, 0.0); 4]; 4];
+        projected[0][0] = Complex64::new(matrix[0][0].re, 0.0);
+        projected[3][3] = Complex64::new(matrix[3][3].re, 0.0);
+        projected[1][1] = Complex64::new(matrix[1][1].re, 0.0);
+        projected[2][2] = Complex64::new(matrix[2][2].re, 0.0);
+        let symmetric_coupling = 0.5 * (matrix[1][2] + matrix[2][1].conj());
+        projected[1][2] = symmetric_coupling;
+        projected[2][1] = symmetric_coupling.conj();
+        let projection_squared = (0_usize..4)
+            .flat_map(|row| (0_usize..4).map(move |column| (row, column)))
+            .map(|(row, column)| (matrix[row][column] - projected[row][column]).norm_sqr())
+            .sum::<f64>();
+        let projection_residual = projection_squared.sqrt();
+        if !projection_residual.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "two-site Hamiltonian projection residual",
+            ));
+        }
+
         Ok(Self {
             matrix,
             hermiticity_residual,
             charge_conservation_residual,
+            projection_residual,
         })
     }
 
@@ -1903,7 +1930,7 @@ impl U1TwoSiteHamiltonian {
         let h11 = self.matrix[3][3].re;
         let a = self.matrix[1][1].re;
         let d = self.matrix[2][2].re;
-        let coupling = self.matrix[1][2];
+        let coupling = 0.5 * (self.matrix[1][2] + self.matrix[2][1].conj());
         let midpoint = 0.5 * (a + d);
         let difference = 0.5 * (a - d);
         let frequency = (difference * difference + coupling.norm_sqr()).sqrt();
@@ -2961,6 +2988,7 @@ pub struct U1TeBDStepDoublingResult {
     pub state: ComplexU1Mps,
     pub time_step: f64,
     pub trotter_order: u8,
+    pub bond_hamiltonian_projection_residuals: Vec<f64>,
     pub measured_step_doubling_defect_l2: f64,
     pub coarse_truncation_error_upper_bound: Option<f64>,
     pub fine_truncation_error_upper_bound: Option<f64>,
@@ -2975,6 +3003,9 @@ pub struct U1TeBDStrangStepResult {
     pub state: ComplexU1Mps,
     pub time_step: f64,
     pub trotter_order: u8,
+    pub bond_hamiltonian_hermiticity_residuals: Vec<f64>,
+    pub bond_hamiltonian_charge_residuals: Vec<f64>,
+    pub bond_hamiltonian_projection_residuals: Vec<f64>,
     pub layers: Vec<U1TeBDLayerResult>,
     pub input_norm_squared: f64,
     pub output_norm_squared: f64,
@@ -3110,6 +3141,11 @@ impl U1TeBDStrangStepper {
             state: fine_second.state,
             time_step: self.time_step,
             trotter_order: 2,
+            bond_hamiltonian_projection_residuals: self
+                .bond_hamiltonians
+                .iter()
+                .map(U1TwoSiteHamiltonian::projection_residual)
+                .collect(),
             measured_step_doubling_defect_l2: defect,
             coarse_truncation_error_upper_bound: coarse_bound,
             fine_truncation_error_upper_bound: fine_bound,
@@ -3176,6 +3212,21 @@ impl U1TeBDStrangStepper {
             state,
             time_step: self.time_step,
             trotter_order: 2,
+            bond_hamiltonian_hermiticity_residuals: self
+                .bond_hamiltonians
+                .iter()
+                .map(U1TwoSiteHamiltonian::hermiticity_residual)
+                .collect(),
+            bond_hamiltonian_charge_residuals: self
+                .bond_hamiltonians
+                .iter()
+                .map(U1TwoSiteHamiltonian::charge_conservation_residual)
+                .collect(),
+            bond_hamiltonian_projection_residuals: self
+                .bond_hamiltonians
+                .iter()
+                .map(U1TwoSiteHamiltonian::projection_residual)
+                .collect(),
             layers,
             input_norm_squared,
             output_norm_squared,
