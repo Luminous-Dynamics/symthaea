@@ -3,6 +3,7 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Nix source parsing via tree-sitter.
 
+pub mod eval_diagnostics;
 pub mod flake_parser;
 pub mod module_parser;
 pub mod nix_code_parser;

@@ -106,6 +106,15 @@ pub enum Command {
         domain: Option<ObserveDomain>,
     },
 
+    /// Classify a captured Nix evaluator/rebuild stderr log (read-only).
+    ///
+    /// Reads the named file, or stdin when no file is supplied. This command
+    /// never invokes Nix or modifies the configuration.
+    Diagnose {
+        /// Captured stderr file (reads stdin when omitted).
+        file: Option<String>,
+    },
+
     /// Run system diagnostics.
     Doctor,
 
@@ -424,6 +433,23 @@ mod tests {
     fn test_output_format_json() {
         let cli = Cli::parse_from(["nixward", "--format", "json", "search", "vim"]);
         assert_eq!(cli.format, OutputFormat::Json);
+    }
+
+    #[test]
+    fn test_parse_diagnose_from_file() {
+        let cli = Cli::parse_from(["nixward", "diagnose", "/tmp/rebuild.stderr"]);
+        match cli.command {
+            Some(Command::Diagnose { file }) => {
+                assert_eq!(file.as_deref(), Some("/tmp/rebuild.stderr"));
+            }
+            _ => panic!("Expected Diagnose command"),
+        }
+    }
+
+    #[test]
+    fn test_parse_diagnose_from_stdin() {
+        let cli = Cli::parse_from(["nixward", "diagnose"]);
+        assert!(matches!(cli.command, Some(Command::Diagnose { file: None })));
     }
 
     #[test]

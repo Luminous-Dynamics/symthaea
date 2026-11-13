@@ -7,6 +7,7 @@
 //! natural language input through the cognitive core.
 
 use clap::Parser;
+use std::io::Read;
 use nixward::action::config_writer::ConfigWriter;
 use nixward::action::executor::NixOSCommand;
 use nixward::action::flake_ops::FlakeOps;
@@ -75,6 +76,10 @@ fn main() {
 
         Command::Observe { domain } => {
             cmd_observe(domain, cli.format);
+        }
+
+        Command::Diagnose { file } => {
+            cmd_diagnose(file.as_deref(), cli.format);
         }
 
         Command::Doctor => {
@@ -205,6 +210,80 @@ fn main() {
 }
 
 // ---- Command implementations ----
+
+/// Analyze an explicitly supplied Nix stderr log, or stdin when no file is
+/// provided. This path is read-only and never invokes Nix or mutates a host.
+fn cmd_diagnose(file: Option<&str>, format: OutputFormat) {
+    let mut stderr = String::new();
+    let read_result = match file {
+        Some(path) => std::fs::read_to_string(path).map(|contents| stderr = contents),
+        None => std::io::stdin().lock().read_to_string(&mut stderr).map(|_| ()),
+    };
+
+    if let Err(error) = read_result {
+        eprintln!("Failed to read diagnostic input: {error}");
+        std::process::exit(2);
+    }
+
+    let report = nixward::parser::eval_diagnostics::NixEvaluationReport::analyze(&stderr);
+
+    match format {
+        OutputFormat::Json => {
+            match serde_json::to_string_pretty(&report) {
+                Ok(json) => println!("{json}"),
+                Err(error) => {
+                    eprintln!("Failed to serialize diagnostic report: {error}");
+                    std::process::exit(2);
+                }
+            }
+        }
+        OutputFormat::Minimal => {
+            if let Some(primary) = report.primary() {
+                println!("{:?}", primary.kind);
+            } else if report.warning_count() > 0 {
+                println!("warnings_only");
+            } else {
+                println!("no_known_diagnostics");
+            }
+        }
+        OutputFormat::Human => {
+            if report.diagnostics.is_empty() {
+                println!("No known Nix evaluation diagnostics were recognized.");
+            }
+            for diagnostic in &report.diagnostics {
+                println!(
+                    "{:?} {:?}: {}",
+                    diagnostic.severity, diagnostic.kind, diagnostic.title
+                );
+                if let Some(subject) = &diagnostic.subject {
+                    println!("  Subject: {subject}");
+                }
+                if let Some(source) = &diagnostic.source {
+                    println!(
+                        "  Source frame: {}:{}:{}",
+                        source.file, source.line, source.column
+                    );
+                }
+                println!("  {}", diagnostic.explanation);
+                for item in &diagnostic.evidence {
+                    println!("  Evidence [{}]: {}", item.line_number, item.text);
+                }
+                for recommendation in &diagnostic.recommendations {
+                    println!("  Review: {recommendation}");
+                }
+            }
+            println!(
+                "Summary: {} error(s), {} warning(s).",
+                report.error_count(),
+                report.warning_count()
+            );
+        }
+    }
+
+    if report.error_count() > 0 {
+        std::process::exit(1);
+    }
+}
 
 fn cmd_search(query: &str, options: bool, limit: usize, format: OutputFormat) {
     if options {
