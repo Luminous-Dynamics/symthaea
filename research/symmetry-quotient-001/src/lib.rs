@@ -8,11 +8,11 @@
 // Explicit indices keep finite multiplication/action tables auditable.
 #![allow(clippy::needless_range_loop)]
 
+use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::fmt;
 use std::fmt::Write as _;
-use serde::Serialize;
-use sha2::{Digest, Sha256};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FiniteGroupV1 {
@@ -137,8 +137,8 @@ fn write_canonical_json(
 /// The current input structs contain only booleans, integers, arrays and strings;
 /// non-finite floating-point encodings are therefore outside this schema.
 fn canonical_json_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, QuotientErrorV1> {
-    let value = serde_json::to_value(value)
-        .map_err(|_| QuotientErrorV1::CanonicalSerializationFailed)?;
+    let value =
+        serde_json::to_value(value).map_err(|_| QuotientErrorV1::CanonicalSerializationFailed)?;
     let mut output = String::new();
     write_canonical_json(&value, &mut output)?;
     Ok(output.into_bytes())
@@ -153,10 +153,7 @@ fn sha256_hex(bytes: &[u8]) -> String {
     result
 }
 
-fn canonical_json_sha256<T: Serialize>(
-    domain: &str,
-    value: &T,
-) -> Result<String, QuotientErrorV1> {
+fn canonical_json_sha256<T: Serialize>(domain: &str, value: &T) -> Result<String, QuotientErrorV1> {
     let canonical = canonical_json_bytes(value)?;
     let mut hasher = Sha256::new();
     hasher.update(domain.as_bytes());
@@ -176,12 +173,9 @@ pub fn input_commitment_v1(
 ) -> Result<InputCommitmentV1, QuotientErrorV1> {
     const SCHEMA_VERSION: &str = "luminous.symmetry_quotient_inputs.v1";
     const CANONICALIZATION_ID: &str = "luminous.canonical_json.sorted_keys_compact_utf8.v1";
-    let problem_sha256 =
-        canonical_json_sha256("luminous.symmetry_quotient.problem.v1", problem)?;
-    let action_sha256 =
-        canonical_json_sha256("luminous.symmetry_quotient.action.v1", action)?;
-    let budget_sha256 =
-        canonical_json_sha256("luminous.symmetry_quotient.budget.v1", &budget)?;
+    let problem_sha256 = canonical_json_sha256("luminous.symmetry_quotient.problem.v1", problem)?;
+    let action_sha256 = canonical_json_sha256("luminous.symmetry_quotient.action.v1", action)?;
+    let budget_sha256 = canonical_json_sha256("luminous.symmetry_quotient.budget.v1", &budget)?;
     let core = InputCommitmentCoreV1 {
         schema_version: SCHEMA_VERSION,
         canonicalization_id: CANONICALIZATION_ID,
@@ -189,8 +183,7 @@ pub fn input_commitment_v1(
         action_sha256: &action_sha256,
         budget_sha256: &budget_sha256,
     };
-    let commitment_sha256 =
-        canonical_json_sha256("luminous.symmetry_quotient.bundle.v1", &core)?;
+    let commitment_sha256 = canonical_json_sha256("luminous.symmetry_quotient.bundle.v1", &core)?;
     Ok(InputCommitmentV1 {
         schema_version: SCHEMA_VERSION.to_owned(),
         canonicalization_id: CANONICALIZATION_ID.to_owned(),
@@ -1141,14 +1134,10 @@ mod tests {
 
     #[test]
     fn canonical_json_sorts_nested_object_keys_and_preserves_array_order() {
-        let left: serde_json::Value = serde_json::from_str(
-            r#"{"z":[{"b":2,"a":1}],"a":true}"#
-        )
-        .unwrap();
-        let right: serde_json::Value = serde_json::from_str(
-            r#"{"a":true,"z":[{"a":1,"b":2}]}"#
-        )
-        .unwrap();
+        let left: serde_json::Value =
+            serde_json::from_str(r#"{"z":[{"b":2,"a":1}],"a":true}"#).unwrap();
+        let right: serde_json::Value =
+            serde_json::from_str(r#"{"a":true,"z":[{"a":1,"b":2}]}"#).unwrap();
         assert_eq!(
             canonical_json_for_test(&left).unwrap(),
             canonical_json_for_test(&right).unwrap()
@@ -1193,7 +1182,7 @@ mod tests {
             &problem,
             &action,
             &decoded,
-            QualificationBudgetV1::default()
+            QualificationBudgetV1::default(),
         )
         .unwrap();
         assert_eq!(
@@ -1218,8 +1207,14 @@ mod tests {
             original_commitment.problem_sha256,
             changed_commitment.problem_sha256
         );
-        assert_eq!(original_commitment.action_sha256, changed_commitment.action_sha256);
-        assert_eq!(original_commitment.budget_sha256, changed_commitment.budget_sha256);
+        assert_eq!(
+            original_commitment.action_sha256,
+            changed_commitment.action_sha256
+        );
+        assert_eq!(
+            original_commitment.budget_sha256,
+            changed_commitment.budget_sha256
+        );
     }
 
     #[test]
