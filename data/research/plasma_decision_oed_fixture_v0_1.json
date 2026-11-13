@@ -1880,7 +1880,9 @@
         "conditioning_temperature_c": 23,
         "conditioning_relative_humidity_pct": 50,
         "condition_evidence_digest": "sha256:synthetic-pa6-condition-pa6-saturated-state-low-wca-reject",
-        "moisture_measurement_id": "pa6-saturated-state-low-wca-reject-moisture_content"
+        "moisture_measurement_id": "pa6-saturated-state-low-wca-reject-moisture_content",
+        "sample_lineage_ref": "synthetic:MAT-013:pa6-saturated-state-low-wca-reject",
+        "material_interface_ref": "synthetic:MAT-INTERFACE-001:pa6-saturated-state-low-wca-reject"
       }
     }
   ]
