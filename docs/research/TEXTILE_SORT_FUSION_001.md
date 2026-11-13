@@ -170,6 +170,25 @@ Every destructive route binds the trial input mass to the physical lot inventory
 
 Unknown condition, chemistry, trial or receiving status remains insufficient evidence. An actual failed trial, rejected output, invalid digest/tier or mass mismatch is ineligible under the declared policy. A route assessment is not an environmental certification, safety certification, legal determination or proof that its evidence sources are honest.
 
+### 4.6 Design-for-recovery component/joint topology
+
+The module `symthaea-materials::textile_design` adds a static design dossier:
+
+- product ID, exact design revision and product family;
+- component inventory with role, material reference, mass estimate and replacement intent;
+- joint inventory with connected component IDs, joining method, reversibility, access zone, removal operation, tools and predecessor dependencies;
+- design intents for repair, disassembly/component recovery and material traceability.
+
+The static audit detects duplicate/dangling component and joint IDs, invalid joint cardinality, unknown materials, replaceable modules without instructions, reversible joints without access/tool/operation, unknown or permanent joints that conflict with the stated recovery scope, and cyclic removal dependencies.
+
+**Recovery-relevant joint scope matters:** a garment can include permanent structural seams outside the intended recovery path while a cuff, pocket, collar, fastener or trim module is intentionally replaceable. Each joint therefore declares whether it is in the target disassembly/recovery path. A disassembly intent with no target joints is incomplete; a permanent joint inside that target path blocks the claim. This avoids the naive rule that every stitch in a garment must be reversible.
+
+The 13-case synthetic design corpus is schema-checked and consumed by Rust tests:
+- `docs/research/fixtures/textile_sort_fusion_v0_1/design_cases.schema.json`
+- `docs/research/fixtures/textile_sort_fusion_v0_1/design_cases.example.json`
+
+A `Complete` static dossier proves only that its declared component/joint graph is internally coherent. It does not establish seam strength, fatigue life, wash durability, actual access in a physical garment, safe repair, disassembly time, panel retention, or downstream recovery. Those require physical testing and independent acceptance.
+
 ## 5. Current synthetic tests
 
 Before corpus integration, the module contained 16 Rust unit tests. The latest change adds an unknown-category/presentation negative control and an executable corpus-binding test (18 test functions total). The 15-case synthetic corpus is now loaded by Rust tests; each case invokes its mapped regression and checks the declared disposition/reason. The Rust unit tests cover the 16 original contract cases plus two new regressions: unknown visual category/presentation abstention and the executable 15-case corpus-to-test mapping (18 test functions total). The original cases cover:
@@ -201,6 +220,8 @@ The recovery-route contract has a separate 27-case synthetic corpus:
 - `docs/research/fixtures/textile_sort_fusion_v0_1/recovery_cases.example.json`
 
 The recovery corpus is also consumed by Rust tests. It covers six route families and adversarial states including model-only composition, unresolved fibre fraction, missing/short fibre-length output, chemical compatibility fail/unknown, downstream reject/conditional, self-issued acceptance, malformed digest, duplicate evidence ID and mass-input mismatch. Its expected outcomes are bound to the route tests. No real specimen or processor acceptance is asserted.
+
+The design-for-recovery module adds a separate 13-case synthetic topology corpus, also consumed by Rust tests. It covers complete modular topology, duplicate/dangling identities, missing tools/instructions, permanent target joints, unknown construction, circular dependencies, and the distinction between recovery-target joints and permanent seams outside the declared recovery path.
 
 ## 6. Benchmark programme to exceed SOTA
 
@@ -268,6 +289,22 @@ Compare matched models/policies:
 5. conservative evidence cascade that requests another measurement on conflict/OOD.
 
 All arms receive the same physical specimen IDs, training splits, calibration boundaries and compute budget. The cascade must never invent fibre composition from a garment label or treat a supplier declaration as a spectral measurement.
+
+### B4 — design-for-repair and design-for-disassembly
+
+Compare conventional and modular/reversible garment construction under matched function, materials, wearer comfort and durability:
+- static dossier completeness and number of unknown joins/material references;
+- percentage of replaceable components with versioned repair instructions and available spare components;
+- disassembly success, time per target joint, tool changes and operator skill requirements;
+- panel retention, textile damage, broken yarns, residual attachment mass and component salvage;
+- seam strength, fatigue, abrasion and wash-cycle performance before and after repair/disassembly;
+- repair success, repair time/cost, post-repair function and additional useful-life cycles;
+- downstream fibre-length/yarn quality after opening each garment construction;
+- added manufacturing cost, production time, material consumption and component inventory burden.
+
+Run at least three arms: (1) conventional sewn construction, (2) selectively reversible modules with permanent non-target seams, and (3) highly modular construction. This supports a Pareto analysis rather than forcing all joints to become reversible. A design that is easy to disassemble but fails seam fatigue or wearer function is not an improvement.
+
+A 2025 Refashion design guide identifies fasteners, labels, linings, elastics, rivets, padding, decorations and electronics as recycling disruptors; ISO 5157:2023 defines vocabulary for repairability, disassembly and recyclability; Cradle to Cradle guidance recognises strategic placement/accessibility of trims as design-for-disassembly features. These are design references, not substitutes for physical trials.
 
 ### B3 — physical sorting, route selection and recovery
 
