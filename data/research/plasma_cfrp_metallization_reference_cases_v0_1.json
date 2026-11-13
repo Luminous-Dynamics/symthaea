@@ -53,7 +53,29 @@
         ],
         "coating_adhesion_method_as_indexed": "pull-off adhesion testing",
         "failure_analysis": "ImageJ analysis of zinc-peeled/fractured CFRP surfaces",
-        "modelling": "cohesive-zone model"
+        "modelling": "cohesive-zone model",
+        "substrate_profile": {
+          "coupon_dimensions_mm": [
+            24,
+            24,
+            3
+          ],
+          "supplier": "Gwangseong Tech Co. Ltd., Korea",
+          "matrix_resin_system": "SIGRAPREG epoxy resin system developed by SGL Carbon",
+          "architecture": "nine-ply orthogonal woven carbon-fibre prepreg",
+          "fibre_orientation_deg": [
+            0,
+            90
+          ],
+          "laminate_class": "commercial thermosetting epoxy-based CFRP"
+        },
+        "reported_morphology_condition_example": {
+          "condition_label": "Air_30_10",
+          "plasma_gas": "air",
+          "nozzle_standoff_mm": 30,
+          "nozzle_passes": 10,
+          "qualifier": "Explicitly described morphology condition; not claimed as the best-performing condition or a recommended recipe."
+        }
       },
       "mechanisms_reported": [
         "Argon plasma ablated some surface epoxy and exposed carbon fibres, supporting mechanical interlocking.",
@@ -86,12 +108,15 @@
         }
       ],
       "unknowns_and_blockers": [
-        "Exact CFRP manufacturer/grade, fibre/resin/layup/lot must be extracted from full methods.",
-        "Exact pull-off standard, fixture adhesive, loading rate, replicate count and specimen geometry are not established by the accessible abstract/indexed record.",
-        "Exact spray parameters, zinc wire grade/lot and coating thickness must be reconstructed from full methods.",
-        "Grid-to-coating energy, gas/extraction loads and lifecycle costs are not established by the abstract.",
-        "No LSP, aircraft qualification, certification, lightning-current performance or post-strike structural claim is established.",
-        "The reported 4.21 ± 0.12 MPa is a source-specific maximum, not a universal design allowable."
+        "Exact commercial CFRP laminate grade, fibre grade, prepreg batch/lot, fibre volume fraction, cure history and coupon-to-panel variability remain to be extracted.",
+        "The full air/argon process matrix, exact winning condition and treatment repeatability must be reconstructed from complete methods/results tables; Air_30_10 is one described morphology condition only.",
+        "The paper discusses grit blasting as a topography-changing process, but whether grit blasting was applied to every comparison arm and the exact treatment sequence must be verified from the full methods.",
+        "Exact plasma article, process gas purity/flow, nozzle, traverse/speed, power measurement boundary, waveform and treatment-to-spray delay are not fully established by indexed methods excerpts.",
+        "Exact zinc wire/feedstock grade/lot, arc-spray equipment identity, spray distance, electrical parameters, deposition rate, coating thickness and post-treatment require full methods extraction.",
+        "Exact pull-off standard, fixture/dolly geometry, adhesive, cure, loading rate, specimen dimensions, replicate count, censoring/invalid specimens and failure-area classification are not established by the accessible abstract/indexed record.",
+        "Raw replicate-level adhesion values and the construction of ±0.12 MPa uncertainty are not yet reconstructed.",
+        "Grid-to-coating energy, gas/extraction loads and lifecycle costs are not established.",
+        "No LSP, aircraft qualification, certification, lightning-current performance or post-strike structural claim is established."
       ],
       "luminous_reproduction": false
     },
@@ -218,5 +243,18 @@
       ],
       "luminous_reproduction": false
     }
-  ]
+  ],
+  "spatial_interface_metrology_hypothesis": {
+    "hypothesis_id": "CFRP-SPATIAL-VM-H1",
+    "status": "UNTESTED_RESEARCH_HYPOTHESIS",
+    "description": "Co-register local surface chemistry, resin/fibre exposure, topography, coating thickness/defects, sheet resistance and destructive adhesion/failure sites to predict local conductive-coating failure and substrate damage on held-out panels/lots.",
+    "required_holdout_groups": [
+      "panel_id",
+      "material_lot_id",
+      "production_day"
+    ],
+    "spatial_registration_uncertainty_required": true,
+    "non_destructive_proxies_are_not_destructive_ground_truth": true,
+    "luminous_reproduction": false
+  }
 }
