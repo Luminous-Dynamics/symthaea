@@ -401,7 +401,7 @@ mod tests {
     fn trapezoidal_integration_handles_nonuniform_sampling() {
         let samples = [(0.0, 1.0), (2.0, 2.0), (5.0, 0.0)];
         let result = trapezoidal_integral(&samples, "test").expect("valid samples");
-        assert!((result - 4.5).abs() < 1.0e-12);
+        assert!((result - 6.0).abs() < 1.0e-12);
     }
 
     #[test]
