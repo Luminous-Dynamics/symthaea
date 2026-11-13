@@ -148,6 +148,12 @@ struct GateReceipt {
     audit_contract_id: String,
     audit_receipt_sha256: String,
     requirement_reference: String,
+    audited_candidate_id: String,
+    vessel_revision: String,
+    propeller_revision: String,
+    operating_point_receipt_sha256: String,
+    service_fingerprint_sha256: String,
+    environment_fingerprint_sha256: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -463,8 +469,26 @@ fn validate_case(case: &Case) -> Vec<String> {
                 || receipt.audit_contract_id.trim().is_empty()
                 || !is_sha256(&receipt.audit_receipt_sha256)
                 || receipt.requirement_reference.trim().is_empty()
+                || receipt.audited_candidate_id.trim().is_empty()
+                || receipt.vessel_revision.trim().is_empty()
+                || receipt.propeller_revision.trim().is_empty()
+                || !is_sha256(&receipt.operating_point_receipt_sha256)
+                || !is_sha256(&receipt.service_fingerprint_sha256)
+                || !is_sha256(&receipt.environment_fingerprint_sha256)
             {
                 errors.push(format!("candidate {} has malformed or duplicate external gate receipt", candidate.candidate_id));
+            }
+            if receipt.audited_candidate_id != candidate.candidate_id
+                || receipt.vessel_revision != candidate.vessel_revision
+                || receipt.propeller_revision != candidate.propeller_revision
+                || receipt.operating_point_receipt_sha256 != candidate.operating_point_receipt_sha256
+                || receipt.service_fingerprint_sha256 != candidate.service_fingerprint_sha256
+                || receipt.environment_fingerprint_sha256 != candidate.environment_fingerprint_sha256
+            {
+                errors.push(format!(
+                    "candidate {} external gate receipt {} is not bound to the exact candidate, revisions, operating point, service and environment",
+                    candidate.candidate_id, receipt.gate_id
+                ));
             }
         }
         for gate in &case.hard_gates {
@@ -962,6 +986,12 @@ mod tests {
                     audit_contract_id: "marine-biofouling-evidence-audit-v0.1".to_string(),
                     audit_receipt_sha256: digest(if id == "A" { '8' } else { '9' }),
                     requirement_reference: "permit:zero-uncontained-organism-release".to_string(),
+                    audited_candidate_id: id.to_string(),
+                    vessel_revision: format!("hull-{id}"),
+                    propeller_revision: format!("prop-{id}"),
+                    operating_point_receipt_sha256: operating_point_receipt_sha256.clone(),
+                    service_fingerprint_sha256: digest('1'),
+                    environment_fingerprint_sha256: digest('2'),
                 },
                 GateReceipt {
                     gate_id: "cleaning-waste-authorization".to_string(),
@@ -969,6 +999,12 @@ mod tests {
                     audit_contract_id: "marine-biofouling-evidence-audit-v0.1".to_string(),
                     audit_receipt_sha256: digest(if id == "A" { 'a' } else { 'b' }),
                     requirement_reference: "permit:in-water-cleaning-authorized-and-waste-captured".to_string(),
+                    audited_candidate_id: id.to_string(),
+                    vessel_revision: format!("hull-{id}"),
+                    propeller_revision: format!("prop-{id}"),
+                    operating_point_receipt_sha256: operating_point_receipt_sha256.clone(),
+                    service_fingerprint_sha256: digest('1'),
+                    environment_fingerprint_sha256: digest('2'),
                 },
                 GateReceipt {
                     gate_id: "acoustic-scale-transfer-evidence".to_string(),
@@ -976,6 +1012,12 @@ mod tests {
                     audit_contract_id: "marine-acoustic-scale-transfer-audit-v0.1.0".to_string(),
                     audit_receipt_sha256: digest(if id == "A" { 'c' } else { 'd' }),
                     requirement_reference: "measurement:scale-transfer-reviewed-on-held-out-full-scale-data".to_string(),
+                    audited_candidate_id: id.to_string(),
+                    vessel_revision: format!("hull-{id}"),
+                    propeller_revision: format!("prop-{id}"),
+                    operating_point_receipt_sha256: operating_point_receipt_sha256.clone(),
+                    service_fingerprint_sha256: digest('1'),
+                    environment_fingerprint_sha256: digest('2'),
                 },
                 GateReceipt {
                     gate_id: "acoustic-source-identifiability".to_string(),
@@ -983,6 +1025,12 @@ mod tests {
                     audit_contract_id: "marine-acoustic-source-contrast-audit-v0.1.0".to_string(),
                     audit_receipt_sha256: digest(if id == "A" { 'e' } else { 'f' }),
                     requirement_reference: "measurement:source-state-contrast-reviewed".to_string(),
+                    audited_candidate_id: id.to_string(),
+                    vessel_revision: format!("hull-{id}"),
+                    propeller_revision: format!("prop-{id}"),
+                    operating_point_receipt_sha256: operating_point_receipt_sha256.clone(),
+                    service_fingerprint_sha256: digest('1'),
+                    environment_fingerprint_sha256: digest('2'),
                 },
                 GateReceipt {
                     gate_id: "cavitation-intermittency-characterization".to_string(),
@@ -990,6 +1038,12 @@ mod tests {
                     audit_contract_id: "marine-cavitation-intermittency-audit-v0.1.0".to_string(),
                     audit_receipt_sha256: digest(if id == "A" { '1' } else { '2' }),
                     requirement_reference: "measurement:cavitation-intermittency-distribution-reviewed".to_string(),
+                    audited_candidate_id: id.to_string(),
+                    vessel_revision: format!("hull-{id}"),
+                    propeller_revision: format!("prop-{id}"),
+                    operating_point_receipt_sha256: operating_point_receipt_sha256.clone(),
+                    service_fingerprint_sha256: digest('1'),
+                    environment_fingerprint_sha256: digest('2'),
                 },
                 GateReceipt {
                     gate_id: "vibration-coherence-characterization".to_string(),
@@ -997,6 +1051,12 @@ mod tests {
                     audit_contract_id: "marine-vibration-coherence-audit-v0.1.0".to_string(),
                     audit_receipt_sha256: digest(if id == "A" { '3' } else { '4' }),
                     requirement_reference: "measurement:vibration-coherent-pressure-component-reviewed".to_string(),
+                    audited_candidate_id: id.to_string(),
+                    vessel_revision: format!("hull-{id}"),
+                    propeller_revision: format!("prop-{id}"),
+                    operating_point_receipt_sha256: operating_point_receipt_sha256.clone(),
+                    service_fingerprint_sha256: digest('1'),
+                    environment_fingerprint_sha256: digest('2'),
                 },
                 GateReceipt {
                     gate_id: "rotation-synchronous-modulation".to_string(),
@@ -1004,6 +1064,12 @@ mod tests {
                     audit_contract_id: "marine-rotation-synchronous-modulation-audit-v0.1.0".to_string(),
                     audit_receipt_sha256: digest(if id == "A" { '5' } else { '6' }),
                     requirement_reference: "measurement:rotation-synchronous-envelope-reviewed".to_string(),
+                    audited_candidate_id: id.to_string(),
+                    vessel_revision: format!("hull-{id}"),
+                    propeller_revision: format!("prop-{id}"),
+                    operating_point_receipt_sha256: operating_point_receipt_sha256.clone(),
+                    service_fingerprint_sha256: digest('1'),
+                    environment_fingerprint_sha256: digest('2'),
                 },
             ],
         }
@@ -1206,6 +1272,36 @@ mod tests {
             .find(|gate| gate.gate_id == "cavitation-intermittency-characterization").unwrap();
         assert_eq!(gate.status, "unresolved");
         assert_eq!(gate.audit_contract_id.as_deref(), Some("marine-cavitation-intermittency-audit-v0.1.0"));
+    }
+
+    #[test]
+    fn external_audit_receipt_is_bound_to_exact_candidate_and_physical_configuration() {
+        let mut input = case();
+        let report = audit(&input);
+        assert_eq!(report.candidate_reports[0].disposition, "HOLD_UNRESOLVED");
+
+        input.candidates[0].gate_receipts[0].audited_candidate_id = "B".to_string();
+        assert!(validate_case(&input).iter().any(|reason| reason.contains("not bound to the exact candidate")));
+
+        let mut input = case();
+        input.candidates[0].gate_receipts[0].operating_point_receipt_sha256 = digest('9');
+        assert!(validate_case(&input).iter().any(|reason| reason.contains("not bound to the exact candidate")));
+
+        let mut input = case();
+        input.candidates[0].gate_receipts[0].vessel_revision = "wrong-hull".to_string();
+        assert!(validate_case(&input).iter().any(|reason| reason.contains("not bound to the exact candidate")));
+
+        let mut input = case();
+        input.candidates[0].gate_receipts[0].propeller_revision = "wrong-propeller".to_string();
+        assert!(validate_case(&input).iter().any(|reason| reason.contains("not bound to the exact candidate")));
+
+        let mut input = case();
+        input.candidates[0].gate_receipts[0].service_fingerprint_sha256 = digest('9');
+        assert!(validate_case(&input).iter().any(|reason| reason.contains("not bound to the exact candidate")));
+
+        let mut input = case();
+        input.candidates[0].gate_receipts[0].environment_fingerprint_sha256 = digest('9');
+        assert!(validate_case(&input).iter().any(|reason| reason.contains("not bound to the exact candidate")));
     }
 
     #[test]
