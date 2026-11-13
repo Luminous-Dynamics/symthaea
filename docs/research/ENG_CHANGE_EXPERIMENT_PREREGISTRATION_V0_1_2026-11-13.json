@@ -250,7 +250,14 @@
     "machine_readable": "docs/research/ENGINEERING_CHANGE_DECISION_TIME_OVERLAY_V0_1.json",
     "lifecycle_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/10600",
     "cases": 9,
-    "status": "blueprint_only_unadjudicated_unscored"
+    "status": "blueprint_only_unadjudicated_unscored",
+    "gold_record_compatibility": {
+      "status": "blocking_prerequisite_before_temporal_gold_adjudication",
+      "current_gold_schema": "strict_additionalProperties_false_without_structured_temporal_fields",
+      "notes_are_sufficient": false,
+      "required_change": "versioned optional nested temporal-evidence extension or independently validated content-addressed companion record bound to existing gold record",
+      "existing_dispositions_unchanged": true
+    }
   },
   "temporal_owner_composition": {
     "lifecycle_as_of_reasoning": "Symthaea #10600",
