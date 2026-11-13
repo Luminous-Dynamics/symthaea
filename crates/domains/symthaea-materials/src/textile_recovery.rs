@@ -10,6 +10,7 @@
 //! or prove legal, safety, chemical or environmental compliance.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
 /// Integer scale for mass fractions: one million parts represent 100%.
 pub const FRACTION_SCALE_PPM: u64 = 1_000_000;
@@ -61,7 +62,7 @@ pub enum EvidenceKind {
 }
 
 /// Evidence maturity. Higher levels do not imply cryptographic authenticity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum EvidenceTier {
     /// Generated fixture with no physical specimen.
     Synthetic,
@@ -271,6 +272,39 @@ impl RecoveryPolicy {
     }
 }
 
+/// Outcome of a downstream receiving-process evaluation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AcceptanceOutcome {
+    /// Material passed the declared receiving specification.
+    Accepted,
+    /// Material failed the declared receiving specification.
+    Rejected,
+    /// Material may be accepted only after further work or a waiver.
+    Conditional,
+    /// No final decision was recorded.
+    Unknown,
+}
+
+/// Versioned downstream specification and its independent acceptance record.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DownstreamAcceptance {
+    /// Exact receiving specification identifier/version.
+    pub specification_id: String,
+    /// Recorded acceptance disposition.
+    pub outcome: AcceptanceOutcome,
+    /// Independent receiving-process evidence.
+    pub evidence: EvidenceRef,
+}
+
+/// Chemical compatibility assessment backed by a physical test.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChemicalCompatibilityEvidence {
+    /// Compatibility test disposition.
+    pub outcome: TrialOutcome,
+    /// Physical chemistry/process test evidence.
+    pub evidence: EvidenceRef,
+}
+
 /// All evidence supplied for one physical item/lot.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RecoveryEvidenceBundle {
@@ -289,9 +323,9 @@ pub struct RecoveryEvidenceBundle {
     /// Optional measured fibre-length distribution from the actual trial output.
     pub fibre_length: Option<FibreLengthEvidence>,
     /// Optional chemical compatibility trial for the declared route.
-    pub chemical_compatibility: Option<EvidenceRef>,
+    pub chemical_compatibility: Option<ChemicalCompatibilityEvidence>,
     /// Optional downstream acceptance record.
-    pub downstream_acceptance: Option<EvidenceRef>,
+    pub downstream_acceptance: Option<DownstreamAcceptance>,
 }
 
 /// Route qualification disposition; this is not a legal or environmental certification.
@@ -320,14 +354,18 @@ pub enum RouteReason {
     UseSafetyNotPassed,
     /// Required physical process trial is absent.
     MissingProcessTrial,
-    /// Process trial did not pass.
+    /// Process trial failed.
     ProcessTrialNotPassed,
+    /// Process trial outcome is unknown.
+    ProcessTrialUnknown,
     /// Process trial evidence has the wrong role or tier.
     InvalidProcessTrialEvidence,
     /// Destructive route has no measured mass balance.
     MissingMassBalance,
     /// Mass balance does not close within measurement uncertainty/policy.
     MassBalanceNotClosed,
+    /// Trial input mass differs from the physical lot inventory mass.
+    MassBalanceInputMismatch,
     /// Composition measurement/calibration evidence is absent.
     MissingCompositionEvidence,
     /// Composition record is unknown or rejected.
@@ -346,8 +384,18 @@ pub enum RouteReason {
     MissingChemicalCompatibilityEvidence,
     /// Chemical compatibility evidence is malformed or wrong-tier.
     InvalidChemicalCompatibilityEvidence,
+    /// Chemical compatibility trial failed.
+    ChemicalCompatibilityFailed,
+    /// Chemical compatibility result is unknown.
+    ChemicalCompatibilityUnknown,
+    /// Evidence identifiers are duplicated within the bundle.
+    DuplicateEvidenceIdentity,
     /// No independent downstream receiving-process acceptance is present.
     MissingDownstreamAcceptance,
+    /// Receiving process explicitly rejected the output.
+    DownstreamAcceptanceRejected,
+    /// Receiving process acceptance remains conditional or unknown.
+    DownstreamAcceptanceUnresolved,
     /// Downstream acceptance is not independent or is malformed.
     InvalidDownstreamAcceptance,
     /// Policy itself has impossible/out-of-range values.
@@ -381,7 +429,7 @@ fn valid_evidence(
     minimum_tier: EvidenceTier,
 ) -> bool {
     if evidence.kind != expected_kind
-        || evidence.tier < minimum_tier
+        || evidence.tier != minimum_tier
         || evidence.evidence_id.trim().is_empty()
         || evidence.method_ref.trim().is_empty()
         || evidence.issuer_id.trim().is_empty()
@@ -399,23 +447,56 @@ fn valid_evidence(
     }
 }
 
-fn require_evidence(
-    evidence: Option<&EvidenceRef>,
-    kind: EvidenceKind,
-    tier: EvidenceTier,
-    missing_reason: RouteReason,
-    invalid_reason: RouteReason,
+fn require_downstream_acceptance(
+    acceptance: Option<&DownstreamAcceptance>,
     reasons: &mut Vec<RouteReason>,
     evidence_ids: &mut Vec<String>,
 ) {
-    match evidence {
-        None => reasons.push(missing_reason),
-        Some(value) => {
-            evidence_ids.push(value.evidence_id.clone());
-            if !valid_evidence(value, kind, tier) {
-                reasons.push(invalid_reason);
-            }
+    let Some(acceptance) = acceptance else {
+        reasons.push(RouteReason::MissingDownstreamAcceptance);
+        return;
+    };
+    evidence_ids.push(acceptance.evidence.evidence_id.clone());
+    if acceptance.specification_id.trim().is_empty()
+        || !valid_evidence(
+            &acceptance.evidence,
+            EvidenceKind::DownstreamAcceptance,
+            EvidenceTier::IndependentAcceptance,
+        )
+    {
+        reasons.push(RouteReason::InvalidDownstreamAcceptance);
+        return;
+    }
+    match acceptance.outcome {
+        AcceptanceOutcome::Accepted => {}
+        AcceptanceOutcome::Rejected => reasons.push(RouteReason::DownstreamAcceptanceRejected),
+        AcceptanceOutcome::Conditional | AcceptanceOutcome::Unknown => {
+            reasons.push(RouteReason::DownstreamAcceptanceUnresolved)
         }
+    }
+}
+
+fn require_chemical_compatibility(
+    compatibility: Option<&ChemicalCompatibilityEvidence>,
+    reasons: &mut Vec<RouteReason>,
+    evidence_ids: &mut Vec<String>,
+) {
+    let Some(compatibility) = compatibility else {
+        reasons.push(RouteReason::MissingChemicalCompatibilityEvidence);
+        return;
+    };
+    evidence_ids.push(compatibility.evidence.evidence_id.clone());
+    if !valid_evidence(
+        &compatibility.evidence,
+        EvidenceKind::ChemicalCompatibilityTrial,
+        EvidenceTier::PhysicalTrial,
+    ) {
+        reasons.push(RouteReason::InvalidChemicalCompatibilityEvidence);
+    }
+    match compatibility.outcome {
+        TrialOutcome::Passed => {}
+        TrialOutcome::Failed => reasons.push(RouteReason::ChemicalCompatibilityFailed),
+        TrialOutcome::Unknown => reasons.push(RouteReason::ChemicalCompatibilityUnknown),
     }
 }
 
@@ -423,6 +504,7 @@ fn add_trial_checks(
     trial: Option<&ProcessTrialEvidence>,
     expected_kind: EvidenceKind,
     require_mass_balance: bool,
+    expected_input_mass_mg: u64,
     policy: &RecoveryPolicy,
     reasons: &mut Vec<RouteReason>,
     evidence_ids: &mut Vec<String>,
@@ -437,14 +519,16 @@ fn add_trial_checks(
     }
     match trial.outcome {
         TrialOutcome::Passed => {}
-        TrialOutcome::Failed | TrialOutcome::Unknown => {
-            reasons.push(RouteReason::ProcessTrialNotPassed)
-        }
+        TrialOutcome::Failed => reasons.push(RouteReason::ProcessTrialNotPassed),
+        TrialOutcome::Unknown => reasons.push(RouteReason::ProcessTrialUnknown),
     }
     if require_mass_balance {
         match &trial.mass_balance {
             None => reasons.push(RouteReason::MissingMassBalance),
             Some(balance) => {
+                if balance.input_mass_mg != expected_input_mass_mg {
+                    reasons.push(RouteReason::MassBalanceInputMismatch);
+                }
                 if !balance.is_closed(policy.max_mass_balance_uncertainty_ppm) {
                     reasons.push(RouteReason::MassBalanceNotClosed);
                 }
@@ -557,18 +641,20 @@ pub fn qualify_recovery_route(
             ) {
                 reasons.push(RouteReason::MissingConditionInspection);
             }
-            if condition.condition != ProductCondition::Wearable {
-                reasons.push(RouteReason::ProductNotWearable);
+            match condition.condition {
+                ProductCondition::Wearable => {}
+                ProductCondition::Unknown => reasons.push(RouteReason::ProductConditionUnknown),
+                ProductCondition::Repairable | ProductCondition::NonWearable => {
+                    reasons.push(RouteReason::ProductNotWearable)
+                }
             }
-            if condition.safety != UseSafetyStatus::Passed {
-                reasons.push(RouteReason::UseSafetyNotPassed);
+            match condition.safety {
+                UseSafetyStatus::Passed => {}
+                UseSafetyStatus::Failed => reasons.push(RouteReason::UseSafetyNotPassed),
+                UseSafetyStatus::Unknown => reasons.push(RouteReason::UseSafetyUnknown),
             }
-            require_evidence(
+            require_downstream_acceptance(
                 bundle.downstream_acceptance.as_ref(),
-                EvidenceKind::DownstreamAcceptance,
-                EvidenceTier::IndependentAcceptance,
-                RouteReason::MissingDownstreamAcceptance,
-                RouteReason::InvalidDownstreamAcceptance,
                 &mut reasons,
                 &mut evidence_ids,
             );
@@ -586,23 +672,24 @@ pub fn qualify_recovery_route(
             ) {
                 reasons.push(RouteReason::MissingConditionInspection);
             }
-            if condition.condition != ProductCondition::Repairable {
-                reasons.push(RouteReason::ProductNotWearable);
+            match condition.condition {
+                ProductCondition::Repairable => {}
+                ProductCondition::Unknown => reasons.push(RouteReason::ProductConditionUnknown),
+                ProductCondition::Wearable | ProductCondition::NonWearable => {
+                    reasons.push(RouteReason::ProductNotWearable)
+                }
             }
             add_trial_checks(
                 bundle.process_trial.as_ref(),
                 EvidenceKind::RepairTrial,
                 false,
+                bundle.input_mass_mg,
                 policy,
                 &mut reasons,
                 &mut evidence_ids,
             );
-            require_evidence(
+            require_downstream_acceptance(
                 bundle.downstream_acceptance.as_ref(),
-                EvidenceKind::DownstreamAcceptance,
-                EvidenceTier::IndependentAcceptance,
-                RouteReason::MissingDownstreamAcceptance,
-                RouteReason::InvalidDownstreamAcceptance,
                 &mut reasons,
                 &mut evidence_ids,
             );
@@ -612,16 +699,13 @@ pub fn qualify_recovery_route(
                 bundle.process_trial.as_ref(),
                 EvidenceKind::ComponentRecoveryTrial,
                 true,
+                bundle.input_mass_mg,
                 policy,
                 &mut reasons,
                 &mut evidence_ids,
             );
-            require_evidence(
+            require_downstream_acceptance(
                 bundle.downstream_acceptance.as_ref(),
-                EvidenceKind::DownstreamAcceptance,
-                EvidenceTier::IndependentAcceptance,
-                RouteReason::MissingDownstreamAcceptance,
-                RouteReason::InvalidDownstreamAcceptance,
                 &mut reasons,
                 &mut evidence_ids,
             );
@@ -637,6 +721,7 @@ pub fn qualify_recovery_route(
                 bundle.process_trial.as_ref(),
                 EvidenceKind::MechanicalRecyclingTrial,
                 true,
+                bundle.input_mass_mg,
                 policy,
                 &mut reasons,
                 &mut evidence_ids,
@@ -666,12 +751,8 @@ pub fn qualify_recovery_route(
                     }
                 }
             }
-            require_evidence(
+            require_downstream_acceptance(
                 bundle.downstream_acceptance.as_ref(),
-                EvidenceKind::DownstreamAcceptance,
-                EvidenceTier::IndependentAcceptance,
-                RouteReason::MissingDownstreamAcceptance,
-                RouteReason::InvalidDownstreamAcceptance,
                 &mut reasons,
                 &mut evidence_ids,
             );
@@ -683,12 +764,8 @@ pub fn qualify_recovery_route(
                 &mut reasons,
                 &mut evidence_ids,
             );
-            require_evidence(
+            require_chemical_compatibility(
                 bundle.chemical_compatibility.as_ref(),
-                EvidenceKind::ChemicalCompatibilityTrial,
-                EvidenceTier::PhysicalTrial,
-                RouteReason::MissingChemicalCompatibilityEvidence,
-                RouteReason::InvalidChemicalCompatibilityEvidence,
                 &mut reasons,
                 &mut evidence_ids,
             );
@@ -696,16 +773,13 @@ pub fn qualify_recovery_route(
                 bundle.process_trial.as_ref(),
                 EvidenceKind::ChemicalRecyclingTrial,
                 true,
+                bundle.input_mass_mg,
                 policy,
                 &mut reasons,
                 &mut evidence_ids,
             );
-            require_evidence(
+            require_downstream_acceptance(
                 bundle.downstream_acceptance.as_ref(),
-                EvidenceKind::DownstreamAcceptance,
-                EvidenceTier::IndependentAcceptance,
-                RouteReason::MissingDownstreamAcceptance,
-                RouteReason::InvalidDownstreamAcceptance,
                 &mut reasons,
                 &mut evidence_ids,
             );
@@ -715,22 +789,23 @@ pub fn qualify_recovery_route(
                 bundle.process_trial.as_ref(),
                 EvidenceKind::DowncyclingTrial,
                 true,
+                bundle.input_mass_mg,
                 policy,
                 &mut reasons,
                 &mut evidence_ids,
             );
-            require_evidence(
+            require_downstream_acceptance(
                 bundle.downstream_acceptance.as_ref(),
-                EvidenceKind::DownstreamAcceptance,
-                EvidenceTier::IndependentAcceptance,
-                RouteReason::MissingDownstreamAcceptance,
-                RouteReason::InvalidDownstreamAcceptance,
                 &mut reasons,
                 &mut evidence_ids,
             );
         }
     }
 
+    let mut unique = BTreeSet::new();
+    if evidence_ids.iter().any(|evidence_id| !unique.insert(evidence_id.clone())) {
+        reasons.push(RouteReason::DuplicateEvidenceIdentity);
+    }
     assessment(route, reasons, evidence_ids)
 }
 
@@ -748,6 +823,9 @@ fn assessment(
                 | RouteReason::UseSafetyNotPassed
                 | RouteReason::ProcessTrialNotPassed
                 | RouteReason::MassBalanceNotClosed
+                | RouteReason::MassBalanceInputMismatch
+                | RouteReason::ChemicalCompatibilityFailed
+                | RouteReason::DownstreamAcceptanceRejected
                 | RouteReason::FibreLengthBelowPolicy
                 | RouteReason::InvalidInventoryEvidence
                 | RouteReason::InvalidProcessTrialEvidence
@@ -756,6 +834,7 @@ fn assessment(
                 | RouteReason::InvalidChemicalCompatibilityEvidence
                 | RouteReason::InvalidDownstreamAcceptance
                 | RouteReason::InvalidPolicy
+                | RouteReason::DuplicateEvidenceIdentity
                 | RouteReason::InvalidPhysicalInventory
         )
     }) {
@@ -814,14 +893,18 @@ mod tests {
         )
     }
 
-    fn acceptance() -> EvidenceRef {
-        evidence(
-            "ACCEPT-01",
-            EvidenceKind::DownstreamAcceptance,
-            EvidenceTier::IndependentAcceptance,
-            "receiving-mill",
-            Some("independent-auditor"),
-        )
+    fn acceptance() -> DownstreamAcceptance {
+        DownstreamAcceptance {
+            specification_id: "RECEIVING-SPEC-V1".to_owned(),
+            outcome: AcceptanceOutcome::Accepted,
+            evidence: evidence(
+                "ACCEPT-01",
+                EvidenceKind::DownstreamAcceptance,
+                EvidenceTier::IndependentAcceptance,
+                "receiving-mill",
+                Some("independent-auditor"),
+            ),
+        }
     }
 
     fn condition(state: ProductCondition, safety: UseSafetyStatus) -> ConditionEvidence {
@@ -1091,13 +1174,16 @@ mod tests {
     fn chemical_route_requires_compatibility_trial_and_downstream_acceptance() {
         let mut bundle = empty_bundle();
         bundle.composition = Some(composition());
-        bundle.chemical_compatibility = Some(evidence(
-            "CHEM-COMPAT-01",
-            EvidenceKind::ChemicalCompatibilityTrial,
-            EvidenceTier::PhysicalTrial,
-            "chemical-lab",
-            None,
-        ));
+        bundle.chemical_compatibility = Some(ChemicalCompatibilityEvidence {
+            outcome: TrialOutcome::Passed,
+            evidence: evidence(
+                "CHEM-COMPAT-01",
+                EvidenceKind::ChemicalCompatibilityTrial,
+                EvidenceTier::PhysicalTrial,
+                "chemical-lab",
+                None,
+            ),
+        });
         bundle.process_trial = Some(process_trial(EvidenceKind::ChemicalRecyclingTrial, true));
         bundle.downstream_acceptance = Some(acceptance());
         assert_eq!(
