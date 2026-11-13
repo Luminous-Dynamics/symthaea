@@ -37,6 +37,11 @@ cargo run --manifest-path tools/textile-dataset-intake/Cargo.toml -- \
   --receipt /path/to/intake-receipt.json
 ~~~
 
+cargo run --manifest-path tools/textile-dataset-intake/Cargo.toml -- \
+  inspect-nir-sort-name \
+  --file /path/to/A01_a100x000x000_00_00_N_01A.csv
+~~~
+
 The receipt is deterministic for a fixed manifest, operation and file inventory. A change to any manifest byte or input file invalidates the receipt.
 
 ## NIR-SORT v2 intake recommendation
@@ -53,3 +58,13 @@ Do not split replicates from the same specimen across train/test. A separate hel
 ## Status
 
 Unit tests use tiny synthetic files created in temporary directories. No NIST or TexSortML raw data is checked in or claimed to have been downloaded.
+
+
+## NIR-SORT filename parser
+
+The `inspect-nir-sort-name` command decodes source class, nominal fibre slots,
+batch/lot, fabric form, instrument, replicate, acquisition mode and standoff
+distance. Its stable `specimen_group_key` excludes instrument and replicate so
+all acquisitions for the same nominal specimen can remain in one partition.
+The nominal fibre percentages are filename metadata only; use the NIST sample
+information and independent reference measurements as composition truth.
