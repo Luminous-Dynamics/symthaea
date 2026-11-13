@@ -413,9 +413,9 @@ fn audit_fixture(fixture: &Fixture) -> Result<AuditReport> {
                     bail!("event order or event identity differs across measured sequences");
                 }
                 report.observed_sequences += 1;
-                report.service_passes += usize::from(service_pass);
-                report.recovery_passes += usize::from(recovery_pass);
-                report.event_gate_passes += usize::from(event_gate_pass);
+                report.service_passes += if service_pass { 1 } else { 0 };
+                report.recovery_passes += if recovery_pass { 1 } else { 0 };
+                report.event_gate_passes += if event_gate_pass { 1 } else { 0 };
                 report.false_ready_events += if !first_event && event.readiness_probe_status == "passed" && !service_pass { 1 } else { 0 };
             }
         }
