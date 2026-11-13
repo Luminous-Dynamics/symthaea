@@ -361,6 +361,13 @@ fn validate_coherence_band(band: &CoherenceBand, report_case: &str) -> Vec<Strin
     if partition_relative_error > PSD_PARTITION_RELATIVE_TOLERANCE {
         errors.push(format!("coherence report {report_case} coherent plus residual PSD does not conserve the pressure PSD"));
     }
+    let coherence_from_power = band.vibration_reference_coherent_pressure_psd_pa2_per_hz
+        / band.pressure_psd_pa2_per_hz;
+    if (coherence_from_power - band.coherence_magnitude_squared).abs()
+        > PSD_PARTITION_RELATIVE_TOLERANCE
+    {
+        errors.push(format!("coherence report {report_case} magnitude-squared coherence does not equal coherent-pressure-PSD / pressure-PSD"));
+    }
     errors
 }
 
@@ -467,8 +474,6 @@ fn validate_case(case: &Case) -> Vec<String> {
     let mut vibration_instrument_ids = BTreeSet::new();
     let mut vibration_channel_ids = BTreeSet::new();
     let mut expected_band_signature: Option<BTreeMap<String, f64>> = None;
-    let mut vibration_instruments = BTreeSet::new();
-    let mut vibration_channels = BTreeSet::new();
     let mut matched_window_keys = BTreeSet::new();
     for input in &case.coherence_windows {
         let key = (input.run_id.clone(), input.window_id.clone());
