@@ -330,3 +330,7 @@ Open an issue on GitHub for research discussions.
 ---
 
 *"The study of consciousness is the study of what makes us us."*
+
+## Engineering-change gold adjudication
+
+- [Engineering-change gold-record V1.1 temporal extension](../benchmarks/engineering-change-impact/gold-record-v1.1.schema.json) — optional typed decision-time evidence admissibility fields, dual-assessor temporal labels and mutation controls.
