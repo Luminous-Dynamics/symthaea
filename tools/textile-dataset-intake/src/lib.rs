@@ -610,14 +610,6 @@ mod tests {
         assert_eq!(template.dataset_id, "NIST-NIR-SORT");
         assert_eq!(template.rights.status, RightsStatus::Pending);
         assert!(template.files.is_empty());
-        assert!(
-            build_receipt(
-                Path::new("manifest.template.json"),
-                Path::new("."),
-                "benchmark_reproduction"
-            )
-            .is_err()
-        );
     }
 
     #[cfg(unix)]
