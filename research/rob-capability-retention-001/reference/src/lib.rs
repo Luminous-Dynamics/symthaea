@@ -223,8 +223,14 @@ pub struct OptionSetReceipt {
 pub struct ArmClusterSummary {
     /// Final work-item dispositions.
     pub work: WorkTally,
-    /// Scheduled available robot minutes in the declared work period.
+    /// Receipt from the accepted-work ledger / inspection owner.
+    pub work_outcome_receipt_digest: String,
+    /// Receipt binding the scheduled time, human intervention and downtime accounting.
+    pub operating_time_receipt_digest: String,
+    /// Scheduled available robot minutes in the declared matched work period.
     pub available_robot_minutes: u32,
+    /// Nonproductive downtime within the scheduled available period.
+    pub nonproductive_downtime_minutes: u32,
     /// Human rescue, teleoperation and intervention minutes.
     pub human_intervention_minutes: u32,
     /// Electrical energy crossing the declared resource boundary, milli-Wh.
@@ -308,6 +314,9 @@ pub struct ClusterCapabilityReport {
     /// Human intervention minutes, kept separate from robot availability.
     pub baseline_human_intervention_minutes: u32,
     pub candidate_human_intervention_minutes: u32,
+    /// Nonproductive downtime within the common scheduled time denominator.
+    pub baseline_nonproductive_downtime_minutes: u32,
+    pub candidate_nonproductive_downtime_minutes: u32,
     /// Energy/resource use, not collapsed into a universal cost scalar.
     pub baseline_electrical_energy_milli_wh: u64,
     pub candidate_electrical_energy_milli_wh: u64,
@@ -396,6 +405,14 @@ pub enum CapabilityRetentionError {
     ZeroAvailableRobotTime { arm_id: String, cluster_id: String },
     /// Candidate/baseline option sets did not start from the same qualified set.
     StartingOptionSetMismatch(String),
+    /// Paired arms did not start from the same qualified physical state.
+    StartingPhysicalStateMismatch(String),
+    /// Paired arms used different scheduled robot-time denominators.
+    ScheduledRobotTimeMismatch(String),
+    /// Downtime exceeded the scheduled robot-time denominator.
+    InvalidTimeAccounting { arm_id: String, cluster_id: String },
+    /// Qualified reserve option count contradicts the qualified option-set receipt.
+    OptionSetReserveCountMismatch { arm_id: String, cluster_id: String },
     /// Required option-set identity or ledger receipt is absent.
     MissingOptionSetReceipt(String),
     /// Option-ledger evidence was explicitly rejected.
@@ -570,6 +587,29 @@ fn validate_option_set(
             return Err(CapabilityRetentionError::MissingOptionSetReceipt(
                 arm_id.to_owned(),
             ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_option_reserve_count(
+    arm_id: &str,
+    cluster_id: &str,
+    summary: &ArmClusterSummary,
+    reserves: &BTreeMap<ReserveKind, &ReserveObservation>,
+) -> Result<(), CapabilityRetentionError> {
+    if summary.option_set.disposition != EvidenceDisposition::Qualified {
+        return Ok(());
+    }
+    if let Some(reserve) = reserves.get(&ReserveKind::RecoveryOptionCount) {
+        if reserve.disposition == EvidenceDisposition::Qualified
+            && reserve.terminal_lower_bound
+                != Some(u64::from(summary.option_set.terminal_qualified_option_count))
+        {
+            return Err(CapabilityRetentionError::OptionSetReserveCountMismatch {
+                arm_id: arm_id.to_owned(),
+                cluster_id: cluster_id.to_owned(),
+            });
         }
     }
     Ok(())
@@ -824,8 +864,18 @@ pub fn compare_work_and_terminal_capability(
             (&input.candidate_manifest.arm_id, &cluster.candidate),
         ] {
             summary.work.validate(arm_id, &cluster.cluster_id)?;
+            require_nonempty("work_outcome_receipt_digest", &summary.work_outcome_receipt_digest)
+                .map_err(|_| CapabilityRetentionError::MissingClusterReceipt(cluster.cluster_id.clone()))?;
+            require_nonempty("operating_time_receipt_digest", &summary.operating_time_receipt_digest)
+                .map_err(|_| CapabilityRetentionError::MissingClusterReceipt(cluster.cluster_id.clone()))?;
             if summary.available_robot_minutes == 0 {
                 return Err(CapabilityRetentionError::ZeroAvailableRobotTime {
+                    arm_id: arm_id.clone(),
+                    cluster_id: cluster.cluster_id.clone(),
+                });
+            }
+            if summary.nonproductive_downtime_minutes > summary.available_robot_minutes {
+                return Err(CapabilityRetentionError::InvalidTimeAccounting {
                     arm_id: arm_id.clone(),
                     cluster_id: cluster.cluster_id.clone(),
                 });
@@ -841,10 +891,22 @@ pub fn compare_work_and_terminal_capability(
                 cluster.cluster_id.clone(),
             ));
         }
+        if cluster.baseline.available_robot_minutes != cluster.candidate.available_robot_minutes {
+            return Err(CapabilityRetentionError::ScheduledRobotTimeMismatch(
+                cluster.cluster_id.clone(),
+            ));
+        }
         if cluster.baseline.option_set.starting_option_set_digest
             != cluster.candidate.option_set.starting_option_set_digest
         {
             return Err(CapabilityRetentionError::StartingOptionSetMismatch(
+                cluster.cluster_id.clone(),
+            ));
+        }
+        if cluster.baseline.option_set.predecessor_state_digest
+            != cluster.candidate.option_set.predecessor_state_digest
+        {
+            return Err(CapabilityRetentionError::StartingPhysicalStateMismatch(
                 cluster.cluster_id.clone(),
             ));
         }
@@ -872,6 +934,18 @@ pub fn compare_work_and_terminal_capability(
             unknown = true;
         }
 
+        validate_option_reserve_count(
+            &input.baseline_manifest.arm_id,
+            &cluster.cluster_id,
+            &cluster.baseline,
+            &baseline_reserves,
+        )?;
+        validate_option_reserve_count(
+            &input.candidate_manifest.arm_id,
+            &cluster.cluster_id,
+            &cluster.candidate,
+            &candidate_reserves,
+        )?;
         let reserves = reserve_deltas(
             &input.reserve_policy,
             &baseline_reserves,
@@ -915,6 +989,8 @@ pub fn compare_work_and_terminal_capability(
             work_rate_delta_milli_per_hour: i128::from(candidate_rate) - i128::from(baseline_rate),
             baseline_human_intervention_minutes: cluster.baseline.human_intervention_minutes,
             candidate_human_intervention_minutes: cluster.candidate.human_intervention_minutes,
+            baseline_nonproductive_downtime_minutes: cluster.baseline.nonproductive_downtime_minutes,
+            candidate_nonproductive_downtime_minutes: cluster.candidate.nonproductive_downtime_minutes,
             baseline_electrical_energy_milli_wh: cluster.baseline.electrical_energy_milli_wh,
             candidate_electrical_energy_milli_wh: cluster.candidate.electrical_energy_milli_wh,
             baseline_compute_energy_milli_joules: cluster.baseline.compute_energy_milli_joules,
@@ -1104,7 +1180,10 @@ mod tests {
     ) -> ArmClusterSummary {
         ArmClusterSummary {
             work: tally(accepted, 0),
+            work_outcome_receipt_digest: "accepted-work-receipt".into(),
+            operating_time_receipt_digest: "operating-time-receipt".into(),
             available_robot_minutes: available_minutes,
+            nonproductive_downtime_minutes: 0,
             human_intervention_minutes: 0,
             electrical_energy_milli_wh: 20_000,
             compute_energy_milli_joules: 100_000,
