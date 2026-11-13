@@ -73,6 +73,7 @@ struct Event {
     event_index: usize,
     event_id: String,
     load_profile_id: String,
+    readiness_probe_profile_id: Option<String>,
     preceding_idle_window_hours: f64,
     readiness_probe_status: String,
     time_to_restored_readiness_hours: Option<f64>,
@@ -248,7 +249,7 @@ fn audit_fixture(fixture: &Fixture) -> Result<AuditReport> {
     }
 
     let mut serials = BTreeSet::new();
-    let mut reference_signature: Option<Vec<(usize, String, String, f64)>> = None;
+    let mut reference_signature: Option<Vec<(usize, String, String, Option<String>, f64)>> = None;
     let mut sequence_passes_count = 0_usize;
     let mut valid_sequences = 0_usize;
     let mut invalid_sequences = 0_usize;
@@ -345,6 +346,7 @@ fn audit_fixture(fixture: &Fixture) -> Result<AuditReport> {
                 event.event_index,
                 event.event_id.clone(),
                 event.load_profile_id.clone(),
+                event.readiness_probe_profile_id.clone(),
                 event.preceding_idle_window_hours,
             ));
 
@@ -357,16 +359,18 @@ fn audit_fixture(fixture: &Fixture) -> Result<AuditReport> {
                     bail!("{context}: first event idle window must equal initial_standby_hours");
                 }
                 if event.readiness_probe_status != "not_applicable"
+                    || event.readiness_probe_profile_id.is_some()
                     || event.time_to_restored_readiness_hours.is_some()
                 {
-                    bail!("{context}: first event must use not_applicable readiness and null recovery time");
+                    bail!("{context}: first event must use not_applicable readiness, null probe profile and null recovery time");
                 }
             } else if !matches!(
                 event.readiness_probe_status.as_str(),
                 "passed" | "failed"
-            ) || event.time_to_restored_readiness_hours.is_none()
+            ) || event.readiness_probe_profile_id.is_none()
+                || event.time_to_restored_readiness_hours.is_none()
             {
-                bail!("{context}: later events require passed/failed readiness probe and measured recovery time");
+                bail!("{context}: later events require passed/failed readiness probe, a probe profile ID and measured recovery time");
             }
 
             let service_pass = service_passes(event, &fixture.requirements);
@@ -432,10 +436,11 @@ fn audit_fixture(fixture: &Fixture) -> Result<AuditReport> {
                     left.0 != right.0
                         || left.1 != right.1
                         || left.2 != right.2
-                        || !close_enough(left.3, right.3)
+                        || left.3 != right.3
+                        || !close_enough(left.4, right.4)
                 })
             {
-                bail!("measured device sequences do not share identical event order, load-profile IDs and idle windows");
+                bail!("measured device sequences do not share identical event order, load-profile IDs, readiness-probe IDs and idle windows");
             }
         } else {
             reference_signature = Some(signature);
@@ -530,7 +535,7 @@ fn audit_schema(root: &Path) -> Result<()> {
     let event_required = schema["$defs"]["event"]["required"]
         .as_array()
         .context("event schema has no required-field list")?;
-    for field in ["event_index", "event_id", "load_profile_id", "readiness_probe_status", "time_to_restored_readiness_hours"] {
+    for field in ["event_index", "event_id", "load_profile_id", "readiness_probe_profile_id", "readiness_probe_status", "time_to_restored_readiness_hours"] {
         if !event_required.iter().any(|entry| entry.as_str() == Some(field)) {
             bail!("event schema must require {field}");
         }
@@ -626,12 +631,12 @@ mod tests {
             },
             "device_sequences":[
                 {"physical_device_serial":"A","status":"measured","events":[
-                    {"event_index":1,"event_id":"E1","load_profile_id":"L1","preceding_idle_window_hours":168.0,"readiness_probe_status":"not_applicable","time_to_restored_readiness_hours":null,"external_replenishment_energy_wh":0.0,"standby_auxiliary_energy_wh":0.02,"delivered_energy_wh":1.0,"minimum_sustained_power_w":1.2,"response_latency_s":0.4,"minimum_application_voltage_v":1.1,"temperature_rise_c":2.0},
-                    {"event_index":2,"event_id":"E2","load_profile_id":"L2","preceding_idle_window_hours":6.0,"readiness_probe_status":"passed","time_to_restored_readiness_hours":2.0,"external_replenishment_energy_wh":0.0,"standby_auxiliary_energy_wh":0.02,"delivered_energy_wh":0.9,"minimum_sustained_power_w":1.2,"response_latency_s":0.4,"minimum_application_voltage_v":1.1,"temperature_rise_c":2.0}
+                    {"event_index":1,"event_id":"E1","load_profile_id":"L1","preceding_idle_window_hours":168.0,"readiness_probe_status":"not_applicable","readiness_probe_profile_id":null,"time_to_restored_readiness_hours":null,"external_replenishment_energy_wh":0.0,"standby_auxiliary_energy_wh":0.02,"delivered_energy_wh":1.0,"minimum_sustained_power_w":1.2,"response_latency_s":0.4,"minimum_application_voltage_v":1.1,"temperature_rise_c":2.0},
+                    {"event_index":2,"event_id":"E2","load_profile_id":"L2","preceding_idle_window_hours":6.0,"readiness_probe_status":"passed","readiness_probe_profile_id":"TEST-READINESS-PROBE","time_to_restored_readiness_hours":2.0,"external_replenishment_energy_wh":0.0,"standby_auxiliary_energy_wh":0.02,"delivered_energy_wh":0.9,"minimum_sustained_power_w":1.2,"response_latency_s":0.4,"minimum_application_voltage_v":1.1,"temperature_rise_c":2.0}
                 ]},
                 {"physical_device_serial":"B","status":"measured","events":[
-                    {"event_index":1,"event_id":"E1","load_profile_id":"L1","preceding_idle_window_hours":168.0,"readiness_probe_status":"not_applicable","time_to_restored_readiness_hours":null,"external_replenishment_energy_wh":0.0,"standby_auxiliary_energy_wh":0.02,"delivered_energy_wh":1.0,"minimum_sustained_power_w":1.2,"response_latency_s":0.4,"minimum_application_voltage_v":1.1,"temperature_rise_c":2.0},
-                    {"event_index":2,"event_id":"E2","load_profile_id":"L2","preceding_idle_window_hours":6.0,"readiness_probe_status":"passed","time_to_restored_readiness_hours":5.0,"external_replenishment_energy_wh":0.0,"standby_auxiliary_energy_wh":0.02,"delivered_energy_wh":0.9,"minimum_sustained_power_w":1.2,"response_latency_s":0.4,"minimum_application_voltage_v":1.1,"temperature_rise_c":2.0}
+                    {"event_index":1,"event_id":"E1","load_profile_id":"L1","preceding_idle_window_hours":168.0,"readiness_probe_status":"not_applicable","readiness_probe_profile_id":null,"time_to_restored_readiness_hours":null,"external_replenishment_energy_wh":0.0,"standby_auxiliary_energy_wh":0.02,"delivered_energy_wh":1.0,"minimum_sustained_power_w":1.2,"response_latency_s":0.4,"minimum_application_voltage_v":1.1,"temperature_rise_c":2.0},
+                    {"event_index":2,"event_id":"E2","load_profile_id":"L2","preceding_idle_window_hours":6.0,"readiness_probe_status":"passed","readiness_probe_profile_id":"TEST-READINESS-PROBE","time_to_restored_readiness_hours":5.0,"external_replenishment_energy_wh":0.0,"standby_auxiliary_energy_wh":0.02,"delivered_energy_wh":0.9,"minimum_sustained_power_w":1.2,"response_latency_s":0.4,"minimum_application_voltage_v":1.1,"temperature_rise_c":2.0}
                 ]}
             ],
             "expected":{"sequence_pass_rate":0.5,"sequence_passes":1,"valid_sequences":2,"false_ready_events":0,"method":EXPECTED_METHOD},
@@ -705,6 +710,14 @@ mod tests {
         value["device_sequences"][1]["events"][1]["load_profile_id"] = json!("OTHER");
         let error = audit_value(value).unwrap_err().to_string();
         assert!(error.contains("identical event order"));
+    }
+
+    #[test]
+    fn inconsistent_readiness_probe_identity_is_rejected() {
+        let mut value = fixture_value();
+        value["device_sequences"][1]["events"][1]["readiness_probe_profile_id"] = json!("OTHER-PROBE");
+        let error = audit_value(value).unwrap_err().to_string();
+        assert!(error.contains("readiness-probe IDs"));
     }
 
     #[test]
