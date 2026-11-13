@@ -1,0 +1,84 @@
+name: Muse Execution Authority
+
+on:
+  push:
+    branches:
+      - "research/muse-runtime-001-*"
+    paths:
+      - "tools/muse-execution-authority/**"
+      - ".github/workflows/muse-execution-authority.yml"
+  pull_request:
+    paths:
+      - "tools/muse-execution-authority/**"
+      - ".github/workflows/muse-execution-authority.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: muse-execution-authority-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: exact-head-transition-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$expected"
+          printf 'exact_head=%s\\n' "$actual"
+
+      - name: Format source on branch push
+        if: github.event_name == 'push'
+        run: cargo fmt --manifest-path tools/muse-execution-authority/Cargo.toml
+
+      - name: Commit formatting-only normalization
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! git diff --quiet -- tools/muse-execution-authority/src/lib.rs; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add tools/muse-execution-authority/src/lib.rs
+            git commit -m "style(muse-runtime): format execution authority contract"
+            git push origin "HEAD:refs/heads/$GITHUB_REF_NAME"
+          fi
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/muse-execution-authority/Cargo.toml -- --check
+
+      - name: Verify post-format branch head
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$GITHUB_REF_NAME"
+          local_head="$(git rev-parse HEAD)"
+          remote_head="$(git rev-parse "origin/$GITHUB_REF_NAME")"
+          test "$local_head" = "$remote_head"
+          printf 'qualified_head=%s\\n' "$local_head"
+
+      - name: Run state-transition tests
+        run: cargo test --locked --manifest-path tools/muse-execution-authority/Cargo.toml
+
+      - name: Run Clippy
+        run: cargo clippy --locked --manifest-path tools/muse-execution-authority/Cargo.toml --all-targets -- -D warnings
+
