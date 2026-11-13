@@ -72,7 +72,7 @@ This v0.1 prototype does not ingest OTel spans, verify in-toto envelopes, valida
 
 ## Local evidence
 
-- 38 top-level test functions plus 18 subtest cases, including signature tampering, wrong-role signers, trust-domain collisions, task-intent mismatch, actual invocation-ID mismatch, permit expiry/revocation, retry permit reuse, malformed joins, witness freshness/binding, dispatch-unknown reconciliation, missing terminal effects, strict JSON parsing and CLI negative controls.
+- 38 top-level test functions plus 18 subtest cases, including signature tampering, wrong-role signers, trust-domain collisions, task-intent mismatch, actual invocation-ID mismatch, permit expiry/revocation, retry permit reuse, malformed joins, witness freshness/binding, dispatch-unknown reconciliation, missing terminal effects, strict JSON parsing, CLI negative controls and global receipt-ID collision rejection including the witness.
 - `go test ./...`, `go test -race ./...`, `go vet ./...`, formatting check and CLI build pass locally.
 - Statement coverage: join package 76.7%; CLI package 66.2%.
 - Five-run verifier microbenchmark median: 369.9 µs/op, 17,299 B/op, 100 allocations/op on Linux/amd64, AMD EPYC 9V74. This is verifier cost only.
