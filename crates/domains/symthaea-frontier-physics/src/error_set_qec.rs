@@ -453,7 +453,6 @@ pub fn compute_error_set_qec_diagnostics(
     })
 }
 
-
 /// Support-aware square root of a Hermitian positive-semidefinite matrix.
 ///
 /// Negative eigenvalues within the declared roundoff tolerance are mapped to
@@ -1094,15 +1093,14 @@ mod tests {
     fn exact_kl_repetition_code_has_zero_strong_petz_bound() {
         let code = repetition_code_isometry();
         let errors = bit_flip_error_set();
-        let diagnostics =
-            compute_error_set_qec_diagnostics(&code, &errors, 1.0e-12).unwrap();
+        let diagnostics = compute_error_set_qec_diagnostics(&code, &errors, 1.0e-12).unwrap();
         // 0.5*I_4 has Frobenius norm 1 and satisfies the stronger
         // coefficient-matrix constraint ||C||_2 <= 1.
         let coefficient = ComplexMatrix::from_real(
             4,
             4,
             &[
-                 0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5,
+                0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5,
             ],
         )
         .unwrap();
@@ -1124,7 +1122,7 @@ mod tests {
             4,
             4,
             &[
-                 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
+                1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
             ],
         )
         .unwrap();
@@ -1145,18 +1143,13 @@ mod tests {
             4,
             4,
             &[
-                 0.4, 0.0, 0.0, 0.0, 0.0, 0.4, 0.0, 0.0, 0.0, 0.0, 0.4, 0.0, 0.0, 0.0, 0.0, 0.4,
+                0.4, 0.0, 0.0, 0.0, 0.0, 0.4, 0.0, 0.0, 0.0, 0.0, 0.4, 0.0, 0.0, 0.0, 0.0, 0.4,
             ],
         )
         .unwrap();
         assert!(matches!(
-            compute_strongly_controlled_petz_worst_case_bound(
-                &diagnostics,
-                &coefficient,
-                1.0e-12
-            ),
+            compute_strongly_controlled_petz_worst_case_bound(&diagnostics, &coefficient, 1.0e-12),
             Err(ErrorSetQecError::ChannelTracePreservationResidual { .. })
         ));
     }
-
 }
