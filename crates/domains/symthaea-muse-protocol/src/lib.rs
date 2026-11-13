@@ -228,6 +228,25 @@ pub struct ImportedNotationStructureSummary {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+/// What the imported-work audition actually represents.
+///
+/// Older persisted summaries predate this distinction. They deserialize as
+/// LegacyUnverified rather than being silently relabeled as a reconstructed
+/// score or a source-MIDI performance.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportedAuditionKind {
+    /// Legacy record without a content digest or recorded audition kind.
+    #[default]
+    LegacyUnverified,
+    /// Exact source MIDI event stream was rendered through FluidSynth.
+    /// This is a SoundFont rendering of MIDI performance data, not the
+    /// original acoustic recording.
+    SourceMidiPerformance,
+    /// A note-centric Score was rendered using a reconstruction backend.
+    ReconstructedScore,
+}
+
 pub struct ImportedWorkSummary {
     pub manifest: ContributionManifest,
     pub analysis: ImportedWorkAnalysis,
@@ -238,6 +257,15 @@ pub struct ImportedWorkSummary {
     /// field existed still deserialize.
     #[serde(default)]
     pub audio_renderer: String,
+    /// Whether the audition renders the original MIDI event stream or a
+    /// reconstructed note-centric Score. Old summaries become
+    /// LegacyUnverified until their provenance is independently established.
+    #[serde(default)]
+    pub audition_kind: ImportedAuditionKind,
+    /// Exact SHA-256 of the bytes written to audition.wav. Missing on older
+    /// legacy records; the audio endpoint must mark those as unverified.
+    #[serde(default)]
+    pub audition_wav_sha256: Option<String>,
     /// Discloses that `audition.wav`'s TIMBRE is reconstructed, not
     /// preserved from the source. `parse_symbolic` extracts pitch, rhythm,
     /// tempo, meter, and voice roles into a plain `Score` -- it does not
@@ -260,6 +288,17 @@ pub struct ImportedWorkSummary {
 pub fn default_instrumentation_note() -> String {
     "reconstructed: fixed Classical-style instrument palette (source instrumentation is not \
      preserved through parsing); pitch, rhythm, and voice roles are from the source unchanged"
+        .to_string()
+}
+
+/// Disclosure for an audition rendered from uploaded source MIDI bytes.
+/// Programs, event timing, velocities, controllers and track/channel layout
+/// are taken from the uploaded MIDI, but the WAV is newly synthesized using
+/// the configured SoundFont; it is not the original recording.
+pub fn source_midi_instrumentation_note() -> String {
+    "source MIDI performance: uploaded MIDI event bytes were rendered with FluidSynth; \
+     event timing, velocity, program and controller data are retained, but the WAV is a new \
+     SoundFont rendering, not the original acoustic recording"
         .to_string()
 }
 
