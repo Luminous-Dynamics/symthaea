@@ -144,6 +144,8 @@ struct BandReport {
     observed_revolution_count: usize,
     occupied_phase_bin_count: usize,
     phase_bin_coverage_fraction: f64,
+    full_phase_circle_covered: bool,
+    phase_alignment_eligible: bool,
     minimum_observations_per_occupied_phase_bin: usize,
     cavitation_annotation_coverage: f64,
     cavitation_window_presence_fraction: Option<f64>,
@@ -162,6 +164,7 @@ struct OrderModulation {
     modulation_amplitude_peak: Option<f64>,
     modulation_phase_rad: Option<f64>,
     modulation_index_fraction_of_mean: Option<f64>,
+    phase_alignment_eligible: bool,
     disposition: &'static str,
 }
 
@@ -299,7 +302,6 @@ fn validate_case(case: &Case) -> Vec<String> {
                     || !observation.shaft_phase_unwrapped_rad.is_finite()
                     || observation.shaft_phase_unwrapped_rad < 0.0
                     || !finite_positive(observation.shaft_phase_expanded_uncertainty_rad)
-                    || observation.shaft_phase_expanded_uncertainty_rad > case.maximum_phase_uncertainty_rad
                     || !finite_positive(observation.envelope_power)
                 {
                     errors.push(format!("run {} band {} sample {} has invalid time/phase/uncertainty/power", run.run_id, band.band_id, observation.sample_id));
@@ -351,7 +353,15 @@ fn audit_band(
 
     let occupied = bin_counts.iter().filter(|count| **count >= case.minimum_samples_per_phase_bin).count();
     let coverage = occupied as f64 / case.phase_bin_count as f64;
-    let sufficiently_covered = coverage >= case.minimum_phase_bin_coverage_fraction;
+    let full_phase_circle_covered = occupied == case.phase_bin_count;
+    let phase_alignment_eligible = band.observations.iter().all(|observation| {
+        observation.shaft_phase_expanded_uncertainty_rad <= case.maximum_phase_uncertainty_rad
+    });
+    // The simple Fourier coefficient below assumes a uniformly sampled
+    // complete phase circle. Missing bins are never interpolated.
+    let sufficiently_covered = coverage >= case.minimum_phase_bin_coverage_fraction
+        && full_phase_circle_covered
+        && phase_alignment_eligible;
     let phase_bin_reports: Vec<PhaseBinReport> = (0..case.phase_bin_count)
         .map(|index| {
             let count = bin_counts[index];
@@ -398,7 +408,12 @@ fn audit_band(
                 modulation_amplitude_peak: None,
                 modulation_phase_rad: None,
                 modulation_index_fraction_of_mean: None,
-                disposition: "INCOMPLETE_PHASE_BIN_COVERAGE",
+                phase_alignment_eligible,
+                disposition: if !phase_alignment_eligible {
+                    "INCOMPLETE_PHASE_ALIGNMENT"
+                } else {
+                    "INCOMPLETE_PHASE_BIN_COVERAGE"
+                },
             });
             continue;
         }
@@ -414,7 +429,7 @@ fn audit_band(
         // Peak sinusoidal modulation amplitude for a fully populated,
         // uniformly sampled phase circle.
         let coefficient_real = 2.0 * real / n;
-        let coefficient_imag = -2.0 * imag / n;
+        let coefficient_imag = 2.0 * imag / n;
         let amplitude = coefficient_real.hypot(coefficient_imag);
         let phase = coefficient_imag.atan2(coefficient_real);
         let index = equal_angle_mean.filter(|mean| *mean > 0.0).map(|mean| amplitude / mean);
@@ -430,11 +445,14 @@ fn audit_band(
             modulation_amplitude_peak: Some(amplitude),
             modulation_phase_rad: Some(phase),
             modulation_index_fraction_of_mean: index,
+            phase_alignment_eligible,
             disposition: "ORDER_SYNCHRONOUS_MODULATION_COMPUTED",
         });
     }
 
-    let disposition = if !sufficiently_covered {
+    let disposition = if !phase_alignment_eligible {
+        "INCOMPLETE_PHASE_ALIGNMENT"
+    } else if !full_phase_circle_covered || coverage < case.minimum_phase_bin_coverage_fraction {
         "INCOMPLETE_PHASE_BIN_COVERAGE"
     } else if annotation_coverage < 1.0 {
         "MODULATION_ONLY_CAVITATION_ANNOTATION_INCOMPLETE"
@@ -451,6 +469,8 @@ fn audit_band(
         observed_revolution_count: band.observations.iter().map(|observation| observation.revolution_index).collect::<BTreeSet<_>>().len(),
         occupied_phase_bin_count: occupied,
         phase_bin_coverage_fraction: coverage,
+        full_phase_circle_covered,
+        phase_alignment_eligible,
         minimum_observations_per_occupied_phase_bin: bin_counts.iter().copied().filter(|count| *count >= case.minimum_samples_per_phase_bin).min().unwrap_or(0),
         cavitation_annotation_coverage: annotation_coverage,
         cavitation_window_presence_fraction: cavitation_presence,
@@ -487,7 +507,12 @@ fn audit(case: &Case) -> AuditReport {
     if run_reports.iter().flat_map(|run| &run.band_reports)
         .any(|band| band.disposition == "INCOMPLETE_PHASE_BIN_COVERAGE")
     {
-        reasons.push("one or more carrier-band runs do not meet the predeclared phase-bin coverage".to_string());
+        reasons.push("one or more carrier-band runs do not provide a complete, sufficiently sampled phase circle".to_string());
+    }
+    if run_reports.iter().flat_map(|run| &run.band_reports)
+        .any(|band| band.disposition == "INCOMPLETE_PHASE_ALIGNMENT")
+    {
+        reasons.push("one or more carrier-band runs exceed the predeclared phase alignment uncertainty".to_string());
     }
     if case.evidence_kind == EvidenceKind::Synthetic {
         reasons.push("synthetic evidence cannot qualify measured propeller modulation".to_string());
@@ -503,7 +528,8 @@ fn audit(case: &Case) -> AuditReport {
     } else if case.evidence_kind == EvidenceKind::Synthetic
         || case.source.rights_status != RightsStatus::PublicOrPermitted
         || !case.source.independently_reviewed
-        || reasons.iter().any(|reason| reason.contains("phase-bin coverage"))
+        || reasons.iter().any(|reason| reason.contains("phase circle"))
+        || reasons.iter().any(|reason| reason.contains("phase alignment uncertainty"))
     {
         "INCOMPLETE"
     } else {
@@ -735,6 +761,16 @@ mod tests {
         let report = audit(&input);
         assert_eq!(report.disposition, "INCOMPLETE");
         assert!(report.reasons.iter().any(|reason| reason.contains("phase-bin coverage")));
+    }
+
+    #[test]
+    fn excessive_phase_uncertainty_is_incomplete_not_invalid() {
+        let mut input = case();
+        input.runs[0].carrier_bands[0].observations[0].shaft_phase_expanded_uncertainty_rad = 0.01;
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(report.run_reports[0].band_reports[0].disposition, "INCOMPLETE_PHASE_ALIGNMENT");
+        assert!(report.run_reports[0].band_reports[0].modulation_orders[0].modulation_amplitude_peak.is_none());
     }
 
     #[test]
