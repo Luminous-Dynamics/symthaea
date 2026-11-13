@@ -244,3 +244,12 @@ func BenchmarkVerifyValidChain(b *testing.B) {
 	keys:=newTestKeys();bundle:=validBundle(b,keys);state:=testState();expected:=testExpectation(bundle);b.ReportAllocs();b.ResetTimer()
 	for n:=0;n<b.N;n++{if _,err:=Verify(bundle,keys.trust,state,expected);err!=nil{b.Fatal(err)}}
 }
+
+func TestWitnessReceiptIDMustBeGloballyUnique(t *testing.T) {
+	k:=newTestKeys(); b:=validBundle(t,k); w:=b.Witness.Payload
+	w.Meta.ReceiptID=b.Authorization.Payload.Meta.ReceiptID
+	b.Witness,_=Sign(w,k.priv[RoleWitness])
+	if _,err:=Verify(b,k.trust,testState(),testExpectation(b)); !errors.Is(err,ErrJoinMismatch) {
+		t.Fatalf("duplicate witness receipt ID accepted: %v",err)
+	}
+}
