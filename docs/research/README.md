@@ -330,3 +330,12 @@ Open an issue on GitHub for research discussions.
 ---
 
 *"The study of consciousness is the study of what makes us us."*
+
+
+### Industry / engineering lifecycle benchmarking — 2026-11-13
+- [Industry stack comparison](INDUSTRY_STACK_COMPARISON_2026-11-12.md) — capability map and proposed matched comparisons.
+- [Industry capability register](INDUSTRY_CAPABILITY_REGISTER_2026-11-12.json) — machine-readable capability and applicability snapshot.
+- [Industry benchmark validity register](INDUSTRY_BENCHMARK_VALIDITY_REGISTER_2026-11-13.json) — validity risks, claim boundaries and benchmark eligibility.
+- [Engineering lifecycle / PLM competitor register](ENGINEERING_LIFECYCLE_COMPETITOR_REGISTER_2026-11-13.md) — Siemens, Aras, PTC and IBM documented capabilities and limits.
+- [Engineering change experiment preregistration](ENG_CHANGE_EXPERIMENT_PREREGISTRATION_V0_1_2026-11-13.md) — ten comparison arms, gold adjudication, hard gates, full cost and statistical precision planning.
+- [Engineering lifecycle applicability matrix](INDUSTRY_STACK_APPLICABILITY_MATRIX_2026-11-12.json) — conditional applicability by workload and system boundary.
