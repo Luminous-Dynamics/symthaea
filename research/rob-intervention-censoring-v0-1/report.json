@@ -1,0 +1,47 @@
+{
+  "censor_method_gates": {
+    "administrative_censor_no_model": {"admissible": false, "reason": "censor_model_not_qualified"},
+    "administrative_censor_supported": {"admissible": true, "reason": "eligible_for_separately_qualified_censor_adjustment"},
+    "informative_censor_not_captured_by_simple_assumption": {"admissible": false, "reason": "censor_model_not_qualified"},
+    "positive_t0_censor_model_but_positivity_failure": {"admissible": false, "reason": "censoring_positivity_not_supported"}
+  },
+  "claim_boundary": "synthetic_protocol_reference_only",
+  "classifications": {
+    "aborted_protocol": "ProtocolDeviationOrAbort",
+    "administrative_censor_no_model": "AdministrativeRightCensorBeforeIntervention",
+    "administrative_censor_supported": "AdministrativeRightCensorBeforeIntervention",
+    "boundary_after_intervention": "PostInterventionBoundaryEvent",
+    "competing_motor_fault": "CompetingTerminalEvent",
+    "event_action_same_tick": "EventInterventionOrderAmbiguous",
+    "event_before_later_intervention": "BoundaryEventObservedBeforeIntervention",
+    "informative_censor_not_captured_by_simple_assumption": "AdministrativeRightCensorBeforeIntervention",
+    "instrument_invalid": "InstrumentationInvalid",
+    "intervention_prevents_boundary": "PreventiveInterventionBeforeBoundary",
+    "observed_boundary_before_action": "BoundaryEventObservedBeforeIntervention",
+    "positive_t0_censor_model_but_positivity_failure": "AdministrativeRightCensorBeforeIntervention",
+    "telemetry_loss": "ObservationOrTelemetryLoss",
+    "unknown_actuation_delivery": "UnknownDeliveryOrEffect",
+    "unknown_clock": "TimeEvidenceInvalid"
+  },
+  "cohort_identifiability": {
+    "episodes": 15,
+    "episodes_with_intervention": 5,
+    "t0_identifiability": "reference_stratum_present",
+    "untreated_reference_episodes": 5,
+    "warning": "Individual T0 is not recovered for an episode whose intervention changed its trajectory."
+  },
+  "fixture_count": 15,
+  "randomized_policy_itt": {
+    "candidate": {"adverse_n": 1, "adverse_risk": 0.25, "assigned_n": 4, "competing_event_n": 0, "safe_success_n": 3},
+    "candidate_minus_control_risk_difference": -0.25,
+    "candidate_policy": "predictive_safe",
+    "control": {"adverse_n": 2, "adverse_risk": 0.5, "assigned_n": 4, "competing_event_n": 0, "safe_success_n": 2},
+    "control_policy": "reactive_safe",
+    "estimable": true,
+    "estimand": "fixed_horizon_intention_to_treat_adverse_event_risk_difference",
+    "individual_counterfactuals_identified": false,
+    "note": "Descriptive synthetic point estimate only; use preregistered episode/article-clustered inference for confirmatory claims.",
+    "uncertainty_interval": null
+  },
+  "schema_version": "mcr2-intervention-censoring-report-v0.1"
+}
