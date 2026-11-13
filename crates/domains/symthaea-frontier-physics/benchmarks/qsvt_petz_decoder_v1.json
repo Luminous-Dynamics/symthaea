@@ -47,10 +47,10 @@
     "accessible_output": "A=E tensor R, dimension 4",
     "inaccessible_environment": "C_remnant_output",
     "message_dimension": 2,
-    "channel_kraus": "K_bprime[(e,r),m] = U[(e,bprime),(m,r)] / sqrt(2)",
-    "decoder_access_policy": "A only",
+    "channel_kraus": "K_c[(e,r),m] = U[(e,c),(m,r)] / sqrt(2)",
+    "decoder_access_policy": "The decoder receives only the declared regime input; for the assisted setup it is E tensor R. The remnant C is always inaccessible.",
     "seed_policy": "frozen common seed schedule across all decoder families",
-    "inaccessible_environment_description": "The remaining black-hole remnant output after U acts on M tensor B; it is traced out and is unavailable to the decoder.",
+    "inaccessible_environment_description": "The remaining black-hole remnant output after U acts on M tensor B; it is traced out and is unavailable to the decoder. In the literature cited for the assisted Hayden–Preskill decoder, this is the remnant output called C; the accessible old radiation is called B'_early there and is our R.",
     "notation_mapping": {
       "local": "M is the message; B is the initially entangled black-hole subsystem; R is the accessible early-radiation purifier; U(M tensor B) outputs E (newly accessible radiation) and C (remaining remnant). Decoder input is A=E tensor R.",
       "literature": "In the cited Hayden-Preskill QSVT paper, the decoder input is D tensor B'_early; its inaccessible remnant output is C.",
@@ -60,7 +60,21 @@
         "unassisted_E_only"
       ],
       "comparison_rule": "Assisted and unassisted runs are distinct channels; compare only within matched access regimes."
-    }
+    },
+    "access_regimes": [
+      {
+        "id": "entanglement_assisted_E_tensor_R",
+        "decoder_input": "E tensor R",
+        "status": "current implementation",
+        "literature_equivalent": "D tensor B'_early"
+      },
+      {
+        "id": "unassisted_E_only",
+        "decoder_input": "E",
+        "status": "required ablation",
+        "literature_equivalent": "no early-radiation purifier supplied"
+      }
+    ]
   },
   "decoder_families": [
     {
