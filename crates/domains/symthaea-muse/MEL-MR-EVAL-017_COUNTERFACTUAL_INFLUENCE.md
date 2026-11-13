@@ -145,7 +145,7 @@ These are proposed targets, not Muse results:
 - Source module: `src/counterfactual_influence.rs`.
 - Score-event exception verifier: `src/performed_event_map.rs`.
 - Renderer receipt source: `src/renderer_execution_receipt.rs`.
-- Twelve source-level tests are authored, including exact MIDI lineage/receipt replay, three distinct no-op controls, Remove preservation, exact +2-semitone transposition, wrong-delta rejection, non-target pitch mutation rejection, MIDI boundary/zero-delta rejection, renderer/schedule substitution, and malformed PCM/config rejection.
+- Thirteen source-level tests are authored, including exact MIDI lineage/receipt replay, three distinct no-op controls, Remove preservation, exact +2-semitone transposition, wrong-delta rejection, non-target pitch mutation rejection, MIDI boundary/zero-delta rejection, renderer/schedule substitution, and malformed PCM/config rejection.
 - Rust tests, Cargo compilation, rustfmt, Clippy, real FluidSynth integration, calibration study and public benchmark runs have **not** been executed in this environment. GitHub workflow states must not be reported as passes unless they actually succeed at the exact head.
 
 ## EVAL-036 Phase 1 — exact semitone transposition (13 November 2026)
