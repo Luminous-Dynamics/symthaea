@@ -1,0 +1,338 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/rea-anytime-evidence-agent-view-v0.schema.json",
+  "title": "REA anytime evidence acquisition agent view v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "status",
+    "source_policy",
+    "use",
+    "not_human_adjudicated",
+    "episodes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "dataset_id": {
+      "const": "rea-anytime-evidence-acquisition"
+    },
+    "status": {
+      "const": "design_fixture_only"
+    },
+    "source_policy": {
+      "const": "original_synthetic_text_only"
+    },
+    "use": {
+      "const": "agent_visible_development_input_only"
+    },
+    "not_human_adjudicated": {
+      "const": true
+    },
+    "episodes": {
+      "type": "array",
+      "minItems": 14,
+      "maxItems": 14,
+      "items": {
+        "$ref": "#/$defs/episode"
+      }
+    }
+  },
+  "$defs": {
+    "obligationStatus": {
+      "enum": [
+        "satisfied",
+        "unknown",
+        "unsatisfied",
+        "conflicted",
+        "stale",
+        "incomplete",
+        "contradicted"
+      ]
+    },
+    "dutyStatus": {
+      "enum": [
+        "satisfied",
+        "unrun",
+        "failed",
+        "unavailable",
+        "stale"
+      ]
+    },
+    "obligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "obligation_id",
+        "required",
+        "status",
+        "admissible_evidence_classes",
+        "evidence_ids"
+      ],
+      "properties": {
+        "obligation_id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "required": {
+          "const": true
+        },
+        "status": {
+          "$ref": "#/$defs/obligationStatus"
+        },
+        "admissible_evidence_classes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 2
+          },
+          "uniqueItems": true
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 2
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "duty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "duty_id",
+        "required",
+        "status",
+        "admissible_evidence_classes",
+        "evidence_ids"
+      ],
+      "properties": {
+        "duty_id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "required": {
+          "const": true
+        },
+        "status": {
+          "$ref": "#/$defs/dutyStatus"
+        },
+        "admissible_evidence_classes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 2
+          },
+          "uniqueItems": true
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 2
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "strength_rank",
+        "claim_text",
+        "required_obligation_ids",
+        "required_defeater_duty_ids"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "strength_rank": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "claim_text": {
+          "type": "string",
+          "minLength": 10
+        },
+        "required_obligation_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 2
+          },
+          "uniqueItems": true
+        },
+        "required_defeater_duty_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 2
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "cost_units",
+        "outcomes",
+        "authorization",
+        "reversible",
+        "destructive",
+        "target_impact"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "cost_units": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "authorization": {
+          "enum": [
+            "authorized",
+            "denied",
+            "unknown"
+          ]
+        },
+        "reversible": {
+          "type": "boolean"
+        },
+        "destructive": {
+          "type": "boolean"
+        },
+        "target_impact": {
+          "enum": [
+            "read_only",
+            "temporary_configuration",
+            "service_restart",
+            "data_mutation",
+            "physical_actuation",
+            "isolated_test"
+          ]
+        }
+      }
+    },
+    "episode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_id",
+        "domain",
+        "fault_family",
+        "scope",
+        "claim_ladder",
+        "initial_state",
+        "candidate_actions",
+        "budget"
+      ],
+      "properties": {
+        "episode_id": {
+          "type": "string",
+          "pattern": "^REA-STOP-[0-9]{3}$"
+        },
+        "domain": {
+          "type": "string",
+          "minLength": 2
+        },
+        "fault_family": {
+          "type": "string",
+          "minLength": 2
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 10
+        },
+        "claim_ladder": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/claim"
+          }
+        },
+        "initial_state": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "obligations",
+            "defeater_duties",
+            "observed_evidence_ids"
+          ],
+          "properties": {
+            "obligations": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/obligation"
+              }
+            },
+            "defeater_duties": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/duty"
+              }
+            },
+            "observed_evidence_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 2
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "candidate_actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/action"
+          }
+        },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_actions",
+            "max_cost_units"
+          ],
+          "properties": {
+            "max_actions": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_cost_units": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    }
+  }
+}

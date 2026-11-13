@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/rea-anytime-evidence-grader-v0.schema.json",
+  "title": "REA anytime evidence acquisition grader v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "status",
+    "source_policy",
+    "access_policy",
+    "not_human_adjudicated",
+    "episodes"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "dataset_id": {
+      "const": "rea-anytime-evidence-acquisition"
+    },
+    "status": {
+      "const": "design_fixture_only"
+    },
+    "source_policy": {
+      "const": "grader_only_synthetic_events"
+    },
+    "access_policy": {
+      "const": "never_mount_in_agent_workspace"
+    },
+    "not_human_adjudicated": {
+      "const": true
+    },
+    "episodes": {
+      "type": "array",
+      "minItems": 14,
+      "maxItems": 14,
+      "items": {
+        "$ref": "#/$defs/episode"
+      }
+    }
+  },
+  "$defs": {
+    "status": {
+      "enum": [
+        "satisfied",
+        "unknown",
+        "unsatisfied",
+        "conflicted",
+        "stale",
+        "incomplete",
+        "contradicted"
+      ]
+    },
+    "dutyStatus": {
+      "enum": [
+        "satisfied",
+        "unrun",
+        "failed",
+        "unavailable",
+        "stale"
+      ]
+    },
+    "update": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "obligation_id",
+        "resulting_status",
+        "evidence_class",
+        "source_family_id"
+      ],
+      "properties": {
+        "obligation_id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "resulting_status": {
+          "$ref": "#/$defs/status"
+        },
+        "evidence_class": {
+          "type": "string",
+          "minLength": 2
+        },
+        "source_family_id": {
+          "type": "string",
+          "minLength": 2
+        }
+      }
+    },
+    "dutyUpdate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "duty_id",
+        "resulting_status",
+        "evidence_class",
+        "source_family_id"
+      ],
+      "properties": {
+        "duty_id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "resulting_status": {
+          "$ref": "#/$defs/dutyStatus"
+        },
+        "evidence_class": {
+          "type": "string",
+          "minLength": 2
+        },
+        "source_family_id": {
+          "type": "string",
+          "minLength": 2
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "trigger_kind",
+        "action_id",
+        "outcome",
+        "obligation_updates",
+        "duty_updates",
+        "invalidated_evidence_ids"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 2
+        },
+        "trigger_kind": {
+          "enum": [
+            "observed_action",
+            "external_update"
+          ]
+        },
+        "action_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "outcome": {
+          "type": "string",
+          "minLength": 1
+        },
+        "obligation_updates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/update"
+          }
+        },
+        "duty_updates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/dutyUpdate"
+          }
+        },
+        "invalidated_evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 2
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "checkpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "after_event_index",
+        "decision",
+        "claim_id",
+        "action_id",
+        "reason"
+      ],
+      "properties": {
+        "after_event_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decision": {
+          "enum": [
+            "continue",
+            "stop_ready",
+            "stop_bounded",
+            "stop_unresolved",
+            "abstain"
+          ]
+        },
+        "claim_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "action_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 10
+        }
+      }
+    },
+    "episode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_id",
+        "world_state_oracle",
+        "events",
+        "checkpoints",
+        "final_ready_claim_id"
+      ],
+      "properties": {
+        "episode_id": {
+          "type": "string",
+          "pattern": "^REA-STOP-[0-9]{3}$"
+        },
+        "world_state_oracle": {
+          "type": "string",
+          "minLength": 2
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/event"
+          }
+        },
+        "checkpoints": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/checkpoint"
+          }
+        },
+        "final_ready_claim_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}
