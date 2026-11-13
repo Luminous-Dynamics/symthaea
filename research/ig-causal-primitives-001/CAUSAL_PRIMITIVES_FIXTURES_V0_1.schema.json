@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/ig-causal-primitives-001/CAUSAL_PRIMITIVES_FIXTURES_V0_1.schema.json",
+  "title": "IG-CAUSAL-PRIMITIVES-001 fixture manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "status",
+    "fixture_count",
+    "primitive_counts",
+    "domains",
+    "tasks",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ig-causal-primitives-fixtures-v0.1"
+    },
+    "benchmark_id": {
+      "const": "IG-CAUSAL-PRIMITIVES-001"
+    },
+    "status": {
+      "const": "synthetic_known_answer_unexecuted"
+    },
+    "fixture_count": {
+      "const": 40
+    },
+    "primitive_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "CausalPrior",
+        "ForwardStateTracing",
+        "BeliefUpdating",
+        "AgencySensitivity"
+      ],
+      "properties": {
+        "CausalPrior": {
+          "const": 10
+        },
+        "ForwardStateTracing": {
+          "const": 10
+        },
+        "BeliefUpdating": {
+          "const": 10
+        },
+        "AgencySensitivity": {
+          "const": 10
+        }
+      }
+    },
+    "domains": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "enum": [
+          "mechanical_infrastructure",
+          "institutional_resource",
+          "abstract_systems"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 40,
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "primitive",
+          "domain"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "primitive": {
+            "enum": [
+              "CausalPrior",
+              "ForwardStateTracing",
+              "BeliefUpdating",
+              "AgencySensitivity"
+            ]
+          },
+          "domain": {
+            "enum": [
+              "mechanical_infrastructure",
+              "institutional_resource",
+              "abstract_systems"
+            ]
+          },
+          "causal_prior": {
+            "type": "object"
+          },
+          "forward_state_trace": {
+            "type": "object"
+          },
+          "belief_update": {
+            "type": "object"
+          },
+          "agency_sensitivity": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
