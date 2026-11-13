@@ -59,6 +59,21 @@ def mat_from_svec_lower(vector: np.ndarray, order: int) -> np.ndarray:
     return matrix
 
 
+def trace_cost_svec_lower(order: int) -> np.ndarray:
+    """Return c such that c @ svec_lower(X) == trace(X)."""
+    if order <= 0:
+        raise ValueError("matrix order must be positive")
+    length = order * (order + 1) // 2
+    cost = np.zeros(length, dtype=np.float64)
+    index = 0
+    for col in range(order):
+        for row in range(col, order):
+            if row == col:
+                cost[index] = 1.0
+            index += 1
+    return cost
+
+
 def solver_options() -> dict:
     return {
         "verbose": False,
@@ -84,7 +99,9 @@ def test_feasible_complex_hermitian_realification() -> None:
     # min trace(X), s.t. X - R(H) >= 0, expressed as A x + s = b.
     a = -sp.eye(variable_count, format="csc", dtype=np.float64)
     b = -expected_x
-    c = np.asarray([1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0])
+    c = trace_cost_svec_lower(order)
+    assert np.flatnonzero(c).tolist() == [0, 4, 7, 9]
+    assert float(c @ svec_lower(np.diag([1.0, 2.0, 3.0, 4.0]))) == 10.0
     p = sp.csc_matrix((variable_count, variable_count), dtype=np.float64)
     cone = {"s": [order]}
 
@@ -167,7 +184,21 @@ def test_primal_infeasibility_farkas_witness() -> None:
     )
 
 
+def test_scs_trace_objective_vectorization() -> None:
+    for order, expected_indices in (
+        (2, [0, 2]),
+        (3, [0, 3, 5]),
+        (4, [0, 4, 7, 9]),
+    ):
+        cost = trace_cost_svec_lower(order)
+        assert np.flatnonzero(cost).tolist() == expected_indices
+        diagonal = np.arange(1.0, order + 1.0)
+        packed = svec_lower(np.diag(diagonal))
+        assert float(cost @ packed) == float(np.sum(diagonal))
+
+
 if __name__ == "__main__":
     print(f"Independent cross-solver version: SCS {scs.__version__}")
+    test_scs_trace_objective_vectorization()
     test_feasible_complex_hermitian_realification()
     test_primal_infeasibility_farkas_witness()
