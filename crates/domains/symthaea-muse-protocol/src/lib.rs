@@ -227,6 +227,25 @@ pub struct ImportedNotationStructureSummary {
     pub explanation: Option<String>,
 }
 
+/// What the imported-work audition actually represents.
+///
+/// Older persisted summaries predate this distinction. They deserialize as
+/// LegacyUnverified rather than being silently relabeled as a reconstructed
+/// score or a source-MIDI performance.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportedAuditionKind {
+    /// Legacy record without a content digest or recorded audition kind.
+    #[default]
+    LegacyUnverified,
+    /// Exact source MIDI event stream was rendered through FluidSynth.
+    /// This is a SoundFont rendering of MIDI performance data, not the
+    /// original acoustic recording.
+    SourceMidiPerformance,
+    /// A note-centric Score was rendered using a reconstruction backend.
+    ReconstructedScore,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ImportedWorkSummary {
     pub manifest: ContributionManifest,
@@ -238,6 +257,20 @@ pub struct ImportedWorkSummary {
     /// field existed still deserialize.
     #[serde(default)]
     pub audio_renderer: String,
+    /// Whether the audition renders the original MIDI event stream or a
+    /// reconstructed note-centric Score. Old summaries become
+    /// LegacyUnverified until their provenance is independently established.
+    #[serde(default)]
+    pub audition_kind: ImportedAuditionKind,
+    /// Exact SHA-256 of the bytes written to audition.wav. Missing on older
+    /// legacy records; the audio endpoint must mark those as unverified.
+    #[serde(default)]
+    pub audition_wav_sha256: Option<String>,
+    /// Stable reason code when a source-MIDI audition falls back to a
+    /// reconstructed Score render. None means the work did not require
+    /// source-MIDI fallback or the source MIDI audition succeeded.
+    #[serde(default)]
+    pub audition_fallback_reason: Option<String>,
     /// Discloses that `audition.wav`'s TIMBRE is reconstructed, not
     /// preserved from the source. `parse_symbolic` extracts pitch, rhythm,
     /// tempo, meter, and voice roles into a plain `Score` -- it does not
@@ -260,6 +293,17 @@ pub struct ImportedWorkSummary {
 pub fn default_instrumentation_note() -> String {
     "reconstructed: fixed Classical-style instrument palette (source instrumentation is not \
      preserved through parsing); pitch, rhythm, and voice roles are from the source unchanged"
+        .to_string()
+}
+
+/// Disclosure for an audition rendered from uploaded source MIDI bytes.
+/// Programs, event timing, velocities, controllers and track/channel layout
+/// are taken from the uploaded MIDI, but the WAV is newly synthesized using
+/// the configured SoundFont; it is not the original recording.
+pub fn source_midi_instrumentation_note() -> String {
+    "source MIDI performance: uploaded MIDI event bytes were rendered with FluidSynth; \
+     event timing, velocity, program and controller data are retained, but the WAV is a new \
+     SoundFont rendering, not the original acoustic recording"
         .to_string()
 }
 
@@ -2725,4 +2769,93 @@ mod tests {
         let back: PerformedNoteEvent = serde_json::from_str(&json).unwrap();
         assert!(back.source_note_id.is_none());
     }
+}
+
+
+#[cfg(test)]
+mod imported_audition_compatibility_tests {
+    use super::*;
+
+    fn legacy_summary_json() -> serde_json::Value {
+        serde_json::json!({
+            "manifest": {
+                "work_id": "fixture-import-id",
+                "title": "Fixture MIDI",
+                "contributor": "Fixture contributor",
+                "declared_authorship": false,
+                "source_format": "Midi",
+                "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "score_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "contribution_scope": "private_project",
+                "content_license": "all_rights_reserved",
+                "imported_at_unix_ms": 1
+            },
+            "analysis": {
+                "source_native": true,
+                "inferred_territory": null,
+                "tempo_bpm": 120.0,
+                "meter": 4,
+                "tonic": "C",
+                "note_count": 1,
+                "voice_count": 1,
+                "duration_seconds": 0.5,
+                "motifs": [],
+                "sections": [],
+                "unresolved_interpretations": []
+            },
+            "audio_available": true,
+            "audio_renderer": "fluidsynth"
+        })
+    }
+
+    #[test]
+    fn legacy_import_summary_defaults_to_unverified_audition_and_no_digest() {
+        let summary: ImportedWorkSummary =
+            serde_json::from_value(legacy_summary_json()).unwrap();
+        assert_eq!(
+            summary.audition_kind,
+            ImportedAuditionKind::LegacyUnverified
+        );
+        assert!(summary.audition_wav_sha256.is_none());
+        assert!(summary.audition_fallback_reason.is_none());
+    }
+
+    #[test]
+    fn new_source_midi_summary_round_trips_typed_kind_and_wav_digest() {
+        let mut value = legacy_summary_json();
+        value["audition_kind"] = serde_json::json!("source_midi_performance");
+        value["audition_wav_sha256"] = serde_json::json!(
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        );
+        let summary: ImportedWorkSummary = serde_json::from_value(value).unwrap();
+        assert_eq!(
+            summary.audition_kind,
+            ImportedAuditionKind::SourceMidiPerformance
+        );
+        assert_eq!(
+            summary.audition_wav_sha256.as_deref(),
+            Some("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")
+        );
+    }
+
+    #[test]
+    fn reconstructed_score_kind_has_explicit_wire_value() {
+        let encoded = serde_json::to_string(&ImportedAuditionKind::ReconstructedScore).unwrap();
+        assert_eq!(encoded, "\"reconstructed_score\"");
+    }
+    #[test]
+    fn source_midi_fallback_reason_round_trips() {
+        let mut value = legacy_summary_json();
+        value["audition_kind"] = serde_json::json!("reconstructed_score");
+        value["audition_wav_sha256"] = serde_json::json!(
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        );
+        value["audition_fallback_reason"] = serde_json::json!("unsupported_sequential_smf");
+        let summary: ImportedWorkSummary = serde_json::from_value(value).unwrap();
+        assert_eq!(
+            summary.audition_fallback_reason.as_deref(),
+            Some("unsupported_sequential_smf")
+        );
+    }
+
 }

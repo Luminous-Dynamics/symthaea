@@ -155,6 +155,28 @@ pub fn AddMusicPage() -> impl IntoView {
                 let playback_title = title.clone();
                 let analysis = work.analysis.clone();
                 let instrumentation_note = work.instrumentation_note.clone();
+                let audition_label = match work.audition_kind {
+                    symthaea_muse_protocol::ImportedAuditionKind::SourceMidiPerformance =>
+                        "Play source MIDI performance (SoundFont render)",
+                    symthaea_muse_protocol::ImportedAuditionKind::ReconstructedScore =>
+                        "Play reconstructed rendition",
+                    symthaea_muse_protocol::ImportedAuditionKind::LegacyUnverified =>
+                        "Play legacy audition (provenance unverified)",
+                };
+                let audition_integrity_note = work.audition_wav_sha256.as_ref()
+                    .map(|digest| format!("Audition WAV SHA-256 · {digest}"))
+                    .unwrap_or_else(|| "Legacy audition · WAV digest not recorded; integrity unverified".to_owned());
+                let audition_fallback_note = work.audition_fallback_reason.as_deref().map(|reason| {
+                    let explanation = match reason {
+                        "fluidsynth_unavailable" => "FluidSynth was unavailable; Muse rendered the reconstructed Score instead.",
+                        "unsupported_sequential_smf" => "This MIDI file contains sequential Format 2 sequences; Muse used the reconstructed Score audition.",
+                        "malformed_source_midi" => "The uploaded MIDI could not be admitted for source-performance playback; Muse used the reconstructed Score audition.",
+                        "source_midi_materialization_failed" => "Muse could not safely materialize the exact uploaded MIDI bytes; it used the reconstructed Score audition.",
+                        "source_midi_bytes_changed" => "The temporary source MIDI changed during audition; Muse discarded that attempt and used the reconstructed Score audition.",
+                        _ => "The source-MIDI performance path was not available; Muse used the reconstructed Score audition.",
+                    };
+                    explanation.to_owned()
+                });
                 let notation_structure = work.notation_structure.clone();
                 let notation_graph_url =
                     api::imported_notation_graph_url(api::DEFAULT_BACKEND, &work_id);
@@ -213,12 +235,16 @@ pub fn AddMusicPage() -> impl IntoView {
                         <div class="import-actions">
                             <button type="button" on:click=move |_| muse.play_review_audio(
                                 api::imported_audio_url(api::DEFAULT_BACKEND, &audio_id), playback_title.clone())>
-                                "Play reconstructed rendition"
+                                {audition_label}
                             </button>
                             <A href="/liked">"Open Library"</A>
                             <A href="/atlas">"Show in private Atlas"</A>
                         </div>
                         <p class="muted small">{instrumentation_note}</p>
+                        <p class="muted small">{audition_integrity_note}</p>
+                        {audition_fallback_note.map(|reason| view! {
+                            <p class="muted small">{reason}</p>
+                        })}
                         <details>
                             <summary>"Unresolved interpretations"</summary>
                             <ul>{analysis.unresolved_interpretations.into_iter().map(|item| view! { <li>{item}</li> }).collect_view()}</ul>

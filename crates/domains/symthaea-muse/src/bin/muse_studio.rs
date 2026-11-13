@@ -2345,18 +2345,94 @@ fn symbolic_import_format(filename: &str) -> Option<symthaea_muse_protocol::Symb
     }
 }
 
-/// Real FluidSynth render for an imported work's audition -- imported
-/// pieces have no `Style`/`CompositionSpec` of their own (they were
-/// PARSED, not composed), so this reuses `export_score_midi`'s clean-grid
-/// symbolic path with a fixed `Style::Classical` instrument palette purely
-/// for timbre (NOT a neutral/generic placeholder -- it's a genuine
-/// string-trio orchestration choice, see `instrumentation_note` on
-/// `ImportedWorkSummary` for the disclosure this implies); every note's
-/// pitch/rhythm/voice-role in the exported MIDI comes from the imported
-/// score unchanged. Falls back to the native in-crate synth (disclosed via
-/// the returned renderer name) when FluidSynth is unavailable, matching
-/// `/api/compose`'s own established fallback convention -- never silent,
-/// always disclosed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum SourceMidiAuditionError {
+    MalformedMidi,
+    SequentialFormatUnsupported,
+    TemporaryFile,
+    SourceBytesChanged,
+}
+
+impl SourceMidiAuditionError {
+    fn code(&self) -> &'static str {
+        match self {
+            Self::MalformedMidi => "malformed_source_midi",
+            Self::SequentialFormatUnsupported => "unsupported_sequential_smf",
+            Self::TemporaryFile => "source_midi_materialization_failed",
+            Self::SourceBytesChanged => "source_midi_bytes_changed",
+        }
+    }
+}
+
+/// Only simultaneous-sequence SMF Format 0/1 can be used as a source
+/// performance audition. Format 2 contains independent sequences and cannot
+/// be rendered as one combined performance without an explicit traversal
+/// policy. Parsing the MIDI here does not rewrite it.
+fn validate_source_midi_audition(bytes: &[u8]) -> Result<(), SourceMidiAuditionError> {
+    let smf = midly::Smf::parse(bytes)
+        .map_err(|_| SourceMidiAuditionError::MalformedMidi)?;
+    match smf.header.format {
+        midly::Format::SingleTrack | midly::Format::Parallel => Ok(()),
+        midly::Format::Sequential => Err(SourceMidiAuditionError::SequentialFormatUnsupported),
+    }
+}
+
+/// Materialize the exact uploaded bytes for FluidSynth. The read-back
+/// equality check is deliberate: the source path is not re-exported from the
+/// note-centric Score, normalized, or otherwise rewritten before rendering.
+fn materialize_source_midi_audition(
+    bytes: &[u8],
+) -> Result<std::path::PathBuf, SourceMidiAuditionError> {
+    validate_source_midi_audition(bytes)?;
+    let path = std::env::temp_dir().join(format!(
+        "muse_source_import_{}.mid",
+        unique_temp_suffix()
+    ));
+    std::fs::write(&path, bytes)
+        .map_err(|_| SourceMidiAuditionError::TemporaryFile)?;
+    let read_back = match std::fs::read(&path) {
+        Ok(value) => value,
+        Err(_) => {
+            let _ = std::fs::remove_file(&path);
+            return Err(SourceMidiAuditionError::TemporaryFile);
+        }
+    };
+    if read_back != bytes {
+        let _ = std::fs::remove_file(&path);
+        return Err(SourceMidiAuditionError::SourceBytesChanged);
+    }
+    Ok(path)
+}
+
+/// Render exact source MIDI bytes through FluidSynth when available. None
+/// means the renderer is unavailable or produced no output; callers must
+/// fall back to a reconstructed Score audition and disclose that fact.
+fn render_source_midi_audition(
+    source_midi_bytes: &[u8],
+) -> Result<Option<Vec<u8>>, SourceMidiAuditionError> {
+    let path = materialize_source_midi_audition(source_midi_bytes)?;
+    if symthaea_muse::fluid_render::available().is_none() {
+        let _ = std::fs::remove_file(&path);
+        return Ok(None);
+    }
+    let rendered =
+        symthaea_muse::fluid_render::render_midi_to_wav(&path, SAMPLE_RATE, None);
+    // Detect ordinary path replacement/mutation during rendering. This does
+    // not protect against a malicious host that restores the bytes between
+    // observations; stronger guarantees require a trusted execution boundary.
+    let unchanged = std::fs::read(&path)
+        .map(|bytes| bytes == source_midi_bytes)
+        .unwrap_or(false);
+    let _ = std::fs::remove_file(&path);
+    if !unchanged {
+        return Err(SourceMidiAuditionError::SourceBytesChanged);
+    }
+    Ok(rendered)
+}
+
+/// Reconstructed-score FluidSynth/native path. This is used for MusicXML,
+/// MuseScore JSON, unsupported MIDI formats, or unavailable/failed source
+/// MIDI rendering; it is not represented as a source-performance replay.
 fn render_import_audition(
     score: &symthaea_music_theory::Score,
 ) -> Result<(Vec<u8>, &'static str), (StatusCode, String)> {
@@ -2385,9 +2461,10 @@ async fn import_music(
     mut multipart: Multipart,
 ) -> Result<Json<symthaea_muse_protocol::ImportedWorkSummary>, (StatusCode, String)> {
     use symthaea_muse_protocol::{
-        AuthorizationBasis, ContributionManifest, ContributionScope, ImportedNotationStructureSummary,
-        ImportedWorkId, ImportedWorkSummary, MusicalContentLicense,
-        default_instrumentation_note,
+        AuthorizationBasis, ContributionManifest, ContributionScope,
+        ImportedAuditionKind, ImportedNotationStructureSummary, ImportedWorkId,
+        ImportedWorkSummary, MusicalContentLicense, default_instrumentation_note,
+        source_midi_instrumentation_note,
     };
 
     let mut title = None;
@@ -2590,19 +2667,63 @@ async fn import_music(
             attribution: Vec::new(),
             imported_at_unix_ms: unix_time_ms(),
         };
-        // Imported music is never passed through Muse's compositional
-        // grammar/style-preset pipeline (progression, phrase structure,
-        // form) -- only `Style::Classical`'s fixed instrument palette is
-        // used, purely to pick a timbre for playback (see
-        // `render_import_audition`'s doc comment and
-        // `instrumentation_note` below for why this still isn't neutral).
-        let (wav, audio_renderer) = render_import_audition(&score)?;
+        // Source MIDI is a performance artifact, not merely a note-centric
+        // Score. Preserve its exact event stream for the audition when the
+        // source is a supported simultaneous-sequence SMF and FluidSynth is
+        // available. MusicXML/MuseScore and unsupported/failed MIDI fall
+        // back to an explicitly reconstructed Score rendition.
+        let (wav, audio_renderer, audition_kind, instrumentation_note, audition_fallback_reason) =
+            if matches!(&format, symthaea_muse_protocol::SymbolicImportFormat::Midi) {
+                match render_source_midi_audition(&source) {
+                    Ok(Some(wav)) => (
+                        wav,
+                        "fluidsynth",
+                        ImportedAuditionKind::SourceMidiPerformance,
+                        source_midi_instrumentation_note(),
+                        None,
+                    ),
+                    Ok(None) => {
+                        let (wav, renderer) = render_import_audition(&score)?;
+                        (
+                            wav,
+                            renderer,
+                            ImportedAuditionKind::ReconstructedScore,
+                            default_instrumentation_note(),
+                            Some("fluidsynth_unavailable".to_owned()),
+                        )
+                    }
+                    Err(error) => {
+                        let reason = error.code().to_owned();
+                        let (wav, renderer) = render_import_audition(&score)?;
+                        (
+                            wav,
+                            renderer,
+                            ImportedAuditionKind::ReconstructedScore,
+                            default_instrumentation_note(),
+                            Some(reason),
+                        )
+                    }
+                }
+            } else {
+                let (wav, renderer) = render_import_audition(&score)?;
+                (
+                    wav,
+                    renderer,
+                    ImportedAuditionKind::ReconstructedScore,
+                    default_instrumentation_note(),
+                    None,
+                )
+            };
+        let audition_wav_sha256 = sha256_hex(&wav);
         let summary = ImportedWorkSummary {
             manifest,
             analysis,
             audio_available: true,
             audio_renderer: audio_renderer.to_string(),
-            instrumentation_note: default_instrumentation_note(),
+            audition_kind,
+            audition_wav_sha256: Some(audition_wav_sha256),
+            audition_fallback_reason,
+            instrumentation_note,
             notation_structure: Some(notation_structure),
         };
 
@@ -2962,11 +3083,57 @@ async fn imported_work_midi_measure_maps(
     Ok(Json(receipt))
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ImportedAudioIntegrity {
+    VerifiedSha256,
+    LegacyUnverified,
+}
+
+/// Verify new imported audio artifacts against the exact digest in their
+/// summary. Old summaries deserialize with LegacyUnverified and no digest;
+/// they remain readable under that explicit legacy policy, but do not receive
+/// a verified-integrity response header.
+fn imported_audio_integrity(
+    audition_kind: symthaea_muse_protocol::ImportedAuditionKind,
+    expected_sha256: Option<&str>,
+    bytes: &[u8],
+) -> Result<ImportedAudioIntegrity, StatusCode> {
+    match expected_sha256 {
+        Some(expected) if expected == sha256_hex(bytes) => {
+            Ok(ImportedAudioIntegrity::VerifiedSha256)
+        }
+        Some(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        None if audition_kind == symthaea_muse_protocol::ImportedAuditionKind::LegacyUnverified => {
+            Ok(ImportedAudioIntegrity::LegacyUnverified)
+        }
+        None => Err(StatusCode::INTERNAL_SERVER_ERROR),
+    }
+}
+
 async fn imported_work_audio(AxPath(id): AxPath<String>) -> Result<Response, StatusCode> {
-    read_import_summary(&id)?;
+    let summary = read_import_summary(&id)?;
     let bytes = std::fs::read(Path::new(IMPORT_ROOT).join(id).join("audition.wav"))
         .map_err(|_| StatusCode::NOT_FOUND)?;
-    Ok(([(header::CONTENT_TYPE, "audio/wav")], bytes).into_response())
+    let integrity = imported_audio_integrity(
+        summary.audition_kind,
+        summary.audition_wav_sha256.as_deref(),
+        &bytes,
+    )?;
+    let integrity_header = match integrity {
+        ImportedAudioIntegrity::VerifiedSha256 => "verified-sha256",
+        ImportedAudioIntegrity::LegacyUnverified => "legacy-unverified",
+    };
+    Ok((
+        [
+            (header::CONTENT_TYPE, "audio/wav"),
+            (
+                axum::http::HeaderName::from_static("x-muse-audio-integrity"),
+                integrity_header,
+            ),
+        ],
+        bytes,
+    )
+        .into_response())
 }
 
 async fn teaching_summary()
@@ -5919,3 +6086,100 @@ mod notation_summary_tests {
 
 }
 
+
+
+#[cfg(test)]
+mod imported_audio_provenance_tests {
+    use super::*;
+
+    fn minimal_smf(format: u16) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(b"MThd");
+        bytes.extend_from_slice(&6u32.to_be_bytes());
+        bytes.extend_from_slice(&format.to_be_bytes());
+        bytes.extend_from_slice(&1u16.to_be_bytes());
+        bytes.extend_from_slice(&480u16.to_be_bytes());
+        bytes.extend_from_slice(b"MTrk");
+        bytes.extend_from_slice(&4u32.to_be_bytes());
+        bytes.extend_from_slice(&[0x00, 0xff, 0x2f, 0x00]);
+        bytes
+    }
+
+    #[test]
+    fn source_midi_audition_accepts_simultaneous_smf_formats_zero_and_one() {
+        assert!(validate_source_midi_audition(&minimal_smf(0)).is_ok());
+        assert!(validate_source_midi_audition(&minimal_smf(1)).is_ok());
+    }
+
+    #[test]
+    fn source_midi_audition_rejects_sequential_format_two() {
+        assert_eq!(
+            validate_source_midi_audition(&minimal_smf(2)),
+            Err(SourceMidiAuditionError::SequentialFormatUnsupported)
+        );
+    }
+
+    #[test]
+    fn source_midi_audition_rejects_malformed_bytes() {
+        assert!(matches!(
+            validate_source_midi_audition(b"not a standard MIDI file"),
+            Err(SourceMidiAuditionError::MalformedMidi)
+        ));
+    }
+
+    #[test]
+    fn materialized_source_midi_bytes_are_identical_to_the_upload() {
+        let source = minimal_smf(1);
+        let path = materialize_source_midi_audition(&source).unwrap();
+        let on_disk = std::fs::read(&path).unwrap();
+        assert_eq!(on_disk, source);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn new_import_audio_digest_accepts_exact_wav_bytes() {
+        let wav = b"RIFF-fixture-audition";
+        let digest = sha256_hex(wav);
+        assert_eq!(
+            imported_audio_integrity(
+                symthaea_muse_protocol::ImportedAuditionKind::SourceMidiPerformance,
+                Some(&digest),
+                wav,
+            ),
+            Ok(ImportedAudioIntegrity::VerifiedSha256)
+        );
+    }
+
+    #[test]
+    fn imported_audio_digest_rejects_tampered_wav() {
+        let expected = sha256_hex(b"original WAV");
+        assert_eq!(
+            imported_audio_integrity(
+                symthaea_muse_protocol::ImportedAuditionKind::ReconstructedScore,
+                Some(&expected),
+                b"modified WAV",
+            ),
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        );
+    }
+
+    #[test]
+    fn missing_digest_is_servable_only_under_explicit_legacy_policy() {
+        assert_eq!(
+            imported_audio_integrity(
+                symthaea_muse_protocol::ImportedAuditionKind::LegacyUnverified,
+                None,
+                b"legacy WAV",
+            ),
+            Ok(ImportedAudioIntegrity::LegacyUnverified)
+        );
+        assert_eq!(
+            imported_audio_integrity(
+                symthaea_muse_protocol::ImportedAuditionKind::ReconstructedScore,
+                None,
+                b"new WAV without digest",
+            ),
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        );
+    }
+}
