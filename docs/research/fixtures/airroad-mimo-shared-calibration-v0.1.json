@@ -1,0 +1,287 @@
+{
+  "schema": "luminous.airroad.mimo_shared_calibration_uncertainty.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_deterministic_hard_set",
+  "ports": [
+    "bus-a",
+    "bus-b"
+  ],
+  "reference_impedance_ohm": [
+    [
+      {
+        "real": {
+          "numerator": "2",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      },
+      {
+        "real": {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "2",
+          "denominator": "1"
+        }
+      }
+    ],
+    [
+      {
+        "real": {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        "imag": {
+          "numerator": "-1",
+          "denominator": "1"
+        }
+      },
+      {
+        "real": {
+          "numerator": "3",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "-1",
+          "denominator": "1"
+        }
+      }
+    ]
+  ],
+  "base_injected_current_a": [
+    {
+      "driven_port_id": "bus-a",
+      "value": {
+        "real": {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      },
+      "record_id": "I-bus-a"
+    },
+    {
+      "driven_port_id": "bus-b",
+      "value": {
+        "real": {
+          "numerator": "2",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      },
+      "record_id": "I-bus-b"
+    }
+  ],
+  "base_voltage_observations_v": [
+    {
+      "observed_port_id": "bus-a",
+      "driven_port_id": "bus-a",
+      "value": {
+        "real": {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "3",
+          "denominator": "1"
+        }
+      },
+      "record_id": "V-bus-a-from-a"
+    },
+    {
+      "observed_port_id": "bus-b",
+      "driven_port_id": "bus-a",
+      "value": {
+        "real": {
+          "numerator": "3",
+          "denominator": "2"
+        },
+        "imag": {
+          "numerator": "-1",
+          "denominator": "2"
+        }
+      },
+      "record_id": "V-bus-b-from-a"
+    },
+    {
+      "observed_port_id": "bus-a",
+      "driven_port_id": "bus-b",
+      "value": {
+        "real": {
+          "numerator": "2",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "4",
+          "denominator": "1"
+        }
+      },
+      "record_id": "V-bus-a-from-b"
+    },
+    {
+      "observed_port_id": "bus-b",
+      "driven_port_id": "bus-b",
+      "value": {
+        "real": {
+          "numerator": "6",
+          "denominator": "1"
+        },
+        "imag": {
+          "numerator": "-2",
+          "denominator": "1"
+        }
+      },
+      "record_id": "V-bus-b-from-b"
+    }
+  ],
+  "shared_calibration_nuisance": {
+    "nuisance_id": "calibration-chain-A-common-complex-gain",
+    "hard_bound_semantics": "deterministic_joint_hard_set",
+    "factor": "q=(1+u)+j*v",
+    "u_domain": {
+      "lower": {
+        "numerator": "-1",
+        "denominator": "10"
+      },
+      "upper": {
+        "numerator": "1",
+        "denominator": "10"
+      }
+    },
+    "v_domain": {
+      "lower": {
+        "numerator": "-1",
+        "denominator": "10"
+      },
+      "upper": {
+        "numerator": "1",
+        "denominator": "10"
+      }
+    },
+    "applies_to_current_record_ids": [
+      "I-bus-a",
+      "I-bus-b"
+    ],
+    "applies_to_voltage_record_ids": [
+      "V-bus-a-from-a",
+      "V-bus-b-from-a",
+      "V-bus-a-from-b",
+      "V-bus-b-from-b"
+    ],
+    "method_reference": "sha256:synthetic-common-calibration-hard-set"
+  },
+  "independent_rectangle_example": {
+    "element": "Z_bus-a,bus-a",
+    "measured_voltage_real": {
+      "lower": {
+        "numerator": "3",
+        "denominator": "5"
+      },
+      "upper": {
+        "numerator": "7",
+        "denominator": "5"
+      }
+    },
+    "measured_voltage_imag": {
+      "lower": {
+        "numerator": "13",
+        "denominator": "5"
+      },
+      "upper": {
+        "numerator": "17",
+        "denominator": "5"
+      }
+    },
+    "measured_current_real": {
+      "lower": {
+        "numerator": "4",
+        "denominator": "5"
+      },
+      "upper": {
+        "numerator": "6",
+        "denominator": "5"
+      }
+    },
+    "measured_current_imag": {
+      "lower": {
+        "numerator": "4",
+        "denominator": "5"
+      },
+      "upper": {
+        "numerator": "6",
+        "denominator": "5"
+      }
+    },
+    "expected_independent_outer_rectangle": {
+      "real": {
+        "lower": {
+          "numerator": "8",
+          "denominator": "9"
+        },
+        "upper": {
+          "numerator": "9",
+          "denominator": "2"
+        }
+      },
+      "imaginary": {
+        "lower": {
+          "numerator": "5",
+          "denominator": "36"
+        },
+        "upper": {
+          "numerator": "45",
+          "denominator": "16"
+        }
+      }
+    }
+  },
+  "negative_controls": [
+    {
+      "id": "voltage-current-nuisance-id-mismatch",
+      "expected": "reject_shared_cancellation"
+    },
+    {
+      "id": "missing-voltage-record-from-coverage",
+      "expected": "not_evaluable"
+    },
+    {
+      "id": "missing-current-record-from-coverage",
+      "expected": "not_evaluable"
+    },
+    {
+      "id": "q-domain-includes-zero",
+      "expected": "not_evaluable"
+    },
+    {
+      "id": "statistical-covariance-labelled-hard-bound",
+      "expected": "reject"
+    },
+    {
+      "id": "duplicate-port-identity",
+      "expected": "reject"
+    },
+    {
+      "id": "altered-voltage-current-port-pairing",
+      "expected": "reject"
+    },
+    {
+      "id": "independent-rectangle-claimed-exact",
+      "expected": "reject_claim_class"
+    }
+  ],
+  "claim_ceiling": [
+    "Synthetic common multiplicative complex calibration hard-set only.",
+    "The common nuisance cancels because the exact same nonzero q applies to every numerator and denominator record.",
+    "No calibrated physical metrology or probabilistic coverage is claimed."
+  ]
+}
