@@ -34,6 +34,22 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
+      # Generate the exact pinned dependency lock, retain it for review, then
+      # use --locked on all qualification commands below.
+      - name: Resolve and snapshot canonical commitment dependencies
+        run: |
+          set -euo pipefail
+          cargo generate-lockfile --manifest-path research/symmetry-quotient-001/Cargo.toml
+          cp research/symmetry-quotient-001/Cargo.lock "$RUNNER_TEMP/symmetry-quotient-Cargo.lock"
+          sha256sum "$RUNNER_TEMP/symmetry-quotient-Cargo.lock" > "$RUNNER_TEMP/symmetry-quotient-Cargo.lock.sha256"
+      - name: Upload resolved lockfile evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: symmetry-quotient-lockfile-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/symmetry-quotient-Cargo.lock
+            ${{ runner.temp }}/symmetry-quotient-Cargo.lock.sha256
+          if-no-files-found: error
       - name: Format
         run: cargo fmt --manifest-path research/symmetry-quotient-001/Cargo.toml --all -- --check
       - name: Test
