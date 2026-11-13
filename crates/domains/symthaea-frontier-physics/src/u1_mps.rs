@@ -3864,6 +3864,98 @@ mod tests {
         }
     }
 
+
+
+    fn dense_apply_two_site_gate(
+        state: &[Complex64],
+        site_count: usize,
+        bond: usize,
+        gate: &U1TwoSiteGate,
+    ) -> Vec<Complex64> {
+        assert_eq!(state.len(), 1_usize << site_count);
+        assert!(bond + 1 < site_count);
+        let first_shift = site_count - bond - 1;
+        let second_shift = site_count - bond - 2;
+        let first_mask = 1_usize << first_shift;
+        let second_mask = 1_usize << second_shift;
+        let mut output = vec![complex_zero(); state.len()];
+
+        for (input_basis, amplitude) in state.iter().copied().enumerate() {
+            let first = (input_basis >> first_shift) & 1;
+            let second = (input_basis >> second_shift) & 1;
+            let input_pair = first * 2 + second;
+            for output_pair in 0..4 {
+                let mut output_basis = input_basis & !(first_mask | second_mask);
+                if output_pair & 0b10 != 0 {
+                    output_basis |= first_mask;
+                }
+                if output_pair & 0b01 != 0 {
+                    output_basis |= second_mask;
+                }
+                output[output_basis] += gate.matrix()[output_pair][input_pair] * amplitude;
+            }
+        }
+        output
+    }
+
+
+    #[test]
+    fn tebd_global_error_bound_dominates_independent_dense_sequential_circuit_residual() {
+        let input = ComplexU1Mps::product_state(&[true, false, false, true]).unwrap();
+        let gate_left = one_excitation_rotation();
+        let gate_right = one_excitation_rotation();
+
+        let mut exact_dense = input.to_dense(8).unwrap();
+        exact_dense =
+            dense_apply_two_site_gate(&exact_dense, 4, 0, &gate_left);
+        exact_dense =
+            dense_apply_two_site_gate(&exact_dense, 4, 2, &gate_right);
+
+        let layer = U1TeBDLayer::new(
+            4,
+            0,
+            vec![
+                U1TeBDGate::new(2, gate_right),
+                U1TeBDGate::new(0, gate_left),
+            ],
+        )
+        .unwrap();
+        let result = layer
+            .apply(
+                &input,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 1,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-10,
+                },
+            )
+            .unwrap();
+
+        assert!(result.global_l2_bound_qualified);
+        assert_eq!(result.canonical_gauge_receipts.len(), 2);
+        assert!(result.canonical_gauge_receipts.iter().all(|receipt| receipt.qualifies(1.0e-10)));
+        let certified_bound = result
+            .truncation_ledger
+            .cumulative_global_l2_error_upper_bound
+            .expect("qualified layer must return a global error upper bound");
+        let approximate_dense = result.state.to_dense(8).unwrap();
+        let measured_residual = exact_dense
+            .iter()
+            .zip(approximate_dense.iter())
+            .map(|(exact, approximate)| (*exact - *approximate).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+
+        assert!(measured_residual > 0.5);
+        assert!(
+            measured_residual <= certified_bound + 1.0e-10,
+            "measured dense L2 residual {measured_residual} exceeds receipt bound {certified_bound}"
+        );
+        assert!(certified_bound < 2.0);
+        assert_eq!(result.output_total_charge, 2);
+        assert!(result.output_selection_rule_residual <= 1.0e-10);
+    }
+
     #[test]
     fn canonical_gauge_weighted_ledger_promotes_local_discard_to_global_bound() {
         let dense = vec![
