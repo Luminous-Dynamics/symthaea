@@ -1329,3 +1329,213 @@ fn add_unmatched_part(
         .ok_or(MusicXmlScoreEvaluationErrorV1::ArithmeticOverflow)?;
     Ok(())
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::musicxml_barline_adapter::parse_musicxml_part_notation_graph;
+
+    fn graphs(xml: &str, source_id: &str, clock: &str) -> Vec<MusicXmlPartNotationGraphV1> {
+        parse_musicxml_part_notation_graph(xml.as_bytes(), source_id, clock).unwrap()
+    }
+
+    fn pair() -> (Vec<MusicXmlPartNotationGraphV1>, Vec<MusicXmlPartNotationGraphV1>) {
+        let gold = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><alter>1.50</alter><octave>4</octave></pitch><duration>4</duration><voice>1</voice><staff>1</staff><type>quarter</type></note>
+            <note><rest/><duration>4</duration><voice>1</voice><staff>1</staff></note>
+            <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>8</duration><voice>2</voice><staff>2</staff></note>
+        </measure></part></score-partwise>"#;
+        let prediction = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>8</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><alter>1.5</alter><octave>4</octave></pitch><duration>8</duration><voice>1</voice><staff>1</staff><type>quarter</type></note>
+            <note><rest/><duration>8</duration><voice>1</voice><staff>1</staff></note>
+            <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>16</duration><voice>2</voice><staff>2</staff></note>
+        </measure></part></score-partwise>"#;
+        (
+            graphs(gold, "gold", "score-clock"),
+            graphs(prediction, "prediction", "score-clock"),
+        )
+    }
+
+    fn report(
+        gold: &[MusicXmlPartNotationGraphV1],
+        prediction: &[MusicXmlPartNotationGraphV1],
+        config: &MusicXmlScoreEvaluationConfigV1,
+    ) -> MusicXmlScoreEvaluationReportV1 {
+        match evaluate_musicxml_score_graphs(gold, prediction, config).unwrap() {
+            MusicXmlScoreEvaluationOutcomeV1::Evaluated(report) => report,
+            other => panic!("expected evaluated report, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn ppq_and_decimal_spelling_variants_produce_identical_score_semantics() {
+        let (gold, prediction) = pair();
+        let result = report(&gold, &prediction, &MusicXmlScoreEvaluationConfigV1::default());
+        assert_eq!(result.event_presence.true_positives, 3);
+        assert_eq!(result.event_presence.false_positives, 0);
+        assert_eq!(result.event_presence.false_negatives, 0);
+        assert_eq!(result.duration_aware_events.true_positives, 3);
+        assert_eq!(result.written_pitch.true_positives, 1);
+        assert_eq!(result.rest_events.true_positives, 1);
+        assert_eq!(result.unpitched_events.true_positives, 1);
+        assert_eq!(result.voice_assignment.accuracy, Some(1.0));
+        assert_eq!(result.staff_assignment.accuracy, Some(1.0));
+        assert_eq!(result.attribute_timeline.edit_distance, 0);
+    }
+
+    #[test]
+    fn wrong_written_pitch_does_not_change_event_presence() {
+        let (gold, mut prediction) = pair();
+        let note = &mut prediction[0].notation_events.note_events[0];
+        if let MusicXmlNotationEventKindV1::Pitched(pitch) = &mut note.kind {
+            pitch.octave = 5;
+        } else {
+            panic!("fixture must contain a pitched note");
+        }
+        let result = report(&gold, &prediction, &MusicXmlScoreEvaluationConfigV1::default());
+        assert_eq!(result.event_presence.true_positives, 3);
+        assert_eq!(result.written_pitch.true_positives, 0);
+        assert_eq!(result.written_pitch.false_negatives, 1);
+        assert_eq!(result.written_pitch.false_positives, 1);
+        assert_eq!(result.written_pitch.f1, Some(0.0));
+    }
+
+    #[test]
+    fn missing_rest_is_a_rest_false_negative_without_shifting_later_events() {
+        let gold = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice></note>
+            <note><rest/><duration>4</duration><voice>1</voice></note>
+            <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>8</duration><voice>2</voice></note>
+        </measure></part></score-partwise>"#;
+        let prediction = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice></note>
+            <forward><duration>4</duration><voice>2</voice></forward>
+            <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>8</duration><voice>2</voice></note>
+        </measure></part></score-partwise>"#;
+        let gold = graphs(gold, "gold", "score-clock");
+        let prediction = graphs(prediction, "prediction", "score-clock");
+        let result = report(&gold, &prediction, &MusicXmlScoreEvaluationConfigV1::default());
+        assert_eq!(result.event_presence.true_positives, 2);
+        assert_eq!(result.event_presence.false_negatives, 1);
+        assert_eq!(result.rest_events.gold_count, 1);
+        assert_eq!(result.rest_events.prediction_count, 0);
+        assert_eq!(result.rest_events.false_negatives, 1);
+        assert_eq!(result.rest_events.recall, Some(0.0));
+        assert_eq!(result.rest_events.f1, Some(0.0));
+    }
+
+    #[test]
+    fn tie_and_tied_are_separate_annotation_metrics() {
+        let gold_xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><tie type="start"/><notations><tied type="start"/><tuplet type="start" number="1"/></notations></note>
+        </measure></part></score-partwise>"#;
+        let prediction_xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><tie type="start"/><notations><tuplet type="start" number="1"/></notations></note>
+        </measure></part></score-partwise>"#;
+        let gold = graphs(gold_xml, "gold", "score-clock");
+        let prediction = graphs(prediction_xml, "prediction", "score-clock");
+        let result = report(&gold, &prediction, &MusicXmlScoreEvaluationConfigV1::default());
+        assert_eq!(result.sound_tie_annotations.true_positives, 1);
+        assert_eq!(result.visual_tie_annotations.true_positives, 0);
+        assert_eq!(result.visual_tie_annotations.false_negatives, 1);
+        assert_eq!(result.tuplet_annotations.true_positives, 1);
+    }
+
+    #[test]
+    fn incompatible_score_clock_is_rejected() {
+        let (gold, mut prediction) = pair();
+        prediction[0].map.score_clock_id = "other-clock".into();
+        assert_eq!(
+            evaluate_musicxml_score_graphs(
+                &gold,
+                &prediction,
+                &MusicXmlScoreEvaluationConfigV1::default()
+            ),
+            Err(MusicXmlScoreEvaluationErrorV1::ScoreClockMismatch)
+        );
+    }
+
+    #[test]
+    fn unknown_notation_events_are_unavailable_not_zero_or_perfect() {
+        let (gold, mut prediction) = pair();
+        prediction[0].notation_events.status = MusicXmlNotationEventsStatusV1::Unknown {
+            reason: "fixture is intentionally unsupported".into(),
+        };
+        prediction[0].notation_events.note_events.clear();
+        let outcome = evaluate_musicxml_score_graphs(
+            &gold,
+            &prediction,
+            &MusicXmlScoreEvaluationConfigV1::default(),
+        )
+        .unwrap();
+        assert!(matches!(
+            outcome,
+            MusicXmlScoreEvaluationOutcomeV1::Unavailable {
+                unknown_prediction_part_ids,
+                ..
+            } if unknown_prediction_part_ids == vec!["P1".to_string()]
+        ));
+    }
+
+    #[test]
+    fn report_replay_rejects_changed_inputs_and_metric_mutation() {
+        let (gold, prediction) = pair();
+        let config = MusicXmlScoreEvaluationConfigV1::default();
+        let mut result = report(&gold, &prediction, &config);
+        assert!(validate_musicxml_score_evaluation_report(&gold, &prediction, &result).unwrap());
+        result.event_presence.false_positives += 1;
+        assert!(!validate_musicxml_score_evaluation_report(&gold, &prediction, &result).unwrap());
+
+        let original = report(&gold, &prediction, &config);
+        let mut changed = prediction.clone();
+        if let MusicXmlNotationEventKindV1::Pitched(pitch) =
+            &mut changed[0].notation_events.note_events[0].kind
+        {
+            pitch.step = "D".into();
+        }
+        assert!(!validate_musicxml_score_evaluation_report(&gold, &changed, &original).unwrap());
+    }
+
+    #[test]
+    fn candidate_pair_budget_fails_closed() {
+        let (gold, prediction) = pair();
+        let mut config = MusicXmlScoreEvaluationConfigV1::default();
+        config.maximum_candidate_pairs = 1;
+        assert!(matches!(
+            evaluate_musicxml_score_graphs(&gold, &prediction, &config),
+            Err(MusicXmlScoreEvaluationErrorV1::CandidatePairBudgetExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn attribute_edit_budget_fails_closed() {
+        let (gold, prediction) = pair();
+        let mut config = MusicXmlScoreEvaluationConfigV1::default();
+        config.maximum_attribute_edit_cells = 1;
+        assert!(matches!(
+            evaluate_musicxml_score_graphs(&gold, &prediction, &config),
+            Err(MusicXmlScoreEvaluationErrorV1::AttributeEditBudgetExceeded { .. })
+        ));
+    }
+
+    #[test]
+    fn extra_and_missing_parts_are_counted_as_false_positive_and_negative() {
+        let (gold, mut prediction) = pair();
+        prediction[0].part_id = "P2".into();
+        prediction[0].notation_events.part_id = "P2".into();
+        prediction[0].map.source_id = "prediction#P2".into();
+        let result = report(&gold, &prediction, &MusicXmlScoreEvaluationConfigV1::default());
+        assert_eq!(result.part_presence.false_positives, 1);
+        assert_eq!(result.part_presence.false_negatives, 1);
+        assert_eq!(result.missing_prediction_part_ids, vec!["P1".to_string()]);
+        assert_eq!(result.extra_prediction_part_ids, vec!["P2".to_string()]);
+    }
+}
+
