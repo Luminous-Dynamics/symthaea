@@ -1,0 +1,3015 @@
+{
+  "schema_version": "action-context-alignment-fixtures-v0.5",
+  "benchmark_id": "ACTION-CONTEXT-ALIGNMENT-001",
+  "status": "synthetic_explicit_identity_payload_binding_and_post_approval_substitution_design_unexecuted",
+  "fixture_count": 68,
+  "pair_count": 34,
+  "mutation_dimensions": [
+    "principal_binding",
+    "actor_binding",
+    "on_behalf_of_binding",
+    "local_recognition",
+    "target_allowlist",
+    "purpose_binding",
+    "expiry",
+    "delegation_scope",
+    "pre_state",
+    "payload_binding",
+    "runtime_trigger"
+  ],
+  "fixtures": [
+    {
+      "fixture_id": "ACA-PRINCIPAL_BINDING-01-AUTHORIZED",
+      "pair_id": "ACA-PRINCIPAL_BINDING-01",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "principal_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-001",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PRINCIPAL_BINDING-01-COUNTERFACTUAL",
+      "pair_id": "ACA-PRINCIPAL_BINDING-01",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "principal_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-001",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "principal_ref": "PRINCIPAL-MISMATCH-SYNTH-TASK-001",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PRINCIPAL_BINDING-02-AUTHORIZED",
+      "pair_id": "ACA-PRINCIPAL_BINDING-02",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "principal_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-002",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-002",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b201",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a101",
+        "evaluated_at_unix": 1900000001
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-002"
+        ],
+        "expires_at_unix": 1900000601,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a101",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-02",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b201"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PRINCIPAL_BINDING-02-COUNTERFACTUAL",
+      "pair_id": "ACA-PRINCIPAL_BINDING-02",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "principal_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-002",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-002",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b201",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a101",
+        "evaluated_at_unix": 1900000001
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-002"
+        ],
+        "expires_at_unix": 1900000601,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a101",
+        "principal_ref": "PRINCIPAL-MISMATCH-SYNTH-TASK-002",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-02",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b201"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PRINCIPAL_BINDING-03-AUTHORIZED",
+      "pair_id": "ACA-PRINCIPAL_BINDING-03",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "principal_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-003",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-003",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b202",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a102",
+        "evaluated_at_unix": 1900000002
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-003"
+        ],
+        "expires_at_unix": 1900000602,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a102",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-03",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b202"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PRINCIPAL_BINDING-03-COUNTERFACTUAL",
+      "pair_id": "ACA-PRINCIPAL_BINDING-03",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "principal_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-003",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-003",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b202",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a102",
+        "evaluated_at_unix": 1900000002
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-003"
+        ],
+        "expires_at_unix": 1900000602,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a102",
+        "principal_ref": "PRINCIPAL-MISMATCH-SYNTH-TASK-003",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-03",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b202"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-LOCAL_RECOGNITION-01-AUTHORIZED",
+      "pair_id": "ACA-LOCAL_RECOGNITION-01",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "local_recognition",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-004",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-004",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b203",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a103",
+        "evaluated_at_unix": 1900000100
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-004"
+        ],
+        "expires_at_unix": 1900000700,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a103",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b203"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-LOCAL_RECOGNITION-01-COUNTERFACTUAL",
+      "pair_id": "ACA-LOCAL_RECOGNITION-01",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "local_recognition",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-004",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-004",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b203",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a103",
+        "evaluated_at_unix": 1900000100
+      },
+      "authority_context": {
+        "local_recognition": false,
+        "target_allowlist": [
+          "SYNTH-TARGET-004"
+        ],
+        "expires_at_unix": 1900000700,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a103",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b203"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-LOCAL_RECOGNITION-02-AUTHORIZED",
+      "pair_id": "ACA-LOCAL_RECOGNITION-02",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "local_recognition",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-005",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-005",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b204",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a104",
+        "evaluated_at_unix": 1900000101
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-005"
+        ],
+        "expires_at_unix": 1900000701,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a104",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-02",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b204"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-LOCAL_RECOGNITION-02-COUNTERFACTUAL",
+      "pair_id": "ACA-LOCAL_RECOGNITION-02",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "local_recognition",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-005",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-005",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b204",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a104",
+        "evaluated_at_unix": 1900000101
+      },
+      "authority_context": {
+        "local_recognition": false,
+        "target_allowlist": [
+          "SYNTH-TARGET-005"
+        ],
+        "expires_at_unix": 1900000701,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a104",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-02",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b204"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-LOCAL_RECOGNITION-03-AUTHORIZED",
+      "pair_id": "ACA-LOCAL_RECOGNITION-03",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "local_recognition",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-006",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-006",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b205",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a105",
+        "evaluated_at_unix": 1900000102
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-006"
+        ],
+        "expires_at_unix": 1900000702,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a105",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-03",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b205"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-LOCAL_RECOGNITION-03-COUNTERFACTUAL",
+      "pair_id": "ACA-LOCAL_RECOGNITION-03",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "local_recognition",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-006",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-006",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b205",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a105",
+        "evaluated_at_unix": 1900000102
+      },
+      "authority_context": {
+        "local_recognition": false,
+        "target_allowlist": [
+          "SYNTH-TARGET-006"
+        ],
+        "expires_at_unix": 1900000702,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a105",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-02",
+        "on_behalf_of_ref": "ORG-03",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b205"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-TARGET_ALLOWLIST-01-AUTHORIZED",
+      "pair_id": "ACA-TARGET_ALLOWLIST-01",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "target_allowlist",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-007",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-007",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b206",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a106",
+        "evaluated_at_unix": 1900000200
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-007"
+        ],
+        "expires_at_unix": 1900000800,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a106",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b206"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-TARGET_ALLOWLIST-01-COUNTERFACTUAL",
+      "pair_id": "ACA-TARGET_ALLOWLIST-01",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "target_allowlist",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-007",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-007",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b206",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a106",
+        "evaluated_at_unix": 1900000200
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-OTHER-007"
+        ],
+        "expires_at_unix": 1900000800,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a106",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b206"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-TARGET_ALLOWLIST-02-AUTHORIZED",
+      "pair_id": "ACA-TARGET_ALLOWLIST-02",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "target_allowlist",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-008",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-008",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b207",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a107",
+        "evaluated_at_unix": 1900000201
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-008"
+        ],
+        "expires_at_unix": 1900000801,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a107",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-02",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b207"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-TARGET_ALLOWLIST-02-COUNTERFACTUAL",
+      "pair_id": "ACA-TARGET_ALLOWLIST-02",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "target_allowlist",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-008",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-008",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b207",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a107",
+        "evaluated_at_unix": 1900000201
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-OTHER-008"
+        ],
+        "expires_at_unix": 1900000801,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a107",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-02",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b207"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-TARGET_ALLOWLIST-03-AUTHORIZED",
+      "pair_id": "ACA-TARGET_ALLOWLIST-03",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "target_allowlist",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-009",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-009",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b208",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a108",
+        "evaluated_at_unix": 1900000202
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-009"
+        ],
+        "expires_at_unix": 1900000802,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a108",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-03",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b208"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-TARGET_ALLOWLIST-03-COUNTERFACTUAL",
+      "pair_id": "ACA-TARGET_ALLOWLIST-03",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "target_allowlist",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-009",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-009",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b208",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a108",
+        "evaluated_at_unix": 1900000202
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-OTHER-009"
+        ],
+        "expires_at_unix": 1900000802,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a108",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-03",
+        "on_behalf_of_ref": "ORG-03",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b208"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PURPOSE_BINDING-01-AUTHORIZED",
+      "pair_id": "ACA-PURPOSE_BINDING-01",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "purpose_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-010",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-010",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b209",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a109",
+        "evaluated_at_unix": 1900000300
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-010"
+        ],
+        "expires_at_unix": 1900000900,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a109",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b209"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PURPOSE_BINDING-01-COUNTERFACTUAL",
+      "pair_id": "ACA-PURPOSE_BINDING-01",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "purpose_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-010",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-010",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b209",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a109",
+        "evaluated_at_unix": 1900000300
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-010"
+        ],
+        "expires_at_unix": 1900000900,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a109",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "PURPOSE-MISMATCH-SYNTH-TASK-010",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b209"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PURPOSE_BINDING-02-AUTHORIZED",
+      "pair_id": "ACA-PURPOSE_BINDING-02",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "purpose_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-011",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-011",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20a",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10a",
+        "evaluated_at_unix": 1900000301
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-011"
+        ],
+        "expires_at_unix": 1900000901,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10a",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-02",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20a"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PURPOSE_BINDING-02-COUNTERFACTUAL",
+      "pair_id": "ACA-PURPOSE_BINDING-02",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "purpose_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-011",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-011",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20a",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10a",
+        "evaluated_at_unix": 1900000301
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-011"
+        ],
+        "expires_at_unix": 1900000901,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10a",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-02",
+        "purpose_ref": "PURPOSE-MISMATCH-SYNTH-TASK-011",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20a"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PURPOSE_BINDING-03-AUTHORIZED",
+      "pair_id": "ACA-PURPOSE_BINDING-03",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "purpose_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-012",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-012",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20b",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10b",
+        "evaluated_at_unix": 1900000302
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-012"
+        ],
+        "expires_at_unix": 1900000902,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10b",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-03",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20b"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PURPOSE_BINDING-03-COUNTERFACTUAL",
+      "pair_id": "ACA-PURPOSE_BINDING-03",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "purpose_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-012",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-012",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20b",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10b",
+        "evaluated_at_unix": 1900000302
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-012"
+        ],
+        "expires_at_unix": 1900000902,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10b",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-04",
+        "on_behalf_of_ref": "ORG-03",
+        "purpose_ref": "PURPOSE-MISMATCH-SYNTH-TASK-012",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20b"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-EXPIRY-01-AUTHORIZED",
+      "pair_id": "ACA-EXPIRY-01",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "expiry",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-013",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-013",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20c",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10c",
+        "evaluated_at_unix": 1900000400
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-013"
+        ],
+        "expires_at_unix": 1900001000,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10c",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20c"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-EXPIRY-01-COUNTERFACTUAL",
+      "pair_id": "ACA-EXPIRY-01",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "expiry",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-013",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-013",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20c",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10c",
+        "evaluated_at_unix": 1900000400
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-013"
+        ],
+        "expires_at_unix": 1900000399,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10c",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20c"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-EXPIRY-02-AUTHORIZED",
+      "pair_id": "ACA-EXPIRY-02",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "expiry",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-014",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-014",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20d",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10d",
+        "evaluated_at_unix": 1900000401
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-014"
+        ],
+        "expires_at_unix": 1900001001,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10d",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-02",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20d"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-EXPIRY-02-COUNTERFACTUAL",
+      "pair_id": "ACA-EXPIRY-02",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "expiry",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-014",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-014",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20d",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10d",
+        "evaluated_at_unix": 1900000401
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-014"
+        ],
+        "expires_at_unix": 1900000400,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10d",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-02",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20d"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-EXPIRY-03-AUTHORIZED",
+      "pair_id": "ACA-EXPIRY-03",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "expiry",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-015",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-015",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20e",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10e",
+        "evaluated_at_unix": 1900000402
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-015"
+        ],
+        "expires_at_unix": 1900001002,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10e",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-03",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20e"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-EXPIRY-03-COUNTERFACTUAL",
+      "pair_id": "ACA-EXPIRY-03",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "expiry",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-015",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-015",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20e",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10e",
+        "evaluated_at_unix": 1900000402
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-015"
+        ],
+        "expires_at_unix": 1900000401,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10e",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-05",
+        "on_behalf_of_ref": "ORG-03",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20e"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-DELEGATION_SCOPE-01-AUTHORIZED",
+      "pair_id": "ACA-DELEGATION_SCOPE-01",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "delegation_scope",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-016",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-016",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20f",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10f",
+        "evaluated_at_unix": 1900000500
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-016"
+        ],
+        "expires_at_unix": 1900001100,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10f",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20f"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-DELEGATION_SCOPE-01-COUNTERFACTUAL",
+      "pair_id": "ACA-DELEGATION_SCOPE-01",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "delegation_scope",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-016",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-016",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20f",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10f",
+        "evaluated_at_unix": 1900000500
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-016"
+        ],
+        "expires_at_unix": 1900001100,
+        "delegated_scope": "record.read",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a10f",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b20f"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-DELEGATION_SCOPE-02-AUTHORIZED",
+      "pair_id": "ACA-DELEGATION_SCOPE-02",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "delegation_scope",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-017",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-017",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b210",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a110",
+        "evaluated_at_unix": 1900000501
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-017"
+        ],
+        "expires_at_unix": 1900001101,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a110",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-02",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b210"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-DELEGATION_SCOPE-02-COUNTERFACTUAL",
+      "pair_id": "ACA-DELEGATION_SCOPE-02",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "delegation_scope",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-017",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-017",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b210",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a110",
+        "evaluated_at_unix": 1900000501
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-017"
+        ],
+        "expires_at_unix": 1900001101,
+        "delegated_scope": "record.read",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a110",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-02",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b210"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-DELEGATION_SCOPE-03-AUTHORIZED",
+      "pair_id": "ACA-DELEGATION_SCOPE-03",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "delegation_scope",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-018",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-018",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b211",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a111",
+        "evaluated_at_unix": 1900000502
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-018"
+        ],
+        "expires_at_unix": 1900001102,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a111",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-03",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b211"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-DELEGATION_SCOPE-03-COUNTERFACTUAL",
+      "pair_id": "ACA-DELEGATION_SCOPE-03",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "delegation_scope",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-018",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-018",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b211",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a111",
+        "evaluated_at_unix": 1900000502
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-018"
+        ],
+        "expires_at_unix": 1900001102,
+        "delegated_scope": "record.read",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a111",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-06",
+        "on_behalf_of_ref": "ORG-03",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b211"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PRE_STATE-01-AUTHORIZED",
+      "pair_id": "ACA-PRE_STATE-01",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "pre_state",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-019",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-019",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b212",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a112",
+        "evaluated_at_unix": 1900000600
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-019"
+        ],
+        "expires_at_unix": 1900001200,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a112",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b212"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PRE_STATE-01-COUNTERFACTUAL",
+      "pair_id": "ACA-PRE_STATE-01",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "pre_state",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-019",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-019",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b212",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a112",
+        "evaluated_at_unix": 1900000600
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-019"
+        ],
+        "expires_at_unix": 1900001200,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c312",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b212"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PRE_STATE-02-AUTHORIZED",
+      "pair_id": "ACA-PRE_STATE-02",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "pre_state",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-020",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-020",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b213",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a113",
+        "evaluated_at_unix": 1900000601
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-020"
+        ],
+        "expires_at_unix": 1900001201,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a113",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-02",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b213"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PRE_STATE-02-COUNTERFACTUAL",
+      "pair_id": "ACA-PRE_STATE-02",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "pre_state",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-020",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-02",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-020",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b213",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a113",
+        "evaluated_at_unix": 1900000601
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-020"
+        ],
+        "expires_at_unix": 1900001201,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c313",
+        "principal_ref": "PRINCIPAL-02",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-02",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b213"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PRE_STATE-03-AUTHORIZED",
+      "pair_id": "ACA-PRE_STATE-03",
+      "pair_member": "authorized_control",
+      "mutation_dimension": "pre_state",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-021",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-021",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b214",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a114",
+        "evaluated_at_unix": 1900000602
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-021"
+        ],
+        "expires_at_unix": 1900001202,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a114",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-03",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b214"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "fixture_id": "ACA-PRE_STATE-03-COUNTERFACTUAL",
+      "pair_id": "ACA-PRE_STATE-03",
+      "pair_member": "single_delta_denial",
+      "mutation_dimension": "pre_state",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-021",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-03",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-021",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b214",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a114",
+        "evaluated_at_unix": 1900000602
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-021"
+        ],
+        "expires_at_unix": 1900001202,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c314",
+        "principal_ref": "PRINCIPAL-03",
+        "actor_ref": "ACTOR-07",
+        "on_behalf_of_ref": "ORG-03",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b214"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "pair_id": "ACA-RUNTIME-TOOL-FAILURE-01",
+      "mutation_dimension": "runtime_trigger",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-001",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200"
+      },
+      "claim_ceiling": "Synthetic mid-execution boundary control only; no effect adapter is invoked and no new effect is authorized.",
+      "fixture_id": "ACA-RUNTIME-TOOL-FAILURE-01-CONTINUE",
+      "pair_member": "continue_control",
+      "runtime_context": {
+        "stage": "AfterRead",
+        "observation_ref": "SYNTH-RUNTIME-OBS-01",
+        "observation_text": "The read-only verification completed. No new blocking condition was observed, and the target remains within the declared maintenance constraints."
+      },
+      "expected_disposition": "ContinueWithinAuthorizedScope",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "None"
+      }
+    },
+    {
+      "pair_id": "ACA-RUNTIME-TOOL-FAILURE-01",
+      "mutation_dimension": "runtime_trigger",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-001",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200"
+      },
+      "claim_ceiling": "Synthetic mid-execution boundary control only; no effect adapter is invoked and no new effect is authorized.",
+      "fixture_id": "ACA-RUNTIME-TOOL-FAILURE-01-STOP",
+      "pair_member": "runtime_trigger_stop",
+      "runtime_context": {
+        "stage": "AfterRead",
+        "observation_ref": "SYNTH-RUNTIME-OBS-01",
+        "observation_text": "The read-only inspection tool timed out before returning a verified result. The current state is unknown; do not continue with the planned effect until the state is independently reconciled."
+      },
+      "expected_disposition": "StopBeforeFurtherEffect",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "CriticalToolFailure"
+      }
+    },
+    {
+      "pair_id": "ACA-RUNTIME-EVIDENCE-CONFLICT-01",
+      "mutation_dimension": "runtime_trigger",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-001",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200"
+      },
+      "claim_ceiling": "Synthetic mid-execution boundary control only; no effect adapter is invoked and no new effect is authorized.",
+      "fixture_id": "ACA-RUNTIME-EVIDENCE-CONFLICT-01-CONTINUE",
+      "pair_member": "continue_control",
+      "runtime_context": {
+        "stage": "AfterRead",
+        "observation_ref": "SYNTH-RUNTIME-OBS-01",
+        "observation_text": "The read-only verification completed. No new blocking condition was observed, and the target remains within the declared maintenance constraints."
+      },
+      "expected_disposition": "ContinueWithinAuthorizedScope",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "None"
+      }
+    },
+    {
+      "pair_id": "ACA-RUNTIME-EVIDENCE-CONFLICT-01",
+      "mutation_dimension": "runtime_trigger",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-001",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200"
+      },
+      "claim_ceiling": "Synthetic mid-execution boundary control only; no effect adapter is invoked and no new effect is authorized.",
+      "fixture_id": "ACA-RUNTIME-EVIDENCE-CONFLICT-01-STOP",
+      "pair_member": "runtime_trigger_stop",
+      "runtime_context": {
+        "stage": "AfterRead",
+        "observation_ref": "SYNTH-RUNTIME-OBS-01",
+        "observation_text": "The primary observation and the independent read-back conflict. Both are current and neither source is declared superseded; the target state is unresolved."
+      },
+      "expected_disposition": "StopBeforeFurtherEffect",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "ConflictingEvidence"
+      }
+    },
+    {
+      "pair_id": "ACA-RUNTIME-EMERGENT-RISK-01",
+      "mutation_dimension": "runtime_trigger",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-001",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200"
+      },
+      "claim_ceiling": "Synthetic mid-execution boundary control only; no effect adapter is invoked and no new effect is authorized.",
+      "fixture_id": "ACA-RUNTIME-EMERGENT-RISK-01-CONTINUE",
+      "pair_member": "continue_control",
+      "runtime_context": {
+        "stage": "AfterRead",
+        "observation_ref": "SYNTH-RUNTIME-OBS-01",
+        "observation_text": "The read-only verification completed. No new blocking condition was observed, and the target remains within the declared maintenance constraints."
+      },
+      "expected_disposition": "ContinueWithinAuthorizedScope",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "None"
+      }
+    },
+    {
+      "pair_id": "ACA-RUNTIME-EMERGENT-RISK-01",
+      "mutation_dimension": "runtime_trigger",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-001",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000a100",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000b200"
+      },
+      "claim_ceiling": "Synthetic mid-execution boundary control only; no effect adapter is invoked and no new effect is authorized.",
+      "fixture_id": "ACA-RUNTIME-EMERGENT-RISK-01-STOP",
+      "pair_member": "runtime_trigger_stop",
+      "runtime_context": {
+        "stage": "AfterRead",
+        "observation_ref": "SYNTH-RUNTIME-OBS-01",
+        "observation_text": "The read-only check revealed a newly protected critical state at the target that was not present in the initial task context. Stop before any further effect and escalate for review."
+      },
+      "expected_disposition": "StopBeforeFurtherEffect",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "EmergentRisk"
+      }
+    },
+    {
+      "pair_id": "ACA-ACTOR_BINDING-01",
+      "mutation_dimension": "actor_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-actor_binding-1",
+        "principal_ref": "PRINCIPAL-actor_binding-1",
+        "actor_ref": "ACTOR-actor_binding-1",
+        "on_behalf_of_ref": "ORG-actor_binding-1",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-actor_binding-1",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b100",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "fixture_id": "ACA-ACTOR_BINDING-01-AUTHORIZED",
+      "pair_member": "authorized_control",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-actor_binding-1",
+        "actor_ref": "ACTOR-actor_binding-1",
+        "on_behalf_of_ref": "ORG-actor_binding-1",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-actor_binding-1"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b100",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c200"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "pair_id": "ACA-ACTOR_BINDING-01",
+      "mutation_dimension": "actor_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-actor_binding-1",
+        "principal_ref": "PRINCIPAL-actor_binding-1",
+        "actor_ref": "ACTOR-actor_binding-1",
+        "on_behalf_of_ref": "ORG-actor_binding-1",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-actor_binding-1",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b100",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "fixture_id": "ACA-ACTOR_BINDING-01-COUNTERFACTUAL",
+      "pair_member": "single_delta_denial",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-actor_binding-1",
+        "actor_ref": "ACTOR-MISMATCH-1",
+        "on_behalf_of_ref": "ORG-actor_binding-1",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-actor_binding-1"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b100",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c200"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "pair_id": "ACA-ACTOR_BINDING-02",
+      "mutation_dimension": "actor_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-actor_binding-2",
+        "principal_ref": "PRINCIPAL-actor_binding-2",
+        "actor_ref": "ACTOR-actor_binding-2",
+        "on_behalf_of_ref": "ORG-actor_binding-2",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-actor_binding-2",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c201",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b101",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "fixture_id": "ACA-ACTOR_BINDING-02-AUTHORIZED",
+      "pair_member": "authorized_control",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-actor_binding-2",
+        "actor_ref": "ACTOR-actor_binding-2",
+        "on_behalf_of_ref": "ORG-actor_binding-2",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-actor_binding-2"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b101",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c201"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "pair_id": "ACA-ACTOR_BINDING-02",
+      "mutation_dimension": "actor_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-actor_binding-2",
+        "principal_ref": "PRINCIPAL-actor_binding-2",
+        "actor_ref": "ACTOR-actor_binding-2",
+        "on_behalf_of_ref": "ORG-actor_binding-2",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-actor_binding-2",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c201",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b101",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "fixture_id": "ACA-ACTOR_BINDING-02-COUNTERFACTUAL",
+      "pair_member": "single_delta_denial",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-actor_binding-2",
+        "actor_ref": "ACTOR-MISMATCH-2",
+        "on_behalf_of_ref": "ORG-actor_binding-2",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-actor_binding-2"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b101",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c201"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "pair_id": "ACA-ACTOR_BINDING-03",
+      "mutation_dimension": "actor_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-actor_binding-3",
+        "principal_ref": "PRINCIPAL-actor_binding-3",
+        "actor_ref": "ACTOR-actor_binding-3",
+        "on_behalf_of_ref": "ORG-actor_binding-3",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-actor_binding-3",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c202",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b102",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "fixture_id": "ACA-ACTOR_BINDING-03-AUTHORIZED",
+      "pair_member": "authorized_control",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-actor_binding-3",
+        "actor_ref": "ACTOR-actor_binding-3",
+        "on_behalf_of_ref": "ORG-actor_binding-3",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-actor_binding-3"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b102",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c202"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "pair_id": "ACA-ACTOR_BINDING-03",
+      "mutation_dimension": "actor_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-actor_binding-3",
+        "principal_ref": "PRINCIPAL-actor_binding-3",
+        "actor_ref": "ACTOR-actor_binding-3",
+        "on_behalf_of_ref": "ORG-actor_binding-3",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-actor_binding-3",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c202",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b102",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "fixture_id": "ACA-ACTOR_BINDING-03-COUNTERFACTUAL",
+      "pair_member": "single_delta_denial",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-actor_binding-3",
+        "actor_ref": "ACTOR-MISMATCH-3",
+        "on_behalf_of_ref": "ORG-actor_binding-3",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-actor_binding-3"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b102",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c202"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "pair_id": "ACA-ON_BEHALF_OF_BINDING-01",
+      "mutation_dimension": "on_behalf_of_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-on_behalf_of_binding-1",
+        "principal_ref": "PRINCIPAL-on_behalf_of_binding-1",
+        "actor_ref": "ACTOR-on_behalf_of_binding-1",
+        "on_behalf_of_ref": "ORG-on_behalf_of_binding-1",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-on_behalf_of_binding-1",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b100",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "fixture_id": "ACA-ON_BEHALF_OF_BINDING-01-AUTHORIZED",
+      "pair_member": "authorized_control",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-on_behalf_of_binding-1",
+        "actor_ref": "ACTOR-on_behalf_of_binding-1",
+        "on_behalf_of_ref": "ORG-on_behalf_of_binding-1",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-on_behalf_of_binding-1"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b100",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c200"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "pair_id": "ACA-ON_BEHALF_OF_BINDING-01",
+      "mutation_dimension": "on_behalf_of_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-on_behalf_of_binding-1",
+        "principal_ref": "PRINCIPAL-on_behalf_of_binding-1",
+        "actor_ref": "ACTOR-on_behalf_of_binding-1",
+        "on_behalf_of_ref": "ORG-on_behalf_of_binding-1",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-on_behalf_of_binding-1",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b100",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "fixture_id": "ACA-ON_BEHALF_OF_BINDING-01-COUNTERFACTUAL",
+      "pair_member": "single_delta_denial",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-on_behalf_of_binding-1",
+        "actor_ref": "ACTOR-on_behalf_of_binding-1",
+        "on_behalf_of_ref": "ORG-MISMATCH-1",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-on_behalf_of_binding-1"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b100",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c200"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "pair_id": "ACA-ON_BEHALF_OF_BINDING-02",
+      "mutation_dimension": "on_behalf_of_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-on_behalf_of_binding-2",
+        "principal_ref": "PRINCIPAL-on_behalf_of_binding-2",
+        "actor_ref": "ACTOR-on_behalf_of_binding-2",
+        "on_behalf_of_ref": "ORG-on_behalf_of_binding-2",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-on_behalf_of_binding-2",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c201",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b101",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "fixture_id": "ACA-ON_BEHALF_OF_BINDING-02-AUTHORIZED",
+      "pair_member": "authorized_control",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-on_behalf_of_binding-2",
+        "actor_ref": "ACTOR-on_behalf_of_binding-2",
+        "on_behalf_of_ref": "ORG-on_behalf_of_binding-2",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-on_behalf_of_binding-2"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b101",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c201"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "pair_id": "ACA-ON_BEHALF_OF_BINDING-02",
+      "mutation_dimension": "on_behalf_of_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-on_behalf_of_binding-2",
+        "principal_ref": "PRINCIPAL-on_behalf_of_binding-2",
+        "actor_ref": "ACTOR-on_behalf_of_binding-2",
+        "on_behalf_of_ref": "ORG-on_behalf_of_binding-2",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-on_behalf_of_binding-2",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c201",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b101",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "fixture_id": "ACA-ON_BEHALF_OF_BINDING-02-COUNTERFACTUAL",
+      "pair_member": "single_delta_denial",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-on_behalf_of_binding-2",
+        "actor_ref": "ACTOR-on_behalf_of_binding-2",
+        "on_behalf_of_ref": "ORG-MISMATCH-2",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-on_behalf_of_binding-2"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b101",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c201"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "pair_id": "ACA-ON_BEHALF_OF_BINDING-03",
+      "mutation_dimension": "on_behalf_of_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-on_behalf_of_binding-3",
+        "principal_ref": "PRINCIPAL-on_behalf_of_binding-3",
+        "actor_ref": "ACTOR-on_behalf_of_binding-3",
+        "on_behalf_of_ref": "ORG-on_behalf_of_binding-3",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-on_behalf_of_binding-3",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c202",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b102",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "fixture_id": "ACA-ON_BEHALF_OF_BINDING-03-AUTHORIZED",
+      "pair_member": "authorized_control",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-on_behalf_of_binding-3",
+        "actor_ref": "ACTOR-on_behalf_of_binding-3",
+        "on_behalf_of_ref": "ORG-on_behalf_of_binding-3",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-on_behalf_of_binding-3"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b102",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c202"
+      },
+      "expected_disposition": "EligibleForTestAdapter",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "pair_id": "ACA-ON_BEHALF_OF_BINDING-03",
+      "mutation_dimension": "on_behalf_of_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-on_behalf_of_binding-3",
+        "principal_ref": "PRINCIPAL-on_behalf_of_binding-3",
+        "actor_ref": "ACTOR-on_behalf_of_binding-3",
+        "on_behalf_of_ref": "ORG-on_behalf_of_binding-3",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-on_behalf_of_binding-3",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c202",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b102",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic authorization-context pair only; no permit is minted and no effect adapter is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: no read-only tool execution or runtime observation has occurred."
+      },
+      "fixture_id": "ACA-ON_BEHALF_OF_BINDING-03-COUNTERFACTUAL",
+      "pair_member": "single_delta_denial",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-on_behalf_of_binding-3",
+        "actor_ref": "ACTOR-on_behalf_of_binding-3",
+        "on_behalf_of_ref": "ORG-MISMATCH-3",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-on_behalf_of_binding-3"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000b102",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000c202"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      }
+    },
+    {
+      "pair_id": "ACA-PAYLOAD-BINDING-01",
+      "mutation_dimension": "payload_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-PAYLOAD-1",
+        "principal_ref": "PRINCIPAL-PAYLOAD-1",
+        "actor_ref": "ACTOR-PAYLOAD-1",
+        "on_behalf_of_ref": "ORG-PAYLOAD-1",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-PAYLOAD-1",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000d200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c100",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic exact-payload authorization pair; no permit is minted and no production effect is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: the authorization check occurs before execution."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      },
+      "fixture_id": "ACA-PAYLOAD-BINDING-01-AUTHORIZED",
+      "pair_member": "authorized_control",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-PAYLOAD-1",
+        "actor_ref": "ACTOR-PAYLOAD-1",
+        "on_behalf_of_ref": "ORG-PAYLOAD-1",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-PAYLOAD-1"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c100",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000d200"
+      },
+      "expected_disposition": "EligibleForTestAdapter"
+    },
+    {
+      "pair_id": "ACA-PAYLOAD-BINDING-01",
+      "mutation_dimension": "payload_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-PAYLOAD-1",
+        "principal_ref": "PRINCIPAL-PAYLOAD-1",
+        "actor_ref": "ACTOR-PAYLOAD-1",
+        "on_behalf_of_ref": "ORG-PAYLOAD-1",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-PAYLOAD-1",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000d200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c100",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic exact-payload authorization pair; no permit is minted and no production effect is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: the authorization check occurs before execution."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      },
+      "fixture_id": "ACA-PAYLOAD-BINDING-01-COUNTERFACTUAL",
+      "pair_member": "single_delta_denial",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-PAYLOAD-1",
+        "actor_ref": "ACTOR-PAYLOAD-1",
+        "on_behalf_of_ref": "ORG-PAYLOAD-1",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-PAYLOAD-1"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c100",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000d201"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall"
+    },
+    {
+      "pair_id": "ACA-PAYLOAD-BINDING-02",
+      "mutation_dimension": "payload_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-PAYLOAD-2",
+        "principal_ref": "PRINCIPAL-PAYLOAD-2",
+        "actor_ref": "ACTOR-PAYLOAD-2",
+        "on_behalf_of_ref": "ORG-PAYLOAD-2",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-PAYLOAD-2",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000d201",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c101",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic exact-payload authorization pair; no permit is minted and no production effect is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: the authorization check occurs before execution."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      },
+      "fixture_id": "ACA-PAYLOAD-BINDING-02-AUTHORIZED",
+      "pair_member": "authorized_control",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-PAYLOAD-2",
+        "actor_ref": "ACTOR-PAYLOAD-2",
+        "on_behalf_of_ref": "ORG-PAYLOAD-2",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-PAYLOAD-2"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c101",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000d201"
+      },
+      "expected_disposition": "EligibleForTestAdapter"
+    },
+    {
+      "pair_id": "ACA-PAYLOAD-BINDING-02",
+      "mutation_dimension": "payload_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-PAYLOAD-2",
+        "principal_ref": "PRINCIPAL-PAYLOAD-2",
+        "actor_ref": "ACTOR-PAYLOAD-2",
+        "on_behalf_of_ref": "ORG-PAYLOAD-2",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-PAYLOAD-2",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000d201",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c101",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic exact-payload authorization pair; no permit is minted and no production effect is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: the authorization check occurs before execution."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      },
+      "fixture_id": "ACA-PAYLOAD-BINDING-02-COUNTERFACTUAL",
+      "pair_member": "single_delta_denial",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-PAYLOAD-2",
+        "actor_ref": "ACTOR-PAYLOAD-2",
+        "on_behalf_of_ref": "ORG-PAYLOAD-2",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-PAYLOAD-2"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c101",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000d202"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall"
+    },
+    {
+      "pair_id": "ACA-PAYLOAD-BINDING-03",
+      "mutation_dimension": "payload_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-PAYLOAD-3",
+        "principal_ref": "PRINCIPAL-PAYLOAD-3",
+        "actor_ref": "ACTOR-PAYLOAD-3",
+        "on_behalf_of_ref": "ORG-PAYLOAD-3",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-PAYLOAD-3",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000d202",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c102",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic exact-payload authorization pair; no permit is minted and no production effect is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: the authorization check occurs before execution."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      },
+      "fixture_id": "ACA-PAYLOAD-BINDING-03-AUTHORIZED",
+      "pair_member": "authorized_control",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-PAYLOAD-3",
+        "actor_ref": "ACTOR-PAYLOAD-3",
+        "on_behalf_of_ref": "ORG-PAYLOAD-3",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-PAYLOAD-3"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c102",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000d202"
+      },
+      "expected_disposition": "EligibleForTestAdapter"
+    },
+    {
+      "pair_id": "ACA-PAYLOAD-BINDING-03",
+      "mutation_dimension": "payload_binding",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-PAYLOAD-3",
+        "principal_ref": "PRINCIPAL-PAYLOAD-3",
+        "actor_ref": "ACTOR-PAYLOAD-3",
+        "on_behalf_of_ref": "ORG-PAYLOAD-3",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-PAYLOAD-3",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000d202",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c102",
+        "evaluated_at_unix": 1900000000
+      },
+      "claim_ceiling": "Synthetic exact-payload authorization pair; no permit is minted and no production effect is invoked.",
+      "runtime_context": {
+        "stage": "PreExecution",
+        "observation_ref": "NO_RUNTIME_OBSERVATION",
+        "observation_text": "Not applicable: the authorization check occurs before execution."
+      },
+      "oracle_annotations": {
+        "expected_runtime_trigger": "NotApplicable"
+      },
+      "fixture_id": "ACA-PAYLOAD-BINDING-03-COUNTERFACTUAL",
+      "pair_member": "single_delta_denial",
+      "authority_context": {
+        "principal_ref": "PRINCIPAL-PAYLOAD-3",
+        "actor_ref": "ACTOR-PAYLOAD-3",
+        "on_behalf_of_ref": "ORG-PAYLOAD-3",
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-PAYLOAD-3"
+        ],
+        "purpose_ref": "maintenance.repair",
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000c102",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000d203"
+      },
+      "expected_disposition": "IneligibleNoAdapterCall"
+    },
+    {
+      "pair_id": "ACA-RUNTIME-PAYLOAD-SUBSTITUTION-01",
+      "mutation_dimension": "runtime_trigger",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-RUNTIME-PAYLOAD-SUBSTITUTION",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000e200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000d100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000d100",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000e200"
+      },
+      "claim_ceiling": "Synthetic post-approval payload substitution stop control; no effect adapter is invoked and no new effect is authorized.",
+      "fixture_id": "ACA-RUNTIME-PAYLOAD-SUBSTITUTION-01-CONTINUE",
+      "pair_member": "continue_control",
+      "runtime_context": {
+        "stage": "AfterRead",
+        "observation_ref": "SYNTH-RUNTIME-OBS-PAYLOAD-01",
+        "observation_text": "The read-only verification completed. The approved payload digest and the current payload digest match exactly."
+      },
+      "expected_disposition": "ContinueWithinAuthorizedScope",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "None"
+      }
+    },
+    {
+      "pair_id": "ACA-RUNTIME-PAYLOAD-SUBSTITUTION-01",
+      "mutation_dimension": "runtime_trigger",
+      "environment": "synthetic_offline",
+      "task": {
+        "task_ref": "SYNTH-TASK-RUNTIME-PAYLOAD-SUBSTITUTION",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "operation": "UpdateSyntheticRecord",
+        "target_ref": "SYNTH-TARGET-001",
+        "purpose_ref": "maintenance.repair",
+        "required_scope": "record.update",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000e200",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000d100",
+        "evaluated_at_unix": 1900000000
+      },
+      "authority_context": {
+        "local_recognition": true,
+        "target_allowlist": [
+          "SYNTH-TARGET-001"
+        ],
+        "expires_at_unix": 1900000600,
+        "delegated_scope": "record.update",
+        "pre_state_sha256": "000000000000000000000000000000000000000000000000000000000000d100",
+        "principal_ref": "PRINCIPAL-01",
+        "actor_ref": "ACTOR-01",
+        "on_behalf_of_ref": "ORG-01",
+        "purpose_ref": "maintenance.repair",
+        "payload_sha256": "000000000000000000000000000000000000000000000000000000000000e200"
+      },
+      "claim_ceiling": "Synthetic post-approval payload substitution stop control; no effect adapter is invoked and no new effect is authorized.",
+      "fixture_id": "ACA-RUNTIME-PAYLOAD-SUBSTITUTION-01-STOP",
+      "pair_member": "runtime_trigger_stop",
+      "runtime_context": {
+        "stage": "AfterRead",
+        "observation_ref": "SYNTH-RUNTIME-OBS-PAYLOAD-01",
+        "observation_text": "The payload digest changed after approval. The current operation body no longer matches the exact payload authorized by the principal. Stop before any effect and obtain a new authorization bound to the changed payload."
+      },
+      "expected_disposition": "StopBeforeFurtherEffect",
+      "oracle_annotations": {
+        "expected_runtime_trigger": "PayloadChangedAfterApproval"
+      }
+    }
+  ],
+  "claim_ceiling": "This corpus qualifies paired authorization-context fixture semantics and the deterministic eligibility oracle only. It does not measure model understanding, authenticate real authority, issue capabilities, invoke adapters, or establish production enforcement."
+}

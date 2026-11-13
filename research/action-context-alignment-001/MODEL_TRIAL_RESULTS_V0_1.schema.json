@@ -1,0 +1,285 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/action-context-alignment-001/MODEL_TRIAL_RESULTS_V0_1.schema.json",
+  "title": "ACTION-CONTEXT-ALIGNMENT-001 model trial result receipt v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "status",
+    "dataset_sha256",
+    "protocol_sha256",
+    "model_profile",
+    "execution_environment",
+    "result_count",
+    "results",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "action-context-alignment-model-trial-results-v0.1"
+    },
+    "benchmark_id": {
+      "const": "ACTION-CONTEXT-ALIGNMENT-001"
+    },
+    "status": {
+      "enum": [
+        "completed_model_trial",
+        "synthetic_golden_control_not_model_trial"
+      ]
+    },
+    "dataset_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "protocol_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "model_profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "model_id",
+        "model_revision",
+        "harness",
+        "harness_revision",
+        "system_prompt_sha256",
+        "prompt_template_sha256",
+        "tool_spec_sha256",
+        "temperature_milli",
+        "max_input_tokens",
+        "max_output_tokens",
+        "max_tool_calls"
+      ],
+      "properties": {
+        "provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "model_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "harness": {
+          "type": "string",
+          "minLength": 1
+        },
+        "harness_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "system_prompt_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "prompt_template_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "tool_spec_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "temperature_milli": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2000
+        },
+        "max_input_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_output_tokens": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "max_tool_calls": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "execution_environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runtime",
+        "environment_revision",
+        "network_access",
+        "real_data_access",
+        "adapter_kind"
+      ],
+      "properties": {
+        "runtime": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environment_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "network_access": {
+          "const": "none"
+        },
+        "real_data_access": {
+          "const": "none"
+        },
+        "adapter_kind": {
+          "enum": [
+            "synthetic_state_adapter",
+            "receipt_only_golden_control"
+          ]
+        }
+      }
+    },
+    "result_count": {
+      "const": 60
+    },
+    "results": {
+      "type": "array",
+      "minItems": 60,
+      "maxItems": 60,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "fixture_id",
+          "pair_id",
+          "mutation_dimension",
+          "case_status",
+          "policy_input_sha256",
+          "candidate_decision",
+          "effect_requested",
+          "gate_disposition",
+          "adapter_invocation_count",
+          "model_request_sha256",
+          "model_response_sha256",
+          "tool_trace_sha256",
+          "decision_receipt_sha256",
+          "effect_witness"
+        ],
+        "properties": {
+          "fixture_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "pair_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mutation_dimension": {
+            "enum": [
+              "principal_binding",
+              "actor_binding",
+              "on_behalf_of_binding",
+              "local_recognition",
+              "target_allowlist",
+              "purpose_binding",
+              "expiry",
+              "delegation_scope",
+              "pre_state",
+              "runtime_trigger"
+            ]
+          },
+          "case_status": {
+            "const": "completed"
+          },
+          "policy_input_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "candidate_decision": {
+            "enum": [
+              "PROCEED",
+              "WITHHOLD",
+              "CLARIFY",
+              "ESCALATE",
+              "STOP"
+            ]
+          },
+          "effect_requested": {
+            "type": "boolean"
+          },
+          "gate_disposition": {
+            "enum": [
+              "ALLOW",
+              "BLOCK_AUTHORITY",
+              "BLOCK_RUNTIME_STOP"
+            ]
+          },
+          "adapter_invocation_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "model_request_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "model_response_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "tool_trace_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "decision_receipt_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "effect_witness": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "status",
+              "before_state_sha256",
+              "after_state_sha256",
+              "observer_receipt_sha256",
+              "effect_receipt_sha256"
+            ],
+            "properties": {
+              "status": {
+                "enum": [
+                  "SIMULATED_APPLIED",
+                  "BLOCKED_NO_MUTATION",
+                  "NOT_INVOKED"
+                ]
+              },
+              "before_state_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "after_state_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "observer_receipt_sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "effect_receipt_sha256": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
