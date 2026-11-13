@@ -146,7 +146,7 @@ Repeated rows, interpolated cells and duplicated support IDs cannot increase the
 
 ## 8. Frozen known-answer challenge suite
 
-The S0 fixture contains 14 synthetic cases:
+The S0 fixture contains 18 synthetic cases:
 
 | Case | Expected audit | Reason |
 |---|---|---|
@@ -164,6 +164,10 @@ The S0 fixture contains 14 synthetic cases:
 | AGGREGATE_OPERATOR | BLOCKED | Local reconstruction requested without a validated measurement operator |
 | DUPLICATE_SUPPORT | REJECTED | Repeated source/support identities inflate independent sample count |
 | COMPLETE_SYNTHETIC | PASS | Structurally sound synthetic join; still not physical qualification |
+| POINT_SUPPORT | PASS | A point-level claim is bounded by its finite calibrated footprint |
+| FIELD_SUPPORT | PASS | Field claim binds declared scope, sampling plan, resolution and zero unmapped regions |
+| SPECIMEN_SUPPORT | PASS | Integrated outcome remains at specimen/joint level |
+| AREA_TO_SPECIMEN_NO_AGGREGATION | BLOCKED | Area evidence cannot be promoted to specimen support without a validated full-support aggregation operator |
 
 PASS means only that the declared join contract is structurally admissible. It never means product acceptance, physical qualification or release.
 
@@ -219,7 +223,7 @@ Physical targets must be frozen only after actual instrument resolution, footpri
 ## 11. S0 implementation
 
 The implementation tranche is:
-1. versioned support-aware benchmark and 14-case known-answer fixture;
+1. versioned support-aware benchmark and 18-case known-answer fixture;
 2. Rust-native offline audit with PASS/BLOCKED/REJECTED dispositions;
 3. mutation tests for support downgrade, geometry mismatch, time mismatch, leakage, duplicate support and inferred-as-physical claims;
 4. deterministic replay of all fixture expectations;
