@@ -5,6 +5,7 @@ use std::{env, fs, process};
 const SCHEMA_VERSION: &str = "0.1.0";
 const SPL_QUANTITY: &str = "received_spl_db_re_1upa";
 const WINDOW_DURATION_TOLERANCE_S: f64 = 1.0e-6;
+const BACKGROUND_TEN_DB_BOUNDARY_TOLERANCE_DB: f64 = 1.0e-9;
 
 #[derive(Debug, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -253,6 +254,7 @@ struct RunReport {
     observed_false_to_true_window_transitions_per_covered_hour: Option<f64>,
     left_censored_active_window_segments: Option<usize>,
     right_censored_active_window_segments: Option<usize>,
+    right_censored_active_window_segments_at_gaps: Option<usize>,
     acquisition_duration_s: f64,
     ittc_recommended_acquisition_duration_met: bool,
     energy_equivalent_mean_spl_db: Option<f64>,
@@ -323,7 +325,7 @@ fn ittc_background_corrected_spl(
     if margin_db < 3.0 {
         return Err(BackgroundFailure::BackgroundDominated);
     }
-    if margin_db == 10.0 {
+    if (margin_db - 10.0).abs() <= BACKGROUND_TEN_DB_BOUNDARY_TOLERANCE_DB {
         return Err(BackgroundFailure::ExactTenDbBoundaryUnspecified);
     }
     if margin_db > 10.0 {
@@ -870,7 +872,7 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
         .filter(|window| window.cavitation_present.is_some())
         .count();
 
-    let (occupancy, onsets, onsets_per_hour, left_censored, right_censored) =
+    let (occupancy, onsets, onsets_per_hour, left_censored, right_censored, right_censored_at_gaps) =
         if aligned_annotations.len() == run.windows.len() && !aligned_annotations.is_empty() {
             let annotated_duration_s: f64 = aligned_annotations
                 .iter()
@@ -885,33 +887,53 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
 
             let mut observed_onsets = 0usize;
             let mut left_censored_segments = 0usize;
+            let mut right_censored_gap_segments = 0usize;
             for index in 0..aligned_annotations.len() {
-                if aligned_annotations[index].cavitation_present != Some(true) {
-                    continue;
-                }
+                let is_present = aligned_annotations[index].cavitation_present == Some(true);
                 if index == 0 {
-                    // Acquisition begins while the active segment is already present.
-                    left_censored_segments += 1;
+                    if is_present {
+                        // The first aligned sample starts an already-active, left-censored episode.
+                        left_censored_segments += 1;
+                    }
                     continue;
                 }
                 let contiguous = (aligned_annotations[index].start_time_s
                     - aligned_annotations[index - 1].end_time_s).abs()
                     <= WINDOW_DURATION_TOLERANCE_S;
+                let previous_present = aligned_annotations[index - 1].cavitation_present == Some(true);
+                if !contiguous && previous_present {
+                    // The episode before the acquisition/alignment gap has an unknown end.
+                    right_censored_gap_segments += 1;
+                }
+                if !is_present {
+                    continue;
+                }
                 if !contiguous {
-                    // An acquisition/alignment gap hides the transition.
+                    // The episode after the acquisition/alignment gap has an unknown start.
                     left_censored_segments += 1;
-                } else if aligned_annotations[index - 1].cavitation_present == Some(false) {
+                } else if !previous_present {
                     observed_onsets += 1;
                 }
             }
-            let right_censored_segments = if aligned_annotations
+            let final_aligned_window_is_final_acquired_window = aligned_annotations.last().is_some_and(|window| {
+                run.windows.last().is_some_and(|last| {
+                    window.window_id == last.window_id
+                        && last.acoustic_cavitation_alignment_offset_s.abs()
+                            + last.acoustic_cavitation_alignment_expanded_uncertainty_s
+                            <= case.maximum_sync_alignment_uncertainty_s
+                        && last.cavitation_present.is_some()
+                })
+            });
+            let final_episode_is_active = aligned_annotations
                 .last()
-                .is_some_and(|window| window.cavitation_present == Some(true))
-            {
-                1
-            } else {
-                0
-            };
+                .is_some_and(|window| window.cavitation_present == Some(true));
+            let right_censored_segments = usize::from(
+                final_aligned_window_is_final_acquired_window && final_episode_is_active
+            );
+            if final_episode_is_active && !final_aligned_window_is_final_acquired_window {
+                // The last aligned active episode is cut by a trailing acquisition/alignment gap.
+                right_censored_gap_segments += 1;
+            }
             let onsets_per_hour = if annotated_duration_s > 0.0 {
                 Some(observed_onsets as f64 * 3600.0 / annotated_duration_s)
             } else {
@@ -923,9 +945,10 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
                 onsets_per_hour,
                 Some(left_censored_segments),
                 Some(right_censored_segments),
+                Some(right_censored_gap_segments),
             )
         } else {
-            (None, None, None, None, None)
+            (None, None, None, None, None, None)
         };
 
     // Cavitation-conditioned acoustic distributions still require eligible
@@ -990,6 +1013,7 @@ fn summarize_run(run: &Run, case: &Case) -> RunReport {
         observed_false_to_true_window_transitions_per_covered_hour: onsets_per_hour,
         left_censored_active_window_segments: left_censored,
         right_censored_active_window_segments: right_censored,
+        right_censored_active_window_segments_at_gaps: right_censored_at_gaps,
         acquisition_duration_s,
         ittc_recommended_acquisition_duration_met: acquisition_duration_s > 20.0,
         energy_equivalent_mean_spl_db: energy_mean,
@@ -1073,7 +1097,7 @@ fn audit(case: &Case) -> AuditReport {
             }
         }
 
-        for run in case.runs.iter().skip(1) {
+        for run in case.runs.iter().filter(|run| run.run_id != reference_run.run_id) {
             let water = &run.water_condition;
             if water.measure != reference_water.measure
                 || water.unit != reference_water.unit
@@ -1591,12 +1615,16 @@ mod tests {
     }
 
     #[test]
-    fn reference_run_is_explicit_and_input_permutation_preserves_comparison() {
+    fn reference_run_is_explicit_and_input_permutation_preserves_all_condition_checks() {
         let mut input = case();
+        input.evidence_kind = EvidenceKind::Measured;
         input.reference_run_id = "run-2".to_string();
+        input.runs[0].water_condition.value = 0.90;
         let first = audit(&input);
         input.runs.reverse();
         let second = audit(&input);
+        assert_eq!(first.disposition, "INCOMPARABLE_CONDITION");
+        assert_eq!(second.disposition, "INCOMPARABLE_CONDITION");
         assert_eq!(first.nuclei_distribution_coverage_fraction, second.nuclei_distribution_coverage_fraction);
         assert_eq!(first.nuclei_distribution_comparisons[0].reference_run_id, "run-2");
         assert_eq!(second.nuclei_distribution_comparisons[0].reference_run_id, "run-2");
@@ -1604,6 +1632,8 @@ mod tests {
             first.nuclei_distribution_comparisons[0].disposition,
             second.nuclei_distribution_comparisons[0].disposition
         );
+        assert!(first.reasons.iter().any(|reason| reason.contains("run run-1 water susceptibility")));
+        assert!(second.reasons.iter().any(|reason| reason.contains("run run-1 water susceptibility")));
     }
 
     #[test]
@@ -1841,6 +1871,34 @@ mod tests {
         assert_eq!(run.observed_false_to_true_window_transitions, Some(2));
         assert_eq!(run.left_censored_active_window_segments, Some(2));
         assert_eq!(run.right_censored_active_window_segments, Some(1));
+        assert_eq!(run.right_censored_active_window_segments_at_gaps, Some(0));
+    }
+
+    #[test]
+    fn active_episode_before_acquisition_gap_is_right_censored_at_gap() {
+        let mut input = case();
+        let windows = &mut input.runs[0].windows;
+        // First active segment ends at an acquisition gap; the next sample is inactive.
+        windows[0].cavitation_present = Some(true);
+        windows[1].start_time_s += 1.0;
+        windows[1].end_time_s += 1.0;
+        windows[1].cavitation_present = Some(false);
+        let report = audit(&input);
+        let run = &report.run_reports[0];
+        assert_eq!(run.right_censored_active_window_segments_at_gaps, Some(1));
+        assert_eq!(run.right_censored_active_window_segments, Some(0));
+    }
+
+    #[test]
+    fn trailing_unaligned_active_annotation_is_gap_censored_not_run_end_censored() {
+        let mut input = case();
+        let last = input.runs[0].windows.last_mut().unwrap();
+        last.acoustic_cavitation_alignment_expanded_uncertainty_s = 0.02;
+        last.cavitation_present = Some(true);
+        let report = audit(&input);
+        let run = &report.run_reports[0];
+        assert_eq!(run.right_censored_active_window_segments, Some(0));
+        assert_eq!(run.right_censored_active_window_segments_at_gaps, Some(1));
     }
 
     #[test]
