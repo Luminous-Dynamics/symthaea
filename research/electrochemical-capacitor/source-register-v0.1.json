@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "as_of": "2026-11-13",
-  "note": "Sources are external comparators only. Their values retain the source's original boundary and evidence class.",
+  "note": "Sources are external comparators only. Values retain their original boundary and evidence class. The register is as-of 2026-11-13; forthcoming literature is explicitly identified and is not eligible for the as-of-date SOTA baseline.",
   "sources": [
     {
       "id": "IEA-GEVO-2026",
@@ -242,6 +242,41 @@
       "evidence_class": "peer_reviewed_review",
       "permitted_use": "Mechanism map for ohmic leakage, parasitic Faradaic reactions and charge redistribution; informs orthogonal diagnostics and mechanism-identifiability experiments.",
       "prohibited_inference": "Review article with no generated dataset; does not establish a new device result, uniquely identify mechanisms from voltage decay alone, or demonstrate a Luminous mitigation."
+    },
+    {
+      "id": "SUPERCAPACITORS-NONEQUILIBRIUM-2026",
+      "title": "Supercapacitors Under Nonequilibrium Conditions: Mechanisms and Design Principles",
+      "url": "https://advanced.onlinelibrary.wiley.com/doi/10.1002/adma.75460",
+      "doi": "10.1002/adma.75460",
+      "publisher": "Advanced Materials",
+      "authors": "Xu and Yang",
+      "published": "2026-10-21",
+      "evidence_class": "peer_reviewed_review",
+      "permitted_use": "Mechanism map for transition and dynamic operating conditions; identifies transport mismatch, interfacial instability and thermomechanical coupling under floating states, high-frequency cycling, rapid charge/discharge, wide temperature windows and high-voltage regimes.",
+      "prohibited_inference": "Review, not a new supercapacitor device dataset or proof that a specific Luminous architecture mitigates these mechanisms; exact quantitative design claims require primary sources and matched experiments."
+    },
+    {
+      "id": "EPRI-BESS-RELIABLE-ROADMAP",
+      "title": "Battery Energy Storage Roadmap — RELIABLE",
+      "url": "https://storagewiki.epri.com/index.php/Battery_Energy_Storage_Roadmap/RELIABLE",
+      "publisher": "Electric Power Research Institute",
+      "published": null,
+      "evidence_class": "industry_reliability_framework",
+      "permitted_use": "Operational reliability framing for storage fleets: common data collection, performance/reliability characterization, outage reporting, monitoring/control, lifecycle and asset-management data.",
+      "prohibited_inference": "Battery-system reliability roadmap, not an EDLC device benchmark, manufacturer result or direct capacitor comparator."
+    },
+    {
+      "id": "RELIABILITY-BY-DESIGN-SUPERCAP-2027",
+      "title": "Reliability-by-design for deployable next-generation supercapacitors: degradation, harsh-environment operation, sustainability, and AI-guided lifetime prediction",
+      "url": "https://www.sciencedirect.com/science/article/pii/S0079642526001908",
+      "doi": "10.1016/j.pmatsci.2026.101843",
+      "publisher": "Progress in Materials Science",
+      "authors": "Shah et al.",
+      "published": "2027-03",
+      "publication_status": "forthcoming_at_2026-11-13_not_eligible_for_current_sota",
+      "evidence_class": "peer_reviewed_review_forthcoming",
+      "permitted_use": "Forward literature watch only: publisher and institutional records specify March 2027 volume publication; abstract describes reliability-by-design and a five-gate 5R readiness framework.",
+      "prohibited_inference": "Not published as of the 2026-11-13 benchmark cutoff; do not cite as current SOTA or as an independently validated result. Review reports no generated dataset."
     }
   ]
 }
