@@ -1950,7 +1950,7 @@ mod tests {
         let state = ComplexU1Mps::product_state(&[true, false, true, false]).unwrap();
         assert_eq!(state.site_count(), 4);
         assert_eq!(state.total_charge(), 2);
-        assert!(state.maximum_bond_dimension() <= 2);
+        assert_eq!(state.maximum_bond_dimension(), 1);
         assert_eq!(state.selection_rule_residual(), 0.0);
         assert_eq!(state.norm_squared(1.0e-12).unwrap(), 1.0);
 
