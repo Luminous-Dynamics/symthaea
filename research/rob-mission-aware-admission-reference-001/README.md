@@ -4,6 +4,28 @@ Parent workstream: Symthaea #11627 and protocol PR #11630.
 
 This standalone reference evaluates **optional remote inference request admission** for a heterogeneous robot fleet against one declared multi-resource budget. It does not schedule local control, RTA, actuator interlocks or safe-stop, and it never authorizes applying a remote result.
 
+## Decision-sufficiency horizon composition
+
+This reference also consumes the calibrated decision-sufficiency output from #11650, calibrated by the simultaneous episode-level coverage owner #11659. It does not recompute expected losses, regret, calibration or robust admissibility.
+
+Every request binds:
+- the decision and selected-action identities;
+- the robot clock/decision epoch and current control tick;
+- task-loss scale, loss-model digest and candidate action-domain digest;
+- the exact decision-sufficiency receipt digest;
+- the conservative remaining ticks before the selected action ceases to be decision-sufficient.
+
+The receipt is checked against the request's exact decision/action/epoch/tick/model/domain/loss-scale identities. Missing or Unknown evidence, an already-insufficient decision, a rejected receipt, or any mismatch blocks remote admission.
+
+The conservative p99 return latency plus local projection/dispatch guard must fit **all three** independent time windows:
+- remaining decision-sufficiency horizon;
+- local action-buffer/fallback slack;
+- task/actuation deadline slack.
+
+The effective bound is their minimum. Exact-boundary equality is inclusive. EVSI remains a separate positive-value requirement: a long decision horizon does not make a zero-EVSI request useful, and positive EVSI cannot authorize a result that arrives after the selected decision expires.
+
+This is not an action-authority extension. Local control, RTA, physical interlocks, fallback and safe-stop remain independent.
+
 ## Hard eligibility precedes policy ranking
 
 A request is eligible only when the caller supplies:
