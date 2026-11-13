@@ -10,4 +10,6 @@ This is a deterministic, authored known-answer example, not an estimated treatme
 
 The untreated T0 cohort and randomized policy-outcome cohort are separate concepts. If every episode is protected by intervention and no valid reference stratum or identification design exists, the untreated event-time distribution is not identified from that cohort alone.
 
+The reference also refuses the fixed-horizon comparison unless assignment precedes time zero, its randomization receipt is valid, and each declared block contains both assigned policies. This validates synthetic trial semantics only; it does not establish randomization quality or causal identification.
+
 No survival calibration, IPCW/AIPCW/HAPS estimator, simulator, HIL, sensor, actuator or physical robot was run. Statistical time-to-event methods remain with #9690; policy assignment and physical run evidence must follow #6226 and #4800.
