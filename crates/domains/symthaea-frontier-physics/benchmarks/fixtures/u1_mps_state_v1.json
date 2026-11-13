@@ -6,7 +6,7 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "Complex U1 MPS representation plus dense fixed-charge to MPS charge-block SVD source-authored; exact-head Rust 1.96 validation pending.",
+  "execution_status": "Complex U1 MPS state representation, fixed-charge dense-to-MPS factorization and exact pre-SVD two-site gate contraction are source-authored. Exact-head Rust 1.96 isolated harness validation pending.",
   "claim_ceiling": "No two-site TEBD circuit evolution, truncation guarantee, large-N scaling or quantum advantage claim.",
   "conventions": {
     "physical_dimension": 2,
@@ -76,6 +76,33 @@
       "api": "ComplexU1Mps::from_dense_fixed_charge",
       "status": "source_authored_runner_pending",
       "explicit_nonclaim": "No two-site gate evolution or TEBD yet."
+    },
+    "two_site_gates": {
+      "status": "source_authored_runner_pending",
+      "api": [
+        "U1TwoSiteGate::new",
+        "U1TwoSiteGate::identity",
+        "U1TwoSiteGate::swap",
+        "U1TwoSiteState::new",
+        "U1TwoSiteState::from_adjacent_tensors",
+        "U1TwoSiteState::apply_gate",
+        "U1TwoSiteState::to_dense_two_qubit"
+      ],
+      "gate_convention": "Complex 4x4 row-major matrix in basis |00>, |01>, |10>, |11>; may mix |01> and |10>, but must not couple different total excitation sectors.",
+      "validations": [
+        "U dagger U = I",
+        "charge-sector off-block amplitude <= tolerance",
+        "two-site virtual charge selection rule after application",
+        "adjacent internal bond charge-label identity"
+      ],
+      "authored_tests": [
+        "two_site_identity_and_swap_gates_preserve_charge_and_dense_amplitudes",
+        "complex_u1_gate_applies_nontrivial_unitary_within_single_excitation_sector",
+        "two_site_gate_constructor_rejects_charge_leaking_and_nonunitary_matrices",
+        "two_site_state_rejects_forbidden_charge_sector_and_nonfinite_values",
+        "adjacent_tensor_contraction_rejects_mismatched_virtual_charge_bonds"
+      ],
+      "claim_ceiling": "Exact two-site contraction and gate application only; no charge-block SVD split or TEBD yet."
     }
   },
   "known_answers": [
@@ -136,12 +163,15 @@
     },
     {
       "id": "MPS-1B",
-      "name": "Two-site U1 gate application without truncation",
-      "status": "planned",
+      "name": "U(1)-conserving nearest-neighbour two-site gate application",
+      "status": "source_authored_runner_pending",
       "acceptance": [
-        "gate preserves charge blocks",
-        "dense overlap at N=4..12",
-        "no truncation during gate application"
+        "4x4 gate unitarity residual",
+        "no coupling between distinct excitation sectors",
+        "exact dense |01> -> |10> SWAP control",
+        "complex U(2) single-excitation block known answer",
+        "MPS virtual-charge selection rule after gate",
+        "no SVD, truncation or renormalization during gate application"
       ]
     },
     {
@@ -211,7 +241,11 @@
     "all-zero input fabricated into a nonzero bond state",
     "drop any positive singular value during untruncated dense factorization",
     "discard tolerated out-of-sector input amplitudes without recording their squared weight",
-    "compare against a dense vector with mismatched MSB/LSB ordering"
+    "compare against a dense vector with mismatched MSB/LSB ordering",
+    "unitary gate that couples different total excitation sectors",
+    "non-unitary two-site gate",
+    "gate application that changes declared virtual-charge selection rules",
+    "implicit SVD or truncation during local gate application"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -232,10 +266,10 @@
     "dense_reconstruction_max_residual",
     "dense_reconstruction_l2_residual",
     "svd_rank_by_charge_and_cut",
-    "dense_input_charge_leakage_max",
-    "dense_input_charge_leakage_weight",
-    "dense_reconstruction_max_residual",
-    "dense_reconstruction_l2_residual",
-    "svd_rank_by_charge_and_cut"
+    "gate_unitarity_residual",
+    "gate_charge_conservation_residual",
+    "two_site_selection_rule_residual",
+    "two_site_dense_oracle_amplitudes",
+    "two_site_gate_identity"
   ]
 }
