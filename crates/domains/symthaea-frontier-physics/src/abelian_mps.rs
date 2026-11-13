@@ -329,15 +329,16 @@ impl<const K: usize> AbelianMps<K> {
                 expected: total_charge,
             });
         }
-        for bond in 0..tensors.len().saturating_sub(1) {
-            if tensors[bond].right_charges() != tensors[bond + 1].left_charges() {
+        for (bond, adjacent) in tensors.windows(2).enumerate() {
+            if adjacent[0].right_charges() != adjacent[1].left_charges() {
                 return Err(AbelianChargeError::BondChargeMismatch { bond });
             }
         }
         let selection_rule_residual = tensors
             .iter()
             .map(AbelianChargeTensor::selection_rule_residual)
-            .fold(0.0_f64, f64::max);
+            .reduce(f64::max)
+            .unwrap_or(0.0);
         if selection_rule_residual > tolerance {
             return Err(AbelianChargeError::NoAllowedChargeBlocks);
         }
@@ -407,19 +408,17 @@ impl<const K: usize> AbelianChargeBlockPlan<K> {
         }
 
         let mut row_groups: BTreeMap<AbelianCharge<K>, Vec<(usize, usize)>> = BTreeMap::new();
-        for left in 0..first.left_dimension() {
-            for physical in 0..first.physical_dimension() {
-                let charge = first.left_charges()[left]
-                    .checked_add(first.physical_charges()[physical])?;
+        for (left, left_charge) in first.left_charges().iter().enumerate() {
+            for (physical, physical_charge) in first.physical_charges().iter().enumerate() {
+                let charge = left_charge.checked_add(*physical_charge)?;
                 row_groups.entry(charge).or_default().push((left, physical));
             }
         }
 
         let mut column_groups: BTreeMap<AbelianCharge<K>, Vec<(usize, usize)>> = BTreeMap::new();
-        for physical in 0..second.physical_dimension() {
-            for right in 0..second.right_dimension() {
-                let charge = second.right_charges()[right]
-                    .checked_sub(second.physical_charges()[physical])?;
+        for (physical, physical_charge) in second.physical_charges().iter().enumerate() {
+            for (right, right_charge) in second.right_charges().iter().enumerate() {
+                let charge = right_charge.checked_sub(*physical_charge)?;
                 column_groups.entry(charge).or_default().push((physical, right));
             }
         }
