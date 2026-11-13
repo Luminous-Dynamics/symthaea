@@ -392,6 +392,8 @@ pub enum HoldoutAuditError {
     },
     /// Duplicate or empty case identity.
     DuplicateOrEmptyCaseId(String),
+    /// One paired scenario/initial-state manifest was counted more than once.
+    DuplicatePairedCaseManifest(String),
     /// Missing case pairing/cluster identity.
     MissingCaseReceipt(String),
     /// One cluster has contradictory receipt or disposition identities.
@@ -644,6 +646,7 @@ fn validate_cases(
         return Err(HoldoutAuditError::NoPairedCases);
     }
     let mut case_ids = BTreeSet::new();
+    let mut paired_case_manifests = BTreeSet::new();
     let mut cluster_receipts: BTreeMap<String, (String, IndependenceDisposition)> =
         BTreeMap::new();
     let mut by_group: BTreeMap<GroupKey, Vec<&PairedCase>> = BTreeMap::new();
@@ -657,6 +660,11 @@ fn validate_cases(
             &case.paired_case_manifest_digest,
         )
         .map_err(|_| HoldoutAuditError::MissingCaseReceipt(case.case_id.clone()))?;
+        if !paired_case_manifests.insert(case.paired_case_manifest_digest.clone()) {
+            return Err(HoldoutAuditError::DuplicatePairedCaseManifest(
+                case.paired_case_manifest_digest.clone(),
+            ));
+        }
         require_nonempty(
             "independence_receipt_digest",
             &case.independence_receipt_digest,
@@ -1375,6 +1383,18 @@ mod tests {
                 field: "resource_budget_digest",
             })
         );
+    }
+
+    #[test]
+    fn duplicate_paired_case_manifest_cannot_be_counted_twice() {
+        let mut audit = input();
+        audit.cases[1].paired_case_manifest_digest =
+            audit.cases[0].paired_case_manifest_digest.clone();
+        assert!(matches!(
+            audit_source_holdouts(&audit),
+            Err(HoldoutAuditError::DuplicatePairedCaseManifest(manifest))
+                if manifest == "paired-001"
+        ));
     }
 
     #[test]
