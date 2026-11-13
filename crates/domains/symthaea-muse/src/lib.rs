@@ -47,6 +47,7 @@ pub mod counterfactual_interaction;
 pub mod factorial_ground_truth;
 pub mod interaction_probe_benchmark;
 pub mod probe_policy_comparison;
+pub mod interaction_probe_campaign;
 pub mod interaction_probe_plan;
 #[cfg(feature = "theory")]
 pub mod edit_contract;
