@@ -85,6 +85,28 @@ def matrix_scale_norm_squared(value: Fraction) -> Fraction:
     return value * value
 
 
+
+def derivative_evidence_valid(data: dict, evidence: dict) -> bool:
+    return (
+        evidence.get("model_identity") == data.get("model_identity")
+        and evidence.get("topology_identity") == data.get("topology_identity")
+        and evidence.get("operating_point_identity") == data.get("operating_point_identity")
+        and evidence.get("frequency_unit") == data.get("frequency_unit")
+        and bool(evidence.get("evidence_reference"))
+        and evidence.get("global_induced_spectral_norm_derivative_bound") is not None
+    )
+
+
+def endpoint_coverage_valid(knots: list[Fraction], lo: Fraction, hi: Fraction) -> bool:
+    return (
+        len(knots) >= 2
+        and knots == sorted(knots)
+        and len(knots) == len(set(knots))
+        and knots[0] == lo
+        and knots[-1] == hi
+    )
+
+
 def main() -> None:
     data = json.loads(FIXTURE.read_text(encoding="utf-8"))
     assert data["schema"] == "luminous.airroad.mimo_composed_pointwise_to_continuous_envelope.v0_1"
@@ -118,8 +140,7 @@ def main() -> None:
 
     knots = [q(value) for value in data["sample_coverage"]["knots"]]
     assert knots == [Fraction(0), Fraction(1, 2), Fraction(1)]
-    assert knots == sorted(knots) and len(knots) == len(set(knots))
-    assert knots[0] == omega_lo and knots[-1] == omega_hi
+    assert endpoint_coverage_valid(knots, omega_lo, omega_hi)
     gaps = [right - left for left, right in zip(knots, knots[1:])]
     maximum_gap = max(gaps)
     nearest_distance = maximum_gap / 2
@@ -158,11 +179,7 @@ def main() -> None:
     derivative_evidence = data["derivative_certificate"]
     assert derived_l == q(derivative_evidence["global_induced_spectral_norm_derivative_bound"]) == Fraction(1, 2)
     assert q(derivative_evidence["derivative_vertex"]) == vertex
-    assert derivative_evidence["model_identity"] == data["model_identity"]
-    assert derivative_evidence["topology_identity"] == data["topology_identity"]
-    assert derivative_evidence["operating_point_identity"] == data["operating_point_identity"]
-    assert derivative_evidence["frequency_unit"] == data["frequency_unit"]
-    assert derivative_evidence["evidence_reference"].strip()
+    assert derivative_evidence_valid(data, derivative_evidence)
 
     # Verify pointwise data-consistency at all three knots. Both basis inputs
     # span the complete input space; every column has its own deterministic
@@ -271,7 +288,24 @@ def main() -> None:
 
     lipschitz_bad = q(data["counterfactuals"]["lipschitz_understated"])
     assert lipschitz_bad < derived_l
+    missing_endpoint_knots = knots[:-1]
+    assert not endpoint_coverage_valid(
+        missing_endpoint_knots, omega_lo, omega_hi
+    )
     assert q(data["counterfactuals"]["band_missing_endpoint"]["upper"]) < omega_hi
+
+    stale_evidence = dict(derivative_evidence)
+    stale_evidence["model_identity"] = "sha256:stale-model"
+    assert not derivative_evidence_valid(data, stale_evidence)
+    stale_evidence = dict(derivative_evidence)
+    stale_evidence["topology_identity"] = "sha256:stale-topology"
+    assert not derivative_evidence_valid(data, stale_evidence)
+    stale_evidence = dict(derivative_evidence)
+    stale_evidence["frequency_unit"] = "Hz"
+    assert not derivative_evidence_valid(data, stale_evidence)
+    missing_l = dict(derivative_evidence)
+    missing_l.pop("global_induced_spectral_norm_derivative_bound")
+    assert not derivative_evidence_valid(data, missing_l)
 
     nonorthogonal = [[q(value) for value in row] for row in data["counterfactuals"]["nonorthogonal_residual_factor"]]
     assert nonorthogonal != p_matrix
@@ -292,10 +326,14 @@ def main() -> None:
     assert stale_model != data["model_identity"]
     assert stale_topology != data["topology_identity"]
     assert wrong_units != data["frequency_unit"]
-    assert derivative_evidence.get("global_induced_spectral_norm_derivative_bound") is not None
-    assert None is None  # missing-L counterfactual is non-admissible by contract
     statistical_semantics = "uncalibrated_statistical_confidence_interval"
     assert statistical_semantics != data["measurement_noise"]["semantics"]
+    statistical_samples = [dict(item) for item in experiments]
+    statistical_samples[0]["uncertainty_semantics"] = statistical_semantics
+    assert not all(
+        item["uncertainty_semantics"] == "deterministic_hard_euclidean_ball"
+        for item in statistical_samples
+    )
 
     controls = {item["id"]: item["expected"] for item in data["negative_controls"]}
     assert controls["rank-deficient-input-excitation"] == "no-full-matrix-pointwise-bound"
