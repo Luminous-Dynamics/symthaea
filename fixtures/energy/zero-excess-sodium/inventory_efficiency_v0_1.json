@@ -1,0 +1,64 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "ZERO-EXCESS-NA-CONSTANT-CE-INVENTORY-001",
+  "evidence_class": "synthetic_known_answer_arithmetic",
+  "claim_ceiling": "IDEALIZED_CONSTANT_EFFICIENCY_INVENTORY_ARITHMETIC_ONLY_NOT_FULL_CELL_LIFE_PREDICTION",
+  "assumptions": [
+    "Each cycle retains the same fraction eta of cyclable sodium inventory.",
+    "No separate time-dependent, temperature-dependent, state-dependent, cathode, electrolyte, mechanical, or competing degradation mechanisms are represented.",
+    "Coulombic efficiency is treated as the only loss term for this arithmetic check.",
+    "This is not a cell-life model, measured result, or safety/manufacturing claim."
+  ],
+  "equation": "retained_fraction = coulombic_efficiency_per_cycle ^ cycle_count",
+  "cycle_count": 1000,
+  "cases": [
+    {
+      "ce_per_cycle": "0.999",
+      "retained_fraction_decimal": "0.367695424770964044626806139220",
+      "retained_percent": 36.7695424770964
+    },
+    {
+      "ce_per_cycle": "0.9995",
+      "retained_fraction_decimal": "0.606454822840061564204518438357",
+      "retained_percent": 60.6454822840062
+    },
+    {
+      "ce_per_cycle": "0.9998",
+      "retained_fraction_decimal": "0.818714376443099479762324212549",
+      "retained_percent": 81.8714376443099
+    },
+    {
+      "ce_per_cycle": "0.9999",
+      "retained_fraction_decimal": "0.904832893558546255039129731119",
+      "retained_percent": 90.4832893558546
+    },
+    {
+      "ce_per_cycle": "0.99995",
+      "retained_fraction_decimal": "0.951228235425040534713385676691",
+      "retained_percent": 95.122823542504
+    },
+    {
+      "ce_per_cycle": "0.99998",
+      "retained_fraction_decimal": "0.980198477264426343027304480109",
+      "retained_percent": 98.0198477264426
+    },
+    {
+      "ce_per_cycle": "0.99999",
+      "retained_fraction_decimal": "0.990049784246347584607881759599",
+      "retained_percent": 99.0049784246343
+    }
+  ],
+  "derived_threshold": {
+    "target_retained_fraction": "0.8",
+    "cycle_count": 1000,
+    "minimum_constant_ce_decimal": "0.999776881343356307307951218247",
+    "minimum_constant_ce_percent": 99.9776881343356,
+    "rounded_percent_for_communication": "99.98%",
+    "note": "Rounding to 99.98% is a shorthand. Preserve the unrounded value and assumptions in calculations."
+  },
+  "source_context": {
+    "source_id": "ZERO-EXCESS-SODIUM-REVIEW-2026-11",
+    "source_url": "https://www.nature.com/articles/s44359-026-00234-6",
+    "note": "The cited review discusses the ≥99.98% average CE requirement for 80% capacity retention over 1000 cycles under its finite-inventory assumptions. This fixture independently checks the simple constant-CE exponentiation only."
+  }
+}
