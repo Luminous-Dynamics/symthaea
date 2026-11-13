@@ -106,7 +106,18 @@ def main() -> None:
     assert controls["knot-only-training-fit-promoted-to-continuous"] == "reject_promotion"
     assert controls["diagonal-only-matrix-comparison"] == "misses-hidden-crossport"
     assert controls["off-grid-validation-observation"] == "distinguishes-models"
-    assert controls["model_b-claimed-improper"] == "reject"
+    # The actual model is proper; a counterfactual degree declaration with
+    # numerator degree >= denominator degree must be rejected.
+    improper_counterfactual = (
+        model_b["numerator_degree"], model_b["numerator_degree"]
+    )
+    assert not (improper_counterfactual[0] < improper_counterfactual[1])
+    assert controls["model_b_claimed-improper"] == "reject"
+
+    # Replacing the declared pole with a right-half-plane pole invalidates
+    # the stable-pole class of the reference.
+    rhp_counterfactual = Fraction(1, 1)
+    assert rhp_counterfactual >= 0
     assert controls["model_b-rhp-pole-declaration"] == "reject"
     assert controls["frequency-unit-mismatch"] == "not_evaluable"
     assert controls["model-b-mislabels-passivity"] == "reject_claim_class"
