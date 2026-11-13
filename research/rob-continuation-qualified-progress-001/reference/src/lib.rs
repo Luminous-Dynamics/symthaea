@@ -185,9 +185,6 @@ fn validate_mission(mission: &MissionManifest) -> Result<BTreeMap<String, bool>,
         {
             return Err(ProgressError::InvalidEdge);
         }
-        if order_index[edge.from.as_str()] >= order_index[edge.to.as_str()] {
-            return Err(ProgressError::InvalidMissionOrder);
-        }
         *indegree.get_mut(&edge.to).ok_or(ProgressError::InvalidEdge)? += 1;
         successors.entry(edge.from.clone()).or_default().push(edge.to.clone());
     }
@@ -210,6 +207,11 @@ fn validate_mission(mission: &MissionManifest) -> Result<BTreeMap<String, bool>,
     }
     if visited != nodes.len() {
         return Err(ProgressError::DependencyCycle);
+    }
+    for edge in &mission.edges {
+        if order_index[edge.from.as_str()] >= order_index[edge.to.as_str()] {
+            return Err(ProgressError::InvalidMissionOrder);
+        }
     }
     Ok(nodes)
 }
