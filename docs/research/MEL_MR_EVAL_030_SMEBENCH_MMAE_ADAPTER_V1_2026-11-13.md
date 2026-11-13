@@ -50,6 +50,29 @@ Baseline implementation/results: https://github.com/Audio-Editing-Challenge/Audi
 
 The challenge registration deadline was 8 October 2026; the Agent model-version cutoff was 1 November; the hidden test/SDK release was 10 November; and the submission deadline is 25 November (11:59 PM Pacific). The adapter does not imply that Luminous Dynamics is a registered team, has organizer credentials, or is eligible to submit. Do not access or claim hidden-set evaluation without authorized credentials and confirmation of team membership.
 
+## 2.1 Adjacent industry capabilities and the differentiation boundary
+
+Melothaea is entering a market where several pieces of the proposed product are already shipping:
+
+- **Suno Studio 2.0** combines generation with a production environment: MIDI, instruments, effects, automation and conversational control. Suno's shareable workspaces also support collaboration. Public docs: https://help.suno.com/en/articles/12024511 and https://help.suno.com/en/articles/14616961
+- **Moises Studio** launched a real-time browser-based collaborative workspace for multitrack recording, MIDI production, arranging and editing on 2 September 2026. Its product framing explicitly keeps the musician's creative decisions central. Announcement: https://moises.ai/newsroom/product-announcements/moises-launches-studio-collaborative-workspace/
+- **Google Lyria RealTime** already offers continuous 48 kHz stereo generation/streaming with prompt blending and controls such as tempo, key, density and brightness. Docs: https://ai.google.dev/gemini-api/docs/music-generation
+
+The current Artificial Analysis AA-Music-Instrumental v1.1 snapshot reviewed 13 November (latest visible snapshot dated 8 November) lists Suno v6 at 1,148 Elo (95% interval 1,126–1,170), ahead of Suno v6-mini at 1,114, Mureka V9.5 at 1,084, and Lyria 3 Pro at 1,080. This is a blind-preference generation measure, not a measure of exact editing, provenance, collaboration or rights handling. Leaderboard: https://artificialanalysis.ai/music/leaderboard/instrumental
+
+**Competitive implication:** do not claim differentiation from having a chat UI, stems, MIDI, live streaming, or shared sessions. Instead test the combination that is still our research hypothesis:
+
+1. persistent, score-native musical state with stable event/part identity;
+2. typed, reversible edit transactions and semantic branch merging;
+3. per-operation capability qualification and conservative abstention;
+4. actual renderer invocation and output lineage;
+5. counterfactual influence / interaction measurements rather than assuming MIDI time windows are acoustic support;
+6. budgeted active probing to reduce the cost of those measurements;
+7. human-governed agency, consent and authorship controls;
+8. independently calibrated edit, preservation and listener outcomes.
+
+The Artificial Analysis generation Elo target must remain a separate experiment. Chasing 1,200 Elo does not establish that Muse is a better editor or collaborator; conversely, a high exact-edit score does not establish superior composition quality. The benchmark registry should keep generation preference, edit correctness, preservation, reciprocal interaction and provenance in separate profiles.
+
 ## 3. Paradigm: benchmark tasks as lineage-bound transformation contracts
 
 A benchmark row is not merely an input WAV plus a prompt. It must bind:
