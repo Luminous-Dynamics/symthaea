@@ -10,7 +10,8 @@
       "intent": "Known target T and decision frontier K; exact source version and captured digest; source availability, ingestion and materialization before K; context inclusion bound to exact run manifest; rights permitted at decision and replay; two distinct synthetic assessor records with matching labels. The independent assessor labels also include evidence_validity_at_target_time=valid, and the final temporal adjudication records agreement separately from the engineering disposition.",
       "expected_structural_result": "valid",
       "expected_semantic_result": "must_be_adjudicated_from_frozen_test_evidence",
-      "status": "synthetic_only"
+      "status": "synthetic_only",
+      "fixture_path": "examples/engineering-change-impact/gold-record-v1.1.temporal.synthetic.json"
     }
   ],
   "structural_negative_controls": [
