@@ -6,7 +6,7 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "Mixed-canonical charge-block left/right sweeps and measured gauge-receipt API are source-authored. Exact-head Rust 1.96 validation pending. TEBD integration is the next stage.",
+  "execution_status": "U1 MPS core, exact charge-block split, global truncation receipts, mixed-canonical gauge sweeps, and TEBD integration of gauge-weighted global error contributions are source-authored. Exact-head Rust 1.96 harness pending.",
   "claim_ceiling": "No TEBD circuit scheduler, nonlocal MPO gates, large-N scaling or quantum advantage claim. Approximation diagnostics are local two-site split receipts only.",
   "conventions": {
     "physical_dimension": 2,
@@ -251,6 +251,28 @@
         "canonicalization_rejects_invalid_center_without_mutating_state"
       ],
       "claim_ceiling": "Gauge sweeps and receipt only. Global TEBD error certification remains disabled until every gate truncation is integrated with and checks a receipt."
+    },
+    "tebd_global_error_ledger": {
+      "status": "source_authored_runner_pending",
+      "integration": "Before each gate, the current MPS is canonicalized around that two-site bond. The gate is applied to the center pair, then explicit truncation is performed. Each receipt is stored alongside the corresponding gate truncation.",
+      "per_gate_global_bound": "gauge_state_reconstruction_l2_residual + left_exterior_operator_norm_upper_bound * right_exterior_operator_norm_upper_bound * sqrt(discarded_weight)",
+      "cumulative_bound": "sum of per-gate global contributions",
+      "assumptions": [
+        "each physical gate is unitary and charge-conserving",
+        "each local truncation is an orthogonal Schmidt projection in the measured mixed-canonical gauge",
+        "no nonlinear renormalization is interleaved",
+        "canonicalization state reconstruction residual is included explicitly",
+        "all canonical gauge receipts pass and match the gate bond, site count and total charge"
+      ],
+      "invalidation": "Any missing, mismatched or failed receipt clears the cumulative global bound and permanently invalidates qualification for that layer. Local discarded-weight receipts remain available.",
+      "output_fields": [
+        "canonical_gauge_receipts",
+        "cumulative_global_l2_error_upper_bound",
+        "cumulative_canonicalization_l2_error",
+        "global_state_error_bound_qualified",
+        "global_l2_bound_qualified"
+      ],
+      "claim_ceiling": "The code computes a conservative candidate bound; no global error claim is qualified until the new exact-head harness and dense sequential-circuit oracle tests pass."
     }
   },
   "known_answers": [
@@ -402,6 +424,20 @@
         "invalid request leaves original MPS unchanged",
         "global exterior operator-norm upper bounds derived from residuals"
       ]
+    },
+    {
+      "id": "MPS-4B",
+      "name": "Canonical-gauge weighted global TEBD error ledger",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "each gate is canonicalized immediately before truncation",
+        "each gauge receipt matches bond, site count and total charge",
+        "global per-gate contribution includes gauge state drift plus weighted sqrt(discarded weight)",
+        "global layer bound equals sum of all per-gate contributions",
+        "single bad receipt permanently clears global qualification",
+        "local truncation measurements remain available when global qualification fails",
+        "sequential gate circuits agree with exact dense-oracle state-vector residual bounds for N<=10"
+      ]
     }
   ],
   "negative_controls": [
@@ -443,7 +479,12 @@
     "left canonical sweep produces a site with A dagger A not identity within tolerance",
     "right canonical sweep produces a site with A A dagger not identity within tolerance",
     "gauge operation fails after partially mutating the original MPS",
-    "claim exterior norm upper bound without measured Gram residual"
+    "claim exterior norm upper bound without measured Gram residual",
+    "global TEBD bound omits canonicalization state-reconstruction drift",
+    "global TEBD bound omits exterior operator-norm amplification",
+    "global TEBD bound remains qualified after one invalid gauge receipt",
+    "gauge receipt is applied to a different bond or total-charge sector",
+    "global TEBD bound is claimed after implicit nonlinear renormalization"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -499,7 +540,12 @@
     "canonical_gauge_factorization_max_residual",
     "canonical_gauge_state_reconstruction_l2_residual",
     "canonical_gauge_norm_drift",
-    "canonical_gauge_qualified"
+    "canonical_gauge_qualified",
+    "tebd_gate_canonical_gauge_receipt",
+    "tebd_gate_global_error_contribution",
+    "tebd_cumulative_global_l2_error_upper_bound",
+    "tebd_global_error_qualified",
+    "tebd_failed_gauge_receipt_count"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
