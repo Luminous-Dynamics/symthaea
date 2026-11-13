@@ -1,0 +1,58 @@
+name: AIRROAD IQC Clarabel SDP Smoke
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-airroad-iqc/**"
+      - "tools/airroad-iqc-clarabel-smoke/**"
+      - ".github/workflows/airroad-iqc-clarabel-smoke.yml"
+  push:
+    branches:
+      - research/airroad-iqc-hermitian-core-v0.1
+    paths:
+      - "crates/domains/symthaea-airroad-iqc/**"
+      - "tools/airroad-iqc-clarabel-smoke/**"
+      - ".github/workflows/airroad-iqc-clarabel-smoke.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-iqc-clarabel-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  clarabel-sdp:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      OPENBLAS_NUM_THREADS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Fortran compiler for static OpenBLAS
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends gfortran
+      - name: Install stable Rust with required components
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Check isolated solver-smoke formatting
+        run: cargo fmt --manifest-path tools/airroad-iqc-clarabel-smoke/Cargo.toml -- --check
+      - name: Resolve and record exact dependency graph for this run
+        run: |
+          cargo generate-lockfile --manifest-path tools/airroad-iqc-clarabel-smoke/Cargo.toml
+          cargo tree --manifest-path tools/airroad-iqc-clarabel-smoke/Cargo.toml --locked -e normal > "$RUNNER_TEMP/airroad-cargo-tree.txt"
+      - name: Run feasible and infeasible analytic SDP tests
+        run: cargo test --manifest-path tools/airroad-iqc-clarabel-smoke/Cargo.toml --locked --all-targets
+      - name: Run isolated solver-smoke Clippy
+        run: cargo clippy --manifest-path tools/airroad-iqc-clarabel-smoke/Cargo.toml --locked --all-targets -- -D warnings
+      - name: Upload solver resolution receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: airroad-iqc-clarabel-resolution
+          path: |
+            tools/airroad-iqc-clarabel-smoke/Cargo.lock
+            ${{ runner.temp }}/airroad-cargo-tree.txt
+          if-no-files-found: error
+          retention-days: 30
