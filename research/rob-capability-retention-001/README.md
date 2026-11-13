@@ -49,7 +49,7 @@ A NotApplicable dimension is a distinct typed state with an explicit reason. It 
 
 The reference does not combine joules, degrees, torque, route counts, hours or service debt into one scalar.
 
-## Option ledger composition
+## Option ledger and recovery-topology composition
 
 The option-set record binds:
 - exact option-loss ledger receipt;
@@ -59,7 +59,21 @@ The option-set record binds:
 - terminal qualified option-set digest;
 - terminal qualified option count.
 
-The starting option-set digest must match across the paired baseline/candidate cluster. The reference consumes these receipts and reports terminal option counts; it does not recompute option membership or future viability.
+The starting option-set digest and predecessor physical-state identity must match across the paired baseline/candidate cluster. The reference consumes these receipts and reports terminal option counts; it does not recompute option membership or future viability.
+
+A separate recovery-topology receipt consumes the bounded outputs of Symtropy #4511:
+- canonical physical recovery-route classes after alias collapse;
+- failure-domain-independent route count;
+- minimum declared common-cause failure-domain cut-set cardinality;
+- exact upstream topology report digest.
+
+The three quantities are deliberately not interchangeable:
+
+    terminal continuation/option count
+    != canonical physical route count
+    != failure-domain-independent route count
+
+Different action IDs or gait labels do not prove redundancy. Shared power, actuator, sensing, clock or other common-cause dependencies can cut several nominal routes at once. This crate only validates/binds the upstream topology receipt; it does not rebuild the graph, calculate route packing or enumerate cut sets. The topology owner's Unknown disposition prevents a complete capability-retention comparison.
 
 ## Comparison and hard gates
 
