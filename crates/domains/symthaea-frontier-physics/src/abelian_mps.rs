@@ -33,9 +33,7 @@ impl<const K: usize> AbelianCharge<K> {
     }
 
     pub const fn zero() -> Self {
-        Self {
-            components: [0; K],
-        }
+        Self { components: [0; K] }
     }
 
     pub const fn components(&self) -> &[i32; K] {
@@ -50,10 +48,7 @@ impl<const K: usize> AbelianCharge<K> {
         self.components.iter().all(|component| *component == 0)
     }
 
-    pub fn checked_add(
-        self,
-        rhs: Self,
-    ) -> Result<Self, AbelianChargeError<K>> {
+    pub fn checked_add(self, rhs: Self) -> Result<Self, AbelianChargeError<K>> {
         if K == 0 {
             return Err(AbelianChargeError::ZeroChargeRank);
         }
@@ -66,10 +61,7 @@ impl<const K: usize> AbelianCharge<K> {
         Ok(Self { components: result })
     }
 
-    pub fn checked_sub(
-        self,
-        rhs: Self,
-    ) -> Result<Self, AbelianChargeError<K>> {
+    pub fn checked_sub(self, rhs: Self) -> Result<Self, AbelianChargeError<K>> {
         if K == 0 {
             return Err(AbelianChargeError::ZeroChargeRank);
         }
@@ -174,10 +166,7 @@ impl<const K: usize> AbelianChargeTensor<K> {
             return Err(AbelianChargeError::InvalidTolerance(tolerance));
         }
         if left_charges.is_empty() {
-            return Err(AbelianChargeError::EmptyBond {
-                site,
-                side: "left",
-            });
+            return Err(AbelianChargeError::EmptyBond { site, side: "left" });
         }
         if physical_charges.is_empty() {
             return Err(AbelianChargeError::EmptyPhysicalBasis { site });
@@ -209,17 +198,14 @@ impl<const K: usize> AbelianChargeTensor<K> {
         let right_dimension = right_charges.len();
         let physical_dimension = physical_charges.len();
         for (left_index, left_charge) in left_charges.iter().copied().enumerate() {
-            for (physical_index, physical_charge) in
-                physical_charges.iter().copied().enumerate()
-            {
+            for (physical_index, physical_charge) in physical_charges.iter().copied().enumerate() {
                 let expected_right = left_charge.checked_add(physical_charge)?;
                 for (right_index, right_charge) in right_charges.iter().copied().enumerate() {
                     if right_charge != expected_right {
                         let index = (left_index * physical_dimension + physical_index)
                             * right_dimension
                             + right_index;
-                        selection_rule_residual =
-                            selection_rule_residual.max(data[index].norm());
+                        selection_rule_residual = selection_rule_residual.max(data[index].norm());
                     }
                 }
             }
@@ -402,8 +388,6 @@ pub struct AbelianChargeBlockPlan<const K: usize> {
     pub blocks: Vec<AbelianChargeBlock<K>>,
 }
 
-
-
 /// Diagnostics from an exact U(1)^K charge-block two-site SVD.
 ///
 /// Exactly-zero singular directions are omitted; every positive singular
@@ -444,7 +428,10 @@ impl<const K: usize> AbelianChargeBlockPlan<K> {
         for (physical, physical_charge) in second.physical_charges().iter().enumerate() {
             for (right, right_charge) in second.right_charges().iter().enumerate() {
                 let charge = right_charge.checked_sub(*physical_charge)?;
-                column_groups.entry(charge).or_default().push((physical, right));
+                column_groups
+                    .entry(charge)
+                    .or_default()
+                    .push((physical, right));
             }
         }
 
@@ -497,9 +484,8 @@ impl<const K: usize> AbelianChargeBlockPlan<K> {
             .max()
             .unwrap_or(0);
         let maximum_iterations = 10_000_usize.max(
-            64_usize.saturating_mul(
-                maximum_block_dimension.saturating_mul(maximum_block_dimension),
-            ),
+            64_usize
+                .saturating_mul(maximum_block_dimension.saturating_mul(maximum_block_dimension)),
         );
 
         let mut factors = Vec::with_capacity(plan.blocks.len());
@@ -510,12 +496,9 @@ impl<const K: usize> AbelianChargeBlockPlan<K> {
         let mut reconstruction_squared = 0.0;
 
         for block in &plan.blocks {
-            let mut matrix =
-                DMatrix::<Complex64>::zeros(block.rows.len(), block.columns.len());
+            let mut matrix = DMatrix::<Complex64>::zeros(block.rows.len(), block.columns.len());
             for (row_index, &(left, first_physical)) in block.rows.iter().enumerate() {
-                for (column_index, &(second_physical, right)) in
-                    block.columns.iter().enumerate()
-                {
+                for (column_index, &(second_physical, right)) in block.columns.iter().enumerate() {
                     let mut value = Complex64::new(0.0, 0.0);
                     for middle in 0..first.right_dimension() {
                         if first.right_charges()[middle] == block.intermediate_charge {
@@ -588,13 +571,10 @@ impl<const K: usize> AbelianChargeBlockPlan<K> {
             });
         }
 
-        let retained_singular_value_count = factors.iter().try_fold(
-            0_usize,
-            |sum, factor| {
-                sum.checked_add(factor.singular_values.len())
-                    .ok_or(AbelianChargeError::DimensionOverflow)
-            },
-        )?;
+        let retained_singular_value_count = factors.iter().try_fold(0_usize, |sum, factor| {
+            sum.checked_add(factor.singular_values.len())
+                .ok_or(AbelianChargeError::DimensionOverflow)
+        })?;
         if retained_singular_value_count == 0 {
             return Err(AbelianChargeError::ZeroTwoSiteState);
         }
@@ -628,8 +608,8 @@ impl<const K: usize> AbelianChargeBlockPlan<K> {
                     let index = (new_middle * second.physical_dimension() + physical)
                         * second.right_dimension()
                         + right;
-                    right_data[index] = factor.singular_values[mode]
-                        * factor.right_vectors_t[(mode, column_index)];
+                    right_data[index] =
+                        factor.singular_values[mode] * factor.right_vectors_t[(mode, column_index)];
                 }
             }
             offset += rank;
@@ -667,8 +647,7 @@ impl<const K: usize> AbelianChargeBlockPlan<K> {
                                 * right_tensor.get(middle, second_physical, right);
                         }
                         let residual = (reconstructed - original).norm();
-                        reconstruction_max_residual =
-                            reconstruction_max_residual.max(residual);
+                        reconstruction_max_residual = reconstruction_max_residual.max(residual);
                         reconstruction_squared += residual * residual;
                     }
                 }
@@ -689,7 +668,6 @@ impl<const K: usize> AbelianChargeBlockPlan<K> {
             reconstruction_l2_residual: reconstruction_squared.sqrt(),
         })
     }
-
 }
 
 #[cfg(test)]
@@ -769,15 +747,9 @@ mod tests {
         second_data[6] = Complex64::new(1.0, 0.0);
         second_data[9] = Complex64::new(1.0, 0.0);
         second_data[12] = Complex64::new(1.0, 0.0);
-        let second = AbelianChargeTensor::new(
-            1,
-            left_bond,
-            physical,
-            vec![double],
-            second_data,
-            1.0e-12,
-        )
-        .unwrap();
+        let second =
+            AbelianChargeTensor::new(1, left_bond, physical, vec![double], second_data, 1.0e-12)
+                .unwrap();
 
         let state = AbelianMps::new(vec![first, second], double, 1.0e-12).unwrap();
         assert_eq!(state.site_count(), 2);
@@ -803,15 +775,9 @@ mod tests {
             1.0e-12,
         )
         .unwrap();
-        let second = AbelianChargeTensor::new(
-            1,
-            bond,
-            physical,
-            vec![double],
-            vec![zero(); 16],
-            1.0e-12,
-        )
-        .unwrap();
+        let second =
+            AbelianChargeTensor::new(1, bond, physical, vec![double], vec![zero(); 16], 1.0e-12)
+                .unwrap();
 
         let plan = AbelianChargeBlockPlan::from_adjacent_tensors(&first, &second).unwrap();
         assert_eq!(plan.blocks.len(), 4);
@@ -932,18 +898,11 @@ mod tests {
         second_data[6] = Complex64::new(1.0, 0.0);
         second_data[9] = Complex64::new(1.0, 0.0);
         second_data[12] = Complex64::new(1.0, 0.0);
-        let second = AbelianChargeTensor::new(
-            1,
-            bond,
-            physical,
-            vec![double],
-            second_data,
-            1.0e-12,
-        )
-        .unwrap();
+        let second =
+            AbelianChargeTensor::new(1, bond, physical, vec![double], second_data, 1.0e-12)
+                .unwrap();
 
-        let split =
-            AbelianChargeBlockPlan::split_exact(&first, &second, 1.0e-12).unwrap();
+        let split = AbelianChargeBlockPlan::split_exact(&first, &second, 1.0e-12).unwrap();
         assert_eq!(
             split.rank_by_charge,
             vec![(vacuum, 1), (down, 1), (up, 1), (double, 0)]
@@ -955,8 +914,7 @@ mod tests {
         assert!(split.reconstruction_l2_residual <= 1.0e-12);
 
         let rebuilt =
-            AbelianMps::new(vec![split.left_tensor, split.right_tensor], double, 1.0e-12)
-                .unwrap();
+            AbelianMps::new(vec![split.left_tensor, split.right_tensor], double, 1.0e-12).unwrap();
         assert_eq!(rebuilt.total_charge(), double);
         assert_eq!(rebuilt.selection_rule_residual(), 0.0);
     }
@@ -987,19 +945,15 @@ mod tests {
         let mut second_data = vec![zero(); 16];
         second_data[6] = Complex64::new(1.0, 0.0);
         second_data[9] = Complex64::new(1.0, 0.0);
-        let second = AbelianChargeTensor::new(
-            1,
-            bond,
-            physical,
-            vec![double],
-            second_data,
-            1.0e-12,
-        )
-        .unwrap();
+        let second =
+            AbelianChargeTensor::new(1, bond, physical, vec![double], second_data, 1.0e-12)
+                .unwrap();
 
-        let split =
-            AbelianChargeBlockPlan::split_exact(&first, &second, 1.0e-12).unwrap();
-        assert_eq!(split.rank_by_charge, vec![(vacuum, 0), (down, 1), (up, 1), (double, 0)]);
+        let split = AbelianChargeBlockPlan::split_exact(&first, &second, 1.0e-12).unwrap();
+        assert_eq!(
+            split.rank_by_charge,
+            vec![(vacuum, 0), (down, 1), (up, 1), (double, 0)]
+        );
         assert_eq!(split.retained_singular_value_count, 2);
         let tiny_middle = split
             .left_tensor
@@ -1007,8 +961,8 @@ mod tests {
             .iter()
             .position(|charge| *charge == down)
             .unwrap();
-        let tiny_amplitude = split.left_tensor.get(0, 2, tiny_middle)
-            * split.right_tensor.get(tiny_middle, 1, 0);
+        let tiny_amplitude =
+            split.left_tensor.get(0, 2, tiny_middle) * split.right_tensor.get(tiny_middle, 1, 0);
         assert!((tiny_amplitude.norm() - tiny).abs() <= 1.0e-30);
         assert!(split.reconstruction_max_residual <= 1.0e-15);
     }
@@ -1041,19 +995,12 @@ mod tests {
         ));
 
         let up = q(1, 1);
-        let mismatched = AbelianChargeTensor::new(
-            1,
-            vec![up],
-            physical,
-            vec![vacuum],
-            vec![zero()],
-            1.0e-12,
-        )
-        .unwrap();
+        let mismatched =
+            AbelianChargeTensor::new(1, vec![up], physical, vec![vacuum], vec![zero()], 1.0e-12)
+                .unwrap();
         assert!(matches!(
             AbelianChargeBlockPlan::split_exact(&first, &mismatched, 1.0e-12),
             Err(AbelianChargeError::BondChargeMismatch { .. })
         ));
     }
-
 }
