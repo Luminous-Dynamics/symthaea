@@ -860,11 +860,12 @@ mod tests {
         </measure></part></score-partwise>"#;
         let events = parse(xml);
         supported(&events);
-        assert_eq!(events.attribute_events.len(), 4);
+        assert_eq!(events.attribute_events.len(), 5);
         assert_eq!(events.attribute_events[0].source.element, "divisions");
-        assert_eq!(events.attribute_events[2].score_offset, RationalBeat::new(2, 1).unwrap());
-        assert_eq!(events.attribute_events[2].source.element, "clef");
-        assert_eq!(events.attribute_events[3].source.element, "key");
+        assert_eq!(events.attribute_events[3].score_offset, RationalBeat::new(2, 1).unwrap());
+        assert_eq!(events.attribute_events[3].source.element, "clef");
+        assert_eq!(events.attribute_events[4].score_offset, RationalBeat::new(2, 1).unwrap());
+        assert_eq!(events.attribute_events[4].source.element, "key");
         assert_eq!(events.note_events[1].score_offset, RationalBeat::new(2, 1).unwrap());
     }
 
@@ -898,8 +899,8 @@ mod tests {
         </measure></part></score-partwise>"#;
         let events = parse(xml);
         supported(&events);
-        assert_eq!(events.note_events[0].source_order, 1);
-        assert_eq!(events.note_events[1].source_order, 2);
+        assert_eq!(events.note_events[0].source_order, 2);
+        assert_eq!(events.note_events[1].source_order, 3);
         let first = &events.note_events[0].source_note;
         assert_eq!(first.attributes, vec![
             ("id".into(), "n-1".into()),
