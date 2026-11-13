@@ -1,0 +1,233 @@
+{
+  "schema": "luminous.airroad.mimo_lipschitz_residual_envelope.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_deterministic_residual_bound",
+  "model_set_identity": "sha256:synthetic-cubic-residual-family-v0.1",
+  "operating_point_identity": "sha256:synthetic-operating-point-v0.1",
+  "frequency_unit": "normalized_frequency",
+  "band": {
+    "lower": {
+      "numerator": "0",
+      "denominator": "1"
+    },
+    "upper": {
+      "numerator": "1",
+      "denominator": "1"
+    }
+  },
+  "residual_polynomial_coefficients_ascending": [
+    "0",
+    "1/2",
+    "-3/2",
+    "1"
+  ],
+  "residual_expression": "omega*(omega-1/2)*(omega-1)",
+  "derivative_polynomial_coefficients_ascending": [
+    "1/2",
+    "-3",
+    "3"
+  ],
+  "derivative_evidence": {
+    "method": "exact-polynomial-extrema",
+    "convex_derivative": true,
+    "derivative_vertex": {
+      "numerator": "1",
+      "denominator": "2"
+    },
+    "derivative_at_lower": {
+      "numerator": "1",
+      "denominator": "2"
+    },
+    "derivative_at_vertex": {
+      "numerator": "-1",
+      "denominator": "4"
+    },
+    "derivative_at_upper": {
+      "numerator": "1",
+      "denominator": "2"
+    },
+    "exact_global_abs_derivative_bound": {
+      "numerator": "1",
+      "denominator": "2"
+    },
+    "bound_scope": "complete_declared_band"
+  },
+  "samples": [
+    {
+      "sample_id": "omega-0",
+      "omega": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "observed_residual_center": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "hard_error_radius": {
+        "numerator": "1",
+        "denominator": "100"
+      }
+    },
+    {
+      "sample_id": "omega-half",
+      "omega": {
+        "numerator": "1",
+        "denominator": "2"
+      },
+      "observed_residual_center": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "hard_error_radius": {
+        "numerator": "1",
+        "denominator": "100"
+      }
+    },
+    {
+      "sample_id": "omega-1",
+      "omega": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "observed_residual_center": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "hard_error_radius": {
+        "numerator": "1",
+        "denominator": "100"
+      }
+    }
+  ],
+  "sample_coverage": {
+    "maximum_gap": {
+      "numerator": "1",
+      "denominator": "2"
+    },
+    "maximum_nearest_knot_distance": {
+      "numerator": "1",
+      "denominator": "4"
+    },
+    "includes_lower_band_endpoint": true,
+    "includes_upper_band_endpoint": true
+  },
+  "expected": {
+    "global_continuous_residual_bound": {
+      "numerator": "27",
+      "denominator": "200"
+    },
+    "actual_residual_at_quarter": {
+      "numerator": "3",
+      "denominator": "64"
+    },
+    "actual_residual_at_three_quarters": {
+      "numerator": "-3",
+      "denominator": "64"
+    },
+    "cone_radii": [
+      {
+        "omega": {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        "radius": {
+          "numerator": "1",
+          "denominator": "100"
+        }
+      },
+      {
+        "omega": {
+          "numerator": "1",
+          "denominator": "4"
+        },
+        "radius": {
+          "numerator": "27",
+          "denominator": "200"
+        }
+      },
+      {
+        "omega": {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        "radius": {
+          "numerator": "1",
+          "denominator": "100"
+        }
+      },
+      {
+        "omega": {
+          "numerator": "3",
+          "denominator": "4"
+        },
+        "radius": {
+          "numerator": "27",
+          "denominator": "200"
+        }
+      },
+      {
+        "omega": {
+          "numerator": "1",
+          "denominator": "1"
+        },
+        "radius": {
+          "numerator": "1",
+          "denominator": "100"
+        }
+      }
+    ],
+    "understated_lipschitz_rejected": true,
+    "no_lipschitz_bound_disposition": "NOT_ESTABLISHED_FOR_CONTINUOUS_DOMAIN"
+  },
+  "negative_controls": [
+    {
+      "id": "zero-sample-residuals-without-L",
+      "expected": "not_established"
+    },
+    {
+      "id": "understated-L-one-quarter",
+      "expected": "reject"
+    },
+    {
+      "id": "stale-model-identity",
+      "expected": "not_evaluable"
+    },
+    {
+      "id": "wrong-operating-point-identity",
+      "expected": "not_evaluable"
+    },
+    {
+      "id": "statistical-only-sample-intervals",
+      "expected": "reject_claim_class"
+    },
+    {
+      "id": "missing-band-endpoint",
+      "expected": "reject"
+    },
+    {
+      "id": "duplicate-knot",
+      "expected": "reject"
+    },
+    {
+      "id": "unsorted-knots",
+      "expected": "reject"
+    },
+    {
+      "id": "hidden-between-knot-residual",
+      "expected": "must-be-enclosed"
+    },
+    {
+      "id": "incorrect-maximum-gap",
+      "expected": "reject"
+    },
+    {
+      "id": "frequency-unit-mismatch",
+      "expected": "not_evaluable"
+    }
+  ],
+  "claim_ceiling": [
+    "Synthetic exact polynomial residual with an independently derived global derivative bound.",
+    "The Lipschitz constant is not inferred from the three zero-valued measurements.",
+    "No real plant regularity, calibration, aircraft stability or certification claim is established."
+  ]
+}
