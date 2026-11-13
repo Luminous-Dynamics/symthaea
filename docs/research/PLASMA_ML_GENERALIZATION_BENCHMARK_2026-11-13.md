@@ -124,7 +124,7 @@ If data access or group metadata are insufficient, the model-transfer claim rema
 
 ## 9. S0 synthetic fixture and evaluator
 
-The fixture at `data/research/plasma_ml_generalization_fixture_v0_1.json` is explicitly synthetic. It contains 12 split scenarios exercising:
+The fixture at `data/research/plasma_ml_generalization_fixture_v0_1.json` is explicitly synthetic. It contains 13 split scenarios exercising:
 - study-, lab-, device- and material-family-held-out group separation;
 - SMOGN-like augmentation whose parents remain train-only;
 - preprocessing fit-lineage restricted to training rows;
@@ -159,9 +159,9 @@ The synthetic fixture is checked by the Rust-native xtask command:
 
 The evaluator checks grouped train/test separation, complete split assignments, specimen and raw-digest identity across folds, augmentation parent lineage, train-only augmentation, train-only preprocessing fit identity, missing source/group identity and explicit claim boundaries.
 
-Thirteen Rust unit tests are authored. The fixture contains twelve scenarios: four positive grouped-holdout controls, six rejected leakage/identity controls and two blocked evidence-completeness controls. An independent source-side JavaScript replay of the fetched JSON matched all twelve frozen dispositions.
+Fourteen Rust unit tests are authored. The fixture contains thirteen scenarios: four positive grouped-holdout controls, six rejected leakage/identity controls and three blocked evidence-completeness controls. An independent source-side JavaScript replay of the fetched JSON matched all thirteen frozen dispositions.
 
-**Execution status:** the exact branch files are fetched back; the fixture parses; the independent replay matched 12/12 expected dispositions. The available authoring environment has no Cargo/Rust toolchain, so the Rust source and 13 tests remain uncompiled/unexecuted. No CI pass, original-data access, published-model reproduction or physical outcome prediction is claimed.
+**Execution status:** the exact branch files are fetched back; the fixture parses; the independent replay matched 13/13 expected dispositions. The available authoring environment has no Cargo/Rust toolchain, so the Rust source and 13 tests remain uncompiled/unexecuted. No CI pass, original-data access, published-model reproduction or physical outcome prediction is claimed.
 
 ## Reuse existing experiment-design infrastructure
 
@@ -174,3 +174,10 @@ Compose with:
 - Symthaea [PLASMA-VV-001 #7588](https://github.com/Luminous-Dynamics/symthaea/issues/7588): plasma-specific model validity and external solver credibility.
 
 PLASMA-ML-GENERALIZATION-001 owns only plasma material/process features, source/device/material holdout policy, plasma outcome definitions and plasma-specific baselines. The general experiment selector remains with its existing owner. The decision-value benchmark should pass plasma-specific candidate/observation contracts into those existing interfaces, not create a parallel optimizer or evidence receipt schema.
+
+
+### Preprocessing population completeness
+
+The evaluator now requires the fitted preprocessing observation IDs to equal the complete declared TRAIN population exactly. Test-row inclusion, unknown IDs and duplicates are rejected; missing train rows are BLOCKED rather than silently accepted. A new frozen adversarial scenario omits one training observation from the preprocessing fit population, and a fourteenth Rust test asserts that this is blocked.
+
+Independent source-side replay of the 13-scenario fixture matched 13/13 expected dispositions (4 PASS, 6 REJECTED, 3 BLOCKED). This is a fixture/evaluator check only.
