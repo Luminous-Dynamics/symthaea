@@ -1480,6 +1480,18 @@ mod tests {
         assert_eq!(safe.candidate_hidden.mean_cluster_rate_ppm, Some(700_000));
         assert_eq!(safe.candidate_transfer_gap_ppm, Some(-200_000));
         assert_eq!(safe.difference_in_differences_ppm, Some(100_000));
+        assert_eq!(
+            safe.baseline_source_group_equal_transfer_gap_ppm,
+            Some(-300_000)
+        );
+        assert_eq!(
+            safe.candidate_source_group_equal_transfer_gap_ppm,
+            Some(-200_000)
+        );
+        assert_eq!(
+            safe.source_group_equal_difference_in_differences_ppm,
+            Some(100_000)
+        );
     }
 
     #[test]
