@@ -473,55 +473,58 @@ pub fn qualify_corpus_track(
     manifest: Option<&CorpusSampleManifestV1>,
     protocol: Option<&CorpusProtocolFingerprintV1>,
 ) -> CorpusQualificationReportV1 {
-    let mut issues = validate_corpus_registration(registration);
+    let registration_issues = validate_corpus_registration(registration);
     let track = manifest.and_then(|manifest| {
         registration
             .tracks
             .iter()
             .find(|track| track.track_id == manifest.track_id)
     });
+    let mut sample_issues = Vec::new();
     if let (Some(manifest), Some(track)) = (manifest, track) {
-        issues.extend(validate_corpus_sample_manifest(registration, track, manifest));
+        sample_issues.extend(validate_corpus_sample_manifest(registration, track, manifest));
     }
     if manifest.is_some() && track.is_none() {
-        issues.push(CorpusQualificationIssueV1::SampleTrackMismatch);
+        sample_issues.push(CorpusQualificationIssueV1::SampleTrackMismatch);
     }
-    if let Some(protocol) = protocol {
-        issues.extend(validate_corpus_protocol(protocol));
-    }
+    let protocol_issues = protocol.map(validate_corpus_protocol).unwrap_or_default();
+    let mut issues = registration_issues.clone();
+    issues.extend(sample_issues.clone());
+    issues.extend(protocol_issues.clone());
 
     let registration_sha256 = canonical_json_sha256(registration).unwrap_or_default();
     let sample_manifest_sha256 = manifest.and_then(|value| canonical_json_sha256(value).ok());
     let protocol_sha256 = protocol.and_then(|value| canonical_json_sha256(value).ok());
 
-    let mut stage = if issues.is_empty() {
-        CorpusQualificationStageV1::MetadataRecorded
-    } else {
+    // A declared manifest is not yet split-qualified. Keep the stage useful
+    // even when its hashes parse but leakage is found: callers can inspect the
+    // exact blocker instead of seeing an uninformative Candidate downgrade.
+    let mut stage = if !registration_issues.is_empty() {
         CorpusQualificationStageV1::Candidate
+    } else if manifest.is_none() {
+        CorpusQualificationStageV1::MetadataRecorded
+    } else if !sample_issues.is_empty() {
+        CorpusQualificationStageV1::SampleDigestsDeclared
+    } else {
+        CorpusQualificationStageV1::SplitQualified
     };
-    if let (Some(manifest), Some(_track)) = (manifest, track) {
-        if issues.is_empty() && !manifest.samples.is_empty() {
-            stage = CorpusQualificationStageV1::SampleDigestsDeclared;
-            stage = CorpusQualificationStageV1::SplitQualified;
-        }
-    }
-    if protocol.is_some() && issues.is_empty()
+    if protocol.is_some()
+        && issues.is_empty()
         && sample_manifest_sha256.is_some()
     {
         stage = CorpusQualificationStageV1::ProtocolFrozen;
     }
 
     let mut next_stage_requirements = Vec::new();
-    if stage == CorpusQualificationStageV1::Candidate {
-        next_stage_requirements.push("Resolve registration/sample/protocol issues and re-run qualification".into());
+    if !registration_issues.is_empty() {
+        next_stage_requirements.push("Resolve registration and rights-scope issues; retain source evidence and obtain any needed legal review".into());
     }
     if manifest.is_none() {
         next_stage_requirements.push("Declare sample IDs, fold assignments and input/reference SHA-256 digests".into());
+    } else if !sample_issues.is_empty() {
+        next_stage_requirements.push("Resolve sample identity, checksum syntax and work/composer/artifact split leakage".into());
     }
-    if manifest.is_some() && stage < CorpusQualificationStageV1::SplitQualified {
-        next_stage_requirements.push("Resolve sample, checksum syntax and split-leakage issues".into());
-    }
-    if protocol.is_none() {
+    if protocol.is_none() || !protocol_issues.is_empty() {
         next_stage_requirements.push("Freeze split, annotation, conversion, parser and evaluator fingerprints".into());
     }
     if stage == CorpusQualificationStageV1::ProtocolFrozen {
@@ -701,4 +704,259 @@ pub fn candidate_musicxml_corpus_registry_v1() -> Vec<CorpusRegistrationV1> {
             ],
         },
     ]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn registration(id: &str) -> CorpusRegistrationV1 {
+        candidate_musicxml_corpus_registry_v1()
+            .into_iter()
+            .find(|corpus| corpus.corpus_id == id)
+            .unwrap()
+    }
+
+    fn sample(
+        id: &str,
+        fold: &str,
+        split: CorpusSplitRoleV1,
+        composer: &str,
+        work: &str,
+        input_digest: char,
+        reference_digest: char,
+    ) -> CorpusSampleV1 {
+        CorpusSampleV1 {
+            sample_id: id.into(),
+            fold_id: fold.into(),
+            split,
+            composer_group_id: Some(composer.into()),
+            work_group_id: Some(work.into()),
+            input_sha256: input_digest.to_string().repeat(64),
+            reference_sha256: reference_digest.to_string().repeat(64),
+        }
+    }
+
+    fn sample_manifest(
+        registration: &CorpusRegistrationV1,
+        track_id: &str,
+        samples: Vec<CorpusSampleV1>,
+    ) -> CorpusSampleManifestV1 {
+        CorpusSampleManifestV1 {
+            schema: MUSICXML_CORPUS_SAMPLE_MANIFEST_SCHEMA_V1.into(),
+            corpus_id: registration.corpus_id.clone(),
+            release_id: registration.release_id.clone(),
+            track_id: track_id.into(),
+            samples,
+        }
+    }
+
+    fn protocol() -> CorpusProtocolFingerprintV1 {
+        CorpusProtocolFingerprintV1 {
+            schema: MUSICXML_CORPUS_PROTOCOL_SCHEMA_V1.into(),
+            split_protocol_sha256: "1".repeat(64),
+            annotation_protocol_sha256: "2".repeat(64),
+            conversion_pipeline_sha256: "3".repeat(64),
+            parser_build_sha256: "4".repeat(64),
+            evaluator_build_sha256: "5".repeat(64),
+            evaluator_schema: "muse-musicxml-notation-evaluation-v1".into(),
+        }
+    }
+
+    #[test]
+    fn candidate_registry_records_four_distinct_usage_scopes() {
+        let registry = candidate_musicxml_corpus_registry_v1();
+        assert_eq!(registry.len(), 4);
+        assert!(registry.iter().all(|entry| validate_corpus_registration(entry).is_empty()));
+        let ossq = registry.iter().find(|entry| entry.corpus_id == "ossq-omr").unwrap();
+        assert_eq!(ossq.license, CorpusLicenseV1::Cc0_1_0);
+        assert_eq!(
+            ossq.use_scope,
+            CorpusUseScopeV1::CommercialAndNonCommercialResearch
+        );
+        let asap = registry.iter().find(|entry| entry.corpus_id == "asap").unwrap();
+        let maestro = registry.iter().find(|entry| entry.corpus_id == "maestro").unwrap();
+        assert_eq!(asap.license, CorpusLicenseV1::CcByNcSa_4_0);
+        assert_eq!(maestro.license, CorpusLicenseV1::CcByNcSa_4_0);
+        assert_eq!(asap.use_scope, CorpusUseScopeV1::NonCommercialResearchOnly);
+        assert_eq!(maestro.use_scope, CorpusUseScopeV1::NonCommercialResearchOnly);
+        let mirex = registry.iter().find(|entry| entry.corpus_id == "mirex-2026-quartets").unwrap();
+        assert_eq!(mirex.license, CorpusLicenseV1::Unknown);
+        assert_eq!(mirex.use_scope, CorpusUseScopeV1::ExternalEvaluationOnly);
+        assert!(mirex.tracks.iter().all(|track| !track.training_allowed && !track.redistribution_allowed));
+    }
+
+    #[test]
+    fn noncommercial_license_cannot_be_registered_for_commercial_reuse() {
+        let mut registration = registration("asap");
+        registration.use_scope = CorpusUseScopeV1::CommercialAndNonCommercialResearch;
+        assert!(validate_corpus_registration(&registration).contains(
+            &CorpusQualificationIssueV1::CommercialUseNotPermitted
+        ));
+    }
+
+    #[test]
+    fn unknown_license_is_not_treated_as_unrestricted() {
+        let mut registration = registration("mirex-2026-quartets");
+        registration.use_scope = CorpusUseScopeV1::CommercialAndNonCommercialResearch;
+        assert!(validate_corpus_registration(&registration).contains(
+            &CorpusQualificationIssueV1::NonCommercialUseNotEstablished
+        ));
+    }
+
+    #[test]
+    fn metadata_only_registration_does_not_claim_sample_or_byte_verification() {
+        let registration = registration("ossq-omr");
+        let report = qualify_corpus_track(&registration, None, None);
+        assert_eq!(report.stage, CorpusQualificationStageV1::MetadataRecorded);
+        assert_eq!(report.sample_count, 0);
+        assert!(report.sample_manifest_sha256.is_none());
+        assert!(report.next_stage_requirements.iter().any(|item| item.contains("sample IDs")));
+        assert!(report.next_stage_requirements.iter().any(|item| item.contains("fingerprints")));
+        assert!(report.report_sha256.len() == 64);
+    }
+
+    #[test]
+    fn composer_disjoint_track_rejects_same_composer_in_train_and_test() {
+        let registration = registration("ossq-omr");
+        let manifest = sample_manifest(
+            &registration,
+            "omr-composer-heldout",
+            vec![
+                sample("train-a", "fold-0", CorpusSplitRoleV1::Train, "composer-a", "work-a", 'a', 'b'),
+                sample("test-b", "fold-0", CorpusSplitRoleV1::Test, "composer-a", "work-b", 'c', 'd'),
+            ],
+        );
+        let track = registration.tracks.iter().find(|track| track.track_id == manifest.track_id).unwrap();
+        let issues = validate_corpus_sample_manifest(&registration, track, &manifest);
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            CorpusQualificationIssueV1::ComposerLeakage { composer_group_id, .. }
+                if composer_group_id == "composer-a"
+        )));
+    }
+
+    #[test]
+    fn work_disjoint_track_rejects_same_score_in_two_splits() {
+        let registration = registration("ossq-omr");
+        let manifest = sample_manifest(
+            &registration,
+            "omr-synthetic-score-image",
+            vec![
+                sample("train-a", "fold-0", CorpusSplitRoleV1::Train, "composer-a", "work-a", 'a', 'b'),
+                sample("test-a", "fold-0", CorpusSplitRoleV1::Test, "composer-b", "work-a", 'c', 'd'),
+            ],
+        );
+        let track = registration.tracks.iter().find(|track| track.track_id == manifest.track_id).unwrap();
+        let issues = validate_corpus_sample_manifest(&registration, track, &manifest);
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            CorpusQualificationIssueV1::WorkLeakage { work_group_id, .. }
+                if work_group_id == "work-a"
+        )));
+    }
+
+    #[test]
+    fn exact_input_or_reference_bytes_cannot_cross_splits() {
+        let registration = registration("ossq-omr");
+        let manifest = sample_manifest(
+            &registration,
+            "omr-synthetic-score-image",
+            vec![
+                sample("train-a", "fold-0", CorpusSplitRoleV1::Train, "composer-a", "work-a", 'a', 'b'),
+                sample("test-b", "fold-0", CorpusSplitRoleV1::Test, "composer-b", "work-b", 'c', 'b'),
+            ],
+        );
+        let track = registration.tracks.iter().find(|track| track.track_id == manifest.track_id).unwrap();
+        let issues = validate_corpus_sample_manifest(&registration, track, &manifest);
+        assert!(issues.iter().any(|issue| matches!(
+            issue,
+            CorpusQualificationIssueV1::ExactArtifactLeakage { digest, .. }
+                if digest == &"b".repeat(64)
+        )));
+    }
+
+    #[test]
+    fn protocol_frozen_requires_clean_manifest_and_all_protocol_fingerprints() {
+        let registration = registration("ossq-omr");
+        let track_id = "omr-composer-heldout";
+        let manifest = sample_manifest(
+            &registration,
+            track_id,
+            vec![
+                sample("train-a", "fold-0", CorpusSplitRoleV1::Train, "composer-a", "work-a", 'a', 'b'),
+                sample("test-b", "fold-0", CorpusSplitRoleV1::Test, "composer-b", "work-b", 'c', 'd'),
+            ],
+        );
+        let report = qualify_corpus_track(&registration, Some(&manifest), Some(&protocol()));
+        assert_eq!(report.stage, CorpusQualificationStageV1::ProtocolFrozen);
+        assert!(report.issues.is_empty());
+        assert_eq!(report.sample_count, 2);
+        assert_eq!(report.fold_count, 1);
+        assert_eq!(report.composer_group_count, 2);
+        assert_eq!(report.work_group_count, 2);
+        assert!(report.next_stage_requirements.iter().any(|item| item.contains("byte verifier")));
+    }
+
+    #[test]
+    fn leakage_keeps_declared_manifest_below_split_qualified() {
+        let registration = registration("ossq-omr");
+        let manifest = sample_manifest(
+            &registration,
+            "omr-composer-heldout",
+            vec![
+                sample("train-a", "fold-0", CorpusSplitRoleV1::Train, "composer-a", "work-a", 'a', 'b'),
+                sample("test-b", "fold-0", CorpusSplitRoleV1::Test, "composer-a", "work-b", 'c', 'd'),
+            ],
+        );
+        let report = qualify_corpus_track(&registration, Some(&manifest), Some(&protocol()));
+        assert_eq!(report.stage, CorpusQualificationStageV1::SampleDigestsDeclared);
+        assert!(!report.issues.is_empty());
+        assert_ne!(report.stage, CorpusQualificationStageV1::ProtocolFrozen);
+    }
+
+    #[test]
+    fn malformed_digest_duplicate_id_and_wrong_track_fail_closed() {
+        let registration = registration("ossq-omr");
+        let mut first = sample("same", "fold-0", CorpusSplitRoleV1::Train, "composer-a", "work-a", 'a', 'b');
+        first.input_sha256 = "not-a-sha".into();
+        let second = sample("same", "fold-0", CorpusSplitRoleV1::Train, "composer-a", "work-b", 'c', 'd');
+        let mut manifest = sample_manifest(&registration, "missing-track", vec![first, second]);
+        let issues = validate_corpus_sample_manifest(
+            &registration,
+            &registration.tracks[0],
+            &manifest,
+        );
+        assert!(issues.contains(&CorpusQualificationIssueV1::SampleTrackMismatch));
+        assert!(issues.contains(&CorpusQualificationIssueV1::DuplicateSampleId { sample_id: "same".into() }));
+        assert!(issues.contains(&CorpusQualificationIssueV1::InvalidInputDigest { sample_id: "same".into() }));
+        manifest.samples.clear();
+        assert!(validate_corpus_sample_manifest(&registration, &registration.tracks[0], &manifest)
+            .contains(&CorpusQualificationIssueV1::EmptySampleManifest));
+    }
+
+    #[test]
+    fn report_commitment_changes_when_stage_or_issue_changes() {
+        let registration = registration("ossq-omr");
+        let mut report = qualify_corpus_track(&registration, None, None);
+        let digest = report.report_sha256.clone();
+        assert_eq!(qualification_report_commitment(&report).unwrap(), digest);
+        report.stage = CorpusQualificationStageV1::ProtocolFrozen;
+        assert_ne!(qualification_report_commitment(&report).unwrap(), digest);
+    }
+
+    #[test]
+    fn metadata_candidate_tracks_are_not_mislabelled_as_audio_to_score() {
+        let registry = candidate_musicxml_corpus_registry_v1();
+        let ossq = registry.iter().find(|entry| entry.corpus_id == "ossq-omr").unwrap();
+        assert!(ossq.tracks.iter().all(|track| track.task == CorpusTaskV1::OpticalMusicRecognition));
+        let maestro = registry.iter().find(|entry| entry.corpus_id == "maestro").unwrap();
+        assert!(maestro.tracks.iter().all(|track| track.task == CorpusTaskV1::AudioToMidi));
+        let mirex = registry.iter().find(|entry| entry.corpus_id == "mirex-2026-quartets").unwrap();
+        assert_eq!(mirex.tracks.len(), 2);
+        assert_ne!(
+            mirex.tracks[0].external_protocol_label,
+            mirex.tracks[1].external_protocol_label
+        );
+    }
 }
