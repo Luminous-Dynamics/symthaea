@@ -130,7 +130,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-complete-planar-map-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-complete-planar-map-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-complete-planar-map-optical_signal-cal",
+          "surface_frame_position_mm": [
+            0,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R2",
@@ -150,7 +155,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-complete-planar-map-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-complete-planar-map-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-complete-planar-map-optical_signal-cal",
+          "surface_frame_position_mm": [
+            10,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R3",
@@ -170,7 +180,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-complete-planar-map-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-complete-planar-map-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-complete-planar-map-optical_signal-cal",
+          "surface_frame_position_mm": [
+            20,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R4",
@@ -190,7 +205,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-complete-planar-map-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-complete-planar-map-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-complete-planar-map-optical_signal-cal",
+          "surface_frame_position_mm": [
+            30,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R5",
@@ -210,12 +230,18 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-complete-planar-map-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-complete-planar-map-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-complete-planar-map-optical_signal-cal",
+          "surface_frame_position_mm": [
+            40,
+            0,
+            0
+          ]
         }
       ],
       "expected": {
         "disposition": "PASS"
-      }
+      },
+      "map_id": "synthetic-exposure-map-complete-planar-map"
     },
     {
       "scenario_id": "same-top-gap-different-ground-boundary",
@@ -327,7 +353,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-same-top-gap-different-ground-boundary-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-same-top-gap-different-ground-boundary-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-same-top-gap-different-ground-boundary-optical_signal-cal",
+          "surface_frame_position_mm": [
+            0,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R2",
@@ -347,7 +378,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-same-top-gap-different-ground-boundary-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-same-top-gap-different-ground-boundary-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-same-top-gap-different-ground-boundary-optical_signal-cal",
+          "surface_frame_position_mm": [
+            10,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R3",
@@ -367,7 +403,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-same-top-gap-different-ground-boundary-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-same-top-gap-different-ground-boundary-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-same-top-gap-different-ground-boundary-optical_signal-cal",
+          "surface_frame_position_mm": [
+            20,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R4",
@@ -387,7 +428,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-same-top-gap-different-ground-boundary-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-same-top-gap-different-ground-boundary-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-same-top-gap-different-ground-boundary-optical_signal-cal",
+          "surface_frame_position_mm": [
+            30,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R5",
@@ -407,12 +453,18 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-same-top-gap-different-ground-boundary-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-same-top-gap-different-ground-boundary-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-same-top-gap-different-ground-boundary-optical_signal-cal",
+          "surface_frame_position_mm": [
+            40,
+            0,
+            0
+          ]
         }
       ],
       "expected": {
         "disposition": "PASS"
-      }
+      },
+      "map_id": "synthetic-exposure-map-same-top-gap-different-ground-boundary"
     },
     {
       "scenario_id": "missing-trailing-edge-region",
@@ -524,7 +576,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-missing-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-missing-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-missing-optical_signal-cal",
+          "surface_frame_position_mm": [
+            0,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R2",
@@ -544,7 +601,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-missing-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-missing-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-missing-optical_signal-cal",
+          "surface_frame_position_mm": [
+            10,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R3",
@@ -564,7 +626,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-missing-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-missing-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-missing-optical_signal-cal",
+          "surface_frame_position_mm": [
+            20,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R4",
@@ -584,12 +651,18 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-missing-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-missing-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-missing-optical_signal-cal",
+          "surface_frame_position_mm": [
+            30,
+            0,
+            0
+          ]
         }
       ],
       "expected": {
         "disposition": "BLOCKED"
-      }
+      },
+      "map_id": "synthetic-exposure-map-missing-trailing-edge-region"
     },
     {
       "scenario_id": "unknown-region-zero-filled",
@@ -701,7 +774,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-unknown-region-zero-filled-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-unknown-region-zero-filled-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-unknown-region-zero-filled-optical_signal-cal",
+          "surface_frame_position_mm": [
+            0,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R2",
@@ -721,7 +799,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-unknown-region-zero-filled-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-unknown-region-zero-filled-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-unknown-region-zero-filled-optical_signal-cal",
+          "surface_frame_position_mm": [
+            10,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R3",
@@ -741,7 +824,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-unknown-region-zero-filled-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-unknown-region-zero-filled-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-unknown-region-zero-filled-optical_signal-cal",
+          "surface_frame_position_mm": [
+            20,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R4",
@@ -761,7 +849,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-unknown-region-zero-filled-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-unknown-region-zero-filled-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-unknown-region-zero-filled-optical_signal-cal",
+          "surface_frame_position_mm": [
+            30,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R5",
@@ -781,12 +874,18 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-unknown-region-zero-filled-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-unknown-region-zero-filled-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-unknown-region-zero-filled-optical_signal-cal",
+          "surface_frame_position_mm": [
+            40,
+            0,
+            0
+          ]
         }
       ],
       "expected": {
         "disposition": "REJECTED"
-      }
+      },
+      "map_id": "synthetic-exposure-map-unknown-region-zero-filled"
     },
     {
       "scenario_id": "clock-skew",
@@ -898,7 +997,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-clock-skew-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-clock-skew-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-clock-skew-optical_signal-cal",
+          "surface_frame_position_mm": [
+            0,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R2",
@@ -918,7 +1022,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-clock-skew-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-clock-skew-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-clock-skew-optical_signal-cal",
+          "surface_frame_position_mm": [
+            10,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R3",
@@ -938,7 +1047,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-clock-skew-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-clock-skew-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-clock-skew-optical_signal-cal",
+          "surface_frame_position_mm": [
+            20,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R4",
@@ -958,7 +1072,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-clock-skew-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-clock-skew-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-clock-skew-optical_signal-cal",
+          "surface_frame_position_mm": [
+            30,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R5",
@@ -978,12 +1097,18 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-clock-skew-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-clock-skew-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-clock-skew-optical_signal-cal",
+          "surface_frame_position_mm": [
+            40,
+            0,
+            0
+          ]
         }
       ],
       "expected": {
         "disposition": "BLOCKED"
-      }
+      },
+      "map_id": "synthetic-exposure-map-clock-skew"
     },
     {
       "scenario_id": "transform-frame-mismatch",
@@ -1095,7 +1220,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-transform-frame-mismatch-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-transform-frame-mismatch-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-transform-frame-mismatch-optical_signal-cal",
+          "surface_frame_position_mm": [
+            0,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R2",
@@ -1115,7 +1245,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-transform-frame-mismatch-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-transform-frame-mismatch-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-transform-frame-mismatch-optical_signal-cal",
+          "surface_frame_position_mm": [
+            10,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R3",
@@ -1135,7 +1270,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-transform-frame-mismatch-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-transform-frame-mismatch-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-transform-frame-mismatch-optical_signal-cal",
+          "surface_frame_position_mm": [
+            20,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R4",
@@ -1155,7 +1295,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-transform-frame-mismatch-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-transform-frame-mismatch-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-transform-frame-mismatch-optical_signal-cal",
+          "surface_frame_position_mm": [
+            30,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R5",
@@ -1175,12 +1320,18 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-transform-frame-mismatch-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-transform-frame-mismatch-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-transform-frame-mismatch-optical_signal-cal",
+          "surface_frame_position_mm": [
+            40,
+            0,
+            0
+          ]
         }
       ],
       "expected": {
         "disposition": "REJECTED"
-      }
+      },
+      "map_id": "synthetic-exposure-map-transform-frame-mismatch"
     },
     {
       "scenario_id": "duplicate-region-identity",
@@ -1292,7 +1443,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-dup-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-dup-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-dup-optical_signal-cal",
+          "surface_frame_position_mm": [
+            0,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R2",
@@ -1312,7 +1468,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-dup-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-dup-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-dup-optical_signal-cal",
+          "surface_frame_position_mm": [
+            10,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R3",
@@ -1332,7 +1493,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-dup-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-dup-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-dup-optical_signal-cal",
+          "surface_frame_position_mm": [
+            20,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R4",
@@ -1352,7 +1518,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-dup-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-dup-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-dup-optical_signal-cal",
+          "surface_frame_position_mm": [
+            30,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R4",
@@ -1372,12 +1543,18 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-dup-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-dup-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-dup-optical_signal-cal",
+          "surface_frame_position_mm": [
+            40,
+            0,
+            0
+          ]
         }
       ],
       "expected": {
         "disposition": "REJECTED"
-      }
+      },
+      "map_id": "synthetic-exposure-map-duplicate-region-identity"
     },
     {
       "scenario_id": "interpolation-uncertainty-high",
@@ -1489,7 +1666,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-interpolation-uncertainty-high-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-interpolation-uncertainty-high-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-interpolation-uncertainty-high-optical_signal-cal",
+          "surface_frame_position_mm": [
+            0,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R2",
@@ -1509,7 +1691,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-interpolation-uncertainty-high-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-interpolation-uncertainty-high-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-interpolation-uncertainty-high-optical_signal-cal",
+          "surface_frame_position_mm": [
+            10,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R3",
@@ -1529,7 +1716,12 @@
           "interpolation_uncertainty_mm": 3,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-interpolation-uncertainty-high-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-interpolation-uncertainty-high-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-interpolation-uncertainty-high-optical_signal-cal",
+          "surface_frame_position_mm": [
+            20,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R4",
@@ -1549,7 +1741,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-interpolation-uncertainty-high-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-interpolation-uncertainty-high-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-interpolation-uncertainty-high-optical_signal-cal",
+          "surface_frame_position_mm": [
+            30,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R5",
@@ -1569,12 +1766,18 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-interpolation-uncertainty-high-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-interpolation-uncertainty-high-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-interpolation-uncertainty-high-optical_signal-cal",
+          "surface_frame_position_mm": [
+            40,
+            0,
+            0
+          ]
         }
       ],
       "expected": {
         "disposition": "BLOCKED"
-      }
+      },
+      "map_id": "synthetic-exposure-map-interpolation-uncertainty-high"
     },
     {
       "scenario_id": "expired-calibration",
@@ -1686,7 +1889,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-expired-calibration-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-expired-calibration-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-expired-calibration-optical_signal-cal",
+          "surface_frame_position_mm": [
+            0,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R2",
@@ -1706,7 +1914,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-expired-calibration-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-expired-calibration-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-expired-calibration-optical_signal-cal",
+          "surface_frame_position_mm": [
+            10,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R3",
@@ -1726,7 +1939,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-expired-calibration-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-expired-calibration-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-expired-calibration-optical_signal-cal",
+          "surface_frame_position_mm": [
+            20,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R4",
@@ -1746,7 +1964,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-expired-calibration-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-expired-calibration-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-expired-calibration-optical_signal-cal",
+          "surface_frame_position_mm": [
+            30,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R5",
@@ -1766,12 +1989,18 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-expired-calibration-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-expired-calibration-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-expired-calibration-optical_signal-cal",
+          "surface_frame_position_mm": [
+            40,
+            0,
+            0
+          ]
         }
       ],
       "expected": {
         "disposition": "BLOCKED"
-      }
+      },
+      "map_id": "synthetic-exposure-map-expired-calibration"
     },
     {
       "scenario_id": "geometry-configuration-mismatch",
@@ -1883,7 +2112,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-geometry-configuration-mismatch-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-geometry-configuration-mismatch-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-geometry-configuration-mismatch-optical_signal-cal",
+          "surface_frame_position_mm": [
+            0,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R2",
@@ -1903,7 +2137,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-geometry-configuration-mismatch-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-geometry-configuration-mismatch-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-geometry-configuration-mismatch-optical_signal-cal",
+          "surface_frame_position_mm": [
+            10,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R3",
@@ -1923,7 +2162,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-geometry-configuration-mismatch-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-geometry-configuration-mismatch-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-geometry-configuration-mismatch-optical_signal-cal",
+          "surface_frame_position_mm": [
+            20,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R4",
@@ -1943,7 +2187,12 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-geometry-configuration-mismatch-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-geometry-configuration-mismatch-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-geometry-configuration-mismatch-optical_signal-cal",
+          "surface_frame_position_mm": [
+            30,
+            0,
+            0
+          ]
         },
         {
           "region_id": "R5",
@@ -1963,12 +2212,18 @@
           "interpolation_uncertainty_mm": 0.25,
           "geometry_transform_id": "article-to-surface",
           "electrical_calibration_record_id": "synthetic-geometry-configuration-mismatch-electrical_power-cal",
-          "optical_calibration_record_id": "synthetic-geometry-configuration-mismatch-optical_signal-cal"
+          "optical_calibration_record_id": "synthetic-geometry-configuration-mismatch-optical_signal-cal",
+          "surface_frame_position_mm": [
+            40,
+            0,
+            0
+          ]
         }
       ],
       "expected": {
         "disposition": "REJECTED"
-      }
+      },
+      "map_id": "synthetic-exposure-map-geometry-configuration-mismatch"
     }
   ]
 }
