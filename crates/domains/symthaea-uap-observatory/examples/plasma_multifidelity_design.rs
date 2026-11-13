@@ -153,7 +153,7 @@ fn missing_mandatory_actions(selected: &[String]) -> Vec<&'static str> {
     let selected: BTreeSet<_> = selected.iter().map(String::as_str).collect();
     REQUIRED
         .into_iter()
-        .filter(|action| !selected.contains(action))
+        .filter(|action| !selected.contains(*action))
         .collect()
 }
 
