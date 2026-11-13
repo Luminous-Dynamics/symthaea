@@ -16,7 +16,6 @@
 //! manifests. They must never be silently replaced with identity output.
 
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub const MUSIC_EDIT_DATASET_MANIFEST_SCHEMA_V1: &str =
