@@ -18663,6 +18663,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-electric-aircraft"
+version = "0.3.0"
+dependencies = [
+ "sha2",
+]
+
+[[package]]
 name = "symthaea-embeddings"
 version = "0.1.0"
 dependencies = [
