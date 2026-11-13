@@ -1827,6 +1827,25 @@ pub struct U1TwoSiteTruncationDiagnostics {
     pub reconstruction_l2_residual: f64,
 }
 
+
+impl U1TwoSiteTruncationPolicy {
+    pub fn validate(self) -> Result<(), U1MpsError> {
+        if self.max_bond_dimension == 0
+            || !self.relative_singular_value_cutoff.is_finite()
+            || !(0.0..=1.0).contains(&self.relative_singular_value_cutoff)
+            || !self.tolerance.is_finite()
+            || self.tolerance <= 0.0
+        {
+            return Err(U1MpsError::InvalidTruncationPolicy {
+                max_bond_dimension: self.max_bond_dimension,
+                relative_cutoff: self.relative_singular_value_cutoff,
+                tolerance: self.tolerance,
+            });
+        }
+        Ok(())
+    }
+}
+
 impl U1TwoSiteState {
     /// Construct a checked two-site tensor with external virtual-charge labels.
     pub fn new(
@@ -2224,18 +2243,7 @@ impl U1TwoSiteState {
         &self,
         policy: U1TwoSiteTruncationPolicy,
     ) -> Result<U1TwoSiteTruncationDiagnostics, U1MpsError> {
-        if policy.max_bond_dimension == 0
-            || !policy.relative_singular_value_cutoff.is_finite()
-            || !(0.0..=1.0).contains(&policy.relative_singular_value_cutoff)
-            || !policy.tolerance.is_finite()
-            || policy.tolerance <= 0.0
-        {
-            return Err(U1MpsError::InvalidTruncationPolicy {
-                max_bond_dimension: policy.max_bond_dimension,
-                relative_cutoff: policy.relative_singular_value_cutoff,
-                tolerance: policy.tolerance,
-            });
-        }
+        policy.validate()?;
 
         let exact = self.split_exact(policy.tolerance)?;
         let full_rank = exact.retained_singular_values;
@@ -2688,6 +2696,7 @@ impl U1TeBDLayer {
         input: &ComplexU1Mps,
         policy: U1TwoSiteTruncationPolicy,
     ) -> Result<U1TeBDLayerResult, U1MpsError> {
+        policy.validate()?;
         if input.site_count() != self.site_count {
             return Err(U1MpsError::TeBDLayerSiteCountMismatch {
                 layer_sites: self.site_count,
@@ -2993,6 +3002,7 @@ impl U1TeBDStrangStepper {
         time_step: f64,
         policy: U1TwoSiteTruncationPolicy,
     ) -> Result<U1TeBDStepResult, U1MpsError> {
+        policy.validate()?;
         if !time_step.is_finite() {
             return Err(U1MpsError::InvalidTeBDTimeStep(time_step));
         }
@@ -3015,6 +3025,7 @@ impl U1TeBDStrangStepper {
         }
 
         let output_norm_squared = state.norm_squared(policy.tolerance)?;
+        let output_total_charge = state.total_charge();
         let mut total_local_l2_error_bound = 0.0;
         let mut total_global_l2_error_bound = Some(0.0);
         let mut global_l2_bound_qualified = true;
@@ -3042,7 +3053,7 @@ impl U1TeBDStrangStepper {
             time_step,
             stages,
             input_total_charge,
-            output_total_charge: state.total_charge(),
+            output_total_charge,
             input_norm_squared,
             output_norm_squared,
             total_local_l2_error_bound,
