@@ -1454,6 +1454,18 @@ mod tests {
                 invalid_policy_cannot_promote_route();
                 ("ineligible", Some("InvalidPolicy"))
             }
+            "ROUTE-025-CONDITION-UNKNOWN" => {
+                unknown_product_condition_remains_insufficient();
+                ("insufficient_evidence", Some("ProductConditionUnknown"))
+            }
+            "ROUTE-026-USE-SAFETY-UNKNOWN" => {
+                unknown_use_safety_remains_insufficient();
+                ("insufficient_evidence", Some("UseSafetyUnknown"))
+            }
+            "ROUTE-027-DOWNCYCLING-ACCEPTED" => {
+                downcycling_requires_physical_trial_mass_balance_and_receiver_acceptance();
+                ("eligible", None)
+            }
             other => panic!("unknown textile recovery corpus case: {other}"),
         }
     }
@@ -1475,12 +1487,12 @@ mod tests {
         assert_eq!(corpus["schema_version"], "0.1.0");
         assert_eq!(corpus["corpus_id"], "TEXTILE-ROUTE-CASES-001");
         assert_eq!(corpus["fixture_class"], "synthetic");
-        assert!(schema["properties"]["cases"]["minItems"].as_u64() == Some(24));
+        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(27));
 
         let cases = corpus["cases"]
             .as_array()
             .expect("recovery cases must be an array");
-        assert_eq!(cases.len(), 24, "review route corpus case count changes");
+        assert_eq!(cases.len(), 27, "review route corpus case count changes");
         let mut seen = BTreeSet::new();
         for case in cases {
             let case_id = case["case_id"]
@@ -1500,7 +1512,7 @@ mod tests {
             assert_eq!(disposition, expected_disposition, "case {case_id} disposition");
             assert_eq!(reason, expected_reason, "case {case_id} reason");
         }
-        assert_eq!(seen.len(), 24);
+        assert_eq!(seen.len(), 27);
     }
 
     #[test]
