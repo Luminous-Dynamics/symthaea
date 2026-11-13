@@ -8,6 +8,7 @@ This first slice provides:
 - typed mobility pathways that distinguish in-place adaptation, temporary displacement, voluntary migration, community-led planned relocation, constrained immobility and return;
 - explicit climate-attribution method requirements;
 - origin/destination area identity and role checks;
+- floor assessments bound to the exact scenario pathway and origin/destination area;
 - arithmetic-only aggregate capacity sufficiency/shortfall evaluation;
 - a separate non-compensatory service-floor evaluator using versioned floor references, observation bounds and explicit scope coverage;
 - full-coverage MeetsFloor / BreachedFloor results, partial-coverage ObservedBreach reporting, and Indeterminate for incomplete evidence or threshold-crossing intervals;
@@ -20,4 +21,4 @@ It does not ingest the JSON fixture, parse GeoJSON, model hydraulics, forecast m
 
 Run: cargo test --manifest-path crates/domains/symthaea-climate-mobility/Cargo.toml
 
-The tests cover the initial hand-calculable fixture arithmetic and selected negative controls. They are authored tests, not reported execution results until run on the exact commit.
+The tests cover the initial hand-calculable fixture arithmetic, non-compensatory floor bounds/coverage, scenario-area binding and selected negative controls. They are authored tests, not reported execution results until run on the exact commit.
