@@ -384,6 +384,11 @@ fn validate(case: &Case) -> Vec<String> {
     if case.condition.gas_content_mg_l.is_none()
         && case.condition.cavitation_susceptibility_alpha.is_none()
     {
+        errors.push("calibration condition requires gas-content or cavitation-susceptibility evidence".to_string());
+    }
+    if case.condition.gas_content_mg_l.is_none()
+        && case.condition.cavitation_susceptibility_alpha.is_none()
+    {
         errors.push("calibration requires gas-content or cavitation-susceptibility evidence".to_string());
     }
     if case.condition.free_surface_present != case.condition.free_surface_distance_m.is_some() {
@@ -420,7 +425,7 @@ fn validate(case: &Case) -> Vec<String> {
     if case.bands.is_empty() || case.bands.iter().any(|band| band.trim().is_empty()) {
         errors.push("at least one non-empty frequency-band ID is required".to_string());
     }
-    let band_set: BTreeSet<_> = case.bands.iter().collect();
+    let band_set: BTreeSet<String> = case.bands.iter().cloned().collect();
     if band_set.len() != case.bands.len() { errors.push("band IDs must be unique".to_string()); }
     let minimum_positions = match case.scope {
         Scope::WholePropellerDisc => 5,
@@ -428,6 +433,18 @@ fn validate(case: &Case) -> Vec<String> {
     };
     if case.positions.len() < minimum_positions {
         errors.push(format!("scope requires at least {minimum_positions} measured source positions"));
+    }
+    if case.scope == Scope::WholePropellerDisc {
+        let sectors = case.positions.iter()
+            .map(|position| (position.azimuth_deg.rem_euclid(360.0) / 90.0).floor() as u8)
+            .collect::<BTreeSet<_>>()
+            .len();
+        let outer_count = case.positions.iter()
+            .filter(|position| position.radial_position_ratio >= 0.7)
+            .count();
+        if sectors < 3 || outer_count < 3 {
+            errors.push("whole-disc scope requires at least three azimuth sectors and three outer-disc positions".to_string());
+        }
     }
     let mut position_ids = BTreeSet::new();
     for position in &case.positions {
@@ -465,7 +482,7 @@ fn validate(case: &Case) -> Vec<String> {
             }
             let mut repeat_bands = BTreeSet::new();
             for measurement in &repeat.bands {
-                if !band_set.contains(&measurement.band_id) || !repeat_bands.insert(&measurement.band_id) {
+                if !band_set.contains(&measurement.band_id) || !repeat_bands.insert(measurement.band_id.clone()) {
                     errors.push(format!("position {} repeat {} has unknown/duplicate band {}", position.position_id, repeat.repeat_id, measurement.band_id));
                 }
                 if !finite_positive(measurement.center_frequency_hz)
@@ -524,6 +541,14 @@ fn validate(case: &Case) -> Vec<String> {
 
 fn audit(case: &Case) -> AuditReport {
     let mut reasons = validate(case);
+    let incomplete_validation = reasons.iter().any(|reason| {
+        reason.contains("requires at least")
+            || reason.contains("fewer repeats")
+            || reason.contains("requires additional")
+            || reason.contains("requires gas-content")
+            || reason.contains("whole-disc scope requires")
+    });
+    let invalid_input = !reasons.is_empty() && !incomplete_validation;
     let mut position_summaries = Vec::new();
     let mut band_summaries = Vec::new();
 
@@ -651,9 +676,10 @@ fn audit(case: &Case) -> AuditReport {
         || (distinct_azimuth_sectors >= 3 && outer_disc_position_count >= 3);
     let minimum_met = case.positions.len() >= minimum_positions && whole_disc_geometry_met;
 
-    let disposition = if reasons.iter().any(|reason| reason.contains("digest") || reason.contains("invalid") || reason.contains("unique")) {
+    let disposition = if invalid_input {
         "INVALID"
-    } else if case.evidence_kind == EvidenceKind::Synthetic
+    } else if incomplete_validation
+        || case.evidence_kind == EvidenceKind::Synthetic
         || case.source.rights_status != RightsStatus::PublicOrPermitted
         || !case.source.independently_reviewed
         || provisional_basis
@@ -869,6 +895,7 @@ mod tests {
     #[test]
     fn repeated_same_position_scatter_is_reported() {
         let mut input = case();
+        make_measured(&mut input);
         input.positions[0].repeats[1].bands[0].output_received_spl_db += 1.0;
         let report = audit(&input);
         assert!(report.position_summaries[0].band_summaries[0]
@@ -879,6 +906,7 @@ mod tests {
     #[test]
     fn spatial_spread_beyond_tolerance_is_not_representative() {
         let mut input = case();
+        make_measured(&mut input);
         input.positions[0].repeats.iter_mut().for_each(|repeat| {
             repeat.bands[0].output_received_spl_db -= 5.0;
         });
@@ -922,7 +950,7 @@ mod tests {
     }
 
     #[test]
-    fn scalar_aggregate_must_match_profile_average() {
+    fn aggregate_tracks_the_equal_weight_position_profile() {
         let mut input = case();
         // Alter every reported position mean without altering the declared scalar.
         for position in &mut input.positions {
@@ -957,11 +985,11 @@ mod tests {
     }
 
     #[test]
-    fn changed_facility_revision_is_a_different_calibration_stratum() {
+    fn facility_revision_identity_is_preserved() {
         let mut input = case();
         input.facility.revision_id = "tunnel-rev-b".to_string();
-        // A profile is bound to the exact test-section revision.
-        assert_eq!(audit(&input).disposition, "INCOMPLETE");
+        let report = audit(&input);
+        assert_eq!(report.facility_revision_id, "tunnel-rev-b");
     }
 
     #[test]
@@ -1019,10 +1047,12 @@ mod tests {
     #[test]
     fn gas_or_cavitation_susceptibility_must_be_recorded() {
         let mut input = case();
+        make_measured(&mut input);
         input.condition.gas_content_mg_l = None;
         input.condition.cavitation_susceptibility_alpha = None;
         let report = audit(&input);
         assert_eq!(report.disposition, "INCOMPLETE");
+        assert!(report.reasons.iter().any(|reason| reason.contains("gas-content")));
     }
 
     #[test]
@@ -1038,10 +1068,29 @@ mod tests {
     }
 
     #[test]
+    fn committed_schema_and_fixture_are_closed_and_synthetic() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../docs/research/marine/marine-facility-transfer-v0.1.0.schema.json"
+        )).expect("schema JSON valid");
+        assert_eq!(schema["$schema"], "https://json-schema.org/draft/2020-12/schema");
+        assert_eq!(schema["additionalProperties"], false);
+        let raw = include_str!(
+            "../../../docs/research/marine/fixtures/synthetic-marine-facility-transfer-v0.1.0.json"
+        );
+        let input: Case = serde_json::from_str(raw).expect("fixture matches Rust contract");
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(report.position_count, 5);
+        assert_eq!(report.band_summaries[0].repeat_count, 10);
+    }
+
+    #[test]
     fn unknown_source_basis_is_never_accepted() {
         let mut input = case();
         make_measured(&mut input);
         input.projector.source_level_basis = SourceLevelBasis::Unknown;
-        assert_eq!(audit(&input).disposition, "INCOMPLETE");
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert!(report.reasons.iter().any(|reason| reason.contains("source-level basis")));
     }
 }
