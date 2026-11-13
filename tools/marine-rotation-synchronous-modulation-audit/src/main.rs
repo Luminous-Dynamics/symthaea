@@ -39,6 +39,7 @@ struct Case {
     shaft_phase_zero_reference: String,
     blade_count: u32,
     maximum_phase_uncertainty_rad: f64,
+    maximum_shaft_rpm_timebase_consistency_fraction: f64,
     phase_bin_count: usize,
     minimum_samples_per_phase_bin: usize,
     minimum_phase_bin_coverage_fraction: f64,
@@ -88,6 +89,8 @@ struct PhaseObservation {
     revolution_index: u64,
     shaft_phase_unwrapped_rad: f64,
     shaft_phase_expanded_uncertainty_rad: f64,
+    measured_shaft_rpm: f64,
+    measured_shaft_rpm_expanded_uncertainty: f64,
     envelope_power: f64,
     cavitation_present: Option<bool>,
     acoustic_window_sha256: String,
@@ -216,6 +219,9 @@ fn validate_case(case: &Case) -> Vec<String> {
         || case.phase_bin_count < 4
         || case.minimum_samples_per_phase_bin == 0
         || !finite_positive(case.maximum_phase_uncertainty_rad)
+        || !case.maximum_shaft_rpm_timebase_consistency_fraction.is_finite()
+        || case.maximum_shaft_rpm_timebase_consistency_fraction <= 0.0
+        || case.maximum_shaft_rpm_timebase_consistency_fraction >= 0.5
         || !case.minimum_phase_bin_coverage_fraction.is_finite()
         || case.minimum_phase_bin_coverage_fraction <= 0.0
         || case.minimum_phase_bin_coverage_fraction > 1.0
@@ -302,6 +308,8 @@ fn validate_case(case: &Case) -> Vec<String> {
                     || !observation.shaft_phase_unwrapped_rad.is_finite()
                     || observation.shaft_phase_unwrapped_rad < 0.0
                     || !finite_positive(observation.shaft_phase_expanded_uncertainty_rad)
+                    || !finite_positive(observation.measured_shaft_rpm)
+                    || !finite_positive(observation.measured_shaft_rpm_expanded_uncertainty)
                     || !finite_positive(observation.envelope_power)
                 {
                     errors.push(format!("run {} band {} sample {} has invalid time/phase/uncertainty/power", run.run_id, band.band_id, observation.sample_id));
@@ -319,6 +327,25 @@ fn validate_case(case: &Case) -> Vec<String> {
                     && observation.timestamp_s <= previous
                 {
                     errors.push(format!("run {} band {} timestamps are not strictly increasing", run.run_id, band.band_id));
+                }
+                if let (Some(previous_phase_value), Some(previous_time_value)) =
+                    (previous_phase, previous_timestamp)
+                {
+                    let elapsed_s = observation.timestamp_s - previous_time_value;
+                    let phase_delta = observation.shaft_phase_unwrapped_rad - previous_phase_value;
+                    if elapsed_s > 0.0 && phase_delta > 0.0 {
+                        let derived_rpm = phase_delta / elapsed_s * 60.0 / TWO_PI;
+                        let reference_rpm = (observation.measured_shaft_rpm + band.observations
+                            .iter()
+                            .find(|sample| sample.sample_id == observation.sample_id)
+                            .map(|sample| sample.measured_shaft_rpm)
+                            .unwrap_or(observation.measured_shaft_rpm)) / 2.0;
+                        let tolerance = reference_rpm * case.maximum_shaft_rpm_timebase_consistency_fraction
+                            + observation.measured_shaft_rpm_expanded_uncertainty;
+                        if (derived_rpm - reference_rpm).abs() > tolerance {
+                            errors.push(format!("run {} band {} sample {} phase/time slope disagrees with measured shaft RPM", run.run_id, band.band_id, observation.sample_id));
+                        }
+                    }
                 }
                 previous_phase = Some(observation.shaft_phase_unwrapped_rad);
                 previous_timestamp = Some(observation.timestamp_s);
@@ -625,10 +652,12 @@ mod tests {
                 let item_index = revolution * bins + bin;
                 output.push(PhaseObservation {
                     sample_id: format!("sample-{index}-{item_index}"),
-                    timestamp_s: item_index as f64 * 0.001,
+                    timestamp_s: phase / (TWO_PI * 10.0),
                     revolution_index: revolution as u64,
                     shaft_phase_unwrapped_rad: phase,
                     shaft_phase_expanded_uncertainty_rad: 0.0001,
+                    measured_shaft_rpm: 600.0,
+                    measured_shaft_rpm_expanded_uncertainty: 0.1,
                     envelope_power: power,
                     cavitation_present: Some((phase.sin() + 1.0) > 1.0),
                     acoustic_window_sha256: format!("{:064x}", 10_000 + index * 1_000 + item_index),
@@ -689,6 +718,7 @@ mod tests {
             shaft_phase_zero_reference: "index_pulse_at_blade_1_reference".to_string(),
             blade_count: 5,
             maximum_phase_uncertainty_rad: 0.001,
+            maximum_shaft_rpm_timebase_consistency_fraction: 0.01,
             phase_bin_count: bins,
             minimum_samples_per_phase_bin: 4,
             minimum_phase_bin_coverage_fraction: 1.0,
@@ -761,6 +791,13 @@ mod tests {
         let report = audit(&input);
         assert_eq!(report.disposition, "INCOMPLETE");
         assert!(report.reasons.iter().any(|reason| reason.contains("phase-bin coverage")));
+    }
+
+    #[test]
+    fn inconsistent_phase_time_slope_is_invalid() {
+        let mut input = case();
+        input.runs[0].carrier_bands[0].observations[1].timestamp_s += 0.01;
+        assert_eq!(audit(&input).disposition, "INVALID");
     }
 
     #[test]
