@@ -93,8 +93,8 @@ fn boundary_rank(boundary: &str) -> Option<u8> {
     }
 }
 
-fn required_complete_device_components() -> [&'static str; 9] {
-    [
+fn required_components_for_boundary(boundary: &str) -> Vec<&'static str> {
+    let mut components = vec![
         "positive_electrode",
         "negative_electrode",
         "electrolyte",
@@ -104,7 +104,21 @@ fn required_complete_device_components() -> [&'static str; 9] {
         "tabs",
         "seals",
         "case",
-    ]
+    ];
+    if boundary == "module" || boundary == "installed_system" {
+        components.extend(["busbars", "module_enclosure", "monitoring_balancing"]);
+    }
+    if boundary == "installed_system" {
+        components.extend([
+            "power_conversion",
+            "thermal_management",
+            "protection",
+            "wiring",
+            "system_enclosure",
+            "controls",
+        ]);
+    }
+    components
 }
 
 fn normalized_metric_name(value: &str) -> String {
@@ -140,7 +154,7 @@ fn has_measured_density_metric(
             .and_then(boundary_rank);
         metric["status"].as_str() == Some("measured")
             && metric["value"].as_f64().is_some_and(|value| value.is_finite() && value >= 0.0)
-            && metric_boundary.is_some_and(|boundary| boundary >= minimum_boundary)
+            && metric_boundary.is_some_and(|boundary| boundary == minimum_boundary)
             && names.contains(&name.as_str())
             && units.contains(&unit.as_str())
     })
@@ -200,7 +214,7 @@ fn audit_record(record: &Value, seen_ids: &mut BTreeSet<String>,
     if required_str(record, "schema_version", &context)? != "0.1.0" {
         bail!("{context}: unsupported record schema_version");
     }
-    one_of(record, "device_class", &context, DEVICE_CLASSES)?;
+    let device_class = one_of(record, "device_class", &context, DEVICE_CLASSES)?;
     let boundary = one_of(record, "boundary", &context, BOUNDARIES)?;
     let disposition = one_of(record, "disposition", &context, DISPOSITIONS)?;
 
@@ -221,7 +235,7 @@ fn audit_record(record: &Value, seen_ids: &mut BTreeSet<String>,
     {
         bail!("{context}.denominator.volume_l must be null or finite and positive");
     }
-    one_of(
+    let denominator_basis = one_of(
         denominator,
         "basis",
         &context,
@@ -230,6 +244,7 @@ fn audit_record(record: &Value, seen_ids: &mut BTreeSet<String>,
             "electrode_basis",
             "complete_device_weighed",
             "module_vendor_reported",
+            "module_measured",
             "installed_system_measured",
             "unknown",
         ],
@@ -271,11 +286,12 @@ fn audit_record(record: &Value, seen_ids: &mut BTreeSet<String>,
         if mass_kg.is_null() || volume_l.is_null() {
             bail!("{context}: complete denominator requires measured mass_kg and volume_l");
         }
-        if !required_complete_device_components()
-            .iter()
-            .all(|component| included.contains(component))
+        if matches!(boundary.as_str(), "complete_device" | "module" | "installed_system")
+            && !required_components_for_boundary(&boundary)
+                .iter()
+                .all(|component| included.contains(component))
         {
-            bail!("{context}: complete device denominator must enumerate all nine physical component groups");
+            bail!("{context}: denominator is missing a component required by its declared physical boundary");
         }
     }
 
@@ -431,11 +447,23 @@ fn audit_record(record: &Value, seen_ids: &mut BTreeSet<String>,
         if denominator_status != "complete" {
             bail!("{context}: evaluation_eligible requires a complete mass-and-volume denominator");
         }
-        if !required_complete_device_components()
+        if !required_components_for_boundary(&boundary)
             .iter()
             .all(|component| included.contains(component))
         {
-            bail!("{context}: evaluation_eligible requires complete-device component accounting");
+            bail!("{context}: evaluation_eligible requires component-complete accounting for its exact boundary");
+        }
+        let expected_basis = match boundary.as_str() {
+            "complete_device" => "complete_device_weighed",
+            "module" => "module_measured",
+            "installed_system" => "installed_system_measured",
+            _ => "unknown",
+        };
+        if denominator_basis != expected_basis {
+            bail!("{context}: denominator basis does not match the exact evaluation boundary");
+        }
+        if device_class == "dielectric_capacitor" {
+            bail!("{context}: dielectric capacitors require a separate device-class benchmark and denominator contract");
         }
         if admission != "evaluation_admitted"
             || (evidence_class != "physical_measurement"
@@ -681,11 +709,22 @@ mod tests {
     #[test]
     fn evaluation_eligibility_rejects_missing_device_power_density() {
         let mut record = test_only_promotable_record();
-        record["metrics"].as_array_mut().unwrap().pop();
+        let _ = record["metrics"].as_array_mut().unwrap().pop();
         let mut seen_ids = BTreeSet::new();
         let mut seen_serials = BTreeSet::new();
         assert!(audit_record(&record, &mut seen_ids, &mut seen_serials).is_err());
     }
+
+    #[test]
+    fn evaluation_eligibility_rejects_metric_from_a_different_boundary() {
+        let mut record = test_only_promotable_record();
+        record["metrics"][0]["boundary"] = json!("module");
+        let mut seen_ids = BTreeSet::new();
+        let mut seen_serials = BTreeSet::new();
+        assert!(audit_record(&record, &mut seen_ids, &mut seen_serials).is_err());
+    }
+
+
 
     #[test]
     fn complete_denominator_rejects_missing_volume_or_component_groups() {
