@@ -44,13 +44,18 @@ pub enum U1MpsError {
     EntryCount { expected: usize, actual: usize },
     NonFiniteTensorEntry { site: usize, index: usize },
     InvalidTolerance(f64),
-    LeftBoundary { dimension: usize, charge: Option<i32> },
+    LeftBoundary {
+        dimension: usize,
+        charge: Option<i32>,
+    },
     RightBoundary {
         dimension: usize,
         actual_charge: Option<i32>,
         expected_charge: i32,
     },
-    BondChargeMismatch { bond: usize },
+    BondChargeMismatch {
+        bond: usize,
+    },
     ChargeSelectionRule {
         site: usize,
         left_charge: i32,
@@ -59,9 +64,15 @@ pub enum U1MpsError {
         amplitude: f64,
         tolerance: f64,
     },
-    DenseExpansionTooLarge { sites: usize, maximum_sites: usize },
+    DenseExpansionTooLarge {
+        sites: usize,
+        maximum_sites: usize,
+    },
     NonFiniteContraction(&'static str),
-    ComplexNormResidual { imaginary_part: f64, tolerance: f64 },
+    ComplexNormResidual {
+        imaginary_part: f64,
+        tolerance: f64,
+    },
     NegativeNormSquared(f64),
 }
 
@@ -95,7 +106,10 @@ impl core::fmt::Display for U1MpsError {
                 "right boundary must be one state with charge {expected_charge}, got dimension {dimension}, charge {actual_charge:?}"
             ),
             Self::BondChargeMismatch { bond } => {
-                write!(f, "right/left charge labels disagree on virtual bond {bond}")
+                write!(
+                    f,
+                    "right/left charge labels disagree on virtual bond {bond}"
+                )
             }
             Self::ChargeSelectionRule {
                 site,
@@ -410,7 +424,10 @@ impl ComplexU1Mps {
                     }
                 }
             }
-            if next.iter().any(|value| !value.re.is_finite() || !value.im.is_finite()) {
+            if next
+                .iter()
+                .any(|value| !value.re.is_finite() || !value.im.is_finite())
+            {
                 return Err(U1MpsError::NonFiniteContraction("transfer environment"));
             }
             environment = next;
@@ -559,10 +576,7 @@ mod tests {
         let nonfinite = U1MpsTensor::new(
             vec![0],
             vec![0],
-            vec![
-                Complex64::new(f64::NAN, 0.0),
-                Complex64::new(0.0, 0.0),
-            ],
+            vec![Complex64::new(f64::NAN, 0.0), Complex64::new(0.0, 0.0)],
         )
         .unwrap();
         assert!(matches!(
