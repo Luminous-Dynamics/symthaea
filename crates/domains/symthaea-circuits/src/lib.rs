@@ -26,6 +26,7 @@
 
 pub mod ac;
 pub mod dc;
+pub mod dc_bus_stability;
 pub mod transient;
 
 #[cfg(test)]
