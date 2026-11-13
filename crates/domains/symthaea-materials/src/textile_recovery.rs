@@ -441,6 +441,8 @@ pub enum RouteReason {
     InvalidDownstreamAcceptance,
     /// Downstream acceptance is not bound to this exact item/output lot and its producing evidence.
     DownstreamAcceptanceBindingMismatch,
+    /// Receiving issuer or verifier is not independent of the originating process/inspection issuer.
+    DownstreamAcceptanceNotIndependentOfBasis,
     /// Policy itself has impossible/out-of-range values.
     InvalidPolicy,
 }
@@ -499,6 +501,7 @@ fn require_downstream_acceptance(
     acceptance: Option<&DownstreamAcceptance>,
     expected_output_lot_id: &str,
     expected_basis_evidence_id: &str,
+    expected_basis_issuer_id: &str,
     reasons: &mut Vec<RouteReason>,
     evidence_ids: &mut Vec<String>,
 ) {
@@ -525,6 +528,15 @@ fn require_downstream_acceptance(
         reasons.push(RouteReason::DownstreamAcceptanceBindingMismatch);
         return;
     }
+    let receiver_issuer = acceptance.evidence.issuer_id.as_str();
+    let verifier = acceptance.evidence.verifier_id.as_deref().unwrap_or("");
+    if !nonempty(expected_basis_issuer_id)
+        || receiver_issuer == expected_basis_issuer_id
+        || verifier == expected_basis_issuer_id
+    {
+        reasons.push(RouteReason::DownstreamAcceptanceNotIndependentOfBasis);
+        return;
+    }
     match acceptance.outcome {
         AcceptanceOutcome::Accepted => {}
         AcceptanceOutcome::Rejected => reasons.push(RouteReason::DownstreamAcceptanceRejected),
@@ -534,16 +546,20 @@ fn require_downstream_acceptance(
     }
 }
 
-fn trial_acceptance_binding(bundle: &RecoveryEvidenceBundle) -> (&str, &str) {
+fn trial_acceptance_binding(bundle: &RecoveryEvidenceBundle) -> (&str, &str, &str) {
     let Some(trial) = bundle.process_trial.as_ref() else {
-        return ("", "");
+        return ("", "", "");
     };
     let output_lot_id = trial
         .mass_balance
         .as_ref()
         .map(|balance| balance.accepted_output_lot_id.as_str())
         .unwrap_or("");
-    (output_lot_id, trial.evidence.evidence_id.as_str())
+    (
+        output_lot_id,
+        trial.evidence.evidence_id.as_str(),
+        trial.evidence.issuer_id.as_str(),
+    )
 }
 
 fn require_chemical_compatibility(
@@ -762,15 +778,19 @@ pub fn qualify_recovery_route(
                 UseSafetyStatus::Failed => reasons.push(RouteReason::UseSafetyNotPassed),
                 UseSafetyStatus::Unknown => reasons.push(RouteReason::UseSafetyUnknown),
             }
-            let basis_evidence_id = bundle
+            let (basis_evidence_id, basis_issuer_id) = bundle
                 .condition
                 .as_ref()
-                .map(|condition| condition.evidence.evidence_id.as_str())
-                .unwrap_or("");
+                .map(|condition| (
+                    condition.evidence.evidence_id.as_str(),
+                    condition.evidence.issuer_id.as_str(),
+                ))
+                .unwrap_or(("", ""));
             require_downstream_acceptance(
                 bundle.downstream_acceptance.as_ref(),
                 &bundle.lot_id,
                 basis_evidence_id,
+                basis_issuer_id,
                 &mut reasons,
                 &mut evidence_ids,
             );
@@ -804,15 +824,19 @@ pub fn qualify_recovery_route(
                 &mut reasons,
                 &mut evidence_ids,
             );
-            let basis_evidence_id = bundle
+            let (basis_evidence_id, basis_issuer_id) = bundle
                 .process_trial
                 .as_ref()
-                .map(|trial| trial.evidence.evidence_id.as_str())
-                .unwrap_or("");
+                .map(|trial| (
+                    trial.evidence.evidence_id.as_str(),
+                    trial.evidence.issuer_id.as_str(),
+                ))
+                .unwrap_or(("", ""));
             require_downstream_acceptance(
                 bundle.downstream_acceptance.as_ref(),
                 &bundle.lot_id,
                 basis_evidence_id,
+                basis_issuer_id,
                 &mut reasons,
                 &mut evidence_ids,
             );
@@ -827,11 +851,13 @@ pub fn qualify_recovery_route(
                 &mut reasons,
                 &mut evidence_ids,
             );
-            let (output_lot_id, trial_evidence_id) = trial_acceptance_binding(bundle);
+            let (output_lot_id, trial_evidence_id, trial_issuer_id) =
+                trial_acceptance_binding(bundle);
             require_downstream_acceptance(
                 bundle.downstream_acceptance.as_ref(),
                 output_lot_id,
                 trial_evidence_id,
+                trial_issuer_id,
                 &mut reasons,
                 &mut evidence_ids,
             );
@@ -884,11 +910,13 @@ pub fn qualify_recovery_route(
                     }
                 }
             }
-            let (output_lot_id, trial_evidence_id) = trial_acceptance_binding(bundle);
+            let (output_lot_id, trial_evidence_id, trial_issuer_id) =
+                trial_acceptance_binding(bundle);
             require_downstream_acceptance(
                 bundle.downstream_acceptance.as_ref(),
                 output_lot_id,
                 trial_evidence_id,
+                trial_issuer_id,
                 &mut reasons,
                 &mut evidence_ids,
             );
@@ -914,11 +942,13 @@ pub fn qualify_recovery_route(
                 &mut reasons,
                 &mut evidence_ids,
             );
-            let (output_lot_id, trial_evidence_id) = trial_acceptance_binding(bundle);
+            let (output_lot_id, trial_evidence_id, trial_issuer_id) =
+                trial_acceptance_binding(bundle);
             require_downstream_acceptance(
                 bundle.downstream_acceptance.as_ref(),
                 output_lot_id,
                 trial_evidence_id,
+                trial_issuer_id,
                 &mut reasons,
                 &mut evidence_ids,
             );
@@ -933,11 +963,13 @@ pub fn qualify_recovery_route(
                 &mut reasons,
                 &mut evidence_ids,
             );
-            let (output_lot_id, trial_evidence_id) = trial_acceptance_binding(bundle);
+            let (output_lot_id, trial_evidence_id, trial_issuer_id) =
+                trial_acceptance_binding(bundle);
             require_downstream_acceptance(
                 bundle.downstream_acceptance.as_ref(),
                 output_lot_id,
                 trial_evidence_id,
+                trial_issuer_id,
                 &mut reasons,
                 &mut evidence_ids,
             );
@@ -979,6 +1011,7 @@ fn assessment(
                 | RouteReason::InvalidChemicalCompatibilityEvidence
                 | RouteReason::InvalidDownstreamAcceptance
                 | RouteReason::DownstreamAcceptanceBindingMismatch
+                | RouteReason::DownstreamAcceptanceNotIndependentOfBasis
                 | RouteReason::InvalidPolicy
                 | RouteReason::DuplicateEvidenceIdentity
                 | RouteReason::InvalidPhysicalInventory
@@ -1226,6 +1259,36 @@ mod tests {
             qualify_recovery_route(RecoveryRoute::Repair, &bundle, &policy()).disposition,
             RouteDisposition::Eligible
         );
+    }
+
+    #[test]
+    fn receiving_acceptance_issuer_must_differ_from_process_issuer() {
+        let mut bundle = empty_bundle();
+        bundle.process_trial = Some(process_trial(EvidenceKind::ComponentRecoveryTrial, true));
+        let mut accepted = acceptance();
+        accepted.evidence.issuer_id = "process-lab".to_owned();
+        bundle.downstream_acceptance = Some(accepted);
+
+        let result = qualify_recovery_route(RecoveryRoute::ComponentRecovery, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result
+            .reasons
+            .contains(&RouteReason::DownstreamAcceptanceNotIndependentOfBasis));
+    }
+
+    #[test]
+    fn receiving_verifier_must_differ_from_process_issuer_too() {
+        let mut bundle = empty_bundle();
+        bundle.process_trial = Some(process_trial(EvidenceKind::ComponentRecoveryTrial, true));
+        let mut accepted = acceptance();
+        accepted.evidence.verifier_id = Some("process-lab".to_owned());
+        bundle.downstream_acceptance = Some(accepted);
+
+        let result = qualify_recovery_route(RecoveryRoute::ComponentRecovery, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result
+            .reasons
+            .contains(&RouteReason::DownstreamAcceptanceNotIndependentOfBasis));
     }
 
     #[test]
