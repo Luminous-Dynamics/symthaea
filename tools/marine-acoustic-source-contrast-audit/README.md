@@ -30,6 +30,10 @@ The synthetic fixture intentionally returns INCOMPLETE as physical evidence, eve
 
 A same-state passive spectrum is UNRESOLVED_MIXTURE. A changed non-target source, service or environment boundary is INCOMPARABLE. Matched repeated (non-randomized/non-counterbalanced) contrasts are only PARTIALLY_IDENTIFIABLE.
 
+## Evidence receipt
+
+The deterministic report repeats the intervention-protocol and experimental-design digests, dataset identity, raw-data digest, baseline/candidate raw acoustic-trace digests, sensor/calibration/timebase identities, service/environment fingerprints, and the complete baseline/candidate source-state records. Each source-state record preserves its categorical state, observable identity, measured value, unit, expanded uncertainty, equivalence tolerance and evidence digest. These references make the audit's decision inspectable; they do not authenticate the sensors, raw bytes or completeness of the physical source inventory.
+
 ## Interpretation boundary
 
 The audit reports the observed candidate-minus-baseline change in **total received sound pressure level** with a conservative uncertainty interval using the sum of expanded uncertainties. It checks eligibility of the declared controlled contrast; one pair does not establish statistical power, a causal effect estimate or transportability. It does not estimate additive propeller/machinery source contributions, source level, propagation loss, ecological exposure, biological response or quiet-ship compliance.
