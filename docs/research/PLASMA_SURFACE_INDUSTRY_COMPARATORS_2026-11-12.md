@@ -232,3 +232,57 @@ The defensible Luminous wedge is therefore not "first modular plasma tool". It i
 6. verified reduction of primer/solvent use while preserving bond durability and substrate function.
 
 Do not claim these advantages until each has passed a matched baseline and held-out verification.
+
+
+## Process monitoring is already commercial — do not claim it as a novelty
+
+A competitive review of process monitoring materially changes our differentiation thesis.
+
+### Plasmatreat PCU — inline monitored process variables
+
+Plasmatreat's current Openair-Plasma PCU documentation describes:
+- continuous optical monitoring of plasma emission / spectral amplitude;
+- power and voltage measurement at the generator/jet;
+- process-gas flow control and measurement;
+- back-pressure monitoring;
+- rotation-speed monitoring;
+- recipe storage, multi-level user management and remote maintenance;
+- EtherCAT / CANopen connections and modular PCUs that separately control jets;
+- optional multi-point / triple process monitoring.
+
+The manufacturer reports availability above 99% for its Openair systems. Treat that as a vendor claim, not independent reliability benchmarking.
+
+Sources:
+- https://www.plasmatreat.com/en/products-and-services/openair-plasmar-process-monitoring
+- https://www.plasmatreat.com/en/products-and-services/process-control
+- https://www.plasmatreat.com/en/news-and-stories/news-and-press/detail/pr-comprehensive-process-control-for-openair-plasma-systems
+
+### Surfx SPM — integrated RF head monitoring
+
+A Surfx SPM atmospheric-plasma cleaning workstation listing describes a 27.12 MHz RF source, automatic matching, closed-loop coolant control and real-time monitoring of forward/reflected power, two process-gas flow rates and head temperature, with Ethernet/RS232 connectivity.
+
+Source: https://www.dkshsce.com/Products-en/Surfx-SPM
+
+This is an equipment distributor/product listing, not a matched independent performance trial.
+
+### 2026 research context: ML process diagnostics
+
+A June 2026 review of machine-learning-enabled in-situ diagnostics for plasma-based semiconductor manufacturing describes anomaly detection, plasma diagnostics, virtual metrology, predictive maintenance, multimodal sensor fusion and process optimization. It identifies limited labeled data, interpretability, domain transfer and the lab-to-fab gap as outstanding barriers.
+
+Source: https://doi.org/10.1021/acsami.6c04768
+
+This review concerns plasma-based semiconductor manufacturing (e.g. PECVD, etch and sputter), not atmospheric polymer surface activation. It is an adjacent capability reference, not direct proof that the same predictive models transfer to plasma surface treatment.
+
+## Revised Luminous differentiation hypothesis
+
+Do **not** position "sensorized plasma", "closed-loop power/flow monitoring", "optical emission monitoring", "recipe logging", "predictive maintenance", "multi-head modular control" or "Industry 4.0 connectivity" as novel by themselves. Commercial systems already describe these capabilities.
+
+A potentially defensible next step is to qualify **the link between upstream plasma-state telemetry and downstream material/service outcomes**:
+- calibrate and retain sensor signals against actual bond, coating or product outcomes;
+- identify when identical plasma telemetry produces different results because material lot, contamination, storage, adhesive, coating or geometry changed;
+- predict the distribution of downstream outcomes and uncertainty, not only whether the discharge looks normal;
+- validate on held-out substrate lots, devices, factories and days;
+- refuse out-of-domain configurations instead of issuing an unqualified process pass;
+- quantify avoided scrap/rework, reduced destructive testing, energy and lifecycle cost against incumbent quality-control practice.
+
+The differentiator is therefore not "more sensors". It is a validated, material-aware process-quality model whose predictions are audited against actual downstream product outcomes and whose economic value is demonstrated under production conditions. Even this is a hypothesis until compared against the vendor's existing process-control and quality systems.
