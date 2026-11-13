@@ -5,7 +5,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -20,56 +19,100 @@ type policyFile struct {
 }
 
 func main() {
-	bundlePath := flag.String("bundle", "-", "signed evidence bundle JSON; use - for stdin")
-	trustPath := flag.String("trust-store", "", "operator-pinned trust store JSON (required)")
-	policyPath := flag.String("policy", "", "operator-pinned policy and task-intent JSON (required)")
-	flag.Parse()
-	if *trustPath == "" || *policyPath == "" {
-		fail(errors.New("--trust-store and --policy are required and must be provisioned out of band"))
+	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
+}
+
+func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	flags := flag.NewFlagSet("mace-join", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	bundlePath := flags.String("bundle", "-", "signed evidence bundle JSON; use - for stdin")
+	trustPath := flags.String("trust-store", "", "operator-pinned trust store JSON (required)")
+	policyPath := flags.String("policy", "", "operator-pinned policy and task-intent JSON (required)")
+	if err := flags.Parse(args); err != nil {
+		return 2
 	}
-	bundleBytes, err := readInput(*bundlePath)
-	if err != nil { fail(err) }
+	if flags.NArg() != 0 {
+		fmt.Fprintln(stderr, "mace-join: unexpected positional arguments")
+		return 2
+	}
+	if *trustPath == "" || *policyPath == "" {
+		fmt.Fprintln(stderr, "mace-join: --trust-store and --policy are required and must be provisioned out of band")
+		return 2
+	}
+	bundleBytes, err := readInput(*bundlePath, stdin)
+	if err != nil {
+		fmt.Fprintln(stderr, "mace-join:", err)
+		return 1
+	}
 	trustBytes, err := readFileBounded(*trustPath)
-	if err != nil { fail(fmt.Errorf("read trusted root configuration: %w", err)) }
+	if err != nil {
+		fmt.Fprintln(stderr, "mace-join: read trusted root configuration:", err)
+		return 1
+	}
 	policyBytes, err := readFileBounded(*policyPath)
-	if err != nil { fail(fmt.Errorf("read pinned policy: %w", err)) }
+	if err != nil {
+		fmt.Fprintln(stderr, "mace-join: read pinned policy:", err)
+		return 1
+	}
 	var bundle join.Bundle
 	var trust join.TrustStore
 	var policy policyFile
-	if err := join.DecodeStrict(bundleBytes, &bundle); err != nil { fail(fmt.Errorf("decode evidence bundle: %w", err)) }
-	if err := join.DecodeStrict(trustBytes, &trust); err != nil { fail(fmt.Errorf("decode trust store: %w", err)) }
-	if err := join.DecodeStrict(policyBytes, &policy); err != nil { fail(fmt.Errorf("decode policy/intent: %w", err)) }
+	if err := join.DecodeStrict(bundleBytes, &bundle); err != nil {
+		fmt.Fprintln(stderr, "mace-join: decode evidence bundle:", err)
+		return 1
+	}
+	if err := join.DecodeStrict(trustBytes, &trust); err != nil {
+		fmt.Fprintln(stderr, "mace-join: decode trust store:", err)
+		return 1
+	}
+	if err := join.DecodeStrict(policyBytes, &policy); err != nil {
+		fmt.Fprintln(stderr, "mace-join: decode policy/intent:", err)
+		return 1
+	}
 	result, err := join.Verify(bundle, trust, policy.State, policy.Expected)
-	if err != nil { fail(err) }
-	encoder := json.NewEncoder(os.Stdout)
+	if err != nil {
+		fmt.Fprintln(stderr, "mace-join: verify:", err)
+		return 1
+	}
+	encoder := json.NewEncoder(stdout)
 	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(result); err != nil { fail(err) }
+	if err := encoder.Encode(result); err != nil {
+		fmt.Fprintln(stderr, "mace-join: encode result:", err)
+		return 1
+	}
+	return 0
 }
-func readInput(path string) ([]byte, error) {
-	var reader io.Reader = os.Stdin
+
+func readInput(path string, stdin io.Reader) ([]byte, error) {
+	var reader io.Reader = stdin
 	if path != "-" {
 		f, err := os.Open(path)
-		if err != nil { return nil, err }
+		if err != nil {
+			return nil, err
+		}
 		defer f.Close()
 		reader = f
 	}
 	data, err := io.ReadAll(io.LimitReader(reader, join.MaximumRequestBytes+1))
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	if len(data) == 0 || len(data) > join.MaximumRequestBytes {
 		return nil, fmt.Errorf("evidence bundle is empty or exceeds %d bytes", join.MaximumRequestBytes)
 	}
 	return data, nil
 }
-func fail(err error) {
-	fmt.Fprintln(os.Stderr, "mace-join:", err)
-	os.Exit(1)
-}
+
 func readFileBounded(path string) ([]byte, error) {
 	f, err := os.Open(path)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	defer f.Close()
 	data, err := io.ReadAll(io.LimitReader(f, join.MaximumRequestBytes+1))
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	if len(data) == 0 || len(data) > join.MaximumRequestBytes {
 		return nil, fmt.Errorf("file %q is empty or exceeds %d bytes", path, join.MaximumRequestBytes)
 	}
