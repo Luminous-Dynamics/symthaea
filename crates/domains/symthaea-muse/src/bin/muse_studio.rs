@@ -2424,10 +2424,10 @@ fn render_import_audition(
 }
 
 fn verify_imported_audition_bytes(
-    summary: &symthaea_muse_protocol::ImportedWorkSummary,
+    expected_sha256: Option<&str>,
     bytes: &[u8],
 ) -> Result<bool, StatusCode> {
-    match summary.audition_sha256.as_deref() {
+    match expected_sha256 {
         Some(expected) if sha256_hex(bytes) == expected => Ok(true),
         Some(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
         // Old summaries predate audio commitments and are explicitly reported
@@ -3025,7 +3025,8 @@ async fn imported_work_audio(AxPath(id): AxPath<String>) -> Result<Response, Sta
     let summary = read_import_summary(&id)?;
     let bytes = std::fs::read(Path::new(IMPORT_ROOT).join(&id).join("audition.wav"))
         .map_err(|_| StatusCode::NOT_FOUND)?;
-    let _integrity_verified = verify_imported_audition_bytes(&summary, &bytes)?;
+    let _integrity_verified =
+        verify_imported_audition_bytes(summary.audition_sha256.as_deref(), &bytes)?;
     Ok(([(header::CONTENT_TYPE, "audio/wav")], bytes).into_response())
 }
 
@@ -5980,29 +5981,17 @@ mod notation_summary_tests {
 
     #[test]
     fn audition_audio_receipt_accepts_exact_bytes_and_rejects_tampering() {
-        let mut summary: symthaea_muse_protocol::ImportedWorkSummary =
-            serde_json::from_value(serde_json::json!({
-                "manifest": {},
-                "analysis": {},
-                "audio_available": true,
-                "audio_renderer": "fluidsynth",
-                "audition_sha256": sha256_hex(b"source-midi-render"),
-                "audition_kind": "source_midi_performance",
-                "instrumentation_note": "source MIDI event stream",
-                "notation_structure": null
-            }))
-            .unwrap_or_else(|_| panic!("test fixture should be expanded only if required protocol fields change"));
+        let expected = sha256_hex(b"source-midi-render");
         assert_eq!(
-            verify_imported_audition_bytes(&summary, b"source-midi-render"),
+            verify_imported_audition_bytes(Some(&expected), b"source-midi-render"),
             Ok(true)
         );
         assert_eq!(
-            verify_imported_audition_bytes(&summary, b"tampered-render"),
+            verify_imported_audition_bytes(Some(&expected), b"tampered-render"),
             Err(StatusCode::INTERNAL_SERVER_ERROR)
         );
-        summary.audition_sha256 = None;
         assert_eq!(
-            verify_imported_audition_bytes(&summary, b"legacy-render"),
+            verify_imported_audition_bytes(None, b"legacy-render"),
             Ok(false)
         );
     }
