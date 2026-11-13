@@ -219,7 +219,7 @@
       },
       "budget": {
         "max_cost_units": 30,
-        "max_latency_hours": 240,
+        "max_latency_hours": 480,
         "max_specimens": 20
       },
       "selection_receipt": {
@@ -321,7 +321,7 @@
       },
       "budget": {
         "max_cost_units": 30,
-        "max_latency_hours": 240,
+        "max_latency_hours": 480,
         "max_specimens": 20
       },
       "selection_receipt": {
@@ -423,7 +423,7 @@
       },
       "budget": {
         "max_cost_units": 60,
-        "max_latency_hours": 360,
+        "max_latency_hours": 480,
         "max_specimens": 40
       },
       "selection_receipt": {
@@ -586,7 +586,7 @@
       },
       "budget": {
         "max_cost_units": 40,
-        "max_latency_hours": 240,
+        "max_latency_hours": 480,
         "max_specimens": 30
       },
       "selection_receipt": {
@@ -714,7 +714,7 @@
       },
       "budget": {
         "max_cost_units": 40,
-        "max_latency_hours": 240,
+        "max_latency_hours": 480,
         "max_specimens": 30
       },
       "selection_receipt": {
@@ -830,7 +830,7 @@
       },
       "budget": {
         "max_cost_units": 40,
-        "max_latency_hours": 240,
+        "max_latency_hours": 480,
         "max_specimens": 30
       },
       "selection_receipt": {
@@ -990,6 +990,148 @@
         "aged_bond_strength_mpa": null,
         "bond_retention": null,
         "failure_mode": null,
+        "wvtr_ratio": null,
+        "otr_ratio": null,
+        "evidence_class": "SYNTHETIC_LABEL",
+        "physically_measured": false
+      },
+      "expected": {
+        "audit_disposition": "REJECTED",
+        "product_decision": "ABSTAIN"
+      }
+    },
+    {
+      "scenario_id": "inadmissible-action-abstain",
+      "profile": {
+        "profile_id": "PP_ADHESIVE_A",
+        "material_family": "PP",
+        "requires_barrier_preservation": false,
+        "min_bond_strength_mpa": 5,
+        "min_aged_bond_strength_mpa": 4.5,
+        "min_retention": 0.85,
+        "max_wvtr_ratio": null,
+        "max_otr_ratio": null,
+        "acceptable_failure_modes": [
+          "cohesive",
+          "mixed"
+        ]
+      },
+      "budget": {
+        "max_cost_units": 40,
+        "max_latency_hours": 480,
+        "max_specimens": 30
+      },
+      "selection_receipt": {
+        "receipt_id": "synthetic-selection-inadmissible",
+        "owner": "UAP-OED-001",
+        "method": "SYNTHETIC_ADVISORY_SELECTION",
+        "objective": "ROBUST_DECISION_EVIDENCE",
+        "selected_action_ids": [
+          "WCA_SCREEN",
+          "FTIR_CHEMISTRY",
+          "UNAPPROVED_CHEMICAL_ACTIVATION",
+          "LAP_SHEAR",
+          "AGED_LAP_SHEAR"
+        ],
+        "training_group_manifest": {
+          "manifest_id": "synthetic-groups-9",
+          "training_lots": [
+            "TRAIN-PP-01"
+          ],
+          "training_devices": [
+            "TRAIN-HEAD-01"
+          ],
+          "training_days": [
+            "2026-11-01",
+            "2026-11-02"
+          ]
+        }
+      },
+      "measurements": [
+        {
+          "measurement_id": "m9-wca",
+          "action_id": "WCA_SCREEN",
+          "specimen_id": "s28",
+          "lot_id": "HOLDOUT-PP-08",
+          "device_id": "HEAD-NEW-08",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-08",
+          "independence_group": "wet-08",
+          "covariance_model_id": "cov-prep-05",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-wca-08"
+        },
+        {
+          "measurement_id": "m9-ftir",
+          "action_id": "FTIR_CHEMISTRY",
+          "specimen_id": "s29",
+          "lot_id": "HOLDOUT-PP-08",
+          "device_id": "HEAD-NEW-08",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-08",
+          "independence_group": "chem-08",
+          "covariance_model_id": "cov-prep-05",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-ftir-08"
+        },
+        {
+          "measurement_id": "m9-bond",
+          "action_id": "LAP_SHEAR",
+          "specimen_id": "s30",
+          "lot_id": "HOLDOUT-PP-08",
+          "device_id": "HEAD-NEW-08",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "bond-pp-08",
+          "independence_group": "bond-08",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-bond-08"
+        },
+        {
+          "measurement_id": "m9-aged",
+          "action_id": "AGED_LAP_SHEAR",
+          "specimen_id": "s31",
+          "lot_id": "HOLDOUT-PP-08",
+          "device_id": "HEAD-NEW-08",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "aged-pp-08",
+          "independence_group": "age-08",
+          "covariance_model_id": null,
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-aged-08"
+        },
+        {
+          "measurement_id": "m9-unapproved",
+          "action_id": "UNAPPROVED_CHEMICAL_ACTIVATION",
+          "specimen_id": "s32",
+          "lot_id": "HOLDOUT-PP-08",
+          "device_id": "HEAD-NEW-08",
+          "production_day": "2026-11-13",
+          "sample_preparation_group": "prep-pp-08",
+          "independence_group": "chem-08",
+          "covariance_model_id": "cov-prep-08",
+          "calibration_status": "QUALIFIED",
+          "raw_trace_digest": "sha256:synthetic-unapproved-08"
+        }
+      ],
+      "covariance_models": [
+        {
+          "model_id": "cov-prep-08",
+          "evidence_class": "SYNTHETIC",
+          "receipt_id": "synthetic-covariance-receipt-08",
+          "measurement_ids": [
+            "m9-wca",
+            "m9-ftir",
+            "m9-unapproved"
+          ]
+        }
+      ],
+      "outcomes": {
+        "wca_deg": 18,
+        "bond_strength_mpa": 6.2,
+        "aged_bond_strength_mpa": 5.5,
+        "bond_retention": 0.887,
+        "failure_mode": "cohesive",
         "wvtr_ratio": null,
         "otr_ratio": null,
         "evidence_class": "SYNTHETIC_LABEL",
