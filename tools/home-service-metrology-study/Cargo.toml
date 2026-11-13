@@ -1,0 +1,20 @@
+[package]
+name = "home-service-metrology-study"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Synthetic preregistration gate for four-stratum household-appliance metrology studies"
+
+[dependencies]
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+
+[workspace]
+resolver = "3"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "home-service-metrology-study"
+path = "src/main.rs"
