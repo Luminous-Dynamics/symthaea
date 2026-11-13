@@ -7,7 +7,7 @@
 
 use clarabel::algebra::CscMatrix;
 use clarabel::solver::{
-    DefaultSettings, DefaultSolver, PSDTriangleConeT, SolverStatus, ZeroConeT,
+    DefaultSettings, DefaultSolver, IPSolver, PSDTriangleConeT, SolverStatus, ZeroConeT,
 };
 #[path = "../../../crates/domains/symthaea-airroad-iqc/src/lib.rs"]
 mod symthaea_airroad_iqc;
