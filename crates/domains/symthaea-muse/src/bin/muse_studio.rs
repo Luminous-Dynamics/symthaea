@@ -3066,20 +3066,52 @@ async fn imported_works()
     Ok(Json(works))
 }
 
+fn validate_imported_musicxml_graph_artifact(
+    source_sha256: &str,
+    expected_graph_sha256: &str,
+    source_bytes: &[u8],
+    graphs: &[symthaea_muse::musicxml_barline_adapter::MusicXmlPartNotationGraphV1],
+) -> Result<(), StatusCode> {
+    if sha256_hex(source_bytes) != source_sha256 {
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+    let actual_graph_sha256 =
+        symthaea_muse::evidence_digest::canonical_json_sha256(graphs)
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if actual_graph_sha256 != expected_graph_sha256 {
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+    let source_id = format!("sha256:{source_sha256}");
+    let score_clock_id = format!("source-score-clock:{source_sha256}");
+    let replay_valid =
+        symthaea_muse::musicxml_barline_adapter::validate_musicxml_notation_graph_replay(
+            source_bytes,
+            &source_id,
+            &score_clock_id,
+            graphs,
+        )
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if !replay_valid {
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+    Ok(())
+}
+
 async fn imported_work_notation_graph(
     AxPath(id): AxPath<String>,
 ) -> Result<Json<Vec<symthaea_muse::musicxml_barline_adapter::MusicXmlPartNotationGraphV1>>, StatusCode>
 {
     let summary = read_import_summary(&id)?;
-    let expected_digest = summary
+    let structure = summary
         .notation_structure
         .as_ref()
-        .and_then(|structure| structure.graph_sha256.as_deref())
         .ok_or(StatusCode::NOT_FOUND)?;
-    let bytes = std::fs::read(
-        Path::new(IMPORT_ROOT).join(&id).join("notation-graph.json"),
-    )
-    .map_err(|error| {
+    let expected_digest = structure
+        .graph_sha256
+        .as_deref()
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let import_dir = Path::new(IMPORT_ROOT).join(&id);
+    let bytes = std::fs::read(import_dir.join("notation-graph.json")).map_err(|error| {
         if error.kind() == std::io::ErrorKind::NotFound {
             StatusCode::NOT_FOUND
         } else {
@@ -3088,12 +3120,25 @@ async fn imported_work_notation_graph(
     })?;
     let graphs: Vec<symthaea_muse::musicxml_barline_adapter::MusicXmlPartNotationGraphV1> =
         serde_json::from_slice(&bytes).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    let actual_digest =
-        symthaea_muse::evidence_digest::canonical_json_sha256(&graphs)
-            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    if actual_digest.as_str() != expected_digest {
-        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+
+    let mut source_path = None;
+    for entry in std::fs::read_dir(&import_dir).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)? {
+        let entry = entry.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        if entry.file_name().to_string_lossy().starts_with("source.") {
+            if source_path.replace(entry.path()).is_some() {
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        }
     }
+    let source_path = source_path.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+    let source_bytes =
+        std::fs::read(source_path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    validate_imported_musicxml_graph_artifact(
+        &summary.manifest.source_sha256,
+        expected_digest,
+        &source_bytes,
+        &graphs,
+    )?;
     Ok(Json(graphs))
 }
 
@@ -6152,6 +6197,55 @@ mod notation_summary_tests {
         assert_eq!(
             verify_imported_audition_bytes(None, b"legacy-render"),
             Ok(false)
+        );
+    }
+
+
+    #[test]
+    fn musicxml_graph_artifact_verification_replays_source_and_rejects_tampering() {
+        let xml = br#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice></note>
+            <note><rest/><duration>16</duration><voice>1</voice></note>
+        </measure></part></score-partwise>"#;
+        let source_sha256 = sha256_hex(xml);
+        let source_id = format!("sha256:{source_sha256}");
+        let score_clock_id = format!("source-score-clock:{source_sha256}");
+        let graphs = symthaea_muse::musicxml_barline_adapter::parse_musicxml_part_notation_graph(
+            xml,
+            &source_id,
+            &score_clock_id,
+        )
+        .unwrap();
+        let graph_sha256 =
+            symthaea_muse::evidence_digest::canonical_json_sha256(&graphs).unwrap();
+        assert!(validate_imported_musicxml_graph_artifact(
+            &source_sha256,
+            &graph_sha256,
+            xml,
+            &graphs,
+        )
+        .is_ok());
+
+        let mut tampered_graph = graphs.clone();
+        tampered_graph[0].notation_events.note_events[0].voice = Some("tampered".into());
+        assert_eq!(
+            validate_imported_musicxml_graph_artifact(
+                &source_sha256,
+                &graph_sha256,
+                xml,
+                &tampered_graph,
+            ),
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        );
+        assert_eq!(
+            validate_imported_musicxml_graph_artifact(
+                &source_sha256,
+                &graph_sha256,
+                b"<score-partwise/>",
+                &graphs,
+            ),
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
         );
     }
 
