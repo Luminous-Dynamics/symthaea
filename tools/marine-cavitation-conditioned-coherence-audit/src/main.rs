@@ -5,6 +5,7 @@ use std::{env, fs, process};
 const SCHEMA_VERSION: &str = "0.1.0";
 const FREQUENCY_TOLERANCE_HZ: f64 = 1.0e-9;
 const WINDOW_TIME_TOLERANCE_S: f64 = 1.0e-9;
+const PSD_PARTITION_RELATIVE_TOLERANCE: f64 = 1.0e-8;
 const UNCERTAINTY_AVAILABLE: &str = "marginal_interval_envelope_available";
 const COHERENCE_ESTIMATE_ONLY: &str = "COHERENCE_ESTIMATE_ONLY";
 const MAGNITUDE_ONLY: &str = "MAGNITUDE_COHERENCE_ONLY_PHASE_UNRESOLVED";
@@ -135,6 +136,7 @@ struct CoherenceReport {
 struct CoherenceBand {
     band_id: String,
     frequency_hz: f64,
+    pressure_psd_pa2_per_hz: f64,
     coherence_magnitude_squared: f64,
     coherence_lower_bound: Option<f64>,
     coherence_upper_bound: Option<f64>,
@@ -152,6 +154,8 @@ struct CoherenceBand {
 struct JoinedWindow {
     run_id: String,
     window_id: String,
+    start_time_s: f64,
+    end_time_s: f64,
     cavitation_state: Option<bool>,
     coherence_report_sha256: String,
     coherence_case_id: String,
@@ -186,6 +190,11 @@ struct AuditReport {
 #[derive(Debug, Serialize)]
 struct RunReport {
     run_id: String,
+    timebase_receipt_sha256: String,
+    operating_point_receipt_sha256: String,
+    acoustic_cavitation_sync_receipt_sha256: String,
+    service_fingerprint_sha256: String,
+    environment_fingerprint_sha256: String,
     total_joined_windows: usize,
     cavitation_present_windows: usize,
     cavitation_absent_windows: usize,
@@ -202,6 +211,8 @@ struct RunReport {
 #[derive(Debug, Serialize)]
 struct JoinedWindowReceipt {
     window_id: String,
+    start_time_s: f64,
+    end_time_s: f64,
     coherence_case_id: String,
     coherence_report_sha256: String,
     acoustic_trace_sha256: String,
@@ -305,6 +316,7 @@ fn validate_coherence_band(band: &CoherenceBand, report_case: &str) -> Vec<Strin
     let mut errors = Vec::new();
     if band.band_id.trim().is_empty()
         || !finite_positive(band.frequency_hz)
+        || !finite_positive(band.pressure_psd_pa2_per_hz)
         || !band.coherence_magnitude_squared.is_finite()
         || !(0.0..=1.0).contains(&band.coherence_magnitude_squared)
         || !finite_nonnegative(band.vibration_reference_coherent_pressure_psd_pa2_per_hz)
@@ -326,6 +338,8 @@ fn validate_coherence_band(band: &CoherenceBand, report_case: &str) -> Vec<Strin
     }
     if band.coherence_lower_bound.is_some_and(|x| x > band.coherence_magnitude_squared)
         || band.coherence_upper_bound.is_some_and(|x| x < band.coherence_magnitude_squared)
+        || band.coherence_lower_bound.is_some_and(|x| x > 1.0)
+        || band.coherence_upper_bound.is_some_and(|x| x > 1.0)
         || band.vibration_reference_coherent_pressure_psd_lower_bound
             .is_some_and(|x| x > band.vibration_reference_coherent_pressure_psd_pa2_per_hz)
         || band.vibration_reference_coherent_pressure_psd_upper_bound
@@ -336,6 +350,13 @@ fn validate_coherence_band(band: &CoherenceBand, report_case: &str) -> Vec<Strin
             .is_some_and(|x| x < band.non_coherent_residual_pressure_psd_pa2_per_hz)
     {
         errors.push(format!("coherence report {report_case} has uncertainty bounds that do not enclose the point estimate"));
+    }
+    let partition_sum = band.vibration_reference_coherent_pressure_psd_pa2_per_hz
+        + band.non_coherent_residual_pressure_psd_pa2_per_hz;
+    let partition_relative_error = (partition_sum - band.pressure_psd_pa2_per_hz).abs()
+        / band.pressure_psd_pa2_per_hz.max(f64::MIN_POSITIVE);
+    if partition_relative_error > PSD_PARTITION_RELATIVE_TOLERANCE {
+        errors.push(format!("coherence report {report_case} coherent plus residual PSD does not conserve the pressure PSD"));
     }
     errors
 }
@@ -438,6 +459,10 @@ fn validate_case(case: &Case) -> Vec<String> {
     let mut coherence_case_ids = BTreeSet::new();
     let mut coherence_report_digests = BTreeSet::new();
     let mut shared_timebase_ids = BTreeSet::new();
+    let mut vessel_ids = BTreeSet::new();
+    let mut propeller_revisions = BTreeSet::new();
+    let mut vibration_instrument_ids = BTreeSet::new();
+    let mut vibration_channel_ids = BTreeSet::new();
     let mut expected_band_signature: Option<BTreeMap<String, f64>> = None;
     let mut vibration_instruments = BTreeSet::new();
     let mut vibration_channels = BTreeSet::new();
@@ -519,8 +544,10 @@ fn validate_case(case: &Case) -> Vec<String> {
             errors.push(format!("coherence report {} has invalid sample window metadata", report.case_id));
         }
         shared_timebase_ids.insert(report.shared_timebase_id.clone());
-        vibration_instruments.insert(report.vibration_instrument_id.clone());
-        vibration_channels.insert(report.vibration_channel_id.clone());
+        vessel_ids.insert(report.vessel_id.clone());
+        propeller_revisions.insert(report.propeller_revision.clone());
+        vibration_instrument_ids.insert(report.vibration_instrument_id.clone());
+        vibration_channel_ids.insert(report.vibration_channel_id.clone());
 
         if report.band_reports.is_empty() {
             errors.push(format!("coherence report {} has no band reports", report.case_id));
@@ -636,6 +663,11 @@ fn summarize_run(run_id: &str, windows: &[JoinedWindow], band_ids: &[(String, f6
 
     RunReport {
         run_id: run_id.to_string(),
+        timebase_receipt_sha256: run.timebase_receipt_sha256.clone(),
+        operating_point_receipt_sha256: run.operating_point_receipt_sha256.clone(),
+        acoustic_cavitation_sync_receipt_sha256: run.acoustic_cavitation_sync_receipt_sha256.clone(),
+        service_fingerprint_sha256: run.service_fingerprint_sha256.clone(),
+        environment_fingerprint_sha256: run.environment_fingerprint_sha256.clone(),
         total_joined_windows: windows.len(),
         cavitation_present_windows: present.len(),
         cavitation_absent_windows: absent.len(),
@@ -648,6 +680,8 @@ fn summarize_run(run_id: &str, windows: &[JoinedWindow], band_ids: &[(String, f6
         run_band_summaries,
         joined_window_receipts: windows.iter().map(|window| JoinedWindowReceipt {
             window_id: window.window_id.clone(),
+            start_time_s: window.start_time_s,
+            end_time_s: window.end_time_s,
             coherence_case_id: window.coherence_case_id.clone(),
             coherence_report_sha256: window.coherence_report_sha256.clone(),
             acoustic_trace_sha256: window.acoustic_trace_sha256.clone(),
@@ -745,6 +779,8 @@ fn audit(case: &Case) -> AuditReport {
             let joined = JoinedWindow {
                 run_id: input.run_id.clone(),
                 window_id: input.window_id.clone(),
+                start_time_s: window.start_time_s,
+                end_time_s: window.end_time_s,
                 cavitation_state: window.cavitation_state_for_conditioning,
                 coherence_report_sha256: input.coherence_report_sha256.clone(),
                 coherence_case_id: report.case_id.clone(),
@@ -789,8 +825,13 @@ fn audit(case: &Case) -> AuditReport {
             }
         }
     }
-    if shared_timebase_ids.len() > 1 {
-        reasons.push("INCOMPARABLE: coherence reports do not share one common sample clock identity across the joined campaign".to_string());
+    if shared_timebase_ids.len() > 1
+        || vessel_ids.len() > 1
+        || propeller_revisions.len() > 1
+        || vibration_instrument_ids.len() > 1
+        || vibration_channel_ids.len() > 1
+    {
+        reasons.push("INCOMPARABLE: coherence reports do not share one vessel/propeller/vibration-reference/shared-clock stratum".to_string());
     }
     let alignment_unknown = run_reports.iter().any(|run| run.cavitation_unknown_windows > 0);
     if alignment_unknown {
@@ -907,6 +948,7 @@ mod tests {
         CoherenceBand {
             band_id: band_id.to_string(),
             frequency_hz: frequency,
+            pressure_psd_pa2_per_hz: 10.0,
             coherence_magnitude_squared: coherence,
             coherence_lower_bound: Some(coherence - 0.05),
             coherence_upper_bound: Some(coherence + 0.05),
