@@ -640,6 +640,16 @@ fn parse_part_events(
                         "MusicXML auxiliary offset leaves the supported score coordinate range".into()
                     ))?;
                 }
+                let measure_end = measure_start
+                    .checked_add(measure_duration)
+                    .map_err(|_| ParseEventError::Unknown("measure end overflow".into()))?;
+                if score_offset.compare_exact(measure_start) == std::cmp::Ordering::Less
+                    || score_offset.compare_exact(measure_end) == std::cmp::Ordering::Greater
+                {
+                    return Err(ParseEventError::Unknown(
+                        "MusicXML auxiliary offset leaves its explicit measure span".into(),
+                    ));
+                }
                 let source = source_node(element, 0, &mut source_tree_nodes)?;
                 auxiliary_events.push(MusicXmlAuxiliaryEventV1 {
                     source_order,
@@ -1148,5 +1158,19 @@ mod tests {
         assert!(events.auxiliary_events[0].source.children.iter().any(|node| node.element == "sound"));
         assert_eq!(events.note_events.len(), 2);
         assert_eq!(events.note_events[1].score_offset, RationalBeat::new(2, 1).unwrap());
+    }
+
+
+    #[test]
+    fn auxiliary_offsets_outside_explicit_measure_span_withhold_all_events() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <direction><direction-type><words>Too early</words></direction-type><offset>-1</offset></direction>
+            <note><rest/><duration>16</duration></note>
+        </measure></part></score-partwise>"#;
+        assert!(matches!(
+            parse(xml).status,
+            MusicXmlNotationEventsStatusV1::Unknown { .. }
+        ));
     }
 
