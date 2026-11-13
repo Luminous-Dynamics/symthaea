@@ -27,7 +27,7 @@ Outputs `report.json`. Scenario parameters, response times, compute cost and int
 
 ## Current synthetic result
 
-The 12 authored scenarios produce 5/12 safe episodes for predictive reflex, 3/12 for reactive threshold and 5/12 for the shuffled-precursor negative control. Predictive beats reactive on two paired scenarios and loses on none. It ties the sham in aggregate: one paired win and one paired loss. Therefore this v0.1 corpus does **not** establish that the true precursor signal contributes value beyond a sham trigger. See the generated report and interpretation note.
+The 12 authored scenarios produce 4/12 safe episodes for predictive reflex, 3/12 for reactive threshold and 5/12 for the shuffled-precursor negative control. Predictive beats reactive on one paired scenario and loses on none (+1/12 paired net lift). Against the sham, predictive wins zero and loses one (-1/12 paired net lift). Therefore this v0.1 corpus does **not** establish that the true precursor signal contributes value beyond a sham trigger; on this authored set the sham does better. See the generated report and interpretation note.
 
 This is intentionally retained as a negative control. It exposes the need for source-bound signal identity, randomized sham construction within disturbance strata and a larger held-out corpus before any causal claim.
 
