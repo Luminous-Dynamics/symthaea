@@ -83,6 +83,17 @@ The 2026 literature warns that >100 Wh/kg reports may be cathode-mass-normalized
 
 ## External comparators
 
+### Practical high-loading ZIHC comparator (July 2026)
+
+Wu et al., *Advanced Science*, first published 27 July 2026, deliberately studied the kinetics–loading trade-off in zinc-ion hybrid capacitors. Raising carbon cathode loading from 2 to 10 mg cm⁻² impaired high-rate retention: at 20 A g⁻¹, reported capacity retention fell from 43.8% to 17.0%. The authors addressed both transport channels by combining CNT conductive networks with directional freeze-dried, low-tortuosity long-range pore channels. Their pouch cell used 10 mg cm⁻² carbon loading and N/P ≈16.4, delivering 38.3 mAh g⁻¹ at 10 A g⁻¹ over 3,000 cycles, with 99.1% Coulombic efficiency. The reported device-level energy density was 2.82 Wh kg⁻¹ based on a 0.746 g total device weight.
+
+This is a useful practical comparator precisely because the device-level energy is much lower than many active-material-normalized headlines. Preserve the authors' own device mass basis and distinguish their coin-cell screening, electrode metrics and pouch-cell result. Do not treat 2.82 Wh kg⁻¹ as a universal commercial benchmark or claim direct parity without reproducing the same protocol and denominator.
+
+**Research implication:** our first ZIHC ablation should compare (i) conventional thick porous carbon, (ii) conductive-network-only, (iii) long-range pore architecture-only, and (iv) combined electron/ion transport design, at matched loading, electrode balance, electrolyte quantity, cell format and test protocol. This is an ablation of architecture and transport, not a race for a novel chemical formula.
+
+Source: Wu et al., DOI [10.1002/advs.76823](https://doi.org/10.1002/advs.76823); [full text](https://advanced.onlinelibrary.wiley.com/doi/full/10.1002/advs.76823).
+
+
 ### Commercial EDLC module
 
 Eaton XLR-48 public datasheet reports:
@@ -141,6 +152,14 @@ Measure:
 - battery stress / degradation only over a sufficiently long matched test.
 
 The capacitor is useful only when system-level benefit exceeds the additional mass, losses, complexity and cost.
+
+## Matched SOTA targets for ZIHC
+
+- **Parity experiment:** reproduce the Wu et al. 2026 pouch-cell result on the same reported basis: 10 mg cm⁻² carbon cathode loading, N/P ≈16.4, 10 A g⁻¹, 3,000 cycles, specific capacity and Coulombic efficiency, with complete device mass accounting and a disclosed 0.746 g denominator comparator.
+- **Stretch experiment:** improve device-level usable Wh/kg or Wh/L by at least 20% versus a matched reproduction while keeping cathode loading at or above 10 mg cm⁻², N/P no worse than 16.4, and 3,000-cycle capacity retention / energy efficiency no worse than the matched baseline. This is an internal research target, not an achieved result.
+- **Robustness experiment:** demonstrate the same improvement on at least three independent material lots, with each device tracked separately and uncertainty intervals reported. Only later, after the cross-lab minimum and power analysis, claim independent-lab reproducibility.
+
+The 20% target is deliberately subordinate to matched test conditions. It cannot be met by reducing the inactive-mass denominator, lowering the loading, increasing zinc excess, increasing electrolyte quantity or changing the voltage window without separately disclosing and benchmarking those changes.
 
 ## Benchmark tournament
 
