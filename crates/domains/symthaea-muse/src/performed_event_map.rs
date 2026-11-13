@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-pub const PERFORMED_EVENT_MAP_VERSION: &str = "mel-mr-eval-014-performed-event-map-v0.1";
+pub const PERFORMED_EVENT_MAP_VERSION: &str = "mel-mr-eval-014-performed-event-map-v0.2";
 pub const MAX_PERFORMED_EVENT_MAP_EVENTS: usize = 100_000;
 const MAX_SAMPLE_RATE_HZ: u32 = 768_000;
 const MIDI_LINEAGE_MARKER_MAGIC: &[u8; 3] = b"LDM";
@@ -43,6 +43,11 @@ pub struct PerformedEventLineage {
     pub note_on_ordinal: u32,
     pub midi_channel: u8,
     pub midi_note: u8,
+    /// Exact absolute source-domain MIDI onset/end ticks from the parsed SMF.
+    /// These are authoritative for operation-specific timing edits; microseconds
+    /// and PCM frames below are derived projections.
+    pub onset_tick: u64,
+    pub end_tick: u64,
     /// Onset and end in rounded microseconds, with a half-open interval.
     pub onset_micros: u64,
     pub end_micros: u64,
@@ -52,6 +57,13 @@ pub struct PerformedEventLineage {
     pub end_frame: u64,
 }
 
+/// A tempo-map change in absolute MIDI ticks.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PerformedEventTempoChange {
+    pub tick: u64,
+    pub microseconds_per_beat: u32,
+}
+
 /// Versioned identity and timing map between the exact target Score and MIDI.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PerformedEventMap {
@@ -59,6 +71,13 @@ pub struct PerformedEventMap {
     pub target_score_sha256: String,
     /// Hash of the exact MIDI bytes delivered to the renderer.
     pub performed_midi_sha256: String,
+    /// Exact PPQ resolution of the parsed MIDI header (SMPTE timing is rejected).
+    pub ticks_per_beat: u64,
+    /// Canonical, complete tempo map. Missing tick-zero entry means MIDI default
+    /// tempo 500,000 microseconds per beat.
+    pub tempo_changes: Vec<PerformedEventTempoChange>,
+    /// Domain-separated SHA-256 commitment to PPQ and the exact tempo map.
+    pub tempo_map_sha256: String,
     pub sample_rate_hz: u32,
     pub total_frames: u64,
     pub events: Vec<PerformedEventLineage>,
@@ -162,6 +181,18 @@ fn sha256_hex(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     format!("{:x}", hasher.finalize())
+}
+
+fn compute_tempo_map_sha256(
+    ticks_per_beat: u64,
+    tempo_changes: &[PerformedEventTempoChange],
+) -> Result<String, PerformedEventMapError> {
+    let bytes = serde_json::to_vec(&(ticks_per_beat, tempo_changes))
+        .map_err(|_| PerformedEventMapError::SerializationFailure)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous-dynamics-performed-event-tempo-map-v1\0");
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 fn parse_score_event_id(value: &str) -> Option<usize> {
@@ -272,6 +303,8 @@ fn close_midi_note(
             note_on_ordinal: note.note_on_ordinal,
             midi_channel: note.midi_channel,
             midi_note: note.midi_note,
+            onset_tick: note.onset_tick,
+            end_tick,
             onset_frame: frame_for_time_micros(onset_micros, sample_rate_hz)?,
             end_frame: frame_for_time_micros(end_micros, sample_rate_hz)?,
             onset_micros,
@@ -462,10 +495,21 @@ impl PerformedEventMap {
             }
         }
 
+        let tempo_changes: Vec<PerformedEventTempoChange> = tempo_changes
+            .into_iter()
+            .map(|(tick, microseconds_per_beat)| PerformedEventTempoChange {
+                tick,
+                microseconds_per_beat,
+            })
+            .collect();
+        let tempo_map_sha256 = compute_tempo_map_sha256(ticks_per_beat, &tempo_changes)?;
         let mut map = Self {
             map_version: PERFORMED_EVENT_MAP_VERSION.into(),
             target_score_sha256: target_score_sha256.into(),
             performed_midi_sha256: sha256_hex(midi_bytes),
+            ticks_per_beat,
+            tempo_changes,
+            tempo_map_sha256,
             sample_rate_hz,
             total_frames,
             events,
@@ -762,6 +806,23 @@ impl PerformedEventMap {
         if !is_lower_hex_sha256(&self.performed_midi_sha256) {
             return Err(PerformedEventMapError::InvalidSha256("performed_midi_sha256"));
         }
+        if self.ticks_per_beat == 0 || self.tempo_changes.len() > 65_536 {
+            return Err(PerformedEventMapError::UnsupportedMidiTiming);
+        }
+        if self.tempo_changes.windows(2).any(|pair| pair[0].tick >= pair[1].tick)
+            || self.tempo_changes.iter().any(|change| change.microseconds_per_beat == 0)
+        {
+            return Err(PerformedEventMapError::InvalidTempoMap);
+        }
+        if compute_tempo_map_sha256(self.ticks_per_beat, &self.tempo_changes)?
+            != self.tempo_map_sha256
+        {
+            return Err(PerformedEventMapError::InvalidTempoMap);
+        }
+        let raw_tempo_changes: Vec<(u64, u32)> = self.tempo_changes
+            .iter()
+            .map(|change| (change.tick, change.microseconds_per_beat))
+            .collect();
         if self.sample_rate_hz == 0 || self.sample_rate_hz > MAX_SAMPLE_RATE_HZ {
             return Err(PerformedEventMapError::InvalidField("sample_rate_hz"));
         }
@@ -784,7 +845,14 @@ impl PerformedEventMap {
             if event.midi_note > 127 {
                 return Err(PerformedEventMapError::InvalidMidiNote);
             }
-            if event.onset_micros >= event.end_micros {
+            if event.onset_tick >= event.end_tick || event.onset_micros >= event.end_micros {
+                return Err(PerformedEventMapError::InvalidTimeInterval);
+            }
+            if event.onset_micros
+                != midi_tick_to_micros(event.onset_tick, self.ticks_per_beat, &raw_tempo_changes)?
+                || event.end_micros
+                    != midi_tick_to_micros(event.end_tick, self.ticks_per_beat, &raw_tempo_changes)?
+            {
                 return Err(PerformedEventMapError::InvalidTimeInterval);
             }
             if event.onset_frame >= event.end_frame || event.end_frame > self.total_frames {
@@ -836,7 +904,7 @@ impl PerformedEventMap {
         let bytes = serde_json::to_vec(&canonical)
             .map_err(|_| PerformedEventMapError::SerializationFailure)?;
         let mut hasher = Sha256::new();
-        hasher.update(b"luminous-dynamics-performed-event-map-v1\0");
+        hasher.update(b"luminous-dynamics-performed-event-map-v2\0");
         hasher.update(bytes);
         Ok(format!("{:x}", hasher.finalize()))
     }
@@ -866,6 +934,8 @@ mod tests {
             note_on_ordinal,
             midi_channel: 0,
             midi_note,
+            onset_tick: onset_micros * 480 / 500_000,
+            end_tick: end_micros * 480 / 500_000,
             onset_micros,
             end_micros,
             onset_frame: frame_for_time_micros(onset_micros, 48_000).unwrap(),
@@ -878,6 +948,19 @@ mod tests {
             map_version: PERFORMED_EVENT_MAP_VERSION.into(),
             target_score_sha256: digest('a'),
             performed_midi_sha256: digest('b'),
+            ticks_per_beat: 480,
+            tempo_changes: vec![PerformedEventTempoChange {
+                tick: 0,
+                microseconds_per_beat: 500_000,
+            }],
+            tempo_map_sha256: compute_tempo_map_sha256(
+                480,
+                &[PerformedEventTempoChange {
+                    tick: 0,
+                    microseconds_per_beat: 500_000,
+                }],
+            )
+            .unwrap(),
             sample_rate_hz: 48_000,
             total_frames: 48_000,
             events: vec![
@@ -938,6 +1021,13 @@ mod tests {
         assert_eq!(event.note_on_ordinal, 0);
         assert_eq!(event.midi_channel, 0);
         assert_eq!(event.midi_note, 60);
+        assert_eq!(event.onset_tick, 0);
+        assert_eq!(event.end_tick, 480);
+        assert_eq!(map.ticks_per_beat, 480);
+        assert_eq!(map.tempo_changes, vec![PerformedEventTempoChange {
+            tick: 0,
+            microseconds_per_beat: 500_000,
+        }]);
         assert_eq!(event.onset_micros, 0);
         assert_eq!(event.end_micros, 500_000);
         assert_eq!(event.onset_frame, 0);
