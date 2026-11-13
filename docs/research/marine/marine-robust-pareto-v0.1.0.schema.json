@@ -399,11 +399,17 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "gate_id",
-        "status",
         "audit_contract_id",
         "audit_receipt_sha256",
-        "requirement_reference"
+        "audited_candidate_id",
+        "environment_fingerprint_sha256",
+        "gate_id",
+        "operating_point_receipt_sha256",
+        "propeller_revision",
+        "requirement_reference",
+        "service_fingerprint_sha256",
+        "status",
+        "vessel_revision"
       ],
       "properties": {
         "gate_id": {
@@ -427,6 +433,27 @@
         "requirement_reference": {
           "type": "string",
           "minLength": 1
+        },
+        "audited_candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vessel_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "propeller_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operating_point_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "service_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
         }
       }
     }
