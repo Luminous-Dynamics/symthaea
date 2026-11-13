@@ -480,28 +480,30 @@ pub fn validate_corpus_sample_manifest(
                 sample_id: sample.sample_id.clone(),
             });
         }
-        if is_safe_relative_path(&sample.input_relative_path) {
-            let key = (sample.fold_id.clone(), sample.input_relative_path.clone());
-            if path_splits
-                .insert(key.clone(), sample.split)
-                .is_some_and(|previous| previous != sample.split)
-            {
-                issues.push(CorpusQualificationIssueV1::PathLeakage {
-                    fold_id: key.0,
-                    path: key.1,
-                });
+        if track.split_policy.exact_artifact_disjoint {
+            if is_safe_relative_path(&sample.input_relative_path) {
+                let key = (sample.fold_id.clone(), sample.input_relative_path.clone());
+                if path_splits
+                    .insert(key.clone(), sample.split)
+                    .is_some_and(|previous| previous != sample.split)
+                {
+                    issues.push(CorpusQualificationIssueV1::PathLeakage {
+                        fold_id: key.0,
+                        path: key.1,
+                    });
+                }
             }
-        }
-        if is_safe_relative_path(&sample.reference_relative_path) {
-            let key = (sample.fold_id.clone(), sample.reference_relative_path.clone());
-            if path_splits
-                .insert(key.clone(), sample.split)
-                .is_some_and(|previous| previous != sample.split)
-            {
-                issues.push(CorpusQualificationIssueV1::PathLeakage {
-                    fold_id: key.0,
-                    path: key.1,
-                });
+            if is_safe_relative_path(&sample.reference_relative_path) {
+                let key = (sample.fold_id.clone(), sample.reference_relative_path.clone());
+                if path_splits
+                    .insert(key.clone(), sample.split)
+                    .is_some_and(|previous| previous != sample.split)
+                {
+                    issues.push(CorpusQualificationIssueV1::PathLeakage {
+                        fold_id: key.0,
+                        path: key.1,
+                    });
+                }
             }
         }
         if !is_sha256(&sample.input_sha256) {
