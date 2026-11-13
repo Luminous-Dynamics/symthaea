@@ -2,8 +2,8 @@
 
 //! Executable Clarabel 0.11.1 SDP smoke tests for AIRROAD's PSD mapping.
 //!
-//! This project is a nested Cargo workspace so it can depend on the AIRROAD
-//! crate without resolving the large Symthaea root workspace.
+//! This project is a nested Cargo workspace. It compiles the exact checked-in
+//! AIRROAD matrix source as a module without resolving the root workspace.
 
 use clarabel::algebra::CscMatrix;
 use clarabel::solver::{
