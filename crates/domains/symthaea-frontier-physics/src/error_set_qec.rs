@@ -494,10 +494,21 @@ pub fn positive_semidefinite_square_root(
         });
     }
 
+    // Project the accepted roundoff-level skew-Hermitian component away
+    // explicitly before calling the Hermitian eigensolver. The raw residual
+    // above remains part of the receipt and the final reconstruction is checked
+    // against the original unmodified input.
+    let mut hermitian_entries = vec![Complex64::new(0.0, 0.0); dimension * dimension];
+    for row in 0..dimension {
+        for column in 0..dimension {
+            hermitian_entries[row * dimension + column] =
+                (matrix.get(row, column) + matrix.get(column, row).conj()) * 0.5;
+        }
+    }
     let dense = DMatrix::<Complex64>::from_row_slice(
         dimension,
         dimension,
-        matrix.entries(),
+        &hermitian_entries,
     );
     let max_iterations = 10_000usize.max(64usize.saturating_mul(dimension.saturating_mul(dimension)));
     let decomposition = dense
