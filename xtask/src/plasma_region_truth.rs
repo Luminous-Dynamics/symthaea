@@ -1,6 +1,6 @@
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
@@ -99,10 +99,20 @@ fn evaluate_case(case: &Value) -> Result<&'static str> {
         return Ok("REJECTED");
     }
 
-    if string(case, "source_observation_id")?.is_empty()
-        || string(case, "support_id")?.is_empty()
+    let source_ids = string_array(case, "source_observation_ids")?;
+    let support_ids = string_array(case, "support_ids")?;
+    let claimed = number(case, "claimed_independent_count")?;
+    let unique_sources: BTreeSet<&str> = source_ids.iter().map(String::as_str).collect();
+    let unique_supports: BTreeSet<&str> = support_ids.iter().map(String::as_str).collect();
+    if source_ids.is_empty()
+        || support_ids.is_empty()
+        || source_ids.len() != support_ids.len()
+        || claimed < 1.0
+        || claimed != source_ids.len() as f64
+        || unique_sources.len() != source_ids.len()
+        || unique_supports.len() != support_ids.len()
     {
-        return Ok("BLOCKED");
+        return Ok("REJECTED");
     }
 
     // Geometry identity is exact: an old transform cannot be applied to a new mesh.
@@ -120,14 +130,6 @@ fn evaluate_case(case: &Value) -> Result<&'static str> {
 
     // A shared causal group is not independent evidence without a selected-set
     // covariance receipt. Distinct row IDs do not establish independence.
-    let claimed = number(case, "claimed_independent_count")?;
-    let unique = number(case, "unique_source_count")?;
-    if claimed < 1.0 || unique < 1.0 || claimed > unique {
-        return Ok("REJECTED");
-    }
-    if boolean(case, "duplicate_source_ids")? {
-        return Ok("REJECTED");
-    }
     if boolean(case, "shared_common_cause")?
         && claimed > 1.0
         && !boolean(case, "covariance_receipt_present")?
@@ -280,6 +282,18 @@ mod tests {
             .find(|case| case["id"] == "REGISTRATION_BOUNDARY")
             .expect("known case");
         assert_eq!(evaluate_case(case).expect("evaluate"), "BLOCKED");
+    }
+
+    #[test]
+    fn duplicate_observation_and_support_ids_are_derived_and_rejected() {
+        let root: Value = serde_json::from_str(FIXTURE).expect("valid fixture");
+        let case = root["cases"]
+            .as_array()
+            .expect("cases")
+            .iter()
+            .find(|case| case["id"] == "DUPLICATE_SUPPORT")
+            .expect("known case");
+        assert_eq!(evaluate_case(case).expect("evaluate"), "REJECTED");
     }
 
     #[test]
