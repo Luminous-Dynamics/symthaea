@@ -1,0 +1,15 @@
+[package]
+name = "airroad-acoustic-evidence-oracle"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "Evidence validator for synchronized rotor aeroacoustic measurement bundles"
+license = "AGPL-3.0-or-later"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+
+[workspace]
