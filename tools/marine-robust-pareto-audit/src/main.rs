@@ -1059,6 +1059,10 @@ mod tests {
             calibration_or_validation_sha256: digest('b'),
             timebase_receipt_sha256: digest('c'),
             operating_point_receipt_sha256: digest('d'),
+            measurement_basis: None,
+            reference_distance_m: None,
+            frequency_band_id: None,
+            bandwidth_convention: None,
         }
     }
 
@@ -1078,6 +1082,22 @@ mod tests {
             observation.operating_point_receipt_sha256 = operating_point_receipt_sha256.clone();
             if observation.metric_id == "availability" {
                 observation.expanded_uncertainty = 0.005;
+            }
+            if observation.metric_id == "acoustic_1khz" {
+                observation.measurement_basis = Some("underwater_source_level".to_string());
+                observation.reference_distance_m = Some(1.0);
+                observation.frequency_band_id = Some("one-third-octave-1khz".to_string());
+                observation.bandwidth_convention = Some("one_third_octave".to_string());
+            } else if observation.metric_id == "acoustic_2_5khz" {
+                observation.measurement_basis = Some("underwater_source_level".to_string());
+                observation.reference_distance_m = Some(1.0);
+                observation.frequency_band_id = Some("one-third-octave-2_5khz".to_string());
+                observation.bandwidth_convention = Some("one_third_octave".to_string());
+            } else if observation.metric_id == "acoustic_30_80khz" {
+                observation.measurement_basis = Some("underwater_source_level".to_string());
+                observation.reference_distance_m = Some(1.0);
+                observation.frequency_band_id = Some("30_80khz".to_string());
+                observation.bandwidth_convention = Some("constant_bandwidth".to_string());
             }
         }
         Candidate {
@@ -1225,41 +1245,73 @@ mod tests {
                     metric_id: "energy_per_cargo_work".to_string(),
                     direction: Direction::Minimize,
                     unit: "kWh_per_1000_tonne_nm".to_string(),
+                    measurement_basis: None,
+                    reference_distance_m: None,
+                    frequency_band_id: None,
+                    bandwidth_convention: None,
                 },
                 ObjectiveDefinition {
                     metric_id: "well_to_wake_ghg_per_cargo_work".to_string(),
                     direction: Direction::Minimize,
                     unit: "kgCO2e_per_1000_tonne_nm".to_string(),
+                    measurement_basis: None,
+                    reference_distance_m: None,
+                    frequency_band_id: None,
+                    bandwidth_convention: None,
                 },
                 ObjectiveDefinition {
                     metric_id: "acoustic_1khz".to_string(),
                     direction: Direction::Minimize,
                     unit: "dB_re_1uPa_at_declared_reference".to_string(),
+                    measurement_basis: Some("underwater_source_level".to_string()),
+                    reference_distance_m: Some(1.0),
+                    frequency_band_id: Some("one-third-octave-1khz".to_string()),
+                    bandwidth_convention: Some("one_third_octave".to_string()),
                 },
                 ObjectiveDefinition {
                     metric_id: "acoustic_2_5khz".to_string(),
                     direction: Direction::Minimize,
                     unit: "dB_re_1uPa_at_declared_reference".to_string(),
+                    measurement_basis: Some("underwater_source_level".to_string()),
+                    reference_distance_m: Some(1.0),
+                    frequency_band_id: Some("one-third-octave-2_5khz".to_string()),
+                    bandwidth_convention: Some("one_third_octave".to_string()),
                 },
                 ObjectiveDefinition {
                     metric_id: "acoustic_30_80khz".to_string(),
                     direction: Direction::Minimize,
                     unit: "dB_re_1uPa_at_declared_reference".to_string(),
+                    measurement_basis: Some("underwater_source_level".to_string()),
+                    reference_distance_m: Some(1.0),
+                    frequency_band_id: Some("30_80khz".to_string()),
+                    bandwidth_convention: Some("constant_bandwidth".to_string()),
                 },
                 ObjectiveDefinition {
                     metric_id: "lifecycle_cost".to_string(),
                     direction: Direction::Minimize,
                     unit: "USD_per_1000_tonne_nm".to_string(),
+                    measurement_basis: None,
+                    reference_distance_m: None,
+                    frequency_band_id: None,
+                    bandwidth_convention: None,
                 },
                 ObjectiveDefinition {
                     metric_id: "maintenance_hours_per_cargo_work".to_string(),
                     direction: Direction::Minimize,
                     unit: "hours_per_1000_tonne_nm".to_string(),
+                    measurement_basis: None,
+                    reference_distance_m: None,
+                    frequency_band_id: None,
+                    bandwidth_convention: None,
                 },
                 ObjectiveDefinition {
                     metric_id: "availability".to_string(),
                     direction: Direction::Maximize,
                     unit: "fraction".to_string(),
+                    measurement_basis: None,
+                    reference_distance_m: None,
+                    frequency_band_id: None,
+                    bandwidth_convention: None,
                 },
             ],
             hard_gates: vec![
@@ -1273,6 +1325,10 @@ mod tests {
                     required_audit_contract_id: None,
                     requirement_reference: "operator-limit:acoustic-1khz".to_string(),
                     non_compensable: true,
+                    measurement_basis: Some("underwater_source_level".to_string()),
+                    reference_distance_m: Some(1.0),
+                    frequency_band_id: Some("one-third-octave-1khz".to_string()),
+                    bandwidth_convention: Some("one_third_octave".to_string()),
                 },
                 HardGateDefinition {
                     gate_id: "acoustic-30-80khz-maximum".to_string(),
@@ -1284,6 +1340,10 @@ mod tests {
                     required_audit_contract_id: None,
                     requirement_reference: "operator-limit:acoustic-30-80khz".to_string(),
                     non_compensable: true,
+                    measurement_basis: Some("underwater_source_level".to_string()),
+                    reference_distance_m: Some(1.0),
+                    frequency_band_id: Some("30_80khz".to_string()),
+                    bandwidth_convention: Some("constant_bandwidth".to_string()),
                 },
                 HardGateDefinition {
                     gate_id: "availability-minimum".to_string(),
@@ -1295,6 +1355,10 @@ mod tests {
                     required_audit_contract_id: None,
                     requirement_reference: "service-contract:minimum-availability".to_string(),
                     non_compensable: true,
+                    measurement_basis: None,
+                    reference_distance_m: None,
+                    frequency_band_id: None,
+                    bandwidth_convention: None,
                 },
                 HardGateDefinition {
                     gate_id: "biosecurity-release".to_string(),
@@ -1306,6 +1370,10 @@ mod tests {
                     required_audit_contract_id: Some("marine-biofouling-evidence-audit-v0.1".to_string()),
                     requirement_reference: "permit:zero-uncontained-organism-release".to_string(),
                     non_compensable: true,
+                    measurement_basis: None,
+                    reference_distance_m: None,
+                    frequency_band_id: None,
+                    bandwidth_convention: None,
                 },
                 HardGateDefinition {
                     gate_id: "cleaning-waste-authorization".to_string(),
@@ -1317,6 +1385,10 @@ mod tests {
                     required_audit_contract_id: Some("marine-biofouling-evidence-audit-v0.1".to_string()),
                     requirement_reference: "permit:in-water-cleaning-authorized-and-waste-captured".to_string(),
                     non_compensable: true,
+                    measurement_basis: None,
+                    reference_distance_m: None,
+                    frequency_band_id: None,
+                    bandwidth_convention: None,
                 },
                 HardGateDefinition {
                     gate_id: "acoustic-scale-transfer-evidence".to_string(),
@@ -1328,6 +1400,10 @@ mod tests {
                     required_audit_contract_id: Some("marine-acoustic-scale-transfer-audit-v0.1.0".to_string()),
                     requirement_reference: "measurement:scale-transfer-reviewed-on-held-out-full-scale-data".to_string(),
                     non_compensable: true,
+                    measurement_basis: None,
+                    reference_distance_m: None,
+                    frequency_band_id: None,
+                    bandwidth_convention: None,
                 },
                 HardGateDefinition {
                     gate_id: "acoustic-source-identifiability".to_string(),
@@ -1339,6 +1415,10 @@ mod tests {
                     required_audit_contract_id: Some("marine-acoustic-source-contrast-audit-v0.1.0".to_string()),
                     requirement_reference: "measurement:source-state-contrast-reviewed".to_string(),
                     non_compensable: true,
+                    measurement_basis: None,
+                    reference_distance_m: None,
+                    frequency_band_id: None,
+                    bandwidth_convention: None,
                 },
                 HardGateDefinition {
                     gate_id: "cavitation-intermittency-characterization".to_string(),
@@ -1350,6 +1430,10 @@ mod tests {
                     required_audit_contract_id: Some("marine-cavitation-intermittency-audit-v0.1.0".to_string()),
                     requirement_reference: "measurement:cavitation-intermittency-distribution-reviewed".to_string(),
                     non_compensable: true,
+                    measurement_basis: None,
+                    reference_distance_m: None,
+                    frequency_band_id: None,
+                    bandwidth_convention: None,
                 },
                 HardGateDefinition {
                     gate_id: "vibration-coherence-characterization".to_string(),
@@ -1361,6 +1445,10 @@ mod tests {
                     required_audit_contract_id: Some("marine-vibration-coherence-audit-v0.1.0".to_string()),
                     requirement_reference: "measurement:vibration-coherent-pressure-component-reviewed".to_string(),
                     non_compensable: true,
+                    measurement_basis: None,
+                    reference_distance_m: None,
+                    frequency_band_id: None,
+                    bandwidth_convention: None,
                 },
                 HardGateDefinition {
                     gate_id: "rotation-synchronous-modulation".to_string(),
@@ -1372,10 +1460,53 @@ mod tests {
                     required_audit_contract_id: Some("marine-rotation-synchronous-modulation-audit-v0.1.0".to_string()),
                     requirement_reference: "measurement:rotation-synchronous-envelope-reviewed".to_string(),
                     non_compensable: true,
+                    measurement_basis: None,
+                    reference_distance_m: None,
+                    frequency_band_id: None,
+                    bandwidth_convention: None,
                 },
             ],
             candidates: vec![a, b],
         }
+    }
+
+    #[test]
+    fn acoustic_metrics_require_explicit_source_level_reference_and_band_context() {
+        let mut input = case();
+        input.candidates[0].metrics.iter_mut()
+            .find(|metric| metric.metric_id == "acoustic_1khz").unwrap()
+            .reference_distance_m = None;
+        assert!(validate_case(&input).iter().any(|reason| reason.contains("underwater_source_level")));
+
+        let mut input = case();
+        input.candidates[0].metrics.iter_mut()
+            .find(|metric| metric.metric_id == "acoustic_1khz").unwrap()
+            .frequency_band_id = Some("wrong-band".to_string());
+        assert!(validate_case(&input).iter().any(|reason| reason.contains("acoustic source-level band")));
+
+        let mut input = case();
+        input.candidates[0].metrics.iter_mut()
+            .find(|metric| metric.metric_id == "acoustic_1khz").unwrap()
+            .measurement_basis = Some("received_sound_pressure_level".to_string());
+        assert!(validate_case(&input).iter().any(|reason| reason.contains("underwater_source_level")));
+    }
+
+    #[test]
+    fn acoustic_metric_hard_gate_must_match_exact_source_level_context() {
+        let mut input = case();
+        input.hard_gates.iter_mut()
+            .find(|gate| gate.gate_id == "acoustic-maximum-1khz").unwrap()
+            .reference_distance_m = Some(10.0);
+        assert!(validate_case(&input).iter().any(|reason| reason.contains("acoustic source-level band/basis/reference distance")));
+    }
+
+    #[test]
+    fn acoustic_reference_and_band_must_match_across_candidates() {
+        let mut input = case();
+        input.candidates[1].metrics.iter_mut()
+            .find(|metric| metric.metric_id == "acoustic_1khz").unwrap()
+            .reference_distance_m = Some(10.0);
+        assert!(validate_case(&input).iter().any(|reason| reason.contains("different acoustic source-level reference/band")));
     }
 
     #[test]
