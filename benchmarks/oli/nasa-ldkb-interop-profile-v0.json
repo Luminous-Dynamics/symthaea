@@ -1,0 +1,237 @@
+{
+  "schema_version": "oli-nasa-ldkb-interop-v0.1",
+  "case_id": "OLI-NASA-LDKB-INTEROPERABILITY-001",
+  "status": "INTEROPERABILITY_DESIGN_ONLY_NO_NASA_DATA_IMPORTED",
+  "claim_ceiling": "Proposed mapping between OLI evidence/experiment contracts and NASA's community-owned life-detection knowledge/mission-planning resources; not an endorsed NASA integration or replacement.",
+  "source_resources": [
+    {
+      "name": "NASA Life Detection Knowledge Base (LDKB)",
+      "url": "https://science.nasa.gov/astrobiology/researchers/life-detection-resources/ldkb/",
+      "resource_type": "community-maintained evidence knowledge base",
+      "described_taxonomy": [
+        "Chemistry",
+        "Structure",
+        "Activity"
+      ],
+      "evaluation_dimensions": [
+        "biological_prevalence",
+        "abiotic_prevalence",
+        "biological_signal_strength",
+        "abiotic_signal_strength"
+      ],
+      "contribution_model": "user-developed arguments supported by literature evidence, with gaps identified for community completion",
+      "last_verified": "2026-11-12"
+    },
+    {
+      "name": "NASA Life Detection Forum (LDF)",
+      "url": "https://lifedetectionforum.com/",
+      "resource_type": "mission-planning webtool suite",
+      "modules": [
+        "Life Detection Knowledge Base",
+        "Measurement Technology Module",
+        "Science Traceability Tool"
+      ],
+      "purpose": "connect life-detection objectives, evidence knowledge, measurement technologies and instrument requirements",
+      "last_verified": "2026-11-12"
+    },
+    {
+      "name": "NASA Ladder of Life Detection",
+      "url": "https://science.nasa.gov/astrobiology/researchers/life-detection-resources/ladder-of-life-detection/",
+      "resource_type": "community discussion and mission-design framework",
+      "constraints": "not a definitive final product, not a universal ranking, and not an instrument or biosignature endorsement",
+      "last_verified": "2026-11-12"
+    },
+    {
+      "name": "Life Detection Knowledge Base: A Community Tool for Knowledge Management and Representation",
+      "doi": "10.1089/ast.2024.0106",
+      "url": "https://doi.org/10.1089/ast.2024.0106",
+      "published": "2025-06-24",
+      "contribution": "describes a shared taxonomy, four standardized assessment dimensions, user-defined evidence arguments and links to measurement technologies and traceability"
+    }
+  ],
+  "architecture_position": {
+    "principle": "Complement and interoperate; do not clone a community-maintained knowledge base or claim superiority on a different task.",
+    "nasa_strengths": [
+      "Community-maintained knowledge and expert-authored scientific arguments",
+      "A biosignature taxonomy spanning chemistry, structure and activity",
+      "Explicit biological/abiotic prevalence and signal-strength dimensions",
+      "Measurement Technology Module",
+      "Science Traceability Tool linking science objectives to measurement and instrument requirements",
+      "Living resource that makes knowledge gaps visible"
+    ],
+    "oli_differentiation_targets": [
+      "Machine-executable typed evidence and observation contracts",
+      "Model-adequacy diagnostics and calibrated abstention",
+      "Causal intervention/sham experiment manifests",
+      "Deterministic simulation controls and open-world adversarial benchmarks",
+      "Source/artifact digests, common-cause groups and independent replay receipts",
+      "Explicit spatial/temporal observability, sampling and detector calibration",
+      "Cross-project connections to physics simulation, spatial evidence and rights-aware provenance"
+    ],
+    "non_claims": [
+      "No NASA endorsement or partnership is implied.",
+      "No claim that LDKB is inferior, obsolete or a classifier.",
+      "No import of NASA community data without permission and source-level attribution.",
+      "No automatic conversion of the four LDKB criteria into a single probability of life.",
+      "No universal scalar ranking of life signatures."
+    ]
+  },
+  "conceptual_mapping": [
+    {
+      "nasa_concept": "biosignature taxonomy entry (chemistry/structure/activity)",
+      "oli_representation": "PropertyQuestion + MechanismHypothesis + scoped ObservablePrediction",
+      "rule": "Preserve the NASA taxonomy term and entry URI as external references; do not silently replace the taxonomy with the OLI substrate ontology."
+    },
+    {
+      "nasa_concept": "literature argument supporting or opposing a biosignature",
+      "oli_representation": "EvidenceRecord + EvidenceConflict + source-level provenance",
+      "rule": "Represent support and contradiction as separate claims; distinct record IDs do not imply independent sources."
+    },
+    {
+      "nasa_concept": "biological prevalence / abiotic prevalence",
+      "oli_representation": "environment-conditioned prior evidence and competing hypothesis context",
+      "rule": "Keep qualitative/quantitative/unknown values, source, environmental scope and uncertainty. Do not force unknown values to zero or one."
+    },
+    {
+      "nasa_concept": "biological signal strength / abiotic signal strength",
+      "oli_representation": "observable response model + likelihood/calibration evidence + abiotic baseline",
+      "rule": "Do not confuse signal strength with posterior probability that life exists."
+    },
+    {
+      "nasa_concept": "Measurement Technology Module",
+      "oli_representation": "ObservationCoverage + instrument capability evidence + calibration records",
+      "rule": "Include units, detection limits, reference abundance, detection probability, spatial footprint, cadence, sample preparation and known false-negative modes."
+    },
+    {
+      "nasa_concept": "Science Traceability Tool",
+      "oli_representation": "science objective -> PropertyQuestion -> ObservablePrediction -> InterventionCandidate/MeasurementCandidate -> instrument constraints -> evidence obligation",
+      "rule": "Every proposal remains advisory; execution, sample acquisition and intervention require separate human/facility/legal authorization."
+    },
+    {
+      "nasa_concept": "Ladder of Life Detection",
+      "oli_representation": "external contextual framework reference plus environment-specific criteria",
+      "rule": "Do not use rung position as a universal life score or replace context-specific judgment with a global ranking."
+    }
+  ],
+  "exchange_contract": {
+    "external_identity": {
+      "required_fields": [
+        "framework_name",
+        "framework_version_or_access_date",
+        "entry_id_or_uri",
+        "original_term",
+        "original_category"
+      ],
+      "rule": "Never discard external IDs or normalize away the source vocabulary."
+    },
+    "claim": {
+      "required_fields": [
+        "claim_text",
+        "scope",
+        "environment",
+        "source_ref",
+        "source_artifact_digest_if_available",
+        "support_or_counter_argument",
+        "uncertainty",
+        "review_status"
+      ],
+      "rule": "A claim is not a measurement and not a truth label."
+    },
+    "measurement": {
+      "required_fields": [
+        "observable",
+        "modality",
+        "instrument_or_method",
+        "units",
+        "detection_limit",
+        "calibration_reference",
+        "spatial_coverage",
+        "temporal_coverage",
+        "sampling_interval",
+        "false_negative_risks"
+      ],
+      "rule": "Unknown measurement metadata stays unknown; no inferred capability."
+    },
+    "experiment": {
+      "required_fields": [
+        "rival_hypotheses",
+        "predicted_outcomes",
+        "intervention_or_measurement",
+        "sham_or_passive_control",
+        "resource_cost",
+        "safety_and_authority_constraints",
+        "stopping_rule"
+      ],
+      "rule": "The experiment selector can rank proposals, not actuate instruments or contact entities."
+    },
+    "provenance": {
+      "required_fields": [
+        "source_uri",
+        "access_date",
+        "artifact_sha256",
+        "license_or_permission",
+        "independence_group",
+        "transformation_history"
+      ],
+      "rule": "No bulk scraping or rehosting of community material. Record permissions and cite original entries."
+    }
+  },
+  "benchmarks": [
+    {
+      "id": "LDKB_TRACEABILITY_MAPPING",
+      "task": "Map selected NASA biosignature entries through objective, observable, measurement and instrument requirements without losing their external IDs or definitions.",
+      "metrics": [
+        "field_mapping_completeness",
+        "source_link_integrity",
+        "term_preservation",
+        "human_adjudication_agreement"
+      ],
+      "acceptance": "100% of mapped records retain original URI/ID and source terminology; unmapped fields remain explicitly unknown."
+    },
+    {
+      "id": "FOUR_DIMENSION_EVIDENCE_COMPLETENESS",
+      "task": "Check whether biological/abiotic prevalence and signal-strength arguments have cited evidence and declared environment scope.",
+      "metrics": [
+        "evidence_coverage_by_dimension",
+        "missingness_detection_recall",
+        "source_provenance_completeness"
+      ],
+      "acceptance": "No missing dimension is silently imputed; all gaps produce explicit evidence obligations."
+    },
+    {
+      "id": "TRACEABILITY_TO_EXECUTABLE_EXPERIMENT",
+      "task": "Convert a selected evidence gap into a bounded, advisory experiment proposal with rival predictions, controls, observability and cost.",
+      "metrics": [
+        "traceability_completeness",
+        "exact_oracle_regret_on_bounded_cases",
+        "inadmissible_proposal_count"
+      ],
+      "acceptance": "Zero proposals bypass safety/rights/authorization constraints."
+    },
+    {
+      "id": "REPLAY_AND_INDEPENDENT_REVIEW",
+      "task": "A separate evaluator reconstructs the evidence path from external entry through raw measurement, inference and experiment proposal.",
+      "metrics": [
+        "replay_parity",
+        "artifact_digest_match",
+        "reviewer_disagreement",
+        "unresolved_claim_rate"
+      ],
+      "acceptance": "Every displayed conclusion is traceable to versioned evidence; disputed or unverified claims remain unresolved."
+    }
+  ],
+  "data_policy": {
+    "nasa_entries_imported": false,
+    "nasa_data_rehosted": false,
+    "source_scraping_authorized": false,
+    "intended_mode": "user-authorized linking/citation or documented export/API if provided by the resource owner",
+    "license_review_required": true,
+    "community_attribution_required": true
+  },
+  "results": {
+    "interoperability_implemented": false,
+    "nasa_integration_tested": false,
+    "source_data_imported": false,
+    "status": "DESIGN_SPECIFICATION_ONLY"
+  }
+}

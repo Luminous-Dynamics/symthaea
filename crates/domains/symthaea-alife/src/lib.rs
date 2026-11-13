@@ -23,6 +23,7 @@
 //!
 //! Neither claim is about consciousness or Φ — see the plan doc's Non-goals.
 
+pub mod agnostic_evidence;
 pub mod agent_id;
 pub mod coalition;
 pub mod earth_forcing;
@@ -41,6 +42,11 @@ pub mod population;
 pub mod predator_prey;
 pub mod types;
 
+pub use agnostic_evidence::{
+    AlternativeHypothesis, EvidenceBasis, EvidenceOutcome, EvidenceRecord, HypothesisClass,
+    ObservationCoverage, Property, PropertyAssessment, PropertyFinding, SystemProfile,
+    SYMTHAEA_OLI_CONTEXT_VERSION,
+};
 pub use agent_id::{AgentId, AgentIdAllocator};
 pub use coalition::{Coalition, detect_coalitions, detect_paying_coalitions};
 pub use earth_forcing::EarthForcedEnvironment;
