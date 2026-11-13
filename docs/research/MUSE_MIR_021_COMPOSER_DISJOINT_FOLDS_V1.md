@@ -74,7 +74,8 @@ causes replay to fail.
 - one work mapped to multiple composers is rejected;
 - unsupported split policies and training-prohibited tracks are rejected;
 - invalid fold count, malformed seed and too few composer groups are rejected;
-- duplicate sample IDs and unsafe paths are rejected;
+- duplicate sample IDs, malformed input/reference hashes and unsafe paths are rejected;
+- inventory size limits are enforced before grouping or cloning candidate rows;
 - tampered manifests and changed source inventory fail replay;
 - source inventory ordering does not change the plan.
 
