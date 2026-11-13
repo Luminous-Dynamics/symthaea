@@ -25,7 +25,6 @@
 //! application, charge-block SVD, TEBD, truncation or discarded-weight bounds.
 
 use nalgebra::DMatrix;
-use nalgebra::DMatrix;
 use num_complex::Complex64;
 
 /// A single-site qubit tensor with explicit integer charges on both virtual bonds.
@@ -956,8 +955,8 @@ impl U1TwoSiteGate {
         }
 
         let mut charge_conservation_residual: f64 = 0.0;
-        for output in 0..4 {
-            for input in 0..4 {
+        for output in 0_usize..4 {
+            for input in 0_usize..4 {
                 if output.count_ones() != input.count_ones() {
                     charge_conservation_residual =
                         charge_conservation_residual.max(matrix[output][input].norm());
@@ -965,10 +964,10 @@ impl U1TwoSiteGate {
             }
         }
         if charge_conservation_residual > tolerance {
-            let witness = (0..4)
-                .flat_map(|output| (0..4).map(move |input| (output, input)))
+            let witness = (0_usize..4)
+                .flat_map(|output| (0_usize..4).map(move |input| (output, input)))
                 .find(|(output, input)| {
-                    output.count_ones() != input.count_ones()
+                    (*output).count_ones() != (*input).count_ones()
                         && matrix[*output][*input].norm() > tolerance
                 })
                 .unwrap_or((0, 0));
@@ -2224,7 +2223,9 @@ mod tests {
         )
         .unwrap();
         let dense = pair.to_dense_two_qubit().unwrap();
-        assert_eq!(dense, state.to_dense(2).unwrap().try_into().unwrap());
+        let dense_vec = state.to_dense(2).unwrap();
+        let dense_from_state: [Complex64; 4] = dense_vec.try_into().unwrap();
+        assert_eq!(dense, dense_from_state);
         assert!(pair.selection_rule_residual() <= 1.0e-12);
     }
 
@@ -2591,7 +2592,7 @@ mod tests {
 
     #[test]
     fn exact_two_site_split_retains_tiny_positive_schmidt_amplitude() {
-        let tiny = 1.0e-18;
+        let tiny: f64 = 1.0e-18;
         let large = (1.0 - tiny * tiny).sqrt();
         let state = U1TwoSiteState::new(
             vec![0],
