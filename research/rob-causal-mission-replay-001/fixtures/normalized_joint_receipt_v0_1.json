@@ -1,0 +1,156 @@
+{
+  "schema_id": "urn:luminous-dynamics:loco-joint-metrology-normalized-receipt:0.1.0",
+  "schema_version": "0.1.0",
+  "canonicalization": "ld-json-integer-canonical-v1",
+  "producer": {
+    "repository": "Luminous-Dynamics/symtropy",
+    "package": "loco-joint-trace-adapter",
+    "version": "0.1.0"
+  },
+  "payload_sha256": "394f94e549a4de9c2657209bcfffb426420fa9dee6dcc9b2e60c2483192cc6b5",
+  "payload": {
+    "identity": {
+      "mission_id": "mission-01",
+      "robot_id": "joint-bench-01",
+      "boot_epoch": 7,
+      "scenario_manifest_digest": "scenario-sha256",
+      "source_observation_id": "observation-01",
+      "source_event_sequence": 1,
+      "decision_id": "decision-01",
+      "decision_event_sequence": 2,
+      "proposal_id": "proposal-01",
+      "proposal_event_sequence": 3,
+      "assurance_event_id": "assurance-01",
+      "assurance_event_sequence": 4,
+      "command_id": "command-01",
+      "command_event_sequence": 5,
+      "actuator_application_event_id": "application-01",
+      "actuator_application_event_sequence": 6,
+      "actuator_application_receipt_digest": "application-receipt",
+      "source_sensor_calibration_digest": "sensor-cal",
+      "physical_transition_id": "physical-01",
+      "physical_transition_event_sequence": 7,
+      "terminal_event_id": "terminal-01",
+      "terminal_event_sequence": 8,
+      "actuator_id": "actuator-01"
+    },
+    "configuration": {
+      "actuator_configuration_digest": "actuator-config",
+      "controller_configuration_digest": "controller-config",
+      "policy_digest": "policy",
+      "model_digest": "model",
+      "action_domain_digest": "action-domain",
+      "sensor_calibration_digest": "sensor-cal",
+      "torque_transducer_calibration_digest": "torque-cal",
+      "power_analyzer_calibration_digest": "power-cal",
+      "thermal_sensor_calibration_digest": "thermal-cal",
+      "sampling_spec_digest": "sampling-spec",
+      "energy_boundary_manifest_digest": "energy-boundary",
+      "actuator_application_receipt_digest": "application-receipt",
+      "executed_prefix_expected_digest": "prefix-expected",
+      "executed_prefix_observed_digest": "prefix-expected",
+      "decision_calibration_receipt_digest": "decision-calibration"
+    },
+    "clock_relation": {
+      "kind": "same_monotonic_clock_verified"
+    },
+    "timestamp_intervals": {
+      "source_capture": {
+        "clock_id": "joint-clock",
+        "boot_epoch": 7,
+        "lower_ns": 100000000,
+        "upper_ns": 100000000
+      },
+      "actuator_application": {
+        "clock_id": "joint-clock",
+        "boot_epoch": 7,
+        "lower_ns": 110000000,
+        "upper_ns": 110000000
+      },
+      "motion_onset": {
+        "clock_id": "joint-clock",
+        "boot_epoch": 7,
+        "lower_ns": 125000000,
+        "upper_ns": 125000000
+      }
+    },
+    "decision_input": {
+      "decision_id": "decision-01",
+      "model_digest": "model",
+      "action_domain_digest": "action-domain",
+      "calibration_receipt_digest": "decision-calibration",
+      "regret_upper_units": 1,
+      "epsilon_task_loss_units": 2,
+      "valid_through_tick": 10,
+      "actuator_application_tick": 3
+    },
+    "thermal_input": {
+      "physical_transition_id": "physical-01",
+      "sensor_calibration_digest": "thermal-cal",
+      "required_node_ids": ["winding", "housing", "drive"],
+      "observed_node_ids": ["winding", "housing", "drive"],
+      "expected_predecessor_digest": "thermal-0",
+      "observed_predecessor_digest": "thermal-0",
+      "result_digest": "thermal-1",
+      "sequence_reset": false
+    },
+    "energy_input": {
+      "boundary_complete": true,
+      "boundary_manifest_digest": "energy-boundary",
+      "closure": {
+        "status": "balanced",
+        "receipt_digest": "first-law-receipt"
+      }
+    },
+    "sampling_input": {
+      "measured_rate_hz": 20000,
+      "required_rate_hz": 20000,
+      "specification_digest": "sampling-spec",
+      "specification_qualified": true
+    },
+    "terminal_safe_stop_qualified": true,
+    "terminal_reserve_state_digest": "thermal-1",
+    "report": {
+      "mission_id": "mission-01",
+      "robot_id": "joint-bench-01",
+      "actuator_id": "actuator-01",
+      "source_to_actuator_aoi": {
+        "status": "qualified",
+        "value": {"lower_ns": 10000000, "upper_ns": 10000000}
+      },
+      "command_to_motion": {
+        "status": "qualified",
+        "value": {"lower_ns": 15000000, "upper_ns": 15000000}
+      },
+      "decision": {
+        "status": "qualified",
+        "value": {"disposition": "sufficient", "regret_upper_units": 1}
+      },
+      "thermal": {
+        "status": "qualified",
+        "value": {"disposition": "continuous", "node_count": 3, "result_digest": "thermal-1"}
+      },
+      "energy": {
+        "status": "qualified",
+        "value": {"disposition": "balanced", "first_law_receipt_digest": "first-law-receipt"}
+      },
+      "sampling": {
+        "status": "qualified",
+        "value": {"disposition": "meets_declared_specification", "measured_rate_hz": 20000}
+      },
+      "terminal_safe_stop": {"status": "qualified", "value": true},
+      "causal_edges": [
+        {"from_event_id": "observation-01", "to_event_id": "decision-01", "from_sequence": 1, "to_sequence": 2},
+        {"from_event_id": "decision-01", "to_event_id": "proposal-01", "from_sequence": 2, "to_sequence": 3},
+        {"from_event_id": "proposal-01", "to_event_id": "assurance-01", "from_sequence": 3, "to_sequence": 4},
+        {"from_event_id": "assurance-01", "to_event_id": "command-01", "from_sequence": 4, "to_sequence": 5},
+        {"from_event_id": "command-01", "to_event_id": "application-01", "from_sequence": 5, "to_sequence": 6},
+        {"from_event_id": "application-01", "to_event_id": "physical-01", "from_sequence": 6, "to_sequence": 7},
+        {"from_event_id": "physical-01", "to_event_id": "terminal-01", "from_sequence": 7, "to_sequence": 8}
+      ],
+      "causal_chain_complete": true,
+      "mission_closure": {"status": "closed", "unqualified_domains": []},
+      "actuation_authorized": false
+    }
+  }
+}
