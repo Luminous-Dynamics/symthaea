@@ -1,0 +1,46 @@
+name: Vocal control candidate allocator
+
+on:
+  pull_request:
+    paths:
+      - "tools/vocal-control-candidate-allocator/**"
+      - "docs/research/VOCAL_CONTROL_CANDIDATE_ALLOCATOR_V1.md"
+      - ".github/workflows/vocal-control-candidate-allocator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vocal-control-candidate-allocator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VOCAL_CONTROL_ALLOCATOR_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check allocator
+        run: cargo +1.96.0 fmt --check --manifest-path tools/vocal-control-candidate-allocator/Cargo.toml
+
+      - name: Generate isolated lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/vocal-control-candidate-allocator/Cargo.toml
+
+      - name: Run robust candidate and abstention controls
+        run: cargo +1.96.0 test --locked --manifest-path tools/vocal-control-candidate-allocator/Cargo.toml
