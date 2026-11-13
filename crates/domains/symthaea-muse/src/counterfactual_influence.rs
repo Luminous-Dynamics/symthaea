@@ -155,6 +155,9 @@ pub struct VerifiedRendererAudioBinding {
     performed_event_map_artifact_sha256: String,
     expected_primary_pitches_sha256: String,
     performed_event_lineage: Vec<PerformedEventLineage>,
+    ticks_per_beat: u64,
+    tempo_changes: Vec<crate::performed_event_map::PerformedEventTempoChange>,
+    tempo_map_sha256: String,
 }
 
 impl VerifiedRendererAudioBinding {
@@ -357,6 +360,9 @@ pub(crate) fn verify_renderer_audio_binding(
         performed_event_map_artifact_sha256: sha256_hex(performed_event_map_bytes),
         expected_primary_pitches_sha256: sha256_hex(expected_primary_midi_by_score_index),
         performed_event_lineage: parsed_map.events,
+        ticks_per_beat: parsed_map.ticks_per_beat,
+        tempo_changes: parsed_map.tempo_changes,
+        tempo_map_sha256: parsed_map.tempo_map_sha256,
     })
 }
 
@@ -1064,8 +1070,10 @@ fn validate_intervention(
         {
             Ok(())
         }
-        // Onset, duration, velocity, fine tuning and instrumentation remain
-        // reserved until their own source-tick/control/patch contracts exist.
+        EventIntervention::ShiftOnset { delta_ticks } if *delta_ticks != 0 => Ok(()),
+        EventIntervention::ChangeDuration { delta_ticks } if *delta_ticks != 0 => Ok(()),
+        // Velocity, fine tuning and instrumentation remain reserved until
+        // their own control/patch contracts exist.
         _ => Err(CounterfactualInfluenceError::InvalidIntervention),
     }
 }
@@ -1093,6 +1101,7 @@ fn counterfactual_primary_pitches(
             }
             expected[target_index] = transformed as u8;
         }
+        EventIntervention::ShiftOnset { .. } | EventIntervention::ChangeDuration { .. } => {}
         _ => return Err(CounterfactualInfluenceError::InvalidIntervention),
     }
     Ok(expected)
@@ -1204,7 +1213,9 @@ fn validate_input(
             EventIntervention::Remove => (0..input.expected_score_event_count)
                 .filter(|index| *index != excluded_index)
                 .collect(),
-            EventIntervention::Transpose { .. } => expected_baseline_ids.clone(),
+            EventIntervention::Transpose { .. }
+            | EventIntervention::ShiftOnset { .. }
+            | EventIntervention::ChangeDuration { .. } => expected_baseline_ids.clone(),
             _ => return Err(CounterfactualInfluenceError::InvalidIntervention),
         };
     if baseline_ids != expected_baseline_ids
@@ -1216,6 +1227,15 @@ fn validate_input(
         != calibration.performed_event_map_receipt_sha256
     {
         return Err(CounterfactualInfluenceError::CalibrationConfigMismatch);
+    }
+    if input.baseline_renderer_evidence.ticks_per_beat
+        != input.counterfactual_renderer_evidence.ticks_per_beat
+        || input.baseline_renderer_evidence.tempo_map_sha256
+            != input.counterfactual_renderer_evidence.tempo_map_sha256
+        || input.baseline_renderer_evidence.tempo_changes
+            != input.counterfactual_renderer_evidence.tempo_changes
+    {
+        return Err(CounterfactualInfluenceError::InvalidIntervention);
     }
 
     let baseline_target_rows: Vec<&PerformedEventLineage> = input
@@ -1253,12 +1273,16 @@ fn validate_input(
                     && candidate.midi_track_index == baseline.midi_track_index
                     && candidate.midi_channel == baseline.midi_channel
                     && candidate.midi_note == baseline.midi_note
+                    && candidate.onset_tick == baseline.onset_tick
+                    && candidate.end_tick == baseline.end_tick
                     && candidate.onset_micros == baseline.onset_micros
                     && candidate.end_micros == baseline.end_micros
                     && candidate.onset_frame == baseline.onset_frame
                     && candidate.end_frame == baseline.end_frame
-                    && (matches!(&input.intervention, EventIntervention::Remove)
-                        || candidate.note_on_ordinal == baseline.note_on_ordinal)
+                    && (matches!(
+                        &input.intervention,
+                        EventIntervention::Remove | EventIntervention::ShiftOnset { .. }
+                    ) || candidate.note_on_ordinal == baseline.note_on_ordinal)
             })
         });
     if protected_mismatch {
@@ -1295,10 +1319,75 @@ fn validate_input(
                     || candidate.note_on_ordinal != baseline.note_on_ordinal
                     || candidate.midi_channel != baseline.midi_channel
                     || i16::from(candidate.midi_note) != transformed
+                    || candidate.onset_tick != baseline.onset_tick
+                    || candidate.end_tick != baseline.end_tick
                     || candidate.onset_micros != baseline.onset_micros
                     || candidate.end_micros != baseline.end_micros
                     || candidate.onset_frame != baseline.onset_frame
                     || candidate.end_frame != baseline.end_frame
+                {
+                    return Err(CounterfactualInfluenceError::InvalidIntervention);
+                }
+            }
+        }
+        EventIntervention::ShiftOnset { delta_ticks } => {
+            if baseline_target_rows.is_empty()
+                || baseline_target_rows.len() != counterfactual_target_rows.len()
+            {
+                return Err(CounterfactualInfluenceError::InvalidIntervention);
+            }
+            for baseline in &baseline_target_rows {
+                let expected_onset = i128::from(baseline.onset_tick) + i128::from(*delta_ticks);
+                let expected_end = i128::from(baseline.end_tick) + i128::from(*delta_ticks);
+                if expected_onset < 0 || expected_end <= expected_onset
+                    || expected_end > i128::from(u64::MAX)
+                {
+                    return Err(CounterfactualInfluenceError::InvalidIntervention);
+                }
+                let mut matches = counterfactual_target_rows
+                    .iter()
+                    .filter(|candidate| candidate.descendant_ordinal == baseline.descendant_ordinal);
+                let candidate = matches
+                    .next()
+                    .ok_or(CounterfactualInfluenceError::InvalidIntervention)?;
+                if matches.next().is_some()
+                    || candidate.midi_track_index != baseline.midi_track_index
+                    || candidate.midi_channel != baseline.midi_channel
+                    || candidate.midi_note != baseline.midi_note
+                    || i128::from(candidate.onset_tick) != expected_onset
+                    || i128::from(candidate.end_tick) != expected_end
+                    || candidate.end_tick - candidate.onset_tick
+                        != baseline.end_tick - baseline.onset_tick
+                {
+                    return Err(CounterfactualInfluenceError::InvalidIntervention);
+                }
+            }
+        }
+        EventIntervention::ChangeDuration { delta_ticks } => {
+            if baseline_target_rows.is_empty()
+                || baseline_target_rows.len() != counterfactual_target_rows.len()
+            {
+                return Err(CounterfactualInfluenceError::InvalidIntervention);
+            }
+            for baseline in &baseline_target_rows {
+                let expected_end = i128::from(baseline.end_tick) + i128::from(*delta_ticks);
+                if expected_end <= i128::from(baseline.onset_tick)
+                    || expected_end > i128::from(u64::MAX)
+                {
+                    return Err(CounterfactualInfluenceError::InvalidIntervention);
+                }
+                let mut matches = counterfactual_target_rows
+                    .iter()
+                    .filter(|candidate| candidate.descendant_ordinal == baseline.descendant_ordinal);
+                let candidate = matches
+                    .next()
+                    .ok_or(CounterfactualInfluenceError::InvalidIntervention)?;
+                if matches.next().is_some()
+                    || candidate.midi_track_index != baseline.midi_track_index
+                    || candidate.midi_channel != baseline.midi_channel
+                    || candidate.midi_note != baseline.midi_note
+                    || candidate.onset_tick != baseline.onset_tick
+                    || i128::from(candidate.end_tick) != expected_end
                 {
                     return Err(CounterfactualInfluenceError::InvalidIntervention);
                 }
