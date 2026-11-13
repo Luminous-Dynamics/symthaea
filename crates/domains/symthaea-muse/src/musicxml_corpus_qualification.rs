@@ -711,6 +711,14 @@ where
             });
             continue;
         };
+        if !is_safe_relative_path(&sample.input_relative_path)
+            || !is_safe_relative_path(&sample.reference_relative_path)
+        {
+            issues.push(CorpusQualificationIssueV1::InvalidInputPath {
+                sample_id: artifact.sample_id.to_string(),
+            });
+            continue;
+        }
         if artifact.input_relative_path != sample.input_relative_path
             || artifact.reference_relative_path != sample.reference_relative_path
         {
@@ -776,6 +784,7 @@ pub fn validate_corpus_byte_verification_receipt(
         || corpus_byte_verification_commitment(receipt).ok().as_deref()
             != Some(receipt.receipt_sha256.as_str())
         || receipt.entries.len() != manifest.samples.len()
+        || receipt.entries.windows(2).any(|pair| pair[0].sample_id >= pair[1].sample_id)
     {
         return false;
     }
@@ -790,6 +799,8 @@ pub fn validate_corpus_byte_verification_receipt(
             return false;
         };
         seen.insert(entry.sample_id.as_str())
+            && is_safe_relative_path(&entry.input_relative_path)
+            && is_safe_relative_path(&entry.reference_relative_path)
             && entry.input_relative_path == sample.input_relative_path
             && entry.reference_relative_path == sample.reference_relative_path
             && entry.input_sha256 == sample.input_sha256
@@ -834,9 +845,10 @@ where
         CorpusQualificationStageV1::ByteVerified
     };
     report.next_stage_requirements.retain(|item| !item.contains("byte verifier"));
-    report.next_stage_requirements.push(
-        "Obtain independent annotation adjudication and any required legal review before public qualification".into()
-    );
+    let final_review = "Obtain independent annotation adjudication and any required legal review before public qualification";
+    if !report.next_stage_requirements.iter().any(|item| item == final_review) {
+        report.next_stage_requirements.push(final_review.into());
+    }
     report.report_sha256 = qualification_report_commitment(&report).unwrap_or_default();
     Ok((report, receipt))
 }
@@ -1019,6 +1031,8 @@ mod tests {
             split,
             composer_group_id: Some(composer.into()),
             work_group_id: Some(work.into()),
+            input_relative_path: format!("inputs/{id}.bin"),
+            reference_relative_path: format!("references/{id}.xml"),
             input_sha256: input_digest.to_string().repeat(64),
             reference_sha256: reference_digest.to_string().repeat(64),
         }
@@ -1240,6 +1254,153 @@ mod tests {
         manifest.samples.clear();
         assert!(validate_corpus_sample_manifest(&registration, &registration.tracks[0], &manifest)
             .contains(&CorpusQualificationIssueV1::EmptySampleManifest));
+    }
+
+
+    #[test]
+    fn actual_bytes_produce_replayable_receipt_and_advance_combined_stage() {
+        use crate::evidence_digest::sha256_hex;
+
+        let registration = registration("ossq-omr");
+        let input_bytes = b"pinned-omr-input";
+        let reference_bytes = b"pinned-musicxml-reference";
+        let mut sample = sample(
+            "page-001",
+            "fold-0",
+            CorpusSplitRoleV1::Test,
+            "composer-a",
+            "work-a",
+            '0',
+            '0',
+        );
+        sample.input_relative_path = "images/page-001.pdf".into();
+        sample.reference_relative_path = "scores/work-a.musicxml".into();
+        sample.input_sha256 = sha256_hex(input_bytes);
+        sample.reference_sha256 = sha256_hex(reference_bytes);
+        let manifest = sample_manifest(
+            &registration,
+            "omr-composer-heldout",
+            vec![sample],
+        );
+        let artifact = CorpusArtifactBytesV1 {
+            sample_id: "page-001",
+            input_relative_path: "images/page-001.pdf",
+            input_bytes,
+            reference_relative_path: "scores/work-a.musicxml",
+            reference_bytes,
+        };
+        let (report, receipt) = qualify_corpus_track_with_artifact_bytes(
+            &registration,
+            &manifest,
+            Some(&protocol()),
+            vec![artifact],
+            &"f".repeat(64),
+        )
+        .unwrap();
+        assert_eq!(
+            report.stage,
+            CorpusQualificationStageV1::ProtocolAndBytesVerified
+        );
+        assert_eq!(
+            report.byte_verification_receipt_sha256.as_deref(),
+            Some(receipt.receipt_sha256.as_str())
+        );
+        assert!(validate_corpus_byte_verification_receipt(&manifest, &receipt));
+        assert!(validate_corpus_byte_verification_replay(
+            &manifest,
+            &receipt,
+            vec![artifact]
+        ));
+
+        let tampered = CorpusArtifactBytesV1 {
+            input_bytes: b"changed-input",
+            ..artifact
+        };
+        assert!(!validate_corpus_byte_verification_replay(
+            &manifest,
+            &receipt,
+            vec![tampered]
+        ));
+    }
+
+    #[test]
+    fn byte_verifier_rejects_missing_or_mismatched_sample_assets() {
+        let registration = registration("ossq-omr");
+        let mut sample = sample(
+            "page-001",
+            "fold-0",
+            CorpusSplitRoleV1::Train,
+            "composer-a",
+            "work-a",
+            'a',
+            'b',
+        );
+        sample.input_relative_path = "images/page-001.pdf".into();
+        sample.reference_relative_path = "scores/work-a.musicxml".into();
+        let manifest = sample_manifest(
+            &registration,
+            "omr-synthetic-score-image",
+            vec![sample],
+        );
+        let missing = verify_corpus_artifact_bytes(
+            &manifest,
+            Vec::<CorpusArtifactBytesV1<'_>>::new(),
+            &"f".repeat(64),
+        )
+        .unwrap_err();
+        assert!(missing.iter().any(|issue| matches!(
+            issue,
+            CorpusQualificationIssueV1::MissingByteVerificationSample { sample_id }
+                if sample_id == "page-001"
+        )));
+        let mismatched = CorpusArtifactBytesV1 {
+            sample_id: "page-001",
+            input_relative_path: "images/page-001.pdf",
+            input_bytes: b"wrong-input-bytes",
+            reference_relative_path: "scores/work-a.musicxml",
+            reference_bytes: b"wrong-reference-bytes",
+        };
+        let mismatch_issues =
+            verify_corpus_artifact_bytes(&manifest, vec![mismatched], &"f".repeat(64))
+                .unwrap_err();
+        assert!(mismatch_issues.contains(
+            &CorpusQualificationIssueV1::InputBytesMismatch {
+                sample_id: "page-001".into()
+            }
+        ));
+        assert!(mismatch_issues.contains(
+            &CorpusQualificationIssueV1::ReferenceBytesMismatch {
+                sample_id: "page-001".into()
+            }
+        ));
+    }
+
+    #[test]
+    fn unsafe_relative_paths_are_rejected_before_they_can_be_resolved() {
+        let registration = registration("ossq-omr");
+        let mut sample = sample(
+            "page-001",
+            "fold-0",
+            CorpusSplitRoleV1::Train,
+            "composer-a",
+            "work-a",
+            'a',
+            'b',
+        );
+        sample.input_relative_path = "../outside/page.pdf".into();
+        sample.reference_relative_path = "scores/work-a.musicxml".into();
+        let manifest = sample_manifest(
+            &registration,
+            "omr-synthetic-score-image",
+            vec![sample],
+        );
+        let track = registration.tracks.iter().find(|track| track.track_id == manifest.track_id).unwrap();
+        let issues = validate_corpus_sample_manifest(&registration, track, &manifest);
+        assert!(issues.contains(
+            &CorpusQualificationIssueV1::InvalidInputPath {
+                sample_id: "page-001".into()
+            }
+        ));
     }
 
     #[test]
