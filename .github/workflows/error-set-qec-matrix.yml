@@ -1,0 +1,48 @@
+name: General error-set QEC matrix audit
+
+on:
+  push:
+    branches:
+      - research/general-error-set-qec-matrix-20261113
+    paths:
+      - crates/domains/symthaea-frontier-physics/src/error_set_qec.rs
+      - crates/domains/symthaea-frontier-physics/src/lib.rs
+      - crates/domains/symthaea-frontier-physics/Cargo.toml
+      - Cargo.toml
+      - Cargo.lock
+      - .github/workflows/error-set-qec-matrix.yml
+  pull_request:
+    branches:
+      - research/universal-error-set-recovery-20261113
+    paths:
+      - crates/domains/symthaea-frontier-physics/src/error_set_qec.rs
+      - crates/domains/symthaea-frontier-physics/src/lib.rs
+      - crates/domains/symthaea-frontier-physics/Cargo.toml
+      - Cargo.toml
+      - Cargo.lock
+      - .github/workflows/error-set-qec-matrix.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: error-set-qec-matrix-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: General error-set QEC matrix (Linux, Rust 1.96.0)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: clippy, rustfmt
+      - name: Check formatting
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-frontier-physics/src/error_set_qec.rs
+      - name: Run Clippy
+        run: cargo clippy --locked --manifest-path crates/domains/symthaea-frontier-physics/Cargo.toml --all-targets -- -D warnings
+      - name: Run crate tests
+        run: cargo test --locked --manifest-path crates/domains/symthaea-frontier-physics/Cargo.toml --lib

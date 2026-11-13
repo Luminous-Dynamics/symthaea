@@ -5,8 +5,8 @@
   "created": "2026-11-13",
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
-  "status": "exact_bit_flip_baseline_passed_rust_1_96",
-  "execution_status": "Exact-head Rust 1.96 formatting, Clippy and complete frontier-physics crate tests passed; general approximate universal recovery remains unimplemented.",
+  "status": "exact_bit_flip_and_general_qec_matrix_passed_rust_1_96",
+  "execution_status": "Universal bit-flip baseline passed 153 tests; general complex QEC matrix diagnostics passed 157 tests at exact head 870ab5bf. Hellinger square-root metrics and approximate universal Petz remain unimplemented.",
   "claim_ceiling": "The implemented baseline is exact three-qubit repetition-code correction for stochastic mixtures of {I,X0,X1,X2}. The general approximate error-set Petz theorem and its Hellinger/environment-leakage certificates are not implemented.",
   "references": [
     {
@@ -54,7 +54,12 @@
     "environment_leakage": "zeta(E,Q) = inf_lambda ||B^E_(lambda,Q)||_diamond",
     "environment_leakage_map": "B^E_(lambda,Q)(X)=sum_kl tr((P E_l^dagger E_k P - lambda_kl P)X)|k><l|",
     "controlled_channel": "F_alpha = sum_k C[alpha,k] E_k",
-    "theorem_policy": "Average-case certificate uses the Knill-Laflamme Hellinger metric; worst-case certificate requires the paper's stronger E-control condition and environment-leakage metric. Verify all coefficient constraints and conventions before applying bounds."
+    "theorem_policy": "Average-case certificate uses the Knill-Laflamme Hellinger metric; worst-case certificate requires the paper's stronger E-control condition and environment-leakage metric. Verify all coefficient constraints and conventions before applying bounds.",
+    "controlled_channel_coefficient_norm": "Spectral/operator norm ||C||_infinity <= 1 (paper Definition 2).",
+    "strongly_controlled_channel_coefficient_norm": "Schatten-2/Hilbert-Schmidt norm ||C||_2 <= 1 (paper Definition 7); stronger than spectral norm <= 1.",
+    "hellinger_closed_form": "zeta_H = sqrt(tr(A_QEC)/K - ||tr_K(sqrt(A_QEC))||_2^2/K^2).",
+    "strongly_controlled_petz_worst_case_bound": "d_wc(R_Petz o N|_Q, I_Q) <= (1/sqrt(2))*||sqrt(A_QEC) - I_K tensor (1/sqrt(K))*sqrt(tr_K(A_QEC))||_infinity; apply only to strongly E-controlled channels.",
+    "distinction": "Environment-leakage diamond distance and the Theorem 11 operator-norm Petz bound are separate quantities; do not substitute one for the other."
   },
   "implemented_baseline": {
     "module": "crates/domains/symthaea-frontier-physics/src/universal_recovery.rs",
@@ -111,22 +116,28 @@
     {
       "id": "UR-1",
       "name": "General finite error-set representation",
-      "status": "planned",
+      "status": "implemented_complex_code_isometry_and_error_operators",
       "acceptance": [
         "explicit code isometry",
         "finite error operators",
-        "basis and register conventions"
+        "basis and register conventions",
+        "complex code isometry validation",
+        "arbitrary finite square error operators",
+        "frozen register/basis order"
       ]
     },
     {
       "id": "UR-2",
       "name": "QEC-matrix diagnostics",
-      "status": "planned",
+      "status": "partial_qec_matrix_hermiticity_and_exact_kl_projection",
       "acceptance": [
         "PSD and Hermiticity",
         "support rank",
         "KL projection",
-        "known-answer fixtures"
+        "known-answer fixtures",
+        "Gram-matrix QEC constructor",
+        "Hermiticity residual",
+        "Frobenius exact-KL projection"
       ]
     },
     {
@@ -136,7 +147,9 @@
       "acceptance": [
         "independent Hellinger distance",
         "matched theorem assumptions",
-        "average-case error comparison"
+        "average-case error comparison",
+        "closed-form Hellinger formula using support-aware sqrt(A_QEC)",
+        "no positive eigenvalue floor"
       ]
     },
     {
@@ -146,7 +159,8 @@
       "acceptance": [
         "environment-leakage diamond norm",
         "strong coefficient constraint",
-        "worst-case logical input"
+        "worst-case logical input",
+        "Theorem 11 Petz operator-norm bound on strongly E-controlled families"
       ]
     },
     {
@@ -236,6 +250,51 @@
     "no_postselection_TP_residual",
     "runtime",
     "peak_memory",
-    "qualification_status"
-  ]
+    "qualification_status",
+    "code_isometry_residual",
+    "KL_projection_frobenius_residual",
+    "KL_projection_relative_residual",
+    "controlled_channel_C_operator_norm",
+    "strong_controlled_channel_C_schatten2_norm",
+    "Hellinger_closed_form",
+    "Petz_strong_control_wc_operator_bound"
+  ],
+  "general_qec_matrix_implementation": {
+    "module": "crates/domains/symthaea-frontier-physics/src/error_set_qec.rs",
+    "module_export": "crates/domains/symthaea-frontier-physics/src/lib.rs",
+    "api": "compute_error_set_qec_diagnostics(code_isometry,error_operators,tolerance)",
+    "operations": [
+      "validate_complex_code_isometry",
+      "construct_QEC_Gram_matrix",
+      "compute_Hermiticity_residual",
+      "compute_Frobenius_projection_lambda=(1/K)*Tr_K(A_QEC)",
+      "compute_absolute_and_relative_KL_projection_residual"
+    ],
+    "limitations": [
+      "no floating point minimum eigenvalue certificate",
+      "no support-aware matrix square root",
+      "no Knill-Laflamme Hellinger metric",
+      "no environment-leakage diamond norm",
+      "no general error-set Petz recovery",
+      "does not certify error-operator family CPTP"
+    ],
+    "authored_tests": [
+      "repetition_code_bit_flip_error_set_satisfies_exact_kl_conditions",
+      "phase_error_on_repetition_code_is_not_misclassified_as_correctable",
+      "nonorthogonal_error_set_retains_its_rank_deficient_lambda",
+      "rejects_nonisometric_code_embeddings_and_bad_error_shapes",
+      "rejects_nonfinite_matrix_entries_and_invalid_tolerances"
+    ],
+    "workflow": ".github/workflows/error-set-qec-matrix.yml",
+    "validation_receipt": {
+      "source_head": "870ab5bf2728f542e9ac64e2236b80795b9cb7",
+      "workflow_run_id": 43380572096,
+      "toolchain": "Rust 1.96.0",
+      "formatting": "passed",
+      "clippy": "passed",
+      "crate_test_result": "157 passed; 0 failed",
+      "focused_tests": 5,
+      "claim_ceiling": "General QEC Gram-matrix construction and exact-KL projection only. No approximate universal recovery claim."
+    }
+  }
 }
