@@ -100,7 +100,7 @@ Source: Wu et al., DOI [10.1002/advs.76823](https://doi.org/10.1002/advs.76823);
 
 ### Additional commercial comparator — Skeleton SkelMod 54V / 188F
 
-Skeleton's 5 June 2026 datasheet specifies a 54 V / 188 F SkelMod module with 76.14 Wh maximum stored energy, 16 kg typical mass, 13.5 L volume, 3.0 mΩ rated DC 10 ms ESR, 3.4 mΩ rated DC 1 s ESR and 162.6 kW power calculated from 1 s ESR. The module includes an integrated supercapacitor management system, cell balancing, four temperature sensors and CAN communication; the datasheet also states IP65 and natural cooling.
+Skeleton's 5 June 2026 datasheet specifies a 54 V / 188 F SkelMod module with 76.14 Wh maximum stored energy, 16 kg typical mass, 13.5 L volume, 3.0 mΩ rated DC 10 ms ESR, 3.4 mΩ rated DC 1 s ESR and 162.6 kW power calculated from 1 s ESR. The module includes an integrated supercapacitor management system, cell balancing, four temperature sensors and CAN communication, with natural cooling. The datasheet lists IP65 protection with the IP covers installed; its notes state that the IP covers are separately supplied.
 
 Dividing vendor-stated maximum stored energy by vendor module mass gives approximately **4.76 Wh/kg**; dividing by the vendor-stated module volume gives **5.64 Wh/L**. These are maximum-stored-energy proxies at module boundary, not independently measured usable energy or installed-system metrics. Preserve rated voltage, voltage window, test conditions and module BOM disclosure. The datasheet's cycle-life rows specify 51 V and 48 V variants/voltage windows; do not transfer those cycle-life figures to the 54 V variant.
 
