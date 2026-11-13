@@ -101,6 +101,8 @@ struct EventReport {
     event_id: String,
     observed_sequences: usize,
     service_passes: usize,
+    interval_budget_passes: usize,
+    recovery_applicable_sequences: usize,
     recovery_passes: usize,
     event_gate_passes: usize,
     false_ready_events: usize,
@@ -368,11 +370,12 @@ fn audit_fixture(fixture: &Fixture) -> Result<AuditReport> {
             }
 
             let service_pass = service_passes(event, &fixture.requirements);
+            let interval_budget_pass = event.standby_auxiliary_energy_wh
+                <= fixture.requirements.maximum_standby_auxiliary_energy_wh
+                && event.external_replenishment_energy_wh
+                    <= fixture.requirements.maximum_external_replenishment_energy_wh_per_interval;
             let recovery_pass = if first_event {
-                event.standby_auxiliary_energy_wh
-                    <= fixture.requirements.maximum_standby_auxiliary_energy_wh
-                    && event.external_replenishment_energy_wh
-                        <= fixture.requirements.maximum_external_replenishment_energy_wh_per_interval
+                false
             } else {
                 let recovered_hours = event
                     .time_to_restored_readiness_hours
@@ -381,13 +384,12 @@ fn audit_fixture(fixture: &Fixture) -> Result<AuditReport> {
                     && recovered_hours
                         <= fixture.requirements.maximum_time_to_restored_readiness_hours
                     && recovered_hours <= event.preceding_idle_window_hours
-                    && event.standby_auxiliary_energy_wh
-                        <= fixture.requirements.maximum_standby_auxiliary_energy_wh
-                    && event.external_replenishment_energy_wh
-                        <= fixture.requirements.maximum_external_replenishment_energy_wh_per_interval
             };
 
-            let event_gate_pass = service_pass && recovery_pass;
+            // The first call has no preceding inter-call recovery gate. It
+            // still must satisfy the initial-standby energy budget.
+            let event_gate_pass =
+                service_pass && interval_budget_pass && (first_event || recovery_pass);
             if !first_event && event.readiness_probe_status == "passed" && !service_pass {
                 false_ready_events += 1;
             }
@@ -401,7 +403,9 @@ fn audit_fixture(fixture: &Fixture) -> Result<AuditReport> {
                     event_id: event.event_id.clone(),
                     observed_sequences: 1,
                     service_passes: if service_pass { 1 } else { 0 },
-                    recovery_passes: if recovery_pass { 1 } else { 0 },
+                    interval_budget_passes: if interval_budget_pass { 1 } else { 0 },
+                    recovery_applicable_sequences: if first_event { 0 } else { 1 },
+                    recovery_passes: if !first_event && recovery_pass { 1 } else { 0 },
                     event_gate_passes: if event_gate_pass { 1 } else { 0 },
                     false_ready_events: if !first_event && event.readiness_probe_status == "passed" && !service_pass { 1 } else { 0 },
                 });
@@ -414,7 +418,9 @@ fn audit_fixture(fixture: &Fixture) -> Result<AuditReport> {
                 }
                 report.observed_sequences += 1;
                 report.service_passes += if service_pass { 1 } else { 0 };
-                report.recovery_passes += if recovery_pass { 1 } else { 0 };
+                report.interval_budget_passes += if interval_budget_pass { 1 } else { 0 };
+                report.recovery_applicable_sequences += if first_event { 0 } else { 1 };
+                report.recovery_passes += if !first_event && recovery_pass { 1 } else { 0 };
                 report.event_gate_passes += if event_gate_pass { 1 } else { 0 };
                 report.false_ready_events += if !first_event && event.readiness_probe_status == "passed" && !service_pass { 1 } else { 0 };
             }
@@ -557,14 +563,23 @@ pub fn audit(root: &Path) -> Result<()> {
         report.invalid_sequences, report.censored_sequences, report.false_ready_events
     );
     for event in &report.events {
+        let recovery = if event.recovery_applicable_sequences == 0 {
+            "n/a".to_string()
+        } else {
+            format!(
+                "{}/{}",
+                event.recovery_passes, event.recovery_applicable_sequences
+            )
+        };
         println!(
-            "event {} {}: service={}/{}, recovery={}/{}, joint-gate={}/{}, false-ready={}",
+            "event {} {}: service={}/{}, interval-budget={}/{}, recovery={}, joint-gate={}/{}, false-ready={}",
             event.event_index,
             event.event_id,
             event.service_passes,
             event.observed_sequences,
-            event.recovery_passes,
+            event.interval_budget_passes,
             event.observed_sequences,
+            recovery,
             event.event_gate_passes,
             event.observed_sequences,
             event.false_ready_events
@@ -631,6 +646,10 @@ mod tests {
         assert_eq!(report.sequence_passes, 1);
         assert_eq!(report.valid_sequences, 2);
         assert_eq!(report.sequence_pass_rate, 0.5);
+        assert_eq!(report.events[0].recovery_applicable_sequences, 0);
+        assert_eq!(report.events[0].recovery_passes, 0);
+        assert_eq!(report.events[0].interval_budget_passes, 2);
+        assert_eq!(report.events[1].recovery_applicable_sequences, 2);
         assert_eq!(report.events[1].recovery_passes, 1);
         assert_eq!(report.events[1].event_gate_passes, 1);
     }
