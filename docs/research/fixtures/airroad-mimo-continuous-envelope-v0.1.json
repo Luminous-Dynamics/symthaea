@@ -1,0 +1,171 @@
+{
+  "schema": "luminous.airroad.mimo_continuous_rational_discrepancy_envelope.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_continuous_band_certificate",
+  "model_set_identity": "sha256:finite-knot-hidden-crossport-model-pair-v0.1",
+  "topology_identity": "sha256:two-port-bus-a-b-reference-v0.1",
+  "frequency_unit": "rad_per_second",
+  "norm": "spectral_norm",
+  "matrix_error_structure": {
+    "rows": 2,
+    "columns": 2,
+    "sole_nonzero_entry": {
+      "row": 0,
+      "column": 1,
+      "observed_port_id": "bus-a",
+      "driven_port_id": "bus-b"
+    },
+    "scalar_delta": "1000*(s^2+1)*(s^2+4)*(s^2+16)/(s+5)^7"
+  },
+  "frequency_band": {
+    "omega_lower": {
+      "numerator": "5",
+      "denominator": "2"
+    },
+    "omega_upper": {
+      "numerator": "7",
+      "denominator": "2"
+    },
+    "x_lower": {
+      "numerator": "25",
+      "denominator": "4"
+    },
+    "x_upper": {
+      "numerator": "49",
+      "denominator": "4"
+    }
+  },
+  "exact_reduction": {
+    "substitution": "x=omega^2",
+    "squared_discrepancy": "1000000*(x-1)^2*(x-4)^2*(16-x)^2/(25+x)^7",
+    "stationary_polynomial_coefficients_ascending": [
+      "-4648",
+      "2520",
+      "-213",
+      "1"
+    ],
+    "stationary_polynomial": "x^3-213*x^2+2520*x-4648",
+    "derivative_sign": "sign(df/dx)=sign(p(x)) throughout x band"
+  },
+  "critical_root_isolation": {
+    "lower": {
+      "numerator": "1017",
+      "denominator": "100"
+    },
+    "upper": {
+      "numerator": "1018",
+      "denominator": "100"
+    },
+    "polynomial_at_lower": {
+      "numerator": "1916213",
+      "denominator": "1000000"
+    },
+    "polynomial_at_upper": {
+      "numerator": "-1640421",
+      "denominator": "125000"
+    },
+    "polynomial_at_band_lower": {
+      "numerator": "193653",
+      "denominator": "64"
+    },
+    "polynomial_at_band_upper": {
+      "numerator": "-249795",
+      "denominator": "64"
+    },
+    "first_derivative_at_band_lower": {
+      "numerator": "-405",
+      "denominator": "16"
+    },
+    "second_derivative_at_band_upper": {
+      "numerator": "-?",
+      "denominator": "1"
+    }
+  },
+  "expected_enclosures": {
+    "minimum_squared_discrepancy": {
+      "lower": {
+        "numerator": "13908900096",
+        "denominator": "30517578125"
+      },
+      "upper": {
+        "numerator": "13908900096",
+        "denominator": "30517578125"
+      }
+    },
+    "supremum_squared_lower_bound": {
+      "numerator": "1089363281328919378211341745610000000000",
+      "denominator": "666398192890950766041034480156534871921"
+    },
+    "supremum_squared_upper_bound": {
+      "numerator": "10939549105801166400000000",
+      "denominator": "6655896779165488119029173"
+    },
+    "upper_to_lower_ratio_limit": {
+      "numerator": "1005435",
+      "denominator": "1000000"
+    }
+  },
+  "coarse_grid_control": {
+    "sampled_omega": [
+      {
+        "numerator": "5",
+        "denominator": "2"
+      },
+      {
+        "numerator": "3",
+        "denominator": "1"
+      },
+      {
+        "numerator": "7",
+        "denominator": "2"
+      }
+    ],
+    "sampled_max_squared": {
+      "numerator": "612500000",
+      "denominator": "410338673"
+    },
+    "unsampled_lower_witness_omega": {
+      "numerator": "319",
+      "denominator": "100"
+    },
+    "unsampled_value_squared": {
+      "numerator": "1089363281328919378211341745610000000000",
+      "denominator": "666398192890950766041034480156534871921"
+    }
+  },
+  "negative_controls": [
+    {
+      "id": "finite-grid-promoted-to-universal-bound",
+      "expected": "reject"
+    },
+    {
+      "id": "frequency-band-crosses-delta-zero-at-2-rad-s",
+      "expected": "uniform-positive-separation-not-established"
+    },
+    {
+      "id": "bad-critical-root-isolation",
+      "expected": "reject"
+    },
+    {
+      "id": "root-interval-outside-frequency-band",
+      "expected": "reject"
+    },
+    {
+      "id": "stale-model-set-identity",
+      "expected": "not-evaluable"
+    },
+    {
+      "id": "frequency-unit-mismatch",
+      "expected": "not-evaluable"
+    },
+    {
+      "id": "port-row-column-swapped",
+      "expected": "not-evaluable"
+    }
+  ],
+  "claim_ceiling": [
+    "Exact analytic bound for one synthetic rational matrix difference on one finite frequency band.",
+    "The bound is model-pair separation, not a bound on an unknown physical plant.",
+    "No finite-knot physical model discrepancy, passivity, flight safety or certification claim is established."
+  ]
+}
