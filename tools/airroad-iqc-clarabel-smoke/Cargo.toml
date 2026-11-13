@@ -12,4 +12,3 @@ publish = false
 
 [dependencies]
 clarabel = { version = "=0.11.1", features = ["sdp-openblas"] }
-symthaea-airroad-iqc = { path = "../../crates/domains/symthaea-airroad-iqc" }
