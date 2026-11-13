@@ -153,6 +153,23 @@ No visual-to-fibre label transfer exists in this contract. If visual-only data a
 
 This prevents multiple views/replicates of one physical item from leaking across the train/test boundary and inflating performance.
 
+### 4.5 Evidence-qualified recovery routes
+
+The new module `symthaea-materials::textile_recovery` evaluates candidate routes separately from sensor admission:
+
+- **Reuse as-is:** requires physical inventory, human condition inspection, safety/hygiene pass and independent receiving acceptance.
+- **Repair:** requires a repairable condition, physical repair trial and independent post-repair acceptance.
+- **Component recovery:** requires a physical component-recovery trial, mass balance and independent component receiver acceptance.
+- **Mechanical fibre recycling:** requires admitted calibrated composition evidence, physical opening trial, closed mass balance, measured fibre-length distribution and independent downstream acceptance.
+- **Chemical fibre recycling:** requires admitted composition, a physical chemical-compatibility trial, a physical process trial, mass balance and independent downstream acceptance.
+- **Downcycling:** requires a physical route trial, mass balance and independent acceptance against a declared receiving specification.
+
+Evidence roles use exact evidence tiers, not a generic “higher score” hierarchy. Downstream acceptance records include a versioned specification and an explicit Accepted/Rejected/Conditional/Unknown outcome. The issuer and verifier identifiers must differ for independent acceptance. These fields are structurally checked; the library does not cryptographically authenticate them.
+
+Every destructive route binds the trial input mass to the physical lot inventory and checks mass closure against a policy ceiling for measurement uncertainty. Fibre-length bins must be ordered, non-overlapping and close to 1,000,000 ppm. The minimum fibre length and required mass fraction are explicit receiving-policy parameters; no single universal 12.7 mm threshold is asserted.
+
+Unknown condition, chemistry, trial or receiving status remains insufficient evidence. An actual failed trial, rejected output, invalid digest/tier or mass mismatch is ineligible under the declared policy. A route assessment is not an environmental certification, safety certification, legal determination or proof that its evidence sources are honest.
+
 ## 5. Current synthetic tests
 
 Before corpus integration, the module contained 16 Rust unit tests. The latest change adds an unknown-category/presentation negative control and an executable corpus-binding test (18 test functions total). The 15-case synthetic corpus is now loaded by Rust tests; each case invokes its mapped regression and checks the declared disposition/reason. The Rust unit tests cover the 16 original contract cases plus two new regressions: unknown visual category/presentation abstention and the executable 15-case corpus-to-test mapping (18 test functions total). The original cases cover:
@@ -246,18 +263,27 @@ Compare matched models/policies:
 
 All arms receive the same physical specimen IDs, training splits, calibration boundaries and compute budget. The cascade must never invent fibre composition from a garment label or treat a supplier declaration as a spectral measurement.
 
-### B3 — physical sorting and recovery
+### B3 — physical sorting, route selection and recovery
 
 Only after a guarded instrumented cell exists, measure:
-- item-level correct sort / reject / abstain;
-- mass per physical output stream;
-- stream purity and contamination;
-- throughput, recirculation and operator intervention;
-- actual output lot identity and custody;
-- recovery route qualification;
-- secondary-fibre grade and functional acceptance.
+- item-level correct sort / reject / abstain and route-selection coverage-risk;
+- mass per physical output stream, with scale uncertainty and mass-balance residual;
+- garment reuse/repair acceptance and useful life where a longitudinal receiving/use test is possible;
+- component reuse acceptance, not merely successful extraction;
+- residual trim by attachment family and process stage;
+- for mechanical opening: fibre-length distribution, short-fibre/fines share, opening efficiency, accepted spinnable mass, yarn imperfections/strength and receiving-spinner acceptance;
+- for chemical routes: polymer purity, molecular/functional properties, contaminants, solvent/chemical inputs, process safety and receiving-polymer acceptance;
+- downstream product-grade acceptance, not model-predicted eligibility;
+- throughput, recirculation, labour, intervention, downtime, utilities and rejects;
+- actual output lot identity, custody and versioned receiving specification.
 
-Classification accuracy alone cannot prove recyclability, recovery yield or environmental benefit.
+A 7 November 2026 controlled cotton study found that fabric interlacing density was a major predictor of opening efficiency (woven structures: reported correlation r = -0.94) and reported up to 70% of recovered fibre mass above 12.7 mm for low-interlacement weaves under its tested conditions. It demonstrates why fabric construction and measured fibre-length distributions matter; its numbers are not universal acceptance criteria:
+https://doi.org/10.1016/j.wasman.2026.115980
+
+A 5 May 2026 industrial-scale cotton study reports that combing and compact ring-spinning improve the handling and performance of mechanically recycled cotton at increasing recycled ratios, emphasizing downstream yarn quality instead of treating opening yield as final success:
+https://doi.org/10.1016/j.wasman.2026.115502
+
+Classification accuracy alone cannot prove recyclability, recovery yield or environmental benefit. Each recovery route needs a receiving-process specification and an independent outcome.
 
 ## 7. Proposed challenge targets (not achieved)
 
@@ -270,10 +296,16 @@ Freeze after baseline reproduction and measurement repeatability:
 - improve macro-F1 and worst-class recall against compute-matched baselines without increasing unknown-material false acceptance;
 - demonstrate reduced instrument-transfer degradation on held-out specimens, with a preregistered instrument-held-out split;
 - compare physical line arms against Fibersort + Trimclean on matched lots, including residual trim, damage, retained textile length/fines, throughput, labour, utilities and downstream accepted grade;
-- 100% of actual physical output lots linked to sort and recovery receipts before material recovery claims.
+- 100% of actual physical output lots linked to sort, route-trial, mass-balance and independent receiving-acceptance receipts before material recovery claims;
+- route-specific accepted output mass and value per input kg improve against the matched incumbent without increasing unsafe false acceptance, textile damage or downstream rejection;
+- mechanical-route improvements are measured through fibre-length distribution and receiving-yarn quality, not shredder throughput alone.
 
 These targets are challenge goals, not predictions or results. Freeze thresholds only after the data protocol, class taxonomy, held-out split and source measurement quality are established.
 
 ## 8. Claim ceiling
 
-A passing Rust contract test validates only the declared input/admission semantics. It does not establish model accuracy, calibrated fibre identification, industrial throughput, garment sorting performance, secondary-fibre grade, recycling yield, textile safety, lifecycle impact or regulatory conformity. Those require actual licensed data, independently checked references, calibrated instruments and physical recovery trials.
+A passing Rust contract test validates only the declared input/admission and route-record semantics. It does not establish model accuracy, calibrated fibre identification, garment condition, industrial throughput, physical repair/disassembly performance, fibre length, secondary-fibre grade, recycling yield, product safety, lifecycle impact or regulatory conformity. Those require licensed data, independently checked references, calibrated instruments, physical process trials, measured outputs and actual receiving-process acceptance.
+
+The EU Commission currently lists Q4 2027 as the planned adoption window for the textile ESPR delegated act; technical specifications and implementation measures follow adoption, and dates may change. Textile Exchange's Materials Matter Standard V1.0 becomes effective 31 December 2026 and mandatory for relevant Tier 4 audits on 31 December 2027. These are versioned external frameworks, not permission to invent final DPP fields or certification claims:
+- https://single-market-economy.ec.europa.eu/single-market/digital-product-passport/textile-apparel_en
+- https://textileexchange.org/app/uploads/2025/12/TE-MM-STN-101-V1.0-Materials-Matter-Standard-1.pdf
