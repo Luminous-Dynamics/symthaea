@@ -10,7 +10,6 @@ on:
       - "tools/connectome-typed-claim-verifier/**"
       - "research/connectomics/connectome-typed-claim-bundle-v0.1.schema.json"
       - "research/connectomics/fixtures/connectome-typed-claim-bundle-known-answer-v0.1.json"
-      - ".github/workflows/connectome-typed-claim-verifier-v1.yml"
 
 permissions:
   contents: read
