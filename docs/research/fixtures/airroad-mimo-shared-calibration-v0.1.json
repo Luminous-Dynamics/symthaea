@@ -65,7 +65,8 @@
           "denominator": "1"
         }
       },
-      "record_id": "I-bus-a"
+      "record_id": "I-bus-a",
+      "calibration_nuisance_id": "calibration-chain-A-common-complex-gain"
     },
     {
       "driven_port_id": "bus-b",
@@ -79,7 +80,8 @@
           "denominator": "1"
         }
       },
-      "record_id": "I-bus-b"
+      "record_id": "I-bus-b",
+      "calibration_nuisance_id": "calibration-chain-A-common-complex-gain"
     }
   ],
   "base_voltage_observations_v": [
@@ -96,7 +98,8 @@
           "denominator": "1"
         }
       },
-      "record_id": "V-bus-a-from-a"
+      "record_id": "V-bus-a-from-a",
+      "calibration_nuisance_id": "calibration-chain-A-common-complex-gain"
     },
     {
       "observed_port_id": "bus-b",
@@ -111,7 +114,8 @@
           "denominator": "2"
         }
       },
-      "record_id": "V-bus-b-from-a"
+      "record_id": "V-bus-b-from-a",
+      "calibration_nuisance_id": "calibration-chain-A-common-complex-gain"
     },
     {
       "observed_port_id": "bus-a",
@@ -126,7 +130,8 @@
           "denominator": "1"
         }
       },
-      "record_id": "V-bus-a-from-b"
+      "record_id": "V-bus-a-from-b",
+      "calibration_nuisance_id": "calibration-chain-A-common-complex-gain"
     },
     {
       "observed_port_id": "bus-b",
@@ -141,7 +146,8 @@
           "denominator": "1"
         }
       },
-      "record_id": "V-bus-b-from-b"
+      "record_id": "V-bus-b-from-b",
+      "calibration_nuisance_id": "calibration-chain-A-common-complex-gain"
     }
   ],
   "shared_calibration_nuisance": {
