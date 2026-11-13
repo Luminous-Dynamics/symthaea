@@ -14,7 +14,7 @@ A hidden-only benchmark reports performance on the hidden source distribution. I
 
 This reference adds a **fresh familiar-source evaluation regime**: new cases/scenarios from source groups represented in training, with a separate evaluation manifest. The source group is familiar; the evaluated episodes are held out. It is compared against a hidden evaluation regime whose complete source groups are disjoint from training and calibration.
 
-The input binds the training, calibration, familiar-reference and hidden-confirmatory manifests plus a split-separation receipt. The crate cannot prove caller-supplied training exclusion, truthful source labels, or that the upstream custodian actually withheld the cases. Those remain dataset-owner obligations.
+The input binds the training, calibration, familiar-reference and hidden-confirmatory manifests plus a split-separation receipt with an explicit QualifiedNoOverlap / Unknown / OverlapDetected disposition. OverlapDetected is rejected; Unknown makes every required dimension Inconclusive. Training and calibration manifests must also be distinct. The crate cannot prove caller-supplied training exclusion, truthful source labels, or that the upstream custodian actually withheld the cases. Those remain dataset-owner obligations.
 
 ## Source split semantics
 
@@ -68,7 +68,7 @@ The crate does not run statistical inference. Source groups, independent cluster
 
 ## Running the reference
 
-The package is dependency-free and isolated from the Symthaea root Cargo workspace:
+The package is dependency-free and isolated from the Symthaea root Cargo workspace. The reference currently has 27 authored deterministic tests; they remain unqualified until the exact-head Rust 1.96 workflow completes:
 
     cargo fmt --manifest-path research/rob-transfer-gap-001/reference/Cargo.toml -- --check
     cargo test --locked --manifest-path research/rob-transfer-gap-001/reference/Cargo.toml
