@@ -156,7 +156,10 @@ struct JoinedWindow {
     window_id: String,
     start_time_s: f64,
     end_time_s: f64,
+    cavitation_annotation_raw: Option<bool>,
     cavitation_state: Option<bool>,
+    alignment_eligible: bool,
+    coherence_disposition: String,
     coherence_report_sha256: String,
     coherence_case_id: String,
     phase_status: String,
@@ -592,16 +595,21 @@ fn validate_case(case: &Case) -> Vec<String> {
     if matched_window_keys != window_keys {
         errors.push("coherence window receipts do not form a one-to-one cover of all intermittency windows".to_string());
     }
-    if shared_timebase_ids.len() > 1 {
-        errors.push("coherence reports use different shared timebase IDs within one joined campaign".to_string());
+    if shared_timebase_ids.len() > 1
+        || vessel_ids.len() > 1
+        || propeller_revisions.len() > 1
+        || vibration_instrument_ids.len() > 1
+        || vibration_channel_ids.len() > 1
+    {
+        errors.push("INCOMPARABLE: coherence reports do not share one vessel/propeller/vibration-reference/shared-clock stratum".to_string());
     }
     if case.coherence_windows.is_empty() {
-        errors.push("no per-window coherence reports were supplied".to_string());
+        errors.push("INCOMPLETE: no per-window coherence reports were supplied".to_string());
     }
     if case.intermittency_report.evidence_kind != "measured"
         || case.intermittency_report.disposition != "DISTRIBUTIONAL_SUMMARY_ONLY"
     {
-        errors.push("intermittency report is not a measured, distributionally eligible receipt".to_string());
+        errors.push("INCOMPLETE: intermittency report is not a measured, distributionally eligible receipt".to_string());
     }
     errors
 }
@@ -637,7 +645,7 @@ fn summarize_group(windows: &[&JoinedWindow], band_id: &str) -> GroupStats {
     }
 }
 
-fn summarize_run(run_id: &str, windows: &[JoinedWindow], band_ids: &[(String, f64)]) -> RunReport {
+fn summarize_run(run: &IntermittencyRun, windows: &[JoinedWindow], band_ids: &[(String, f64)]) -> RunReport {
     let present: Vec<&JoinedWindow> = windows.iter().filter(|window| window.cavitation_state == Some(true)).collect();
     let absent: Vec<&JoinedWindow> = windows.iter().filter(|window| window.cavitation_state == Some(false)).collect();
     let unknown_count = windows.iter().filter(|window| window.cavitation_state.is_none()).count();
@@ -662,7 +670,7 @@ fn summarize_run(run_id: &str, windows: &[JoinedWindow], band_ids: &[(String, f6
     }).collect();
 
     RunReport {
-        run_id: run_id.to_string(),
+        run_id: run.run_id.clone(),
         timebase_receipt_sha256: run.timebase_receipt_sha256.clone(),
         operating_point_receipt_sha256: run.operating_point_receipt_sha256.clone(),
         acoustic_cavitation_sync_receipt_sha256: run.acoustic_cavitation_sync_receipt_sha256.clone(),
@@ -756,9 +764,11 @@ fn audit(case: &Case) -> AuditReport {
     let mut run_reports = Vec::new();
     let mut band_ids: Vec<(String, f64)> = Vec::new();
     let mut joined_by_run: BTreeMap<String, Vec<JoinedWindow>> = BTreeMap::new();
-    let mut vibration_instruments = BTreeSet::new();
-    let mut vibration_channels = BTreeSet::new();
+    let mut vibration_instrument_ids = BTreeSet::new();
+    let mut vibration_channel_ids = BTreeSet::new();
     let mut shared_timebase_ids = BTreeSet::new();
+    let mut vessel_ids = BTreeSet::new();
+    let mut propeller_revisions = BTreeSet::new();
 
     if validation_errors.is_empty() {
         let windows_by_key: BTreeMap<(String, String), &IntermittencyWindow> = case.intermittency_report.run_reports.iter()
@@ -767,9 +777,11 @@ fn audit(case: &Case) -> AuditReport {
 
         for input in &case.coherence_windows {
             let report = &input.coherence_report;
-            vibration_instruments.insert(report.vibration_instrument_id.clone());
-            vibration_channels.insert(report.vibration_channel_id.clone());
+            vibration_instrument_ids.insert(report.vibration_instrument_id.clone());
+            vibration_channel_ids.insert(report.vibration_channel_id.clone());
             shared_timebase_ids.insert(report.shared_timebase_id.clone());
+            vessel_ids.insert(report.vessel_id.clone());
+            propeller_revisions.insert(report.propeller_revision.clone());
             for band in &report.band_reports {
                 if !band_ids.iter().any(|(id, _)| id == &band.band_id) {
                     band_ids.push((band.band_id.clone(), band.frequency_hz));
@@ -781,7 +793,10 @@ fn audit(case: &Case) -> AuditReport {
                 window_id: input.window_id.clone(),
                 start_time_s: window.start_time_s,
                 end_time_s: window.end_time_s,
+                cavitation_annotation_raw: window.cavitation_annotation_raw,
                 cavitation_state: window.cavitation_state_for_conditioning,
+                alignment_eligible: window.acoustic_cavitation_alignment_eligible,
+                coherence_disposition: report.disposition.clone(),
                 coherence_report_sha256: input.coherence_report_sha256.clone(),
                 coherence_case_id: report.case_id.clone(),
                 phase_status: if report.band_reports.iter().all(|band| band.phase_status == "phase_resolved_within_declared_limit") {
@@ -798,7 +813,7 @@ fn audit(case: &Case) -> AuditReport {
         for run in &case.intermittency_report.run_reports {
             let mut windows = joined_by_run.remove(&run.run_id).unwrap_or_default();
             windows.sort_by(|a,b| a.window_id.cmp(&b.window_id));
-            run_reports.push(summarize_run(&run.run_id, &windows, &band_ids));
+            run_reports.push(summarize_run(run, &windows, &band_ids));
         }
         run_reports.sort_by(|a,b| a.run_id.cmp(&b.run_id));
     }
@@ -871,8 +886,8 @@ fn audit(case: &Case) -> AuditReport {
         environment_fingerprint_sha256: case.intermittency_report.environment_fingerprint_sha256.clone(),
         pressure_instrument_id: case.intermittency_report.hydrophone_instrument_id.clone(),
         pressure_calibration_certificate_sha256: case.intermittency_report.calibration_certificate_sha256.clone(),
-        vibration_reference_instrument_ids: vibration_instruments.into_iter().collect(),
-        vibration_reference_channel_ids: vibration_channels.into_iter().collect(),
+        vibration_reference_instrument_ids: vibration_instrument_ids.into_iter().collect(),
+        vibration_reference_channel_ids: vibration_channel_ids.into_iter().collect(),
         shared_timebase_ids: shared_timebase_ids.into_iter().collect(),
         disposition,
         claim_ceiling: "condition_stratified_descriptive_association_of_magnitude_coherence_and_reference_coherent_residual_pressure_power_only_no_unique_source_causality_significance_noise_reduction_ecological_or_regulatory_qualification",
