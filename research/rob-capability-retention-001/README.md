@@ -75,6 +75,14 @@ The three quantities are deliberately not interchangeable:
 
 Different action IDs or gait labels do not prove redundancy. Shared power, actuator, sensing, clock or other common-cause dependencies can cut several nominal routes at once. This crate only validates/binds the upstream topology receipt; it does not rebuild the graph, calculate route packing or enumerate cut sets. The topology owner's Unknown disposition prevents a complete capability-retention comparison.
 
+### Exact terminal-state join
+
+The \`result_state_digest\` from each arm's option-ledger receipt is the canonical terminal physical/reserve-state identity for that arm. Every Qualified reserve observation and Qualified recovery-topology receipt must carry that same state digest. A measurement from an earlier point in the shift, a different terminal snapshot, or an independently valid topology report for another physical state is rejected rather than joined by robot ID or mission label alone.
+
+Baseline and candidate are allowed to have different resulting physical states because they execute different policies; each arm's reserve and topology evidence must be internally bound to its own option-ledger result state. The pair must still share the same declared predecessor state and starting option-set identity.
+
+Unknown evidence is not upgraded by a matching digest. A missing terminal-state binding on a Qualified reserve or Qualified topology receipt is incomplete evidence; a supplied but mismatched digest is an explicit binding failure.
+
 ## Comparison and hard gates
 
 Candidate and baseline bind the same task/work mix, robot configuration, evaluator, operating envelope, resource budget and reserve policy.
@@ -106,4 +114,4 @@ The package is dependency-free and isolated from the Symthaea root Cargo workspa
     cargo test --locked --manifest-path research/rob-capability-retention-001/reference/Cargo.toml
     cargo clippy --locked --manifest-path research/rob-capability-retention-001/reference/Cargo.toml --all-targets -- -D warnings
 
-The exact-head Rust 1.96 GitHub Actions workflow is the qualification gate. Authored tests are not PASS until the dedicated workflow succeeds.
+The reference currently has 36 authored deterministic tests. The exact-head Rust 1.96 GitHub Actions workflow is the qualification gate. Authored tests are not PASS until the dedicated workflow succeeds.
