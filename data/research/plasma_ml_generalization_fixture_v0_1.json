@@ -1,0 +1,1798 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "PLASMA-ML-GENERALIZATION-001",
+  "evidence_class": "SYNTHETIC",
+  "synthetic_only": true,
+  "published_model_reproduction": false,
+  "physical_measurements": false,
+  "claim_ceiling": "Synthetic fixtures validate split/group/provenance integrity only. No original 534-row data or trained model is included. No published score is reproduced and no plasma outcome is predicted.",
+  "group_dimensions": [
+    "source_paper_id",
+    "lab_id",
+    "device_id",
+    "material_family"
+  ],
+  "split_policy": "GROUP_DISJOINT",
+  "augmentation_policy": "TRAIN_FOLD_ONLY",
+  "preprocessing_policy": "FIT_TRAIN_ONLY",
+  "scenarios": [
+    {
+      "scenario_id": "source-heldout-clean",
+      "holdout_dimension": "source_paper_id",
+      "observations": [
+        {
+          "observation_id": "obs-001",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-001",
+          "raw_observation_digest": "sha256:raw-001"
+        },
+        {
+          "observation_id": "obs-002",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-002",
+          "raw_observation_digest": "sha256:raw-002"
+        },
+        {
+          "observation_id": "obs-003",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-003",
+          "raw_observation_digest": "sha256:raw-003"
+        },
+        {
+          "observation_id": "obs-004",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-004",
+          "raw_observation_digest": "sha256:raw-004"
+        },
+        {
+          "observation_id": "obs-005",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-005",
+          "raw_observation_digest": "sha256:raw-005"
+        },
+        {
+          "observation_id": "obs-006",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-006",
+          "raw_observation_digest": "sha256:raw-006"
+        },
+        {
+          "observation_id": "obs-007",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-007",
+          "raw_observation_digest": "sha256:raw-007"
+        },
+        {
+          "observation_id": "obs-008",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-008",
+          "raw_observation_digest": "sha256:raw-008"
+        }
+      ],
+      "assignments": [
+        {
+          "observation_id": "obs-001",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-002",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-003",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-004",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-005",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-006",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-007",
+          "fold": "TEST"
+        },
+        {
+          "observation_id": "obs-008",
+          "fold": "TEST"
+        }
+      ],
+      "augmentations": [
+        {
+          "generated_row_id": "synthetic-001",
+          "parent_observation_ids": [
+            "obs-001",
+            "obs-002"
+          ],
+          "assigned_fold": "TRAIN"
+        },
+        {
+          "generated_row_id": "synthetic-002",
+          "parent_observation_ids": [
+            "obs-003",
+            "obs-004"
+          ],
+          "assigned_fold": "TRAIN"
+        }
+      ],
+      "preprocessing_fit_observation_ids": [
+        "obs-001",
+        "obs-002",
+        "obs-003",
+        "obs-004",
+        "obs-005",
+        "obs-006"
+      ],
+      "expected_disposition": "PASS"
+    },
+    {
+      "scenario_id": "device-heldout-clean",
+      "holdout_dimension": "device_id",
+      "observations": [
+        {
+          "observation_id": "obs-001",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-001",
+          "raw_observation_digest": "sha256:raw-001"
+        },
+        {
+          "observation_id": "obs-002",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-002",
+          "raw_observation_digest": "sha256:raw-002"
+        },
+        {
+          "observation_id": "obs-003",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-003",
+          "raw_observation_digest": "sha256:raw-003"
+        },
+        {
+          "observation_id": "obs-004",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-004",
+          "raw_observation_digest": "sha256:raw-004"
+        },
+        {
+          "observation_id": "obs-005",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-005",
+          "raw_observation_digest": "sha256:raw-005"
+        },
+        {
+          "observation_id": "obs-006",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-006",
+          "raw_observation_digest": "sha256:raw-006"
+        },
+        {
+          "observation_id": "obs-007",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-007",
+          "raw_observation_digest": "sha256:raw-007"
+        },
+        {
+          "observation_id": "obs-008",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-008",
+          "raw_observation_digest": "sha256:raw-008"
+        }
+      ],
+      "assignments": [
+        {
+          "observation_id": "obs-001",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-002",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-003",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-004",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-005",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-006",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-007",
+          "fold": "TEST"
+        },
+        {
+          "observation_id": "obs-008",
+          "fold": "TEST"
+        }
+      ],
+      "augmentations": [
+        {
+          "generated_row_id": "synthetic-001",
+          "parent_observation_ids": [
+            "obs-001",
+            "obs-002"
+          ],
+          "assigned_fold": "TRAIN"
+        },
+        {
+          "generated_row_id": "synthetic-002",
+          "parent_observation_ids": [
+            "obs-003",
+            "obs-004"
+          ],
+          "assigned_fold": "TRAIN"
+        }
+      ],
+      "preprocessing_fit_observation_ids": [
+        "obs-001",
+        "obs-002",
+        "obs-003",
+        "obs-004",
+        "obs-005",
+        "obs-006"
+      ],
+      "expected_disposition": "PASS"
+    },
+    {
+      "scenario_id": "lab-heldout-clean",
+      "holdout_dimension": "lab_id",
+      "observations": [
+        {
+          "observation_id": "obs-001",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-001",
+          "raw_observation_digest": "sha256:raw-001"
+        },
+        {
+          "observation_id": "obs-002",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-002",
+          "raw_observation_digest": "sha256:raw-002"
+        },
+        {
+          "observation_id": "obs-003",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-003",
+          "raw_observation_digest": "sha256:raw-003"
+        },
+        {
+          "observation_id": "obs-004",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-004",
+          "raw_observation_digest": "sha256:raw-004"
+        },
+        {
+          "observation_id": "obs-005",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-005",
+          "raw_observation_digest": "sha256:raw-005"
+        },
+        {
+          "observation_id": "obs-006",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-006",
+          "raw_observation_digest": "sha256:raw-006"
+        },
+        {
+          "observation_id": "obs-007",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-007",
+          "raw_observation_digest": "sha256:raw-007"
+        },
+        {
+          "observation_id": "obs-008",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-008",
+          "raw_observation_digest": "sha256:raw-008"
+        }
+      ],
+      "assignments": [
+        {
+          "observation_id": "obs-001",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-002",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-003",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-004",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-005",
+          "fold": "TEST"
+        },
+        {
+          "observation_id": "obs-006",
+          "fold": "TEST"
+        },
+        {
+          "observation_id": "obs-007",
+          "fold": "TEST"
+        },
+        {
+          "observation_id": "obs-008",
+          "fold": "TEST"
+        }
+      ],
+      "augmentations": [
+        {
+          "generated_row_id": "synthetic-001",
+          "parent_observation_ids": [
+            "obs-001",
+            "obs-002"
+          ],
+          "assigned_fold": "TRAIN"
+        },
+        {
+          "generated_row_id": "synthetic-002",
+          "parent_observation_ids": [
+            "obs-003",
+            "obs-004"
+          ],
+          "assigned_fold": "TRAIN"
+        }
+      ],
+      "preprocessing_fit_observation_ids": [
+        "obs-001",
+        "obs-002",
+        "obs-003",
+        "obs-004"
+      ],
+      "expected_disposition": "PASS"
+    },
+    {
+      "scenario_id": "material-family-heldout-clean",
+      "holdout_dimension": "material_family",
+      "observations": [
+        {
+          "observation_id": "obs-001",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-001",
+          "raw_observation_digest": "sha256:raw-001"
+        },
+        {
+          "observation_id": "obs-002",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-002",
+          "raw_observation_digest": "sha256:raw-002"
+        },
+        {
+          "observation_id": "obs-003",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-003",
+          "raw_observation_digest": "sha256:raw-003"
+        },
+        {
+          "observation_id": "obs-004",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-004",
+          "raw_observation_digest": "sha256:raw-004"
+        },
+        {
+          "observation_id": "obs-005",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-005",
+          "raw_observation_digest": "sha256:raw-005"
+        },
+        {
+          "observation_id": "obs-006",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-006",
+          "raw_observation_digest": "sha256:raw-006"
+        },
+        {
+          "observation_id": "obs-007",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-007",
+          "raw_observation_digest": "sha256:raw-007"
+        },
+        {
+          "observation_id": "obs-008",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-008",
+          "raw_observation_digest": "sha256:raw-008"
+        }
+      ],
+      "assignments": [
+        {
+          "observation_id": "obs-001",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-002",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-003",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-004",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-005",
+          "fold": "TEST"
+        },
+        {
+          "observation_id": "obs-006",
+          "fold": "TEST"
+        },
+        {
+          "observation_id": "obs-007",
+          "fold": "TEST"
+        },
+        {
+          "observation_id": "obs-008",
+          "fold": "TEST"
+        }
+      ],
+      "augmentations": [
+        {
+          "generated_row_id": "synthetic-001",
+          "parent_observation_ids": [
+            "obs-001",
+            "obs-002"
+          ],
+          "assigned_fold": "TRAIN"
+        },
+        {
+          "generated_row_id": "synthetic-002",
+          "parent_observation_ids": [
+            "obs-003",
+            "obs-004"
+          ],
+          "assigned_fold": "TRAIN"
+        }
+      ],
+      "preprocessing_fit_observation_ids": [
+        "obs-001",
+        "obs-002",
+        "obs-003",
+        "obs-004"
+      ],
+      "expected_disposition": "PASS"
+    },
+    {
+      "scenario_id": "augmentation-before-split-leakage",
+      "holdout_dimension": "source_paper_id",
+      "observations": [
+        {
+          "observation_id": "obs-001",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-001",
+          "raw_observation_digest": "sha256:raw-001"
+        },
+        {
+          "observation_id": "obs-002",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-002",
+          "raw_observation_digest": "sha256:raw-002"
+        },
+        {
+          "observation_id": "obs-003",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-003",
+          "raw_observation_digest": "sha256:raw-003"
+        },
+        {
+          "observation_id": "obs-004",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-004",
+          "raw_observation_digest": "sha256:raw-004"
+        },
+        {
+          "observation_id": "obs-005",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-005",
+          "raw_observation_digest": "sha256:raw-005"
+        },
+        {
+          "observation_id": "obs-006",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-006",
+          "raw_observation_digest": "sha256:raw-006"
+        },
+        {
+          "observation_id": "obs-007",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-007",
+          "raw_observation_digest": "sha256:raw-007"
+        },
+        {
+          "observation_id": "obs-008",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-008",
+          "raw_observation_digest": "sha256:raw-008"
+        }
+      ],
+      "assignments": [
+        {
+          "observation_id": "obs-001",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-002",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-003",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-004",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-005",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-006",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-007",
+          "fold": "TEST"
+        },
+        {
+          "observation_id": "obs-008",
+          "fold": "TEST"
+        }
+      ],
+      "augmentations": [
+        {
+          "generated_row_id": "synthetic-001",
+          "parent_observation_ids": [
+            "obs-001",
+            "obs-002"
+          ],
+          "assigned_fold": "TRAIN"
+        },
+        {
+          "generated_row_id": "synthetic-002",
+          "parent_observation_ids": [
+            "obs-003",
+            "obs-004"
+          ],
+          "assigned_fold": "TRAIN"
+        },
+        {
+          "generated_row_id": "synthetic-leaked",
+          "parent_observation_ids": [
+            "obs-001",
+            "obs-007"
+          ],
+          "assigned_fold": "TRAIN"
+        }
+      ],
+      "preprocessing_fit_observation_ids": [
+        "obs-001",
+        "obs-002",
+        "obs-003",
+        "obs-004",
+        "obs-005",
+        "obs-006"
+      ],
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "scenario_id": "preprocessor-fit-includes-test",
+      "holdout_dimension": "source_paper_id",
+      "observations": [
+        {
+          "observation_id": "obs-001",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-001",
+          "raw_observation_digest": "sha256:raw-001"
+        },
+        {
+          "observation_id": "obs-002",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-002",
+          "raw_observation_digest": "sha256:raw-002"
+        },
+        {
+          "observation_id": "obs-003",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-003",
+          "raw_observation_digest": "sha256:raw-003"
+        },
+        {
+          "observation_id": "obs-004",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-004",
+          "raw_observation_digest": "sha256:raw-004"
+        },
+        {
+          "observation_id": "obs-005",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-005",
+          "raw_observation_digest": "sha256:raw-005"
+        },
+        {
+          "observation_id": "obs-006",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-006",
+          "raw_observation_digest": "sha256:raw-006"
+        },
+        {
+          "observation_id": "obs-007",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-007",
+          "raw_observation_digest": "sha256:raw-007"
+        },
+        {
+          "observation_id": "obs-008",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-008",
+          "raw_observation_digest": "sha256:raw-008"
+        }
+      ],
+      "assignments": [
+        {
+          "observation_id": "obs-001",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-002",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-003",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-004",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-005",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-006",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-007",
+          "fold": "TEST"
+        },
+        {
+          "observation_id": "obs-008",
+          "fold": "TEST"
+        }
+      ],
+      "augmentations": [
+        {
+          "generated_row_id": "synthetic-001",
+          "parent_observation_ids": [
+            "obs-001",
+            "obs-002"
+          ],
+          "assigned_fold": "TRAIN"
+        },
+        {
+          "generated_row_id": "synthetic-002",
+          "parent_observation_ids": [
+            "obs-003",
+            "obs-004"
+          ],
+          "assigned_fold": "TRAIN"
+        }
+      ],
+      "preprocessing_fit_observation_ids": [
+        "obs-001",
+        "obs-002",
+        "obs-003",
+        "obs-004",
+        "obs-005",
+        "obs-006",
+        "obs-007"
+      ],
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "scenario_id": "specimen-duplicated-across-folds",
+      "holdout_dimension": "source_paper_id",
+      "observations": [
+        {
+          "observation_id": "obs-001",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-001",
+          "raw_observation_digest": "sha256:raw-001"
+        },
+        {
+          "observation_id": "obs-002",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-002",
+          "raw_observation_digest": "sha256:raw-002"
+        },
+        {
+          "observation_id": "obs-003",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-003",
+          "raw_observation_digest": "sha256:raw-003"
+        },
+        {
+          "observation_id": "obs-004",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-004",
+          "raw_observation_digest": "sha256:raw-004"
+        },
+        {
+          "observation_id": "obs-005",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-005",
+          "raw_observation_digest": "sha256:raw-005"
+        },
+        {
+          "observation_id": "obs-006",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-006",
+          "raw_observation_digest": "sha256:raw-006"
+        },
+        {
+          "observation_id": "obs-007",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-001",
+          "raw_observation_digest": "sha256:raw-007"
+        },
+        {
+          "observation_id": "obs-008",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-008",
+          "raw_observation_digest": "sha256:raw-008"
+        }
+      ],
+      "assignments": [
+        {
+          "observation_id": "obs-001",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-002",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-003",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-004",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-005",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-006",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-007",
+          "fold": "TEST"
+        },
+        {
+          "observation_id": "obs-008",
+          "fold": "TEST"
+        }
+      ],
+      "augmentations": [
+        {
+          "generated_row_id": "synthetic-001",
+          "parent_observation_ids": [
+            "obs-001",
+            "obs-002"
+          ],
+          "assigned_fold": "TRAIN"
+        },
+        {
+          "generated_row_id": "synthetic-002",
+          "parent_observation_ids": [
+            "obs-003",
+            "obs-004"
+          ],
+          "assigned_fold": "TRAIN"
+        }
+      ],
+      "preprocessing_fit_observation_ids": [
+        "obs-001",
+        "obs-002",
+        "obs-003",
+        "obs-004",
+        "obs-005",
+        "obs-006"
+      ],
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "scenario_id": "raw-record-digest-duplicated-across-folds",
+      "holdout_dimension": "source_paper_id",
+      "observations": [
+        {
+          "observation_id": "obs-001",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-001",
+          "raw_observation_digest": "sha256:raw-001"
+        },
+        {
+          "observation_id": "obs-002",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-002",
+          "raw_observation_digest": "sha256:raw-002"
+        },
+        {
+          "observation_id": "obs-003",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-003",
+          "raw_observation_digest": "sha256:raw-003"
+        },
+        {
+          "observation_id": "obs-004",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-004",
+          "raw_observation_digest": "sha256:raw-004"
+        },
+        {
+          "observation_id": "obs-005",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-005",
+          "raw_observation_digest": "sha256:raw-005"
+        },
+        {
+          "observation_id": "obs-006",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-006",
+          "raw_observation_digest": "sha256:raw-006"
+        },
+        {
+          "observation_id": "obs-007",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-007",
+          "raw_observation_digest": "sha256:raw-001"
+        },
+        {
+          "observation_id": "obs-008",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-008",
+          "raw_observation_digest": "sha256:raw-008"
+        }
+      ],
+      "assignments": [
+        {
+          "observation_id": "obs-001",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-002",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-003",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-004",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-005",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-006",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-007",
+          "fold": "TEST"
+        },
+        {
+          "observation_id": "obs-008",
+          "fold": "TEST"
+        }
+      ],
+      "augmentations": [
+        {
+          "generated_row_id": "synthetic-001",
+          "parent_observation_ids": [
+            "obs-001",
+            "obs-002"
+          ],
+          "assigned_fold": "TRAIN"
+        },
+        {
+          "generated_row_id": "synthetic-002",
+          "parent_observation_ids": [
+            "obs-003",
+            "obs-004"
+          ],
+          "assigned_fold": "TRAIN"
+        }
+      ],
+      "preprocessing_fit_observation_ids": [
+        "obs-001",
+        "obs-002",
+        "obs-003",
+        "obs-004",
+        "obs-005",
+        "obs-006"
+      ],
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "scenario_id": "missing-source-identity",
+      "holdout_dimension": "source_paper_id",
+      "observations": [
+        {
+          "observation_id": "obs-001",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-001",
+          "raw_observation_digest": "sha256:raw-001"
+        },
+        {
+          "observation_id": "obs-002",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-002",
+          "raw_observation_digest": "sha256:raw-002"
+        },
+        {
+          "observation_id": "obs-003",
+          "source_paper_id": null,
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-003",
+          "raw_observation_digest": "sha256:raw-003"
+        },
+        {
+          "observation_id": "obs-004",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-004",
+          "raw_observation_digest": "sha256:raw-004"
+        },
+        {
+          "observation_id": "obs-005",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-005",
+          "raw_observation_digest": "sha256:raw-005"
+        },
+        {
+          "observation_id": "obs-006",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-006",
+          "raw_observation_digest": "sha256:raw-006"
+        },
+        {
+          "observation_id": "obs-007",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-007",
+          "raw_observation_digest": "sha256:raw-007"
+        },
+        {
+          "observation_id": "obs-008",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-008",
+          "raw_observation_digest": "sha256:raw-008"
+        }
+      ],
+      "assignments": [
+        {
+          "observation_id": "obs-001",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-002",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-003",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-004",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-005",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-006",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-007",
+          "fold": "TEST"
+        },
+        {
+          "observation_id": "obs-008",
+          "fold": "TEST"
+        }
+      ],
+      "augmentations": [
+        {
+          "generated_row_id": "synthetic-001",
+          "parent_observation_ids": [
+            "obs-001",
+            "obs-002"
+          ],
+          "assigned_fold": "TRAIN"
+        },
+        {
+          "generated_row_id": "synthetic-002",
+          "parent_observation_ids": [
+            "obs-003",
+            "obs-004"
+          ],
+          "assigned_fold": "TRAIN"
+        }
+      ],
+      "preprocessing_fit_observation_ids": [
+        "obs-001",
+        "obs-002",
+        "obs-003",
+        "obs-004",
+        "obs-005",
+        "obs-006"
+      ],
+      "expected_disposition": "BLOCKED"
+    },
+    {
+      "scenario_id": "augmentation-parent-missing",
+      "holdout_dimension": "source_paper_id",
+      "observations": [
+        {
+          "observation_id": "obs-001",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-001",
+          "raw_observation_digest": "sha256:raw-001"
+        },
+        {
+          "observation_id": "obs-002",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-002",
+          "raw_observation_digest": "sha256:raw-002"
+        },
+        {
+          "observation_id": "obs-003",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-003",
+          "raw_observation_digest": "sha256:raw-003"
+        },
+        {
+          "observation_id": "obs-004",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-004",
+          "raw_observation_digest": "sha256:raw-004"
+        },
+        {
+          "observation_id": "obs-005",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-005",
+          "raw_observation_digest": "sha256:raw-005"
+        },
+        {
+          "observation_id": "obs-006",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-006",
+          "raw_observation_digest": "sha256:raw-006"
+        },
+        {
+          "observation_id": "obs-007",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-007",
+          "raw_observation_digest": "sha256:raw-007"
+        },
+        {
+          "observation_id": "obs-008",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-008",
+          "raw_observation_digest": "sha256:raw-008"
+        }
+      ],
+      "assignments": [
+        {
+          "observation_id": "obs-001",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-002",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-003",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-004",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-005",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-006",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-007",
+          "fold": "TEST"
+        },
+        {
+          "observation_id": "obs-008",
+          "fold": "TEST"
+        }
+      ],
+      "augmentations": [
+        {
+          "generated_row_id": "synthetic-001",
+          "parent_observation_ids": [
+            "obs-001",
+            "obs-002"
+          ],
+          "assigned_fold": "TRAIN"
+        },
+        {
+          "generated_row_id": "synthetic-002",
+          "parent_observation_ids": [
+            "obs-003",
+            "obs-004"
+          ],
+          "assigned_fold": "TRAIN"
+        },
+        {
+          "generated_row_id": "synthetic-missing-parent",
+          "parent_observation_ids": [
+            "obs-001",
+            "obs-099"
+          ],
+          "assigned_fold": "TRAIN"
+        }
+      ],
+      "preprocessing_fit_observation_ids": [
+        "obs-001",
+        "obs-002",
+        "obs-003",
+        "obs-004",
+        "obs-005",
+        "obs-006"
+      ],
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "scenario_id": "synthetic-row-assigned-to-test",
+      "holdout_dimension": "source_paper_id",
+      "observations": [
+        {
+          "observation_id": "obs-001",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-001",
+          "raw_observation_digest": "sha256:raw-001"
+        },
+        {
+          "observation_id": "obs-002",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-002",
+          "raw_observation_digest": "sha256:raw-002"
+        },
+        {
+          "observation_id": "obs-003",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-003",
+          "raw_observation_digest": "sha256:raw-003"
+        },
+        {
+          "observation_id": "obs-004",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-004",
+          "raw_observation_digest": "sha256:raw-004"
+        },
+        {
+          "observation_id": "obs-005",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-005",
+          "raw_observation_digest": "sha256:raw-005"
+        },
+        {
+          "observation_id": "obs-006",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-006",
+          "raw_observation_digest": "sha256:raw-006"
+        },
+        {
+          "observation_id": "obs-007",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-007",
+          "raw_observation_digest": "sha256:raw-007"
+        },
+        {
+          "observation_id": "obs-008",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-008",
+          "raw_observation_digest": "sha256:raw-008"
+        }
+      ],
+      "assignments": [
+        {
+          "observation_id": "obs-001",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-002",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-003",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-004",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-005",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-006",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-007",
+          "fold": "TEST"
+        },
+        {
+          "observation_id": "obs-008",
+          "fold": "TEST"
+        }
+      ],
+      "augmentations": [
+        {
+          "generated_row_id": "synthetic-001",
+          "parent_observation_ids": [
+            "obs-001",
+            "obs-002"
+          ],
+          "assigned_fold": "TRAIN"
+        },
+        {
+          "generated_row_id": "synthetic-002",
+          "parent_observation_ids": [
+            "obs-003",
+            "obs-004"
+          ],
+          "assigned_fold": "TRAIN"
+        },
+        {
+          "generated_row_id": "synthetic-test-row",
+          "parent_observation_ids": [
+            "obs-001",
+            "obs-002"
+          ],
+          "assigned_fold": "TEST"
+        }
+      ],
+      "preprocessing_fit_observation_ids": [
+        "obs-001",
+        "obs-002",
+        "obs-003",
+        "obs-004",
+        "obs-005",
+        "obs-006"
+      ],
+      "expected_disposition": "REJECTED"
+    },
+    {
+      "scenario_id": "incomplete-preprocessing-fit-lineage",
+      "holdout_dimension": "source_paper_id",
+      "observations": [
+        {
+          "observation_id": "obs-001",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-001",
+          "raw_observation_digest": "sha256:raw-001"
+        },
+        {
+          "observation_id": "obs-002",
+          "source_paper_id": "paper-A",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyolefin",
+          "material_grade": "PP-grade-A",
+          "specimen_id": "specimen-002",
+          "raw_observation_digest": "sha256:raw-002"
+        },
+        {
+          "observation_id": "obs-003",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-003",
+          "raw_observation_digest": "sha256:raw-003"
+        },
+        {
+          "observation_id": "obs-004",
+          "source_paper_id": "paper-B",
+          "lab_id": "lab-1",
+          "device_id": "device-1",
+          "material_family": "polyester",
+          "material_grade": "PETG-grade-B",
+          "specimen_id": "specimen-004",
+          "raw_observation_digest": "sha256:raw-004"
+        },
+        {
+          "observation_id": "obs-005",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-005",
+          "raw_observation_digest": "sha256:raw-005"
+        },
+        {
+          "observation_id": "obs-006",
+          "source_paper_id": "paper-C",
+          "lab_id": "lab-2",
+          "device_id": "device-2",
+          "material_family": "biopolymer",
+          "material_grade": "PLA-grade-C",
+          "specimen_id": "specimen-006",
+          "raw_observation_digest": "sha256:raw-006"
+        },
+        {
+          "observation_id": "obs-007",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-007",
+          "raw_observation_digest": "sha256:raw-007"
+        },
+        {
+          "observation_id": "obs-008",
+          "source_paper_id": "paper-D",
+          "lab_id": "lab-2",
+          "device_id": "device-3",
+          "material_family": "biopolymer",
+          "material_grade": "PCL-grade-D",
+          "specimen_id": "specimen-008",
+          "raw_observation_digest": "sha256:raw-008"
+        }
+      ],
+      "assignments": [
+        {
+          "observation_id": "obs-001",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-002",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-003",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-004",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-005",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-006",
+          "fold": "TRAIN"
+        },
+        {
+          "observation_id": "obs-007",
+          "fold": "TEST"
+        },
+        {
+          "observation_id": "obs-008",
+          "fold": "TEST"
+        }
+      ],
+      "augmentations": [
+        {
+          "generated_row_id": "synthetic-001",
+          "parent_observation_ids": [
+            "obs-001",
+            "obs-002"
+          ],
+          "assigned_fold": "TRAIN"
+        },
+        {
+          "generated_row_id": "synthetic-002",
+          "parent_observation_ids": [
+            "obs-003",
+            "obs-004"
+          ],
+          "assigned_fold": "TRAIN"
+        }
+      ],
+      "preprocessing_fit_observation_ids": [],
+      "expected_disposition": "BLOCKED"
+    }
+  ]
+}
