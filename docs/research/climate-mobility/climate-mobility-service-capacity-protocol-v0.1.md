@@ -158,6 +158,7 @@ Water accounting must use multiple indicators. Non-revenue water (NRW) alone can
 A service-capacity calculation and a protected minimum-service-floor assessment are different claims. A capacity surplus is not proof of delivered service, legal compliance, safety, affordability or destination suitability.
 
 Every floor assessment must bind:
+- the exact pathway and area/service-scope identity it qualifies, with the assessment invalidated if either changes;
 - an exact, versioned floor profile and the responsible authority/reference;
 - a named aggregate service scope (such as a declared community cell), metric and unit;
 - the exact observation bundle and its validity/coverage;
@@ -320,6 +321,18 @@ A passing synthetic evaluator demonstrates contract and arithmetic behavior on i
 
 **The success condition is not "the model predicts migration." It is that a community can inspect the assumptions, preserve its decision rights, compare credible adaptation choices, see where essential services fail, and obtain independently checkable evidence before a decision is made.**
 
+## 14. Research update — 13 November 2026
+
+Newer evidence strengthens the Johannesburg pilot rationale while reinforcing the need to keep service, mobility and rights claims separate:
+
+- Johannesburg Water's 29 October 2026 statement reports high demand and excessive draw-off limiting reservoir/tower recovery, low pressure and intermittent/prolonged outages in multiple named supply systems. This is an operator statement about system conditions and active interventions; it is not a customer-level measured time series.
+- The South African Human Rights Commission's 2 November 2026 statement on its Gauteng water-services inquiry identifies interconnected failures across the water-service value chain, including ageing infrastructure, losses, maintenance, storage/pumping capacity, electricity, wastewater treatment, skills and finance. It also warns against normalising recurring tanker delivery as an inferior permanent service.
+- SAnews reported on 3 November 2026 that DWS warned of El Niño-related 2026/27 summer pressure, heat-driven demand, and high Gauteng consumption and loss context. This is a risk/stress context, not a quantified local inflow forecast for a particular sub-catchment.
+- A September 2026 systematic review of 244 climate-(im)mobility articles finds persistent disciplinary separation, quantitative emphasis on large-scale movement, underrepresentation of internal/intra-regional mobility and local context, and weaker treatment of immobility and lived agency in predominantly quantitative studies.
+- The OECD's March 2026 migration forecasters' toolkit says gravity models can explain some historical flows but typically struggle with trend breaks and forced displacement; it cautions against treating a model family as a universal temporal forecaster.
+
+Pilot implication: treat Johannesburg's near-term problem first as a measurable delivered-service and infrastructure-reliability problem. Mobility research should consume those qualified service trajectories as one input, while separately incorporating agency, livelihoods, housing, rights and receiving-place capacity. Do not conflate the 2026 pressure episode with a climate-attributed migration event.
+
 ## References
 
 - IPCC AR6 WGII, Technical Summary — migration, displacement, immobility and planned relocation: https://www.ipcc.ch/report/ar6/wg2/chapter/technical-summary/
@@ -335,14 +348,3 @@ A passing synthetic evaluator demonstrates contract and arithmetic behavior on i
 - South African DWS, 2026 Budget Speech water security statement: https://www.dws.gov.za/Communications/MinisterSpeeches/2026/speech%20-%20Budget%20speech%20May%202026.pdf
 
 
-## 14. Research update — 13 November 2026
-
-Newer evidence strengthens the Johannesburg pilot rationale while reinforcing the need to keep service, mobility and rights claims separate:
-
-- Johannesburg Water's 29 October 2026 statement reports high demand and excessive draw-off limiting reservoir/tower recovery, low pressure and intermittent/prolonged outages in multiple named supply systems. This is an operator statement about system conditions and active interventions; it is not a customer-level measured time series.
-- The South African Human Rights Commission's 2 November 2026 statement on its Gauteng water-services inquiry identifies interconnected failures across the water-service value chain, including ageing infrastructure, losses, maintenance, storage/pumping capacity, electricity, wastewater treatment, skills and finance. It also warns against normalising recurring tanker delivery as an inferior permanent service.
-- SAnews reported on 3 November 2026 that DWS warned of El Niño-related 2026/27 summer pressure, heat-driven demand, and high Gauteng consumption and loss context. This is a risk/stress context, not a quantified local inflow forecast for a particular sub-catchment.
-- A September 2026 systematic review of 244 climate-(im)mobility articles finds persistent disciplinary separation, quantitative emphasis on large-scale movement, underrepresentation of internal/intra-regional mobility and local context, and weaker treatment of immobility and lived agency in predominantly quantitative studies.
-- The OECD's March 2026 migration forecasters' toolkit says gravity models can explain some historical flows but typically struggle with trend breaks and forced displacement; it cautions against treating a model family as a universal temporal forecaster.
-
-Pilot implication: treat Johannesburg's near-term problem first as a measurable delivered-service and infrastructure-reliability problem. Mobility research should consume those qualified service trajectories as one input, while separately incorporating agency, livelihoods, housing, rights and receiving-place capacity. Do not conflate the 2026 pressure episode with a climate-attributed migration event.
