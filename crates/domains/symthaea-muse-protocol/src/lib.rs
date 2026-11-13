@@ -223,6 +223,28 @@ pub struct ImportedNotationStructureSummary {
     pub measure_count: usize,
     pub barline_event_count: usize,
     pub non_controlling_measure_count: usize,
+    /// Counts for the MusicXML notation-event layer; zero/None for formats
+    /// which do not supply this representation.
+    #[serde(default)]
+    pub notation_event_count: usize,
+    #[serde(default)]
+    pub notation_supported_part_count: usize,
+    #[serde(default)]
+    pub notation_unknown_part_count: usize,
+    #[serde(default)]
+    pub rest_event_count: usize,
+    #[serde(default)]
+    pub grace_note_count: usize,
+    #[serde(default)]
+    pub tuplet_notation_count: usize,
+    #[serde(default)]
+    pub sound_tie_count: usize,
+    #[serde(default)]
+    pub visual_tie_count: usize,
+    #[serde(default)]
+    pub voice_assignment_count: usize,
+    #[serde(default)]
+    pub staff_assignment_count: usize,
     pub unavailable_part_ids: Vec<String>,
     pub explanation: Option<String>,
 }
