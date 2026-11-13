@@ -56,9 +56,10 @@ The module `musicxml_corpus_qualification.rs` defines:
 
 - `CorpusRegistrationV1`: corpus/release identity, source URL, immutable revision ID, declared license, project use scope, rights-evidence status/URL/notes, and separate task tracks.
 - `CorpusTrackRegistrationV1`: input/reference modalities, task, train permission, redistribution permission, split policy and external protocol label.
-- `CorpusSampleManifestV1`: per-sample ID, fold, split role, composer/work group IDs, input SHA-256 and reference SHA-256.
+- `CorpusSampleManifestV1`: per-sample ID, fold, split role, composer/work group IDs, safe relative input/reference paths, and their expected SHA-256 digests.
 - `CorpusProtocolFingerprintV1`: frozen split, annotation, conversion pipeline, parser build, evaluator build and evaluator schema identities.
-- `CorpusQualificationReportV1`: canonical registration/sample/protocol commitments, sample/fold/group counts, issues, stage and a deterministic report commitment.
+- `CorpusByteVerificationReceiptV1`: hashes of the actual input/reference byte slices supplied per sample, bound to the sample-manifest digest and declared verifier-build digest.
+- `CorpusQualificationReportV1`: canonical registration/sample/protocol/byte-receipt commitments, sample/fold/group counts, issues, stage and a deterministic report commitment.
 
 ## Rights and qualification semantics
 
@@ -72,15 +73,21 @@ The registry is not legal advice. It records the dataset publisher's declared te
 
 ### Qualification stages
 
-V1 emits only these stages:
+V1 emits these stages:
 
 1. `Candidate` — registration/rights metadata is invalid or incomplete (for example, MIREX's task page is not yet pinned to a stable content revision).
 2. `MetadataRecorded` — corpus release and rights metadata are recorded, but no sample manifest exists.
-3. `SampleDigestsDeclared` — sample manifest exists, but sample identity/checksum/split issues remain.
+3. `SampleDigestsDeclared` — a manifest exists, but sample identity, path, digest syntax or split issues remain.
 4. `SplitQualified` — declared input/reference digests are syntactically valid and work/composer/artifact leakage checks pass.
 5. `ProtocolFrozen` — split, annotation, conversion, parser and evaluator fingerprints are present and valid.
+6. `ByteVerified` — the supplied input/reference byte slices for every sample have actually been SHA-256 hashed and match the pinned sample manifest; no protocol fingerprint is required for this stage.
+7. `ProtocolAndBytesVerified` — both the protocol fingerprints and actual sample bytes have been verified.
 
-**V1 does not emit ByteVerified or FullyQualified.** A hexadecimal SHA-256 string in JSON is only a digest declaration. It does not prove that the bytes were read from the source artifact. A separate file-reading verifier must hash the actual files and retain its exact executable/build and output receipt. Independent annotation adjudication, rights review and any human correction-time study are also outside this metadata-only layer.
+There is deliberately no `FullyQualified` status. Even `ProtocolAndBytesVerified` does not authenticate who supplied the files, prove that the declared relative paths were resolved from an authentic upstream release, adjudicate the annotations, or provide legal review.
+
+The byte API is `verify_corpus_artifact_bytes` / `qualify_corpus_track_with_artifact_bytes`. The caller supplies one input/reference byte pair per sample through an iterator, so it can load and release one pair at a time. The verifier hashes those exact slices, compares them with the sample manifest, checks the supplied path labels match the manifest, and emits a deterministic receipt bound to the sample-manifest hash and a declared verifier-build hash. `validate_corpus_byte_verification_replay` recomputes the hashes from the same files and compares the complete receipt.
+
+Paths are required to be normalized relative paths: no absolute paths, empty components, dot/dot-dot components, drive/URI colons, backslashes or NUL. This is lexical validation only. The caller remains responsible for resolving each relative path beneath a controlled, trusted corpus root and supplying bytes read from the intended release. The receipt is a content commitment, not a signature or proof of upstream authenticity.
 
 ## Split leakage controls
 
@@ -89,13 +96,13 @@ For each fold, the validator enforces the configured policy:
 - composer-disjoint means one composer group cannot appear in multiple split roles;
 - exact-artifact-disjoint means input/reference hashes cannot recur across split roles.
 
-Duplicate sample IDs, malformed digests, missing required group identifiers, wrong corpus/release/track IDs, and empty manifests are blockers. Exact content reuse between train and test is rejected even when group labels differ.
+Duplicate sample IDs, malformed lowercase SHA-256 digests, unsafe relative paths, missing required group identifiers, wrong corpus/release/track IDs, and empty manifests are blockers. The direct byte verifier repeats its own schema, duplicate-ID, path and digest checks rather than relying exclusively on the higher-level track qualifier. Exact content reuse between train and test is rejected even when group labels differ.
 
 Five-fold composer-disjoint validation is representable, but this code does not generate the folds. The split generator and seed/assignment protocol must be independently frozen and committed before qualification.
 
 ## Tests authored
 
-13 focused tests currently cover:
+18 focused tests currently cover:
 - candidate registry scope separation;
 - CC BY-NC-SA refusal for commercial-reuse declarations;
 - Unknown license refusal outside external-evaluation-only;
@@ -105,14 +112,18 @@ Five-fold composer-disjoint validation is representable, but this code does not 
 - clean manifest + protocol promotion to ProtocolFrozen;
 - leakage remaining below SplitQualified;
 - malformed digests, duplicate IDs and wrong-track binding;
-- the unpinned MIREX task page remaining Candidate;
-- report commitment tamper sensitivity and task/modality separation.
+- the unpinned MIREX task page remaining Candidate and non-commit revision strings being refused;
+- report commitment tamper sensitivity and task/modality separation;
+- hashing actual input/reference bytes, receipt replay and tamper rejection;
+- missing/duplicate sample coverage, digest mismatches and unsafe relative paths;
+- duplicate IDs and malformed manifest refusal in the direct byte-verification API.
 
-Tests are authored but not compiled or executed.
+Tests and the focused GitHub workflow are authored but not compiled or executed in the authoring environment. The workflow now includes the corpus-qualification module and its focused test filter.
 
 ## Benchmark qualification targets (not achieved results)
 
-- 100% sample ID and input/reference digest coverage for every counted example.
+- 100% sample ID, safe relative path, and input/reference digest coverage for every counted example.
+- 100% actual byte matches to the pinned manifests before any ByteVerified stage is issued.
 - Zero composer/work/exact-artifact leakage across required split boundaries.
 - Zero test-to-train or test-to-tune reuse.
 - 100% explicit license/use-scope classification; Unknown never means unrestricted.
@@ -127,4 +138,4 @@ Tests are authored but not compiled or executed.
 4. Add the ASAP/MAESTRO non-commercial performance tracks only in a distinct research configuration; preserve unaligned/uncertain items as explicit unsupported strata.
 5. Pin the MIREX task page/version before registering external benchmark results. Keep Blind, Staves-Informed, familiar Quartets and composer-held-out QuartetsMIREX separate.
 
-No cross-corpus aggregate score or commercial rights claim is produced by this module.
+No cross-corpus aggregate score or commercial rights claim is produced by this module. The byte receipt is not a signature; independent upstream release verification, rights review and annotation adjudication remain separate requirements.
