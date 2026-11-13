@@ -19,6 +19,10 @@ exclude = [
     "crates/core/symthaea",
     # Source-only attestation prototype; no Cargo.toml exists yet.
     "crates/core/symthaea-observation-attestation",
+    # Test-only IIT research directory; no Cargo.toml exists at this workspace path.
+    "crates/core/symthaea-iit",
+    # README-only REA verifier proposal; executable package is still tracked separately.
+    "crates/domains/symthaea-rea-evidence-verifier",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
