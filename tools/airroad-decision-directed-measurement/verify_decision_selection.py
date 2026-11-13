@@ -113,8 +113,14 @@ def main() -> None:
 
     assert data["claim_ceiling"] == [
         "Synthetic exact-rational two-coordinate decision-value discriminator only.",
-        "Action contractions are stipulated and are not observed or physically validated measurements.",
-        "No IQC solve, actual excitation, FRF qualification, aircraft stability or certification is established.",
+        (
+            "Action contractions are stipulated and are not observed or physically "
+            "validated measurements."
+        ),
+        (
+            "No IQC solve, actual excitation, FRF qualification, aircraft stability "
+            "or certification is established."
+        ),
     ]
 
     print("AIRROAD decision-directed measurement exact-rational reference: PASS")
