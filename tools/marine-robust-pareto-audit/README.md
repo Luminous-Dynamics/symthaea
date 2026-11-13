@@ -49,6 +49,14 @@ These are evidence-quality gates, not automatic proof that a candidate is enviro
 
 Each external gate receipt is bound to the exact candidate it qualifies: candidate ID, vessel revision, propeller revision, operating-point receipt digest, service fingerprint and environment fingerprint must match the candidate record byte-for-byte. This prevents a valid-looking pass receipt for one propulsion configuration or voyage context from being reused for another. These are binding checks over declared references; they do not authenticate the audit publisher or verify the raw receipt bytes.
 
+## Acoustic metric comparability
+
+Underwater-noise objectives and metric gates must explicitly identify their quantity basis. V0 accepts `underwater_source_level` only, with a declared reference distance, frequency-band ID and bandwidth convention. The same basis, band and reference distance must be present in the objective, candidate metric and any metric hard gate, and must agree across compared candidates. Received SPL and cumulative SEL are different quantities and are not silently comparable to source level; they belong in the receiver-exposure ledger rather than this source-level design frontier.
+
+## External receipt subject binding
+
+Every external gate receipt is explicitly bound to candidate ID, vessel revision, propeller revision, operating-point receipt digest, service fingerprint and environment fingerprint. A receipt for another candidate or operating condition is invalid. These checks bind declared references; they do not authenticate the publisher or raw receipt bytes.
+
 ## Interpretation limits
 
 The audit tests declared comparison contracts and computes interval relations. It does not authenticate sensor certificates or raw bytes, validate physical measurements, acoustic propagation, ecology, CFD, full-scale transfer or regulatory compliance. A SHA-256 digest is a reference, not proof of authenticity.
