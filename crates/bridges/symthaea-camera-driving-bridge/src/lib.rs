@@ -953,6 +953,7 @@ mod tests {
             maximum_sensor_clock_skew_us: 2_000,
             visual_weight_ppm: 500_000,
             vehicle_encoder_seed_phrase: "symthaea-camera-driving-bridge-test-seed".to_string(),
+            expected_camera_calibration_sha256: Some("d".repeat(64)),
         }
     }
 
@@ -1295,7 +1296,7 @@ mod tests {
     fn vehicle_encoder_seed_is_bound_to_receipt_and_policy_input() {
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
-        let mut first_config = config();
+        let first_config = config();
         let mut second_config = config();
         second_config.vehicle_encoder_seed_phrase = "different-vehicle-seed".to_string();
         let mut first =
@@ -1326,7 +1327,7 @@ mod tests {
     fn vision_configuration_is_bound_to_receipt_and_visual_representation() {
         let state = VehicleState::cruising(10.0);
         let pixels = vec![128; 16 * 16 * 3];
-        let mut vision_a = VisionConfig::default();
+        let vision_a = VisionConfig::default();
         let mut vision_b = VisionConfig::default();
         vision_b.seed += 1;
         let mut first = CameraDrivingBridge::try_new(config(), vision_a).unwrap();
@@ -1588,16 +1589,7 @@ mod tests {
             Some(BridgeError::VehicleTimestampRegression)
         );
         assert_eq!(bridge.frames_processed(), 1);
-        let valid = CapturedDrivingObservation {
-            sequence: 2,
-            timestamp_us: 20_000,
-            vehicle_state_timestamp_us: 20_000,
-            pixels: &pixels,
-            width: 16,
-            height: 16,
-            channels: 3,
-            vehicle_state: &state,
-        };
+        let valid = observation(&pixels, 2, 20_000, &state);
         assert!(bridge.observe(valid).is_ok());
     }
 
