@@ -1,0 +1,305 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/energy/edlc_sequential_reserve_v0_1.schema.json",
+  "title": "EDLC Sequential Reserve Readiness v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "fixture_id",
+    "evidence_class",
+    "claim_ceiling",
+    "assumptions",
+    "protocol",
+    "requirements",
+    "device_sequences",
+    "expected",
+    "negative_controls"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "fixture_id": {
+      "const": "EDLC-SEQUENTIAL-RESERVE-KNOWN-ANSWER-001"
+    },
+    "evidence_class": {
+      "const": "synthetic_sequential_reserve_replay"
+    },
+    "claim_ceiling": {
+      "const": "SYNTHETIC_SEQUENCE_AND_RECOVERY_GATE_ARITHMETIC_ONLY_NOT_PHYSICAL_DEVICE_RELIABILITY"
+    },
+    "assumptions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "protocol": {
+      "$ref": "#/$defs/protocol"
+    },
+    "requirements": {
+      "$ref": "#/$defs/requirements"
+    },
+    "device_sequences": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/deviceSequence"
+      }
+    },
+    "expected": {
+      "$ref": "#/$defs/expected"
+    },
+    "negative_controls": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_id",
+        "sequence_profile_id",
+        "standby_mode",
+        "physical_boundary",
+        "initial_standby_hours",
+        "event_order_frozen_before_evaluation",
+        "external_replenishment_boundary"
+      ],
+      "properties": {
+        "protocol_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "standby_mode": {
+          "enum": [
+            "open_circuit",
+            "regulated_voltage_hold"
+          ]
+        },
+        "physical_boundary": {
+          "enum": [
+            "cell",
+            "complete_device",
+            "installed_system"
+          ]
+        },
+        "initial_standby_hours": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "event_order_frozen_before_evaluation": {
+          "const": true
+        },
+        "external_replenishment_boundary": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "requirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "minimum_delivered_energy_wh",
+        "minimum_sustained_power_w",
+        "maximum_response_latency_s",
+        "minimum_application_voltage_v",
+        "maximum_temperature_rise_c",
+        "maximum_standby_auxiliary_energy_wh",
+        "maximum_external_replenishment_energy_wh_per_interval",
+        "maximum_time_to_restored_readiness_hours"
+      ],
+      "properties": {
+        "minimum_delivered_energy_wh": {
+          "type": "number",
+          "minimum": 0
+        },
+        "minimum_sustained_power_w": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_response_latency_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "minimum_application_voltage_v": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_temperature_rise_c": {
+          "type": "number"
+        },
+        "maximum_standby_auxiliary_energy_wh": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_external_replenishment_energy_wh_per_interval": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_time_to_restored_readiness_hours": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "deviceSequence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physical_device_serial",
+        "status",
+        "events"
+      ],
+      "properties": {
+        "physical_device_serial": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "measured",
+            "failed",
+            "invalid",
+            "censored"
+          ]
+        },
+        "failure_reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/event"
+          }
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_index",
+        "event_id",
+        "load_profile_id",
+        "preceding_idle_window_hours",
+        "readiness_probe_status",
+        "time_to_restored_readiness_hours",
+        "external_replenishment_energy_wh",
+        "standby_auxiliary_energy_wh",
+        "delivered_energy_wh",
+        "minimum_sustained_power_w",
+        "response_latency_s",
+        "minimum_application_voltage_v",
+        "temperature_rise_c"
+      ],
+      "properties": {
+        "event_index": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "load_profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preceding_idle_window_hours": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "readiness_probe_status": {
+          "enum": [
+            "not_applicable",
+            "passed",
+            "failed"
+          ]
+        },
+        "time_to_restored_readiness_hours": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "external_replenishment_energy_wh": {
+          "type": "number",
+          "minimum": 0
+        },
+        "standby_auxiliary_energy_wh": {
+          "type": "number",
+          "minimum": 0
+        },
+        "delivered_energy_wh": {
+          "type": "number",
+          "minimum": 0
+        },
+        "minimum_sustained_power_w": {
+          "type": "number",
+          "minimum": 0
+        },
+        "response_latency_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "minimum_application_voltage_v": {
+          "type": "number",
+          "minimum": 0
+        },
+        "temperature_rise_c": {
+          "type": "number"
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sequence_pass_rate",
+        "sequence_passes",
+        "valid_sequences",
+        "false_ready_events",
+        "method"
+      ],
+      "properties": {
+        "sequence_pass_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "sequence_passes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "valid_sequences": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "false_ready_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "method": {
+          "const": "non_compensatory_all_events_and_recovery_gates_per_device_sequence"
+        }
+      }
+    }
+  }
+}
