@@ -357,11 +357,22 @@ pub struct RegimeRateSummary {
     /// Total scheduled episodes; shown for coverage, not as the statistical sample size.
     pub episode_count: u64,
     /// Equal-weighted mean of per-cluster rates.
+    ///
+    /// Each independent cluster receives equal weight, regardless of episode count.
     pub mean_cluster_rate_ppm: Option<u32>,
     /// Minimum per-cluster rate.
     pub minimum_cluster_rate_ppm: Option<u32>,
     /// Maximum per-cluster rate.
     pub maximum_cluster_rate_ppm: Option<u32>,
+    /// Equal-weighted mean of source-group rates.
+    ///
+    /// Cluster rates are averaged within each source group first; then each
+    /// source group receives equal weight regardless of its cluster count.
+    pub mean_source_group_rate_ppm: Option<u32>,
+    /// Minimum source-group mean rate.
+    pub minimum_source_group_rate_ppm: Option<u32>,
+    /// Maximum source-group mean rate.
+    pub maximum_source_group_rate_ppm: Option<u32>,
     /// Whether any cluster has Unknown/censored outcomes or independence evidence.
     pub has_unknown_evidence: bool,
 }
@@ -383,11 +394,17 @@ pub struct AxisTransferGapReport {
     pub candidate_hidden: RegimeRateSummary,
     /// Candidate transfer gap: hidden minus familiar.
     pub candidate_transfer_gap_ppm: Option<i64>,
-    /// Difference-in-differences: candidate gap minus baseline gap.
+    /// Difference-in-differences: candidate gap minus baseline gap using cluster-equal rates.
     ///
     /// Positive means the candidate has a less negative observed transfer
     /// gap than the matched baseline for this frozen source scope.
     pub difference_in_differences_ppm: Option<i64>,
+    /// Baseline hidden-minus-familiar gap using source-group-equal rates.
+    pub baseline_source_group_equal_transfer_gap_ppm: Option<i64>,
+    /// Candidate hidden-minus-familiar gap using source-group-equal rates.
+    pub candidate_source_group_equal_transfer_gap_ppm: Option<i64>,
+    /// Candidate-minus-baseline difference-in-differences using source-group-equal rates.
+    pub source_group_equal_difference_in_differences_ppm: Option<i64>,
 }
 
 /// Completeness for one source dimension.
@@ -1030,49 +1047,64 @@ fn axis_rate(report: &ClusterTransferReport, axis: OutcomeAxis, candidate: bool)
     }
 }
 
+fn mean_rate_ppm(rates: &[u32]) -> Result<Option<u32>, TransferGapError> {
+    if rates.is_empty() {
+        return Ok(None);
+    }
+    let sum = rates
+        .iter()
+        .try_fold(0_u128, |acc, rate| acc.checked_add(u128::from(*rate)))
+        .ok_or(TransferGapError::ArithmeticOverflow)?;
+    let count = u128::try_from(rates.len()).map_err(|_| TransferGapError::ArithmeticOverflow)?;
+    let mean = sum / count;
+    Ok(Some(
+        u32::try_from(mean).map_err(|_| TransferGapError::ArithmeticOverflow)?,
+    ))
+}
+
 fn summarize_regime(
     reports: &[ClusterTransferReport],
     axis: OutcomeAxis,
     candidate: bool,
 ) -> Result<RegimeRateSummary, TransferGapError> {
-    let mut rates = Vec::with_capacity(reports.len());
-    let mut groups = BTreeSet::new();
+    let mut cluster_rates = Vec::with_capacity(reports.len());
+    let mut rates_by_source_group: BTreeMap<&str, Vec<u32>> = BTreeMap::new();
     let mut episodes = 0_u64;
     let mut unknown = false;
     for report in reports {
-        rates.push(axis_rate(report, axis, candidate));
-        groups.insert(report.source_group_digest.as_str());
+        let rate = axis_rate(report, axis, candidate);
+        cluster_rates.push(rate);
+        rates_by_source_group
+            .entry(report.source_group_digest.as_str())
+            .or_default()
+            .push(rate);
         episodes = episodes
             .checked_add(u64::from(report.scheduled_episodes))
             .ok_or(TransferGapError::ArithmeticOverflow)?;
         unknown |= !report.evidence_complete;
     }
-    rates.sort_unstable();
-    let mean = if rates.is_empty() {
-        None
-    } else {
-        let sum = rates
-            .iter()
-            .try_fold(0_u128, |acc, rate| acc.checked_add(u128::from(*rate)));
-        let total = sum.ok_or(TransferGapError::ArithmeticOverflow)?;
-        Some(
-            u32::try_from(
-                total
-                    / u128::try_from(rates.len())
-                        .map_err(|_| TransferGapError::ArithmeticOverflow)?,
-            )
-            .map_err(|_| TransferGapError::ArithmeticOverflow)?,
-        )
-    };
+    cluster_rates.sort_unstable();
+
+    let mut source_group_rates = rates_by_source_group
+        .values()
+        .map(|cluster_rates| {
+            mean_rate_ppm(cluster_rates)?.ok_or(TransferGapError::ArithmeticOverflow)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    source_group_rates.sort_unstable();
+
     Ok(RegimeRateSummary {
         cluster_count: u16::try_from(reports.len())
             .map_err(|_| TransferGapError::ArithmeticOverflow)?,
-        source_group_count: u16::try_from(groups.len())
+        source_group_count: u16::try_from(rates_by_source_group.len())
             .map_err(|_| TransferGapError::ArithmeticOverflow)?,
         episode_count: episodes,
-        mean_cluster_rate_ppm: mean,
-        minimum_cluster_rate_ppm: rates.first().copied(),
-        maximum_cluster_rate_ppm: rates.last().copied(),
+        mean_cluster_rate_ppm: mean_rate_ppm(&cluster_rates)?,
+        minimum_cluster_rate_ppm: cluster_rates.first().copied(),
+        maximum_cluster_rate_ppm: cluster_rates.last().copied(),
+        mean_source_group_rate_ppm: mean_rate_ppm(&source_group_rates)?,
+        minimum_source_group_rate_ppm: source_group_rates.first().copied(),
+        maximum_source_group_rate_ppm: source_group_rates.last().copied(),
         has_unknown_evidence: unknown,
     })
 }
@@ -1205,6 +1237,17 @@ pub fn audit_transfer_gap(input: &TransferGapInput) -> Result<TransferGapReport,
                     let did = candidate_gap
                         .zip(baseline_gap)
                         .map(|(candidate, baseline)| candidate - baseline);
+                    let baseline_source_group_gap = subtract_rates(
+                        baseline_hidden.mean_source_group_rate_ppm,
+                        baseline_familiar.mean_source_group_rate_ppm,
+                    );
+                    let candidate_source_group_gap = subtract_rates(
+                        candidate_hidden.mean_source_group_rate_ppm,
+                        candidate_familiar.mean_source_group_rate_ppm,
+                    );
+                    let source_group_did = candidate_source_group_gap
+                        .zip(baseline_source_group_gap)
+                        .map(|(candidate, baseline)| candidate - baseline);
                     axes.push(AxisTransferGapReport {
                         axis,
                         baseline_familiar,
@@ -1214,6 +1257,9 @@ pub fn audit_transfer_gap(input: &TransferGapInput) -> Result<TransferGapReport,
                         candidate_hidden,
                         candidate_transfer_gap_ppm: candidate_gap,
                         difference_in_differences_ppm: did,
+                        baseline_source_group_equal_transfer_gap_ppm: baseline_source_group_gap,
+                        candidate_source_group_equal_transfer_gap_ppm: candidate_source_group_gap,
+                        source_group_equal_difference_in_differences_ppm: source_group_did,
                     });
                 }
 
@@ -1757,7 +1803,6 @@ mod tests {
             unknown: 0,
         };
         audit.evaluations[0].candidate = audit.evaluations[0].baseline.clone();
-        audit.evaluations[0].candidate = audit.evaluations[0].baseline.clone();
         audit.evaluations[1].baseline = OutcomeTally {
             scheduled_episodes: 10,
             safe_successes: 0,
@@ -1770,6 +1815,39 @@ mod tests {
         let safe = &report.dimensions[0].axes[1];
         assert_eq!(safe.baseline_familiar.mean_cluster_rate_ppm, Some(500_000));
         assert_eq!(safe.baseline_familiar.episode_count, 1_010);
+    }
+
+    #[test]
+    fn source_group_equal_rate_prevents_a_high_cluster_count_group_from_dominating() {
+        let mut audit = input();
+        // Add a third successful independent cluster to source group A.
+        // Cluster-equal mean becomes 90%; group-equal mean averages group A's
+        // 95% with group B's 80%, resulting in 87.5%.
+        audit.evaluations.push(eval(
+            SourceDimension::CollectionSite,
+            EvaluationRegime::FamiliarSourceReference,
+            "site-train-A",
+            "familiar-A-extra",
+            tally(10, 0, 0),
+            tally(10, 0, 0),
+        ));
+        let report = audit_transfer_gap(&audit).unwrap();
+        let safe = &report.dimensions[0].axes[1];
+        assert_eq!(safe.baseline_familiar.cluster_count, 3);
+        assert_eq!(safe.baseline_familiar.source_group_count, 2);
+        assert_eq!(safe.baseline_familiar.mean_cluster_rate_ppm, Some(900_000));
+        assert_eq!(
+            safe.baseline_familiar.mean_source_group_rate_ppm,
+            Some(875_000)
+        );
+        assert_eq!(
+            safe.baseline_familiar.minimum_source_group_rate_ppm,
+            Some(800_000)
+        );
+        assert_eq!(
+            safe.baseline_familiar.maximum_source_group_rate_ppm,
+            Some(950_000)
+        );
     }
 
     #[test]
