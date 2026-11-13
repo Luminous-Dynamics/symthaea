@@ -161,7 +161,7 @@ struct Expected {
     product_decision: ProductDecisionInput,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum AuditDispositionInput {
     Pass,
@@ -169,7 +169,7 @@ enum AuditDispositionInput {
     Rejected,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 enum ProductDecisionInput {
     AcceptWindow,
