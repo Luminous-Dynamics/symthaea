@@ -5,8 +5,8 @@
   "created": "2026-11-13",
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
-  "status": "exact_bit_flip_and_general_qec_matrix_passed_rust_1_96",
-  "execution_status": "Universal bit-flip baseline passed 153 tests; general complex QEC matrix diagnostics passed 157 tests at exact head 870ab5bf. Hellinger square-root metrics and approximate universal Petz remain unimplemented.",
+  "status": "Hellinger_and_strong_Petz_bounds_source_authored_validation_pending",
+  "execution_status": "Support-aware QEC square root, closed-form Hellinger metric and Theorem-11 strong-control Petz Bures bound are source-authored. Exact-head Rust validation pending; environment-leakage diamond norm and general recovery channel unimplemented.",
   "claim_ceiling": "The implemented baseline is exact three-qubit repetition-code correction for stochastic mixtures of {I,X0,X1,X2}. The general approximate error-set Petz theorem and its Hellinger/environment-leakage certificates are not implemented.",
   "references": [
     {
@@ -59,7 +59,37 @@
     "strongly_controlled_channel_coefficient_norm": "Schatten-2/Hilbert-Schmidt norm ||C||_2 <= 1 (paper Definition 7); stronger than spectral norm <= 1.",
     "hellinger_closed_form": "zeta_H = sqrt(tr(A_QEC)/K - ||tr_K(sqrt(A_QEC))||_2^2/K^2).",
     "strongly_controlled_petz_worst_case_bound": "d_wc(R_Petz o N|_Q, I_Q) <= (1/sqrt(2))*||sqrt(A_QEC) - I_K tensor (1/sqrt(K))*sqrt(tr_K(A_QEC))||_infinity; apply only to strongly E-controlled channels.",
-    "distinction": "Environment-leakage diamond distance and the Theorem 11 operator-norm Petz bound are separate quantities; do not substitute one for the other."
+    "distinction": "Environment-leakage diamond distance and the Theorem 11 operator-norm Petz bound are separate quantities; do not substitute one for the other.",
+    "support_aware_sqrt": {
+      "method": "nalgebra complex Hermitian eigendecomposition",
+      "policy": "Reject material negative eigenvalues; zero only negative roundoff within tolerance; never floor positive eigenvalues.",
+      "receipts": [
+        "min_eigenvalue",
+        "max_eigenvalue",
+        "support_rank",
+        "support_threshold",
+        "roundoff_negative_eigenvalue_count",
+        "hermiticity_residual",
+        "reconstruction_relative_residual"
+      ]
+    },
+    "hellinger_implementation": {
+      "api": "compute_knill_laflamme_hellinger",
+      "formula": "zeta_H^2 = tr(A_QEC)/K - ||Tr_K(sqrt(A_QEC))||_2^2/K^2",
+      "source": "arXiv:2608.28962v2, Eq. (8)",
+      "status": "source_authored_runner_pending"
+    },
+    "strong_petz_implementation": {
+      "api": "compute_strongly_controlled_petz_worst_case_bound",
+      "formula": "d_wc <= (1/sqrt(2))*||sqrt(A_QEC)-I_K tensor (1/sqrt(K))*sqrt(Tr_K(A_QEC))||_infinity",
+      "source": "arXiv:2608.28962v2, Theorem 11",
+      "preconditions": [
+        "coefficient matrix Frobenius/Schatten-2 norm <= 1+tolerance",
+        "induced Kraus channel F_alpha=sum_k C[alpha,k]E_k passes sum_alpha F_alpha^dagger F_alpha=I"
+      ],
+      "status": "source_authored_runner_pending",
+      "nonclaim": "does not compute the environment-leakage diamond norm or implement the general error-set Petz recovery channel"
+    }
   },
   "implemented_baseline": {
     "module": "crates/domains/symthaea-frontier-physics/src/universal_recovery.rs",
@@ -143,24 +173,31 @@
     {
       "id": "UR-3",
       "name": "Average-case error-set recovery",
-      "status": "planned",
+      "status": "source_authored_runner_pending",
       "acceptance": [
         "independent Hellinger distance",
         "matched theorem assumptions",
         "average-case error comparison",
         "closed-form Hellinger formula using support-aware sqrt(A_QEC)",
-        "no positive eigenvalue floor"
+        "no positive eigenvalue floor",
+        "support-aware PSD square root",
+        "Eq. (8) closed-form Hellinger distance",
+        "exact-KL zero-distance known answer",
+        "approximate-family phase-error negative control"
       ]
     },
     {
       "id": "UR-4",
       "name": "Worst-case error-set recovery",
-      "status": "planned",
+      "status": "source_authored_runner_pending",
       "acceptance": [
         "environment-leakage diamond norm",
         "strong coefficient constraint",
         "worst-case logical input",
-        "Theorem 11 Petz operator-norm bound on strongly E-controlled families"
+        "Theorem 11 Petz operator-norm bound on strongly E-controlled families",
+        "Theorem 11 operator-norm Petz Bures bound",
+        "Schatten-2 coefficient check",
+        "induced Kraus channel TP residual"
       ]
     },
     {
@@ -257,7 +294,15 @@
     "controlled_channel_C_operator_norm",
     "strong_controlled_channel_C_schatten2_norm",
     "Hellinger_closed_form",
-    "Petz_strong_control_wc_operator_bound"
+    "Petz_strong_control_wc_operator_bound",
+    "QEC_sqrt_min_eigenvalue",
+    "QEC_sqrt_support_rank",
+    "QEC_sqrt_reconstruction_residual",
+    "Hellinger_radicand",
+    "Hellinger_distance",
+    "Petz_Theorem11_operator_norm_deviation",
+    "Petz_Theorem11_bures_bound",
+    "induced_channel_TP_residual"
   ],
   "general_qec_matrix_implementation": {
     "module": "crates/domains/symthaea-frontier-physics/src/error_set_qec.rs",
@@ -295,6 +340,18 @@
       "crate_test_result": "157 passed; 0 failed",
       "focused_tests": 5,
       "claim_ceiling": "General QEC Gram-matrix construction and exact-KL projection only. No approximate universal recovery claim."
+    },
+    "support_aware_metrics": {
+      "status": "source_authored_runner_pending",
+      "authored_tests": [
+        "psd_square_root_preserves_rank_deficiency_without_positive_flooring",
+        "psd_square_root_rejects_materially_negative_and_nonhermitian_inputs",
+        "exact_kl_repetition_code_has_zero_hellinger_distance",
+        "phase_error_negative_control_has_positive_hellinger_distance",
+        "exact_kl_repetition_code_has_zero_strong_petz_bound",
+        "strong_petz_bound_rejects_coefficients_outside_schatten_two_ball",
+        "strong_petz_bound_requires_the_coefficient_induced_channel_to_be_tp"
+      ]
     }
   }
 }
