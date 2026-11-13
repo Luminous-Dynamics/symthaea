@@ -29,7 +29,7 @@ These dimensions are not collapsed into a weighted score. A payment can satisfy 
 
 Requires Go 1.23+ and uses only the standard library.
 
-    ./verify.sh
+    bash verify.sh
 
     go run ./cmd/mace-evalqual validate -corpus fixtures/corpus.json -manifest fixtures/manifest.json
 
