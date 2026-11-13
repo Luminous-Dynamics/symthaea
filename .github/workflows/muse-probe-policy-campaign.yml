@@ -73,7 +73,7 @@ jobs:
           set -euo pipefail
           mkdir -p /tmp/muse-campaign-lock
           cp Cargo.lock /tmp/muse-campaign-lock/Cargo.lock.committed
-          if cargo generate-lockfile --offline; then
+          if cargo generate-lockfile 2>&1 | tee /tmp/muse-campaign-lock/generation.log; then
             printf 'generation=success\n' > /tmp/muse-campaign-lock/status.txt
             diff -u /tmp/muse-campaign-lock/Cargo.lock.committed Cargo.lock \
               > /tmp/muse-campaign-lock/Cargo.lock.diff || true
