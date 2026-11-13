@@ -177,6 +177,17 @@ Primary comparison is a mission-conditioned Pareto frontier. A new design must i
 - JSON key order and input record order do not change canonical audit results.
 - Negative controls include wrong boundary, mixed device classes, missing inactive mass, impossible unit/boundary joins, duplicate physical serials, uncalibrated instrument, expired/missing protocol, fabricated physical evidence, and false promotion of vendor claims.
 
+## Local audit command
+
+The workspace `xtask` exposes a dependency-free domain audit using the existing `serde_json` dependency:
+
+```sh
+cargo run -p xtask -- electrochemical-capacitor-audit
+cargo test -p xtask electrochemical_capacitor
+```
+
+The command checks schema/fixture structure, canonical identifiers, device and metric categories, units/voltage-window sanity, evidence-class/status alignment, digest syntax, duplicate physical serials, source-register uniqueness and the fail-closed promotion rules. It is not a complete JSON Schema evaluator and does not authenticate remote source bytes or measurements. Rust compilation, formatting, tests and hosted CI remain pending until a Rust toolchain/runner is available.
+
 ## Claim ceiling
 
 A schema/fixture/CLI pass establishes software semantics only. No capacitance, energy density, power, cycle life, safety, process yield, scale-up, commercial viability or SOTA superiority is established until physical devices are made and independently measured.
