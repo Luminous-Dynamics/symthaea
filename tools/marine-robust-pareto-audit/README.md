@@ -47,6 +47,8 @@ The scenario can require exact external audit contract/receipt pairs as non-comp
 
 These are evidence-quality gates, not automatic proof that a candidate is environmentally superior. A missing, unresolved or mismatched receipt holds the candidate out of the robust Pareto frontier, irrespective of energy or cost savings. The actual underwater-noise objective and biosecurity thresholds remain separate declared gates. Synthetic fixture receipts are placeholders for known-answer tests only; they do not represent physical evidence.
 
+Each external gate receipt is bound to the exact candidate it qualifies: candidate ID, vessel revision, propeller revision, operating-point receipt digest, service fingerprint and environment fingerprint must match the candidate record byte-for-byte. This prevents a valid-looking pass receipt for one propulsion configuration or voyage context from being reused for another. These are binding checks over declared references; they do not authenticate the audit publisher or verify the raw receipt bytes.
+
 ## Interpretation limits
 
 The audit tests declared comparison contracts and computes interval relations. It does not authenticate sensor certificates or raw bytes, validate physical measurements, acoustic propagation, ecology, CFD, full-scale transfer or regulatory compliance. A SHA-256 digest is a reference, not proof of authenticity.
