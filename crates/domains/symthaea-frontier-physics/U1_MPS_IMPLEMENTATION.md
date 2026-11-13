@@ -47,17 +47,30 @@ This is a charge-block factorization path with no Schmidt truncation:
 
 Tests include dense-to-MPS reconstruction of the W state, a non-normalized \(|1010\rangle\) basis state, and a tolerated tiny charge-leakage component whose loss must appear in the receipt. This is the exact bridge needed before testing TEBD gate application. The factorization is numerically faithful to the reported SVD/reconstruction residual, not a claim of symbolic exactness in floating point. Exactly-zero SVD directions are omitted as nullspace, but every positive singular value is retained.
 
+
+## U(1)-conserving two-site gate semantics
+
+The next branch adds a validated local gate interface in \`src/u1_mps.rs\`.
+
+- \`U1TwoSiteGate::new\` accepts a complex 4×4 matrix in basis order \(|00\rangle,|01\rangle,|10\rangle,|11\rangle\). It independently checks unitarity and forbids matrix elements between distinct total-excitation sectors.
+- \`U1TwoSiteState::from_adjacent_tensors\` contracts one internal MPS bond without splitting or truncating it.
+- \`U1TwoSiteState::apply_gate\` applies the validated gate in the two-qubit physical basis and checks the resulting virtual-charge selection rule.
+- Identity, SWAP and a complex U(2) single-excitation block provide deterministic controls.
+- Small two-site open-boundary states can be expanded to four dense amplitudes for direct comparison.
+
+The operation is deliberately **pre-SVD**. It establishes the gate convention and charge-preserving contraction, not a full MPS circuit simulator. The next work is the charge-block two-site split, followed by per-sector and global truncation accounting.
+
 ## Explicit limitations
 
 This increment does **not** yet implement:
-- Two-site \(U(1)\)-conserving gate application.
-- Canonical-form sweeps or two-site gate SVD updates with per-gate truncation receipts.
+- Charge-sector two-site SVD splitting, canonical-form sweeps and per-gate truncation receipts.
+- TEBD gate sequencing and nonlocal MPO evolution.
 - TEBD or nonlocal MPO evolution.
 - Per-truncation discarded-weight accounting.
 - Cumulative state-vector / reduced-state error bounds.
 - Any N=16–64 scaling or matched Quimb/ITensor performance claim.
 
-Those are the next stages. The implementation should add them in this order: exact two-site gate contraction without truncation, sector-resolved Schmidt decomposition, truncation receipts and dense-overlap qualification, then controlled scaling.
+Those are the next stages. The implementation should add them in this order: charge-sector two-site SVD split, global singular-value truncation policy, per-gate discarded-weight ledger, cumulative state-error bounds, then controlled scaling.
 
 ## Competitive benchmark policy
 
