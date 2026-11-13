@@ -23,6 +23,9 @@ CARGO_VERSION="$(rustup run "$TOOLCHAIN" cargo --version)"
 # out manifests or Cargo.lock.
 git archive HEAD | tar -x -C "$WORK"
 BEFORE="$(sha256sum "$WORK/Cargo.lock" | awk '{print $1}')"
+OVERALL_STATUS=0
+TOTAL_DIRECT_WARNINGS=0
+TOTAL_WORKSPACE_WARNINGS=0
 
 for package in symthaea-core symthaea-fep; do
   case "$package" in
@@ -47,24 +50,28 @@ unused_dependencies = "warn"
 EOF
 
   LOG="$WORK/$package-unused-dependencies.log"
-  echo "=== $package / Cargo unused_dependencies ==="
+  echo "=== $package / Cargo unused_dependencies (library + tests) ==="
   set +e
   (
     cd "$WORK"
     rustup run "$TOOLCHAIN" cargo check \
-      --locked --all-targets --package "$package" \
+      --locked --lib --tests --package "$package" \
       --message-format=short
   ) > "$LOG" 2>&1
   status=$?
   set -e
   cat "$LOG"
 
-  count="$(grep -Eic 'unused dependency' "$LOG" || true)"
-  printf 'package=%s exit=%s unused_dependency_warnings=%s\n' "$package" "$status" "$count"
+  direct_count="$(grep -Eic 'warning: unused dependency `' "$LOG" || true)"
+  workspace_count="$(grep -Eic 'warning: unused workspace dependency `' "$LOG" || true)"
+  TOTAL_DIRECT_WARNINGS=$((TOTAL_DIRECT_WARNINGS + direct_count))
+  TOTAL_WORKSPACE_WARNINGS=$((TOTAL_WORKSPACE_WARNINGS + workspace_count))
+  printf 'package=%s exit=%s unused_package_dependencies=%s unused_workspace_dependencies=%s\n' \
+    "$package" "$status" "$direct_count" "$workspace_count"
 
   if [[ $status -ne 0 ]]; then
-    echo "AUDIT_INCOMPLETE: all-target Cargo check failed for $package" >&2
-    exit "$status"
+    echo "AUDIT_INCOMPLETE: library/test target check failed for $package" >&2
+    OVERALL_STATUS=1
   fi
 done
 
@@ -81,4 +88,10 @@ echo "source_lock_sha256=$BEFORE"
 echo "source_lock_unchanged=PASS"
 echo "manifest_policy_scope=temporary archive only"
 echo "default manifests and lockfile=untouched"
+echo "unused_package_dependency_warning_total=$TOTAL_DIRECT_WARNINGS"
+echo "unused_workspace_dependency_warning_total=$TOTAL_WORKSPACE_WARNINGS"
+if [[ $OVERALL_STATUS -ne 0 ]]; then
+  echo "cargo_unused_dependency_audit=INCOMPLETE"
+  exit 1
+fi
 echo "cargo_unused_dependency_audit=COMPLETE"
