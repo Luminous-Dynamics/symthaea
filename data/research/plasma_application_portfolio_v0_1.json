@@ -98,9 +98,9 @@
       "issue": 11907,
       "pr": 11910,
       "service_unit": "correct durable-bond product decisions per experimental cost/latency/sample budget, with explicit ACCEPT/REJECT/ABSTAIN",
-      "sota_anchor": "2026 matched gas/polymer comparison shows WCA does not always rank bond strength; 2026 PE CAP study reports surface-wettability gains with WVTR/OTR penalties; robust multifidelity OED and correlated-measurement design are active generic fields",
-      "primary_gap": "plasma-specific selection of complementary F0-F4 measurements for bond strength, aging, failure mode and substrate preservation while accounting for lot/device/day shift, shared preparation covariance and model inadequacy",
-      "evidence_ceiling": "10-scenario synthetic contract replay only; no optimizer result, EVSI improvement, physical data or laboratory savings"
+      "sota_anchor": "2026 matched polymer/gas comparison shows WCA does not always rank bond strength; 2026 PE CAP aging shows most WCA recovery occurs within 24 h and plateaus around 3–6 d; PA6 moisture study shows dry <0.1 wt% vs saturated 3 wt% can yield similar WCA but about 2x lap-shear difference; durable primer studies show material-additive-specific storage behavior",
+      "primary_gap": "select complementary F0-F4 measurements for bond strength, aging, failure mode and material-function preservation while observing hidden substrate state (moisture/conditioning/additive package), lot/device/day shift, common-mode covariance, and durable primer/non-plasma comparators",
+      "evidence_ceiling": "12-scenario synthetic contract replay only; no optimizer result, EVSI improvement or physical data"
     }
   ],
   "no_longer_novel_by_itself": [
