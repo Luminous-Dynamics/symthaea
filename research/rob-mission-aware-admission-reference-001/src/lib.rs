@@ -314,9 +314,7 @@ pub struct AdmissionReport {
     pub actuation_authorized: bool,
 }
 
-fn decision_sufficiency_slack(
-    request: &InferenceRequest,
-) -> Result<u64, RejectReason> {
+fn decision_sufficiency_slack(request: &InferenceRequest) -> Result<u64, RejectReason> {
     let decision_id = request
         .decision_id
         .as_deref()
@@ -926,11 +924,8 @@ mod tests {
         );
 
         let mut unknown = request("q2", "r2");
-        unknown
-            .decision_sufficiency
-            .as_mut()
-            .unwrap()
-            .disposition = DecisionSufficiencyDisposition::Unknown;
+        unknown.decision_sufficiency.as_mut().unwrap().disposition =
+            DecisionSufficiencyDisposition::Unknown;
         let report =
             admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[unknown]).unwrap();
         assert_eq!(
@@ -947,19 +942,21 @@ mod tests {
             .as_mut()
             .unwrap()
             .disposition = DecisionSufficiencyDisposition::Insufficient;
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[insufficient]).unwrap();
+        let report = admit_batch(
+            SchedulerPolicy::Luminous,
+            &cursor(),
+            budget(),
+            &[insufficient],
+        )
+        .unwrap();
         assert_eq!(
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::DecisionAlreadyInsufficient)
         );
 
         let mut rejected = request("q2", "r2");
-        rejected
-            .decision_sufficiency
-            .as_mut()
-            .unwrap()
-            .disposition = DecisionSufficiencyDisposition::Rejected;
+        rejected.decision_sufficiency.as_mut().unwrap().disposition =
+            DecisionSufficiencyDisposition::Rejected;
         let report =
             admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[rejected]).unwrap();
         assert_eq!(
@@ -972,8 +969,7 @@ mod tests {
     fn decision_horizon_must_bind_exact_decision_action_epoch_model_and_domain() {
         let mut audit = request("q1", "r1");
         audit.selected_action_id = Some("different-action".into());
-        let report =
-            admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
+        let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
         assert_eq!(
             report.requests[0].disposition,
             RequestDisposition::Rejected(RejectReason::DecisionSufficiencyBindingMismatch)
