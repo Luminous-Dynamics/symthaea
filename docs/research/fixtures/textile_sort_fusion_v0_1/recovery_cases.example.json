@@ -1,0 +1,200 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "TEXTILE-ROUTE-CASES-001",
+  "fixture_class": "synthetic",
+  "claim_ceiling": "Synthetic route-contract outcomes only; no real garment, process trial, yarn acceptance, chemical compatibility or environmental result.",
+  "cases": [
+    {
+      "case_id": "ROUTE-001-REUSE-ACCEPTED",
+      "mutation": "Complete physical condition, safety and receiving acceptance",
+      "expected": {
+        "disposition": "eligible",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "ROUTE-002-VISUAL-INFERENCE-ONLY",
+      "mutation": "Replace human inspection tier with model inference",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "MissingConditionInspection"
+      }
+    },
+    {
+      "case_id": "ROUTE-003-REUSE-SAFETY-FAIL",
+      "mutation": "Set safety outcome to failed",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "UseSafetyNotPassed"
+      }
+    },
+    {
+      "case_id": "ROUTE-004-REPAIR-ACCEPTED",
+      "mutation": "Complete repair trial and post-repair acceptance",
+      "expected": {
+        "disposition": "eligible",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "ROUTE-005-COMPONENT-RECOVERY",
+      "mutation": "Physical component recovery, closed mass balance and receiver acceptance",
+      "expected": {
+        "disposition": "eligible",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "ROUTE-006-MECHANICAL-ACCEPTED",
+      "mutation": "Composition, fibre length, opening trial and yarn receiver all pass",
+      "expected": {
+        "disposition": "eligible",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "ROUTE-007-MODEL-COMPOSITION",
+      "mutation": "Promote a model inference to composition evidence",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidCompositionEvidence"
+      }
+    },
+    {
+      "case_id": "ROUTE-008-UNKNOWN-FIBRE-FRACTION",
+      "mutation": "Unidentified upper-bound exceeds route policy",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "UnknownFibreFractionAbovePolicy"
+      }
+    },
+    {
+      "case_id": "ROUTE-009-MISSING-FIBRE-LENGTH",
+      "mutation": "Omit measured output fibre-length distribution",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "MissingFibreLengthEvidence"
+      }
+    },
+    {
+      "case_id": "ROUTE-010-SHORT-FIBRE-OUTPUT",
+      "mutation": "Measured output fails receiving length requirement",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "FibreLengthBelowPolicy"
+      }
+    },
+    {
+      "case_id": "ROUTE-011-MALFORMED-FIBRE-BINS",
+      "mutation": "Fibre-length bins do not sum to 1,000,000 ppm",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidFibreLengthDistribution"
+      }
+    },
+    {
+      "case_id": "ROUTE-012-CHEMICAL-ACCEPTED",
+      "mutation": "Compatibility trial, chemical process and receiver all pass",
+      "expected": {
+        "disposition": "eligible",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "ROUTE-013-CHEMICAL-COMPATIBILITY-MISSING",
+      "mutation": "Do not infer chemistry compatibility from fibre labels",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "MissingChemicalCompatibilityEvidence"
+      }
+    },
+    {
+      "case_id": "ROUTE-014-MASS-NOT-CLOSED",
+      "mutation": "Destructive trial leaves unexplained mass beyond uncertainty",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "MassBalanceNotClosed"
+      }
+    },
+    {
+      "case_id": "ROUTE-015-SELF-ISSUED-ACCEPTANCE",
+      "mutation": "Receiver and independent verifier IDs are identical",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidDownstreamAcceptance"
+      }
+    },
+    {
+      "case_id": "ROUTE-016-SYNTHETIC-PHYSICAL-TRIAL",
+      "mutation": "Try to promote synthetic evidence to a physical trial",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidProcessTrialEvidence"
+      }
+    },
+    {
+      "case_id": "ROUTE-017-CORRUPTED-DIGEST",
+      "mutation": "Change acceptance digest to malformed text",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidDownstreamAcceptance"
+      }
+    },
+    {
+      "case_id": "ROUTE-018-RECEIVER-REJECTED",
+      "mutation": "Receiver explicitly rejects output under versioned specification",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "DownstreamAcceptanceRejected"
+      }
+    },
+    {
+      "case_id": "ROUTE-019-RECEIVER-CONDITIONAL",
+      "mutation": "Receiver has not issued final acceptance",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "DownstreamAcceptanceUnresolved"
+      }
+    },
+    {
+      "case_id": "ROUTE-020-TRIAL-UNKNOWN",
+      "mutation": "Process outcome remains unknown",
+      "expected": {
+        "disposition": "insufficient_evidence",
+        "reason": "ProcessTrialUnknown"
+      }
+    },
+    {
+      "case_id": "ROUTE-021-TRIAL-INPUT-MISMATCH",
+      "mutation": "Trial input mass differs from item/lot inventory mass",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "MassBalanceInputMismatch"
+      }
+    },
+    {
+      "case_id": "ROUTE-022-CHEMICAL-COMPATIBILITY-FAIL",
+      "mutation": "Chemical compatibility trial fails",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "ChemicalCompatibilityFailed"
+      }
+    },
+    {
+      "case_id": "ROUTE-023-EVIDENCE-ID-DUPLICATE",
+      "mutation": "Reuse an evidence ID for separate claims",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "DuplicateEvidenceIdentity"
+      }
+    },
+    {
+      "case_id": "ROUTE-024-POLICY-INVALID",
+      "mutation": "Set a policy fraction above 100 percent",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidPolicy"
+      }
+    }
+  ]
+}
