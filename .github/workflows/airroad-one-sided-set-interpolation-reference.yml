@@ -1,0 +1,46 @@
+name: AIRROAD One-Sided Set Interpolation Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_ONE_SIDED_SET_INTERPOLATION_001_V0_1.md"
+      - "docs/research/fixtures/airroad-one-sided-set-interpolation-v0.1.json"
+      - "tools/airroad-one-sided-set-interpolation/verify_one_sided_interpolation.py"
+      - ".github/workflows/airroad-one-sided-set-interpolation-reference.yml"
+  push:
+    branches:
+      - research/airroad-one-sided-set-interpolation-v0.1
+    paths:
+      - "docs/research/AIRROAD_ONE_SIDED_SET_INTERPOLATION_001_V0_1.md"
+      - "docs/research/fixtures/airroad-one-sided-set-interpolation-v0.1.json"
+      - "tools/airroad-one-sided-set-interpolation/verify_one_sided_interpolation.py"
+      - ".github/workflows/airroad-one-sided-set-interpolation-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-one-sided-set-interpolation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rational-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute exact one-sided set oracle
+        run: |
+          python3 -m py_compile \
+            tools/airroad-one-sided-set-interpolation/verify_one_sided_interpolation.py
+          python3 \
+            tools/airroad-one-sided-set-interpolation/verify_one_sided_interpolation.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool \
+            docs/research/fixtures/airroad-one-sided-set-interpolation-v0.1.json \
+            > /dev/null
