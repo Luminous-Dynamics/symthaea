@@ -20,9 +20,18 @@ exclude = [
     # `nixward` path dependency. Keep it out of the workspace and build it
     # standalone (`cargo build -p nixward-web` from its own directory).
     "crates/core/nixward-web",
-    # This directory contains examples only and has no Cargo.toml. The
-    # crates/core/* workspace glob otherwise selects it as an invalid member.
+    # This directory contains an unused example only, not a workspace package.
     "crates/core/symthaea",
+    # IIT 4.0 parity artifacts currently contain integration-test source only;
+    # restore as a crate only with an owned manifest and dependency contract.
+    "crates/core/symthaea-iit",
+    # These source/evidence shells are not yet standalone Cargo packages. Keep
+    # them out of the broad workspace glob until each has an owned manifest and
+    # dependency/test contract; their code remains present in the repository.
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/domains/symthaea-dishwasher-design",
+    "crates/domains/symthaea-rea-compat",
+    "crates/domains/symthaea-rea-evidence-verifier",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
