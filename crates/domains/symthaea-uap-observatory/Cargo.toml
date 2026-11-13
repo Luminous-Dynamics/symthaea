@@ -1,0 +1,32 @@
+[package]
+name = "symthaea-uap-observatory"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "AGPL-3.0-or-later"
+description = "Calibration-aware, provenance-preserving sensor evidence contracts for anomalous observation analysis"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[lib]
+path = "src/lib.rs"
+
+# Keep the evidence/geometry primitives std-only so their scientific contracts
+# can be audited independently. Workspace lockfile reconciliation and
+# exact-head locked tests remain mandatory; minimal dependencies do not
+# eliminate the need for a reproducible workspace dependency graph.
+
+[[example]]
+name = "sensor_placement_design"
+path = "examples/sensor_placement_design.rs"
+
+[[example]]
+name = "budgeted_experiment_design"
+path = "examples/budgeted_experiment_design.rs"
+
+[[example]]
+name = "global_ambiguity_screen"
+path = "examples/global_ambiguity_screen.rs"
+
+[[example]]
+name = "correlated_experiment_design"
+path = "examples/correlated_experiment_design.rs"

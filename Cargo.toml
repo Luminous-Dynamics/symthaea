@@ -1,3 +1,7 @@
+# Cargo workspace placeholders are excluded explicitly so glob discovery
+# remains deterministic and manifest-backed on every pinned-toolchain run.
+# The focused physics lockfile job regenerates and commits the Cargo-resolved graph.
+
 [workspace]
 resolver = "2"
 members = [
@@ -22,6 +26,14 @@ exclude = [
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
+    # Placeholder directory contains only examples/unused.rs and no crate manifest.
+    # Exclude it from the crates/core/* workspace glob until it becomes a real crate.
+    "crates/core/symthaea",
+    "crates/domains/symthaea-rea-evidence-verifier",
+    "crates/domains/symthaea-dishwasher-design",
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/core/symthaea-observation-attestation",
+    "crates/core/symthaea-iit",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
