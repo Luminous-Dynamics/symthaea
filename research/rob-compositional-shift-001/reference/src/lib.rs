@@ -232,10 +232,7 @@ pub enum CompositionalAuditError {
         group_digest: String,
     },
     /// Arm identity or common evaluation scope is mismatched.
-    ArmScopeMismatch {
-        arm_id: String,
-        field: &'static str,
-    },
+    ArmScopeMismatch { arm_id: String, field: &'static str },
     /// Candidate and baseline identities are not distinct.
     DuplicateArmId(String),
     /// No hidden paired cases were supplied.
@@ -282,10 +279,7 @@ type CellCases<'a> = BTreeMap<CellKey, Vec<&'a PairedCase>>;
 type CellPartitions = BTreeMap<CellKey, Partition>;
 type FactorLevels = BTreeMap<SourceDimension, BTreeSet<String>>;
 
-fn require_nonempty(
-    field: &'static str,
-    value: &str,
-) -> Result<(), CompositionalAuditError> {
+fn require_nonempty(field: &'static str, value: &str) -> Result<(), CompositionalAuditError> {
     if value.trim().is_empty() {
         return Err(CompositionalAuditError::EmptyIdentity(field));
     }
@@ -312,23 +306,19 @@ fn canonical_dimensions(
     dimensions: &[SourceDimension],
 ) -> Result<Vec<SourceDimension>, CompositionalAuditError> {
     if !(2..=3).contains(&dimensions.len()) {
-        return Err(
-            CompositionalAuditError::InvalidInteractionDimensionCount {
-                interaction_id: interaction_id.to_owned(),
-                observed: dimensions.len(),
-            },
-        );
+        return Err(CompositionalAuditError::InvalidInteractionDimensionCount {
+            interaction_id: interaction_id.to_owned(),
+            observed: dimensions.len(),
+        });
     }
     let mut canonical = dimensions.to_vec();
     canonical.sort_unstable();
     for pair in canonical.windows(2) {
         if pair[0] == pair[1] {
-            return Err(
-                CompositionalAuditError::DuplicateInteractionDimension {
-                    interaction_id: interaction_id.to_owned(),
-                    dimension: pair[0],
-                },
-            );
+            return Err(CompositionalAuditError::DuplicateInteractionDimension {
+                interaction_id: interaction_id.to_owned(),
+                dimension: pair[0],
+            });
         }
     }
     Ok(canonical)
@@ -342,25 +332,20 @@ fn canonical_key(
     let expected: BTreeSet<_> = dimensions.iter().copied().collect();
     let mut observed = BTreeMap::new();
     for (dimension, digest) in &key.factors {
-        require_nonempty("factor_group_digest", digest)
-            .map_err(|_| CompositionalAuditError::EmptyFactorGroupDigest(
-                interaction_id.to_owned(),
-            ))?;
+        require_nonempty("factor_group_digest", digest).map_err(|_| {
+            CompositionalAuditError::EmptyFactorGroupDigest(interaction_id.to_owned())
+        })?;
         if observed.insert(*dimension, digest.clone()).is_some() {
-            return Err(
-                CompositionalAuditError::InteractionFactorSetMismatch(
-                    interaction_id.to_owned(),
-                ),
-            );
+            return Err(CompositionalAuditError::InteractionFactorSetMismatch(
+                interaction_id.to_owned(),
+            ));
         }
     }
     let observed_dimensions: BTreeSet<_> = observed.keys().copied().collect();
     if observed_dimensions != expected {
-        return Err(
-            CompositionalAuditError::InteractionFactorSetMismatch(
-                interaction_id.to_owned(),
-            ),
-        );
+        return Err(CompositionalAuditError::InteractionFactorSetMismatch(
+            interaction_id.to_owned(),
+        ));
     }
     Ok(InteractionKey {
         factors: observed.into_iter().collect(),
@@ -374,11 +359,20 @@ fn validate_arm(
 ) -> Result<(), CompositionalAuditError> {
     for (field, value) in [
         ("candidate.arm_id", candidate.arm_id.as_str()),
-        ("candidate.model_artifact_digest", candidate.model_artifact_digest.as_str()),
+        (
+            "candidate.model_artifact_digest",
+            candidate.model_artifact_digest.as_str(),
+        ),
         ("candidate.policy_digest", candidate.policy_digest.as_str()),
-        ("candidate.harness_digest", candidate.harness_digest.as_str()),
+        (
+            "candidate.harness_digest",
+            candidate.harness_digest.as_str(),
+        ),
         ("baseline.arm_id", baseline.arm_id.as_str()),
-        ("baseline.model_artifact_digest", baseline.model_artifact_digest.as_str()),
+        (
+            "baseline.model_artifact_digest",
+            baseline.model_artifact_digest.as_str(),
+        ),
         ("baseline.policy_digest", baseline.policy_digest.as_str()),
         ("baseline.harness_digest", baseline.harness_digest.as_str()),
     ] {
@@ -392,13 +386,41 @@ fn validate_arm(
 
     for (arm_id, arm) in [(&candidate.arm_id, candidate), (&baseline.arm_id, baseline)] {
         for (field, observed, expected) in [
-            ("benchmark_id", arm.benchmark_id.as_str(), manifest.benchmark_id.as_str()),
-            ("benchmark_version", arm.benchmark_version.as_str(), manifest.benchmark_version.as_str()),
-            ("dataset_manifest_digest", arm.dataset_manifest_digest.as_str(), manifest.dataset_manifest_digest.as_str()),
-            ("source_manifest_digest", arm.source_manifest_digest.as_str(), manifest.source_manifest_digest.as_str()),
-            ("grouping_policy_digest", arm.grouping_policy_digest.as_str(), manifest.grouping_policy_digest.as_str()),
-            ("split_policy_digest", arm.split_policy_digest.as_str(), manifest.split_policy_digest.as_str()),
-            ("hidden_partition_digest", arm.hidden_partition_digest.as_str(), manifest.hidden_partition_digest.as_str()),
+            (
+                "benchmark_id",
+                arm.benchmark_id.as_str(),
+                manifest.benchmark_id.as_str(),
+            ),
+            (
+                "benchmark_version",
+                arm.benchmark_version.as_str(),
+                manifest.benchmark_version.as_str(),
+            ),
+            (
+                "dataset_manifest_digest",
+                arm.dataset_manifest_digest.as_str(),
+                manifest.dataset_manifest_digest.as_str(),
+            ),
+            (
+                "source_manifest_digest",
+                arm.source_manifest_digest.as_str(),
+                manifest.source_manifest_digest.as_str(),
+            ),
+            (
+                "grouping_policy_digest",
+                arm.grouping_policy_digest.as_str(),
+                manifest.grouping_policy_digest.as_str(),
+            ),
+            (
+                "split_policy_digest",
+                arm.split_policy_digest.as_str(),
+                manifest.split_policy_digest.as_str(),
+            ),
+            (
+                "hidden_partition_digest",
+                arm.hidden_partition_digest.as_str(),
+                manifest.hidden_partition_digest.as_str(),
+            ),
         ] {
             if observed != expected {
                 return Err(CompositionalAuditError::ArmScopeMismatch {
@@ -410,17 +432,61 @@ fn validate_arm(
     }
 
     for (field, left, right) in [
-        ("task_manifest_digest", candidate.task_manifest_digest.as_str(), baseline.task_manifest_digest.as_str()),
-        ("environment_manifest_digest", candidate.environment_manifest_digest.as_str(), baseline.environment_manifest_digest.as_str()),
-        ("robot_configuration_digest", candidate.robot_configuration_digest.as_str(), baseline.robot_configuration_digest.as_str()),
-        ("evaluator_digest", candidate.evaluator_digest.as_str(), baseline.evaluator_digest.as_str()),
-        ("resource_budget_digest", candidate.resource_budget_digest.as_str(), baseline.resource_budget_digest.as_str()),
-        ("benchmark_id", candidate.benchmark_id.as_str(), baseline.benchmark_id.as_str()),
-        ("dataset_manifest_digest", candidate.dataset_manifest_digest.as_str(), baseline.dataset_manifest_digest.as_str()),
-        ("source_manifest_digest", candidate.source_manifest_digest.as_str(), baseline.source_manifest_digest.as_str()),
-        ("grouping_policy_digest", candidate.grouping_policy_digest.as_str(), baseline.grouping_policy_digest.as_str()),
-        ("split_policy_digest", candidate.split_policy_digest.as_str(), baseline.split_policy_digest.as_str()),
-        ("hidden_partition_digest", candidate.hidden_partition_digest.as_str(), baseline.hidden_partition_digest.as_str()),
+        (
+            "task_manifest_digest",
+            candidate.task_manifest_digest.as_str(),
+            baseline.task_manifest_digest.as_str(),
+        ),
+        (
+            "environment_manifest_digest",
+            candidate.environment_manifest_digest.as_str(),
+            baseline.environment_manifest_digest.as_str(),
+        ),
+        (
+            "robot_configuration_digest",
+            candidate.robot_configuration_digest.as_str(),
+            baseline.robot_configuration_digest.as_str(),
+        ),
+        (
+            "evaluator_digest",
+            candidate.evaluator_digest.as_str(),
+            baseline.evaluator_digest.as_str(),
+        ),
+        (
+            "resource_budget_digest",
+            candidate.resource_budget_digest.as_str(),
+            baseline.resource_budget_digest.as_str(),
+        ),
+        (
+            "benchmark_id",
+            candidate.benchmark_id.as_str(),
+            baseline.benchmark_id.as_str(),
+        ),
+        (
+            "dataset_manifest_digest",
+            candidate.dataset_manifest_digest.as_str(),
+            baseline.dataset_manifest_digest.as_str(),
+        ),
+        (
+            "source_manifest_digest",
+            candidate.source_manifest_digest.as_str(),
+            baseline.source_manifest_digest.as_str(),
+        ),
+        (
+            "grouping_policy_digest",
+            candidate.grouping_policy_digest.as_str(),
+            baseline.grouping_policy_digest.as_str(),
+        ),
+        (
+            "split_policy_digest",
+            candidate.split_policy_digest.as_str(),
+            baseline.split_policy_digest.as_str(),
+        ),
+        (
+            "hidden_partition_digest",
+            candidate.hidden_partition_digest.as_str(),
+            baseline.hidden_partition_digest.as_str(),
+        ),
     ] {
         if left != right {
             return Err(CompositionalAuditError::ArmScopeMismatch {
@@ -446,11 +512,23 @@ fn validate_manifest(
     for (field, value) in [
         ("benchmark_id", manifest.benchmark_id.as_str()),
         ("benchmark_version", manifest.benchmark_version.as_str()),
-        ("dataset_manifest_digest", manifest.dataset_manifest_digest.as_str()),
-        ("source_manifest_digest", manifest.source_manifest_digest.as_str()),
-        ("grouping_policy_digest", manifest.grouping_policy_digest.as_str()),
+        (
+            "dataset_manifest_digest",
+            manifest.dataset_manifest_digest.as_str(),
+        ),
+        (
+            "source_manifest_digest",
+            manifest.source_manifest_digest.as_str(),
+        ),
+        (
+            "grouping_policy_digest",
+            manifest.grouping_policy_digest.as_str(),
+        ),
         ("split_policy_digest", manifest.split_policy_digest.as_str()),
-        ("hidden_partition_digest", manifest.hidden_partition_digest.as_str()),
+        (
+            "hidden_partition_digest",
+            manifest.hidden_partition_digest.as_str(),
+        ),
     ] {
         require_nonempty(field, value)?;
     }
@@ -463,7 +541,10 @@ fn validate_manifest(
     for spec in &manifest.interactions {
         require_nonempty("interaction_id", &spec.interaction_id)?;
         let dimensions = canonical_dimensions(&spec.interaction_id, &spec.dimensions)?;
-        if specs.insert(spec.interaction_id.clone(), dimensions).is_some() {
+        if specs
+            .insert(spec.interaction_id.clone(), dimensions)
+            .is_some()
+        {
             return Err(CompositionalAuditError::DuplicateInteractionId(
                 spec.interaction_id.clone(),
             ));
@@ -496,11 +577,16 @@ fn validate_manifest(
             )
         })?;
         let key = canonical_key(&assignment.interaction_id, dimensions, &assignment.key)?;
-        require_nonempty("assignment_receipt_digest", &assignment.assignment_receipt_digest)
-            .map_err(|_| CompositionalAuditError::MissingInteractionAssignmentReceipt {
+        require_nonempty(
+            "assignment_receipt_digest",
+            &assignment.assignment_receipt_digest,
+        )
+        .map_err(
+            |_| CompositionalAuditError::MissingInteractionAssignmentReceipt {
                 interaction_id: assignment.interaction_id.clone(),
                 key: key.clone(),
-            })?;
+            },
+        )?;
         let cell_key = (assignment.interaction_id.clone(), key.clone());
         if partitions.insert(cell_key, assignment.partition).is_some() {
             return Err(CompositionalAuditError::DuplicateInteractionCell {
@@ -519,7 +605,11 @@ fn validate_manifest(
     let mut level_coverage = BTreeMap::new();
     for (interaction_id, dimensions) in &specs {
         let by_partition = cells_by_spec.entry(interaction_id.clone()).or_default();
-        for partition in [Partition::Training, Partition::Calibration, Partition::HiddenConfirmatory] {
+        for partition in [
+            Partition::Training,
+            Partition::Calibration,
+            Partition::HiddenConfirmatory,
+        ] {
             let observed = by_partition.get(&partition).map_or(0, Vec::len);
             let minimum = match partition {
                 Partition::Training => minimums[interaction_id].0,
@@ -548,9 +638,18 @@ fn validate_manifest(
             }
         }
 
-        let training = factor_coverage.get(&Partition::Training).cloned().unwrap_or_default();
-        let calibration = factor_coverage.get(&Partition::Calibration).cloned().unwrap_or_default();
-        let hidden = factor_coverage.get(&Partition::HiddenConfirmatory).cloned().unwrap_or_default();
+        let training = factor_coverage
+            .get(&Partition::Training)
+            .cloned()
+            .unwrap_or_default();
+        let calibration = factor_coverage
+            .get(&Partition::Calibration)
+            .cloned()
+            .unwrap_or_default();
+        let hidden = factor_coverage
+            .get(&Partition::HiddenConfirmatory)
+            .cloned()
+            .unwrap_or_default();
         for dimension in dimensions {
             let training_levels = training.get(dimension).cloned().unwrap_or_default();
             let calibration_levels = calibration.get(dimension).cloned().unwrap_or_default();
@@ -604,8 +703,7 @@ fn validate_cases<'a>(
         .collect();
     let mut case_ids = BTreeSet::new();
     let mut paired_manifests = BTreeSet::new();
-    let mut cluster_receipts: BTreeMap<String, (String, IndependenceDisposition)> =
-        BTreeMap::new();
+    let mut cluster_receipts: BTreeMap<String, (String, IndependenceDisposition)> = BTreeMap::new();
     let mut receipt_clusters = BTreeMap::<String, String>::new();
     let mut cells: CellCases<'a> = BTreeMap::new();
 
@@ -613,10 +711,16 @@ fn validate_cases<'a>(
         require_nonempty("case_id", &case.case_id)?;
         require_nonempty("cluster_id", &case.cluster_id)
             .map_err(|_| CompositionalAuditError::MissingCaseReceipt(case.case_id.clone()))?;
-        require_nonempty("paired_case_manifest_digest", &case.paired_case_manifest_digest)
-            .map_err(|_| CompositionalAuditError::MissingCaseReceipt(case.case_id.clone()))?;
-        require_nonempty("independence_receipt_digest", &case.independence_receipt_digest)
-            .map_err(|_| CompositionalAuditError::MissingCaseReceipt(case.case_id.clone()))?;
+        require_nonempty(
+            "paired_case_manifest_digest",
+            &case.paired_case_manifest_digest,
+        )
+        .map_err(|_| CompositionalAuditError::MissingCaseReceipt(case.case_id.clone()))?;
+        require_nonempty(
+            "independence_receipt_digest",
+            &case.independence_receipt_digest,
+        )
+        .map_err(|_| CompositionalAuditError::MissingCaseReceipt(case.case_id.clone()))?;
         if !case_ids.insert(case.case_id.clone()) {
             return Err(CompositionalAuditError::DuplicateOrEmptyCaseId(
                 case.case_id.clone(),
@@ -670,11 +774,12 @@ fn validate_cases<'a>(
 
         let mut groups = BTreeMap::new();
         for (dimension, digest) in &case.source_groups {
-            require_nonempty("case_factor_digest", digest)
-                .map_err(|_| CompositionalAuditError::MissingCaseSourceDimension {
+            require_nonempty("case_factor_digest", digest).map_err(|_| {
+                CompositionalAuditError::MissingCaseSourceDimension {
                     case_id: case.case_id.clone(),
                     dimension: *dimension,
-                })?;
+                }
+            })?;
             if groups.insert(*dimension, digest.clone()).is_some() {
                 return Err(CompositionalAuditError::DuplicateCaseSourceDimension {
                     case_id: case.case_id.clone(),
@@ -778,8 +883,8 @@ fn summarize_cell(
         }
     }
 
-    let episode_count = u64::try_from(cases.len())
-        .map_err(|_| CompositionalAuditError::ArithmeticOverflow)?;
+    let episode_count =
+        u64::try_from(cases.len()).map_err(|_| CompositionalAuditError::ArithmeticOverflow)?;
     let candidate_rate = safe_rate_ppm(candidate_safe, episode_count)?;
     let baseline_rate = safe_rate_ppm(baseline_safe, episode_count)?;
     Ok(InteractionCellReport {
@@ -812,11 +917,7 @@ pub fn audit_compositional_shift(
     input: &CompositionalAuditInput,
 ) -> Result<CompositionalAuditReport, CompositionalAuditError> {
     let validated = validate_manifest(&input.manifest)?;
-    validate_arm(
-        &input.manifest,
-        &input.candidate,
-        &input.baseline,
-    )?;
+    validate_arm(&input.manifest, &input.candidate, &input.baseline)?;
     let case_cells = validate_cases(&validated, &input.cases)?;
 
     let mut reports = Vec::new();
@@ -1006,24 +1107,57 @@ mod tests {
             interaction_id: interaction_id.into(),
             key,
             partition,
-            assignment_receipt_digest: format!(
-                "receipt-{interaction_id}-{:?}",
-                partition
-            ),
+            assignment_receipt_digest: format!("receipt-{interaction_id}-{:?}", partition),
         }
     }
 
     fn pair_assignments() -> Vec<InteractionAssignment> {
         vec![
-            assignment("site-morphology", key("site-a", "morph-x"), Partition::Training),
-            assignment("site-morphology", key("site-b", "morph-y"), Partition::Training),
-            assignment("site-morphology", key("site-c", "morph-z"), Partition::Training),
-            assignment("site-morphology", key("site-a", "morph-y"), Partition::Calibration),
-            assignment("site-morphology", key("site-b", "morph-z"), Partition::Calibration),
-            assignment("site-morphology", key("site-c", "morph-x"), Partition::Calibration),
-            assignment("site-morphology", key("site-a", "morph-z"), Partition::HiddenConfirmatory),
-            assignment("site-morphology", key("site-b", "morph-x"), Partition::HiddenConfirmatory),
-            assignment("site-morphology", key("site-c", "morph-y"), Partition::HiddenConfirmatory),
+            assignment(
+                "site-morphology",
+                key("site-a", "morph-x"),
+                Partition::Training,
+            ),
+            assignment(
+                "site-morphology",
+                key("site-b", "morph-y"),
+                Partition::Training,
+            ),
+            assignment(
+                "site-morphology",
+                key("site-c", "morph-z"),
+                Partition::Training,
+            ),
+            assignment(
+                "site-morphology",
+                key("site-a", "morph-y"),
+                Partition::Calibration,
+            ),
+            assignment(
+                "site-morphology",
+                key("site-b", "morph-z"),
+                Partition::Calibration,
+            ),
+            assignment(
+                "site-morphology",
+                key("site-c", "morph-x"),
+                Partition::Calibration,
+            ),
+            assignment(
+                "site-morphology",
+                key("site-a", "morph-z"),
+                Partition::HiddenConfirmatory,
+            ),
+            assignment(
+                "site-morphology",
+                key("site-b", "morph-x"),
+                Partition::HiddenConfirmatory,
+            ),
+            assignment(
+                "site-morphology",
+                key("site-c", "morph-y"),
+                Partition::HiddenConfirmatory,
+            ),
         ]
     }
 
@@ -1074,9 +1208,27 @@ mod tests {
             candidate: arm("candidate"),
             baseline: arm("baseline"),
             cases: vec![
-                case("one", "site-a", "morph-z", Outcome::SafeSuccess, Outcome::Failure),
-                case("two", "site-b", "morph-x", Outcome::Failure, Outcome::SafeSuccess),
-                case("three", "site-c", "morph-y", Outcome::UnsafeSuccess, Outcome::Failure),
+                case(
+                    "one",
+                    "site-a",
+                    "morph-z",
+                    Outcome::SafeSuccess,
+                    Outcome::Failure,
+                ),
+                case(
+                    "two",
+                    "site-b",
+                    "morph-x",
+                    Outcome::Failure,
+                    Outcome::SafeSuccess,
+                ),
+                case(
+                    "three",
+                    "site-c",
+                    "morph-y",
+                    Outcome::UnsafeSuccess,
+                    Outcome::Failure,
+                ),
             ],
         }
     }
@@ -1104,10 +1256,10 @@ mod tests {
         let mut audit = input();
         audit.manifest.assignments.retain(|assignment| {
             !(assignment.partition == Partition::Training
-                && assignment.key.factors.contains(&(
-                    SourceDimension::CollectionSite,
-                    "site-c".into(),
-                )))
+                && assignment
+                    .key
+                    .factors
+                    .contains(&(SourceDimension::CollectionSite, "site-c".into())))
         });
         assert!(matches!(
             audit_compositional_shift(&audit),
@@ -1124,10 +1276,10 @@ mod tests {
         let mut audit = input();
         audit.manifest.assignments.retain(|assignment| {
             !(assignment.partition == Partition::Calibration
-                && assignment.key.factors.contains(&(
-                    SourceDimension::RobotMorphology,
-                    "morph-y".into(),
-                )))
+                && assignment
+                    .key
+                    .factors
+                    .contains(&(SourceDimension::RobotMorphology, "morph-y".into())))
         });
         assert!(matches!(
             audit_compositional_shift(&audit),
@@ -1212,8 +1364,7 @@ mod tests {
     #[test]
     fn interaction_requires_two_or_three_dimensions() {
         let mut audit = input();
-        audit.manifest.interactions[0].dimensions =
-            vec![SourceDimension::CollectionSite];
+        audit.manifest.interactions[0].dimensions = vec![SourceDimension::CollectionSite];
         assert!(matches!(
             audit_compositional_shift(&audit),
             Err(CompositionalAuditError::InvalidInteractionDimensionCount { .. })
@@ -1223,7 +1374,9 @@ mod tests {
     #[test]
     fn missing_assignment_receipt_is_rejected() {
         let mut audit = input();
-        audit.manifest.assignments[0].assignment_receipt_digest.clear();
+        audit.manifest.assignments[0]
+            .assignment_receipt_digest
+            .clear();
         assert!(matches!(
             audit_compositional_shift(&audit),
             Err(CompositionalAuditError::MissingInteractionAssignmentReceipt { .. })
@@ -1360,7 +1513,10 @@ mod tests {
         audit.cases[0].candidate_outcome = Outcome::Failure;
         audit.cases[0].baseline_outcome = Outcome::SafeSuccess;
         let report = audit_compositional_shift(&audit).unwrap();
-        assert_eq!(report.interactions[0].worst_cell_effect_ppm, Some(-1_000_000));
+        assert_eq!(
+            report.interactions[0].worst_cell_effect_ppm,
+            Some(-1_000_000)
+        );
         assert_eq!(report.interactions[0].cells.len(), 3);
     }
 
@@ -1376,12 +1532,30 @@ mod tests {
             (vec!["site-a", "morph-x", "payload-1"], Partition::Training),
             (vec!["site-b", "morph-y", "payload-2"], Partition::Training),
             (vec!["site-c", "morph-z", "payload-3"], Partition::Training),
-            (vec!["site-a", "morph-y", "payload-2"], Partition::Calibration),
-            (vec!["site-b", "morph-z", "payload-3"], Partition::Calibration),
-            (vec!["site-c", "morph-x", "payload-1"], Partition::Calibration),
-            (vec!["site-a", "morph-z", "payload-1"], Partition::HiddenConfirmatory),
-            (vec!["site-b", "morph-x", "payload-2"], Partition::HiddenConfirmatory),
-            (vec!["site-c", "morph-y", "payload-3"], Partition::HiddenConfirmatory),
+            (
+                vec!["site-a", "morph-y", "payload-2"],
+                Partition::Calibration,
+            ),
+            (
+                vec!["site-b", "morph-z", "payload-3"],
+                Partition::Calibration,
+            ),
+            (
+                vec!["site-c", "morph-x", "payload-1"],
+                Partition::Calibration,
+            ),
+            (
+                vec!["site-a", "morph-z", "payload-1"],
+                Partition::HiddenConfirmatory,
+            ),
+            (
+                vec!["site-b", "morph-x", "payload-2"],
+                Partition::HiddenConfirmatory,
+            ),
+            (
+                vec!["site-c", "morph-y", "payload-3"],
+                Partition::HiddenConfirmatory,
+            ),
         ];
         audit.manifest.interactions.push(InteractionSpec {
             interaction_id: "site-morphology-payload".into(),
@@ -1401,9 +1575,7 @@ mod tests {
                     ],
                 },
                 partition,
-                assignment_receipt_digest: format!(
-                    "triple-{values:?}-{partition:?}"
-                ),
+                assignment_receipt_digest: format!("triple-{values:?}-{partition:?}"),
             });
         }
         for (i, case) in audit.cases.iter_mut().enumerate() {
@@ -1412,17 +1584,15 @@ mod tests {
                 1 => ("site-b", "morph-x", "payload-2"),
                 _ => ("site-c", "morph-y", "payload-3"),
             };
-            case.source_groups.push((SourceDimension::PayloadRegime, payload.into()));
+            case.source_groups
+                .push((SourceDimension::PayloadRegime, payload.into()));
             assert_eq!(case.source_groups[0].1, site);
             assert_eq!(case.source_groups[1].1, morphology);
         }
         let report = audit_compositional_shift(&audit).unwrap();
         assert_eq!(report.interactions.len(), 2);
         assert_eq!(report.disposition, CellDisposition::Complete);
-        assert_eq!(
-            report.interactions[0].interaction_id,
-            "site-morphology"
-        );
+        assert_eq!(report.interactions[0].interaction_id, "site-morphology");
         assert_eq!(
             report.interactions[1].interaction_id,
             "site-morphology-payload"
