@@ -180,8 +180,13 @@ fn audit_schema(root: &Path) -> Result<()> {
     {
         bail!("capacitor schema records must reference the canonical record definition");
     }
-    if schema["$defs"]["record"]["required"].as_array().is_none() {
-        bail!("capacitor schema has no required-field contract for records");
+    let required_fields = schema["$defs"]["record"]["required"]
+        .as_array()
+        .context("capacitor schema has no required-field contract for records")?;
+    if !required_fields.iter().any(|field| field.as_str() == Some("denominator"))
+        || schema["$defs"]["record"]["properties"]["denominator"].is_null()
+    {
+        bail!("capacitor schema must require the explicit mass/volume denominator contract");
     }
     Ok(())
 }
@@ -580,14 +585,11 @@ mod tests {
 
     #[test]
     fn synthetic_evidence_cannot_be_promoted() {
-        let mut value = fixture();
-        let negative = &mut value["records"][1];
-        negative["boundary"] = json!("complete_device");
-        negative["evidence"]["admission"] = json!("evaluation_admitted");
-        negative["disposition"] = json!("evaluation_eligible");
-        negative["test_conditions"]["raw_data_digest"] =
-            json!("sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
-        assert!(audit_fixture_value(&value).is_err());
+        let mut record = test_only_promotable_record();
+        record["evidence"]["class"] = json!("synthetic");
+        let mut seen_ids = BTreeSet::new();
+        let mut seen_serials = BTreeSet::new();
+        assert!(audit_record(&record, &mut seen_ids, &mut seen_serials).is_err());
     }
 
     #[test]
