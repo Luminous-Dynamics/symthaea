@@ -77,8 +77,8 @@
       "denominator": "16"
     },
     "second_derivative_at_band_upper": {
-      "numerator": "-?",
-      "denominator": "1"
+      "numerator": "-705",
+      "denominator": "2"
     }
   },
   "expected_enclosures": {
