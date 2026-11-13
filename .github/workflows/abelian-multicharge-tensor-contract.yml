@@ -52,6 +52,7 @@ jobs:
 
           [dependencies]
           num-complex = "=0.4.6"
+          nalgebra = "=0.34.2"
           EOF
           cargo clippy --manifest-path "$harness/Cargo.toml" --all-targets -- -D warnings
           cargo test --manifest-path "$harness/Cargo.toml" --lib
