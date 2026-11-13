@@ -226,7 +226,11 @@
               "denominator": "1"
             }
           ]
-        ]
+        ],
+        "model_identity": "sha256:synthetic-identity-mimo-with-cubic-residual-v0.1",
+        "topology_identity": "sha256:two-port-symmetric-crossport-reference-v0.1",
+        "operating_point_identity": "sha256:synthetic-operating-point-v0.1",
+        "frequency_unit": "normalized_frequency"
       },
       {
         "frequency_knot_id": "omega-0",
@@ -331,7 +335,11 @@
               "denominator": "1"
             }
           ]
-        ]
+        ],
+        "model_identity": "sha256:synthetic-identity-mimo-with-cubic-residual-v0.1",
+        "topology_identity": "sha256:two-port-symmetric-crossport-reference-v0.1",
+        "operating_point_identity": "sha256:synthetic-operating-point-v0.1",
+        "frequency_unit": "normalized_frequency"
       },
       {
         "frequency_knot_id": "omega-1",
@@ -436,7 +444,11 @@
               "denominator": "1"
             }
           ]
-        ]
+        ],
+        "model_identity": "sha256:synthetic-identity-mimo-with-cubic-residual-v0.1",
+        "topology_identity": "sha256:two-port-symmetric-crossport-reference-v0.1",
+        "operating_point_identity": "sha256:synthetic-operating-point-v0.1",
+        "frequency_unit": "normalized_frequency"
       },
       {
         "frequency_knot_id": "omega-1",
@@ -541,7 +553,11 @@
               "denominator": "1"
             }
           ]
-        ]
+        ],
+        "model_identity": "sha256:synthetic-identity-mimo-with-cubic-residual-v0.1",
+        "topology_identity": "sha256:two-port-symmetric-crossport-reference-v0.1",
+        "operating_point_identity": "sha256:synthetic-operating-point-v0.1",
+        "frequency_unit": "normalized_frequency"
       },
       {
         "frequency_knot_id": "omega-2",
@@ -646,7 +662,11 @@
               "denominator": "1"
             }
           ]
-        ]
+        ],
+        "model_identity": "sha256:synthetic-identity-mimo-with-cubic-residual-v0.1",
+        "topology_identity": "sha256:two-port-symmetric-crossport-reference-v0.1",
+        "operating_point_identity": "sha256:synthetic-operating-point-v0.1",
+        "frequency_unit": "normalized_frequency"
       },
       {
         "frequency_knot_id": "omega-2",
@@ -751,7 +771,11 @@
               "denominator": "1"
             }
           ]
-        ]
+        ],
+        "model_identity": "sha256:synthetic-identity-mimo-with-cubic-residual-v0.1",
+        "topology_identity": "sha256:two-port-symmetric-crossport-reference-v0.1",
+        "operating_point_identity": "sha256:synthetic-operating-point-v0.1",
+        "frequency_unit": "normalized_frequency"
       }
     ]
   },
