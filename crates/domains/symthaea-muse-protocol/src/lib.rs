@@ -266,6 +266,11 @@ pub struct ImportedWorkSummary {
     /// legacy records; the audio endpoint must mark those as unverified.
     #[serde(default)]
     pub audition_wav_sha256: Option<String>,
+    /// Stable reason code when a source-MIDI audition falls back to a
+    /// reconstructed Score render. None means the work did not require
+    /// source-MIDI fallback or the source MIDI audition succeeded.
+    #[serde(default)]
+    pub audition_fallback_reason: Option<String>,
     /// Discloses that `audition.wav`'s TIMBRE is reconstructed, not
     /// preserved from the source. `parse_symbolic` extracts pitch, rhythm,
     /// tempo, meter, and voice roles into a plain `Score` -- it does not
@@ -2812,6 +2817,7 @@ mod imported_audition_compatibility_tests {
             ImportedAuditionKind::LegacyUnverified
         );
         assert!(summary.audition_wav_sha256.is_none());
+        assert!(summary.audition_fallback_reason.is_none());
     }
 
     #[test]
@@ -2837,4 +2843,19 @@ mod imported_audition_compatibility_tests {
         let encoded = serde_json::to_string(&ImportedAuditionKind::ReconstructedScore).unwrap();
         assert_eq!(encoded, "\"reconstructed_score\"");
     }
+    #[test]
+    fn source_midi_fallback_reason_round_trips() {
+        let mut value = legacy_summary_json();
+        value["audition_kind"] = serde_json::json!("reconstructed_score");
+        value["audition_wav_sha256"] = serde_json::json!(
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        );
+        value["audition_fallback_reason"] = serde_json::json!("unsupported_sequential_smf");
+        let summary: ImportedWorkSummary = serde_json::from_value(value).unwrap();
+        assert_eq!(
+            summary.audition_fallback_reason.as_deref(),
+            Some("unsupported_sequential_smf")
+        );
+    }
+
 }
