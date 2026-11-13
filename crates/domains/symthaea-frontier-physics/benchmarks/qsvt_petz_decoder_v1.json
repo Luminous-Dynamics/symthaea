@@ -45,11 +45,22 @@
     "initial_bath_pair": "B,R Bell pair",
     "scrambler": "seeded Haar U(4) on M tensor B",
     "accessible_output": "A=E tensor R, dimension 4",
-    "inaccessible_environment": "B-prime, traced out",
+    "inaccessible_environment": "C_remnant_output",
     "message_dimension": 2,
     "channel_kraus": "K_bprime[(e,r),m] = U[(e,bprime),(m,r)] / sqrt(2)",
     "decoder_access_policy": "A only",
-    "seed_policy": "frozen common seed schedule across all decoder families"
+    "seed_policy": "frozen common seed schedule across all decoder families",
+    "inaccessible_environment_description": "The remaining black-hole remnant output after U acts on M tensor B; it is traced out and is unavailable to the decoder.",
+    "notation_mapping": {
+      "local": "M is the message; B is the initially entangled black-hole subsystem; R is the accessible early-radiation purifier; U(M tensor B) outputs E (newly accessible radiation) and C (remaining remnant). Decoder input is A=E tensor R.",
+      "literature": "In the cited Hayden-Preskill QSVT paper, the decoder input is D tensor B'_early; its inaccessible remnant output is C.",
+      "equivalence": "Local E tensor R corresponds to literature D tensor B'_early. Local C_remnant corresponds to literature C. The existing source identifier b_prime names local C_remnant, not literature B'_early.",
+      "access_regimes": [
+        "entanglement_assisted_E_tensor_R",
+        "unassisted_E_only"
+      ],
+      "comparison_rule": "Assisted and unassisted runs are distinct channels; compare only within matched access regimes."
+    }
   },
   "decoder_families": [
     {
@@ -219,7 +230,7 @@
     "comparisons": "Matched channel, seed, decoder access, accuracy and resource budget."
   },
   "negative_controls": [
-    "decoder_receives_inaccessible_Bprime",
+    "decoder_receives_inaccessible_C_remnant",
     "decoder_receives_global_state_amplitudes",
     "decoder_receives_hidden_seed",
     "postselected_output_reported_as_trace_preserving_without_success_probability",
@@ -228,7 +239,8 @@
     "finite_modular_grid_reported_as_exact_optimum",
     "commuting_Petz_theorem_applied_outside_its_hypotheses",
     "QSVT_iteration_count_reported_as_physical_gate_count",
-    "poorly_conditioned_samples_removed_without_attempted_work_record"
+    "poorly_conditioned_samples_removed_without_attempted_work_record",
+    "compare entanglement-assisted E_tensor_R channel against unassisted E-only channel as though their decoder access sets matched"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -266,6 +278,7 @@
     "not a macroscopic black-hole evaporation simulation",
     "not a proof that rotated Petz is universally optimal",
     "not an efficient decoder claim until resources are implemented and measured",
-    "not an MPS/TEBD implementation"
+    "not an MPS/TEBD implementation",
+    "the internal variable name b_prime denotes the inaccessible remnant C, not the literature's accessible early-radiation B-prime register"
   ]
 }
