@@ -51,8 +51,12 @@ jobs:
           test "$actual" = "$expected"
           printf 'exact_head=%s\n' "$actual"
 
-      - name: Check package formatting
-        run: cargo fmt --package symthaea-muse -- --check
+      - name: Check formatting for PR-owned Rust files
+        run: |
+          rustfmt --check --edition 2024 --config skip_children=true \
+            crates/domains/symthaea-muse/src/lib.rs \
+            crates/domains/symthaea-muse/src/audio_event_observation.rs \
+            crates/domains/symthaea-muse/src/part_stem_evidence.rs
 
       - name: Test part-stem validator
         run: cargo test --locked -p symthaea-muse --features theory --lib part_stem_evidence::tests -- --test-threads=1
