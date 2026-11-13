@@ -561,6 +561,8 @@ fn validate_case(case: &Case) -> Vec<String> {
     }
 
     let mut run_ids = BTreeSet::new();
+    let mut all_acoustic_trace_digests = BTreeSet::new();
+    let mut all_cavitation_observation_digests = BTreeSet::new();
     for run in &case.runs {
         if run.run_id.trim().is_empty() || !run_ids.insert(run.run_id.clone()) {
             errors.push(format!("empty or duplicate run_id {}", run.run_id));
@@ -650,8 +652,6 @@ fn validate_case(case: &Case) -> Vec<String> {
             errors.push(format!("run {} has no windows", run.run_id));
         }
         let mut window_ids = BTreeSet::new();
-        let mut acoustic_trace_digests = BTreeSet::new();
-        let mut cavitation_observation_digests = BTreeSet::new();
         let mut previous_end: Option<f64> = None;
         for window in &run.windows {
             if window.window_id.trim().is_empty() || !window_ids.insert(window.window_id.clone()) {
@@ -662,11 +662,11 @@ fn validate_case(case: &Case) -> Vec<String> {
             {
                 errors.push(format!("run {} window {} has malformed acoustic/cavitation evidence digest", run.run_id, window.window_id));
             }
-            if !acoustic_trace_digests.insert(window.acoustic_trace_sha256.clone()) {
-                errors.push(format!("run {} reuses an acoustic trace digest across windows", run.run_id));
+            if !all_acoustic_trace_digests.insert(window.acoustic_trace_sha256.clone()) {
+                errors.push(format!("run {} reuses an acoustic trace digest across the campaign", run.run_id));
             }
-            if !cavitation_observation_digests.insert(window.cavitation_observation_sha256.clone()) {
-                errors.push(format!("run {} reuses a cavitation-observation digest across windows", run.run_id));
+            if !all_cavitation_observation_digests.insert(window.cavitation_observation_sha256.clone()) {
+                errors.push(format!("run {} reuses a cavitation-observation digest across the campaign", run.run_id));
             }
             if !window.start_time_s.is_finite()
                 || window.start_time_s < 0.0
@@ -1694,11 +1694,16 @@ mod tests {
     }
 
     #[test]
-    fn exact_ten_db_background_margin_is_unresolved() {
+    fn exact_ten_db_background_margin_and_floating_boundary_noise_are_unresolved() {
         assert!(matches!(
             ittc_background_corrected_spl(100.0, 90.0),
             Err(BackgroundFailure::ExactTenDbBoundaryUnspecified)
         ));
+        assert!(matches!(
+            ittc_background_corrected_spl(100.0000000005, 90.0),
+            Err(BackgroundFailure::ExactTenDbBoundaryUnspecified)
+        ));
+        assert_eq!(ittc_background_corrected_spl(100.000000002, 90.0), Ok(100.000000002));
     }
 
     #[test]
@@ -1976,6 +1981,18 @@ mod tests {
         assert_eq!(report.run_reports[0].acquisition_duration_s, 8.0);
         assert!(!report.run_reports[0].ittc_recommended_acquisition_duration_met);
         assert!(report.reasons.iter().any(|reason| reason.contains("greater than 20 seconds")));
+    }
+
+    #[test]
+    fn window_trace_digest_reuse_across_independent_runs_is_invalid() {
+        let mut input = case();
+        input.runs[1].windows[0].acoustic_trace_sha256 =
+            input.runs[0].windows[0].acoustic_trace_sha256.clone();
+        assert_eq!(audit(&input).disposition, "INVALID");
+        let mut input = case();
+        input.runs[1].windows[0].cavitation_observation_sha256 =
+            input.runs[0].windows[0].cavitation_observation_sha256.clone();
+        assert_eq!(audit(&input).disposition, "INVALID");
     }
 
     #[test]
