@@ -148,6 +148,30 @@ These are proposed engineering targets, not established standards or results:
 
 For zero observed failures, the exact one-sided 95% binomial lower bound is `p_L = 0.05^(1/n)`. The minimum independent-device sequence count for a target reliability floor `p_0` is `n_min = ceil(ln(0.05) / ln(p_0))`. These are mathematical lower bounds under an ideal independent, identically distributed Bernoulli model, not a substitute for power analysis. Repeated events are not independent devices; lot/lab clustering, multiple strata, censoring and nonzero failures require an appropriate design and analysis. A multi-stratum programme should not reuse one nominal 95% per-stratum interval and imply simultaneous 95% coverage.
 
+
+### Proposed numerical research targets (not standards or current results)
+
+After the physical reference baseline is frozen, use these as initial engineering targets and revise them if measurement uncertainty or the application safety case demands stricter limits:
+
+| Metric | Proposed target | Acceptance caveat |
+|---|---|---|
+| Complete-sequence service | One-sided 95% lower confidence bound at least 95% for a non-critical pilot mission | Must use independent device sequences and account for lot/lab clustering; target reliability may be higher for critical reserve use |
+| False-ready | One-sided 95% upper confidence bound below 1% | With zero false-ready events this requires at least 299 independent device sequences under an ideal IID binomial model; calculate per relevant risk stratum and with an appropriate clustered design |
+| Delivered-energy forecast | 95th-percentile absolute relative error no greater than 5% on held-out devices/lots | Require uncertainty intervals and no hidden exclusion of hard waveforms; use absolute error where the denominator is near zero |
+| Prediction intervals | Nominal 90% interval coverage between 88% and 92% overall | Also publish coverage and width for each temperature, dwell, load and lot stratum; aggregate coverage can hide a bad subgroup |
+| Model comparison | Beat the replicated two-branch RC baseline on held-out delivered Wh and sequence-service prediction | Voltage RMSE alone does not qualify; preserve false-pass cost, calibration, abstention and compute burden |
+| Recovery readiness | 95th-percentile time-to-restored-readiness within the application deadline | The deadline and readiness probe are application-specific and must be frozen before evaluation |
+
+The confidence sample sizes above are zero-failure binomial reference values only. They are not a sample-size plan for clustered devices, multiple lots/labs, incomplete sequences or nonzero failures.
+
+### Predictive model tournament
+
+The follow-on [EDLC-PREDICTIVE-MODEL-TOURNAMENT-001 #11979](https://github.com/Luminous-Dynamics/symthaea/issues/11979) will compare no-model and direct-measurement baselines, one-branch RC, two-branch RC, multi-branch equivalent circuits, reduced-order porous-electrode/transmission-line models, fractional-order models where justified, physics-informed state-space models and hybrid/ML challengers.
+
+Primary splits must be grouped by physical serial. The stronger generalization tests hold out entire production lots, laboratories/fixtures and later ageing intervals. No trace, pulse or time window from one device may appear in both training and test. Hyperparameter selection and prediction-interval calibration must not inspect the held-out set.
+
+The tournament must score delivered-Wh error, minimum sustained-power and cutoff error, recovery-time error, sequence-pass calibration, false-ready / false-pass rate, coverage/abstention, calibration drift and inference/identification cost. The model may abstain outside its verified operating envelope; a confident incorrect reserve prediction is worse than a disclosed unknown. The published two-branch model's 49–83% RMSE reduction is a reproduction target under the source conditions, not a guaranteed improvement on a different device or mission.
+
 ## 7. What would beat current practice
 
 The defensible path is not one giant composite score. It is a matched, falsifiable test programme:
