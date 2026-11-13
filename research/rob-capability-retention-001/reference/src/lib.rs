@@ -193,6 +193,8 @@ pub struct ReserveObservation {
     pub terminal_lower_bound: Option<u64>,
     /// Source/metrology receipt identity.
     pub source_receipt_digest: Option<String>,
+    /// Exact terminal physical-state snapshot qualified by this observation.
+    pub physical_state_digest: Option<String>,
     /// Calibration identity, where the dimension requires calibration.
     pub calibration_receipt_digest: Option<String>,
     /// Required only for an explicitly NotApplicable reserve dimension.
@@ -209,6 +211,8 @@ pub struct RecoveryTopologyReceipt {
     pub disposition: EvidenceDisposition,
     /// Exact recovery-topology report digest.
     pub report_digest: Option<String>,
+    /// Exact physical-state snapshot for which topology/recovery routes were evaluated.
+    pub physical_state_digest: Option<String>,
     /// Canonical physical recovery-route classes after alias collapse.
     pub recovery_route_class_count: Option<u32>,
     /// Failure-domain-independent routes, not merely action-distinct paths.
@@ -455,6 +459,10 @@ pub enum CapabilityRetentionError {
     IncompleteQualifiedRecoveryTopology(String),
     /// Failure-domain-independent route count exceeds the canonical route count.
     InconsistentRecoveryTopology(String),
+    /// Recovery topology was evaluated against a different terminal physical state.
+    RecoveryTopologyTerminalStateMismatch(String),
+    /// A reserve observation was measured against a different terminal physical state.
+    ReserveTerminalStateMismatch { arm_id: String, kind: ReserveKind },
     /// A rate or aggregate arithmetic operation overflowed.
     ArithmeticOverflow,
 }
@@ -672,6 +680,22 @@ fn validate_option_set(
         }
     }
     validate_recovery_topology(arm_id, &options.recovery_topology)?;
+    if let Some(topology_state) = options.recovery_topology.physical_state_digest.as_deref() {
+        if topology_state.trim().is_empty() {
+            return Err(CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(
+                arm_id.to_owned(),
+            ));
+        }
+        if topology_state != options.result_state_digest {
+            return Err(CapabilityRetentionError::RecoveryTopologyTerminalStateMismatch(
+                arm_id.to_owned(),
+            ));
+        }
+    } else if options.recovery_topology.disposition == EvidenceDisposition::Qualified {
+        return Err(CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(
+            arm_id.to_owned(),
+        ));
+    }
     Ok(())
 }
 
@@ -702,6 +726,7 @@ fn validate_option_reserve_count(
 fn validate_reserves<'a>(
     arm_id: &str,
     policy: &ReservePolicy,
+    terminal_state_digest: &str,
     observations: &'a [ReserveObservation],
 ) -> Result<BTreeMap<ReserveKind, &'a ReserveObservation>, CapabilityRetentionError> {
     let mut indexed = BTreeMap::new();
@@ -730,6 +755,22 @@ fn validate_reserves<'a>(
                 });
             }
             (ReserveApplicability::Required { .. }, EvidenceDisposition::Qualified) => {
+                let observed_state = observation
+                    .physical_state_digest
+                    .as_deref()
+                    .filter(|value| !value.trim().is_empty());
+                if observed_state != Some(terminal_state_digest) {
+                    if observed_state.is_some() {
+                        return Err(CapabilityRetentionError::ReserveTerminalStateMismatch {
+                            arm_id: arm_id.to_owned(),
+                            kind: *kind,
+                        });
+                    }
+                    return Err(CapabilityRetentionError::IncompleteQualifiedReserve {
+                        arm_id: arm_id.to_owned(),
+                        kind: *kind,
+                    });
+                }
                 if observation.terminal_lower_bound.is_none() {
                     return Err(CapabilityRetentionError::IncompleteQualifiedReserve {
                         arm_id: arm_id.to_owned(),
@@ -778,6 +819,7 @@ fn validate_reserves<'a>(
             {
                 if observation.terminal_lower_bound.is_some()
                     || observation.source_receipt_digest.is_some()
+                    || observation.physical_state_digest.is_some()
                     || observation.calibration_receipt_digest.is_some()
                 {
                     return Err(CapabilityRetentionError::InvalidNotApplicableReserve {
@@ -792,6 +834,14 @@ fn validate_reserves<'a>(
                     kind: *kind,
                 });
             }
+        }
+        if let Some(observed_state) = observation.physical_state_digest.as_deref()
+            && (observed_state.trim().is_empty() || observed_state != terminal_state_digest)
+        {
+            return Err(CapabilityRetentionError::ReserveTerminalStateMismatch {
+                arm_id: arm_id.to_owned(),
+                kind: *kind,
+            });
         }
         if let Some(calibration) = observation.calibration_receipt_digest.as_deref()
             && calibration.trim().is_empty()
@@ -1015,11 +1065,13 @@ pub fn compare_work_and_terminal_capability(
         let baseline_reserves = validate_reserves(
             &input.baseline_manifest.arm_id,
             &input.reserve_policy,
+            &cluster.baseline.option_set.result_state_digest,
             &cluster.baseline.reserves,
         )?;
         let candidate_reserves = validate_reserves(
             &input.candidate_manifest.arm_id,
             &input.reserve_policy,
+            &cluster.candidate.option_set.result_state_digest,
             &cluster.candidate.reserves,
         )?;
         if baseline_reserves
@@ -1237,13 +1289,19 @@ mod tests {
         }
     }
 
-    fn reserves(energy: u64, thermal: u64, options: u64) -> Vec<ReserveObservation> {
+    fn reserves(
+        energy: u64,
+        thermal: u64,
+        options: u64,
+        terminal_state_digest: &str,
+    ) -> Vec<ReserveObservation> {
         vec![
             ReserveObservation {
                 kind: ReserveKind::EnergyReserveMilliWh,
                 disposition: EvidenceDisposition::Qualified,
                 terminal_lower_bound: Some(energy),
                 source_receipt_digest: Some("energy-receipt".into()),
+                physical_state_digest: Some(terminal_state_digest.into()),
                 calibration_receipt_digest: Some("energy-calibration".into()),
                 not_applicable_reason: None,
             },
@@ -1252,6 +1310,7 @@ mod tests {
                 disposition: EvidenceDisposition::Qualified,
                 terminal_lower_bound: Some(thermal),
                 source_receipt_digest: Some("thermal-receipt".into()),
+                physical_state_digest: Some(terminal_state_digest.into()),
                 calibration_receipt_digest: Some("thermal-calibration".into()),
                 not_applicable_reason: None,
             },
@@ -1260,6 +1319,7 @@ mod tests {
                 disposition: EvidenceDisposition::Qualified,
                 terminal_lower_bound: Some(options),
                 source_receipt_digest: Some("option-reserve-receipt".into()),
+                physical_state_digest: Some(terminal_state_digest.into()),
                 calibration_receipt_digest: None,
                 not_applicable_reason: None,
             },
@@ -1268,6 +1328,7 @@ mod tests {
                 disposition: EvidenceDisposition::NotApplicable,
                 terminal_lower_bound: None,
                 source_receipt_digest: None,
+                physical_state_digest: None,
                 calibration_receipt_digest: None,
                 not_applicable_reason: Some(
                     "No active sensor stack in this non-sensing fixture".into(),
@@ -1276,10 +1337,11 @@ mod tests {
         ]
     }
 
-    fn topology() -> RecoveryTopologyReceipt {
+    fn topology(terminal_state_digest: &str) -> RecoveryTopologyReceipt {
         RecoveryTopologyReceipt {
             disposition: EvidenceDisposition::Qualified,
             report_digest: Some("recovery-topology-report-sha256".into()),
+            physical_state_digest: Some(terminal_state_digest.into()),
             recovery_route_class_count: Some(3),
             failure_domain_independent_route_count: Some(2),
             minimum_failure_domain_cut_set_cardinality: Some(1),
@@ -1287,15 +1349,16 @@ mod tests {
     }
 
     fn option_set(terminal_digest: &str, count: u32) -> OptionSetReceipt {
+        let result_state_digest = format!("{terminal_digest}-state");
         OptionSetReceipt {
             disposition: EvidenceDisposition::Qualified,
             ledger_receipt_digest: "option-ledger-receipt".into(),
             predecessor_state_digest: "initial-physical-state".into(),
-            result_state_digest: format!("{terminal_digest}-state"),
+            result_state_digest: result_state_digest.clone(),
             starting_option_set_digest: "starting-options".into(),
             terminal_option_set_digest: terminal_digest.into(),
             terminal_qualified_option_count: count,
-            recovery_topology: topology(),
+            recovery_topology: topology(&result_state_digest),
         }
     }
 
@@ -1306,6 +1369,8 @@ mod tests {
         thermal: u64,
         options: u64,
     ) -> ArmClusterSummary {
+        let option_set = option_set("terminal-options", options as u32);
+        let terminal_state_digest = option_set.result_state_digest.clone();
         ArmClusterSummary {
             work: tally(accepted, 0),
             work_outcome_receipt_digest: "accepted-work-receipt".into(),
@@ -1316,8 +1381,8 @@ mod tests {
             electrical_energy_milli_wh: 20_000,
             compute_energy_milli_joules: 100_000,
             critical_safety_violation_episodes: 0,
-            reserves: reserves(energy, thermal, options),
-            option_set: option_set("terminal-options", options as u32),
+            reserves: reserves(energy, thermal, options, &terminal_state_digest),
+            option_set,
         }
     }
 
