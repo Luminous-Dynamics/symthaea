@@ -81,23 +81,23 @@ LTC networks model neurons with individual time constants, creating:
 - Hasani, R., et al. (2021). "Liquid Time-Constant Networks"
 - Hasani, R., et al. (2022). "Closed-Form Continuous-Time Neural Networks"
 
-### Autopoiesis
+### Autopoiesis and functional self-maintenance
 
-**Core Claim**: Life (and consciousness) = self-creation
+**Theory:** Maturana and Varela's biological autopoiesis concerns a recursively organized network of production processes that regenerates components and maintains the boundary that distinguishes the system as a unity. This is not equivalent to generic feedback, self-reference, self-repair, or a definition of consciousness.
 
-Autopoiesis, from Maturana and Varela, describes systems that:
-- Produce their own components
-- Maintain their own boundaries
-- Are organizationally closed but materially open
+**Current Symthaea status:**
+- `crates/domains/symthaea-wisdom/src/autopoiesis.rs` implements a diagnostic heuristic based on prediction-error history, coherence history, cognitive-cycle count, and boundary-violation count.
+- It does not verify component producer/consumer events, output bytes/digests, actual runtime regeneration, or causal closure.
+- A high monitor score is not evidence of biological autopoiesis, life, sentience, or consciousness.
+- `crates/domains/symthaea-alife` provides simulated-organism and perturbation environments that may support experiments; a simulation is not itself proof of autopoiesis.
 
-**Symthaea Implementation**:
-- `src/consciousness/mod.rs` - Self-referential consciousness graph
-- Nodes can create self-loops (self-reference)
-- The system maintains its own coherence
+**Research programme:**
+- [AOBench specification](autopoiesis/AOBENCH_SPEC_2026-11-13.md)
+- [Operational organizational-closure model](autopoiesis/ORGANIZATIONAL_CLOSURE_MODEL_2026-11-13.md)
+- [AOBENCH-001 tracking issue](https://github.com/Luminous-Dynamics/symthaea/issues/11980)
+- [MEL-AUTO-001 runtime regeneration qualification](https://github.com/Luminous-Dynamics/symthaea/issues/10098)
 
-**Key Papers**:
-- Maturana, H. & Varela, F. (1980). "Autopoiesis and Cognition"
-- Thompson, E. (2007). "Mind in Life"
+**Key sources:** Maturana & Varela (1980), *Autopoiesis and Cognition*; Thompson (2007), *Mind in Life*; Frank (2026), Big Think interview; contemporary closure literature (2026).
 
 ---
 
