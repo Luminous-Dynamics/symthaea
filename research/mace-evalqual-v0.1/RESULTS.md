@@ -65,6 +65,28 @@ The observer CLI is a self-test demonstration that intentionally supplies an inc
 - Run manifest: 5fe2ff681e99d919516ed0ffdaebe8d585a9f7093dfa40354e6ae6b7c59495d6
 - Observations: d66742e7ad677cd5e7d333f66ca4f188a1be028cb2877249cbc67b2cd00ac66f
 
+
+## Oracle non-interference laboratory
+
+A new `oraclelab` package adds snapshot + observer-event checks for the evaluator itself.
+
+- **19 test functions pass** in the local standalone Go package (Go 1.23.2/Linux amd64).
+- `go test -count=1 ./...`: pass.
+- `go test -count=1 -race ./...`: pass.
+- `go vet ./...`: pass.
+- Statement coverage: **70.9%**.
+- Persistent state mutation: rejected.
+- Transient write-then-restore: rejected from the revision/event evidence even when the final content digest equals the initial digest.
+- Missing event, incomplete observer coverage, uninstrumented path, scope mismatch and invocation-attribution mismatch: indeterminate; the evaluator is not run where coverage is already known to be incomplete.
+- Repeated-query output instability: detected with a shared evaluator instance and exact pristine-state reset between invocations.
+- A→B versus B→A evaluation-order dependence: detected.
+- Grader errors and panics: grade remains indeterminate; state mutation after error still fails non-interference.
+- Pure read-only oracle: passes the non-interference check.
+
+**Trust boundary:** the lab's in-memory world and event recorder are synthetic. It assumes the adapter's independently operated event source honestly and completely covers the declared scope. Final-state snapshots alone cannot detect transient writes that are restored; those require event monitoring. A dishonest or incomplete event source can still hide activity. Production qualification therefore requires a domain-native snapshot/transaction-log source plus an observer outside the evaluator's trust domain.
+
+This package qualifies neither a production sandbox nor the real observer, and does not prove that the oracle's expected labels are correct. It is a reusable test contract for the next adapter.
+
 ## Claim boundary
 
 This implementation validates a benchmark adapter's declared fixture catalogue, exact input-byte bindings, typed three-axis outcomes and paired metamorphic relations. It does not launch or sandbox tasks; verify grader behavior in a real benchmark; prove task/oracle semantics; authenticate producers; establish oracle independence; observe all OS/API/filesystem/network events; or qualify the durable one-shot broker.
