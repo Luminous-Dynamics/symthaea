@@ -206,6 +206,8 @@ def compare(scenarios: list[Scenario]) -> dict[str, Any]:
 
     no_action = rows[Arm.NO_ACTION.value]
     predictive = rows[Arm.PREDICTIVE.value]
+    preventable = sum(not r.safe for r in no_action)
+    intercepted = sum((not n.safe) and p.safe for n, p in zip(no_action, predictive))
     return {
         "schema_version": "mcr2-causal-reflex-report-v0.1",
         "scenario_count": len(scenarios),
@@ -214,10 +216,9 @@ def compare(scenarios: list[Scenario]) -> dict[str, Any]:
         "predictive_vs_reactive": paired(predictive, rows[Arm.REACTIVE.value]),
         "predictive_vs_sham": paired(predictive, rows[Arm.SHAM.value]),
         "predictive_preventable_event_interception": {
-            "preventable_events_without_action": sum(not r.safe for r in no_action),
-            "prevented_by_predictive_arm": sum(
-                (not n.safe) and p.safe for n, p in zip(no_action, predictive)
-            ),
+            "preventable_events_without_action": preventable,
+            "prevented_by_predictive_arm": intercepted,
+            "interception_rate": intercepted / preventable if preventable else None,
         },
         "oracle_is_evaluator_only": True,
         "claim_boundary": "synthetic_deterministic_reference_only",
