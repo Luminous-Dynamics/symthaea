@@ -820,7 +820,7 @@ fn validate_evaluations(
             TransferGapError::EvaluationForUnknownDimension(evaluation.dimension),
         )?;
         if matches!(
-            policy.applicability,
+            &policy.applicability,
             DimensionApplicability::NotApplicable { .. }
         ) {
             return Err(TransferGapError::EvaluationForNotApplicableDimension(
