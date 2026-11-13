@@ -2976,6 +2976,26 @@ pub struct U1TeBDStrangStepper {
 
 
 
+
+
+/// Error-budget receipt that keeps distinct numerical error sources separate.
+///
+/// This type intentionally does not manufacture a total physical error bound:
+/// the Richardson term is asymptotic, and f64 residuals are not interval-enclosed.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDErrorBudget {
+    pub hamiltonian_projection_residual_sum: f64,
+    pub canonicalization_rebase_l2_residual_sum: Option<f64>,
+    pub schmidt_truncation_l2_upper_bound: Option<f64>,
+    pub truncation_global_bound_qualified: bool,
+    pub measured_step_doubling_defect_l2: f64,
+    pub richardson_fine_trotter_error_estimate: Option<f64>,
+    pub richardson_estimate_qualified: bool,
+    pub total_physical_error_upper_bound: Option<f64>,
+    pub total_physical_error_qualified: bool,
+    pub unqualified_terms: Vec<&'static str>,
+}
+
 /// Richardson step-doubling diagnostic for a second-order Strang integrator.
 ///
 /// measured_step_doubling_defect_l2 is the norm distance between one coarse
@@ -2995,6 +3015,7 @@ pub struct U1TeBDStepDoublingResult {
     pub richardson_fine_trotter_error_estimate: Option<f64>,
     pub richardson_estimate_qualified: bool,
     pub truncation_contamination_included: bool,
+    pub error_budget: U1TeBDErrorBudget,
 }
 
 /// One second-order TEBD time step, with truncation and Trotter status separated.
@@ -3119,7 +3140,76 @@ impl U1TeBDStrangStepper {
             (Some(first), Some(second)) => Some(first + second),
             _ => None,
         };
-        let richardson_estimate_qualified = coarse.global_truncation_bound_qualified
+
+        let layer_components = |layer: &U1TeBDLayerResult| -> Option<(f64, f64)> {
+            if !layer.global_l2_bound_qualified
+                || layer.gate_truncations.len() != layer.canonical_gauge_receipts.len()
+            {
+                return None;
+            }
+            let mut gauge_rebase = 0.0;
+            let mut truncation = 0.0;
+            for (diagnostics, receipt) in layer
+                .gate_truncations
+                .iter()
+                .zip(layer.canonical_gauge_receipts.iter())
+            {
+                if !receipt.qualifies(policy.tolerance) {
+                    return None;
+                }
+                gauge_rebase += receipt.state_reconstruction_l2_residual;
+                truncation += receipt.exterior_operator_norm_product_upper_bound()
+                    * diagnostics.discarded_weight.sqrt();
+            }
+            if gauge_rebase.is_finite() && truncation.is_finite() {
+                Some((gauge_rebase, truncation))
+            } else {
+                None
+            }
+        };
+
+        let aggregate_components = |layers: &[U1TeBDLayerResult]| -> Option<(f64, f64)> {
+            let mut gauge_rebase = 0.0;
+            let mut truncation = 0.0;
+            for layer in layers {
+                let (gauge, compressed) = layer_components(layer)?;
+                gauge_rebase += gauge;
+                truncation += compressed;
+            }
+            if gauge_rebase.is_finite() && truncation.is_finite() {
+                Some((gauge_rebase, truncation))
+            } else {
+                None
+            }
+        };
+
+        let coarse_components = aggregate_components(&coarse.layers);
+        let fine_first_components = aggregate_components(&fine_first.layers);
+        let fine_second_components = aggregate_components(&fine_second.layers);
+        let truncation_global_bound_qualified = coarse_components.is_some()
+            && fine_first_components.is_some()
+            && fine_second_components.is_some();
+        let canonicalization_rebase_l2_residual_sum = if truncation_global_bound_qualified {
+            Some(
+                coarse_components.unwrap_or((0.0, 0.0)).0
+                    + fine_first_components.unwrap_or((0.0, 0.0)).0
+                    + fine_second_components.unwrap_or((0.0, 0.0)).0,
+            )
+        } else {
+            None
+        };
+        let schmidt_truncation_l2_upper_bound = if truncation_global_bound_qualified {
+            Some(
+                coarse_components.unwrap_or((0.0, 0.0)).1
+                    + fine_first_components.unwrap_or((0.0, 0.0)).1
+                    + fine_second_components.unwrap_or((0.0, 0.0)).1,
+            )
+        } else {
+            None
+        };
+
+        let richardson_estimate_qualified = truncation_global_bound_qualified
+            && coarse.global_truncation_bound_qualified
             && fine_first.global_truncation_bound_qualified
             && fine_second.global_truncation_bound_qualified
             && coarse_bound.is_some()
@@ -3137,6 +3227,39 @@ impl U1TeBDStrangStepper {
             None
         };
 
+        let hamiltonian_projection_residual_sum = self
+            .bond_hamiltonians
+            .iter()
+            .map(U1TwoSiteHamiltonian::projection_residual)
+            .sum::<f64>();
+        if !hamiltonian_projection_residual_sum.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "Hamiltonian projection residual budget",
+            ));
+        }
+        let mut unqualified_terms = vec![
+            "Richardson step-doubling value is asymptotic, not a formal Trotter upper theorem",
+            "f64 canonicalization and gate residuals are not interval-arithmetic enclosures",
+            "Hamiltonian projection residual is measured separately, not a total-evolution error bound",
+        ];
+        if !truncation_global_bound_qualified {
+            unqualified_terms.push(
+                "one or more canonical-gauge truncation receipts failed or did not match their gate",
+            );
+        }
+        let error_budget = U1TeBDErrorBudget {
+            hamiltonian_projection_residual_sum,
+            canonicalization_rebase_l2_residual_sum,
+            schmidt_truncation_l2_upper_bound,
+            truncation_global_bound_qualified,
+            measured_step_doubling_defect_l2: defect,
+            richardson_fine_trotter_error_estimate,
+            richardson_estimate_qualified,
+            total_physical_error_upper_bound: None,
+            total_physical_error_qualified: false,
+            unqualified_terms,
+        };
+
         Ok(U1TeBDStepDoublingResult {
             state: fine_second.state,
             time_step: self.time_step,
@@ -3152,6 +3275,7 @@ impl U1TeBDStrangStepper {
             richardson_fine_trotter_error_estimate,
             richardson_estimate_qualified,
             truncation_contamination_included: coarse_bound.is_some() && fine_bound.is_some(),
+            error_budget,
         })
     }
 
