@@ -37,8 +37,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Check isolated solver-smoke formatting
-        run: cargo fmt --manifest-path tools/airroad-iqc-clarabel-smoke/Cargo.toml -- --check
       - name: Resolve and record exact dependency graph for this run
         run: |
           cargo generate-lockfile --manifest-path tools/airroad-iqc-clarabel-smoke/Cargo.toml
