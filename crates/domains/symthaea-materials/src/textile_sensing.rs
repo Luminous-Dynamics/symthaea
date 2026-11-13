@@ -1046,35 +1046,68 @@ mod tests {
         ];
         assert_eq!(validate_grouped_splits(&rows), Ok(()));
     }
-    fn exercise_corpus_case(case_id: &str) {
+    fn exercise_corpus_case(case_id: &str) -> (&'static str, Option<&'static str>) {
         match case_id {
-            "SORT-001-CURRENT-NIR" =>
-                current_calibrated_spectrum_with_closed_composition_is_admitted(),
-            "SORT-002-EXPIRED-CALIBRATION" =>
-                expired_calibration_at_acquisition_time_abstains(),
-            "SORT-003-REVOKED-CALIBRATION" => revoked_calibration_is_rejected(),
-            "SORT-004-SATURATED-SIGNAL" => saturated_spectral_observation_abstains(),
-            "SORT-005-OUTSIDE-WAVELENGTH-PROFILE" =>
-                wavelength_range_outside_profile_abstains(),
-            "SORT-006-UNKNOWN-FIBRE-FRACTION" =>
-                unidentified_fraction_is_preserved_and_causes_abstention(),
-            "SORT-007-VISUAL-ONLY" =>
-                visual_only_observation_does_not_create_fibre_composition_evidence(),
-            "SORT-008-SUBJECT-MISMATCH" =>
-                visual_and_spectral_observations_must_bind_to_the_same_subject(),
-            "SORT-009-VISUAL-LOW-CONFIDENCE" =>
-                visual_observation_below_declared_confidence_floor_abstains(),
-            "SORT-010-VISUAL-UNKNOWN-CATEGORY" =>
-                visual_unknown_category_or_presentation_abstains(),
-            "SORT-011-GARMENT-FRAME-LEAKAGE" =>
-                garment_frames_from_one_identity_cannot_cross_partitions(),
-            "SORT-012-NIR-REPLICATE-LEAKAGE" =>
-                nir_replicates_from_one_specimen_cannot_cross_partitions(),
-            "SORT-013-COMPOSITION-FRACTION-NOT-CLOSED" =>
-                invalid_composition_total_is_rejected(),
-            "SORT-014-INSTRUMENT-MISMATCH" => mismatched_instrument_is_rejected(),
-            "SORT-015-GROUPED-SPLIT-VALID" =>
-                grouped_split_accepts_multiple_frames_or_replicates_in_one_partition(),
+            "SORT-001-CURRENT-NIR" => {
+                current_calibrated_spectrum_with_closed_composition_is_admitted();
+                ("admitted", None)
+            }
+            "SORT-002-EXPIRED-CALIBRATION" => {
+                expired_calibration_at_acquisition_time_abstains();
+                ("unknown", Some("CalibrationNotValidAtAcquisition"))
+            }
+            "SORT-003-REVOKED-CALIBRATION" => {
+                revoked_calibration_is_rejected();
+                ("rejected", Some("CalibrationRevoked"))
+            }
+            "SORT-004-SATURATED-SIGNAL" => {
+                saturated_spectral_observation_abstains();
+                ("unknown", Some("Saturated"))
+            }
+            "SORT-005-OUTSIDE-WAVELENGTH-PROFILE" => {
+                wavelength_range_outside_profile_abstains();
+                ("unknown", Some("WavelengthOutsideQualifiedProfile"))
+            }
+            "SORT-006-UNKNOWN-FIBRE-FRACTION" => {
+                unidentified_fraction_is_preserved_and_causes_abstention();
+                ("unknown", Some("UnknownFibreFraction"))
+            }
+            "SORT-007-VISUAL-ONLY" => {
+                visual_only_observation_does_not_create_fibre_composition_evidence();
+                ("unknown", Some("MissingSpectral"))
+            }
+            "SORT-008-SUBJECT-MISMATCH" => {
+                visual_and_spectral_observations_must_bind_to_the_same_subject();
+                ("rejected", Some("SubjectMismatch"))
+            }
+            "SORT-009-VISUAL-LOW-CONFIDENCE" => {
+                visual_observation_below_declared_confidence_floor_abstains();
+                ("unknown", Some("BelowDeclaredConfidenceThreshold"))
+            }
+            "SORT-010-VISUAL-UNKNOWN-CATEGORY" => {
+                visual_unknown_category_or_presentation_abstains();
+                ("unknown", Some("CategoryUnknown"))
+            }
+            "SORT-011-GARMENT-FRAME-LEAKAGE" => {
+                garment_frames_from_one_identity_cannot_cross_partitions();
+                ("group_leakage", Some("GroupLeakage:GarmentIdentity"))
+            }
+            "SORT-012-NIR-REPLICATE-LEAKAGE" => {
+                nir_replicates_from_one_specimen_cannot_cross_partitions();
+                ("group_leakage", Some("GroupLeakage:PhysicalSpecimen"))
+            }
+            "SORT-013-COMPOSITION-FRACTION-NOT-CLOSED" => {
+                invalid_composition_total_is_rejected();
+                ("rejected", Some("CompositionInvalid:FractionTotalMismatch"))
+            }
+            "SORT-014-INSTRUMENT-MISMATCH" => {
+                mismatched_instrument_is_rejected();
+                ("rejected", Some("InstrumentProfileMismatch"))
+            }
+            "SORT-015-GROUPED-SPLIT-VALID" => {
+                grouped_split_accepts_multiple_frames_or_replicates_in_one_partition();
+                ("valid_split", None)
+            }
             other => panic!("unknown textile sensing corpus case: {other}"),
         }
     }
@@ -1111,10 +1144,6 @@ mod tests {
                 .expect("every corpus case needs a string case_id");
             assert!(seen.insert(case_id), "duplicate corpus case {case_id}");
             assert!(
-                case["purpose"].is_null(),
-                "corpus format must use mutation/invariant fields only"
-            );
-            assert!(
                 case["mutation"].as_str().is_some_and(|value| !value.is_empty()),
                 "case {case_id} must declare its mutation"
             );
@@ -1127,7 +1156,17 @@ mod tests {
                 .expect("every corpus case needs expected outcome");
             assert!(expected.get("disposition").and_then(|v| v.as_str()).is_some());
             assert!(expected.contains_key("reason"));
-            exercise_corpus_case(case_id);
+            let (disposition, reason) = exercise_corpus_case(case_id);
+            assert_eq!(
+                expected["disposition"].as_str(),
+                Some(disposition),
+                "case {case_id} disposition changed"
+            );
+            assert_eq!(
+                expected["reason"].as_str(),
+                reason,
+                "case {case_id} reason changed"
+            );
         }
 
         assert_eq!(seen.len(), 15);
