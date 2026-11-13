@@ -253,3 +253,77 @@ References:
 A synthetic audit PASS validates only support, source identity, geometry/time lineage, group-separation and refusal semantics for the fixture. It does not prove physical registration accuracy, local adhesion, local failure location, virtual-metrology accuracy, bond reliability, manufacturing yield, cost savings, standards compliance, safety or actuation authority.
 
 Physical promotion requires calibrated instruments, exact specimen and geometry lineage, validated support/resolution, preregistered matched experiments, blinded independent specimens, appropriate destructive ground truth and laboratory authorization.
+
+
+## 14. Industry baseline and differentiation
+
+The published commercial baseline already includes substantial process monitoring and inline integration. Luminous should not claim novelty for those capabilities:
+
+| Vendor / published system | Publicly documented capability | Competitive interpretation |
+|---|---|---|
+| Plasmatreat Openair-Plasma / PCU | Inline integration; process-control unit and generator; process-parameter recording, deviation warnings and preventive-maintenance signals; voltage measurement at generator, jet or across jets; optional three-fold nozzle monitoring | Process telemetry, alarms, multi-nozzle voltage monitoring and inline integration are incumbent capabilities |
+| Surfx Atomflo AFC-600 | RF power supply and auto-tuning; mass-flow control for plasma/process gases; real-time RF power, gas-flow and source-temperature control; recipe storage; out-of-spec alarms; Ethernet remote control and data logging | Recipe control, gas/power/temperature monitoring and digital trace logging are incumbent capabilities |
+| Plasmatreat surface testing | Test inks for quick surface-energy screening; contact-angle measurement / measurement-system analysis for more precise, documentable wettability checks | Wetting and surface-energy screening are existing QA tools, not a sufficient Luminous differentiator |
+
+Sources:
+- [Plasmatreat Openair-Plasma systems and PCU](https://www.plasmatreat.ch/en/products-and-services): inline integration and process-control claims are described in the vendor's product overview.
+- [Plasmatreat surface testing](https://www.plasmatreat.com/en/products-and-services/test-and-validation): test inks are described as quick screening; contact angle / MSA as more precise surface analysis.
+- [Surfx Atomflo AFC-600 vendor datasheet](https://www.surfxtechnologies.com/wp-content/uploads/2023/08/AFC-600-Datasheet-1.4.pdf): controller capabilities and interfaces.
+
+This is a review of publicly documented product capabilities, not a teardown or independent performance audit of proprietary competitor systems. We must not infer that a vendor lacks an undisclosed capability.
+
+### What Luminous should compete on instead
+
+| Dimension | Incumbent comparison protocol | Luminous differentiator to prove |
+|---|---|---|
+| Process-control conformance | Compare vendor alarms / recorded parameters at matched recipe and line speed | Source-bound evidence and explicit uncertainty, not another alarm dashboard |
+| Delivered spatial exposure | Compare recipe-only and vendor monitoring against independently calibrated local witness maps | Geometry-, thickness-, edge- and motion-aware coverage with registration bounds |
+| Product outcome | Same substrate lot, adhesive, geometry, cure and aging; include the best incumbent primer/preparation route | Predict the actual product endpoint, not only wettability or plasma health |
+| Spatial claims | Check the actual support of each instrument and destructive test | No specimen-to-pixel leakage; explicit POINT / AREA / SPECIMEN / FIELD / INFERRED semantics |
+| Transfer | Hold out whole lots, production days, device configurations and geometries | Calibrated risk and abstention on unseen material/geometry regimes |
+| Economics | Same useful service unit, quality floor and full resource boundary | Cost per accepted durable bond, including gas, power, cooling, extraction, motion, inspection, scrap, rework and downtime |
+| Evidence | Audit what the incumbent can export and what remains proprietary | Reproducible observation lineage, registration and decision receipts |
+
+The commercial comparison must use the vendor's best applicable process plus its normal quality-control policy as the incumbent, not an untreated control alone. Match throughput, product acceptance threshold, inspection budget, material and adhesive profile, and lifecycle boundary. A brochure comparison cannot establish superiority.
+
+### Product-level scorecard
+
+At minimum, publish:
+- first-pass yield and escaped-defect risk;
+- bond-strength distribution and failure-mode distribution;
+- retention after the predeclared storage / environmental aging schedule;
+- worst-lot, worst-day and worst-geometry performance;
+- spatial coverage and critical unknown-region area;
+- false acceptance, false rejection and abstention;
+- destructive inspection count and cost/time to decision;
+- full-system energy and resource consumption per accepted durable bond;
+- availability, downtime, maintenance burden and line throughput.
+
+Process alarms and surface-wetting tests are useful baseline inputs. They do not substitute for the physical product outcomes.
+
+## 15. Recommended physical comparison campaign
+
+A first external-laboratory campaign should be intentionally small in scope but strong in design:
+
+1. Freeze one substrate grade and lot family, one exact adhesive/joint geometry, and one realistic application acceptance floor.
+2. Obtain and run the vendor-recommended treatment and its normal inspection policy as the primary incumbent.
+3. Include matched untreated, plasma-only, best-applicable-primer-only and plasma-plus-promoter arms where the chemistry and application permit them. Do not assume a combined treatment is always admissible.
+4. Measure local surface observables only at their true instrument footprint. Keep destructive lap-shear results at the exact bonded-joint/specimen support.
+5. Record geometry, substrate thickness, edge distance, grounding, nozzle pose, speed/acceleration, gas, electrical waveform and temperature with synchronized calibration lineage.
+6. Measure initial and delayed/aged mechanical outcomes, failure mode, and any substrate-function preservation endpoint that matters to the application (for example, barrier performance for packaging).
+7. Randomize/block run order and specimen positions. Keep entire specimens out of training/holdout splits; reserve at least one material lot and one production day for blinded confirmation.
+8. Conduct measurement-system analysis for contact angle, registration and any local imaging/metrology before fitting a spatial predictor.
+9. Determine replicate counts from pilot variance, the minimum practically important effect, acceptable false-accept risk and power; do not select sample size by convenience.
+10. Compare cost per accepted durable bond and risk-coverage at the same line speed and inspection budget.
+
+The planned 0 h, 1 h, 4 h, 24 h, 72 h, 6 d and 18 d surface-aging observations are a hypothesis-driven schedule, not a universal aging law. Bond outcomes must be measured separately at the timepoints relevant to the actual production workflow. Extend to 30/60 d only where pretreated-part storage makes those horizons commercially relevant.
+
+### Promotion gates
+
+- **S0 software:** synthetic fixture, schema and deterministic audit only.
+- **S1 metrology feasibility:** calibration, repeatability, registration, support footprints and data lineage pass an independent measurement-system review.
+- **S2 physical mechanism study:** preregistered, randomized matched experiments with destructive outcomes and declared aging.
+- **S3 held-out qualification study:** whole unseen specimens/lots/days/geometries, calibrated uncertainty, no increased escaped-defect risk.
+- **S4 production pilot:** same product specification and throughput as incumbent, independent quality oversight, full lifecycle economics and rollback conditions.
+
+Progression between stages is not automatic. A failure or unmeasured condition returns the relevant claim to BLOCKED or REJECTED.
