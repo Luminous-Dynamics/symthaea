@@ -57,6 +57,29 @@ def affine_scaled_rectangle(z: ComplexQ, u: Interval, v: Interval) -> tuple[Inte
     return real, imag
 
 
+
+def shared_coverage_valid(
+    current_records: list[dict], voltage_records: list[dict], nuisance_id: str
+) -> bool:
+    current_ids = {item["record_id"] for item in current_records}
+    voltage_ids = {item["record_id"] for item in voltage_records}
+    if len(current_ids) != len(current_records) or len(voltage_ids) != len(voltage_records):
+        return False
+    if any(item.get("calibration_nuisance_id") != nuisance_id for item in current_records):
+        return False
+    if any(item.get("calibration_nuisance_id") != nuisance_id for item in voltage_records):
+        return False
+    return True
+
+
+def square_matrix_coverage_valid(ports: list[str], records: list[dict]) -> bool:
+    if not ports or len(set(ports)) != len(ports):
+        return False
+    pairs = [(item["observed_port_id"], item["driven_port_id"]) for item in records]
+    expected = {(row, column) for row in ports for column in ports}
+    return len(pairs) == len(set(pairs)) and set(pairs) == expected
+
+
 def main() -> None:
     data = json.loads(FIXTURE.read_text(encoding="utf-8"))
     assert data["schema"] == "luminous.airroad.mimo_shared_calibration_uncertainty.v0_1"
@@ -99,6 +122,14 @@ def main() -> None:
     voltage_nuisance_ids = {item["calibration_nuisance_id"] for item in data["base_voltage_observations_v"]}
     assert current_nuisance_ids == {nuisance_id}
     assert voltage_nuisance_ids == {nuisance_id}
+    assert shared_coverage_valid(
+        data["base_injected_current_a"],
+        data["base_voltage_observations_v"],
+        nuisance_id,
+    )
+    assert square_matrix_coverage_valid(
+        ports, data["base_voltage_observations_v"]
+    )
 
     u = read_interval(cal["u_domain"])
     v = read_interval(cal["v_domain"])
@@ -155,23 +186,50 @@ def main() -> None:
     assert independent_real[0] <= true_z11[0] <= independent_real[1]
     assert independent_imag[0] <= true_z11[1] <= independent_imag[1]
 
-    # Negative controls are executable semantic counterexamples.
-    mismatched_record = dict(data["base_injected_current_a"][0])
-    mismatched_record["calibration_nuisance_id"] = "different-calibration-chain"
-    assert mismatched_record["calibration_nuisance_id"] != nuisance_id
-    q_real_including_zero = (
-        Fraction(1) + Fraction(-1),
-        Fraction(1) + Fraction(0),
+    # Negative controls are executed against the admission predicates.
+    mismatch_currents = [dict(item) for item in data["base_injected_current_a"]]
+    mismatch_currents[0]["calibration_nuisance_id"] = "different-calibration-chain"
+    assert not shared_coverage_valid(
+        mismatch_currents, data["base_voltage_observations_v"], nuisance_id
     )
+
+    missing_voltage_coverage = list(cal["applies_to_voltage_record_ids"][:-1])
+    assert set(missing_voltage_coverage) != voltage_ids
+    missing_current_coverage = list(cal["applies_to_current_record_ids"][:-1])
+    assert set(missing_current_coverage) != current_ids
+
+    q_real_including_zero = (Fraction(0), Fraction(1))
     assert q_real_including_zero[0] <= 0 <= q_real_including_zero[1]
+
     statistical_semantics = "statistical_covariance_only"
     assert statistical_semantics != "deterministic_joint_hard_set"
-    incomplete_coverage = set(cal["applies_to_voltage_record_ids"]) - {"V-bus-b-from-b"}
-    assert incomplete_coverage != set(cal["applies_to_voltage_record_ids"])
+
+    duplicate_ports = ["bus-a", "bus-a"]
+    assert not square_matrix_coverage_valid(
+        duplicate_ports, data["base_voltage_observations_v"]
+    )
+
+    altered_pairs = [dict(item) for item in data["base_voltage_observations_v"]]
+    altered_pairs[0]["driven_port_id"] = "bus-b"
+    assert not square_matrix_coverage_valid(ports, altered_pairs)
+
+    # A wide independent rectangle cannot be labelled an exact point set:
+    # its bounds do not collapse to the known reference element.
+    claimed_exact = (
+        independent_real == (true_z11[0], true_z11[0])
+        and independent_imag == (true_z11[1], true_z11[1])
+    )
+    assert not claimed_exact
+
     controls = {item["id"]: item["expected"] for item in data["negative_controls"]}
     assert controls["voltage-current-nuisance-id-mismatch"] == "reject_shared_cancellation"
+    assert controls["missing-voltage-record-from-coverage"] == "not_evaluable"
+    assert controls["missing-current-record-from-coverage"] == "not_evaluable"
     assert controls["q-domain-includes-zero"] == "not_evaluable"
     assert controls["statistical-covariance-labelled-hard-bound"] == "reject"
+    assert controls["duplicate-port-identity"] == "reject"
+    assert controls["altered-voltage-current-port-pairing"] == "reject"
+    assert controls["independent-rectangle-claimed-exact"] == "reject_claim_class"
 
     print("PASS complete shared nuisance coverage and nonzero q")
     print("PASS independent rectangle exact outer bounds")
