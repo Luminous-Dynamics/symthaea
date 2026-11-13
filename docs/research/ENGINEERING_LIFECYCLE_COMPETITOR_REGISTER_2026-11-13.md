@@ -58,6 +58,7 @@ Aras' release notes state that Impact Analysis AI Agent v1.0.0 became generally 
 - a change request that remains in Draft after application.
 
 Important documented prerequisites include substantive change-request title/reason, correct product-structure links, unique item numbers for custom types and Draft-state selection. The agent is a direct benchmark target, not a hypothetical future feature.
+The user guide additionally exposes an optional free-text **Analysis Instructions** field for session-level focus/constraining. Its documented account prerequisites include read/update access to Change Requests and read access to Affected Items (Parts, CADs and Documents). The agent is user-invoked: recommendations are not written until the user selects Apply Changes; the Change Request remains Draft afterward. The actual effective principal, permissions, selected items and resulting state must be recorded in a trial.
 
 A key research distinction: the five specialist agents and final validator are components of one product workflow. Their count is not evidence of independent adjudication, operational independence or separate failure domains.
 
