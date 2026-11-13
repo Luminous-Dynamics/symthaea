@@ -1,0 +1,340 @@
+name: Marine Standalone Contracts
+
+on:
+  pull_request:
+    paths:
+      - "tools/marine-propulsion-validator/**"
+      - "docs/research/marine/**"
+      - ".github/workflows/marine-standalone-contracts.yml"
+  push:
+    branches:
+      - research/marine-waps-co-design-20261110
+    paths:
+      - "tools/marine-propulsion-validator/**"
+      - "docs/research/marine/**"
+      - ".github/workflows/marine-standalone-contracts.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marine-standalone-contracts-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Pinned Rust build, tests and contract smoke checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Install repository-pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Generate standalone lockfile
+        run: cargo generate-lockfile --manifest-path tools/marine-propulsion-validator/Cargo.toml
+
+      - name: Format check
+        run: cargo fmt --manifest-path tools/marine-propulsion-validator/Cargo.toml -- --check
+
+      - name: Clippy
+        run: cargo clippy --manifest-path tools/marine-propulsion-validator/Cargo.toml --locked --all-targets -- -D warnings
+
+      - name: Unit and schema integration tests
+        run: cargo test --manifest-path tools/marine-propulsion-validator/Cargo.toml --locked --all-targets
+
+      - name: Marine case validator synthetic fixture returns explicit INCOMPLETE
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-propulsion-validator -- \
+            docs/research/marine/marine-propulsion-case-v0.3.0.schema.json \
+            docs/research/marine/fixtures/synthetic-waps-case-v0.3.0.json \
+            > "$RUNNER_TEMP/marine-case-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-case-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE"' "$RUNNER_TEMP/marine-case-report.json"
+
+      - name: Regulatory rule register v0.1.0 retains split ECA timelines
+        run: |
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-regulatory-rule-audit -- \
+            docs/research/marine/marine-regulatory-rule-register-v0.1.0.schema.json \
+            docs/research/marine/marine-regulatory-rule-register-2026-11-10.json \
+            > "$RUNNER_TEMP/marine-regulatory-v0.1-report.json"
+          cat "$RUNNER_TEMP/marine-regulatory-v0.1-report.json"
+          jq -e '.disposition == "REGISTER_CONTRACT_VALID"' "$RUNNER_TEMP/marine-regulatory-v0.1-report.json"
+
+      - name: Regulatory rule register returns REGISTER_CONTRACT_VALID
+        run: |
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-regulatory-rule-audit -- \
+            docs/research/marine/marine-regulatory-rule-register-v0.2.0.schema.json \
+            docs/research/marine/marine-regulatory-rule-register-2026-11-10-v0.2.0.json \
+            > "$RUNNER_TEMP/marine-regulatory-report.json"
+          cat "$RUNNER_TEMP/marine-regulatory-report.json"
+          jq -e '.disposition == "REGISTER_CONTRACT_VALID"' "$RUNNER_TEMP/marine-regulatory-report.json"
+
+      - name: Marine benchmark manifest preserves protocol integrity and synthetic INCOMPLETE disposition
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-benchmark-manifest-audit -- \
+            docs/research/marine/marine-benchmark-manifest-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-benchmark-manifest-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-benchmark-manifest-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-benchmark-manifest-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .claim_stage == "synthetic_smoke"' "$RUNNER_TEMP/marine-benchmark-manifest-report.json"
+
+      - name: Engine-resolved CH4/N2O evidence remains explicitly INCOMPLETE when synthetic/uncertainty is unqualified
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-emissions-evidence-audit -- \
+            docs/research/marine/marine-emissions-evidence-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-gas-emissions-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-emissions-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-emissions-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .expected_gases == 2 and .observed_gases == 2' "$RUNNER_TEMP/marine-emissions-report.json"
+
+      - name: Engine-resolved CH4/N2O v0.2 context-bound fixture remains INCOMPLETE
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-emissions-evidence-audit -- \
+            docs/research/marine/marine-emissions-evidence-v0.2.0.schema.json \
+            docs/research/marine/fixtures/synthetic-gas-emissions-v0.2.0.json \
+            > "$RUNNER_TEMP/marine-emissions-v0.2-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-emissions-v0.2-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .expected_gases == 2 and .observed_gases == 2' "$RUNNER_TEMP/marine-emissions-v0.2-report.json"
+
+      - name: Energy source ledger known subtotal remains incomplete when wind is unknown
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-energy-source-ledger-audit -- \
+            docs/research/marine/marine-energy-source-ledger-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-energy-source-ledger-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-energy-ledger-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-energy-ledger-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .known_subtotal_micro_gj == 102000000 and .total_source_input_micro_gj == null and (.non_additive_flow_ids | length) == 4' "$RUNNER_TEMP/marine-energy-ledger-report.json"
+
+      - name: Component and whole-system energy conservation audit
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-energy-conservation-audit -- \
+            docs/research/marine/marine-energy-conservation-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-energy-conservation-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-energy-balance-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-energy-balance-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .system_residual_micro_gj == 0 and .external_input_micro_gj == 110 and .external_output_micro_gj == 25 and .total_loss_micro_gj == 82 and .total_storage_delta_micro_gj == 3 and ([.component_balances[].residual_micro_gj] | all(. == 0))' "$RUNNER_TEMP/marine-energy-balance-report.json"
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-energy-conservation-audit -- \
+            docs/research/marine/marine-energy-conservation-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-energy-conservation-unbalanced-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-energy-balance-unbalanced-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-energy-balance-unbalanced-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "UNBALANCED" and ([.component_balances[] | select(.component_id == "HOTEL-LOAD")][0].residual_micro_gj == -2)' "$RUNNER_TEMP/marine-energy-balance-unbalanced-report.json"
+
+      - name: Synthetic WAPS wind-energy evidence remains explicitly NOT_READY
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-wind-energy-evidence-audit -- \
+            docs/research/marine/marine-wind-energy-evidence-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-wind-energy-evidence-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-wind-energy-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-wind-energy-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "NOT_READY"' "$RUNNER_TEMP/marine-wind-energy-report.json"
+
+      - name: Synthetic causal protocol remains explicitly NOT_READY
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-causal-protocol-audit -- \
+            docs/research/marine/marine-causal-study-protocol-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-causal-study-protocol-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-causal-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-causal-report.json"
+          test "$status" -eq 2
+          jq -e '.readiness_disposition == "NOT_READY"' "$RUNNER_TEMP/marine-causal-report.json"
+
+      - name: Synthetic schedule flexibility remains INCOMPLETE and reports time slack only
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-service-flexibility-audit -- \
+            docs/research/marine/marine-service-flexibility-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-service-flexibility-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-service-flexibility-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-service-flexibility-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .port_calls_checked == 6 and ([.port_call_results[] | select(.case_id == "SYNTHETIC-SCHEDULE-FLEX" and .port_call_id == "PORT-A")][0] | .window_slack_available_seconds == 10800 and .window_slack_consumed_seconds == 7200 and .window_slack_remaining_seconds == 3600)' "$RUNNER_TEMP/marine-service-flexibility-report.json"
+
+      - name: Underwater acoustic evidence fixture remains explicitly INCOMPLETE
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-acoustic-evidence-audit -- \
+            docs/research/marine/marine-acoustic-evidence-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-acoustic-evidence-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-acoustic-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-acoustic-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .spectral_band_count == 4 and .raw_trace_present == true' "$RUNNER_TEMP/marine-acoustic-report.json"
+
+      - name: Biofouling inspection and cleaning evidence remains explicitly INCOMPLETE
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-biofouling-evidence-audit -- \
+            docs/research/marine/marine-biofouling-evidence-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-biofouling-evidence-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-biofouling-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-biofouling-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .hull_coverage_fraction == 0.9 and .zone_count == 3 and .confirmed_species_count == 0 and .performance_pair_conditions_matched == true' "$RUNNER_TEMP/marine-biofouling-report.json"
+
+      - name: Environmental trial v0.4 shared-clock case remains synthetic INCOMPLETE
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-propulsion-validator -- \
+            docs/research/marine/marine-propulsion-case-v0.4.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-environmental-trial-case-v0.4.0.json \
+            > "$RUNNER_TEMP/marine-environmental-trial-case-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-environmental-trial-case-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE"' "$RUNNER_TEMP/marine-environmental-trial-case-report.json"
+
+      - name: Acoustic and propulsion channels bind to one declared timebase; synthetic remains INCOMPLETE
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-acoustic-timebase-binding-audit -- \
+            docs/research/marine/marine-acoustic-evidence-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-acoustic-timebase-v0.1.0.json \
+            docs/research/marine/marine-propulsion-case-v0.4.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-environmental-trial-case-v0.4.0.json \
+            > "$RUNNER_TEMP/marine-acoustic-timebase-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-acoustic-timebase-report.json"
+          test "$status" -eq 2
+          jq -e '.binding_valid == true and .disposition == "INCOMPLETE" and .synchronized_channel_count == 6 and .common_reference_clock_id == "SYNTHETIC-UTC-REFERENCE-001"' "$RUNNER_TEMP/marine-acoustic-timebase-report.json"
+
+      - name: Cross-domain acoustic and hull-state evidence join resolves context but remains INCOMPLETE
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-hull-state-evidence-join-audit -- \
+            docs/research/marine/marine-hull-state-evidence-join-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-hull-state-timebase-join-v0.1.0.json \
+            docs/research/marine/marine-acoustic-evidence-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-acoustic-timebase-v0.1.0.json \
+            docs/research/marine/marine-biofouling-evidence-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-biofouling-timebase-v0.1.0.json \
+            "$RUNNER_TEMP/marine-acoustic-timebase-report.json" \
+            > "$RUNNER_TEMP/marine-hull-state-join-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-hull-state-join-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .context_links_valid == true and .timebase_binding_valid == true and (.source_record_statuses | length) == 2' "$RUNNER_TEMP/marine-hull-state-join-report.json"
+
+      - name: Cross-domain hull-state join resolves context but remains INCOMPLETE for synthetic sources
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-hull-state-evidence-join-audit -- \
+            docs/research/marine/marine-hull-state-evidence-join-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-hull-state-timebase-join-v0.1.0.json \
+            docs/research/marine/marine-acoustic-evidence-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-acoustic-timebase-v0.1.0.json \
+            docs/research/marine/marine-biofouling-evidence-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-biofouling-timebase-v0.1.0.json \
+            "$RUNNER_TEMP/marine-acoustic-timebase-report.json" \
+            > "$RUNNER_TEMP/marine-hull-state-join-report.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/marine-hull-state-join-report.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .context_links_valid == true and .timebase_binding_valid == true and (.source_record_statuses | length) == 2' "$RUNNER_TEMP/marine-hull-state-join-report.json"
+
+      - name: Preserve generated lockfile and audit receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marine-standalone-validation-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            tools/marine-propulsion-validator/Cargo.lock
+            ${{ runner.temp }}/marine-case-report.json
+            ${{ runner.temp }}/marine-regulatory-report.json
+            ${{ runner.temp }}/marine-causal-report.json
+            ${{ runner.temp }}/marine-wind-energy-report.json
+            ${{ runner.temp }}/marine-energy-ledger-report.json
+            ${{ runner.temp }}/marine-energy-balance-report.json
+            ${{ runner.temp }}/marine-energy-balance-unbalanced-report.json
+            ${{ runner.temp }}/marine-emissions-report.json
+            ${{ runner.temp }}/marine-emissions-v0.2-report.json
+            ${{ runner.temp }}/marine-service-flexibility-report.json
+            ${{ runner.temp }}/marine-acoustic-report.json
+            ${{ runner.temp }}/marine-acoustic-timebase-report.json
+            ${{ runner.temp }}/marine-environmental-trial-case-report.json

@@ -1,0 +1,268 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-service-flexibility:0.1.0",
+  "title": "Marine Service Flexibility Benchmark v0.1.0",
+  "description": "Service-matched schedule-window and temporal-flexibility contract. Temporal slack is not energy storage.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "study_id",
+    "data_class",
+    "service",
+    "cases",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "study_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "data_class": {
+      "enum": [
+        "synthetic",
+        "observed",
+        "modelled",
+        "mixed"
+      ]
+    },
+    "service": {
+      "$ref": "#/$defs/service"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service_fingerprint",
+        "service_contract_id",
+        "functional_unit",
+        "cargo_class",
+        "annual_delivered_work",
+        "port_calls"
+      ],
+      "properties": {
+        "service_fingerprint": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "service_contract_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "functional_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cargo_class": {
+          "type": "string",
+          "minLength": 1
+        },
+        "annual_delivered_work": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "port_calls": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/port_call_contract"
+          }
+        }
+      }
+    },
+    "port_call_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "port_call_id",
+        "earliest_arrival",
+        "target_arrival",
+        "latest_arrival",
+        "minimum_turnaround_seconds",
+        "latest_departure"
+      ],
+      "properties": {
+        "port_call_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "earliest_arrival": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "target_arrival": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "latest_arrival": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "minimum_turnaround_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "latest_departure": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "role",
+        "policy_family",
+        "service_fingerprint",
+        "storage",
+        "energy_evidence",
+        "port_calls"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": [
+            "baseline",
+            "candidate"
+          ]
+        },
+        "policy_family": {
+          "enum": [
+            "fixed_schedule",
+            "schedule_flexible",
+            "battery_storage",
+            "combined_schedule_storage",
+            "forecast_aware_joint",
+            "perfect_foresight_reference",
+            "degraded_mode"
+          ]
+        },
+        "service_fingerprint": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "storage": {
+          "$ref": "#/$defs/storage"
+        },
+        "energy_evidence": {
+          "$ref": "#/$defs/energy_evidence"
+        },
+        "port_calls": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/call_schedule"
+          }
+        }
+      }
+    },
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "technology",
+        "usable_energy_kwh",
+        "mass_kg",
+        "volume_m3"
+      ],
+      "properties": {
+        "technology": {
+          "enum": [
+            "none",
+            "lithium_ion",
+            "other"
+          ]
+        },
+        "usable_energy_kwh": {
+          "type": "number",
+          "minimum": 0
+        },
+        "mass_kg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "volume_m3": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "energy_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "reason"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_supplied",
+            "observed",
+            "modelled",
+            "mixed"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "call_schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "port_call_id",
+        "planned_arrival",
+        "planned_departure"
+      ],
+      "properties": {
+        "port_call_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "planned_arrival": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "planned_departure": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  }
+}

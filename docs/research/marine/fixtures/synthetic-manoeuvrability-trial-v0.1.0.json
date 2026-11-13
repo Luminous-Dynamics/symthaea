@@ -1,0 +1,82 @@
+{
+  "schema_version": "0.1.0",
+  "case_id": "SYNTHETIC-MSC137-REFERENCE-0001",
+  "record_status": "synthetic",
+  "standard": {
+    "id": "IMO-MSC.137(76)",
+    "revision": "2002-12-04"
+  },
+  "applicability_review": {
+    "status": "review_required",
+    "authority_or_administration": "Synthetic fixture; no Administration decision",
+    "decision_reference": "SYNTHETIC-NO-LEGAL-REVIEW",
+    "reviewer_id": "SYNTHETIC-REVIEWER",
+    "review_date": "2026-11-10",
+    "limitations": [
+      "Synthetic software fixture; no legal applicability has been assessed."
+    ]
+  },
+  "vessel": {
+    "length_m": 200,
+    "speed_m_s": 7.5,
+    "ship_type": "container_ship",
+    "construction_date": "2026-11-10"
+  },
+  "test_conditions": {
+    "deep_unrestricted_water": true,
+    "calm_environment": true,
+    "full_load_summer_draft": true,
+    "even_keel": true,
+    "steady_approach": true,
+    "port_and_starboard_tests": true,
+    "deviations": [
+      "Synthetic reference values only; not physical test conditions."
+    ]
+  },
+  "waps_context": {
+    "installed": true,
+    "operating_state": "active",
+    "wind_speed_m_s": 8,
+    "wind_direction_deg": 90,
+    "device_configuration_id": "SYNTHETIC-WAPS-001",
+    "limitations": [
+      "Illustrative wind context only; MSC.137(76) conventional manoeuvres do not define WAPS-specific test scenarios."
+    ]
+  },
+  "measurements": {
+    "turning_circle": {
+      "port": {
+        "advance_m": 800,
+        "tactical_diameter_m": 900
+      },
+      "starboard": {
+        "advance_m": 790,
+        "tactical_diameter_m": 910
+      }
+    },
+    "initial_turning": {
+      "port": 400,
+      "starboard": 390
+    },
+    "zig_zag_10_10": {
+      "port": {
+        "first_overshoot_deg": 12,
+        "second_overshoot_deg": 28
+      },
+      "starboard": {
+        "first_overshoot_deg": 13,
+        "second_overshoot_deg": 27
+      }
+    },
+    "zig_zag_20_20": {
+      "port": 20,
+      "starboard": 21
+    },
+    "full_astern_stopping": {
+      "track_reach_m": 2500
+    }
+  },
+  "limitations": [
+    "Synthetic test values only; no vessel, model test, or full-scale trial is represented."
+  ]
+}

@@ -1,0 +1,1837 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-propulsion-case:0.3.0",
+  "title": "Luminous Marine Propulsion Benchmark Case v0.3.0",
+  "description": "Version 0.3.0 tightens trial evidence provenance, certificate rights, sampling-rate basis and rate/window/sample-count consistency.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "record_status",
+    "comparison",
+    "service",
+    "vessel",
+    "route",
+    "environment",
+    "architecture",
+    "economics",
+    "evidence",
+    "hard_gates"
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "class",
+        "source_id",
+        "method",
+        "limitations"
+      ],
+      "properties": {
+        "class": {
+          "type": "string",
+          "enum": [
+            "measured",
+            "published",
+            "derived",
+            "synthetic",
+            "assumed",
+            "vendor_nominal"
+          ]
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "source_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "rights_status": {
+          "type": "string",
+          "enum": [
+            "public",
+            "permissioned",
+            "restricted",
+            "unknown",
+            "not_applicable"
+          ]
+        }
+      }
+    },
+    "uncertainty": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "lower",
+            "upper",
+            "method",
+            "basis"
+          ],
+          "properties": {
+            "kind": {
+              "const": "interval"
+            },
+            "lower": {
+              "type": "number"
+            },
+            "upper": {
+              "type": "number"
+            },
+            "method": {
+              "type": "string",
+              "minLength": 1
+            },
+            "basis": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "standard_uncertainty",
+            "distribution",
+            "method",
+            "basis"
+          ],
+          "properties": {
+            "kind": {
+              "const": "standard"
+            },
+            "standard_uncertainty": {
+              "type": "number",
+              "minimum": 0
+            },
+            "distribution": {
+              "type": "string",
+              "enum": [
+                "normal",
+                "lognormal",
+                "uniform",
+                "triangular",
+                "empirical",
+                "other_declared"
+              ]
+            },
+            "method": {
+              "type": "string",
+              "minLength": 1
+            },
+            "basis": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "reason"
+          ],
+          "properties": {
+            "kind": {
+              "const": "unknown"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ],
+      "description": "One of a declared interval, standard uncertainty or explicit unknown. Cross-field validation must check lower <= upper and that uncertainty units match the parent quantity unit; JSON Schema structural validation alone cannot establish those equalities."
+    },
+    "quantity": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "unit",
+            "provenance",
+            "uncertainty"
+          ],
+          "properties": {
+            "value": {
+              "type": "number"
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "provenance": {
+              "$ref": "#/$defs/provenance"
+            },
+            "uncertainty": {
+              "$ref": "#/$defs/uncertainty"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "unit",
+            "unknown_reason",
+            "provenance"
+          ],
+          "properties": {
+            "value": {
+              "type": "null"
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "unknown_reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "provenance": {
+              "$ref": "#/$defs/provenance"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value",
+            "unit",
+            "not_applicable_reason",
+            "provenance"
+          ],
+          "properties": {
+            "value": {
+              "type": "null"
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "not_applicable_reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "provenance": {
+              "$ref": "#/$defs/provenance"
+            }
+          },
+          "description": "An explicitly not-applicable quantity. This is distinct from an unknown value and from a missing field."
+        }
+      ],
+      "description": "A known finite value with uncertainty, an explicit unknown with a reason, or an explicit not-applicable value with a reason. Unknown, not-applicable and absent fields are distinct states."
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "hard_gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "gate_id",
+        "status",
+        "scope_note",
+        "evidence_ids"
+      ],
+      "properties": {
+        "gate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "pass",
+            "fail",
+            "unknown",
+            "not_applicable",
+            "blocked"
+          ]
+        },
+        "scope_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "source_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "title",
+        "publisher",
+        "publication_date",
+        "evidence_class",
+        "limitations"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publisher": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publication_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "evidence_class": {
+          "type": "string",
+          "enum": [
+            "peer_reviewed_model",
+            "peer_reviewed_experiment",
+            "standard",
+            "regulator",
+            "class_society",
+            "industry_trial",
+            "vendor_case",
+            "vendor_claim",
+            "synthetic"
+          ]
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rights_status": {
+          "type": "string",
+          "enum": [
+            "public",
+            "permissioned",
+            "restricted",
+            "unknown",
+            "not_applicable"
+          ]
+        }
+      }
+    },
+    "measurement_channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channel_id",
+        "physical_quantity",
+        "unit",
+        "instrument_identity",
+        "measurement_location",
+        "sample_rate_hz",
+        "calibration_record_id",
+        "calibration_status",
+        "timebase_id",
+        "time_alignment_uncertainty",
+        "sample_window_start",
+        "sample_window_end",
+        "missing_sample_count",
+        "raw_trace_sha256",
+        "uncertainty",
+        "provenance",
+        "limitations",
+        "expected_sample_count",
+        "observed_sample_count",
+        "sample_rate_basis"
+      ],
+      "properties": {
+        "channel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "physical_quantity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "instrument_identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "measurement_location": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_rate_hz": {
+          "$ref": "#/$defs/quantity"
+        },
+        "calibration_record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_status": {
+          "type": "string",
+          "enum": [
+            "in_tolerance",
+            "out_of_tolerance",
+            "stale",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "timebase_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "time_alignment_uncertainty": {
+          "$ref": "#/$defs/quantity"
+        },
+        "sample_window_start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "sample_window_end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "missing_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "raw_trace_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "uncertainty": {
+          "$ref": "#/$defs/uncertainty"
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "derived_from_channel_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "expected_sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "observed_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sample_rate_basis": {
+          "type": "string",
+          "enum": [
+            "nominal",
+            "measured"
+          ]
+        }
+      },
+      "description": "A sensor or measurement channel tied to calibration, timebase, sample window, raw trace digest and explicit uncertainty. Channel units must agree with uncertainty and sample-rate quantities; cross-field checks belong to the semantic validator. Version 0.2.0 additionally requires expected and observed counts; semantic validation checks observed + missing = expected and the declared completeness policy."
+    },
+    "trial_evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trial_id",
+        "protocol_id",
+        "protocol_revision",
+        "service_fingerprint",
+        "disposition",
+        "validation_stage",
+        "time_sync_method",
+        "channels",
+        "raw_dataset_sha256",
+        "limitations",
+        "calibration_records",
+        "timebases",
+        "sample_completeness_policy"
+      ],
+      "properties": {
+        "trial_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "service_fingerprint": {
+          "$ref": "#/$defs/sha256"
+        },
+        "baseline_case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "disposition": {
+          "type": "string",
+          "enum": [
+            "raw",
+            "corrected",
+            "reduced",
+            "incomplete",
+            "rejected",
+            "unknown"
+          ]
+        },
+        "validation_stage": {
+          "type": "string",
+          "enum": [
+            "instrumented_bench",
+            "model_test",
+            "sea_trial",
+            "in_service",
+            "published_only",
+            "synthetic_only",
+            "unknown"
+          ]
+        },
+        "time_sync_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "time_alignment_uncertainty": {
+          "$ref": "#/$defs/quantity"
+        },
+        "channels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/measurement_channel"
+          }
+        },
+        "raw_dataset_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "processed_dataset_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "calibration_set_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environmental_correction_method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "environmental_correction_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "excluded_intervals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "start",
+              "end",
+              "reason"
+            ],
+            "properties": {
+              "start": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "end": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "calibration_records": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/calibration_record"
+          }
+        },
+        "timebases": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/timebase_record"
+          }
+        },
+        "sample_completeness_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy_id",
+            "revision",
+            "minimum_observed_fraction",
+            "method",
+            "limitations",
+            "window_semantics",
+            "rate_count_tolerance_samples"
+          ],
+          "properties": {
+            "policy_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minimum_observed_fraction": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "method": {
+              "type": "string",
+              "minLength": 1
+            },
+            "limitations": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "window_semantics": {
+              "type": "string",
+              "const": "start_inclusive_end_exclusive"
+            },
+            "rate_count_tolerance_samples": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "description": "Predeclared rule for trial sample completeness. Coverage is observed_sample_count / expected_sample_count; channel omissions and exclusions remain visible."
+        }
+      },
+      "description": "Trial-level evidence must bind to the same service fingerprint as the compared case. Timestamp alignment, calibration, missing samples, exclusions and raw trace identity are explicit. This schema does not itself establish sensor authenticity or trial validity. Version 0.2.0 resolves each channel calibration_record_id and timebase_id against normalized trial registries and binds explicit sample counts to a predeclared completeness policy."
+    },
+    "calibration_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "calibration_record_id",
+        "revision",
+        "instrument_identity",
+        "physical_quantity",
+        "unit",
+        "range_min",
+        "range_max",
+        "uncertainty",
+        "calibration_date",
+        "valid_from",
+        "valid_until",
+        "disposition",
+        "calibration_provider",
+        "traceability_reference",
+        "limitations",
+        "calibration_method",
+        "evidence_source_id",
+        "rights_status",
+        "certificate_sha256",
+        "reviewer_id"
+      ],
+      "properties": {
+        "calibration_record_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "instrument_identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "physical_quantity": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "range_min": {
+          "type": "number"
+        },
+        "range_max": {
+          "type": "number"
+        },
+        "uncertainty": {
+          "$ref": "#/$defs/uncertainty"
+        },
+        "calibration_date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_from": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "disposition": {
+          "type": "string",
+          "enum": [
+            "in_tolerance",
+            "out_of_tolerance",
+            "stale",
+            "unknown"
+          ]
+        },
+        "calibration_provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "traceability_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "certificate_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "certificate_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reviewer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "calibration_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rights_status": {
+          "type": "string",
+          "enum": [
+            "public",
+            "permissioned",
+            "restricted",
+            "unknown",
+            "not_applicable"
+          ]
+        }
+      },
+      "description": "Normalized calibration record. A certificate reference and digest identify supplied evidence, not independent authenticity or metrological traceability."
+    },
+    "timebase_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timebase_id",
+        "revision",
+        "clock_source",
+        "synchronization_method",
+        "reference_clock_id",
+        "offset_seconds",
+        "drift_ppm",
+        "synchronization_uncertainty",
+        "valid_from",
+        "valid_until",
+        "limitations",
+        "evidence_source_id",
+        "rights_status"
+      ],
+      "properties": {
+        "timebase_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "clock_source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "synchronization_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reference_clock_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "offset_seconds": {
+          "type": "number"
+        },
+        "drift_ppm": {
+          "type": "number"
+        },
+        "synchronization_uncertainty": {
+          "$ref": "#/$defs/quantity"
+        },
+        "valid_from": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "evidence_source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rights_status": {
+          "type": "string",
+          "enum": [
+            "public",
+            "permissioned",
+            "restricted",
+            "unknown",
+            "not_applicable"
+          ]
+        }
+      },
+      "description": "Timebase/clock record with source, method, reference, offset, drift, uncertainty and validity window. A timebase record does not prove the clock was correctly configured or independently authenticated."
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "const": "0.3.0"
+    },
+    "case_id": {
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9._-]{2,95}$"
+    },
+    "record_status": {
+      "type": "string",
+      "enum": [
+        "synthetic",
+        "published_reference_reconstruction",
+        "design_study",
+        "physical_trial"
+      ]
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparison_group_id",
+        "candidate_id",
+        "role",
+        "service_fingerprint",
+        "service_fingerprint_profile"
+      ],
+      "properties": {
+        "comparison_group_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "enum": [
+            "baseline",
+            "candidate",
+            "reference_only"
+          ]
+        },
+        "service_fingerprint": {
+          "$ref": "#/$defs/sha256"
+        },
+        "paired_case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "matching_deviations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "service_fingerprint_profile": {
+          "const": "marine-service-payload-v1+symthaea-canonical-json-sha256-v1",
+          "description": "Versioned service/route/load payload projection and canonical JSON digest algorithm."
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cargo_class",
+        "functional_unit",
+        "service_contract_id",
+        "annual_delivered_work",
+        "arrival_policy"
+      ],
+      "properties": {
+        "cargo_class": {
+          "type": "string",
+          "enum": [
+            "container",
+            "dry_bulk",
+            "liquid_bulk",
+            "general_cargo",
+            "ro_ro",
+            "other_declared"
+          ]
+        },
+        "functional_unit": {
+          "type": "string",
+          "enum": [
+            "tonne-nautical-mile",
+            "TEU-nautical-mile",
+            "vehicle-nautical-mile",
+            "declared_other"
+          ]
+        },
+        "declared_other_unit": {
+          "type": "string"
+        },
+        "service_contract_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "annual_delivered_work": {
+          "$ref": "#/$defs/quantity"
+        },
+        "annual_delivered_cargo_mass": {
+          "$ref": "#/$defs/quantity"
+        },
+        "annual_delivered_teu": {
+          "$ref": "#/$defs/quantity"
+        },
+        "required_arrival_window_hours": {
+          "$ref": "#/$defs/quantity"
+        },
+        "arrival_policy": {
+          "type": "string",
+          "enum": [
+            "fixed_schedule",
+            "windowed",
+            "best_effort",
+            "declared_other"
+          ]
+        },
+        "service_availability_target": {
+          "$ref": "#/$defs/quantity"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "vessel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vessel_class",
+        "configuration",
+        "loading_condition",
+        "principal_dimensions"
+      ],
+      "properties": {
+        "vessel_class": {
+          "type": "string",
+          "enum": [
+            "container_ship",
+            "bulk_carrier",
+            "general_cargo",
+            "ro_ro",
+            "coastal_cargo",
+            "inland_cargo",
+            "other_declared"
+          ]
+        },
+        "configuration": {
+          "$ref": "#/$defs/identity"
+        },
+        "loading_condition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "principal_dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "length_overall",
+            "beam",
+            "design_draft"
+          ],
+          "properties": {
+            "length_overall": {
+              "$ref": "#/$defs/quantity"
+            },
+            "length_between_perpendiculars": {
+              "$ref": "#/$defs/quantity"
+            },
+            "beam": {
+              "$ref": "#/$defs/quantity"
+            },
+            "design_draft": {
+              "$ref": "#/$defs/quantity"
+            },
+            "air_draft": {
+              "$ref": "#/$defs/quantity"
+            },
+            "displacement": {
+              "$ref": "#/$defs/quantity"
+            },
+            "deadweight": {
+              "$ref": "#/$defs/quantity"
+            },
+            "cargo_capacity": {
+              "$ref": "#/$defs/quantity"
+            },
+            "cargo_volume": {
+              "$ref": "#/$defs/quantity"
+            }
+          }
+        },
+        "stability_report_id": {
+          "type": "string"
+        },
+        "structural_report_id": {
+          "type": "string"
+        }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "route_id",
+        "route_revision",
+        "segments"
+      ],
+      "properties": {
+        "route_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "route_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "segments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "segment_id",
+              "distance",
+              "speed_policy"
+            ],
+            "properties": {
+              "segment_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "distance": {
+                "$ref": "#/$defs/quantity"
+              },
+              "speed_policy": {
+                "type": "string",
+                "minLength": 1
+              },
+              "target_speed": {
+                "$ref": "#/$defs/quantity"
+              },
+              "arrival_time_window": {
+                "$ref": "#/$defs/quantity"
+              },
+              "port_or_waypoint_id": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "route_data_provenance": {
+          "$ref": "#/$defs/provenance"
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile_id",
+        "profile_revision",
+        "time_basis",
+        "provenance"
+      ],
+      "properties": {
+        "profile_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "profile_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "time_basis": {
+          "type": "string",
+          "enum": [
+            "observed",
+            "hindcast",
+            "forecast",
+            "synthetic",
+            "climatology",
+            "mixed"
+          ]
+        },
+        "wind_reference_height": {
+          "$ref": "#/$defs/quantity"
+        },
+        "wind_series_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "wave_series_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "current_series_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "water_depth_series_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        },
+        "out_of_domain_policy": {
+          "type": "string",
+          "enum": [
+            "reject",
+            "unknown",
+            "qualified_fallback"
+          ]
+        }
+      }
+    },
+    "architecture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hull_propulsor",
+        "powertrain",
+        "energy_sources",
+        "wind_devices",
+        "storage",
+        "waste_heat_recovery"
+      ],
+      "properties": {
+        "hull_propulsor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "hull_configuration",
+            "propulsor_family",
+            "propulsor_configuration"
+          ],
+          "properties": {
+            "hull_configuration": {
+              "$ref": "#/$defs/identity"
+            },
+            "propulsor_family": {
+              "type": "string",
+              "enum": [
+                "fixed_pitch_open_propeller",
+                "controllable_pitch_open_propeller",
+                "ducted_propeller",
+                "contra_rotating",
+                "azimuthing",
+                "waterjet",
+                "other_declared"
+              ]
+            },
+            "propulsor_configuration": {
+              "$ref": "#/$defs/identity"
+            },
+            "propeller_diameter": {
+              "$ref": "#/$defs/quantity"
+            },
+            "shaft_rpm_map_id": {
+              "type": "string"
+            },
+            "wake_or_inflow_map_id": {
+              "type": "string"
+            },
+            "resistance_model_id": {
+              "type": "string"
+            },
+            "propulsion_model_id": {
+              "type": "string"
+            }
+          }
+        },
+        "powertrain": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "topology",
+            "shaft_boundary_id",
+            "electrical_boundary_id",
+            "stages"
+          ],
+          "properties": {
+            "topology": {
+              "type": "string",
+              "enum": [
+                "direct_mechanical",
+                "mechanical_with_pto_pti",
+                "diesel_electric",
+                "hybrid_electric",
+                "fuel_cell_electric",
+                "nuclear_electric_interface",
+                "multi_source_hybrid"
+              ]
+            },
+            "shaft_boundary_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "electrical_boundary_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "stages": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "stage_id",
+                  "role",
+                  "configuration",
+                  "model_id"
+                ],
+                "properties": {
+                  "stage_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "prime_mover",
+                      "generator",
+                      "motor",
+                      "inverter",
+                      "rectifier",
+                      "dc_dc_converter",
+                      "gearbox",
+                      "shaft_generator",
+                      "boost_motor",
+                      "other_declared"
+                    ]
+                  },
+                  "configuration": {
+                    "$ref": "#/$defs/identity"
+                  },
+                  "model_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rated_power": {
+                    "$ref": "#/$defs/quantity"
+                  },
+                  "efficiency_map_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "pt_count": {
+              "$ref": "#/$defs/quantity"
+            },
+            "pti_count": {
+              "$ref": "#/$defs/quantity"
+            }
+          }
+        },
+        "energy_sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source_id",
+              "source_type",
+              "pathway_id",
+              "provenance"
+            ],
+            "properties": {
+              "source_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_type": {
+                "type": "string",
+                "enum": [
+                  "marine_diesel",
+                  "biofuel",
+                  "methanol",
+                  "ammonia",
+                  "hydrogen",
+                  "electricity",
+                  "nuclear_heat_electricity",
+                  "wind",
+                  "other_declared"
+                ]
+              },
+              "pathway_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "well_to_wake_factor": {
+                "$ref": "#/$defs/quantity"
+              },
+              "lower_heating_value": {
+                "$ref": "#/$defs/quantity"
+              },
+              "provenance": {
+                "$ref": "#/$defs/provenance"
+              }
+            }
+          }
+        },
+        "wind_devices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "device_id",
+              "technology",
+              "configuration",
+              "count",
+              "control_model_id",
+              "operating_envelope_id",
+              "auxiliary_power"
+            ],
+            "properties": {
+              "device_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "technology": {
+                "type": "string",
+                "enum": [
+                  "flettner_rotor",
+                  "suction_wing",
+                  "rigid_wing",
+                  "soft_sail",
+                  "towing_kite",
+                  "other_declared"
+                ]
+              },
+              "configuration": {
+                "$ref": "#/$defs/identity"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "control_model_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "operating_envelope_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "auxiliary_power": {
+                "$ref": "#/$defs/quantity"
+              },
+              "force_moment_map_id": {
+                "type": "string"
+              },
+              "retraction_time": {
+                "$ref": "#/$defs/quantity"
+              },
+              "deck_or_cargo_interference_report_id": {
+                "type": "string"
+              },
+              "availability_fraction": {
+                "$ref": "#/$defs/quantity"
+              },
+              "geometry_record_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "installed_mass": {
+                "$ref": "#/$defs/quantity"
+              },
+              "installed_volume": {
+                "$ref": "#/$defs/quantity"
+              },
+              "foundation_load_report_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "cut_in_wind_speed": {
+                "$ref": "#/$defs/quantity"
+              },
+              "cut_out_wind_speed": {
+                "$ref": "#/$defs/quantity"
+              },
+              "maximum_operating_wind_speed": {
+                "$ref": "#/$defs/quantity"
+              }
+            }
+          }
+        },
+        "storage": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "storage_id",
+              "technology",
+              "configuration",
+              "usable_energy",
+              "rated_power",
+              "degradation_model_id"
+            ],
+            "properties": {
+              "storage_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "technology": {
+                "type": "string",
+                "enum": [
+                  "lithium_ion",
+                  "sodium_ion",
+                  "supercapacitor",
+                  "thermal",
+                  "mechanical",
+                  "other_declared"
+                ]
+              },
+              "configuration": {
+                "$ref": "#/$defs/identity"
+              },
+              "usable_energy": {
+                "$ref": "#/$defs/quantity"
+              },
+              "rated_power": {
+                "$ref": "#/$defs/quantity"
+              },
+              "mass": {
+                "$ref": "#/$defs/quantity"
+              },
+              "volume": {
+                "$ref": "#/$defs/quantity"
+              },
+              "degradation_model_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reserve_policy_id": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "waste_heat_recovery": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "system_id",
+              "technology",
+              "source_boundary_id",
+              "model_id",
+              "parasitic_power"
+            ],
+            "properties": {
+              "system_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "technology": {
+                "type": "string",
+                "enum": [
+                  "organic_rankine_cycle",
+                  "steam_cycle",
+                  "thermoelectric",
+                  "other_declared"
+                ]
+              },
+              "source_boundary_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "parasitic_power": {
+                "$ref": "#/$defs/quantity"
+              },
+              "recovered_electric_power": {
+                "$ref": "#/$defs/quantity"
+              },
+              "recovered_shaft_power": {
+                "$ref": "#/$defs/quantity"
+              },
+              "useful_heat": {
+                "$ref": "#/$defs/quantity"
+              }
+            }
+          }
+        }
+      }
+    },
+    "economics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "currency",
+        "base_year",
+        "lifecycle_years",
+        "discount_rate",
+        "boundary_note",
+        "provenance"
+      ],
+      "properties": {
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "base_year": {
+          "type": "integer",
+          "minimum": 1900
+        },
+        "lifecycle_years": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "discount_rate": {
+          "$ref": "#/$defs/quantity"
+        },
+        "capital_cost": {
+          "$ref": "#/$defs/quantity"
+        },
+        "annual_operating_cost": {
+          "$ref": "#/$defs/quantity"
+        },
+        "boundary_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "replacement_and_decommissioning_note": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "data_class",
+        "model_identities",
+        "sources",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "data_class": {
+          "type": "string",
+          "enum": [
+            "synthetic_only",
+            "published_only",
+            "measured_only",
+            "mixed"
+          ]
+        },
+        "model_identities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model_id",
+              "revision",
+              "validation_stage",
+              "applicability_domain",
+              "limitations"
+            ],
+            "properties": {
+              "model_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "validation_stage": {
+                "type": "string",
+                "enum": [
+                  "analytical",
+                  "synthetic_tested",
+                  "peer_reviewed_model",
+                  "CFD_verified",
+                  "model_test_validated",
+                  "sea_trial_validated",
+                  "independently_reproduced",
+                  "unknown"
+                ]
+              },
+              "applicability_domain": {
+                "type": "string",
+                "minLength": 1
+              },
+              "limitations": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "configuration_sha256": {
+                "$ref": "#/$defs/sha256"
+              }
+            }
+          }
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/source_record"
+          }
+        },
+        "claim_ceiling": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_trace_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reproduction_recipe_id": {
+          "type": "string"
+        }
+      }
+    },
+    "hard_gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/hard_gate"
+      }
+    },
+    "candidate_metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric_id",
+          "value",
+          "functional_unit",
+          "boundary_id",
+          "provenance"
+        ],
+        "properties": {
+          "metric_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "$ref": "#/$defs/quantity"
+          },
+          "functional_unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "boundary_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "provenance": {
+            "$ref": "#/$defs/provenance"
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "trial_evidence": {
+      "$ref": "#/$defs/trial_evidence"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "service": {
+            "properties": {
+              "functional_unit": {
+                "const": "declared_other"
+              }
+            },
+            "required": [
+              "functional_unit"
+            ]
+          }
+        },
+        "required": [
+          "service"
+        ]
+      },
+      "then": {
+        "properties": {
+          "service": {
+            "required": [
+              "declared_other_unit"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,252 @@
+{
+  "schema_version": "0.1.0",
+  "balance_id": "SYNTHETIC-MARINE-ENERGY-BALANCE-UNBALANCED-0001",
+  "record_status": "synthetic",
+  "accounting_basis": "first_law_component_boundary_v1",
+  "vessel_configuration_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+  "service_fingerprint": "e3ec23f5308213b6d7ea3743e6cf483623436bec5384e29d3044d525d736fca9",
+  "reporting_window": {
+    "window_id": "WINDOW-001",
+    "start": "2026-11-01T00:00:00Z",
+    "end": "2026-11-01T01:00:00Z",
+    "timebase_id": "SYNTHETIC-TIMEBASE-001"
+  },
+  "evidence_source_ids": [
+    "SYNTHETIC-ONLY"
+  ],
+  "components": [
+    {
+      "component_id": "MAIN-ENGINE",
+      "component_type": "prime_mover",
+      "conversion_loss": {
+        "value_micro_gj": 60,
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "method_id": "SYNTHETIC-ENGINE-LOSS-V1"
+      },
+      "storage_change": {
+        "direction": "none",
+        "value_micro_gj": 0,
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "method_id": "SYNTHETIC-STORAGE-STATE-V1"
+      },
+      "uncertainty_budget": {
+        "budget_id": "UB-ENGINE",
+        "basis": "metrology_expanded_uncertainty",
+        "expanded_uncertainty_micro_gj": 1,
+        "coverage_factor": 2,
+        "propagation_method": "worst_case_linear_sum",
+        "method_id": "SYNTHETIC-UNCERTAINTY-BUDGET-V1",
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "limitations": [
+          "Synthetic uncertainty fixture only; not a qualified measurement uncertainty budget."
+        ]
+      },
+      "limitations": [
+        "Synthetic known-answer conversion boundary."
+      ]
+    },
+    {
+      "component_id": "PROPELLER",
+      "component_type": "propeller",
+      "conversion_loss": {
+        "value_micro_gj": 20,
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "method_id": "SYNTHETIC-PROPELLER-LOSS-V1"
+      },
+      "storage_change": {
+        "direction": "none",
+        "value_micro_gj": 0,
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "method_id": "SYNTHETIC-STORAGE-STATE-V1"
+      },
+      "uncertainty_budget": {
+        "budget_id": "UB-PROP",
+        "basis": "metrology_expanded_uncertainty",
+        "expanded_uncertainty_micro_gj": 1,
+        "coverage_factor": 2,
+        "propagation_method": "worst_case_linear_sum",
+        "method_id": "SYNTHETIC-UNCERTAINTY-BUDGET-V1",
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "limitations": [
+          "Synthetic uncertainty fixture only; not a qualified measurement uncertainty budget."
+        ]
+      },
+      "limitations": [
+        "Synthetic known-answer propulsive conversion boundary."
+      ]
+    },
+    {
+      "component_id": "BATTERY",
+      "component_type": "battery_storage",
+      "conversion_loss": {
+        "value_micro_gj": 1,
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "method_id": "SYNTHETIC-BATTERY-LOSS-V1"
+      },
+      "storage_change": {
+        "direction": "increase",
+        "value_micro_gj": 3,
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "method_id": "SYNTHETIC-STORAGE-STATE-V1"
+      },
+      "uncertainty_budget": {
+        "budget_id": "UB-BATTERY",
+        "basis": "metrology_expanded_uncertainty",
+        "expanded_uncertainty_micro_gj": 1,
+        "coverage_factor": 2,
+        "propagation_method": "worst_case_linear_sum",
+        "method_id": "SYNTHETIC-UNCERTAINTY-BUDGET-V1",
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "limitations": [
+          "Synthetic uncertainty fixture only; not a qualified measurement uncertainty budget."
+        ]
+      },
+      "limitations": [
+        "Synthetic charging interval; storage increase is included in the first-law balance."
+      ]
+    },
+    {
+      "component_id": "HOTEL-LOAD",
+      "component_type": "hotel_load",
+      "conversion_loss": {
+        "value_micro_gj": 1,
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "method_id": "SYNTHETIC-HOTEL-LOSS-V1"
+      },
+      "storage_change": {
+        "direction": "none",
+        "value_micro_gj": 0,
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "method_id": "SYNTHETIC-STORAGE-STATE-V1"
+      },
+      "uncertainty_budget": {
+        "budget_id": "UB-HOTEL",
+        "basis": "metrology_expanded_uncertainty",
+        "expanded_uncertainty_micro_gj": 1,
+        "coverage_factor": 2,
+        "propagation_method": "worst_case_linear_sum",
+        "method_id": "SYNTHETIC-UNCERTAINTY-BUDGET-V1",
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "limitations": [
+          "Synthetic uncertainty fixture only; not a qualified measurement uncertainty budget."
+        ]
+      },
+      "limitations": [
+        "Synthetic hotel-load boundary."
+      ]
+    }
+  ],
+  "flows": [
+    {
+      "flow_id": "FUEL-IN",
+      "measurement_id": "FUEL-METER-001",
+      "reporting_window_id": "WINDOW-001",
+      "flow_class": "external_input",
+      "from_component_id": null,
+      "to_component_id": "MAIN-ENGINE",
+      "carrier": "fuel_chemical",
+      "energy": {
+        "value_micro_gj": 100,
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "method_id": "SYNTHETIC-FUEL-LHV-V1"
+      },
+      "method_id": "SYNTHETIC-FUEL-LHV-V1",
+      "limitations": [
+        "Synthetic input."
+      ]
+    },
+    {
+      "flow_id": "SHAFT-OUT",
+      "measurement_id": "SHAFT-METER-001",
+      "reporting_window_id": "WINDOW-001",
+      "flow_class": "internal_transfer",
+      "from_component_id": "MAIN-ENGINE",
+      "to_component_id": "PROPELLER",
+      "carrier": "shaft_mechanical",
+      "energy": {
+        "value_micro_gj": 40,
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "method_id": "SYNTHETIC-SHAFT-METER-V1"
+      },
+      "method_id": "SYNTHETIC-SHAFT-METER-V1",
+      "limitations": [
+        "Synthetic shaft energy transfer."
+      ]
+    },
+    {
+      "flow_id": "PROPULSIVE-WORK",
+      "measurement_id": "PROP-WORK-001",
+      "reporting_window_id": "WINDOW-001",
+      "flow_class": "external_output",
+      "from_component_id": "PROPELLER",
+      "to_component_id": null,
+      "carrier": "propulsive_mechanical",
+      "energy": {
+        "value_micro_gj": 20,
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "method_id": "SYNTHETIC-PROPULSIVE-WORK-V1"
+      },
+      "method_id": "SYNTHETIC-PROPULSIVE-WORK-V1",
+      "limitations": [
+        "Synthetic useful propulsive work."
+      ]
+    },
+    {
+      "flow_id": "SHORE-IN",
+      "measurement_id": "SHORE-METER-001",
+      "reporting_window_id": "WINDOW-001",
+      "flow_class": "external_input",
+      "from_component_id": null,
+      "to_component_id": "BATTERY",
+      "carrier": "shore_electricity",
+      "energy": {
+        "value_micro_gj": 10,
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "method_id": "SYNTHETIC-SHORE-METER-V1"
+      },
+      "method_id": "SYNTHETIC-SHORE-METER-V1",
+      "limitations": [
+        "Synthetic shore-energy input."
+      ]
+    },
+    {
+      "flow_id": "BATTERY-OUT",
+      "measurement_id": "BMS-DISCHARGE-001",
+      "reporting_window_id": "WINDOW-001",
+      "flow_class": "internal_transfer",
+      "from_component_id": "BATTERY",
+      "to_component_id": "HOTEL-LOAD",
+      "carrier": "onboard_electricity",
+      "energy": {
+        "value_micro_gj": 6,
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "method_id": "SYNTHETIC-BMS-OUT-V1"
+      },
+      "method_id": "SYNTHETIC-BMS-OUT-V1",
+      "limitations": [
+        "Synthetic battery electrical output."
+      ]
+    },
+    {
+      "flow_id": "HOTEL-SERVICE",
+      "measurement_id": "HOTEL-METER-001",
+      "reporting_window_id": "WINDOW-001",
+      "flow_class": "external_output",
+      "from_component_id": "HOTEL-LOAD",
+      "to_component_id": null,
+      "carrier": "hotel_service",
+      "energy": {
+        "value_micro_gj": 7,
+        "evidence_source_id": "SYNTHETIC-ONLY",
+        "method_id": "SYNTHETIC-HOTEL-SERVICE-V1"
+      },
+      "method_id": "SYNTHETIC-HOTEL-SERVICE-V1",
+      "limitations": [
+        "Synthetic useful hotel-energy service."
+      ]
+    }
+  ],
+  "limitations": [
+    "Synthetic negative control: hotel service output exceeds incoming electrical energy after declared conversion loss."
+  ]
+}

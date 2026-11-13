@@ -1,0 +1,372 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-manoeuvrability-trial:0.1.0",
+  "title": "Marine Manoeuvrability Reference Trial v0.1.0",
+  "description": "A trial-result contract for calculating reference limits from IMO MSC.137(76). It is not an applicability or compliance determination.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "record_status",
+    "standard",
+    "applicability_review",
+    "vessel",
+    "test_conditions",
+    "waps_context",
+    "measurements",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_status": {
+      "enum": [
+        "synthetic",
+        "measured",
+        "modelled",
+        "published"
+      ]
+    },
+    "standard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision"
+      ],
+      "properties": {
+        "id": {
+          "const": "IMO-MSC.137(76)"
+        },
+        "revision": {
+          "const": "2002-12-04"
+        }
+      }
+    },
+    "applicability_review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "authority_or_administration",
+        "decision_reference",
+        "reviewer_id",
+        "review_date",
+        "limitations"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "confirmed_applicable",
+            "review_required",
+            "not_applicable"
+          ]
+        },
+        "authority_or_administration": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reviewer_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "vessel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "length_m",
+        "speed_m_s",
+        "ship_type",
+        "construction_date"
+      ],
+      "properties": {
+        "length_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "speed_m_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "ship_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "construction_date": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "test_conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "deep_unrestricted_water",
+        "calm_environment",
+        "full_load_summer_draft",
+        "even_keel",
+        "steady_approach",
+        "port_and_starboard_tests"
+      ],
+      "properties": {
+        "deep_unrestricted_water": {
+          "type": "boolean"
+        },
+        "calm_environment": {
+          "type": "boolean"
+        },
+        "full_load_summer_draft": {
+          "type": "boolean"
+        },
+        "even_keel": {
+          "type": "boolean"
+        },
+        "steady_approach": {
+          "type": "boolean"
+        },
+        "port_and_starboard_tests": {
+          "type": "boolean"
+        },
+        "deviations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "waps_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "installed",
+        "operating_state",
+        "wind_speed_m_s",
+        "wind_direction_deg",
+        "device_configuration_id",
+        "limitations"
+      ],
+      "properties": {
+        "installed": {
+          "type": "boolean"
+        },
+        "operating_state": {
+          "enum": [
+            "not_installed",
+            "active",
+            "feathered",
+            "furled",
+            "retracted",
+            "faulted",
+            "unknown"
+          ]
+        },
+        "wind_speed_m_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "wind_direction_deg": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 360
+        },
+        "device_configuration_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "measurements": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "turning_circle",
+        "initial_turning",
+        "zig_zag_10_10",
+        "zig_zag_20_20",
+        "full_astern_stopping"
+      ],
+      "properties": {
+        "turning_circle": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "port",
+            "starboard"
+          ],
+          "properties": {
+            "port": {
+              "$ref": "#/$defs/turning_result"
+            },
+            "starboard": {
+              "$ref": "#/$defs/turning_result"
+            }
+          }
+        },
+        "initial_turning": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "port",
+            "starboard"
+          ],
+          "properties": {
+            "port": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "starboard": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "zig_zag_10_10": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "port",
+            "starboard"
+          ],
+          "properties": {
+            "port": {
+              "$ref": "#/$defs/zigzag_10"
+            },
+            "starboard": {
+              "$ref": "#/$defs/zigzag_10"
+            }
+          }
+        },
+        "zig_zag_20_20": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "port",
+            "starboard"
+          ],
+          "properties": {
+            "port": {
+              "type": "number",
+              "minimum": 0
+            },
+            "starboard": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "full_astern_stopping": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "track_reach_m"
+          ],
+          "properties": {
+            "track_reach_m": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      }
+    },
+    "administration_stopping_limit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "limit_lengths",
+        "decision_reference"
+      ],
+      "properties": {
+        "limit_lengths": {
+          "type": "number",
+          "minimum": 15,
+          "maximum": 20
+        },
+        "decision_reference": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "turning_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "advance_m",
+        "tactical_diameter_m"
+      ],
+      "properties": {
+        "advance_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "tactical_diameter_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "zigzag_10": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "first_overshoot_deg",
+        "second_overshoot_deg"
+      ],
+      "properties": {
+        "first_overshoot_deg": {
+          "type": "number",
+          "minimum": 0
+        },
+        "second_overshoot_deg": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,2690 @@
+{
+  "schema_version": "0.1.0",
+  "registry_id": "MARINE-PROPULSION-REFERENCE-BASELINES-2026-11-10-v2",
+  "created_on": "2026-11-10",
+  "purpose": "Source-attributed public reference corpus for cargo-vessel propulsion architecture research. Values are not transferable performance predictions.",
+  "evidence_policy": {
+    "evidence_classes_are_not_ranked_as_equivalent": true,
+    "required_comparison_fields": [
+      "vessel_class",
+      "route_and_metocean",
+      "cargo_and_service_fingerprint",
+      "power_and_energy_boundary",
+      "lifecycle_boundary",
+      "measurement_or_model_method",
+      "uncertainty",
+      "configuration_revision"
+    ],
+    "missing_inputs_disposition": "unknown_not_zero",
+    "no_cross_study_averaging": true,
+    "no_addition_of_independent_saving_percentages": true,
+    "regulatory_rule_policy": "Regulatory records distinguish proposal, review, adoption, entry into force, application and supersession dates. A meeting summary or workplan is not silently promoted to an effective legal requirement. Route outputs preserve the rule edition and segment applicability."
+  },
+  "sources": [
+    {
+      "source_id": "ABB-ECONOWIND-VENTOFOIL-ROUTING-2026",
+      "title": "How ABB and Econowind optimize the route to wind-assisted shipping",
+      "publisher": "ABB",
+      "publication_year": 2026,
+      "url": "https://www.abb.com/global/en/news/137533/how-abb-and-econowind-optimize-the-route-to-wind-assisted-shipping",
+      "evidence_class": "vendor_partnership_and_vendor_performance_claim",
+      "scope": {
+        "technology": "Econowind VentoFoil suction-based wing system with ABB SPOS routing",
+        "commercial_deployment": "2025 contract for approximately 150 VentoFoil units across 50 vessels",
+        "routing_platform_adoption": "ABB Ability SPOS reported adopted on more than 4,500 vessels",
+        "operating_method": "weather and route optimization by the ship's Master using routing tools"
+      },
+      "observations": [
+        {
+          "metric_id": "vendor_claimed_ventofoil_fuel_saving",
+          "minimum": 6,
+          "maximum": 10,
+          "unit": "percent",
+          "attribution": "ABB/Econowind public vendor statement",
+          "statement": "ABB reports VentoFoil can help maintain required transit speed on lower main-engine power, with claimed fuel reductions of 6-10%."
+        },
+        {
+          "metric_id": "ventofoil_units_in_supply_contract",
+          "value": 150,
+          "unit": "units",
+          "qualifier": "approximately",
+          "statement": "ABB reports a 2025 Econowind contract covering about 150 VentoFoil units for 50 vessels."
+        },
+        {
+          "metric_id": "sp_os_vessel_adoption",
+          "value": 4500,
+          "unit": "vessels",
+          "qualifier": "more_than",
+          "statement": "ABB reports SPOS has been adopted on more than 4,500 vessels."
+        }
+      ],
+      "limitations": [
+        "Vendor partnership publication; claimed fuel-savings range is not presented as an independent controlled trial result.",
+        "The 150 units/50 vessels is a supply-contract figure, not evidence that every unit is already installed or operating.",
+        "The 4,500-vessel SPOS adoption count is not the number of VentoFoil vessels.",
+        "Weather routing, VentoFoil and other vessel upgrades interact; their effects require a matched counterfactual.",
+        "Do not transfer 6-10% to a deep-sea cargo vessel without route, device count, apparent-wind and service matching."
+      ],
+      "eligible_use": [
+        "Vendor claims benchmark with attribution preserved",
+        "WAPS and voyage-routing integration case",
+        "Commercial rollout and installed-base questions"
+      ],
+      "ineligible_use": [
+        "Independent proof of net vessel fuel saving",
+        "VentoFoil installed-fleet count inferred from SPOS",
+        "Deep-sea performance guarantee"
+      ]
+    },
+    {
+      "source_id": "BAR-WINDWINGS-COMMERCIAL-2026",
+      "title": "WindWings commercial ship technology and performance specifications",
+      "publisher": "BAR Technologies",
+      "publication_year": 2026,
+      "url": "https://www.bartechnologies.uk/commercial-ships/windwings/",
+      "evidence_class": "vendor_product_specification_and_performance_claim",
+      "scope": {
+        "technology": "Three-element folding rigid wing sail with adjustable camber and angle of attack",
+        "large_variant": {
+          "span_m": 37.5,
+          "chord_m": 20,
+          "wing_area_m2": 750,
+          "most_suitable_vessel": "greater than 40,000 DWT"
+        },
+        "compact_variant": {
+          "span_m_range": [
+            20,
+            24
+          ],
+          "chord_m": "10m",
+          "deck_retraction": "tilts to deck level for pilotage/dockside operations"
+        }
+      },
+      "observations": [
+        {
+          "metric_id": "large_wing_vendor_average_fuel_saving",
+          "value": 1.5,
+          "unit": "tonnes_per_day",
+          "attribution": "BAR Technologies vendor page",
+          "statement": "BAR lists average fuel saving of 1.5 tonnes/day for the 37.5m variant."
+        },
+        {
+          "metric_id": "large_wing_vendor_achievable_fuel_saving",
+          "value": 2.1,
+          "unit": "tonnes_per_day",
+          "qualifier": "achievable",
+          "attribution": "BAR Technologies vendor page",
+          "statement": "BAR lists achievable fuel savings of 2.1 tonnes/day for the 37.5m variant."
+        },
+        {
+          "metric_id": "compact_wing_vendor_average_fuel_saving",
+          "value": 0.7,
+          "unit": "tonnes_per_day",
+          "attribution": "BAR Technologies vendor page",
+          "statement": "BAR lists average fuel saving of 0.7 tonnes/day for the 20-24m variant."
+        },
+        {
+          "metric_id": "compact_wing_vendor_achievable_fuel_saving",
+          "value": 0.9,
+          "unit": "tonnes_per_day",
+          "qualifier": "achievable",
+          "attribution": "BAR Technologies vendor page",
+          "statement": "BAR lists achievable fuel saving of 0.9 tonnes/day for the 20-24m variant."
+        }
+      ],
+      "limitations": [
+        "Product-page figures are vendor claims; detailed route/weather, vessel baseline, statistical variation and uncertainty are not supplied on this page.",
+        "Daily tonnes are not a transferable percentage and depend on baseline fuel consumption and operating conditions.",
+        "WindWings has specific folding/deck-space integration and structural requirements.",
+        "Compare net main-engine fuel after auxiliaries, route, installation mass/volume, cargo access, pilotage and availability."
+      ],
+      "eligible_use": [
+        "Commercial device geometry and integration reference",
+        "Vendor-claim replication questions",
+        "Physical installation mass/air-draft/deck-layout data requests"
+      ],
+      "ineligible_use": [
+        "Independent performance validation",
+        "Direct numerical comparison to rotor/suction devices without matched route and vessel"
+      ]
+    },
+    {
+      "source_id": "CFD-LOW-CARBON-SHIPPING-REVIEW-2026-MPB-120155",
+      "title": "CFD-based approaches for low-carbon shipping: A systematic review",
+      "publisher": "Marine Pollution Bulletin",
+      "publication_date": "2026-07-18",
+      "volume": "233",
+      "article_number": "120155",
+      "url": "https://doi.org/10.1016/j.marpolbul.2026.120155",
+      "evidence_class": "peer_reviewed_systematic_review",
+      "scope": {
+        "study_type": "systematic review of CFD applications in hull form, surface drag, propeller/wake, wind integration and operational approaches"
+      },
+      "observations": [
+        {
+          "metric_id": "hull_optimization_resistance_reduction",
+          "minimum": 5,
+          "maximum": 12,
+          "unit": "percent",
+          "basis": "review-reported range across heterogeneous studies"
+        },
+        {
+          "metric_id": "surface_technology_drag_reduction",
+          "minimum": 10,
+          "maximum": 30,
+          "unit": "percent",
+          "basis": "review-reported upper range across heterogeneous studies",
+          "qualifier": "up_to"
+        },
+        {
+          "metric_id": "propeller_wake_propulsive_efficiency_gain",
+          "minimum": 2,
+          "maximum": 10,
+          "unit": "percent",
+          "basis": "review-reported range across heterogeneous studies"
+        }
+      ],
+      "limitations": [
+        "The review synthesizes heterogeneous geometries, regimes, methods and validation levels.",
+        "The ranges are not additive and must not be combined into a synthetic total saving.",
+        "These are not guaranteed improvements for a target cargo vessel.",
+        "Use as a literature landscape and candidate-mechanism map, not as a design input without source-case reproduction."
+      ],
+      "eligible_use": [
+        "Candidate mechanism discovery",
+        "CFD research-gap taxonomy",
+        "Range sanity checks when source studies are individually retrieved"
+      ],
+      "ineligible_use": [
+        "A priori performance guarantee",
+        "Universal technology ranking",
+        "Independent validation of a new hull or surface treatment"
+      ]
+    },
+    {
+      "source_id": "COASTAL-HYBRID-2026-APPSCI-4940",
+      "title": "Integrated Design and Dynamic Performance Optimisation of Hybrid Electric Propulsion Systems for Coastal Cargo Vessels Under Real-World Operational Profiles",
+      "publisher": "Applied Sciences",
+      "publication_date": "2026-05-15",
+      "volume": "16",
+      "issue": "10",
+      "article_number": "4940",
+      "url": "https://doi.org/10.3390/app16104940",
+      "evidence_class": "peer_reviewed_model_case_using_AIS_logbook_profiles",
+      "scope": {
+        "vessel_class": "coastal general cargo",
+        "route": "Dalian-Yantai / Bohai Bay short-sea service",
+        "baseline": "conventional mechanical propulsion",
+        "candidate": "diesel generator sets, DC bus, propulsion motors and lithium-ion battery storage",
+        "design_method": "bi-level sizing optimization with dynamic-programming energy management and battery degradation-aware lifecycle cost"
+      },
+      "observations": [
+        {
+          "metric_id": "fuel_saving_vs_mechanical_baseline",
+          "minimum": 16,
+          "maximum": 21,
+          "unit": "percent",
+          "basis": "source-reported route-pattern range",
+          "statement": "The article reports 16-21% fuel savings for its optimized hybrid configuration relative to its mechanical baseline."
+        },
+        {
+          "metric_id": "co2_reduction_vs_mechanical_baseline",
+          "minimum": 17,
+          "maximum": 20,
+          "unit": "percent",
+          "basis": "source-reported route-pattern range",
+          "statement": "The article reports 17-20% CO2 reduction relative to its mechanical baseline."
+        },
+        {
+          "metric_id": "lifecycle_cost_reduction_vs_mechanical_baseline",
+          "minimum": 8,
+          "maximum": 14,
+          "unit": "percent",
+          "basis": "source-reported route-pattern range",
+          "statement": "The article reports 8-14% lifecycle cost reduction relative to its mechanical baseline."
+        },
+        {
+          "metric_id": "optimized_installed_generator_power",
+          "value": 2300,
+          "unit": "kW",
+          "basis": "source case model output",
+          "statement": "The optimized case reports 2.3 MW installed generator power compared with 6.0 MW in its mechanical baseline."
+        },
+        {
+          "metric_id": "optimized_battery_energy",
+          "value": 1600,
+          "unit": "kWh",
+          "basis": "source case model output",
+          "statement": "The optimized case reports a 1.6 MWh battery energy storage system."
+        }
+      ],
+      "limitations": [
+        "This is a specific coastal cargo case, not a deep-sea container-ship result.",
+        "The article uses reconstructed AIS/logbook operating profiles and a model-based optimization; it is not an independent sea-trial measurement of the claimed savings.",
+        "The authors identify simplified resistance/propulsion modeling and incomplete representation of fouling, extreme weather and manoeuvring.",
+        "The lower-level offline dynamic-programming controller assumes perfect knowledge of future voyage power profiles.",
+        "Do not transfer percentages, installed power or battery size to another route/vessel."
+      ],
+      "eligible_use": [
+        "Coastal hybrid design/control reproduction target",
+        "Route-profile and degradation-aware energy-management comparison",
+        "Baseline for a coastal-vessel branch of the programme"
+      ],
+      "ineligible_use": [
+        "Deep-sea savings prediction",
+        "Wind propulsion performance claim",
+        "Independent physical validation"
+      ],
+      "case_facts": {
+        "vessel_particulars": {
+          "deadweight_tonne": 8000,
+          "length_overall_m": 110,
+          "length_between_perpendiculars_m": 104,
+          "beam_m": 18,
+          "design_draft_m": 7,
+          "service_speed_kn": 14
+        },
+        "mechanical_baseline": {
+          "propulsion_diesels": "2 × 3,000 kW medium-speed diesels",
+          "hotel_generators": "2 × 750 kW diesel generator sets",
+          "fuel_tonnes_per_year": 4250,
+          "lifecycle_cost_usd_millions": 28.6,
+          "co2_tonnes_per_year": 13260
+        },
+        "hybrid_design_space": {
+          "architecture": "DC bus, diesel generator sets, propulsion motors and lithium-ion ESS",
+          "ess_capacity_range_mwh": [
+            0.8,
+            3
+          ],
+          "optimized_generator_power_mw": 2.3,
+          "optimized_ess_capacity_mwh": 1.6
+        },
+        "operational_profile": {
+          "ais_period": "2021-2022 (24 months)",
+          "complete_voyages_reported": ">120",
+          "average_original_sampling_interval_minutes": 3,
+          "profile_count_used_for_optimization": 5,
+          "data_gap_repair": "For gaps longer than 15 minutes, linear interpolation or speed extrapolation is used.",
+          "source_data_availability": "Data and code available from the corresponding author upon reasonable request; not a public raw-data download."
+        },
+        "reported_normalized_results": {
+          "mechanical": {
+            "fuel": 1,
+            "lifecycle_cost": 1,
+            "co2": 1
+          },
+          "rule_based_hybrid": {
+            "fuel": 0.92,
+            "lifecycle_cost": 0.94,
+            "co2": 0.91
+          },
+          "optimized_hybrid": {
+            "fuel": 0.81,
+            "lifecycle_cost": 0.86,
+            "co2": 0.8
+          },
+          "route_patterns": [
+            {
+              "route_type": "transit-dominated",
+              "fuel_reduction_percent": 16,
+              "lifecycle_cost_reduction_percent": 11,
+              "ess_kwh": 1400
+            },
+            {
+              "route_type": "port-dominated",
+              "fuel_reduction_percent": 21,
+              "lifecycle_cost_reduction_percent": 16,
+              "ess_kwh": 1800
+            }
+          ]
+        },
+        "degradation_sensitivity": {
+          "description": "The article reports fuel-reduction/battery-lifetime trade-offs for different degradation weightings.",
+          "cases": [
+            {
+              "weighting": "low",
+              "fuel_reduction_percent": 22,
+              "ess_lifetime_years": 6
+            },
+            {
+              "weighting": "medium",
+              "fuel_reduction_percent": 19,
+              "ess_lifetime_years": 9
+            },
+            {
+              "weighting": "high",
+              "fuel_reduction_percent": 14,
+              "ess_lifetime_years": 12
+            }
+          ]
+        },
+        "hybrid_power_sizing": {
+          "table_5_statement": {
+            "field": "Installed DG power (HYB)",
+            "reported_configuration": "2 × 2250 kW diesel generator sets",
+            "computed_total_kw": 4500,
+            "source_location": "Table 5",
+            "interpretation": "Published hybrid-concept machinery entry; relation to the optimized Table 8 result is not explained."
+          },
+          "table_8_statement": {
+            "configurations": [
+              {
+                "configuration": "MECH",
+                "installed_engine_power_kw": 6000,
+                "ess_kwh": 0
+              },
+              {
+                "configuration": "HYB-RB",
+                "installed_engine_power_kw": 2600,
+                "ess_kwh": 1000
+              },
+              {
+                "configuration": "HYB-OPT",
+                "installed_engine_power_kw": 2300,
+                "ess_kwh": 1600
+              }
+            ],
+            "source_location": "Table 8",
+            "interpretation": "The paper describes HYB-OPT as about 23% downsizing relative to the 6 MW mechanical baseline."
+          },
+          "consistency_status": "UNRESOLVED_INTERNAL_SOURCE_CONFLICT",
+          "discrepancy": "Table 5's hybrid DG entry implies 4.5 MW installed generation, while Table 8 reports 2.3 MW as optimized total engine rating. These quantities cannot be treated as the same boundary without author clarification.",
+          "policy": "Preserve both values. Do not choose one, average them, or infer generator count, redundancy or shaft/electrical boundary. Reproduction work must obtain source clarification or independently map the two terms to distinct equipment boundaries."
+        },
+        "design_life_years": 20
+      },
+      "methodological_details": [
+        "The lower-level dynamic-programming energy-management policy assumes perfect knowledge of each voyage's future power profile; this is an offline design upper bound, not a deployable online controller.",
+        "The propulsion-power reconstruction uses simplified resistance and propulsion relations and assumes a single-screw arrangement; higher-order hull-propeller-rudder interaction effects are neglected.",
+        "The article identifies incomplete representation of hull fouling, extreme weather and detailed manoeuvring.",
+        "Battery ageing uses laboratory-derived cycle-life data represented as a stationary cycle-life surface with pack-level scaling assumptions; thermal gradients and cell-to-cell variation are not fully represented.",
+        "Long AIS data gaps are repaired by interpolation or speed extrapolation; the effects of that repair policy should be stress-tested.",
+        "Five statistically representative typical operating profiles are used for the optimization, rather than scoring every voyage as a held-out observation.",
+        "Internal sizing discrepancy: Table 5 states hybrid installed DG power of 2 × 2250 kW (4.5 MW total), while Table 8 reports HYB-OPT P_eng,max = 2300 kW total engine rating. Preserve both statements as an unresolved source conflict and obtain author clarification before treating either as a reproduced installed-power boundary."
+      ]
+    },
+    {
+      "source_id": "DLR-ODYSSA-WHOLE-SHIP-2026",
+      "title": "Design and Optimisation of Future-Oriented Ships",
+      "publisher": "German Aerospace Center (DLR)",
+      "publication_year": 2026,
+      "url": "https://www.dlr.de/en/ms/research-transfer/topics/design-and-optimization-of-future-oriented-ships",
+      "evidence_class": "research_framework_description",
+      "scope": {
+        "system": "Odyssa framework",
+        "capability_description": [
+          "aero- and hydrodynamics for overall ship system",
+          "load, power and movement profiles from transport task and historical weather",
+          "energy and propulsion system evaluation and optimization"
+        ]
+      },
+      "observations": [],
+      "limitations": [
+        "Public capability description is not a reproducible benchmark result.",
+        "No quantitative prediction-accuracy, cost or fuel-saving metric is inferred from this page.",
+        "Detailed software access, model fidelity and validation corpora are not established by the public description alone."
+      ],
+      "eligible_use": [
+        "State-of-the-art capability crosswalk",
+        "Interoperability and benchmark design",
+        "Competitive comparison questions"
+      ],
+      "ineligible_use": [
+        "Quantitative superiority or inferiority claim",
+        "Assumption that unreported functionality is absent"
+      ]
+    },
+    {
+      "source_id": "EU-THETIS-MRV-ANNUAL-DATA",
+      "title": "EU Monitoring, Reporting and Verification (MRV) annual ship emissions data",
+      "publisher": "European Commission / European Maritime Safety Agency",
+      "publication_date": "ongoing",
+      "url": "https://mrv.emsa.europa.eu",
+      "evidence_class": "official_public_annual_ship_level_aggregate",
+      "scope": {
+        "temporal_resolution": "annual per-ship aggregate",
+        "reported_fields": [
+          "ship type",
+          "IMO number",
+          "capacity (DWT or GT)",
+          "annual sailing distance",
+          "sea hours",
+          "annual fuel consumption",
+          "CO2 emissions"
+        ],
+        "role": "Fleet-level emissions/CII diagnostics and external consistency checks"
+      },
+      "limitations": [
+        "Annual aggregates are not voyage-level or daily operational labels.",
+        "Annual totals cannot identify daily speed-fuel elasticity without additional assumptions and time-resolved data.",
+        "Must not be disaggregated into synthetic daily fuel labels."
+      ],
+      "eligible_use": [
+        "Annual fleet emissions and CII diagnostics",
+        "External fleet-level consistency checks"
+      ],
+      "ineligible_use": [
+        "Daily fuel prediction training",
+        "Causal inference of speed-fuel response from annual aggregates"
+      ]
+    },
+    {
+      "source_id": "FUELCAST-KROHNE-DATASET-2026",
+      "title": "FuelCast measured daily ship fuel-consumption dataset",
+      "publisher": "KROHNE Digital",
+      "publication_date": "2026",
+      "url": "https://huggingface.co/datasets/krohnedigital/FuelCast",
+      "evidence_class": "public_measured_daily_operational_dataset_with_restrictive_license",
+      "scope": {
+        "ships": [
+          "Poseidon",
+          "Triton",
+          "Ceto"
+        ],
+        "variables": [
+          "daily total onboard fuel consumption",
+          "operational features",
+          "weather variables"
+        ],
+        "temporal_resolution": "daily",
+        "reported_license": "CC BY-NC-ND 4.0"
+      },
+      "limitations": [
+        "No mainstream cargo vessel in the three-ship sample.",
+        "No propulsion-vs-hotel fuel split in the target.",
+        "No trim record for Poseidon and only low draft variation for Triton/Ceto.",
+        "No raw trace/sample-level instrument chain for this benchmark.",
+        "License must be checked before commercial use, redistribution, adapted data, derivative outputs or model-weight release; do not mirror the dataset in this repository."
+      ],
+      "eligible_use": [
+        "Local method-reproduction only after legal/license review",
+        "Leakage and validation protocol software testing"
+      ],
+      "ineligible_use": [
+        "Unrestricted redistribution or derivative dataset publication",
+        "Cargo-vessel or WAPS performance generalization"
+      ]
+    },
+    {
+      "source_id": "IACS-UR-E26-E27-CYBER-RESILIENCE",
+      "title": "UR E26 Cyber Resilience of Ships and UR E27 Cyber Resilience of On-Board Systems and Equipment",
+      "publisher": "International Association of Classification Societies",
+      "publication_date": "2023 (revised URs apply to new ships contracted for construction on or after 2024-07-01)",
+      "url": "https://iacs.org.uk/news/iacs-ur-e26-and-e27-press-release",
+      "evidence_class": "official_class_society_unified_requirements",
+      "scope": {
+        "UR_E26": "Cyber resilience of the ship as a whole, including secure IT/OT integration through design, construction, commissioning and operation.",
+        "UR_E27": "Cyber resilience of on-board systems and equipment, including equipment/system hardening and supplier design/development."
+      },
+      "limitations": [
+        "Applicability has vessel-type and size criteria and must be confirmed with the selected class society and flag.",
+        "The existence of UR E26/E27 does not mean this research programme or any proposed configuration is compliant or approved."
+      ]
+    },
+    {
+      "source_id": "IMO-GREENVOYAGE2050-EFFICIENCY-PORTAL",
+      "title": "Ship Energy Efficiency Solutions Portal",
+      "publisher": "International Maritime Organization / GreenVoyage2050",
+      "publication_year": 2026,
+      "url": "https://greenvoyage2050.imo.org/energy-efficiency-technologies-information-portal/",
+      "evidence_class": "regulator_technical_reference_portal",
+      "scope": {
+        "technology_groups": [
+          "machinery",
+          "propulsion_and_hull",
+          "energy_consumers",
+          "energy_recovery",
+          "operational_optimization"
+        ],
+        "examples": [
+          "waste-heat recovery and batteries",
+          "air lubrication and propeller-improving devices",
+          "kites, fixed sails, wings and Flettner rotors",
+          "trim, draft, speed and autopilot optimization"
+        ]
+      },
+      "observations": [],
+      "limitations": [
+        "Savings and applicability vary by vessel type and operation.",
+        "Portal descriptions are not a matched evaluation of one candidate vessel.",
+        "Do not sum individual measure estimates without interaction and double-counting analysis."
+      ],
+      "eligible_use": [
+        "Coverage taxonomy and measure discovery"
+      ],
+      "ineligible_use": [
+        "Guaranteed combined savings",
+        "Universal technology ranking"
+      ]
+    },
+    {
+      "source_id": "IMO-MARITIME-CYBER-REV4-2026",
+      "title": "Guidelines on Maritime Cyber Risk Management (MSC-FAL.1/Circ.3/Rev.4)",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026",
+      "url": "https://www.imo.org/en/ourwork/security/pages/cyber-security.aspx",
+      "evidence_class": "official_maritime_guidance",
+      "scope": {
+        "topic": "Maritime cyber-risk management",
+        "systems_in_scope": [
+          "bridge systems",
+          "cargo handling and management systems",
+          "propulsion and machinery management",
+          "power control systems",
+          "communications and ship/shore interfaces"
+        ],
+        "intent": "Risk-based resilience across digitization, system integration and automation."
+      },
+      "limitations": [
+        "High-level cyber-risk-management guidance; not a WAPS-specific technical approval or a substitute for vessel-specific class/flag requirements.",
+        "Applicability and implementation must be assessed for the vessel, equipment, operator and flag context."
+      ]
+    },
+    {
+      "source_id": "IMO-MSC111-GHG-SAFETY-WORKPLAN-2026",
+      "title": "Maritime Safety Committee 111 highlights: GHG safety framework under SDC",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-05-22",
+      "url": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-msc-111.aspx",
+      "evidence_class": "regulator_committee_decision_and_workplan",
+      "scope": {
+        "meeting": "MSC 111, 13-22 May 2026",
+        "decision": "endorsed work plan for safety regulatory framework under SDC",
+        "technology_families": [
+          "nuclear power",
+          "wind propulsion and wind-assisted power",
+          "lithium-ion batteries",
+          "swappable traction battery containers"
+        ]
+      },
+      "observations": [],
+      "limitations": [
+        "Endorsement of a work plan is not a completed safety code or an approval to operate a particular design.",
+        "Future work milestones and adoption dates can change; recheck the current IMO instrument status before legal or class decisions."
+      ],
+      "eligible_use": [
+        "Regulatory roadmap and design-risk tracking"
+      ],
+      "ineligible_use": [
+        "Claim that WAPS safety requirements are fully harmonized or approved"
+      ]
+    },
+    {
+      "source_id": "ISO-15016-2025",
+      "title": "Ships and marine technology — Specifications for the assessment of speed and power performance by analysis of speed trial data",
+      "publisher": "International Organization for Standardization",
+      "publication_year": 2025,
+      "url": "https://www.iso.org/standard/82080.html",
+      "evidence_class": "international_standard",
+      "scope": {
+        "purpose": "Analysis of ship speed-power trial data for prescribed conditions, including environmental corrections within the standard's applicability."
+      },
+      "observations": [],
+      "limitations": [
+        "The standard is a method reference, not a ship-performance data source.",
+        "Applicability and required corrections must be determined by qualified personnel for the vessel and trial.",
+        "This project must not invent or claim ISO conformity from a simplified calculation."
+      ],
+      "eligible_use": [
+        "Trial protocol and data-boundary reference"
+      ],
+      "ineligible_use": [
+        "Direct savings estimate",
+        "Software-only certification"
+      ]
+    },
+    {
+      "source_id": "ISO-19030-1-2016",
+      "title": "Ships and marine technology — Measurement of changes in hull and propeller performance — Part 1: General principles",
+      "publisher": "International Organization for Standardization",
+      "publication_date": "2016-11",
+      "url": "https://www.iso.org/standard/63774.html",
+      "evidence_class": "international_standard",
+      "scope": {
+        "purpose": "General principles and performance indicators for measuring changes in hull and propeller performance over time."
+      },
+      "observations": [],
+      "limitations": [
+        "The published scope focuses on conventional fixed-pitch propeller ships and compares the same ship to itself over time.",
+        "Do not treat it as a general inter-vessel architecture-ranking method.",
+        "Check current applicability and edition at the time of any formal trial."
+      ],
+      "eligible_use": [
+        "In-service hull/propeller maintenance and retrofit measurement reference"
+      ],
+      "ineligible_use": [
+        "Direct comparison of unlike ship designs",
+        "Novel wind-device validation by itself"
+      ]
+    },
+    {
+      "source_id": "ISO-19030-2-2016",
+      "title": "Ships and marine technology — Measurement of changes in hull and propeller performance — Part 2: Default method",
+      "publisher": "International Organization for Standardization",
+      "publication_date": "2016-11",
+      "url": "https://www.iso.org/standard/63775.html",
+      "evidence_class": "international_standard",
+      "scope": {
+        "purpose": "Default method and basic performance indicators for measuring hull and propeller performance changes over time on applicable vessel types."
+      },
+      "observations": [],
+      "limitations": [
+        "The published scope is centered on commercial displacement ships with conventional fixed-pitch propellers.",
+        "It is primarily same-vessel before/after measurement, not a universal comparison standard across vessel types.",
+        "Normative procedures are not reproduced in this registry."
+      ],
+      "eligible_use": [
+        "In-service performance measurement reference"
+      ],
+      "ineligible_use": [
+        "Inter-vessel universal score",
+        "Claim of compliance without qualified method execution"
+      ]
+    },
+    {
+      "source_id": "ITTC-7.5-03-02-01-2024",
+      "title": "Uncertainty Analysis in CFD, Examples for Resistance and Flow",
+      "publisher": "International Towing Tank Conference (ITTC)",
+      "publication_date": "2024-09",
+      "url": "https://ittc.info/media/11954/75-03-02-01.pdf",
+      "evidence_class": "official_recommended_procedure_cfd_uncertainty_example",
+      "scope": {
+        "procedure": "7.5-03-02-01, Revision 02",
+        "benchmark_geometry": "Series 60 cargo/container ship",
+        "conditions": {
+          "froude_number": 0.316,
+          "reynolds_number": 4300000,
+          "sinkage_trim": "zero for fixed model comparison"
+        },
+        "observables": [
+          "total resistance coefficient",
+          "wave profile"
+        ],
+        "method": [
+          "four grid levels",
+          "refinement ratio approximately square-root-of-two",
+          "iterative and grid uncertainty",
+          "comparison against reference data uncertainty"
+        ]
+      },
+      "observations": [
+        {
+          "metric_id": "total_resistance_validation_error_percent",
+          "value": 7.2,
+          "unit": "percent",
+          "basis": "published example; comparison error"
+        },
+        {
+          "metric_id": "total_resistance_validation_uncertainty_percent",
+          "value": 3.1,
+          "unit": "percent",
+          "basis": "published example; combined validation uncertainty"
+        },
+        {
+          "metric_id": "total_resistance_validation_status",
+          "value": "not_validated",
+          "basis": "absolute comparison error exceeds combined validation uncertainty"
+        },
+        {
+          "metric_id": "wave_profile_profile_averaged_error_percent",
+          "value": 5,
+          "unit": "percent",
+          "basis": "approximately as stated in procedure"
+        }
+      ],
+      "limitations": [
+        "The example concerns one solver (CFDSHIP-IOWA), one Series 60 hull and specified flow conditions.",
+        "It is a procedure/example, not a universal accuracy claim for other solvers, hulls, WAPS installations or operating domains.",
+        "Total resistance is explicitly not validated in the published example; wave-profile validation is a separate observable outcome."
+      ],
+      "eligible_use": [
+        "CFD uncertainty and verification/validation protocol benchmark",
+        "Observable-specific validation state design"
+      ],
+      "ineligible_use": [
+        "Claim that an arbitrary solver is validated",
+        "Direct full-scale cargo-vessel or WAPS performance claim"
+      ]
+    },
+    {
+      "source_id": "JMSE-PI-FUELCAST-2026-1774",
+      "title": "Physics-Informed Machine Learning with Monotonic Constraints for Daily Fuel Consumption and CII Prediction of Ships",
+      "publisher": "Journal of Marine Science and Engineering",
+      "publication_date": "2026-09-23",
+      "url": "https://doi.org/10.3390/jmse14191774",
+      "evidence_class": "peer_reviewed_methodology_with_three_measured_vessels",
+      "scope": {
+        "datasets": [
+          "FuelCast daily measured records",
+          "EU MRV annual ship-level aggregates"
+        ],
+        "vessels": [
+          "Poseidon large cruise ship, diesel-electric, 12 months, 12430 rows",
+          "Triton small cruise ship, direct-drive diesel, 3 months, 9575 rows",
+          "Ceto offshore support vessel, thruster pods, 6 months, 7102 rows"
+        ],
+        "method": [
+          "partial monotonic constraints for Random Forest and XGBoost",
+          "purged contiguous time-block validation",
+          "five rotated time folds and split-consistent OOF",
+          "feature-target arithmetic leakage audit"
+        ],
+        "reported_results": {
+          "poseidon_random_split_r2": 0.975,
+          "poseidon_time_block_r2": 0.943,
+          "random_split_optimism_bias_r2": 0.032,
+          "ale_nonphysical_reversals_before_after": [
+            "8 to 0",
+            "7 to 0",
+            "9 to 0"
+          ],
+          "cii_mape_percent": 6.8,
+          "cii_exact_rating_agreement_percent": 80.6,
+          "cii_within_one_grade_percent": 95.8
+        }
+      },
+      "limitations": [
+        "Empirical measured-data study covers two cruise ships and one offshore support vessel, not mainstream cargo vessels.",
+        "FuelCast target is total daily onboard fuel, not propulsion-only or shaft fuel.",
+        "FuelCast records omit trim and do not represent large cargo loading/draft cycles.",
+        "Wind-assisted ship physics requires conditional constraints; global wind-speed monotonicity is not valid when favourable wind/device state may reduce engine demand.",
+        "Reported values are author-reported and require independent reproduction."
+      ],
+      "eligible_use": [
+        "Leakage-resistant time-series validation benchmark",
+        "Methodology reproduction for monotonic models and fuel prediction",
+        "Public daily measured-data software pipeline test, subject to dataset license"
+      ],
+      "ineligible_use": [
+        "Direct cargo vessel prediction validation",
+        "Wind-assisted propulsion savings claim",
+        "Fleet transfer or operational qualification"
+      ]
+    },
+    {
+      "source_id": "LR-GN-044-WAPS-2024",
+      "title": "LR-GN-044 Guidance Notes on Wind Assisted Propulsion Systems",
+      "publisher": "Lloyd's Register",
+      "publication_date": "2024-01-02",
+      "url": "https://www.lr.org/en/knowledge/lloyds-register-rules/guidance-notes/guidance-notes-on-wind-assisted-propulsion-systems/",
+      "evidence_class": "classification_society_guidance",
+      "scope": {
+        "topics": [
+          "WAPS construction and operation",
+          "supporting structures and foundations",
+          "deck plating and under-deck structure reinforcement"
+        ]
+      },
+      "observations": [],
+      "limitations": [
+        "Guidance notes are not by themselves a class approval for any specific installation.",
+        "Requires vessel-specific structural and integration assessment.",
+        "Applicable rule edition, approval path and notation must be confirmed with LR/class."
+      ],
+      "eligible_use": [
+        "WAPS structural-integration requirements",
+        "Foundation, local reinforcement and hull/deck design review questions"
+      ],
+      "ineligible_use": [
+        "Structural adequacy claim without calculations and approval"
+      ]
+    },
+    {
+      "source_id": "LR-SEASPAN-NUCLEAR-CONTAINERSHIP-2026",
+      "title": "Power Shift: Nuclear Power Pathways for Future Containership Fleets",
+      "publisher": "Lloyd's Register Advisory / LucidCatalyst (case for Seaspan)",
+      "publication_date": "2026-07-14",
+      "url": "https://www.lr.org/en/knowledge/case-studies/power-shift-nuclear-power-pathways-for-future-containership-fleets/",
+      "evidence_class": "industry_model_public_summary",
+      "scope": {
+        "vessel_class": "containership",
+        "capacity_teu": 15000,
+        "service_speed_knots": 25,
+        "comparison_context": "public case study compares a higher-speed nuclear-powered case with conventional vessel operations"
+      },
+      "observations": [
+        {
+          "metric_id": "annual_cargo_capacity_uplift",
+          "value": 38,
+          "unit": "percent",
+          "qualifier": "up_to",
+          "statement": "The public summary reports up to 38% greater annual cargo capacity."
+        },
+        {
+          "metric_id": "additional_container_space",
+          "value": 5,
+          "unit": "percent",
+          "qualifier": "up_to",
+          "statement": "The public summary reports up to 5% additional container space from removing fuel tanks and systems."
+        },
+        {
+          "metric_id": "annual_round_voyages_conventional",
+          "value": 5,
+          "unit": "voyages_per_year",
+          "statement": "Public summary uses five annual round voyages for the conventional comparison."
+        },
+        {
+          "metric_id": "annual_round_voyages_nuclear",
+          "value": 6.3,
+          "unit": "voyages_per_year",
+          "statement": "Public summary uses 6.3 annual round voyages for the nuclear-powered case."
+        }
+      ],
+      "limitations": [
+        "Public summary is insufficient to reconstruct all route, demand, cost, utilization and operating assumptions.",
+        "These are modelled case-study outputs, not measured fleet outcomes.",
+        "The higher annual cargo figure includes speed and space effects and must not be attributed solely to propulsion energy efficiency.",
+        "Do not directly compare against the UCL TCO model without a transparent boundary bridge.",
+        "This is not a wind-assist study."
+      ],
+      "eligible_use": [
+        "Service-throughput benchmark questions",
+        "Separate high-speed cargo-service reference"
+      ],
+      "ineligible_use": [
+        "Universal vessel speed or throughput claim",
+        "Direct economic comparison without source-specific reproduction"
+      ]
+    },
+    {
+      "source_id": "MTF-WAPS-SMS-GUIDELINES-2026",
+      "title": "Guidelines to Develop and Implement a Safety Management System for Ships Using Wind Assisted Propulsion Systems",
+      "publisher": "Maritime Technologies Forum",
+      "publication_date": "2026-03-30",
+      "url": "https://www.maritimetechnologiesforum.com/en/news-publications/maritime-technologies-forum-announces-new-guidelines-to-strengthen-safety-management-for-ships-using-wind-assisted-propulsion-systems",
+      "evidence_class": "flag_state_and_class_society_safety_management_guidance",
+      "scope": {
+        "ship_scope": "wind-assisted ships, not primary wind-propelled vessels",
+        "technologies": [
+          "rotor sails",
+          "suction sails",
+          "wing sails"
+        ],
+        "considerations": [
+          "operational risk management",
+          "technical integration",
+          "organization",
+          "crew procedures"
+        ]
+      },
+      "observations": [],
+      "limitations": [
+        "Safety management guidance, not a design rule, class approval or complete statutory code.",
+        "The scope is wind-assisted vessels rather than primary wind-powered vessels.",
+        "Project applicability must be checked with flag, class, operator and vessel-specific risk assessment."
+      ],
+      "eligible_use": [
+        "Safety-management requirements and risk register",
+        "Crew training, maintenance and operational procedure design",
+        "Incident, near-miss and non-conformity data requirements"
+      ],
+      "ineligible_use": [
+        "Proof of certification or approval",
+        "Replacement for vessel-specific hazard analysis"
+      ]
+    },
+    {
+      "source_id": "NORSEPOWER-SEA-CARGO-TRANS-HAV-SOL-2026",
+      "title": "Norsepower Rotor Sails support the launch of Sea-Cargo's Trans Hav and Trans Sol into full operations following major efficiency upgrade",
+      "publisher": "Norsepower / Sea-Cargo",
+      "publication_date": "2026-04-17",
+      "url": "https://www.norsepower.com/post/norsepower-rotor-sails-support-the-launch-of-sea-cargos-trans-hav-and-trans-sol-into-full-operations-following-major-efficiency-upgrade/",
+      "evidence_class": "vendor_press_release_with_operator_self_reported_figures",
+      "scope": {
+        "vessel_class": "Northern European short-sea cargo liner vessels",
+        "retrofit_devices": "Three Norsepower Rotor Sails per vessel",
+        "retrofit_timing": "Installations commissioned January-February 2026",
+        "co_installed_systems": [
+          "solar power",
+          "battery storage",
+          "advanced power management",
+          "optimized propulsion configurations"
+        ],
+        "service_context": "fixed liner operations"
+      },
+      "observations": [
+        {
+          "metric_id": "sea_cargo_reported_co2_reduction_per_tonne_transported",
+          "value": 35,
+          "unit": "percent",
+          "qualifier": "up_to",
+          "attribution": "Sea-Cargo own figures as quoted by Norsepower",
+          "statement": "The announcement attributes up to 35% lower CO2 emissions per tonne transported to the comprehensive rebuild programme."
+        },
+        {
+          "metric_id": "sea_cargo_reported_total_fleet_emissions_reduction",
+          "value": 50,
+          "unit": "percent",
+          "qualifier": "up_to",
+          "attribution": "Sea-Cargo own figures as quoted by Norsepower",
+          "statement": "The announcement reports up to 50% total emissions reduction across the upgraded fleet."
+        },
+        {
+          "metric_id": "rotor_sail_equivalent_thrust_under_favourable_wind",
+          "value": 7500,
+          "unit": "kW",
+          "qualifier": "approximate",
+          "attribution": "Norsepower company announcement",
+          "statement": "Norsepower states the rotor sails can generate thrust equivalent to approximately 7,500 kW under favourable wind conditions."
+        },
+        {
+          "metric_id": "mechanical_installation_duration",
+          "value": 2,
+          "unit": "working_days_per_vessel",
+          "qualifier": "as_little_as",
+          "attribution": "Norsepower company announcement",
+          "statement": "Norsepower states mechanical installation took as little as two working days per vessel."
+        }
+      ],
+      "limitations": [
+        "Vendor press release containing operator self-reported figures, not an independently audited performance dataset.",
+        "The CO2 reductions apply to a comprehensive retrofit including rotors, solar, batteries, power management and optimized propulsion; do not attribute the full figure to rotor sails alone.",
+        "The 7,500 kW figure is favourable-condition equivalent thrust, not annual average delivered propulsion power or a fuel-saving percentage.",
+        "No underlying voyage traces, counterfactual weather correction, uncertainty intervals or raw emissions accounting are supplied in the announcement.",
+        "Short-sea fixed liner operation is not a substitute for deep-sea container/bulk route validation."
+      ],
+      "eligible_use": [
+        "Commercial deployment and integration case study",
+        "Retrofit outage/installation-time benchmark question",
+        "Combined energy-system architecture example",
+        "Requirements for independent operational data"
+      ],
+      "ineligible_use": [
+        "Independent proof of 35% rotor-only CO2 reduction",
+        "Deep-sea savings prediction",
+        "Fleet-wide reliability claim"
+      ]
+    },
+    {
+      "source_id": "SHIPFLOW-CFD-2026-WEB",
+      "title": "SHIPFLOW: CFD for ships",
+      "publisher": "SHIPFLOW",
+      "publication_year": 2026,
+      "url": "https://shipflow.se/",
+      "evidence_class": "vendor_capability_description",
+      "scope": {
+        "capability_description": [
+          "hull and appendage optimization",
+          "propulsion performance analysis",
+          "seakeeping and ship motions",
+          "automated design workflows and CAESES integration"
+        ]
+      },
+      "observations": [],
+      "limitations": [
+        "Vendor capability page is not independent performance validation.",
+        "No benchmark result or quantitative accuracy figure is inferred from the public page.",
+        "Detailed capabilities must be assessed on an identical case and solver-validation basis."
+      ],
+      "eligible_use": [
+        "Commercial tool crosswalk",
+        "Interoperability planning"
+      ],
+      "ineligible_use": [
+        "Independent accuracy claim",
+        "Quantitative product ranking"
+      ]
+    },
+    {
+      "source_id": "UCL-NUCLEAR-MERCHANT-TCO-2026",
+      "title": "Nuclear Reactors for Merchant Shipping: A Total Cost of Ownership Assessment of a Low-Carbon Pathway",
+      "publisher": "UCL Energy Institute",
+      "publication_date": "2026-11-05",
+      "url": "https://www.ucl.ac.uk/bartlett/publications/2026/nov/nuclear-reactors-merchant-shipping-total-cost-ownership-assessment-low-carbon-pathway",
+      "evidence_class": "peer_reviewed_or_research_cost_model",
+      "scope": {
+        "vessel_class": "large containership",
+        "capacity_range_teu": "14500-19999",
+        "lifecycle_years": 25,
+        "speed_cases_knots": [
+          14.85,
+          25
+        ],
+        "metric": "total cost of ownership normalized by transport work"
+      },
+      "observations": [
+        {
+          "metric_id": "nuclear_cost_competitiveness_without_imo_nzf",
+          "value": "not_least_cost",
+          "unit": "categorical",
+          "statement": "The published summary states no nuclear option is cheaper than conventional ships without the IMO Net-Zero Framework, even under the lowest reactor-cost assumptions."
+        },
+        {
+          "metric_id": "nuclear_cost_competitiveness_with_nzf",
+          "value": "conditional_from_2040",
+          "unit": "categorical",
+          "statement": "The published summary describes nuclear as potentially least cost from 2040 only if reactor costs fall substantially to levels not yet demonstrated."
+        }
+      ],
+      "limitations": [
+        "The result is conditional on the modelled policy and reactor-cost assumptions.",
+        "Insurance, liability and regulatory frameworks remain major barriers.",
+        "This is not a wind-assist study and is not a direct comparator for the hybrid cargo case.",
+        "Use the admitted source-specific inputs and full study boundary for reproduction."
+      ],
+      "eligible_use": [
+        "Economic policy sensitivity and fuel-system architecture reference"
+      ],
+      "ineligible_use": [
+        "Default nuclear economic superiority",
+        "Operational or regulatory readiness claim"
+      ]
+    },
+    {
+      "source_id": "WIND-REVIEW-2026-IJNAOE-100785",
+      "title": "Wind-propelled ships for maritime decarbonization: Technologies, global deployment, and engineering challenges",
+      "publisher": "International Journal of Naval Architecture and Ocean Engineering",
+      "publication_year": 2026,
+      "volume": "18",
+      "article_number": "100785",
+      "url": "https://doi.org/10.1016/j.ijnaoe.2026.100785",
+      "evidence_class": "peer_reviewed_review_with_inventory",
+      "scope": {
+        "vessel_classes": [
+          "commercial vessels across multiple classes"
+        ],
+        "inventory_cutoff": "2025-12-31",
+        "study_type": "multi-source ship-level deployment inventory and technology review"
+      },
+      "observations": [
+        {
+          "metric_id": "wind_equipped_ships_end_2025",
+          "value": 96,
+          "unit": "ships",
+          "direction": "inventory_count",
+          "statement": "Review inventory identified 96 ships equipped with wind propulsion systems by the end of 2025."
+        },
+        {
+          "metric_id": "wind_equipped_ships_still_operating_end_2025",
+          "value": 90,
+          "unit": "ships",
+          "direction": "inventory_count",
+          "statement": "The review reported 90 of the 96 inventoried ships still in service at the end of 2025."
+        }
+      ],
+      "technology_families": [
+        "Flettner rotors",
+        "suction wing sails",
+        "rigid wing sails",
+        "soft sails",
+        "kite sails"
+      ],
+      "limitations": [
+        "Multi-source inventory coverage depends on public reports and source availability.",
+        "The ship count is not a measure of fuel saved, operational availability, or economic return.",
+        "Device-level savings are route-, vessel-, weather-, control- and service-dependent.",
+        "Do not infer a universal percentage benefit from fleet adoption counts."
+      ],
+      "eligible_use": [
+        "Technology-family taxonomy",
+        "Public deployment corpus seed",
+        "Evidence-gap and operational-maturity questions"
+      ],
+      "ineligible_use": [
+        "Direct prediction of savings for a new vessel",
+        "Proof of economic viability for a specific ship",
+        "Measured device reliability without underlying service records"
+      ]
+    },
+    {
+      "source_id": "IMO-MEPC84-EEXI-CII-WIND-REVIEW-2026",
+      "title": "Marine Environment Protection Committee 84: phase-two review of short-term GHG measures",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-05-01",
+      "url": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-mepc-84th-session.aspx",
+      "evidence_class": "official_committee_workplan_and_meeting_outcome",
+      "scope": {
+        "meeting": "MEPC 84, 27 April–1 May 2026",
+        "work": "Initiated the second phase of the review of EEXI, SEEMP and CII short-term measures.",
+        "wind_propulsion": "Work includes consideration of wind propulsion in EEDI/EEXI calculations and possible CII metric/rating revisions."
+      },
+      "limitations": [
+        "A review/workplan is not an adopted wind-propulsion credit formula or a vessel-specific statutory calculation.",
+        "Do not treat discussion topics or candidate amendments as applicable rules before formal adoption and effective dates."
+      ],
+      "eligible_use": [
+        "Regulatory scenario planning",
+        "Versioned rule-change monitoring",
+        "Evidence requirements for wind-propulsion credit review"
+      ],
+      "ineligible_use": [
+        "Claiming an adopted WAPS EEXI/CII credit",
+        "Replacing statutory calculation or verifier approval"
+      ]
+    },
+    {
+      "source_id": "IMO-MEPC414-416-CH4-N2O-2026",
+      "title": "IMO 2026 guidelines for marine diesel engine methane and nitrous-oxide measurements",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-05-01",
+      "url": "https://www.imo.org/en/knowledgecentre/indexofimoresolutions/pages/mepc-2026-27.aspx",
+      "evidence_class": "official_mepc_resolutions",
+      "scope": {
+        "resolutions": [
+          {
+            "id": "MEPC.414(84)",
+            "topic": "Test-bed and onboard measurements of CH4 and/or N2O emissions from marine diesel engines"
+          },
+          {
+            "id": "MEPC.415(84)",
+            "topic": "Engine-load monitoring and calculation of emission values"
+          },
+          {
+            "id": "MEPC.416(84)",
+            "topic": "Continuous emission monitoring systems for CH4 and/or N2O"
+          }
+        ],
+        "significance": "Provides methods for gas-resolved tank-to-wake emissions measurement and quantification."
+      },
+      "limitations": [
+        "Verify exact resolution text, applicability and any voluntary/mandatory status before using in a compliance determination.",
+        "Method guidance does not establish that a particular ship's instruments are calibrated or emissions data are verified."
+      ],
+      "eligible_use": [
+        "Gas-specific trial-evidence design",
+        "CH4/N2O measurement method mapping",
+        "Emissions uncertainty and provenance requirements"
+      ],
+      "ineligible_use": [
+        "Assuming CH4/N2O values exist when only CO2/fuel data are available",
+        "Claiming verifier approval"
+      ]
+    },
+    {
+      "source_id": "EU-ETS-MARITIME-2026",
+      "title": "EU Emissions Trading System for maritime transport",
+      "publisher": "European Commission",
+      "publication_date": "2026",
+      "url": "https://climate.ec.europa.eu/areas-action/transport-decarbonisation/reducing-emissions-shipping-sector_en",
+      "evidence_class": "official_eu_regulatory_guidance",
+      "scope": {
+        "coverage": "100% of emissions for voyages between EU ports and emissions within EU ports; 50% for voyages with one end outside the EU, subject to legal scope.",
+        "phase_in": {
+          "emissions_year_2024": 40,
+          "emissions_year_2025": 70,
+          "emissions_year_2026_onward": 100
+        },
+        "gases": "CO2; CH4 and N2O from 2026.",
+        "reporting": "Emissions year, voyage legs, port activity and gas-specific covered emissions are distinct inputs."
+      },
+      "limitations": [
+        "Applicability depends on company, ship, voyage and legal scope; use the consolidated legal acts and verifier for actual reporting.",
+        "Surrender percentages are phase-in requirements, not route-level emissions reduction factors."
+      ],
+      "eligible_use": [
+        "Route-specific ETS exposure scenarios",
+        "Gas-specific covered-emissions accounting",
+        "Cost sensitivity under explicit allowance-price assumptions"
+      ],
+      "ineligible_use": [
+        "Legal determination of applicability without vessel/company facts",
+        "Using one fleet-wide coverage fraction for every voyage"
+      ]
+    },
+    {
+      "source_id": "EU-FUELEU-MARITIME-REG2023-1805",
+      "title": "Regulation (EU) 2023/1805 on the use of renewable and low-carbon fuels in maritime transport (FuelEU Maritime)",
+      "publisher": "European Union",
+      "publication_date": "2023-09-22",
+      "url": "https://eur-lex.europa.eu/eli/reg/2023/1805/oj/eng",
+      "evidence_class": "binding_eu_regulation",
+      "scope": {
+        "application_date": "2025-01-01",
+        "reference_ghg_intensity_gco2e_per_mj": 91.16,
+        "reduction_factors_percent": [
+          {
+            "year": 2025,
+            "value": 2
+          },
+          {
+            "year": 2030,
+            "value": 6
+          },
+          {
+            "year": 2035,
+            "value": 14.5
+          },
+          {
+            "year": 2040,
+            "value": 31
+          },
+          {
+            "year": 2045,
+            "value": 62
+          },
+          {
+            "year": 2050,
+            "value": 80
+          }
+        ],
+        "boundary": "Well-to-wake GHG intensity for energy used on board, under the regulation's defined methods and scope."
+      },
+      "limitations": [
+        "Use the consolidated Regulation, delegated/implementing acts and current guidance for actual calculations.",
+        "RFNBO incentives, banking, borrowing, pooling and exemptions require their own legal and evidence checks.",
+        "Do not replace FuelEU methodology with generic tank-to-wake CO2 intensity."
+      ],
+      "eligible_use": [
+        "Fuel-pathway scenario modelling",
+        "Well-to-wake energy intensity calculations",
+        "Regulatory sensitivity analysis"
+      ],
+      "ineligible_use": [
+        "Compliance certification without verifier",
+        "Applying a reduction factor without vessel and fuel scope review"
+      ]
+    },
+    {
+      "source_id": "IMO-NE-ATLANTIC-ECA-2026",
+      "title": "North-East Atlantic Emission Control Area adopted by MEPC 84",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-05-01",
+      "url": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-mepc-84th-session.aspx",
+      "evidence_class": "official_adopted_marine_pollution_measure",
+      "scope": {
+        "geography": "North-East Atlantic Emission Control Area",
+        "adoption": "MEPC 84, 27 April–1 May 2026",
+        "anticipated_effective_date": "2028",
+        "sulphur_limit_percent": "0.10",
+        "meaning": "Geographic and date-sensitive fuel-sulphur constraint for applicable operation within the ECA."
+      },
+      "limitations": [
+        "Use the adopted MARPOL amendment and charted boundary/effective date for actual compliance determinations.",
+        "This is not a general lifecycle-GHG factor and must not be conflated with EU ETS or FuelEU."
+      ],
+      "eligible_use": [
+        "Route segment ECA intersection tests",
+        "Fuel sulphur constraint scenarios",
+        "Regulatory map versioning"
+      ],
+      "ineligible_use": [
+        "Assuming a route-wide uniform fuel rule",
+        "Claiming compliance from route geometry alone"
+      ]
+    },
+    {
+      "source_id": "IMO-NETZERO-FRAMEWORK-STATUS-2026-11-10",
+      "title": "IMO Net-Zero Framework status and MEPC 85 schedule",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-11-10",
+      "url": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-mepc-84th-session.aspx",
+      "evidence_class": "official_negotiation_status_snapshot",
+      "scope": {
+        "as_of": "2026-11-10",
+        "status": "Not formally adopted as of this snapshot; intersessional work continues.",
+        "next_scheduled_meeting": "MEPC 85, 30 November–3 December 2026",
+        "resumed_extraordinary_session": "Provisionally scheduled for 4 December 2026, subject to confirmation."
+      },
+      "limitations": [
+        "A dated status snapshot becomes stale when new sessions or adoption decisions occur.",
+        "Pending proposals are not binding legal obligations and must be maintained as scenario alternatives."
+      ],
+      "eligible_use": [
+        "Policy scenario analysis with dated status",
+        "Rule-version and effective-date monitoring"
+      ],
+      "ineligible_use": [
+        "Treating pending framework provisions as current law",
+        "Using this status snapshot after later decisions without refresh"
+      ]
+    },
+    {
+      "source_id": "EU-MRV-MARITIME-REG2015-757",
+      "title": "Regulation (EU) 2015/757 on monitoring, reporting and verification of maritime transport emissions, as amended",
+      "publisher": "European Union",
+      "publication_date": "2015-04-29",
+      "url": "https://eur-lex.europa.eu/eli/reg/2015/757/oj/eng",
+      "evidence_class": "binding_eu_regulation",
+      "scope": {
+        "CO2_from_emissions_year": 2018,
+        "CH4_N2O_from_emissions_year": 2024,
+        "additional_ship_scope_from_2025": "Offshore ships ≥5,000 GT and offshore/general cargo ships 400–5,000 GT, subject to legal scope.",
+        "role": "Monitoring/reporting/verification obligation. Distinct from EU ETS allowance surrender."
+      },
+      "limitations": [
+        "Use current consolidated Regulation and applicable implementation acts for reporting determinations.",
+        "EU MRV gas coverage and ship scope are not identical to EU ETS coverage/surrender scope."
+      ]
+    },
+    {
+      "source_id": "EU-ETS-DIRECTIVE-REVISION-2026-0212",
+      "title": "COM(2026) 616 final — EU ETS Directive and Market Stability Reserve targeted revision proposal",
+      "publisher": "European Commission / European Parliament",
+      "publication_date": "2026-07-17",
+      "url": "https://oeil.europarl.europa.eu/oeil/en/procedure-file?reference=2026%2F0212%28COD%29",
+      "evidence_class": "official_legislative_proposal_and_procedure_status",
+      "scope": {
+        "procedure": "2026/0212(COD)",
+        "status_as_of": "2026-11-10: awaiting committee decision",
+        "proposal": "Targeted revision of Directive 2003/87/EC and Decision (EU) 2015/1814, including additional maritime scope and offshore anti-evasion provisions."
+      },
+      "limitations": [
+        "Pending proposal, not adopted/applicable law.",
+        "Final maritime scope and effective dates may change."
+      ]
+    },
+    {
+      "source_id": "EU-MRV-FUELEU-REVISION-2026-0210",
+      "title": "COM(2026) 620 final — maritime MRV and FuelEU streamlining proposal",
+      "publisher": "European Commission / European Parliament",
+      "publication_date": "2026-07-17",
+      "url": "https://oeil.europarl.europa.eu/oeil/en/procedure-file?reference=2026%2F0210%28COD%29",
+      "evidence_class": "official_legislative_proposal_and_procedure_status",
+      "scope": {
+        "procedure": "2026/0210(COD)",
+        "status_as_of": "2026-11-10: awaiting committee decision",
+        "proposal": "Amends Regulations (EU) 2015/757 and (EU) 2023/1805; proposes unified monitoring/reporting of GHG and onboard energy, including wind assistance, with future standards/certification for wind energy."
+      },
+      "limitations": [
+        "Pending proposal, not adopted/applicable law.",
+        "Wind-energy standards/certification are future Commission implementing acts and not specified by this proposal."
+      ]
+    },
+    {
+      "source_id": "EU-MRV-FUELEU-COM2026-620-TEXT",
+      "title": "COM(2026) 620 final — proposed regulation amending maritime MRV and FuelEU",
+      "publisher": "European Commission",
+      "uri": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52026PC0620",
+      "publication_date": "2026-07-17",
+      "evidence_class": "official_legislative_proposal_text",
+      "limitations": [
+        "Pending legislative proposal, not adopted law.",
+        "Text may be amended during procedure 2026/0210(COD)."
+      ],
+      "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52026PC0620"
+    },
+    {
+      "source_id": "EU-MRV-FUELEU-COM2026-620-ANNEX",
+      "title": "Annex to COM(2026) 620 final — proposed methods for monitoring GHG emissions and energy used",
+      "publisher": "European Commission / Publications Office of the European Union",
+      "uri": "https://publications.europa.eu/resource/cellar/bef58239-81f4-11f1-bf5e-01aa75ed71a1.0001.03/DOC_2",
+      "publication_date": "2026-07-17",
+      "evidence_class": "official_legislative_proposal_annex",
+      "scope": {
+        "proposal": "COM(2026) 620 final / 2026/0210(COD)",
+        "wind_power_method": "Proposed Annex I formula treats energy used from substitute sources separately; wind-energy amount is to be determined using international standards and certification references set by implementing acts under proposed Article 5(4).",
+        "retention": "Proposal text sets 10-year retention for monitoring records to support reproducibility."
+      },
+      "limitations": [
+        "Proposed method only; implementing-act standards/certification have not yet been issued by this proposal.",
+        "Do not use this annex as the current statutory WAPS calculation or certification method."
+      ],
+      "url": "https://publications.europa.eu/resource/cellar/bef58239-81f4-11f1-bf5e-01aa75ed71a1.0001.03/DOC_2"
+    },
+    {
+      "source_id": "ITTC-WAPS-POWER-SAVING-2024",
+      "title": "ITTC Recommended Procedure 7.5-02-03-01.9: Predicting the Power Saving of Wind Powered Ships",
+      "publisher": "International Towing Tank Conference",
+      "publication_date": "2024-09",
+      "url": "https://ittc.info/media/11806/75-02-03-019.pdf",
+      "evidence_class": "official_recommended_procedure",
+      "scope": {
+        "prediction_levels": [
+          "Level I: surge / 1-DOF",
+          "Level II: 3-4 DOF (surge, sway, roll, yaw)",
+          "Level III: 4 DOF",
+          "Level IV: at least 4 DOF; 6-DOF seakeeping where route optimization requires motion constraints"
+        ],
+        "requirements": [
+          "realistic WPS control and operating limits",
+          "idle-device resistance when WPS cannot thrust and cannot retract/tilt",
+          "source and validation of lift/drag coefficients",
+          "wind profile and weather data source",
+          "uncertainty analysis and observable-specific verification"
+        ],
+        "verification_note": "No complete experimental/CFD standard exists for full wind power-saving prediction; hybrid model tests or sea trials are currently highest fidelity."
+      },
+      "limitations": [
+        "Procedure recommends methods and levels; it does not validate any specific ship model.",
+        "Follow the latest ITTC revision and justify model fidelity for each output."
+      ],
+      "eligible_use": [
+        "WAPS model-fidelity selection",
+        "power-saving prediction protocol",
+        "documentation and validation requirements"
+      ],
+      "ineligible_use": [
+        "Claiming generic or automatic model validation"
+      ]
+    },
+    {
+      "source_id": "SINTEF-SOBC1-WAPS-CYBERPHYSICAL-TESTS-2026",
+      "title": "Cyber-Physical Testing of Wind-Assisted Ships: Recent Developments and Open Data Set for the SOBC-1 Bulk Carrier",
+      "publisher": "SINTEF Ocean / Journal of Sailing Technology",
+      "publication_date": "2026-10-02",
+      "url": "https://doi.org/10.5957/jst/2026.11.1.453",
+      "evidence_class": "published_physical_model_test_campaign_with_open_data_description",
+      "scope": {
+        "vessel": "SOBC-1 open bulk carrier design",
+        "campaign": "SINTEF Ocean September 2025 test campaign",
+        "scale_or_method": "free-running physical ship model coupled in real time to dynamic lifting-line aerodynamic model",
+        "reported_test_count": "nearly 100 tests",
+        "phenomena": [
+          "transient aerodynamic effects",
+          "sail-hull and sail-sail interactions",
+          "sail/propeller thrust distribution",
+          "alternative sail configurations and operating profiles",
+          "parametric side-force magnitude and application point",
+          "coastal wind direction/speed changes",
+          "aerodynamic loads on superstructure"
+        ],
+        "data_access": "Publication describes an open data set; obtain the files and record exact licence, provenance and variable dictionary before benchmark use."
+      },
+      "limitations": [
+        "Model-scale physical tests require scaling and uncertainty treatment before full-scale transfer.",
+        "Open-data description does not itself guarantee every raw file or complete metadata are available."
+      ],
+      "eligible_use": [
+        "Independent WAPS physical-model benchmark",
+        "lateral-force/application-point model validation",
+        "transient wind and sail interaction tests"
+      ],
+      "ineligible_use": [
+        "Direct full-scale fuel-savings claim",
+        "Assuming an unverified dataset licence"
+      ]
+    },
+    {
+      "source_id": "JMSE-WAPS-3DOF-ROUTE-2026-148",
+      "title": "Weather Routing Optimisation for Ships with Wind-Assisted Propulsion",
+      "publisher": "Journal of Marine Science and Engineering",
+      "publication_date": "2026-01-09",
+      "url": "https://doi.org/10.3390/jmse14020148",
+      "evidence_class": "peer_reviewed_3dof_weather_routing_case_with_open_dataset",
+      "scope": {
+        "vessel": "Kamsarmax bulk carrier with suction sails",
+        "models": [
+          "1-DOF longitudinal force balance",
+          "3-DOF surge/sway/yaw with leeway and rudder equilibrium"
+        ],
+        "reported_results": {
+          "one_dof_peak_reported_foc_saving_percent": 26,
+          "three_dof_peak_reported_foc_saving_percent": 23.5,
+          "one_vs_three_dof_me_power_difference_mcr_percent_range": [
+            2,
+            7
+          ],
+          "route_reoptimization_relative_foc_saving_improvement_percent": 1.25,
+          "route_case": {
+            "one_dof_optimized_route_evaluated_with_3dof": {
+              "total_foc_tonnes": 187.16,
+              "distance_nm": 2781.29,
+              "duration_days": 10.48,
+              "reported_foc_reduction_percent": 7.07
+            },
+            "three_dof_optimized_route_evaluated_with_3dof": {
+              "total_foc_tonnes": 184.64,
+              "distance_nm": 2804.91,
+              "duration_days": 10.57,
+              "reported_foc_reduction_percent": 8.32
+            },
+            "differences": {
+              "total_foc_tonnes_less": 2.52,
+              "additional_distance_nm": 23.62,
+              "relative_distance_increase_percent": 0.85,
+              "additional_duration_days": 0.09,
+              "approximate_additional_duration_hours": 2.16,
+              "reported_additional_foc_saving_percentage_points": 1.25
+            },
+            "fuel_boundary": "Table 4 total FOC includes both main-engine fuel and diesel-generator fuel; do not present this as main-engine-only fuel.",
+            "interpretation": "Case-specific trade-off: 3-DOF route is slightly longer/slower but lower total ME+DG fuel. Eligibility depends on the declared cargo arrival window and whole-service contract."
+          }
+        },
+        "dataset_doi": "10.5281/zenodo.17859015",
+        "dataset_license": "CC BY 4.0",
+        "article_details": "1-DOF overstates the modelled WAPS benefit in the studied slices; 3-DOF changes optimal route through side-force/yaw/rudder effects."
+      },
+      "limitations": [
+        "Reported case is a Kamsarmax with a particular suction-sail system and route/weather profile.",
+        "Reported figures are not transferable fuel-savings predictions for other ships.",
+        "Reproduce exact tables and definitions before comparing the summarized peak and average values."
+      ],
+      "eligible_use": [
+        "1-vs-3 DOF benchmark reproduction",
+        "weather-routing model and dataset pipeline",
+        "route-rank sensitivity under lateral forces"
+      ],
+      "ineligible_use": [
+        "Generic WAPS performance guarantee",
+        "Transfer to other hulls without model validation"
+      ]
+    },
+    {
+      "source_id": "OCEANENG-LEeway-RUDDER-WAPS-2026-127431",
+      "title": "Impact of leeway and rudder angles on propulsive performance of a single screw wind-powered ship",
+      "publisher": "Ocean Engineering",
+      "publication_date": "2026-09-01",
+      "url": "https://doi.org/10.1016/j.oceaneng.2026.127431",
+      "evidence_class": "peer_reviewed_self_propulsion_towing_tank_experiment",
+      "scope": {
+        "hull": "Single-screw containership model",
+        "conditions": {
+          "leeway_degrees": [
+            -5,
+            5
+          ],
+          "rudder_angle_degrees": [
+            -30,
+            30
+          ],
+          "wind_thrust_offloading_percent": [
+            0,
+            40
+          ]
+        },
+        "observables": [
+          "thrust deduction factor",
+          "effective wake fraction",
+          "relative rotative efficiency",
+          "hull efficiency",
+          "quasi-propulsive efficiency"
+        ],
+        "reported_highlights": [
+          "leeway strongly affects thrust deduction and wake with asymmetry",
+          "yaw-balancing rudder angles reduce propulsive efficiency",
+          "quasi-propulsive efficiency departures from +16% to -31% across tested conditions",
+          "positive leeway around +2.5 degrees gave greatest net power saving in the studied full-scale extrapolation"
+        ]
+      },
+      "limitations": [
+        "Results are configuration/condition-specific and must not be used as a universal leeway/rudder correction factor.",
+        "Full-scale extrapolation carries method uncertainty; preserve model-scale data and extrapolation method."
+      ],
+      "eligible_use": [
+        "Propeller-hull-rudder interaction benchmark",
+        "leeway/rudder coefficient-map validation",
+        "M5 self-propulsion coupling reproduction"
+      ],
+      "ineligible_use": [
+        "Applying the +16/-31% range as a generic correction",
+        "Generalizing to multi-screw or other hull forms without validation"
+      ]
+    },
+    {
+      "source_id": "MARIN-SHIP-AFTERBODY-MULTIFIDELITY-2023",
+      "title": "Practical ship afterbody optimisation by multifidelity techniques",
+      "publisher": "MARIN / Ship Technology Research",
+      "publication_date": "2023-11-21",
+      "url": "https://doi.org/10.1080/09377255.2023.2275371",
+      "evidence_class": "industrial_ship_hull_multifidelity_methodology",
+      "scope": {
+        "method": "Surrogate-based multi-objective optimization combining relatively few high-fidelity free-surface RANS simulations with many lower-fidelity evaluations.",
+        "lower_fidelity_methods": [
+          "Potential-flow solver for slender hulls where wave-resistance variations dominate",
+          "Coarse-grid RANS for designs with viscous and wave resistance variation"
+        ],
+        "high_fidelity_method": "Fine-grid/free-surface RANS",
+        "reported_cost_ratio": "Coarse-grid RANS evaluations reported about 20 times cheaper than fine-grid in the cited application."
+      },
+      "limitations": [
+        "Examples cover ship afterbody optimization, not complete WAPS propulsion or cargo-service qualification.",
+        "Lower-fidelity suitability depends on hull family and dominant resistance physics."
+      ],
+      "eligible_use": [
+        "Industry comparator for multi-fidelity ship design",
+        "Cost-aware model-fidelity allocation research"
+      ],
+      "ineligible_use": [
+        "Claiming a WAPS optimizer outperforms MARIN without matched validation"
+      ]
+    },
+    {
+      "source_id": "GERAD-MF-CONSTRAINED-BO-AIRCRAFT-2026",
+      "title": "Multi-fidelity approaches for general constrained Bayesian optimization with application to aircraft design",
+      "publisher": "GERAD",
+      "publication_date": "2026-04",
+      "url": "https://www.gerad.ca/en/papers/G-2026-17",
+      "evidence_class": "peer_reviewed_or_institute_report_multifidelity_constrained_optimization",
+      "scope": {
+        "method": "Multi-fidelity selection strategies using information from both objective and constraints.",
+        "application": "Aircraft aerodynamic/structural design with low-/high-fidelity analysis.",
+        "reported_result": "86% to 200% more constraint-compliant solutions than comparison state-of-the-art approach given limited budget in reported application."
+      },
+      "limitations": [
+        "Aircraft application and specific comparison setup; not direct maritime evidence.",
+        "Reported gain is not transferable to a WAPS benchmark without matched baselines."
+      ],
+      "eligible_use": [
+        "Constraint-aware multi-fidelity algorithm methodology comparison"
+      ],
+      "ineligible_use": [
+        "Direct ship performance or fuel-saving claim"
+      ]
+    },
+    {
+      "source_id": "CONSEQUENTIAL-IMPROVEMENT-MFBO-2026",
+      "title": "Consequential improvement acquisition function for efficient multi-fidelity Bayesian optimization",
+      "publisher": "Optimization and Engineering",
+      "publication_date": "2026-03-27",
+      "url": "https://doi.org/10.1007/s11081-026-10078-5",
+      "evidence_class": "peer_reviewed_multifidelity_optimization_method",
+      "scope": {
+        "method": "Consequential-improvement acquisition function with validation-aware cost treatment.",
+        "insight": "Low-fidelity selections carry deferred high-fidelity validation cost; expected objective gain at low fidelity is not yet validated improvement.",
+        "intended_use": "Acquisition policy for expensive experiments and simulations where the selected optimum must ultimately be validated."
+      },
+      "limitations": [
+        "General engineering and simulation examples, not a ship-specific benchmark.",
+        "Algorithm must be independently implemented/reproduced before comparative claims."
+      ],
+      "eligible_use": [
+        "Validation-cost-aware acquisition baseline",
+        "Decision regret and true validated improvement accounting"
+      ],
+      "ineligible_use": [
+        "Assuming method gives a fixed cost reduction on ship design"
+      ]
+    },
+    {
+      "source_id": "OCEANENG-MFBO-HYDROFOIL-2026",
+      "title": "Ensemble adaptive gated multi-fidelity neural network for Bayesian optimization: Application to hydrofoil design",
+      "publisher": "Ocean Engineering",
+      "publication_date": "2026-01-15",
+      "url": "https://doi.org/10.1016/j.oceaneng.2025.123314",
+      "evidence_class": "peer_reviewed_marine_multifidelity_surrogate_method",
+      "scope": {
+        "method": "Deep ensemble adaptive-gated multi-fidelity neural network coupled to Bayesian optimization.",
+        "application": "Hydrofoil design with CFD simulations.",
+        "reported_highlights": [
+          "Limited high-fidelity observations",
+          "Faster convergence than co-Kriging and multi-fidelity neural network on benchmark functions"
+        ]
+      },
+      "limitations": [
+        "Hydrofoil design does not validate whole-vessel wind-assisted propulsion.",
+        "Reported superiority needs independent matched reproduction."
+      ],
+      "eligible_use": [
+        "Marine multi-fidelity surrogate-method comparator"
+      ],
+      "ineligible_use": [
+        "Whole ship WAPS/fuel/cargo service performance claim"
+      ]
+    },
+    {
+      "source_id": "WAPS-MMG-VCT-FREERUN-2025-100664",
+      "title": "Identification of maneuvering models for wind-assisted ships with large rudders using virtual captive tests",
+      "publisher": "International Journal of Naval Architecture and Ocean Engineering / Chalmers University of Technology",
+      "publication_date": "2025",
+      "url": "https://doi.org/10.1016/j.ijnaoe.2025.100664",
+      "evidence_class": "peer_reviewed_waps_maneuvering_model_and_free_running_comparison",
+      "scope": {
+        "model": "Modular MMG manoeuvring model adapted for WAPS and enlarged rudders.",
+        "methods": [
+          "virtual captive tests to identify hydrodynamic damping",
+          "fully nonlinear potential-flow panel method for pure-sway/pure-yaw added masses",
+          "inverse-dynamics comparison against free-running model tests"
+        ],
+        "vessels": [
+          {
+            "name": "wPCC",
+            "features": "WAPS-designed cargo vessel, twin large rudders and bilge fins; study used motor mode."
+          },
+          {
+            "name": "Optiwise",
+            "features": "VLCC tanker with enlarged single rudder for wind-assist requirements."
+          }
+        ],
+        "findings": [
+          "Virtual captive forces can identify model parameters when the correct VCT set and assumptions are used.",
+          "Measured propeller thrust is used to reduce uncertainty in propeller-rudder interaction while identifying rudder/hull effects.",
+          "wPCC inverse-dynamics comparison exposed potential VCT errors associated with wave-generation and roll assumptions; Optiwise showed better agreement."
+        ]
+      },
+      "limitations": [
+        "VCT and inverse-dynamics agreement do not replace independent free-running validation for all states.",
+        "The paper's two model cases have different rudder/propulsion architectures; do not transfer coefficients between them.",
+        "Exact data and reuse rights must be checked before implementation."
+      ],
+      "eligible_use": [
+        "WAPS-specific MMG manoeuvring-model benchmark",
+        "VCT versus free-running validation protocol",
+        "Rudder/hull/propeller interaction and model-discrepancy analysis"
+      ],
+      "ineligible_use": [
+        "Assuming virtual captive tests prove manoeuvrability in gusts/waves",
+        "Applying the same identified coefficients to other hull/rudder layouts without validation"
+      ]
+    },
+    {
+      "source_id": "IMO-MSC137-76-SHIP-MANOEUVRABILITY",
+      "title": "Standards for Ship Manoeuvrability",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2002-12-04",
+      "url": "https://wwwcdn.imo.org/localresources/en/KnowledgeCentre/IndexofIMOResolutions/MSCResolutions/MSC.137%2876%29.pdf",
+      "evidence_class": "official_imo_resolution",
+      "scope": {
+        "resolution": "MSC.137(76)",
+        "manoeuvres": [
+          "turning circle",
+          "initial turning",
+          "10°/10° zig-zag",
+          "20°/20° zig-zag",
+          "full-astern stopping"
+        ],
+        "criteria": {
+          "turning_advance_ship_lengths_max": 4.5,
+          "tactical_diameter_ship_lengths_max": 5,
+          "initial_turning_distance_for_10deg_heading_change_ship_lengths_max": 2.5,
+          "full_astern_track_reach_ship_lengths_default_max": 15
+        },
+        "scope_caveat": "The resolution says its standards were developed for traditional propulsion and steering systems; Administration applicability/interpretation for WAPS and non-conventional steering/propulsion must be confirmed."
+      },
+      "limitations": [
+        "Not a complete WAPS-specific manoeuvrability code.",
+        "Do not present reference criteria as automatically applicable to every vessel; confirm ship type, size, date and Administration requirements."
+      ],
+      "eligible_use": [
+        "Conventional manoeuvring reference test suite",
+        "Turning/zig-zag/stopping metric definitions",
+        "Baseline for supplementary WAPS-specific course-keeping tests"
+      ],
+      "ineligible_use": [
+        "Claiming WAPS compliance solely from MSC.137(76) predictions"
+      ]
+    },
+    {
+      "source_id": "OPTIWISE-WAPS-MANOEUVRABILITY-CRITERIA",
+      "title": "Methods to execute manoeuvring and seakeeping tests with substantial wind propulsion",
+      "publisher": "OPTIWISE project",
+      "publication_date": "2026",
+      "url": "https://www.optiwise-project.eu/exploitable-results",
+      "evidence_class": "eu_project_methodology_and_test-development",
+      "scope": {
+        "topic": "Design-stage manoeuvrability and course-keeping assessment of ships with substantial wind propulsion.",
+        "proposed_methods": [
+          "integrate wind propulsion forces into free-sailing model tests",
+          "define additional course-keeping criteria for physical and digital tests",
+          "identify relevant wind and wave scenarios"
+        ],
+        "objective": "Address the shortfall of conventional procedures for wind-propelled ships and support early design and safety assessment."
+      },
+      "limitations": [
+        "Project methodology and proposed criteria are not automatically statutory or class rules.",
+        "Confirm latest public deliverables, exact criteria, test conditions, partner data rights and validation status."
+      ],
+      "eligible_use": [
+        "WAPS-specific course-keeping test design",
+        "Wind/wave scenario construction",
+        "Comparison against conventional manoeuvring criteria"
+      ],
+      "ineligible_use": [
+        "Treating project recommendations as approved certification criteria"
+      ]
+    },
+    {
+      "source_id": "SOTON-KCS-TIMEACCURATE-HULL-PROPELLER-RUDDER-DATA-2024",
+      "title": "Experimental dataset of a model-scale ship in calm water and waves",
+      "publisher": "University of Southampton / Data in Brief",
+      "publication_date": "2025-02-01",
+      "url": "https://doi.org/10.5258/SOTON/D3076",
+      "evidence_class": "public_model_scale_KCS_hull_propeller_rudder_experimental_dataset",
+      "scope": {
+        "hull": "KRISO Container Ship (KCS), single-screw model, LBP 3.773 m.",
+        "test_site": "University of Southampton, Boldrewood towing tank.",
+        "instrumentation": [
+          "propeller thrust and torque load cells",
+          "RPM encoder",
+          "six-component rudder dynamometer",
+          "six-degree-of-freedom IMU"
+        ],
+        "sample_rate_hz": 250,
+        "conditions": [
+          "calm water and regular waves",
+          "leeway and rudder angle combinations",
+          "offloaded propeller operation"
+        ],
+        "repository": "https://eprints.soton.ac.uk/490226/",
+        "doi": "10.5258/SOTON/D3076",
+        "related_paper": "https://doi.org/10.1016/j.oceaneng.2024.119258",
+        "rights": "The related Data in Brief article is CC BY-NC-ND; the repository's dataset-specific license and permitted commercial/derivative use must be checked separately."
+      },
+      "limitations": [
+        "KCS conventional single-screw model is a hydrodynamic interaction reference, not itself a WAPS trial.",
+        "Model scale and captive test constraints must be preserved.",
+        "No commercial use, derivative publication or mirroring until repository-specific rights are resolved."
+      ],
+      "eligible_use": [
+        "Non-commercial methodology reproduction after legal review",
+        "Hull-propeller-rudder signal-processing and provenance tests",
+        "Independent hydrodynamic model validation where license permits"
+      ],
+      "ineligible_use": [
+        "WAPS full-scale performance claim",
+        "Commercial model training or derivative dataset release without separate rights"
+      ]
+    },
+    {
+      "source_id": "IMO-SDC12-STEERING-MANOEUVRABILITY-ROADMAP-2026",
+      "title": "IMO SDC 12: goal-based steering/propulsion amendments and draft International Ship Manoeuvrability Standards",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-01-23",
+      "url": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/sdc-12.aspx",
+      "evidence_class": "official_subcommittee_outcome_and_forward_workplan",
+      "scope": {
+        "meeting": "SDC 12, 19–23 January 2026",
+        "steering_propulsion": "Continued development of goal-based amendments to SOLAS Chapter II-1 (Part C) and Chapter V, including application dates, ship steering performance and steering-system failure tolerance; intended to cover traditional and non-traditional propulsion/steering.",
+        "manoeuvrability_standards": "Discussed draft new International Ship Manoeuvrability Standards for new ships subject to the new goal-based SOLAS regulations; agreed fundamental principles in principle, with further technical development required.",
+        "roadmap": [
+          "SDC 13 in 2027 to continue technical work",
+          "Expected adoption around 2029 per current roadmap",
+          "Target entry into force 1 January 2032 per current roadmap"
+        ],
+        "existing_ships": "Current MSC.137(76) standards remain the reference for existing ships under the stated roadmap."
+      },
+      "limitations": [
+        "Draft ISSM and SOLAS amendments are not adopted/effective requirements as of the 10 November 2026 snapshot.",
+        "Roadmap dates can change; confirm subsequent MSC/SDC decisions and formal instruments.",
+        "Ship-specific applicability, existing-ship/new-ship transition, build contract, keel-laying and delivery dates require legal/Administration review."
+      ],
+      "eligible_use": [
+        "Dated regulatory scenario tracking",
+        "New-ship design requirements horizon",
+        "Manoeuvrability trial data contribution planning"
+      ],
+      "ineligible_use": [
+        "Treating draft ISSM as binding law",
+        "Declaring compliance from a research manoeuvring benchmark"
+      ]
+    },
+    {
+      "source_id": "JMSE-MEASUREMENT-IDENTIFIABILITY-2026-1940",
+      "title": "Measurement Adequacy and Parameter Identifiability Before Calibration of a Physics-Informed Ship-Performance Model: A Methodological Case Study on Four Tanker Voyages",
+      "publisher": "Journal of Marine Science and Engineering",
+      "publication_date": "2026-10-17",
+      "url": "https://doi.org/10.3390/jmse14201940",
+      "evidence_class": "peer_reviewed_methodological_case_study_with_processed_CC_BY_4_0_reproduction_package",
+      "scope": {
+        "records": 207,
+        "voyages": 4,
+        "vessels": 1,
+        "measurement_audit": "Before-calibration audit of onboard performance-monitoring channels; underlying acquisition architecture not documented.",
+        "method": [
+          "exact algebraic dependence tests among speed/current/distance fields",
+          "five-test measurement screening",
+          "structural sensitivity matrix rank analysis",
+          "practical identifiability and conditioning",
+          "prospective scalar correction with frozen adaptation window"
+        ],
+        "reported_findings": {
+          "five_parameter_model_structural_sensitivity_rank_upper_bound": 2,
+          "practically_identifiable_parameters_on_reported_records": 1,
+          "scalar_kappa_interpretation": "ratio of reconstructed main-engine fuel to reported power at nominal specific consumption; not a physical efficiency or independently identified hull/engine state",
+          "remaining_route_fuel_prediction_percent_range": "-5.67 to +0.70",
+          "sensitivity_range_across_fuel_fields_and_freeze_points_percent": "-8.5 to +2.1"
+        },
+        "reproduction_package": {
+          "zenodo_doi": "10.5281/zenodo.23235788",
+          "license": "CC BY 4.0",
+          "contents": [
+            "processed 207-record CSV",
+            "traceability workbook",
+            "analysis code",
+            "checksums",
+            "verification scripts",
+            "archived outputs"
+          ]
+        },
+        "proprietary_inputs": "Original commercial workbook and sailing-leg performance pages are not distributed."
+      },
+      "limitations": [
+        "One tanker and four voyages; no cargo/WAPS generalization is established.",
+        "The underlying sensor types, manufacturers, calibration, sampling, filtering and manual-entry status are undocumented.",
+        "The paper's scalar correction κ must not be interpreted as physical efficiency or independent vessel-condition state.",
+        "Route-total agreement is not proof of segment-level physical identifiability.",
+        "The study's rank bound is specific to its observation model and parameterization; do not generalize the same rank deficiency to other models."
+      ],
+      "eligible_use": [
+        "reproduce pre-calibration measurement adequacy screening",
+        "structural and practical identifiability benchmark",
+        "prospective adaptation leakage controls",
+        "synthetic measurement-portfolio/VOI tests"
+      ],
+      "ineligible_use": [
+        "unverified cargo-vessel performance labels",
+        "WAPS saving claims",
+        "claim that every ship-performance model has rank at most two"
+      ]
+    },
+    {
+      "source_id": "CIMAC-HYBRID-MONITORING-GUIDELINE-2021",
+      "title": "Monitoring Systems for Marine Hybrid Propulsion Systems",
+      "publisher": "CIMAC Working Group 20 — System Integration",
+      "publication_date": "2021-11",
+      "url": "https://www.cimac.com/cms/upload/Publication_Press/WG_Publications/CIMAC_WG20_Guideline_Monitoring_Systems_for_Marine_Hybrid_Propulsion_Systems_Nov_2021.pdf",
+      "evidence_class": "industry_monitoring_guideline",
+      "scope": {
+        "focus": "Monitoring-system implementation for marine hybrid propulsion systems, data integration, quality assurance, reliability and reporting.",
+        "data_quality_dimensions": [
+          "syntactic quality",
+          "semantic quality",
+          "pragmatic quality"
+        ],
+        "relevance": "Supports a decision-oriented measurement contract and hybrid-system monitoring architecture."
+      },
+      "limitations": [
+        "Guideline provides information and recommendations, not a vessel-specific monitoring-system design or certification.",
+        "It does not calculate the marginal economic value of a sensor portfolio."
+      ],
+      "eligible_use": [
+        "monitoring architecture requirements",
+        "data quality taxonomy",
+        "hybrid system interface and reporting design"
+      ],
+      "ineligible_use": [
+        "claim that any sensor deployment meets class/flag requirements"
+      ]
+    },
+    {
+      "source_id": "MARINE-FUEL-METROLOGY-2024-114161",
+      "title": "Metrology for reliable fuel consumption measurements in the maritime sector",
+      "publisher": "Measurement",
+      "publication_date": "2024-02-28",
+      "url": "https://doi.org/10.1016/j.measurement.2024.114161",
+      "evidence_class": "peer_reviewed_marine_fuel_meter_metrology",
+      "scope": {
+        "method": "Dynamic flow-meter calibration test profile and evaluation criteria for maritime applications.",
+        "findings": [
+          "proposes a dynamic flow-meter calibration profile",
+          "demonstrates implementation on a conventional test rig",
+          "assesses a spindle screw meter",
+          "shows that flow-meter housing can affect measurement performance"
+        ]
+      },
+      "limitations": [
+        "Specific test-rig and meter configuration; do not transfer accuracy claims to untested ship installations.",
+        "Does not independently validate a vessel's installed fuel-flow system."
+      ],
+      "eligible_use": [
+        "fuel flow meter test planning",
+        "dynamic calibration protocol design",
+        "measurement uncertainty budgeting"
+      ],
+      "ineligible_use": [
+        "assume installed meters are accurate without calibration and installation evidence"
+      ]
+    },
+    {
+      "source_id": "OCEANENG-PORT-BERTH-YARD-OPS-ROBUST-2026-125850",
+      "title": "An integrated robust framework for berth, yard, and shore power planning considering vessel arrival uncertainty",
+      "publisher": "Ocean Engineering / Elsevier",
+      "publication_date": "2026-06-15",
+      "url": "https://doi.org/10.1016/j.oceaneng.2026.125850",
+      "evidence_class": "peer_reviewed_optimization_methodology",
+      "scope": {
+        "approach": "Robust integrated berth, yard and shore-power planning under vessel arrival uncertainty; article preview reports hierarchical multi-agent SAC and an anchor-point mechanism.",
+        "reported_case_savings_percent": {
+          "lower": 4,
+          "upper": 13,
+          "metric": "cost savings in the paper's studied cases"
+        },
+        "relevance": "Methodology comparator for coordinating berth/yard/shore-power decisions under uncertain arrival."
+      },
+      "limitations": [
+        "The reported 4-13% cost reduction is case-specific and is not transferable to another port, fleet or vessel.",
+        "Access to full inputs, code and data may be restricted; reproduce published baselines before comparison.",
+        "This paper is not a validation of the Luminous port-call energy audit."
+      ],
+      "eligible_use": [
+        "Published-method reproduction",
+        "Port/berth/OPS uncertainty benchmark design"
+      ],
+      "ineligible_use": [
+        "Direct prediction of Luminous port savings",
+        "Assuming the paper's multi-agent optimizer is independently reproduced"
+      ]
+    },
+    {
+      "source_id": "EMSA-SHORE-SIDE-ELECTRICITY-GUIDANCE-2025",
+      "title": "Guidance on Shore-Side Electricity: Guidance to Port Authorities and Administrations",
+      "publisher": "European Maritime Safety Agency",
+      "publication_date": "2025-11-11",
+      "url": "https://www.emsa.europa.eu/electrification/sse.html",
+      "evidence_class": "official_regulator_agency_technical_guidance",
+      "scope": {
+        "published": "2022-07-19",
+        "updated": "2025-11-11",
+        "topics": [
+          "OPS infrastructure planning",
+          "ship-shore interface compatibility",
+          "responsibility frameworks",
+          "construction and operating controls",
+          "battery charging",
+          "battery swapping",
+          "power banking",
+          "microgeneration"
+        ]
+      },
+      "limitations": [
+        "Guidance supports port planning and controls; it is not a vessel/berth-specific electrical compatibility certificate.",
+        "Current national, port and class rules and applicable IEC/ISO/IEEE standards must be independently checked."
+      ],
+      "eligible_use": [
+        "Ship-port interface requirements",
+        "Port-side OPS risk/role design"
+      ],
+      "ineligible_use": [
+        "Claiming an actual berth has available or reserved power"
+      ]
+    },
+    {
+      "source_id": "EU-FUELEU-ARTICLE6-OPS-QA-2026",
+      "title": "European Commission Q&A on FuelEU Maritime Article 6 zero-emission-at-berth requirements",
+      "publisher": "European Commission Directorate-General for Mobility and Transport",
+      "publication_date": "2026",
+      "url": "https://transport.ec.europa.eu/transport-modes/maritime/decarbonising-maritime-transport-fueleu-maritime/questions-and-answers-regulation-eu-20231805-use-renewable-and-low-carbon-fuels-maritime-transport_en",
+      "evidence_class": "official_eu_regulatory_interpretive_guidance",
+      "scope": {
+        "vessel_scope": "Passenger ships and ships carrying exclusively containers, within Regulation (EU) 2023/1805 scope; not all general-cargo or mixed-use ships.",
+        "timeline": [
+          {
+            "date": "2030-01-01",
+            "scope": "In AFIR Article 9 covered ports, within FuelEU Article 6 scope."
+          },
+          {
+            "date": "2035-01-01",
+            "scope": "Other ports equipped with OPS, within FuelEU Article 6 scope."
+          }
+        ],
+        "transition": "Member States may apply certain obligations earlier in the 2030-2034 period in specified circumstances."
+      },
+      "limitations": [
+        "This guidance does not make every cargo ship subject to zero-emission-at-berth requirements.",
+        "Use the consolidated Regulation and current national implementation/port facts for legal determinations."
+      ],
+      "eligible_use": [
+        "Vessel/port OPS rule-scope tests",
+        "FuelEU Article 6 applicability evidence"
+      ],
+      "ineligible_use": [
+        "Automatic OPS mandate for general-cargo ships",
+        "Substituting Q&A guidance for legal review"
+      ]
+    },
+    {
+      "source_id": "EU-AFIR-REG2023-1804",
+      "title": "Regulation (EU) 2023/1804 on deployment of alternative fuels infrastructure",
+      "publisher": "European Union",
+      "publication_date": "2023-09-13",
+      "url": "https://eur-lex.europa.eu/eli/reg/2023/1804/oj",
+      "evidence_class": "binding_eu_regulation",
+      "scope": {
+        "maritime_scope": "Requirements for shore-side electricity supply in certain TEN-T maritime ports for specified ship categories, including seagoing container and passenger ships, based on regulatory port/vessel criteria.",
+        "target_date": "2029-12-31",
+        "relationship": "FuelEU Article 6 references AFIR Article 9 port coverage in its staged zero-emission-at-berth requirements."
+      },
+      "limitations": [
+        "Port obligations are conditional on TEN-T port category/activity and ship category; not a universal OPS availability guarantee at every quay.",
+        "Use consolidated legal text and port-specific infrastructure status."
+      ],
+      "eligible_use": [
+        "Port infrastructure obligation scenario",
+        "AFIR/FuelEU port-scope mapping"
+      ],
+      "ineligible_use": [
+        "Assuming real-time berth power reservation from an infrastructure mandate"
+      ]
+    },
+    {
+      "source_id": "ROUTING-DRO-DISTRL-2026-TRD-105598",
+      "title": "Robust low-carbon ship routing under weather uncertainty: a distributional reinforcement learning approach",
+      "publisher": "Transportation Research Part D: Transport and Environment",
+      "publication_date": "2026-11-01",
+      "url": "https://doi.org/10.1016/j.trd.2026.105598",
+      "evidence_class": "peer_reviewed_2026_methodology_single_corridor_case_author_reported",
+      "scope": {
+        "route": "Rotterdam–New York containership corridor",
+        "method": [
+          "Distributional reinforcement learning using a quantile-regression deep Q-network (QR-DQN)",
+          "Wasserstein-metric distributionally robust optimization to address weather-distribution shift",
+          "Physics-informed reward including hydrodynamic resistance and carbon-intensity compliance"
+        ],
+        "reported_results": {
+          "fuel_reduction_vs_slow_steaming_percent": 17.9,
+          "fuel_reduction_vs_standard_dqn_percent": 5.1,
+          "reported_co2_saving_tonnes_per_voyage": 390,
+          "adverse_weather_exposure": "reported near zero"
+        },
+        "publication": "Transportation Research Part D, Volume 160, November 2026, Article 105598"
+      },
+      "limitations": [
+        "Author-reported results for one corridor and one modelling/evaluation setup; not independently reproduced by Luminous.",
+        "Published percentage results must not be compared directly with another route, ship, service boundary or baseline unless conditions and accounting are matched.",
+        "No claim of transfer to wind-assisted cargo ships, other vessel classes or fleet operation.",
+        "Require full article/model/input details and held-out voyage data before reproducing any numerical result."
+      ],
+      "eligible_use": [
+        "SOTA methodology comparator for distributional RL and Wasserstein DRO",
+        "Design of route/weather distribution-shift experiments",
+        "Common-case baseline candidate after implementation details are extracted"
+      ],
+      "ineligible_use": [
+        "Direct fuel-saving forecast for a Luminous vessel",
+        "Safety qualification or autonomous navigation authority"
+      ]
+    },
+    {
+      "source_id": "RISK-AWARE-SHORTSEA-DT-CVAR-DRO-2026-JEMS-95826",
+      "title": "Risk-Aware Digital Twin-Based Speed Optimization for CO2 Emission Reduction in Short-Sea Shipping: The İstanbul-Piraeus Route",
+      "publisher": "Journal of ETA Maritime Science",
+      "publication_date": "2026-10-02",
+      "url": "https://doi.org/10.4274/jems.2026.95826",
+      "evidence_class": "peer_reviewed_2026_methodology_single_corridor_case_author_reported",
+      "scope": {
+        "route": "İstanbul–Piraeus short-sea corridor",
+        "method": [
+          "AIS-based voyage records with meteorological forcing, bunker-price indicators and port-congestion uncertainty",
+          "PDE–ODE reduced hydrodynamic resistance/navigation-state model",
+          "Conditional Value-at-Risk (CVaR) and distributionally robust optimization"
+        ],
+        "reported_results": {
+          "baseline_speed_kn": 20,
+          "optimized_speed_kn_approx": 16,
+          "co2_reduction_percent_approx": 24,
+          "cvar_tail_risk_reduction_percent_approx": 26
+        }
+      },
+      "limitations": [
+        "Author-reported result for one short-sea corridor and stated cost/uncertainty assumptions.",
+        "The paper explicitly positions the reduced PDE–ODE model as voyage decision support, not a replacement for high-fidelity CFD.",
+        "Not directly comparable with deep-sea containerships or wind-assisted propulsion without matched vessel/service boundaries.",
+        "Require independent reproduction and input provenance before using reported percentages as performance evidence."
+      ],
+      "eligible_use": [
+        "Risk-aware digital-twin and CVaR/DRO methodology comparator",
+        "Matched-speed and delay-risk scenario design",
+        "Common-case baseline candidate after model details are extracted"
+      ],
+      "ineligible_use": [
+        "Direct performance prediction for Luminous deep-sea vessel",
+        "Physical/CFD validation or regulatory approval"
+      ]
+    },
+    {
+      "source_id": "IMO-MEPC407-RESOLUTION-INDEX-2026",
+      "title": "IMO MEPC 2026-27 resolution index entry for MEPC.407(84)",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-05-01",
+      "url": "https://www.imo.org/en/knowledgecentre/indexofimoresolutions/pages/mepc-2026-27.aspx",
+      "evidence_class": "official_resolution_index_status_snapshot",
+      "scope": {
+        "resolution": "MEPC.407(84)",
+        "index_status_checked": "2026-11-11",
+        "index_status": "AWAITING CERTIFICATION",
+        "meeting_outcome": "MEPC 84 meeting summary separately reports adoption of the North-East Atlantic ECA amendment and a 1 September 2027 entry-into-force date."
+      },
+      "limitations": [
+        "The linked resolution PDF currently presents an awaiting-certification placeholder, not the certified Annex VI text.",
+        "The committee meeting outcome and formal certified publication status are distinct facts.",
+        "Ship-specific legal interpretation and official ECA coordinates must use the certified amendment and authoritative MARPOL Annex VI Appendix VII."
+      ],
+      "eligible_use": [
+        "Versioned regulatory source status",
+        "Evidence of public resolution-index status as of 11 November 2026"
+      ],
+      "ineligible_use": [
+        "Substituting for certified legal text or official ECA polygon coordinates",
+        "Ship-specific compliance determination"
+      ]
+    },
+    {
+      "source_id": "DNV-NE-ATLANTIC-ECA-2026",
+      "title": "North-east Atlantic joins the expanding network of ECAs",
+      "publisher": "DNV",
+      "publication_date": "2026-06-17",
+      "url": "https://www.dnv.com/news/2026/north-east-atlantic-joins-the-expanding-network-of-ecas/",
+      "evidence_class": "classification_society_regulatory_analysis",
+      "scope": {
+        "instrument": "Resolution MEPC.407(84)",
+        "geography_note": "DNV identifies the Azores, Madeira and Canary Islands EEZs as excluded; exact area is defined by official MARPOL Annex VI Appendix VII coordinates.",
+        "entry_into_force": "2027-09-01",
+        "sox_pm_application": "2028-09-01",
+        "nox_tier_iii": "Ships meeting the MARPOL three-date construction/delivery criteria; relevant engines above 130 kW."
+      },
+      "limitations": [
+        "DNV explanatory summary is secondary analysis; certified MEPC.407(84) text and official coordinates control.",
+        "Geographic descriptions are not a substitute for official polygon data."
+      ],
+      "eligible_use": [
+        "Independent cross-check of ECA timeline and geographic exclusions",
+        "Class-oriented implementation planning"
+      ],
+      "ineligible_use": [
+        "Replacing certified MARPOL amendments or official coordinates"
+      ]
+    },
+    {
+      "source_id": "CLASSNK-MEPC84-WIND-GFI-GUIDANCE-2026",
+      "title": "Preliminary Report of IMO MEPC 84 — draft GFI guidance for wind propulsion monitoring, reporting and verification",
+      "publisher": "ClassNK, External Affairs Department",
+      "publication_date": "2026-05-04",
+      "url": "https://www.classnk.or.jp/hp/pdf/info_service/imo_and_iacs/MEPC84_sumE.pdf",
+      "evidence_class": "classification_society_meeting_summary_of_draft_guideline_work",
+      "scope": {
+        "sections": [
+          "1.1.2",
+          "1.2"
+        ],
+        "details": [
+          "ISWG-GHG 21 worked on draft guidance for calculation of attained annual GHG Fuel Intensity (GFI), including draft guidance on monitoring, reporting and verifying energy derived from wind propulsion systems.",
+          "The report states that development would continue while discussions on IMO mid-term measures remained ongoing."
+        ],
+        "implication": "Useful evidence of planned methodological work; not an adopted wind-energy calculation or present reporting obligation."
+      },
+      "limitations": [
+        "This is a preliminary class-society summary of committee working-group activity, not a final adopted guideline.",
+        "The IMO mid-term measure framework remained unresolved as of the MEPC 84 outcome; draft guidance must not be treated as operative.",
+        "Do not infer a final wind-energy formula, certification method or regulatory credit from this source."
+      ],
+      "eligible_use": [
+        "Research planning for wind energy MRV evidence",
+        "Draft methodology change monitoring"
+      ],
+      "ineligible_use": [
+        "Statutory wind-energy calculation",
+        "Claiming adopted IMO WAPS MRV requirements"
+      ]
+    },
+    {
+      "source_id": "AREDAH-RAKHA-WEATHER-ROUTING-BENCHMARK-2026",
+      "title": "Weather-Routing Benchmark: a multi-basin, multi-vessel instance set for ship weather-routing and speed-optimization research",
+      "publisher": "Ahmed Aredah and Hesham A. Rakha; Texas A&M Transportation Institute / Virginia Tech",
+      "publication_date": "2026",
+      "url": "https://doi.org/10.5281/zenodo.21052776",
+      "evidence_class": "public_physics_model_benchmark_with_ERA5_reanalysis_and_priced_per_instance_results",
+      "scope": {
+        "dataset_version": "1.0.0",
+        "license": "CC BY 4.0",
+        "repository": "https://github.com/AhmedAredah/weather-routing-benchmark",
+        "paper_status": "Accompanying paper is listed as under review in CITATION.cff.",
+        "design": {
+          "route_count": 12,
+          "seasons": [
+            "DJF",
+            "MAM",
+            "JJA",
+            "SON"
+          ],
+          "years": [
+            2022,
+            2023
+          ],
+          "instances_per_vessel": 96,
+          "vessel_classes": [
+            "S175 containership",
+            "KVLCC2 VLCC tanker",
+            "JBC capesize bulk carrier"
+          ],
+          "objectives": [
+            "minimum fuel",
+            "minimum voyage cost"
+          ],
+          "total_priced_voyages": 576
+        },
+        "baseline": "Weather-blind calm-optimal route scored under the same historical ERA5 weather, with separate route-only and joint route+speed optimization.",
+        "weather_inputs": "ERA5 reanalysis (hourly 10 m winds; significant wave height / mean wave period), not operational forecast vintages. Raw metocean fields are not redistributed in this repository.",
+        "model_components": [
+          "Holtrop–Mennen calm-water resistance",
+          "Lang–Mao spectral added resistance",
+          "Fujiwara wind resistance",
+          "Wageningen B-series propeller operating point",
+          "load-dependent SFOC map",
+          "engine MCR / IMO MSC.1/Circ.1228 seakeeping / under-keel clearance / current-triangle gates"
+        ],
+        "published_headlines": {
+          "S175": {
+            "route_only_mean_percent": 5.04,
+            "route_only_median_percent": 1.91,
+            "route_only_p90_percent": 14.58,
+            "joint_route_speed_mean_percent": 11.01
+          },
+          "KVLCC2": {
+            "route_only_mean_percent": 6.14,
+            "route_only_median_percent": 3.91,
+            "route_only_p90_percent": 16.07,
+            "joint_route_speed_mean_percent": 10.95
+          },
+          "JBC": {
+            "route_only_mean_percent": 4.55,
+            "route_only_median_percent": 1.82,
+            "route_only_p90_percent": 15.09,
+            "joint_route_speed_mean_percent": 9.57
+          }
+        }
+      },
+      "limitations": [
+        "This is a first-principles simulation benchmark evaluated under historical ERA5 reanalysis, not a dataset of measured ship fuel consumption or sea-trial truth.",
+        "The published campaign outputs/results are provided, but raw ERA5 metocean fields are not redistributed; users must obtain them separately under their source terms.",
+        "The KVLCC2 and JBC engine SFOC shape is stated by the benchmark authors as scaled from the S175 reference; it is not a vessel-specific measured engine map.",
+        "Weather-blind baseline infeasibility and canal/draft route infeasibility are represented by statuses and missing savings values. They must not be dropped silently or counted as zero savings.",
+        "The accompanying paper is marked under review in CITATION.cff; reported summaries are author-provided and require independent reproduction.",
+        "The 2024 bunker price and ECA min-cost objective is a benchmark scenario, not a current 2026 statutory emissions-liability calculation.",
+        "The benchmark contains no WAPS device model or ship-specific actual service contract; it is a routing-method baseline only."
+      ],
+      "eligible_use": [
+        "Common deterministic weather-routing and speed-optimization algorithm comparison",
+        "Instance-level reproduction of the published headline summaries",
+        "Feasibility, runtime, route-quality and objective-sensitivity evaluation",
+        "Retrospective route selection under reanalysis, clearly distinguished from forecast-aware operation"
+      ],
+      "ineligible_use": [
+        "Measured cargo-vessel fuel-prediction validation",
+        "Direct forecast-aware controller validation without operational forecast inputs",
+        "WAPS fuel-saving claims",
+        "Fleet transfer or physical qualification"
+      ]
+    },
+    {
+      "source_id": "IEC-60092-501-2025",
+      "title": "Electrical installations in ships — Part 501: Special features — Electric propulsion plant",
+      "publisher": "International Electrotechnical Commission",
+      "publication_date": "2025-08-26",
+      "url": "https://webstore.iec.ch/en/publication/92837",
+      "evidence_class": "published_international_standard",
+      "scope": {
+        "edition": "IEC 60092-501:2025, Edition 6",
+        "coverage": [
+          "generators and prime movers",
+          "battery and alternative power sources",
+          "switchboards and distribution",
+          "power converters",
+          "propulsion motors",
+          "control, monitoring and safety systems",
+          "podded drives including azimuth"
+        ],
+        "relevance": "Electrical equipment and configuration boundaries for hybrid-electric marine propulsion design and test."
+      },
+      "limitations": [
+        "This standard is not a whole-vessel first-law energy balance method or a fuel-saving benchmark.",
+        "Use the licensed current standard and vessel-specific class/flag applicability; public web metadata is not the full normative text."
+      ],
+      "eligible_use": [
+        "Electrical propulsion system boundary and interface mapping",
+        "Configuration/test evidence planning"
+      ],
+      "ineligible_use": [
+        "Claiming that a first-law ledger pass establishes IEC compliance",
+        "Substituting an accounting audit for electrical system testing"
+      ]
+    },
+    {
+      "source_id": "ISO-TS-25128-2026",
+      "title": "Small craft — Propulsion system energy consumption — Test method",
+      "publisher": "International Organization for Standardization",
+      "publication_date": "2026-09-01",
+      "url": "https://www.iso.org/standard/89049.html",
+      "evidence_class": "published_technical_specification_limited_scope",
+      "scope": {
+        "edition": "ISO/TS 25128:2026, Edition 1",
+        "scope": "Measurement, documentation and presentation of mechanical propulsion energy consumption for small craft underway, irrespective of propulsion system, energy type or hull characteristics.",
+        "explicit_exclusions": [
+          "wind propulsion",
+          "wind-assisted hybrid propulsion",
+          "wave propulsion"
+        ]
+      },
+      "limitations": [
+        "Small-craft scope; not a cargo-vessel standard.",
+        "Explicit exclusions mean it cannot be claimed as a WAPS or wind-assisted hybrid cargo validation standard.",
+        "Do not infer coverage from its general propulsion-system wording."
+      ],
+      "eligible_use": [
+        "Scope-bound small-craft mechanical propulsion methodology comparison",
+        "Demonstrating why a cargo/WAPS test method needs an explicit scope"
+      ],
+      "ineligible_use": [
+        "Claiming compliance for cargo vessels or WAPS hybrid propulsion",
+        "Using its method as a whole-vessel energy conservation or lifecycle benchmark"
+      ]
+    },
+    {
+      "source_id": "IMO-URN-GUIDELINES-MEPC1CIRC906REV1",
+      "title": "Revised Guidelines for the reduction of underwater radiated noise from shipping to address adverse impacts on marine life",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2025-10-10",
+      "url": "https://glonoise.imo.org/documents/2524",
+      "evidence_class": "official_imo_guideline",
+      "scope": {
+        "instrument": "MEPC.1/Circ.906/Rev.1",
+        "topic": "Underwater radiated noise management planning and reduction from commercial shipping.",
+        "status": "Guidelines under IMO experience-building phase; MEPC 84 agreed in principle to extend phase to end 2028."
+      },
+      "limitations": [
+        "Guidelines are not a universal numeric noise limit or a ship-specific acoustic certification.",
+        "Biological impact requires separate receiving-environment, propagation and species-sensitivity analysis."
+      ]
+    },
+    {
+      "source_id": "IMO-URN-EBP-MEPC84-2026",
+      "title": "MEPC 84 decision on underwater radiated noise experience-building phase and further IMO study",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-05-01",
+      "url": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-mepc-84th-session.aspx",
+      "evidence_class": "official_committee_outcome",
+      "scope": {
+        "experience_building_phase_extension": "Agreed in principle to extend the URN experience-building phase to the end of 2028.",
+        "further_study": "Agreed in principle to commission an IMO study on URN emissions and invited proposals for a policy roadmap ahead of MEPC 85."
+      },
+      "limitations": [
+        "Agreed-in-principle work is not a binding numeric ship-noise limit.",
+        "The MEPC 85 roadmap and subsequent decisions may update this snapshot."
+      ]
+    },
+    {
+      "source_id": "ISO-17208-1-2016",
+      "title": "Underwater acoustics — Quantities and procedures for description and measurement of underwater sound from ships — Part 1: Deep-water precision measurements",
+      "publisher": "International Organization for Standardization",
+      "publication_date": "2016-03",
+      "url": "https://www.iso.org/standard/62408.html",
+      "evidence_class": "international_standard",
+      "scope": {
+        "standard": "ISO 17208-1:2016",
+        "amendment": "Amendment 1:2024",
+        "method": "Prescribed-condition deep-water radiated-noise measurement; far-field RMS SPL normalized to 1 m and reported in one-third-octave bands.",
+        "applicability": "Underway surface vessels; this part does not provide biological noise criteria."
+      },
+      "limitations": [
+        "Measurement procedure does not determine impact on marine organisms.",
+        "Propagation effects including bottom reflections, refraction and absorption may remain relevant."
+      ]
+    },
+    {
+      "source_id": "ISO-17208-2-2019",
+      "title": "Underwater acoustics — Part 2: Determination of source levels from deep-water measurements",
+      "publisher": "International Organization for Standardization",
+      "publication_date": "2019-07",
+      "url": "https://www.iso.org/standard/62409.html",
+      "evidence_class": "international_standard_confirmed_2026",
+      "scope": {
+        "standard": "ISO 17208-2:2019",
+        "method": "Derives equivalent monopole source level from eligible deep-water ISO 17208-1 measurements or prescribed deep-water hydrophone geometry.",
+        "reported_aspect": "Broadside aspect with specified nominal source depth."
+      },
+      "limitations": [
+        "Equivalent monopole source level is not identical to directly measured radiated-noise level.",
+        "Deep-water and broadside conditions must be preserved."
+      ]
+    },
+    {
+      "source_id": "ISO-17208-3-2025",
+      "title": "Underwater acoustics — Part 3: Requirements for measurements in shallow water",
+      "publisher": "International Organization for Standardization",
+      "publication_date": "2025-09",
+      "url": "https://www.iso.org/standard/81321.html",
+      "evidence_class": "international_standard",
+      "scope": {
+        "standard": "ISO 17208-3:2025",
+        "method": "Shallow-water ship-noise measurements and source-level calculations accounting for shallow-water propagation.",
+        "band_convention": "Radiated-noise level reported in decidecade bands.",
+        "comparison": "Supports contract criteria, ship-to-ship comparison, periodic signature assessments and R&D when measurement conditions are controlled."
+      },
+      "limitations": [
+        "Shallow-water results are not directly interchangeable with deep-water data without the prescribed conversion.",
+        "Ecological exposure requires further propagation/context analysis."
+      ]
+    },
+    {
+      "source_id": "ISO-7605-2025",
+      "title": "Underwater acoustics — Measurement of underwater ambient sound",
+      "publisher": "International Organization for Standardization",
+      "publication_date": "2025-07",
+      "url": "https://www.iso.org/standard/82844.html",
+      "evidence_class": "international_standard",
+      "scope": {
+        "standard": "ISO 7605:2025",
+        "method": "Ambient underwater sound measurement and reporting including instrument calibration/deployment, acquisition and processing of sound-pressure time series, levels, spectra and statistics."
+      },
+      "limitations": [
+        "Ambient sound excludes self-noise from the source under measurement.",
+        "The standard scope described does not include particle-motion measurement."
+      ]
+    },
+    {
+      "source_id": "OCEANENG-PROPELLER-URN-FULLSCALE-2025-121412",
+      "title": "Propeller design by optimisation for underwater radiated noise reduction: a full scale application",
+      "publisher": "Ocean Engineering",
+      "publication_date": "2025",
+      "url": "https://doi.org/10.1016/j.oceaneng.2025.121412",
+      "evidence_class": "peer_reviewed_full_scale_propeller_noise_case",
+      "scope": {
+        "method": "Propeller optimisation, numerical/scale model testing, refit and full-scale measurements.",
+        "reported_result": "Authors report coherent model-scale/numerical results and full-scale confirmation of URN reduction for a small passenger vessel."
+      },
+      "limitations": [
+        "Small passenger-vessel result, not a cargo/WAPS transfer result.",
+        "Full numerical methods and test conditions must be reviewed before reproduction."
+      ]
+    },
+    {
+      "source_id": "OCEANENG-CAVITATION-URN-INBEHIND-2026-124084",
+      "title": "Cavitation underwater radiated noise methodology applied to a propeller operating in-behind condition",
+      "publisher": "Ocean Engineering",
+      "publication_date": "2026-03-15",
+      "url": "https://doi.org/10.1016/j.oceaneng.2025.124084",
+      "evidence_class": "peer_reviewed_acoustic_methodology_with_model_and_full_scale_comparisons",
+      "scope": {
+        "method": "Predicted propeller pressure pulses and URN compared against model-scale experiments and full-scale sea trials; includes permeable FW-H and cavitation-volume monopole-source methods.",
+        "findings": "Paper reports sensitivity to integration surface and rotating/stationary interface errors for permeable FW-H URN calculations."
+      },
+      "limitations": [
+        "Solver-specific methodology; not universal URN solver validation.",
+        "Applicability depends on propeller, flow, cavitation and test conditions."
+      ]
+    },
+    {
+      "source_id": "IMO-MEPC378-80-BIOFOULING-2023",
+      "title": "2023 Guidelines for the control and management of ships' biofouling to minimize the transfer of invasive aquatic species",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2023-07",
+      "url": "https://www.imo.org/en/ourwork/environment/pages/biofouling.aspx",
+      "evidence_class": "official_imo_guideline",
+      "scope": {
+        "instrument": "Resolution MEPC.378(80)",
+        "topic": "Voluntary global guidance for biofouling management to minimize transfer of invasive aquatic species."
+      },
+      "limitations": [
+        "Guidelines are not a completed mandatory global biofouling treaty.",
+        "Implementation and local cleaning/port requirements must be checked separately."
+      ]
+    },
+    {
+      "source_id": "IMO-MEPC1CIRC918-INWATER-CLEANING-2025",
+      "title": "Guidance on in-water cleaning of ships' biofouling",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2025",
+      "url": "https://www.imo.org/en/ourwork/environment/pages/biofouling.aspx",
+      "evidence_class": "official_imo_guidance",
+      "scope": {
+        "instrument": "MEPC.1/Circ.918",
+        "topic": "Guidance for safe and environmentally responsible in-water cleaning of ships' biofouling."
+      },
+      "limitations": [
+        "Guidance is not a local port permit or authorization.",
+        "Cleaning can damage coatings and release fouling organisms or waste; assess actual method and containment."
+      ]
+    },
+    {
+      "source_id": "IMO-PPR13-BIOFOULING-LEGAL-FRAMEWORK-2026",
+      "title": "PPR 13 groundwork for future legally binding framework on biofouling",
+      "publisher": "International Maritime Organization",
+      "publication_date": "2026-02-13",
+      "url": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/ppr-13th-session.aspx",
+      "evidence_class": "official_committee_workplan",
+      "scope": {
+        "meeting": "PPR 13, 9–13 February 2026",
+        "status": "Agreed foundational work for a standalone instrument and correspondence group; subsequent MEPC work required.",
+        "target": "IMO page identifies a draft legal framework/recommendations target around MEPC 89 in mid-2029."
+      },
+      "limitations": [
+        "Workplan milestone is not an adopted mandatory legal requirement.",
+        "The framework text, scope, tests, verification and enforcement remain under development."
+      ]
+    },
+    {
+      "source_id": "ISO-6319-2026-INWATER-CLEANING",
+      "title": "Ships and marine technology — Marine environment protection — Conducting and documenting in-water cleaning of biofouling on ships",
+      "publisher": "International Organization for Standardization",
+      "publication_date": "2026",
+      "url": "https://www.iso.org/obp/ui?_escaped_fragment_=iso%3Astd%3Aiso%3A6319%3Aed-1%3Av1%3Aen",
+      "evidence_class": "international_standard_2026",
+      "scope": {
+        "standard": "ISO 6319:2026",
+        "topic": "Conducting and documenting in-water cleaning of biofouling on ships.",
+        "rationale": "Biofouling affects hull resistance/propeller efficiency and can transfer invasive aquatic species."
+      },
+      "limitations": [
+        "Review the full licensed standard text and scope before encoding conformity checks.",
+        "A documentation record does not substitute for local port/state permission or biosecurity clearance."
+      ]
+    },
+    {
+      "source_id": "IMO-GREENVOYAGE-HULL-CLEANING",
+      "title": "GreenVoyage2050 Ship Energy Efficiency Solutions Portal — Hull cleaning",
+      "publisher": "International Maritime Organization / DNV",
+      "publication_date": "ongoing",
+      "url": "https://greenvoyage2050.imo.org/technology/hull-cleaning/",
+      "evidence_class": "official_technology_portal_with_disclaimer",
+      "scope": {
+        "topic": "Hull cleaning methods, indicative work rates, cost and fuel-saving potential.",
+        "reported_ranges": "The portal gives indicative 1–5% fuel-reduction potential depending on fouling and vessel/route; diver and ROV cleaning work-rate/cost estimates are explicitly context dependent."
+      },
+      "limitations": [
+        "The portal disclaims warranty/accuracy/completeness and estimates are not universal performance claims.",
+        "Local contamination restrictions and cleaning permissions vary."
+      ]
+    },
+    {
+      "source_id": "OCEANENG-BIOFOULING-REVIEW-2026-123988",
+      "title": "Biofouling of ships and offshore structures: research trends and future pathways",
+      "publisher": "Ocean Engineering",
+      "publication_date": "2026-02-15",
+      "url": "https://doi.org/10.1016/j.oceaneng.2025.123988",
+      "evidence_class": "peer_reviewed_systematic_bibliometric_review",
+      "scope": {
+        "method": "Review and bibliometric analysis across marine organisms, hydrodynamics, carbon intensity, hull roughness inspection, mitigation and maintenance.",
+        "reported_gap": "The authors identify inspection and maintenance as under-explored in their research mapping."
+      },
+      "limitations": [
+        "Bibliometric review, not a direct ship-performance measurement dataset.",
+        "Use it to identify research gaps, not numeric performance targets."
+      ]
+    },
+    {
+      "source_id": "APOR-HULL-FOULING-GHG-2025-104870",
+      "title": "Underestimated penalty of hull fouling: A scenario-based analysis of GHG emissions from global shipping",
+      "publisher": "Applied Ocean Research",
+      "publication_date": "2025",
+      "url": "https://doi.org/10.1016/j.apor.2025.104870",
+      "evidence_class": "peer_reviewed_scenario_model",
+      "scope": {
+        "fleet_sample": "52,636 vessels across six ship types",
+        "reported_result": "Authors estimate moderate fouling can increase annual fuel/GHG by an average 20–30% under their scenario assumptions."
+      },
+      "limitations": [
+        "Scenario-based model estimate, not direct measurement for each ship.",
+        "Not a universal saving target or transferable factor; reproduce model, fouling scenarios and ship-type assumptions before use."
+      ]
+    }
+  ]
+}

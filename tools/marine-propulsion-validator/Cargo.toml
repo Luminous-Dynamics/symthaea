@@ -1,0 +1,75 @@
+[package]
+name = "marine-propulsion-validator"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Fail-closed schema and semantic validator for Luminous marine propulsion evidence cases"
+
+# Kept outside the monorepo workspace so this focused validator does not expand
+# unrelated workspace resolution or weaken existing workspace gates.
+[workspace]
+resolver = "2"
+
+[dependencies]
+chrono = "=0.4.45"
+jsonschema = { version = "=0.59.0", default-features = false }
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = "=1.0.150"
+sha2 = "=0.10.9"
+
+[[bin]]
+name = "marine-propulsion-validator"
+path = "src/main.rs"
+
+[[bin]]
+name = "marine-regulatory-rule-audit"
+path = "src/bin/marine_regulatory_rule_audit.rs"
+
+[[bin]]
+name = "marine-causal-protocol-audit"
+path = "src/bin/marine_causal_protocol_audit.rs"
+
+[[bin]]
+name = "marine-wind-energy-evidence-audit"
+path = "src/bin/marine_wind_energy_evidence_audit.rs"
+
+[[bin]]
+name = "marine-energy-source-ledger-audit"
+path = "src/bin/marine_energy_source_ledger_audit.rs"
+
+[[bin]]
+name = "marine-emissions-evidence-audit"
+path = "src/bin/marine_emissions_evidence_audit.rs"
+
+[[bin]]
+name = "marine-service-flexibility-audit"
+path = "src/bin/marine_service_flexibility_audit.rs"
+
+[[bin]]
+name = "marine-port-call-energy-audit"
+path = "src/bin/marine_port_call_energy_audit.rs"
+
+[[bin]]
+name = "marine-benchmark-manifest-audit"
+path = "src/bin/marine_benchmark_manifest_audit.rs"
+
+[[bin]]
+name = "marine-energy-conservation-audit"
+path = "src/bin/marine_energy_conservation_audit.rs"
+
+[[bin]]
+name = "marine-acoustic-evidence-audit"
+path = "src/bin/marine_acoustic_evidence_audit.rs"
+
+[[bin]]
+name = "marine-biofouling-evidence-audit"
+path = "src/bin/marine_biofouling_evidence_audit.rs"
+
+[[bin]]
+name = "marine-hull-state-evidence-join-audit"
+path = "src/bin/marine_hull_state_evidence_join_audit.rs"
+
+[[bin]]
+name = "marine-acoustic-timebase-binding-audit"
+path = "src/bin/marine_acoustic_timebase_binding_audit.rs"

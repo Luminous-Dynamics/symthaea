@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/marine-propeller-operating-point-v0.1.0.schema.json",
+  "title": "Marine propeller operating-point reduction record v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "record_status",
+    "test_mode",
+    "case_id",
+    "service_fingerprint",
+    "measurement_window",
+    "timebase_id",
+    "propeller",
+    "fluid",
+    "observations",
+    "acoustic_link",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_status": {
+      "enum": [
+        "synthetic",
+        "measured",
+        "modelled",
+        "assumed"
+      ]
+    },
+    "test_mode": {
+      "enum": [
+        "open_water",
+        "behind_hull",
+        "full_scale_service"
+      ]
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "service_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "measurement_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end"
+      ],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "timebase_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "propeller": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "propeller_id",
+        "revision",
+        "diameter_m",
+        "blade_count"
+      ],
+      "properties": {
+        "propeller_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "diameter_m": {
+          "$ref": "#/$defs/positive_interval_m"
+        },
+        "blade_count": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 12
+        }
+      }
+    },
+    "fluid": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "density",
+        "static_pressure",
+        "vapour_pressure"
+      ],
+      "properties": {
+        "density": {
+          "$ref": "#/$defs/measurement"
+        },
+        "static_pressure": {
+          "$ref": "#/$defs/measurement"
+        },
+        "vapour_pressure": {
+          "$ref": "#/$defs/measurement"
+        }
+      }
+    },
+    "observations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "advance_velocity",
+        "shaft_rate",
+        "thrust",
+        "torque",
+        "shaft_power"
+      ],
+      "properties": {
+        "advance_velocity": {
+          "$ref": "#/$defs/measurement"
+        },
+        "shaft_rate": {
+          "$ref": "#/$defs/measurement"
+        },
+        "thrust": {
+          "$ref": "#/$defs/measurement"
+        },
+        "torque": {
+          "$ref": "#/$defs/measurement"
+        },
+        "shaft_power": {
+          "$ref": "#/$defs/measurement"
+        }
+      }
+    },
+    "acoustic_link": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "raw_trace_sha256"
+      ],
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_trace_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "positive_interval_m": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "lower",
+        "upper",
+        "unit"
+      ],
+      "properties": {
+        "value": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "lower": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "upper": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "unit": {
+          "const": "m"
+        }
+      }
+    },
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physical_quantity",
+        "unit",
+        "value",
+        "lower",
+        "upper",
+        "channel_id",
+        "calibration_record_id",
+        "raw_trace_sha256"
+      ],
+      "properties": {
+        "physical_quantity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "number"
+        },
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        },
+        "channel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_trace_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}

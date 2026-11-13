@@ -1,0 +1,534 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-acoustic-evidence:0.1.0",
+  "title": "Luminous Marine Acoustic Evidence Record v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "record_status",
+    "standard_id",
+    "metric_kind",
+    "vessel",
+    "service_fingerprint",
+    "test_site",
+    "measurement_window",
+    "hydrophone",
+    "operating_condition",
+    "measurement_geometry",
+    "sample_window",
+    "raw_trace_sha256",
+    "spectral_bands",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "record_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "record_status": {
+      "enum": [
+        "synthetic",
+        "measured",
+        "modelled"
+      ]
+    },
+    "standard_id": {
+      "enum": [
+        "ISO 17208-1:2016",
+        "ISO 17208-2:2019",
+        "ISO 17208-3:2025"
+      ]
+    },
+    "standard_amendments": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "metric_kind": {
+      "enum": [
+        "radiated_noise_level",
+        "equivalent_monopole_source_level"
+      ]
+    },
+    "vessel": {
+      "$ref": "#/$defs/vessel"
+    },
+    "service_fingerprint": {
+      "$ref": "#/$defs/sha256"
+    },
+    "test_site": {
+      "$ref": "#/$defs/test_site"
+    },
+    "measurement_window": {
+      "$ref": "#/$defs/window"
+    },
+    "hydrophone": {
+      "$ref": "#/$defs/hydrophone"
+    },
+    "operating_condition": {
+      "$ref": "#/$defs/operating_condition"
+    },
+    "measurement_geometry": {
+      "$ref": "#/$defs/geometry"
+    },
+    "sample_window": {
+      "$ref": "#/$defs/sample_window"
+    },
+    "ambient_reference": {
+      "$ref": "#/$defs/ambient_reference"
+    },
+    "raw_trace_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "spectral_bands": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/spectral_band"
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "revision"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "quantity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "unit"
+      ],
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end"
+      ],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "vessel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "length_overall_m"
+      ],
+      "properties": {
+        "identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "length_overall_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "test_site": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "site_id",
+        "water_depth_m",
+        "water_depth_method"
+      ],
+      "properties": {
+        "site_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "water_depth_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "water_depth_method": {
+          "enum": [
+            "surveyed",
+            "charted",
+            "modelled",
+            "unknown"
+          ]
+        },
+        "seabed_description": {
+          "type": "string"
+        },
+        "sound_speed_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "hydrophone": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instrument_identity",
+        "calibration_record_id",
+        "calibration_provider",
+        "calibration_certificate_sha256",
+        "calibration_rights_status",
+        "calibration_valid_from",
+        "calibration_valid_until",
+        "calibration_frequency_min_hz",
+        "calibration_frequency_max_hz",
+        "calibration_uncertainty_db"
+      ],
+      "properties": {
+        "instrument_identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "calibration_record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_provider": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_certificate_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "calibration_rights_status": {
+          "enum": [
+            "public",
+            "permissioned",
+            "restricted",
+            "unknown"
+          ]
+        },
+        "calibration_valid_from": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "calibration_valid_until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "calibration_frequency_min_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "calibration_frequency_max_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "calibration_uncertainty_db": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "operating_condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "loading_condition",
+        "speed_through_water_kn",
+        "shaft_power_kw",
+        "shaft_rpm",
+        "draft_m",
+        "trim_m",
+        "wind_assist_installation",
+        "wind_device_states"
+      ],
+      "properties": {
+        "loading_condition": {
+          "enum": [
+            "ballast",
+            "partial",
+            "design",
+            "full",
+            "other",
+            "unknown"
+          ]
+        },
+        "speed_through_water_kn": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "shaft_power_kw": {
+          "type": "number",
+          "minimum": 0
+        },
+        "shaft_rpm": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "draft_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "trim_m": {
+          "type": "number"
+        },
+        "rudder_angle_deg": {
+          "type": "number"
+        },
+        "significant_wave_height_m": {
+          "type": "number",
+          "minimum": 0
+        },
+        "wind_speed_kn": {
+          "type": "number",
+          "minimum": 0
+        },
+        "wind_from_bow_deg": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 360
+        },
+        "wind_assist_installation": {
+          "enum": [
+            "installed",
+            "not_installed",
+            "unknown"
+          ]
+        },
+        "wind_device_states": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "device_id",
+              "commanded_state",
+              "achieved_state"
+            ],
+            "properties": {
+              "device_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "commanded_state": {
+                "enum": [
+                  "active",
+                  "feathered",
+                  "stowed",
+                  "retracted",
+                  "unavailable",
+                  "unknown"
+                ]
+              },
+              "achieved_state": {
+                "enum": [
+                  "active",
+                  "feathered",
+                  "stowed",
+                  "retracted",
+                  "unavailable",
+                  "faulted",
+                  "unknown"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "geometry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hydrophone_depth_m",
+        "range_at_closest_point_of_approach_m",
+        "closest_point_of_approach_bearing_deg",
+        "aspect"
+      ],
+      "properties": {
+        "hydrophone_depth_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "source_depth_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "range_at_closest_point_of_approach_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "closest_point_of_approach_bearing_deg": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 360
+        },
+        "aspect": {
+          "enum": [
+            "broadside",
+            "other",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "sample_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_rate_hz",
+        "expected_sample_count",
+        "observed_sample_count",
+        "missing_sample_count",
+        "minimum_observed_fraction",
+        "window_semantics"
+      ],
+      "properties": {
+        "sample_rate_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "expected_sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "observed_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minimum_observed_fraction": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "window_semantics": {
+          "const": "start_inclusive_end_exclusive"
+        }
+      }
+    },
+    "spectral_band": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "band_type",
+        "lower_frequency_hz",
+        "centre_frequency_hz",
+        "upper_frequency_hz",
+        "rms_sound_pressure_level_db_re_1upa",
+        "expanded_uncertainty_db",
+        "coverage_factor"
+      ],
+      "properties": {
+        "band_type": {
+          "enum": [
+            "one_third_octave",
+            "decidecade"
+          ]
+        },
+        "lower_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "centre_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "upper_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "rms_sound_pressure_level_db_re_1upa": {
+          "type": "number"
+        },
+        "expanded_uncertainty_db": {
+          "type": "number",
+          "minimum": 0
+        },
+        "coverage_factor": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "ambient_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_id",
+        "standard_id",
+        "raw_trace_sha256",
+        "measurement_window",
+        "limitations"
+      ],
+      "properties": {
+        "record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "standard_id": {
+          "const": "ISO 7605:2025"
+        },
+        "raw_trace_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "measurement_window": {
+          "$ref": "#/$defs/window"
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

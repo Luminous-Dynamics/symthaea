@@ -1,0 +1,865 @@
+{
+  "schema_version": "0.2.0",
+  "registry_id": "MARINE-REGULATORY-RULE-REGISTER-2026-11-10",
+  "snapshot_date": "2026-11-10",
+  "status_policy": {
+    "rule_statuses": [
+      "proposed",
+      "under_review",
+      "adopted",
+      "in_force",
+      "applicable",
+      "superseded",
+      "withdrawn",
+      "guidance_adopted"
+    ],
+    "promotion_policy": "A rule is never promoted from proposal or committee review to adopted, in-force or applicable by model inference. Adoption, entry into force and application dates remain separate. A rule's jurisdiction, vessel scope, voyage scope and reporting period must be resolved for each case.",
+    "limitations": [
+      "This snapshot is a research register, not legal advice or a verifier determination.",
+      "Official meeting summaries can evidence committee decisions but do not replace the adopted legal text or charted geographic boundary.",
+      "Re-fetch and review official instruments before every real reporting period; this dated snapshot must not be treated as timeless."
+    ]
+  },
+  "rules": [
+    {
+      "rule_id": "IMO-STR-MEASURE-REVIEW-2026",
+      "title": "IMO phase-two review of EEXI, SEEMP and CII short-term GHG measures",
+      "authority": "International Maritime Organization",
+      "instrument": "MEPC 84 outcome and intersessional work plan",
+      "revision_or_resolution": "MEPC 84, 27 April–1 May 2026",
+      "rule_status": "under_review",
+      "legal_character": "committee_workplan",
+      "dates": {
+        "review_scheduled_from": "2026-05-01"
+      },
+      "applicability": {
+        "ship_scope": "Ships within the scope of the relevant IMO short-term GHG measures; vessel-specific applicability remains subject to current MARPOL/IMO instruments.",
+        "geographic_scope": "International shipping under applicable IMO instruments.",
+        "voyage_scope": "Design and annual operational efficiency metrics; route and reporting boundaries depend on the underlying measure.",
+        "conditions": [
+          "Phase-two review includes possible revisions to EEXI, SEEMP and CII measures and consideration of wind propulsion in EEDI/EEXI calculations."
+        ],
+        "exclusions_or_unknowns": [
+          "No new WAPS credit formula is established by the review workplan.",
+          "Do not treat candidate amendments as current legal requirements."
+        ]
+      },
+      "output_scope": [
+        "regulatory_scenario",
+        "EEXI/EEDI design metric review",
+        "CII/SEEMP review"
+      ],
+      "source_ids": [
+        "IMO-MEPC84-EEXI-CII-WIND-REVIEW-2026"
+      ],
+      "limitations": [
+        "This is a review/workplan, not an adopted wind-propulsion credit formula or vessel-specific statutory calculation."
+      ]
+    },
+    {
+      "rule_id": "IMO-CH4-N2O-ENGINE-MEASUREMENT-2026",
+      "title": "Marine diesel engine CH4/N2O measurement and calculation guidelines",
+      "authority": "International Maritime Organization",
+      "instrument": "MEPC resolutions 414(84), 415(84), 416(84)",
+      "revision_or_resolution": "MEPC.414(84); MEPC.415(84); MEPC.416(84)",
+      "rule_status": "guidance_adopted",
+      "legal_character": "official_guideline",
+      "dates": {
+        "adopted_on": "2026-05-01"
+      },
+      "applicability": {
+        "ship_scope": "Marine diesel engines and relevant test-bed/onboard measurement programmes, subject to each resolution's detailed scope.",
+        "geographic_scope": "International maritime emissions measurement guidance.",
+        "voyage_scope": "Tank-to-wake CH4 and/or N2O measurement and calculation.",
+        "conditions": [
+          "MEPC.414(84) addresses test-bed/onboard measurements.",
+          "MEPC.415(84) addresses engine-load monitoring and calculation of emission values.",
+          "MEPC.416(84) addresses continuous emission monitoring systems."
+        ],
+        "exclusions_or_unknowns": [
+          "Do not assume measurement data exists unless suitable calibrated instruments and records are available.",
+          "Confirm mandatory/voluntary status and applicable method from the resolution and current IMO instructions."
+        ]
+      },
+      "output_scope": [
+        "CH4 tank-to-wake emissions",
+        "N2O tank-to-wake emissions",
+        "measurement method provenance",
+        "measurement uncertainty"
+      ],
+      "source_ids": [
+        "IMO-MEPC414-416-CH4-N2O-2026"
+      ],
+      "limitations": [
+        "Guidelines do not establish that a particular ship's instruments are calibrated or that emissions records have been independently verified."
+      ]
+    },
+    {
+      "rule_id": "EU-ETS-MARITIME",
+      "title": "EU Emissions Trading System maritime transport coverage",
+      "authority": "European Union / European Commission",
+      "instrument": "Directive 2003/87/EC as amended, including Directive (EU) 2023/959 and maritime implementing provisions",
+      "revision_or_resolution": "Consolidated text and current Commission guidance must be consulted",
+      "rule_status": "in_force",
+      "legal_character": "binding_regulation",
+      "dates": {
+        "applies_from": "2024-01-01"
+      },
+      "applicability": {
+        "ship_scope": "Since 2024: cargo and passenger ships ≥5,000 GT; from 2027: offshore ships ≥5,000 GT. MRV scope differs and includes additional 400–5,000 GT offshore/general cargo ships from 2025.",
+        "geographic_scope": "EU/EEA port emissions and voyages with EU port calls, as defined in current law.",
+        "voyage_scope": "100% coverage for voyages between EU ports and emissions within EU ports; 50% coverage for voyages with one end outside the EU, subject to the legal rules.",
+        "conditions": [
+          "The EU ETS is flag-neutral and route-based.",
+          "100% of emissions for eligible voyages between EU/EEA ports and 100% of eligible emissions within EU/EEA ports.",
+          "50% of eligible emissions for voyages between an EU/EEA port and a non-EU/EEA port.",
+          "CH4 and N2O are included in ETS maritime scope from emissions year 2026."
+        ],
+        "exclusions_or_unknowns": [
+          "Applicability, responsible company, ship scope, exemptions and voyage classification must be resolved from legal text and verified facts."
+        ]
+      },
+      "output_scope": [
+        "EU ETS covered CO2 emissions",
+        "EU ETS covered CH4 emissions from 2026",
+        "EU ETS covered N2O emissions from 2026",
+        "allowance liability scenario"
+      ],
+      "calculation_contract": {
+        "metric_id": "eu_ets_covered_emissions",
+        "formula_or_method": "Aggregate gas-specific emissions by eligible voyage/port segment and reporting year, applying the legally defined coverage share and surrender phase-in. Preserve each gas and the applicable GWP/calculation method.",
+        "surrender_phase_in": [
+          {
+            "emissions_year": 2024,
+            "surrender_year": 2025,
+            "surrender_fraction": 0.4,
+            "meaning": "40% of emissions from 2024 to be covered by allowances surrendered in 2025."
+          },
+          {
+            "emissions_year": 2025,
+            "surrender_year": 2026,
+            "surrender_fraction": 0.7,
+            "meaning": "70% of emissions from 2025 to be covered by allowances surrendered in 2026."
+          },
+          {
+            "emissions_year": 2026,
+            "surrender_year": 2027,
+            "surrender_fraction": 1,
+            "meaning": "100% of emissions from 2026 to be covered by allowances surrendered in 2027; full surrender applies thereafter under current rules."
+          }
+        ],
+        "voyage_coverage": [
+          {
+            "coverage_id": "EU_TO_EU",
+            "voyage_scope": "Voyage departing an EU/EEA Member State port and arriving at an EU/EEA Member State port.",
+            "covered_fraction": 1,
+            "emissions_boundary": "All emissions of the eligible voyage, with within-port emissions accounted separately according to the regulation.",
+            "limitations": [
+              "Subject to port-call definition, derogations and applicable ship/company scope."
+            ]
+          },
+          {
+            "coverage_id": "EU_TO_NON_EU",
+            "voyage_scope": "Voyage departing an EU/EEA Member State port and arriving outside EU/EEA jurisdiction.",
+            "covered_fraction": 0.5,
+            "emissions_boundary": "Half of the eligible voyage emissions.",
+            "limitations": [
+              "Subject to legally defined port-of-call rules and derogations."
+            ]
+          },
+          {
+            "coverage_id": "NON_EU_TO_EU",
+            "voyage_scope": "Voyage departing outside EU/EEA jurisdiction and arriving at an EU/EEA Member State port.",
+            "covered_fraction": 0.5,
+            "emissions_boundary": "Half of the eligible voyage emissions.",
+            "limitations": [
+              "Subject to legally defined port-of-call rules and derogations."
+            ]
+          },
+          {
+            "coverage_id": "WITHIN_EU_PORT",
+            "voyage_scope": "Emissions within a qualifying EU/EEA port of call.",
+            "covered_fraction": 1,
+            "emissions_boundary": "Emissions at berth and ship movements within port limits, counted without duplication with voyage emissions.",
+            "limitations": [
+              "Port approach/departure outside port of call is part of the voyage, not within-port emissions."
+            ]
+          }
+        ],
+        "gas_scope": [
+          {
+            "gas": "CO2",
+            "included_from_emissions_year": 2024,
+            "limitations": [
+              "Verify ship/reporting scope under applicable law."
+            ]
+          },
+          {
+            "gas": "CH4",
+            "included_from_emissions_year": 2026,
+            "limitations": [
+              "Gas enters EU ETS maritime scope from 2026; MRV monitoring/reporting scope began earlier."
+            ]
+          },
+          {
+            "gas": "N2O",
+            "included_from_emissions_year": 2026,
+            "limitations": [
+              "Gas enters EU ETS maritime scope from 2026; MRV monitoring/reporting scope began earlier."
+            ]
+          }
+        ]
+      },
+      "source_ids": [
+        "EU-ETS-MARITIME-2026"
+      ],
+      "limitations": [
+        "Surrender phase-in is not the same as the geographic covered-emissions fraction.",
+        "Do not apply one fleet-wide coverage ratio to every voyage or period."
+      ]
+    },
+    {
+      "rule_id": "EU-MRV-MARITIME",
+      "title": "EU Monitoring, Reporting and Verification of maritime transport emissions",
+      "authority": "European Union",
+      "instrument": "Regulation (EU) 2015/757 as amended, including Regulation (EU) 2023/957",
+      "revision_or_resolution": "Consolidated EU MRV Maritime Regulation and applicable implementing acts",
+      "rule_status": "in_force",
+      "legal_character": "binding_regulation",
+      "dates": {
+        "applies_from": "2018-01-01"
+      },
+      "applicability": {
+        "ship_scope": "From 2024: cargo and passenger ships ≥5,000 GT; from 2025 reporting period: offshore ships ≥5,000 GT and offshore/general cargo ships ≥400 GT and <5,000 GT, subject to detailed legal scope and exclusions.",
+        "geographic_scope": "Voyages to, from and between EU/EEA ports and emissions within ports under the MRV Maritime Regulation's scope.",
+        "voyage_scope": "Monitoring, reporting and verification of gas-specific ship emissions and related activity data for each reporting period; do not confuse the MRV scope with EU ETS allowance coverage.",
+        "conditions": [
+          "CO2 has been monitored/reported under EU MRV since 2018.",
+          "CH4 and N2O are within EU MRV monitoring/reporting from emissions year 2024.",
+          "Annual reporting follows the statutory reporting period and voyage/port definitions."
+        ],
+        "exclusions_or_unknowns": [
+          "Exact ship scope, monitoring plan, port-call definition, exclusions and verifier requirements must be resolved under the consolidated regulation and implementing acts.",
+          "MRV reporting coverage does not mean all reported gases are in EU ETS surrender scope in the same year."
+        ]
+      },
+      "output_scope": [
+        "annual gas-resolved CO2/CH4/N2O emissions",
+        "fuel and energy monitoring",
+        "annual voyage and port activity",
+        "verified MRV report"
+      ],
+      "calculation_contract": {
+        "metric_id": "eu_mrv_monitored_emissions",
+        "formula_or_method": "Monitor and aggregate ship emissions and activity data using the prescribed MRV monitoring plan and approved method. Preserve CO2, CH4 and N2O as separate gases and bind to the relevant reporting year and verifier status.",
+        "gas_scope": [
+          {
+            "gas": "CO2",
+            "included_from_emissions_year": 2018,
+            "limitations": [
+              "Subject to ship and reporting scope under the regulation."
+            ]
+          },
+          {
+            "gas": "CH4",
+            "included_from_emissions_year": 2024,
+            "limitations": [
+              "Gas included in the MRV monitoring/reporting scope from 2024."
+            ]
+          },
+          {
+            "gas": "N2O",
+            "included_from_emissions_year": 2024,
+            "limitations": [
+              "Gas included in the MRV monitoring/reporting scope from 2024."
+            ]
+          }
+        ]
+      },
+      "source_ids": [
+        "EU-MRV-MARITIME-REG2015-757"
+      ],
+      "limitations": [
+        "MRV is a monitoring/reporting/verification obligation, not an allowance surrender requirement.",
+        "MRV gas coverage and EU ETS gas coverage have different start years; do not reuse one rule for both."
+      ]
+    },
+    {
+      "rule_id": "FUELEU-MARITIME",
+      "title": "FuelEU Maritime annual well-to-wake GHG intensity requirement",
+      "authority": "European Union",
+      "instrument": "Regulation (EU) 2023/1805",
+      "revision_or_resolution": "Use consolidated Regulation and applicable delegated/implementing acts",
+      "rule_status": "in_force",
+      "legal_character": "binding_regulation",
+      "dates": {
+        "entry_into_force_on": "2023-10-12",
+        "applies_from": "2025-01-01"
+      },
+      "applicability": {
+        "ship_scope": "Ships and energy use within FuelEU Maritime's vessel, size, company and voyage scope.",
+        "geographic_scope": "EU/EEA port and voyage scope as defined in Regulation (EU) 2023/1805.",
+        "voyage_scope": "Annual average GHG intensity of energy used on board under the Regulation's well-to-wake boundary.",
+        "conditions": [
+          "Reference GHG intensity is 91.16 gCO2e/MJ.",
+          "The regulation defines yearly reduction factors and specific treatment of eligible fuels/flexibilities."
+        ],
+        "exclusions_or_unknowns": [
+          "Verify RFNBO reward, banking, borrowing, pooling, exemptions and verification under current text and acts.",
+          "A generic tank-to-wake CO2 factor is not a substitute."
+        ]
+      },
+      "output_scope": [
+        "FuelEU annual GHG intensity",
+        "FuelEU compliance balance",
+        "fuel pathway and certificate evidence"
+      ],
+      "calculation_contract": {
+        "metric_id": "fueleu_annual_ghg_intensity",
+        "reference_value": 91.16,
+        "reference_unit": "gCO2e/MJ",
+        "formula_or_method": "Calculate annual average well-to-wake GHG intensity of energy used on board using the prescribed fuel pathway, gas and GWP methodology, then compare with the applicable target after reduction factor.",
+        "ghg_reduction_phase_in": [
+          {
+            "year": 2025,
+            "value": 2,
+            "unit": "percent",
+            "meaning": "GHG-intensity reduction factor"
+          },
+          {
+            "year": 2030,
+            "value": 6,
+            "unit": "percent",
+            "meaning": "GHG-intensity reduction factor"
+          },
+          {
+            "year": 2035,
+            "value": 14.5,
+            "unit": "percent",
+            "meaning": "GHG-intensity reduction factor"
+          },
+          {
+            "year": 2040,
+            "value": 31,
+            "unit": "percent",
+            "meaning": "GHG-intensity reduction factor"
+          },
+          {
+            "year": 2045,
+            "value": 62,
+            "unit": "percent",
+            "meaning": "GHG-intensity reduction factor"
+          },
+          {
+            "year": 2050,
+            "value": 80,
+            "unit": "percent",
+            "meaning": "GHG-intensity reduction factor"
+          }
+        ]
+      },
+      "source_ids": [
+        "EU-FUELEU-MARITIME-REG2023-1805"
+      ],
+      "limitations": [
+        "A regulation calculation is not a verifier statement; all ship scope, fuel pathway and annual energy records must be evidenced."
+      ]
+    },
+    {
+      "authority": "International Maritime Organization",
+      "instrument": "MARPOL Annex VI amendment adopted at MEPC 84",
+      "revision_or_resolution": "Resolution MEPC.407(84); as checked 2026-11-11, the IMO MEPC resolution index labels it AWAITING CERTIFICATION.",
+      "rule_status": "adopted",
+      "legal_character": "adopted_amendment_future_application",
+      "source_ids": [
+        "IMO-NE-ATLANTIC-ECA-2026",
+        "IMO-MEPC407-RESOLUTION-INDEX-2026"
+      ],
+      "limitations": [
+        "Adoption is distinct from entry into force and application. Route geometry alone does not establish ship/engine compliance; authoritative coordinates and certification evidence are required.",
+        "As of 11 November 2026, the IMO resolution index marks MEPC.407(84) AWAITING CERTIFICATION and its linked PDF is only an awaiting-certification placeholder. The committee adoption outcome is known, but ship-specific interpretation, exceptions and geospatial classification must use the certified amendment and official Appendix VII coordinates."
+      ],
+      "rule_id": "NE-ATLANTIC-NOX-ECA-2026",
+      "title": "North-East Atlantic NOx ECA — Tier III new-ship applicability",
+      "dates": {
+        "adopted_on": "2026-05-01",
+        "entry_into_force_on": "2027-09-01",
+        "applies_from": "2027-09-01"
+      },
+      "applicability": {
+        "ship_scope": "Ships operating in the designated North-East Atlantic NOx ECA, with relevant marine diesel engines of more than 130 kW and qualifying construction/delivery dates.",
+        "geographic_scope": "The North-East Atlantic ECA includes designated EEZs/territorial seas of Greenland, Iceland, Faroe Islands, Ireland, mainland United Kingdom, France, Spain and Portugal, but the EEZs around the Azores, Madeira and Canary Islands are excluded; exact legal applicability requires official Appendix VII coordinates.",
+        "voyage_scope": "Operation of qualifying ships and engines within the ECA on or after 1 September 2027.",
+        "engine_power_kw_min_exclusive": 130,
+        "ship_construction_triggers": [
+          {
+            "milestone": "building_contract_placed",
+            "threshold_date": "2027-01-01",
+            "meaning": "Building contract placed on or after 1 January 2027."
+          },
+          {
+            "milestone": "keel_laid_or_similar_stage",
+            "threshold_date": "2027-07-01",
+            "meaning": "Where no building contract exists, keel laid or similar stage of construction on or after 1 July 2027."
+          },
+          {
+            "milestone": "ship_delivery",
+            "threshold_date": "2031-01-01",
+            "meaning": "Ship delivered on or after 1 January 2031."
+          }
+        ],
+        "conditions": [
+          "The amendment enters into force on 1 September 2027.",
+          "Tier III applicability requires ECA operation, a relevant marine diesel engine above 130 kW and at least one alternative construction/delivery trigger.",
+          "Construction/delivery triggers are alternatives, not cumulative."
+        ],
+        "exclusions_or_unknowns": [
+          "Do not apply Tier III to every existing ship merely because it enters the ECA.",
+          "Confirm construction milestones, engine power, EIAPP certification and ship scope against MEPC.407(84) and flag/class records.",
+          "Official adopted ECA polygon coordinates are still required for geospatial classification.",
+          "The official IMO resolution index still marks MEPC.407(84) AWAITING CERTIFICATION as of 11 November 2026; obtain the certified amendment and official Appendix VII coordinates before compliance decisions.",
+          "The ECA excludes the EEZs around the Azores, Madeira and Canary Islands; do not implement the area as a simple country coastline buffer."
+        ]
+      },
+      "output_scope": [
+        "NOx Tier III new-ship applicability",
+        "engine power threshold",
+        "construction/delivery trigger qualification",
+        "ECA route-segment intersection"
+      ],
+      "calculation_contract": {
+        "metric_id": "nea_nox_tier_iii_applicability",
+        "formula_or_method": "Applicable only when the ship operates inside the official ECA on or after 2027-09-01, a relevant marine diesel engine is >130 kW, and at least one alternative build/delivery trigger is satisfied. Evaluate triggers against evidenced construction records and engine certification."
+      }
+    },
+    {
+      "authority": "International Maritime Organization",
+      "instrument": "MARPOL Annex VI amendment adopted at MEPC 84",
+      "revision_or_resolution": "Resolution MEPC.407(84); as checked 2026-11-11, the IMO MEPC resolution index labels it AWAITING CERTIFICATION.",
+      "rule_status": "adopted",
+      "legal_character": "adopted_amendment_future_application",
+      "source_ids": [
+        "IMO-NE-ATLANTIC-ECA-2026",
+        "IMO-MEPC407-RESOLUTION-INDEX-2026"
+      ],
+      "limitations": [
+        "Adoption is distinct from entry into force and application. Route geometry alone does not establish ship/engine compliance; authoritative coordinates and certification evidence are required.",
+        "As of 11 November 2026, the IMO resolution index marks MEPC.407(84) AWAITING CERTIFICATION and its linked PDF is only an awaiting-certification placeholder. The committee adoption outcome is known, but ship-specific interpretation, exceptions and geospatial classification must use the certified amendment and official Appendix VII coordinates."
+      ],
+      "rule_id": "NE-ATLANTIC-SOX-PM-ECA-2026",
+      "title": "North-East Atlantic SOx/PM ECA — 0.10% fuel sulphur limit",
+      "dates": {
+        "adopted_on": "2026-05-01",
+        "entry_into_force_on": "2027-09-01",
+        "applies_from": "2028-09-01"
+      },
+      "applicability": {
+        "ship_scope": "Ships subject to MARPOL Annex VI regulation 14 fuel-sulphur requirements while operating within the designated North-East Atlantic SOx ECA.",
+        "geographic_scope": "The North-East Atlantic ECA includes designated EEZs/territorial seas of Greenland, Iceland, Faroe Islands, Ireland, mainland United Kingdom, France, Spain and Portugal, but the EEZs around the Azores, Madeira and Canary Islands are excluded; exact legal applicability requires official Appendix VII coordinates.",
+        "voyage_scope": "Use of fuel oil on operational/voyage segments within the ECA on or after 1 September 2028.",
+        "conditions": [
+          "The amendment enters into force on 1 September 2027.",
+          "The one-year delayed SOx/PM operational requirement applies from 1 September 2028.",
+          "Fuel oil used within the ECA must meet the applicable sulphur limit of 0.10% m/m, subject to permitted exceptions/equivalent methods."
+        ],
+        "exclusions_or_unknowns": [
+          "Do not apply the 0.10% sulphur limit from 1 September 2027; it applies from 1 September 2028.",
+          "Confirm official ECA coordinates, permitted equivalent methods and applicable ship/operation scope from current MARPOL Annex VI.",
+          "This is a local air-pollution requirement, not a lifecycle-GHG factor.",
+          "The official IMO resolution index still marks MEPC.407(84) AWAITING CERTIFICATION as of 11 November 2026; obtain the certified amendment and official Appendix VII coordinates before compliance decisions."
+        ]
+      },
+      "output_scope": [
+        "SOx/PM ECA applicability",
+        "0.10% m/m fuel-sulphur requirement",
+        "geographic route-segment classification"
+      ],
+      "calculation_contract": {
+        "metric_id": "nea_sox_pm_sulphur_limit",
+        "reference_value": 0.1,
+        "reference_unit": "percent_mass_sulphur",
+        "formula_or_method": "For operation within the official ECA from 2028-09-01, evaluate fuel sulphur against 0.10% m/m, subject to permitted exceptions/equivalent methods in current MARPOL Annex VI."
+      }
+    },
+    {
+      "rule_id": "IMO-NETZERO-FRAMEWORK-STATUS-2026-11-10",
+      "title": "IMO Net-Zero Framework negotiation status snapshot",
+      "authority": "International Maritime Organization",
+      "instrument": "MEPC 84 intersessional work and MEPC 85 agenda",
+      "revision_or_resolution": "Dated status snapshot as of 10 November 2026",
+      "rule_status": "under_review",
+      "legal_character": "negotiation_proposal",
+      "dates": {
+        "review_scheduled_from": "2026-11-30",
+        "review_scheduled_through": "2026-12-03"
+      },
+      "applicability": {
+        "ship_scope": "Proposed global maritime fuel standard and GHG pricing mechanism; final ship/vessel scope is subject to adoption text.",
+        "geographic_scope": "Potential global application if formally adopted.",
+        "voyage_scope": "Scenario analysis only until adoption and effective dates are established.",
+        "conditions": [
+          "MEPC 85 scheduled for 30 November–3 December 2026.",
+          "A resumed extraordinary session is provisionally scheduled for 4 December 2026, subject to confirmation."
+        ],
+        "exclusions_or_unknowns": [
+          "As of this snapshot, the framework is not formally adopted.",
+          "Do not model proposed provisions as current binding liability."
+        ]
+      },
+      "output_scope": [
+        "future policy scenario",
+        "investment sensitivity",
+        "rule-status monitoring"
+      ],
+      "source_ids": [
+        "IMO-NETZERO-FRAMEWORK-STATUS-2026-11-10"
+      ],
+      "limitations": [
+        "This snapshot becomes stale after subsequent IMO sessions or decisions; refresh before future use."
+      ]
+    },
+    {
+      "rule_id": "EU-ETS-DIRECTIVE-REVISION-2026-0212",
+      "title": "EU ETS Directive targeted revision proposal — COM(2026) 616",
+      "authority": "European Commission / European Parliament / Council",
+      "instrument": "Proposal for a Directive amending Directive 2003/87/EC and Decision (EU) 2015/1814",
+      "revision_or_resolution": "COM(2026) 616 final; procedure 2026/0212(COD); published 17 July 2026",
+      "rule_status": "proposed",
+      "legal_character": "negotiation_proposal",
+      "dates": {},
+      "applicability": {
+        "ship_scope": "Proposed changes to the EU ETS Directive including targeted maritime scope and offshore-operation provisions; exact ship categories and thresholds remain subject to legislative adoption.",
+        "geographic_scope": "EU ETS jurisdiction as defined by the final Directive.",
+        "voyage_scope": "Scenario analysis only; current EU ETS voyage coverage and surrender duties are not changed by this proposal.",
+        "conditions": [
+          "Legislative proposal would extend EU ETS/MRV coverage to certain additional categories of ships to reinforce the level playing field.",
+          "Proposal includes tailored safeguards against evasion by vessels performing or supporting offshore operations.",
+          "Proposal includes review provisions concerning international IMO measures and interactions with ETS scope and double-payment risk."
+        ],
+        "exclusions_or_unknowns": [
+          "European Parliament procedure 2026/0212(COD) status is awaiting committee decision in the 10 November 2026 snapshot.",
+          "This proposal is not adopted law and must not alter current ETS liabilities.",
+          "Final ship scope, offshore definitions, reporting periods, exemptions and application dates depend on the adopted text."
+        ]
+      },
+      "output_scope": [
+        "future_EU_ETS_scope_scenario",
+        "offshore_scope_sensitivity",
+        "IMO_interaction_scenario",
+        "legislative_delta"
+      ],
+      "source_ids": [
+        "EU-ETS-DIRECTIVE-REVISION-2026-0212"
+      ],
+      "limitations": [
+        "Proposal published 17 July 2026; refresh after later parliamentary/Council decisions.",
+        "Do not treat proposed provisions as binding or applicable."
+      ]
+    },
+    {
+      "rule_id": "EU-MRV-FUELEU-REVISION-2026-0210",
+      "title": "Maritime MRV and FuelEU streamlining proposal — COM(2026) 620",
+      "authority": "European Commission / European Parliament / Council",
+      "instrument": "Proposal for a Regulation amending Regulations (EU) 2015/757 and (EU) 2023/1805",
+      "revision_or_resolution": "COM(2026) 620 final; procedure 2026/0210(COD); published 17 July 2026",
+      "rule_status": "proposed",
+      "legal_character": "negotiation_proposal",
+      "dates": {},
+      "applicability": {
+        "ship_scope": "Proposed changes to maritime MRV and FuelEU monitoring/reporting; proposal would extend MRV to additional ship categories including oil/chemical/gas/LNG tankers, Ro-Pax and passenger ships 400–5,000 GT from 2029, subject to final text.",
+        "geographic_scope": "EU/EEA maritime MRV and FuelEU scope as defined by adopted legislation.",
+        "voyage_scope": "Scenario analysis only until the regulation is adopted and applicable.",
+        "conditions": [
+          "Proposal seeks one aligned MRV system for GHG emissions, well-to-wake emissions and energy used on board, with a single monitoring plan and a single ship report.",
+          "Proposed definition of energy used on board is GJ for propulsion and onboard equipment at sea or at berth.",
+          "Proposed substitute energy sources include renewable energy generated on board, onshore power supply and wind-assisted propulsion systems.",
+          "Proposed definition of wind-assisted propulsion includes partial or full propulsion by wind energy harnessed through rotor sails, kites, hard/rigid sails, soft sails, suction wings or turbines.",
+          "Proposed monitoring method counts fuel use from all fuel consumers and energy from substitute sources; wind energy amount is to use international standards and certification references specified in future Commission implementing acts.",
+          "Proposal text requires transparent, reproducible monitoring records and proposes at least 10 years of data retention."
+        ],
+        "exclusions_or_unknowns": [
+          "European Parliament procedure 2026/0210(COD) status is awaiting committee decision in the 10 November 2026 snapshot.",
+          "The proposal itself does not specify the wind-energy calculation standard/certification method; future implementing acts are contemplated.",
+          "This is not an adopted rule and does not establish a current legal WAPS energy-accounting formula.",
+          "Do not equate modelled avoided fuel or shaft-energy displacement with regulatory wind-energy-used values without the future method."
+        ]
+      },
+      "output_scope": [
+        "future_WAPS_wind_energy_reporting_scenario",
+        "energy_used_on_board_GJ",
+        "single_MRV_monitoring_plan_scenario",
+        "well_to_tank_and_tank_to_wake_reporting_scenario",
+        "future_wind_measurement_certification"
+      ],
+      "source_ids": [
+        "EU-MRV-FUELEU-REVISION-2026-0210",
+        "EU-MRV-FUELEU-COM2026-620-TEXT",
+        "EU-MRV-FUELEU-COM2026-620-ANNEX"
+      ],
+      "limitations": [
+        "Proposal published 17 July 2026; refresh as the ordinary legislative procedure progresses.",
+        "Standards/certification for wind-energy amount are future implementing acts and are not supplied by this record.",
+        "Do not infer that the proposal or its future methodology is in force."
+      ]
+    },
+    {
+      "rule_id": "FUELEU-ARTICLE6-ZERO-EMISSIONS-AT-BERTH",
+      "title": "FuelEU Maritime Article 6 zero-emission-at-berth requirement for eligible containerships and passenger ships",
+      "authority": "European Union",
+      "instrument": "Regulation (EU) 2023/1805, Article 6",
+      "revision_or_resolution": "Use consolidated Regulation and current Commission guidance",
+      "rule_status": "in_force",
+      "legal_character": "binding_regulation",
+      "dates": {
+        "entry_into_force_on": "2023-10-12",
+        "applies_from": "2030-01-01"
+      },
+      "applicability": {
+        "ship_scope": "Passenger ships and ships carrying exclusively containers, within Regulation (EU) 2023/1805 vessel/company/GT scope. The zero-emission-at-berth requirement does not automatically apply to general-cargo or mixed-cargo ships.",
+        "geographic_scope": "EU ports covered by AFIR Article 9 from 1 January 2030; all other EU ports that develop OPS facilities from 1 January 2035, subject to Article 6 and the current Regulation.",
+        "voyage_scope": "Ships at berth, moored to the quayside, for the period and conditions set out in FuelEU Maritime Article 6.",
+        "conditions": [
+          "The ship categories in scope are passenger ships and ships carrying exclusively containers, within the Regulation's applicable gross-tonnage and company scope.",
+          "From 1 January 2030, eligible ships at berth in AFIR Article 9 covered ports must connect to OPS and use it for all electrical power demand at berth, or use an applicable zero-emission technology, subject to exceptions.",
+          "From 1 January 2035, the same obligation applies in other ports that develop OPS facilities.",
+          "From 1 January 2030 through 31 December 2034, Member States may extend the obligation in specified circumstances to ports/parts of ports not covered by AFIR Article 9."
+        ],
+        "exclusions_or_unknowns": [
+          "Do not apply automatically to general cargo or mixed-use/mixed-cargo vessels.",
+          "Check the consolidated Regulation's ship scope, gross tonnage, exceptions, port status and any Member-State early application.",
+          "An AFIR infrastructure obligation does not prove that a specific berth has live, compatible or reserved OPS power."
+        ],
+        "ship_categories": [
+          "passenger",
+          "container_exclusively"
+        ],
+        "minimum_gt": 5000,
+        "berth_only": true,
+        "implementation_phases": [
+          {
+            "applies_from": "2030-01-01",
+            "port_scope": "afir_article_9_ports",
+            "ship_categories": [
+              "passenger",
+              "container_exclusively"
+            ],
+            "requirement": "connect_ops_and_use_electricity_or_zero_emission_technology",
+            "member_state_early_application_possible": true
+          },
+          {
+            "applies_from": "2035-01-01",
+            "port_scope": "eu_ports_with_ops",
+            "ship_categories": [
+              "passenger",
+              "container_exclusively"
+            ],
+            "requirement": "connect_ops_and_use_electricity_or_zero_emission_technology",
+            "member_state_early_application_possible": false
+          }
+        ]
+      },
+      "output_scope": [
+        "FuelEU Article 6 ship-category applicability",
+        "berth-only zero-emission obligation",
+        "OPS connection or zero-emission technology requirement",
+        "port-phase and effective-date evidence"
+      ],
+      "calculation_contract": {
+        "metric_id": "fueleu_article6_ops_applicability",
+        "formula_or_method": "Resolve ship type (passenger or exclusively container), gross tonnage, company/voyage scope, berth status, port AFIR Article 9 coverage or OPS-equipment status, effective date and exceptions. Do not infer a mandate for general-cargo or mixed-cargo vessels."
+      },
+      "source_ids": [
+        "EU-FUELEU-ARTICLE6-OPS-QA-2026",
+        "EU-AFIR-REG2023-1804"
+      ],
+      "limitations": [
+        "This rule record is a machine-readable interpretation aid and not a legal opinion or verifier statement.",
+        "Use consolidated Regulation (EU) 2023/1805, applicable amendments, AFIR status and Member-State implementation for actual determinations."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "source_id": "IMO-MEPC84-EEXI-CII-WIND-REVIEW-2026",
+      "title": "MEPC 84 phase-two review of EEXI, SEEMP and CII",
+      "publisher": "IMO",
+      "uri": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-mepc-84th-session.aspx",
+      "publication_date": "2026-05-01",
+      "evidence_class": "official_committee_workplan",
+      "limitations": [
+        "Not an adopted WAPS credit formula."
+      ]
+    },
+    {
+      "source_id": "IMO-MEPC414-416-CH4-N2O-2026",
+      "title": "MEPC resolutions 414(84), 415(84), 416(84)",
+      "publisher": "IMO",
+      "uri": "https://www.imo.org/en/knowledgecentre/indexofimoresolutions/pages/mepc-2026-27.aspx",
+      "publication_date": "2026-05-01",
+      "evidence_class": "official_adopted_guidelines",
+      "limitations": [
+        "Check detailed instrument text and status before compliance use."
+      ]
+    },
+    {
+      "source_id": "EU-ETS-MARITIME-2026",
+      "title": "EU ETS maritime transport",
+      "publisher": "European Commission",
+      "uri": "https://climate.ec.europa.eu/areas-action/transport-decarbonisation/reducing-emissions-shipping-sector_en",
+      "evidence_class": "official_eu_regulatory_guidance",
+      "limitations": [
+        "Guidance does not replace consolidated legislation or verifier interpretation."
+      ]
+    },
+    {
+      "source_id": "EU-FUELEU-MARITIME-REG2023-1805",
+      "title": "Regulation (EU) 2023/1805 FuelEU Maritime",
+      "publisher": "European Union",
+      "uri": "https://eur-lex.europa.eu/eli/reg/2023/1805/oj/eng",
+      "publication_date": "2023-09-22",
+      "evidence_class": "binding_eu_regulation",
+      "limitations": [
+        "Use consolidated legal text and applicable delegated/implementing acts."
+      ]
+    },
+    {
+      "source_id": "IMO-NE-ATLANTIC-ECA-2026",
+      "title": "Resolution MEPC.407(84): North-East Atlantic NOx, SOx and PM ECA",
+      "publisher": "IMO",
+      "uri": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-mepc-84th-session.aspx",
+      "publication_date": "2026-05-01",
+      "evidence_class": "official_adopted_marpole_amendment",
+      "limitations": [
+        "Use adopted MARPOL amendment and charted coordinates."
+      ]
+    },
+    {
+      "source_id": "IMO-NETZERO-FRAMEWORK-STATUS-2026-11-10",
+      "title": "IMO Net-Zero Framework negotiation status snapshot",
+      "publisher": "IMO",
+      "uri": "https://www.imo.org/en/mediacentre/meetingsummaries/pages/temporary-mepc-84th-session.aspx",
+      "publication_date": "2026-11-10",
+      "evidence_class": "dated_official_status_snapshot",
+      "limitations": [
+        "Pending proposals are not binding requirements; refresh after MEPC 85."
+      ]
+    },
+    {
+      "source_id": "EU-MRV-MARITIME-REG2015-757",
+      "title": "Regulation (EU) 2015/757 on monitoring, reporting and verification of maritime transport emissions, as amended",
+      "publisher": "European Union",
+      "uri": "https://eur-lex.europa.eu/eli/reg/2015/757/oj/eng",
+      "publication_date": "2015-04-29",
+      "evidence_class": "binding_eu_regulation",
+      "limitations": [
+        "Use the current consolidated version and implementing acts for reporting determinations.",
+        "The legal MRV scope and gas reporting years differ from EU ETS surrender scope."
+      ]
+    },
+    {
+      "source_id": "EU-ETS-DIRECTIVE-REVISION-2026-0212",
+      "title": "COM(2026) 616 final — EU ETS Directive and Market Stability Reserve targeted revision proposal",
+      "publisher": "European Commission / European Parliament",
+      "uri": "https://oeil.europarl.europa.eu/oeil/en/procedure-file?reference=2026%2F0212%28COD%29",
+      "publication_date": "2026-07-17",
+      "evidence_class": "official_legislative_proposal_and_procedure_status",
+      "limitations": [
+        "Procedure 2026/0212(COD) is a pending proposal, not adopted law.",
+        "Use the final adopted act for exact maritime scope and dates."
+      ]
+    },
+    {
+      "source_id": "EU-MRV-FUELEU-REVISION-2026-0210",
+      "title": "COM(2026) 620 final — maritime MRV and FuelEU streamlining proposal",
+      "publisher": "European Commission / European Parliament",
+      "uri": "https://oeil.europarl.europa.eu/oeil/en/procedure-file?reference=2026%2F0210%28COD%29",
+      "publication_date": "2026-07-17",
+      "evidence_class": "official_legislative_proposal_and_procedure_status",
+      "limitations": [
+        "Procedure 2026/0210(COD) is a pending proposal, not adopted law.",
+        "Wind-energy standards/certification are future implementing acts and are not specified by this source record."
+      ]
+    },
+    {
+      "source_id": "EU-MRV-FUELEU-COM2026-620-TEXT",
+      "title": "COM(2026) 620 final — proposed regulation amending maritime MRV and FuelEU",
+      "publisher": "European Commission",
+      "uri": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:52026PC0620",
+      "publication_date": "2026-07-17",
+      "evidence_class": "official_legislative_proposal_text",
+      "limitations": [
+        "Pending legislative proposal, not adopted law.",
+        "Text may be amended during procedure 2026/0210(COD)."
+      ]
+    },
+    {
+      "source_id": "EU-MRV-FUELEU-COM2026-620-ANNEX",
+      "title": "Annex to COM(2026) 620 final — proposed methods for monitoring GHG emissions and energy used",
+      "publisher": "European Commission / Publications Office of the European Union",
+      "uri": "https://publications.europa.eu/resource/cellar/bef58239-81f4-11f1-bf5e-01aa75ed71a1.0001.03/DOC_2",
+      "publication_date": "2026-07-17",
+      "evidence_class": "official_legislative_proposal_annex",
+      "scope": {
+        "proposal": "COM(2026) 620 final / 2026/0210(COD)",
+        "wind_power_method": "Proposed Annex I formula treats energy used from substitute sources separately; wind-energy amount is to be determined using international standards and certification references set by implementing acts under proposed Article 5(4).",
+        "retention": "Proposal text sets 10-year retention for monitoring records to support reproducibility."
+      },
+      "limitations": [
+        "Proposed method only; implementing-act standards/certification have not yet been issued by this proposal.",
+        "Do not use this annex as the current statutory WAPS calculation or certification method."
+      ]
+    },
+    {
+      "source_id": "EU-FUELEU-ARTICLE6-OPS-QA-2026",
+      "title": "European Commission Q&A on FuelEU Maritime Article 6 zero-emission-at-berth requirements",
+      "publisher": "European Commission Directorate-General for Mobility and Transport",
+      "publication_date": "2026-01-01",
+      "url": "https://transport.ec.europa.eu/transport-modes/maritime/decarbonising-maritime-transport-fueleu-maritime/questions-and-answers-regulation-eu-20231805-use-renewable-and-low-carbon-fuels-maritime-transport_en",
+      "evidence_class": "official_eu_regulatory_interpretive_guidance",
+      "scope": {
+        "ship_categories": [
+          "passenger",
+          "container_exclusively"
+        ],
+        "minimum_gt": 5000,
+        "timelines": [
+          "2030-01-01 AFIR Article 9 covered ports",
+          "2035-01-01 other EU ports with OPS"
+        ],
+        "clarifies": "General cargo ships carrying containers but not exclusively containers are not in scope of Article 6 under this Q&A."
+      },
+      "limitations": [
+        "Use the consolidated regulation and current national implementation for legal determination.",
+        "A port mandate does not prove a specific berth connection is operational or reserved."
+      ]
+    },
+    {
+      "source_id": "EU-AFIR-REG2023-1804",
+      "title": "Regulation (EU) 2023/1804 on deployment of alternative fuels infrastructure",
+      "publisher": "European Union",
+      "publication_date": "2023-09-13",
+      "url": "https://eur-lex.europa.eu/eli/reg/2023/1804/oj",
+      "evidence_class": "binding_eu_regulation",
+      "scope": {
+        "maritime": "Shore-side electricity supply infrastructure requirements for specified TEN-T ports and eligible container/passenger vessel categories.",
+        "target_date": "2029-12-31"
+      },
+      "limitations": [
+        "Port infrastructure obligations depend on port category/activity and ship category; they are not a guarantee of live capacity at a particular berth."
+      ]
+    },
+    {
+      "source_id": "IMO-MEPC407-RESOLUTION-INDEX-2026",
+      "title": "IMO MEPC 2026-27 resolution index entry for MEPC.407(84)",
+      "publisher": "International Maritime Organization",
+      "uri": "https://www.imo.org/en/knowledgecentre/indexofimoresolutions/pages/mepc-2026-27.aspx",
+      "publication_date": "2026-05-01",
+      "evidence_class": "official_resolution_index_status_snapshot",
+      "limitations": [
+        "As checked on 11 November 2026, the IMO index labels MEPC.407(84) AWAITING CERTIFICATION and the linked PDF is a one-page awaiting-certification placeholder, not the complete certified amendment text.",
+        "The MEPC 84 meeting summary separately reports committee adoption of the North-East Atlantic ECA and states the 1 September 2027 entry-into-force date.",
+        "Do not claim ship-specific legal compliance or derive official coordinates from the summary; obtain the certified amendment and authoritative Appendix VII coordinates."
+      ]
+    }
+  ]
+}

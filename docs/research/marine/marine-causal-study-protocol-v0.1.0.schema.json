@@ -1,0 +1,652 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-causal-study-protocol:0.1.0",
+  "title": "Luminous Marine Causal Study Protocol v0.1.0",
+  "description": "Preregistered causal-design and evidence-readiness contract. Conformance is not causal identification or a fuel-savings result.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "record_status",
+    "study",
+    "estimand",
+    "treatment",
+    "design",
+    "confounders",
+    "outcomes",
+    "battery_energy_accounting",
+    "identification_gates",
+    "diagnostics",
+    "negative_controls",
+    "evidence_source_ids",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "protocol_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_status": {
+      "enum": [
+        "synthetic",
+        "preregistered",
+        "completed",
+        "rejected"
+      ]
+    },
+    "study": {
+      "$ref": "#/$defs/study"
+    },
+    "estimand": {
+      "$ref": "#/$defs/estimand"
+    },
+    "treatment": {
+      "$ref": "#/$defs/treatment"
+    },
+    "design": {
+      "$ref": "#/$defs/design"
+    },
+    "confounders": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/confounder"
+      }
+    },
+    "outcomes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/outcome"
+      }
+    },
+    "battery_energy_accounting": {
+      "$ref": "#/$defs/battery"
+    },
+    "identification_gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "consistency",
+        "exchangeability",
+        "positivity",
+        "no_interference_or_carryover",
+        "temporal_integrity",
+        "outcome_validity",
+        "service_equivalence",
+        "missingness_accounted",
+        "model_support",
+        "independent_replication"
+      ],
+      "properties": {
+        "consistency": {
+          "$ref": "#/$defs/gate"
+        },
+        "exchangeability": {
+          "$ref": "#/$defs/gate"
+        },
+        "positivity": {
+          "$ref": "#/$defs/gate"
+        },
+        "no_interference_or_carryover": {
+          "$ref": "#/$defs/gate"
+        },
+        "temporal_integrity": {
+          "$ref": "#/$defs/gate"
+        },
+        "outcome_validity": {
+          "$ref": "#/$defs/gate"
+        },
+        "service_equivalence": {
+          "$ref": "#/$defs/gate"
+        },
+        "missingness_accounted": {
+          "$ref": "#/$defs/gate"
+        },
+        "model_support": {
+          "$ref": "#/$defs/gate"
+        },
+        "independent_replication": {
+          "$ref": "#/$defs/gate"
+        }
+      }
+    },
+    "diagnostics": {
+      "$ref": "#/$defs/diagnostics"
+    },
+    "negative_controls": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/negative_control"
+      }
+    },
+    "evidence_source_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "evidence_ids",
+        "review_note"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "review_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "study": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vessel_id",
+        "configuration_sha256",
+        "service_fingerprint",
+        "target_population",
+        "route_scope",
+        "season_scope",
+        "study_start",
+        "study_end",
+        "preregistered_at",
+        "study_owner"
+      ],
+      "properties": {
+        "vessel_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "configuration_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "service_fingerprint": {
+          "$ref": "#/$defs/sha256"
+        },
+        "target_population": {
+          "type": "string",
+          "minLength": 1
+        },
+        "route_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "season_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "study_start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "study_end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "preregistered_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "study_owner": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "estimand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "estimand_id",
+        "type",
+        "treatment_strategy",
+        "control_strategy",
+        "outcome_id",
+        "target_population",
+        "effect_scale",
+        "normalization",
+        "followup_window_seconds",
+        "estimation_target"
+      ],
+      "properties": {
+        "estimand_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "enum": [
+            "average_treatment_effect",
+            "average_treatment_effect_on_treated",
+            "intention_to_treat",
+            "controlled_direct_effect",
+            "conditional_average_treatment_effect"
+          ]
+        },
+        "treatment_strategy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "control_strategy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target_population": {
+          "type": "string",
+          "minLength": 1
+        },
+        "effect_scale": {
+          "enum": [
+            "absolute",
+            "relative",
+            "log_ratio",
+            "difference_in_means",
+            "other_declared"
+          ]
+        },
+        "normalization": {
+          "type": "string",
+          "minLength": 1
+        },
+        "followup_window_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "estimation_target": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "treatment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "treatment_id",
+        "treatment_unit",
+        "assigned_state",
+        "commanded_state",
+        "achieved_state",
+        "state_definitions",
+        "configuration_revision",
+        "safety_envelope_id"
+      ],
+      "properties": {
+        "treatment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "treatment_unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assigned_state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "commanded_state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "achieved_state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "state_definitions": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "configuration_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "safety_envelope_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "design_type",
+        "assignment_mechanism",
+        "time_zero_definition",
+        "window_seconds",
+        "washout_seconds",
+        "randomization_authorized",
+        "authorization_evidence_ids",
+        "analysis_methods",
+        "predeclared_exclusions"
+      ],
+      "properties": {
+        "design_type": {
+          "enum": [
+            "randomized_switchback",
+            "matched_observational",
+            "target_trial_emulation",
+            "natural_experiment",
+            "bench_controlled"
+          ]
+        },
+        "assignment_mechanism": {
+          "type": "string",
+          "minLength": 1
+        },
+        "time_zero_definition": {
+          "type": "string",
+          "minLength": 1
+        },
+        "window_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "washout_seconds": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "randomization_authorized": {
+          "type": "boolean"
+        },
+        "authorization_evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "analysis_methods": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "predeclared_exclusions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "confounder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "confounder_id",
+        "name",
+        "causal_role",
+        "measurement_id",
+        "source_id",
+        "adjustment_method"
+      ],
+      "properties": {
+        "confounder_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "causal_role": {
+          "enum": [
+            "pre_treatment_confounder",
+            "effect_modifier",
+            "mediator",
+            "post_treatment_variable",
+            "negative_control"
+          ]
+        },
+        "measurement_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adjustment_method": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outcome_id",
+        "name",
+        "physical_boundary",
+        "unit",
+        "normalization",
+        "measurement_id",
+        "uncertainty_method"
+      ],
+      "properties": {
+        "outcome_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "physical_boundary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "normalization": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measurement_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "uncertainty_method": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "battery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "battery_present",
+        "soc_boundary_treatment",
+        "initial_soc_evidence_id",
+        "final_soc_evidence_id",
+        "battery_energy_correction_method",
+        "boundary_uncertainty_method"
+      ],
+      "properties": {
+        "battery_present": {
+          "type": "boolean"
+        },
+        "soc_boundary_treatment": {
+          "enum": [
+            "not_applicable",
+            "matched",
+            "energy_adjusted",
+            "unknown"
+          ]
+        },
+        "initial_soc_evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "final_soc_evidence_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "battery_energy_correction_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "boundary_uncertainty_method": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "overlap_method",
+        "minimum_propensity",
+        "maximum_propensity",
+        "effective_sample_size",
+        "maximum_weight",
+        "treatment_adherence_fraction",
+        "missingness_method",
+        "cluster_unit"
+      ],
+      "properties": {
+        "overlap_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minimum_propensity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "maximum_propensity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "effective_sample_size": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximum_weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "treatment_adherence_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "missingness_method": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cluster_unit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "negative_control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "control_id",
+        "control_type",
+        "status",
+        "expected_result",
+        "observed_result",
+        "review_note"
+      ],
+      "properties": {
+        "control_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "control_type": {
+          "enum": [
+            "placebo_treatment_lead",
+            "future_treatment_past_outcome",
+            "negative_control_outcome",
+            "permutation",
+            "sham_transition",
+            "battery_soc_carryover",
+            "other_declared"
+          ]
+        },
+        "status": {
+          "enum": [
+            "pass",
+            "fail",
+            "unknown"
+          ]
+        },
+        "expected_result": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observed_result": {
+          "type": "string",
+          "minLength": 1
+        },
+        "review_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
