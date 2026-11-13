@@ -58,8 +58,11 @@ off-diagonal entries. The Python cross-check therefore builds and decodes
 SCS vectors independently instead of reusing Clarabel's packed vector.
 
 The SCS job solves both analytic problems again and independently checks its
-primal solution and infeasibility certificate. NumPy, SciPy and SCS are
-validation-only dependencies; the production AIRROAD crate remains Rust-only.
+primal solution and infeasibility certificate. It also constructs the trace
+objective in SCS's lower-triangle ordering and checks the diagonal positions
+for matrix orders 2, 3 and 4. The upper- and lower-triangle objective vectors
+must not be reused interchangeably. NumPy, SciPy and SCS are validation-only
+dependencies; the production AIRROAD crate remains Rust-only.
 
 ## Scope
 
