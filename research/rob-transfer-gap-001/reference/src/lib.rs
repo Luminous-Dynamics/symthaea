@@ -102,6 +102,17 @@ pub enum EvidenceDisposition {
     Rejected,
 }
 
+/// Whether the upstream split owner confirmed the evaluation manifests are disjoint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SplitSeparationDisposition {
+    /// No overlap was found under the frozen manifest/case-ID comparison.
+    QualifiedNoOverlap,
+    /// Training or calibration data overlap an evaluation regime.
+    OverlapDetected,
+    /// The split owner could not establish complete separation.
+    Unknown,
+}
+
 /// Frozen dataset, evaluation and split identities.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransferScope {
@@ -123,6 +134,8 @@ pub struct TransferScope {
     pub split_policy_digest: String,
     /// Receipt attesting the four manifests are separated as declared.
     pub split_separation_receipt_digest: String,
+    /// Upstream split owner disposition for case-level separation.
+    pub split_separation_disposition: SplitSeparationDisposition,
     /// Task/environment/work mix manifest digest.
     pub task_manifest_digest: String,
     /// Physical environment and fixture digest.
@@ -419,6 +432,8 @@ pub struct TransferGapReport {
     pub benchmark_id: String,
     /// Dataset split-separation receipt digest.
     pub split_separation_receipt_digest: String,
+    /// Split owner disposition; Unknown makes the report inconclusive.
+    pub split_separation_disposition: SplitSeparationDisposition,
     /// Baseline arm identity.
     pub baseline_arm_id: String,
     /// Candidate arm identity.
@@ -566,6 +581,9 @@ fn validate_scope(scope: &TransferScope) -> Result<(), TransferGapError> {
         ),
     ] {
         require_nonempty(name, value)?;
+    }
+    if scope.split_separation_disposition == SplitSeparationDisposition::OverlapDetected {
+        return Err(TransferGapError::EvaluationDataOverlap);
     }
     if scope.familiar_reference_manifest_digest == scope.training_manifest_digest
         || scope.familiar_reference_manifest_digest == scope.calibration_manifest_digest
@@ -790,7 +808,8 @@ fn validate_evaluations(
     }
     let mut seen_clusters = BTreeSet::new();
     let mut seen_case_manifests = BTreeSet::new();
-    let mut cluster_identity: BTreeMap<String, ClusterGroup> = BTreeMap::new();
+    let mut cluster_identity: BTreeMap<(SourceDimension, String), ClusterGroup> =
+        BTreeMap::new();
     let mut receipt_clusters: BTreeMap<String, String> = BTreeMap::new();
     let mut reports: BTreeMap<(SourceDimension, EvaluationRegime), Vec<ClusterTransferReport>> =
         BTreeMap::new();
@@ -887,7 +906,8 @@ fn validate_evaluations(
             });
         }
 
-        match cluster_identity.get(&evaluation.cluster_id) {
+        let cluster_identity_key = (evaluation.dimension, evaluation.cluster_id.clone());
+        match cluster_identity.get(&cluster_identity_key) {
             Some(existing)
                 if existing.regime != evaluation.regime
                     || existing.group_digest != evaluation.source_group_digest
@@ -902,7 +922,7 @@ fn validate_evaluations(
             Some(_) => {}
             None => {
                 cluster_identity.insert(
-                    evaluation.cluster_id.clone(),
+                    cluster_identity_key,
                     ClusterGroup {
                         regime: evaluation.regime,
                         group_digest: evaluation.source_group_digest.clone(),
@@ -1051,6 +1071,8 @@ pub fn audit_transfer_gap(input: &TransferGapInput) -> Result<TransferGapReport,
     }
 
     let policies = validate_policies(&input.dimensions, &input.assignments)?;
+    let split_evidence_unknown =
+        input.scope.split_separation_disposition == SplitSeparationDisposition::Unknown;
     let grouped = validate_evaluations(
         &input.scope,
         &policies,
@@ -1125,7 +1147,8 @@ pub fn audit_transfer_gap(input: &TransferGapInput) -> Result<TransferGapReport,
                             } => *minimum_hidden_groups,
                             DimensionApplicability::NotApplicable { .. } => 0,
                         });
-                let complete = sufficient_coverage
+                let complete = !split_evidence_unknown
+                    && sufficient_coverage
                     && familiar
                         .iter()
                         .chain(hidden.iter())
@@ -1224,6 +1247,7 @@ mod tests {
             grouping_policy_digest: "grouping-sha256".into(),
             split_policy_digest: "split-sha256".into(),
             split_separation_receipt_digest: "separation-receipt-sha256".into(),
+            split_separation_disposition: SplitSeparationDisposition::QualifiedNoOverlap,
             task_manifest_digest: "task-sha256".into(),
             environment_manifest_digest: "environment-sha256".into(),
             robot_configuration_digest: "robot-config-sha256".into(),
@@ -1363,6 +1387,10 @@ mod tests {
     fn familiar_and_hidden_transfer_gaps_are_reported_separately() {
         let report = audit_transfer_gap(&input()).unwrap();
         assert_eq!(report.disposition, TransferGapDisposition::Complete);
+        assert_eq!(
+            report.split_separation_disposition,
+            SplitSeparationDisposition::QualifiedNoOverlap
+        );
         assert!(!report.actuation_authorized);
         let site = &report.dimensions[0];
         assert_eq!(site.disposition, DimensionTransferDisposition::Complete);
@@ -1469,6 +1497,91 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn split_separation_unknown_makes_all_required_dimensions_inconclusive() {
+        let mut audit = input();
+        audit.scope.split_separation_disposition = SplitSeparationDisposition::Unknown;
+        let report = audit_transfer_gap(&audit).unwrap();
+        assert_eq!(report.disposition, TransferGapDisposition::Inconclusive);
+        assert_eq!(
+            report.dimensions[0].disposition,
+            DimensionTransferDisposition::Inconclusive
+        );
+    }
+
+    #[test]
+    fn split_separation_overlap_is_rejected() {
+        let mut audit = input();
+        audit.scope.split_separation_disposition = SplitSeparationDisposition::OverlapDetected;
+        assert_eq!(
+            audit_transfer_gap(&audit),
+            Err(TransferGapError::EvaluationDataOverlap)
+        );
+    }
+
+    #[test]
+    fn same_cluster_may_be_familiar_for_one_dimension_and_hidden_for_another() {
+        let mut audit = input();
+        audit.dimensions.push(DimensionPolicy {
+            dimension: SourceDimension::RobotMorphology,
+            applicability: DimensionApplicability::Required {
+                minimum_familiar_groups: 2,
+                minimum_hidden_groups: 2,
+                minimum_familiar_clusters: 2,
+                minimum_hidden_clusters: 2,
+            },
+        });
+        audit.assignments.extend([
+            SourceGroupAssignment {
+                dimension: SourceDimension::RobotMorphology,
+                group_digest: "morph-train-A".into(),
+                partition: SourcePartition::Training,
+                assignment_receipt_digest: "morph-train-receipt-A".into(),
+            },
+            SourceGroupAssignment {
+                dimension: SourceDimension::RobotMorphology,
+                group_digest: "morph-train-B".into(),
+                partition: SourcePartition::Training,
+                assignment_receipt_digest: "morph-train-receipt-B".into(),
+            },
+            SourceGroupAssignment {
+                dimension: SourceDimension::RobotMorphology,
+                group_digest: "morph-calibration".into(),
+                partition: SourcePartition::Calibration,
+                assignment_receipt_digest: "morph-calibration-receipt".into(),
+            },
+            SourceGroupAssignment {
+                dimension: SourceDimension::RobotMorphology,
+                group_digest: "morph-hidden-A".into(),
+                partition: SourcePartition::HiddenConfirmatory,
+                assignment_receipt_digest: "morph-hidden-receipt-A".into(),
+            },
+            SourceGroupAssignment {
+                dimension: SourceDimension::RobotMorphology,
+                group_digest: "morph-hidden-B".into(),
+                partition: SourcePartition::HiddenConfirmatory,
+                assignment_receipt_digest: "morph-hidden-receipt-B".into(),
+            },
+        ]);
+        for item in audit.evaluations.clone() {
+            let mut second = item.clone();
+            second.dimension = SourceDimension::RobotMorphology;
+            second.source_group_digest = match (item.regime, item.source_group_digest.as_str()) {
+                (EvaluationRegime::FamiliarSourceReference, "site-train-A") => "morph-train-A",
+                (EvaluationRegime::FamiliarSourceReference, _) => "morph-train-B",
+                (EvaluationRegime::HiddenSourceTransfer, "site-hidden-A") => "morph-hidden-A",
+                (EvaluationRegime::HiddenSourceTransfer, _) => "morph-hidden-B",
+            }
+            .into();
+            audit.evaluations.push(second);
+        }
+        // A mission cluster can be familiar for one dimension and hidden for another;
+        // cluster identity is scoped by dimension, while its receipt remains stable.
+        let report = audit_transfer_gap(&audit).unwrap();
+        assert_eq!(report.disposition, TransferGapDisposition::Complete);
+        assert_eq!(report.dimensions.len(), 2);
     }
 
     #[test]
