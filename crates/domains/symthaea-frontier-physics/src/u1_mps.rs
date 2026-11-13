@@ -23,6 +23,7 @@
 //! contraction-based norm evaluation. It does not yet implement two-site gate
 //! application, charge-block SVD, TEBD, truncation or discarded-weight bounds.
 
+use nalgebra::DMatrix;
 use num_complex::Complex64;
 
 /// A single-site qubit tensor with explicit integer charges on both virtual bonds.
@@ -63,6 +64,9 @@ pub enum U1MpsError {
     NonFiniteContraction(&'static str),
     ComplexNormResidual { imaginary_part: f64, tolerance: f64 },
     NegativeNormSquared(f64),
+    InvalidTotalCharge { total_charge: i32, site_count: usize },
+    DenseChargeLeakage { basis_index: usize, amplitude: f64, tolerance: f64 },
+    SvdFailed { rows: usize, columns: usize },
 }
 
 impl core::fmt::Display for U1MpsError {
@@ -127,6 +131,17 @@ impl core::fmt::Display for U1MpsError {
             ),
             Self::NegativeNormSquared(value) => {
                 write!(f, "MPS norm squared is negative: {value}")
+            }
+            Self::InvalidTotalCharge { total_charge, site_count } => write!(
+                f,
+                "total charge {total_charge} is invalid for a {site_count}-site qubit MPS"
+            ),
+            Self::DenseChargeLeakage { basis_index, amplitude, tolerance } => write!(
+                f,
+                "dense basis amplitude {basis_index} has forbidden charge-sector magnitude {amplitude}, tolerance {tolerance}"
+            ),
+            Self::SvdFailed { rows, columns } => {
+                write!(f, "charge-block SVD failed to converge for {rows}x{columns} block")
             }
         }
     }
@@ -376,6 +391,234 @@ impl ComplexU1Mps {
             dense[basis] = contracted[0];
         }
         Ok(dense)
+    }
+
+
+
+    /// Factor an exact dense fixed-charge state into a complex U(1)-symmetric MPS.
+    ///
+    /// The decomposition performs a full SVD independently in each intermediate
+    /// charge sector at every cut. It applies no bond cap, singular-value cutoff,
+    /// normalization or truncation. All returned singular directions are retained,
+    /// including numerically zero directions; callers can therefore compare the
+    /// dense reconstruction directly against the source amplitudes.
+    ///
+    /// Bit order is most-significant-site first. Dense amplitudes outside the
+    /// declared total-charge sector are rejected when they exceed tolerance.
+    pub fn from_dense_fixed_charge(
+        amplitudes: &[Complex64],
+        site_count: usize,
+        total_charge: i32,
+        tolerance: f64,
+    ) -> Result<Self, U1MpsError> {
+        if site_count == 0 {
+            return Err(U1MpsError::EmptyChain);
+        }
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        if site_count > i32::MAX as usize || total_charge < 0 || total_charge > site_count as i32 {
+            return Err(U1MpsError::InvalidTotalCharge {
+                total_charge,
+                site_count,
+            });
+        }
+        if site_count >= usize::BITS as usize {
+            return Err(U1MpsError::DenseExpansionTooLarge {
+                sites: site_count,
+                maximum_sites: usize::BITS as usize - 1,
+            });
+        }
+        let dense_dimension = 1_usize
+            .checked_shl(site_count as u32)
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        if amplitudes.len() != dense_dimension {
+            return Err(U1MpsError::EntryCount {
+                expected: dense_dimension,
+                actual: amplitudes.len(),
+            });
+        }
+        for (index, amplitude) in amplitudes.iter().enumerate() {
+            if !amplitude.re.is_finite() || !amplitude.im.is_finite() {
+                return Err(U1MpsError::NonFiniteTensorEntry { site: 0, index });
+            }
+            if (index.count_ones() as i32) != total_charge {
+                let forbidden = amplitude.norm();
+                if forbidden > tolerance {
+                    return Err(U1MpsError::DenseChargeLeakage {
+                        basis_index: index,
+                        amplitude: forbidden,
+                        tolerance,
+                    });
+                }
+            }
+        }
+
+        // The current residual is a matrix from the left virtual basis to the
+        // remaining computational-basis suffix. Initially there is one left
+        // state with prefix charge zero and the full dense state as its row.
+        let mut current = DMatrix::<Complex64>::from_row_slice(1, dense_dimension, amplitudes);
+        let mut left_charges = vec![0_i32];
+        let mut tensors = Vec::with_capacity(site_count);
+
+        for site in 0..(site_count - 1) {
+            let suffix_sites = site_count - site - 1;
+            let suffix_dimension = 1_usize
+                .checked_shl(suffix_sites as u32)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+
+            // Group local (left, physical) rows by their resulting prefix charge.
+            let mut row_groups: Vec<(i32, Vec<(usize, usize)>)> = Vec::new();
+            for left in 0..left_charges.len() {
+                for physical in 0..2 {
+                    let charge = left_charges[left] + physical as i32;
+                    if let Some((_, rows)) = row_groups.iter_mut().find(|(q, _)| *q == charge) {
+                        rows.push((left, physical));
+                    } else {
+                        row_groups.push((charge, vec![(left, physical)]));
+                    }
+                }
+            }
+
+            struct ChargeBlockSvd {
+                charge: i32,
+                rows: Vec<(usize, usize)>,
+                columns: Vec<usize>,
+                u: DMatrix<Complex64>,
+                v_t: DMatrix<Complex64>,
+                singular_values: Vec<f64>,
+            }
+
+            let mut blocks = Vec::new();
+            let max_block_dimension = left_charges.len().saturating_mul(2).max(suffix_dimension);
+            let max_iterations = 10_000usize.max(
+                64usize.saturating_mul(max_block_dimension.saturating_mul(max_block_dimension)),
+            );
+
+            for (charge, rows) in row_groups {
+                let suffix_charge = total_charge - charge;
+                if suffix_charge < 0 || suffix_charge > suffix_sites as i32 {
+                    continue;
+                }
+                let columns: Vec<usize> = (0..suffix_dimension)
+                    .filter(|suffix| suffix.count_ones() as i32 == suffix_charge)
+                    .collect();
+                if rows.is_empty() || columns.is_empty() {
+                    continue;
+                }
+
+                let mut block = DMatrix::<Complex64>::zeros(rows.len(), columns.len());
+                for (row_index, &(left, physical)) in rows.iter().enumerate() {
+                    for (column_index, &suffix) in columns.iter().enumerate() {
+                        let full_suffix = physical * suffix_dimension + suffix;
+                        block[(row_index, column_index)] = current[(left, full_suffix)];
+                    }
+                }
+
+                let (block_rows, block_columns) = (block.nrows(), block.ncols());
+                let decomposition = block
+                    .try_svd(true, true, tolerance, max_iterations)
+                    .ok_or(U1MpsError::SvdFailed {
+                        rows: block_rows,
+                        columns: block_columns,
+                    })?;
+                let u = decomposition.u.ok_or(U1MpsError::SvdFailed {
+                    rows: block_rows,
+                    columns: block_columns,
+                })?;
+                let v_t = decomposition.v_t.ok_or(U1MpsError::SvdFailed {
+                    rows: block_rows,
+                    columns: block_columns,
+                })?;
+                let singular_values = decomposition.singular_values.iter().copied().collect();
+                blocks.push(ChargeBlockSvd {
+                    charge,
+                    rows,
+                    columns,
+                    u,
+                    v_t,
+                    singular_values,
+                });
+            }
+
+            let next_bond_dimension = blocks.iter().try_fold(0_usize, |sum, block| {
+                sum.checked_add(block.singular_values.len())
+                    .ok_or(U1MpsError::DimensionOverflow)
+            })?;
+            if next_bond_dimension == 0 {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "dense-to-MPS factorization produced an empty charge support",
+                ));
+            }
+
+            let tensor_entries = left_charges
+                .len()
+                .checked_mul(2)
+                .and_then(|value| value.checked_mul(next_bond_dimension))
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let mut tensor_data = vec![Complex64::new(0.0, 0.0); tensor_entries];
+            let next_entries = next_bond_dimension
+                .checked_mul(suffix_dimension)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let mut next_current =
+                DMatrix::<Complex64>::zeros(next_bond_dimension, suffix_dimension);
+            let mut next_charges = Vec::with_capacity(next_bond_dimension);
+            let mut offset = 0;
+
+            for block in blocks {
+                let block_rank = block.singular_values.len();
+                for _ in 0..block_rank {
+                    next_charges.push(block.charge);
+                }
+                for singular_index in 0..block_rank {
+                    let new_bond = offset + singular_index;
+                    for (row_index, &(left, physical)) in block.rows.iter().enumerate() {
+                        let index =
+                            (left * 2 + physical) * next_bond_dimension + new_bond;
+                        tensor_data[index] = block.u[(row_index, singular_index)];
+                    }
+                    let singular_value = block.singular_values[singular_index];
+                    for (column_index, &suffix) in block.columns.iter().enumerate() {
+                        next_current[(new_bond, suffix)] =
+                            block.v_t[(singular_index, column_index)] * singular_value;
+                    }
+                }
+                offset += block_rank;
+            }
+
+            debug_assert_eq!(next_current.len(), next_entries);
+            let tensor = U1MpsTensor::new(left_charges, next_charges.clone(), tensor_data)?;
+            tensors.push(tensor);
+            left_charges = next_charges;
+            current = next_current;
+        }
+
+        if current.ncols() != 2 {
+            return Err(U1MpsError::NonFiniteContraction(
+                "final dense-to-MPS suffix dimension",
+            ));
+        }
+        let mut last_data = vec![Complex64::new(0.0, 0.0); left_charges.len() * 2];
+        for left in 0..left_charges.len() {
+            for physical in 0..2 {
+                if left_charges[left] + physical as i32 == total_charge {
+                    last_data[left * 2 + physical] = current[(left, physical)];
+                } else {
+                    let forbidden = current[(left, physical)].norm();
+                    if forbidden > tolerance {
+                        return Err(U1MpsError::DenseChargeLeakage {
+                            basis_index: 0,
+                            amplitude: forbidden,
+                            tolerance,
+                        });
+                    }
+                }
+            }
+        }
+        let last = U1MpsTensor::new(left_charges, vec![total_charge], last_data)?;
+        tensors.push(last);
+
+        Self::new(tensors, total_charge, tolerance)
     }
 
     /// Compute the MPS norm by contracting the double-layer transfer matrices.
