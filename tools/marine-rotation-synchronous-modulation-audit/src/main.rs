@@ -790,7 +790,7 @@ mod tests {
         });
         let report = audit(&input);
         assert_eq!(report.disposition, "INCOMPLETE");
-        assert!(report.reasons.iter().any(|reason| reason.contains("phase-bin coverage")));
+        assert!(report.reasons.iter().any(|reason| reason.contains("phase circle")));
     }
 
     #[test]
