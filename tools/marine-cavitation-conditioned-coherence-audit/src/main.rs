@@ -1126,7 +1126,18 @@ mod tests {
                     .find(|window| window.window_id == item.window_id)
                     .and_then(|window| window.cavitation_state_for_conditioning);
                 for band in &mut item.coherence_report.band_reports {
-                    band.coherence_magnitude_squared = if state == Some(true) { 0.4 } else { 0.1 };
+                    let coherence = if state == Some(true) { 0.4 } else { 0.1 };
+                    let coherent_psd = coherence * band.pressure_psd_pa2_per_hz;
+                    let residual_psd = band.pressure_psd_pa2_per_hz - coherent_psd;
+                    band.coherence_magnitude_squared = coherence;
+                    band.coherence_lower_bound = Some((coherence - 0.05).max(0.0));
+                    band.coherence_upper_bound = Some((coherence + 0.05).min(1.0));
+                    band.vibration_reference_coherent_pressure_psd_pa2_per_hz = coherent_psd;
+                    band.vibration_reference_coherent_pressure_psd_lower_bound = Some((coherent_psd - 0.5).max(0.0));
+                    band.vibration_reference_coherent_pressure_psd_upper_bound = Some(coherent_psd + 0.5);
+                    band.non_coherent_residual_pressure_psd_pa2_per_hz = residual_psd;
+                    band.non_coherent_residual_pressure_psd_lower_bound = Some((residual_psd - 0.5).max(0.0));
+                    band.non_coherent_residual_pressure_psd_upper_bound = Some(residual_psd + 0.5);
                 }
             }
         }
@@ -1289,9 +1300,19 @@ mod tests {
     #[test]
     fn coherence_one_does_not_promote_a_unique_source_claim() {
         let mut input = case();
-        input.coherence_windows[0].coherence_report.band_reports[0].coherence_magnitude_squared = 1.0;
+        let band = &mut input.coherence_windows[0].coherence_report.band_reports[0];
+        band.coherence_magnitude_squared = 1.0;
+        band.coherence_lower_bound = Some(0.95);
+        band.coherence_upper_bound = Some(1.0);
+        band.vibration_reference_coherent_pressure_psd_pa2_per_hz = 10.0;
+        band.vibration_reference_coherent_pressure_psd_lower_bound = Some(9.5);
+        band.vibration_reference_coherent_pressure_psd_upper_bound = Some(10.0);
+        band.non_coherent_residual_pressure_psd_pa2_per_hz = 0.0;
+        band.non_coherent_residual_pressure_psd_lower_bound = Some(0.0);
+        band.non_coherent_residual_pressure_psd_upper_bound = Some(0.5);
         let report = audit(&input);
         assert!(report.claim_ceiling.contains("no_unique_source"));
+        assert_eq!(report.disposition, "INCOMPLETE");
     }
 
     #[test]
