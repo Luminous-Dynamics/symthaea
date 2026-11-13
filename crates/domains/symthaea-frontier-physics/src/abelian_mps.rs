@@ -135,6 +135,11 @@ pub enum AbelianChargeError<const K: usize> {
     },
     NonFiniteSingularValue,
     ZeroTwoSiteState,
+    InvalidTruncationPolicy {
+        max_bond_dimension: usize,
+        relative_cutoff: f64,
+        tolerance: f64,
+    },
 }
 
 impl<const K: usize> fmt::Display for AbelianChargeError<K> {
@@ -420,6 +425,46 @@ pub struct AbelianTwoSiteSplit<const K: usize> {
     pub reconstruction_l2_residual: f64,
 }
 
+
+
+/// Explicit approximate-compression policy across all U(1)^K sectors.
+///
+/// The relative singular-value cutoff keeps sigma_i >= r * sigma_max.
+/// The maximum bond dimension is global across all charge vectors.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AbelianTwoSiteTruncationPolicy {
+    pub max_bond_dimension: usize,
+    pub relative_singular_value_cutoff: f64,
+    pub tolerance: f64,
+}
+
+/// Receipts from global cutoff/cap truncation across Abelian charge sectors.
+///
+/// The output tensors are not renormalized. A restoring factor is reported but
+/// not applied.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AbelianTwoSiteTruncation<const K: usize> {
+    pub left_tensor: AbelianChargeTensor<K>,
+    pub right_tensor: AbelianChargeTensor<K>,
+    pub retained_rank_by_charge: Vec<(AbelianCharge<K>, usize)>,
+    pub total_singular_value_count: usize,
+    pub retained_singular_value_count: usize,
+    pub cutoff_discarded_singular_value_count: usize,
+    pub bond_cap_discarded_singular_value_count: usize,
+    pub total_schmidt_weight: f64,
+    pub retained_schmidt_weight: f64,
+    pub cutoff_discarded_weight: f64,
+    pub bond_cap_discarded_weight: f64,
+    pub discarded_weight: f64,
+    pub relative_discarded_weight: f64,
+    pub pre_truncation_norm_squared: f64,
+    pub post_truncation_norm_squared: f64,
+    pub renormalization_factor_to_restore_original_norm: f64,
+    pub bond_cap_binding: bool,
+    pub reconstruction_max_residual: f64,
+    pub reconstruction_l2_residual: f64,
+}
+
 impl<const K: usize> AbelianChargeBlockPlan<K> {
     pub fn from_adjacent_tensors(
         first: &AbelianChargeTensor<K>,
@@ -685,6 +730,230 @@ impl<const K: usize> AbelianChargeBlockPlan<K> {
             total_singular_value_count,
             retained_singular_value_count,
             exact_zero_singular_values_omitted,
+            reconstruction_max_residual,
+            reconstruction_l2_residual: reconstruction_squared.sqrt(),
+        })
+    }
+
+
+    /// Apply a relative singular-value cutoff, then one global bond cap across
+    /// all charge vectors. No implicit renormalization is performed.
+    pub fn split_truncated(
+        first: &AbelianChargeTensor<K>,
+        second: &AbelianChargeTensor<K>,
+        policy: AbelianTwoSiteTruncationPolicy,
+    ) -> Result<AbelianTwoSiteTruncation<K>, AbelianChargeError<K>> {
+        if policy.max_bond_dimension == 0
+            || !policy.relative_singular_value_cutoff.is_finite()
+            || !(0.0..=1.0).contains(&policy.relative_singular_value_cutoff)
+            || !policy.tolerance.is_finite()
+            || policy.tolerance <= 0.0
+        {
+            return Err(AbelianChargeError::InvalidTruncationPolicy {
+                max_bond_dimension: policy.max_bond_dimension,
+                relative_cutoff: policy.relative_singular_value_cutoff,
+                tolerance: policy.tolerance,
+            });
+        }
+
+        let exact = Self::split_exact(first, second, policy.tolerance)?;
+        let full_rank = exact.retained_singular_value_count;
+        let middle_charges = exact.left_tensor.right_charges().to_vec();
+        let mut singular_values = vec![0.0_f64; full_rank];
+        let mut total_schmidt_weight = 0.0;
+        for middle in 0..full_rank {
+            let mut row_norm_squared = 0.0;
+            for physical in 0..exact.right_tensor.physical_dimension() {
+                for right in 0..exact.right_tensor.right_dimension() {
+                    row_norm_squared +=
+                        exact.right_tensor.get(middle, physical, right).norm_sqr();
+                }
+            }
+            let value = row_norm_squared.sqrt();
+            if !value.is_finite() {
+                return Err(AbelianChargeError::NonFiniteSingularValue);
+            }
+            singular_values[middle] = value;
+            total_schmidt_weight += value * value;
+        }
+        if !total_schmidt_weight.is_finite() || total_schmidt_weight <= 0.0 {
+            return Err(AbelianChargeError::ZeroTwoSiteState);
+        }
+
+        let maximum_singular_value = singular_values.iter().copied().fold(0.0, f64::max);
+        let cutoff_threshold =
+            policy.relative_singular_value_cutoff * maximum_singular_value;
+        let mut cutoff_eligible = Vec::new();
+        let mut cutoff_discarded_weight = 0.0;
+        let mut cutoff_discarded_singular_value_count = 0;
+        for (index, value) in singular_values.iter().copied().enumerate() {
+            if value >= cutoff_threshold {
+                cutoff_eligible.push(index);
+            } else {
+                cutoff_discarded_weight += value * value;
+                cutoff_discarded_singular_value_count += 1;
+            }
+        }
+
+        cutoff_eligible.sort_by(|left, right| {
+            singular_values[*right]
+                .total_cmp(&singular_values[*left])
+                .then_with(|| left.cmp(right))
+        });
+        let bond_cap_binding = cutoff_eligible.len() > policy.max_bond_dimension;
+        let retained_ranked = cutoff_eligible
+            .iter()
+            .copied()
+            .take(policy.max_bond_dimension)
+            .collect::<Vec<_>>();
+        let mut bond_cap_discarded_weight = 0.0;
+        let mut bond_cap_discarded_singular_value_count = 0;
+        for index in cutoff_eligible
+            .iter()
+            .copied()
+            .skip(policy.max_bond_dimension)
+        {
+            bond_cap_discarded_weight += singular_values[index] * singular_values[index];
+            bond_cap_discarded_singular_value_count += 1;
+        }
+        let mut retained = retained_ranked;
+        retained.sort_unstable();
+        let retained_rank = retained.len();
+        if retained_rank == 0 {
+            return Err(AbelianChargeError::ZeroTwoSiteState);
+        }
+
+        let retained_schmidt_weight = retained
+            .iter()
+            .map(|index| singular_values[*index] * singular_values[*index])
+            .sum::<f64>();
+        let discarded_weight = cutoff_discarded_weight + bond_cap_discarded_weight;
+        let relative_discarded_weight = discarded_weight / total_schmidt_weight;
+        let renormalization_factor_to_restore_original_norm =
+            (total_schmidt_weight / retained_schmidt_weight).sqrt();
+        if !retained_schmidt_weight.is_finite()
+            || retained_schmidt_weight <= 0.0
+            || !discarded_weight.is_finite()
+            || !relative_discarded_weight.is_finite()
+            || !renormalization_factor_to_restore_original_norm.is_finite()
+        {
+            return Err(AbelianChargeError::NonFiniteSingularValue);
+        }
+
+        let left_entries = exact
+            .left_tensor
+            .left_dimension()
+            .checked_mul(exact.left_tensor.physical_dimension())
+            .and_then(|value| value.checked_mul(retained_rank))
+            .ok_or(AbelianChargeError::DimensionOverflow)?;
+        let right_entries = retained_rank
+            .checked_mul(exact.right_tensor.physical_dimension())
+            .and_then(|value| value.checked_mul(exact.right_tensor.right_dimension()))
+            .ok_or(AbelianChargeError::DimensionOverflow)?;
+        let mut left_data = vec![Complex64::new(0.0, 0.0); left_entries];
+        let mut right_data = vec![Complex64::new(0.0, 0.0); right_entries];
+        let mut retained_middle_charges = Vec::with_capacity(retained_rank);
+
+        for (new_middle, old_middle) in retained.iter().copied().enumerate() {
+            retained_middle_charges.push(middle_charges[old_middle]);
+            for left in 0..exact.left_tensor.left_dimension() {
+                for physical in 0..exact.left_tensor.physical_dimension() {
+                    let index =
+                        (left * exact.left_tensor.physical_dimension() + physical)
+                            * retained_rank
+                            + new_middle;
+                    left_data[index] = exact.left_tensor.get(left, physical, old_middle);
+                }
+            }
+            for physical in 0..exact.right_tensor.physical_dimension() {
+                for right in 0..exact.right_tensor.right_dimension() {
+                    let index =
+                        (new_middle * exact.right_tensor.physical_dimension() + physical)
+                            * exact.right_tensor.right_dimension()
+                            + right;
+                    right_data[index] =
+                        exact.right_tensor.get(old_middle, physical, right);
+                }
+            }
+        }
+
+        let left_tensor = AbelianChargeTensor::new(
+            0,
+            exact.left_tensor.left_charges().to_vec(),
+            exact.left_tensor.physical_charges().to_vec(),
+            retained_middle_charges.clone(),
+            left_data,
+            policy.tolerance,
+        )?;
+        let right_tensor = AbelianChargeTensor::new(
+            1,
+            retained_middle_charges.clone(),
+            exact.right_tensor.physical_charges().to_vec(),
+            exact.right_tensor.right_charges().to_vec(),
+            right_data,
+            policy.tolerance,
+        )?;
+
+        let mut retained_rank_by_charge = Vec::new();
+        for charge in retained_middle_charges.iter().copied() {
+            if !retained_rank_by_charge
+                .iter()
+                .any(|(existing, _)| *existing == charge)
+            {
+                let count = retained_middle_charges
+                    .iter()
+                    .filter(|candidate| **candidate == charge)
+                    .count();
+                retained_rank_by_charge.push((charge, count));
+            }
+        }
+
+        let mut reconstruction_max_residual: f64 = 0.0;
+        let mut reconstruction_squared = 0.0;
+        for left in 0..first.left_dimension() {
+            for first_physical in 0..first.physical_dimension() {
+                for second_physical in 0..second.physical_dimension() {
+                    for right in 0..second.right_dimension() {
+                        let mut original = Complex64::new(0.0, 0.0);
+                        for middle in 0..first.right_dimension() {
+                            original += first.get(left, first_physical, middle)
+                                * second.get(middle, second_physical, right);
+                        }
+                        let mut reconstructed = Complex64::new(0.0, 0.0);
+                        for middle in 0..retained_rank {
+                            reconstructed += left_tensor.get(left, first_physical, middle)
+                                * right_tensor.get(middle, second_physical, right);
+                        }
+                        let residual = (reconstructed - original).norm();
+                        reconstruction_max_residual =
+                            reconstruction_max_residual.max(residual);
+                        reconstruction_squared += residual * residual;
+                    }
+                }
+            }
+        }
+        if !reconstruction_max_residual.is_finite() || !reconstruction_squared.is_finite() {
+            return Err(AbelianChargeError::NonFiniteSingularValue);
+        }
+
+        Ok(AbelianTwoSiteTruncation {
+            left_tensor,
+            right_tensor,
+            retained_rank_by_charge,
+            total_singular_value_count: exact.total_singular_value_count,
+            retained_singular_value_count: retained_rank,
+            cutoff_discarded_singular_value_count,
+            bond_cap_discarded_singular_value_count,
+            total_schmidt_weight,
+            retained_schmidt_weight,
+            cutoff_discarded_weight,
+            bond_cap_discarded_weight,
+            discarded_weight,
+            relative_discarded_weight,
+            pre_truncation_norm_squared: total_schmidt_weight,
+            post_truncation_norm_squared: retained_schmidt_weight,
+            renormalization_factor_to_restore_original_norm,
+            bond_cap_binding,
             reconstruction_max_residual,
             reconstruction_l2_residual: reconstruction_squared.sqrt(),
         })
