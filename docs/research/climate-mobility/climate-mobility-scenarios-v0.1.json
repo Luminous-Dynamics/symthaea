@@ -167,7 +167,8 @@
     "Only drinking-water delivery and habitable-household capacity are included; all other service domains remain unassessed.",
     "The expected outcomes test arithmetic and contract behavior only. They do not establish potable-water safety, housing habitability or receiving-place suitability.",
     "The fixture does not assign probabilities to pathways and does not infer climate attribution.",
-    "The service-floor example is synthetic-only: its arbitrary threshold is not a real minimum service standard, and its partial coverage cannot support a full-scope floor verdict."
+    "The service-floor example is synthetic-only: its arbitrary threshold is not a real minimum service standard, and its partial coverage cannot support a full-scope floor verdict.",
+    "No observation-valid-time window, assessment timestamp, or freshness budget is supplied; the executable service-floor evaluator therefore returns Indeterminate regardless of the synthetic threshold or interval."
   ],
   "claim_ceiling": "Synthetic arithmetic and schema behavior only; not a real city assessment, migration forecast, engineering validation or relocation recommendation.",
   "service_floor_assessments": [
@@ -195,7 +196,11 @@
         "Synthetic/contract-only floor evidence must remain Indeterminate in the executable evaluator; the partial-breach arithmetic is exercised by unit tests using explicit reference-matched test inputs, not promoted from this fixture."
       ],
       "pathway_id": "voluntary-move-a-b",
-      "area_id": "destination-b"
+      "area_id": "destination-b",
+      "observation_valid_from_unix_seconds": null,
+      "observation_valid_to_unix_seconds": null,
+      "assessed_at_unix_seconds": null,
+      "max_observation_age_seconds": null
     }
   ]
 }
