@@ -347,18 +347,38 @@ fn dependency_report(alias: &str, config: &Value, ws: &Workspace, manifests: &[M
         .flat_map(|m| m.uses.iter().filter(|u| u.inherited && (u.alias == alias || u.package_name.as_deref() == Some(package_name.as_str()))))
         .collect();
     let (mut classification, mut reasons) = classify(alias, &uses);
+    if uses.is_empty() && ws.path != "Cargo.toml" {
+        classification = "UNUSED_IN_NESTED_WORKSPACE".into();
+    }
+
+    // A malformed manifest can hide an inheritance edge. Keep this unresolved rather
+    // than treating it as unused. Parse errors wholly inside a deeper workspace are separate.
+    let workspace_dir = dir_of(&ws.path);
+    let malformed_in_scope = manifests.iter().filter(|m| m.parse_error.is_some()).any(|m| {
+        let candidate_dir = dir_of(&m.path);
+        is_within(&workspace_dir, &candidate_dir)
+            && !workspaces.iter().any(|nested| {
+                nested.path != ws.path
+                    && dir_of(&nested.path).len() > workspace_dir.len()
+                    && is_within(&dir_of(&nested.path), &candidate_dir)
+            })
+    });
+    if inheriting.is_empty() && malformed_in_scope {
+        classification = "UNRESOLVED_OWNERSHIP".into();
+        reasons.push("At least one manifest in this workspace scope could not be parsed; unused status is not established.".into());
+    }
 
     if inheriting.is_empty() && !external.is_empty() {
-        if external.iter().any(|o| manifests.iter().find(|m| m.path == o.manifest)
-            .and_then(|m| nearest_workspace(m, workspaces)).is_some_and(|w| w.path != ws.path))
-        {
-            classification = "USED_BY_NESTED_WORKSPACE".into();
-            reasons.push("Same-name declarations exist in nested workspaces, but they do not inherit this workspace entry.".into());
-        } else if external.iter().any(|o| manifests.iter().find(|m| m.path == o.manifest)
-            .is_some_and(|m| membership(m, ws).1))
-        {
+        let has_excluded = external.iter().any(|o| manifests.iter().find(|m| m.path == o.manifest)
+            .is_some_and(|m| membership(m, ws).1));
+        let has_nested = external.iter().any(|o| manifests.iter().find(|m| m.path == o.manifest)
+            .and_then(|m| nearest_workspace(m, workspaces)).is_some_and(|w| w.path != ws.path));
+        if has_excluded {
             classification = "USED_BY_EXCLUDED_MEMBER".into();
             reasons.push("Same-name declarations exist under excluded paths, but they do not inherit this entry.".into());
+        } else if has_nested {
+            classification = "USED_BY_NESTED_WORKSPACE".into();
+            reasons.push("Same-name declarations exist in nested workspaces, but they do not inherit this workspace entry.".into());
         } else {
             classification = "UNRESOLVED_OWNERSHIP".into();
             reasons.push("Same-name declarations exist but workspace inheritance is not proven.".into());
@@ -504,4 +524,39 @@ mod tests {
             package: Some("demo".into()), workspace_root: false, uses: vec![], parse_error: None };
         assert_eq!(nearest_workspace(&manifest, &workspaces).map(|w| w.path.as_str()), Some("nested/Cargo.toml"));
     }
+    #[test]
+    fn excludes_are_not_workspace_members() {
+        let workspace = Workspace {
+            path: "Cargo.toml".into(), package: Some("root".into()), hash: String::new(),
+            members: vec!["crates/*".into()], excludes: vec!["crates/experimental".into()],
+            dependencies: BTreeMap::new(),
+        };
+        let excluded = Manifest {
+            path: "crates/experimental/Cargo.toml".into(), hash: String::new(),
+            package: Some("experimental".into()), workspace_root: false, uses: vec![],
+            parse_error: None,
+        };
+        assert_eq!(membership(&excluded, &workspace), (false, true));
+    }
+
+    #[test]
+    fn build_and_test_uses_are_not_misclassified_as_runtime_dependencies() {
+        let uses = vec![
+            Use { alias: "serde".into(), package_name: None, section: "dev-dependencies".into(),
+                inherited: true, optional: false, feature_only: false },
+            Use { alias: "serde".into(), package_name: None, section: "build-dependencies".into(),
+                inherited: true, optional: false, feature_only: false },
+        ];
+        assert_eq!(classify("serde", &uses).0, "USED_ONLY_BY_BUILD_OR_TEST_TARGET");
+    }
+
+    #[test]
+    fn optional_dependency_can_be_feature_only() {
+        let uses = vec![Use {
+            alias: "simd".into(), package_name: None, section: "dependencies".into(),
+            inherited: true, optional: true, feature_only: true,
+        }];
+        assert_eq!(classify("simd", &uses).0, "USED_ONLY_UNDER_FEATURE");
+    }
+
 }
