@@ -162,6 +162,18 @@
       "evidence_class": "institutional_capability_page",
       "permitted_use": "Potential collaboration on porous carbon, graphene and supercapacitor research",
       "prohibited_inference": "No partnership or facility access agreed"
+    },
+    {
+      "id": "ZIHSC-TRANSPORT-POUCH-2026",
+      "title": "Breaking the Kinetics–Loading Trade-Off in Zinc-Ion Hybrid Capacitors Through Synergistic Electron–Ion Transport Design",
+      "url": "https://advanced.onlinelibrary.wiley.com/doi/full/10.1002/advs.76823",
+      "doi": "10.1002/advs.76823",
+      "publisher": "Advanced Science",
+      "authors": "Wu et al.",
+      "published": "2026-07-27",
+      "evidence_class": "peer_reviewed_literature",
+      "permitted_use": "Matched research comparator for 10 mg cm-2 carbon cathode loading, approximately 16.4 N/P ratio, 38.3 mAh g-1 at 10 A g-1 over 3000 cycles, and 2.82 Wh kg-1 reported device-level energy based on 0.746 g total device weight",
+      "prohibited_inference": "Not a universal ZIHSC benchmark or Luminous result; retain the paper's precise device denominator, cathode/coin/pouch distinction and test conditions"
     }
   ]
 }
