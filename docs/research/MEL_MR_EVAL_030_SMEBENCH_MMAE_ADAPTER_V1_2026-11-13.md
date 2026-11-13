@@ -65,7 +65,7 @@ A benchmark row is not merely an input WAV plus a prompt. It must bind:
 - split and dataset stratum;
 - data-rights and access evidence.
 
-The source-lineage digest is the grouping key for split integrity. Different edits or paired renditions derived from one underlying composition/recording may live in the same split, but they must never cross train/development/test. This protects against leakage through alternate renders, stems, remixes or near-duplicate source recordings.
+The source-lineage digest is the grouping key for split integrity. Different edits or paired renditions derived from one underlying composition/recording may live in the same split, but they must never cross train/development/test. This protects against leakage through alternate renders, stems, remixes or near-duplicate source recordings. In this metadata-only tranche the digest is a manifest-supplied identity: the validator checks syntax and split consistency, but does not independently prove that two different digests are not near-duplicate recordings. The later materializer must compute/verify canonical source fingerprints (and apply near-duplicate detection) before using the manifest for a real split.
 
 The comparison layer requires exact benchmark ID/version, track, stratum, split, protocol digest, scorer digest, native metric set and sample-manifest digest. A music-only subset cannot be labelled directly comparable to the full multimodal benchmark.
 
@@ -104,7 +104,7 @@ All twelve SMEBench operation families are currently marked **NotYetQualified** 
 | Decrescendo | Instrument-level and mixture-level targets must be separate |
 | A4=440 tuning correction | Integer MIDI semitones are not cent-level tuning correction |
 
-A Qualified status requires a pinned qualification-evidence digest. The adapter rejects a Qualified status without evidence. Unsupported/unqualified tasks must remain explicit in the run denominator; they may not be silently emitted unchanged and scored as successful.
+A Qualified status requires a pinned qualification-evidence digest. That digest must point to an exact-head qualification record binding the operation, target scope, renderer profile, scorer/protocol and adversarial controls; this adapter checks the digest syntax and status relation, not the contents of that record. The adapter rejects a Qualified status without evidence. Unsupported/unqualified tasks must remain explicit in the run denominator; they may not be silently emitted unchanged and scored as successful.
 
 ### Isolated harness and workflow
 
