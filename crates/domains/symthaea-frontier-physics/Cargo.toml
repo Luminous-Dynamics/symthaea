@@ -12,3 +12,5 @@ categories = ["science", "simulation"]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
+nalgebra = { workspace = true }
+num-complex = { workspace = true }

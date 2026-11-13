@@ -19,10 +19,12 @@
 //! check.
 //!
 //! This first implementation provides validated complex tensors, exact
-//! product-state construction, exact small-system dense expansion, and
-//! contraction-based norm evaluation. It does not yet implement two-site gate
+//! product-state construction, charge-block dense-to-MPS SVD factorization,
+//! exact small-system dense expansion, and contraction-based norm evaluation.
+//! It does not yet implement two-site gate
 //! application, charge-block SVD, TEBD, truncation or discarded-weight bounds.
 
+use nalgebra::DMatrix;
 use num_complex::Complex64;
 
 /// A single-site qubit tensor with explicit integer charges on both virtual bonds.
@@ -83,6 +85,20 @@ pub enum U1MpsError {
         tolerance: f64,
     },
     NegativeNormSquared(f64),
+    InvalidTotalCharge {
+        total_charge: i32,
+        site_count: usize,
+    },
+    ZeroDenseState,
+    DenseChargeLeakage {
+        basis_index: usize,
+        amplitude: f64,
+        tolerance: f64,
+    },
+    SvdFailed {
+        rows: usize,
+        columns: usize,
+    },
 }
 
 impl core::fmt::Display for U1MpsError {
@@ -150,6 +166,31 @@ impl core::fmt::Display for U1MpsError {
             ),
             Self::NegativeNormSquared(value) => {
                 write!(f, "MPS norm squared is negative: {value}")
+            }
+            Self::InvalidTotalCharge {
+                total_charge,
+                site_count,
+            } => write!(
+                f,
+                "total charge {total_charge} is invalid for a {site_count}-site qubit MPS"
+            ),
+            Self::ZeroDenseState => write!(
+                f,
+                "the dense input has no nonzero amplitude in the declared charge sector"
+            ),
+            Self::DenseChargeLeakage {
+                basis_index,
+                amplitude,
+                tolerance,
+            } => write!(
+                f,
+                "dense basis amplitude {basis_index} has forbidden charge-sector magnitude {amplitude}, tolerance {tolerance}"
+            ),
+            Self::SvdFailed { rows, columns } => {
+                write!(
+                    f,
+                    "charge-block SVD failed to converge for {rows}x{columns} block"
+                )
             }
         }
     }
@@ -251,6 +292,11 @@ pub struct ComplexU1Mps {
     tensors: Vec<U1MpsTensor>,
     total_charge: i32,
     selection_rule_residual: f64,
+    dense_input_charge_leakage_max: f64,
+    dense_input_charge_leakage_weight: f64,
+    dense_reconstruction_max_residual: Option<f64>,
+    dense_reconstruction_l2_residual: Option<f64>,
+    dense_svd_rank_by_charge_and_cut: Option<Vec<Vec<(i32, usize)>>>,
 }
 
 impl ComplexU1Mps {
@@ -317,6 +363,11 @@ impl ComplexU1Mps {
             tensors,
             total_charge,
             selection_rule_residual,
+            dense_input_charge_leakage_max: 0.0,
+            dense_input_charge_leakage_weight: 0.0,
+            dense_reconstruction_max_residual: None,
+            dense_reconstruction_l2_residual: None,
+            dense_svd_rank_by_charge_and_cut: None,
         })
     }
 
@@ -359,6 +410,26 @@ impl ComplexU1Mps {
         self.selection_rule_residual
     }
 
+    pub fn dense_input_charge_leakage_max(&self) -> f64 {
+        self.dense_input_charge_leakage_max
+    }
+
+    pub fn dense_input_charge_leakage_weight(&self) -> f64 {
+        self.dense_input_charge_leakage_weight
+    }
+
+    pub fn dense_reconstruction_max_residual(&self) -> Option<f64> {
+        self.dense_reconstruction_max_residual
+    }
+
+    pub fn dense_reconstruction_l2_residual(&self) -> Option<f64> {
+        self.dense_reconstruction_l2_residual
+    }
+
+    pub fn dense_svd_rank_by_charge_and_cut(&self) -> Option<&[Vec<(i32, usize)>]> {
+        self.dense_svd_rank_by_charge_and_cut.as_deref()
+    }
+
     pub fn maximum_bond_dimension(&self) -> usize {
         self.tensors
             .iter()
@@ -399,6 +470,283 @@ impl ComplexU1Mps {
             dense[basis] = contracted[0];
         }
         Ok(dense)
+    }
+
+    /// Factor an exact dense fixed-charge state into a complex U(1)-symmetric MPS.
+    ///
+    /// The decomposition performs a full SVD independently in each intermediate
+    /// charge sector at every cut. It applies no bond cap, singular-value cutoff,
+    /// normalization or truncation. All returned singular directions are retained,
+    /// including numerically zero directions; callers can therefore compare the
+    /// dense reconstruction directly against the source amplitudes.
+    ///
+    /// Bit order is most-significant-site first. Dense amplitudes outside the
+    /// declared total-charge sector are rejected when they exceed tolerance.
+    pub fn from_dense_fixed_charge(
+        amplitudes: &[Complex64],
+        site_count: usize,
+        total_charge: i32,
+        tolerance: f64,
+    ) -> Result<Self, U1MpsError> {
+        if site_count == 0 {
+            return Err(U1MpsError::EmptyChain);
+        }
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        if site_count > i32::MAX as usize || total_charge < 0 || total_charge > site_count as i32 {
+            return Err(U1MpsError::InvalidTotalCharge {
+                total_charge,
+                site_count,
+            });
+        }
+        if site_count >= usize::BITS as usize {
+            return Err(U1MpsError::DenseExpansionTooLarge {
+                sites: site_count,
+                maximum_sites: usize::BITS as usize - 1,
+            });
+        }
+        let dense_dimension = 1_usize
+            .checked_shl(site_count as u32)
+            .ok_or(U1MpsError::DimensionOverflow)?;
+        if amplitudes.len() != dense_dimension {
+            return Err(U1MpsError::EntryCount {
+                expected: dense_dimension,
+                actual: amplitudes.len(),
+            });
+        }
+        let mut dense_input_charge_leakage_max: f64 = 0.0;
+        let mut dense_input_charge_leakage_weight = 0.0;
+        for (index, amplitude) in amplitudes.iter().enumerate() {
+            if !amplitude.re.is_finite() || !amplitude.im.is_finite() {
+                return Err(U1MpsError::NonFiniteTensorEntry { site: 0, index });
+            }
+            if (index.count_ones() as i32) != total_charge {
+                let forbidden = amplitude.norm();
+                if !forbidden.is_finite() {
+                    return Err(U1MpsError::NonFiniteTensorEntry { site: 0, index });
+                }
+                dense_input_charge_leakage_max = dense_input_charge_leakage_max.max(forbidden);
+                dense_input_charge_leakage_weight += forbidden * forbidden;
+                if !dense_input_charge_leakage_weight.is_finite() {
+                    return Err(U1MpsError::NonFiniteContraction(
+                        "dense input charge-leakage weight",
+                    ));
+                }
+                if forbidden > tolerance {
+                    return Err(U1MpsError::DenseChargeLeakage {
+                        basis_index: index,
+                        amplitude: forbidden,
+                        tolerance,
+                    });
+                }
+            }
+        }
+
+        // The current residual is a matrix from the left virtual basis to the
+        // remaining computational-basis suffix. Initially there is one left
+        // state with prefix charge zero and the full dense state as its row.
+        let mut current = DMatrix::<Complex64>::from_row_slice(1, dense_dimension, amplitudes);
+        let mut left_charges = vec![0_i32];
+        let mut tensors = Vec::with_capacity(site_count);
+        let mut svd_rank_by_charge_and_cut = Vec::with_capacity(site_count.saturating_sub(1));
+
+        for site in 0..(site_count - 1) {
+            let suffix_sites = site_count - site - 1;
+            let suffix_dimension = 1_usize
+                .checked_shl(suffix_sites as u32)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+
+            // Group local (left, physical) rows by their resulting prefix charge.
+            let mut row_groups: Vec<(i32, Vec<(usize, usize)>)> = Vec::new();
+            for left in 0..left_charges.len() {
+                for physical in 0..2 {
+                    let charge = left_charges[left] + physical as i32;
+                    if let Some((_, rows)) = row_groups.iter_mut().find(|(q, _)| *q == charge) {
+                        rows.push((left, physical));
+                    } else {
+                        row_groups.push((charge, vec![(left, physical)]));
+                    }
+                }
+            }
+
+            struct ChargeBlockSvd {
+                charge: i32,
+                rows: Vec<(usize, usize)>,
+                columns: Vec<usize>,
+                u: DMatrix<Complex64>,
+                v_t: DMatrix<Complex64>,
+                singular_values: Vec<f64>,
+            }
+
+            let mut blocks = Vec::new();
+            let max_block_dimension = left_charges.len().saturating_mul(2).max(suffix_dimension);
+            let max_iterations = 10_000usize.max(
+                64usize.saturating_mul(max_block_dimension.saturating_mul(max_block_dimension)),
+            );
+
+            for (charge, rows) in row_groups {
+                let suffix_charge = total_charge - charge;
+                if suffix_charge < 0 || suffix_charge > suffix_sites as i32 {
+                    continue;
+                }
+                let columns: Vec<usize> = (0..suffix_dimension)
+                    .filter(|suffix| suffix.count_ones() as i32 == suffix_charge)
+                    .collect();
+                if rows.is_empty() || columns.is_empty() {
+                    continue;
+                }
+
+                let mut block = DMatrix::<Complex64>::zeros(rows.len(), columns.len());
+                for (row_index, &(left, physical)) in rows.iter().enumerate() {
+                    for (column_index, &suffix) in columns.iter().enumerate() {
+                        let full_suffix = physical * suffix_dimension + suffix;
+                        block[(row_index, column_index)] = current[(left, full_suffix)];
+                    }
+                }
+
+                let (block_rows, block_columns) = (block.nrows(), block.ncols());
+                let decomposition = block.try_svd(true, true, tolerance, max_iterations).ok_or(
+                    U1MpsError::SvdFailed {
+                        rows: block_rows,
+                        columns: block_columns,
+                    },
+                )?;
+                let u = decomposition.u.ok_or(U1MpsError::SvdFailed {
+                    rows: block_rows,
+                    columns: block_columns,
+                })?;
+                let v_t = decomposition.v_t.ok_or(U1MpsError::SvdFailed {
+                    rows: block_rows,
+                    columns: block_columns,
+                })?;
+                // Remove exact zero singular directions only. Every positive
+                // singular value is retained, however small; no cutoff is applied.
+                let kept_indices: Vec<usize> = decomposition
+                    .singular_values
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(index, value)| (*value > 0.0).then_some(index))
+                    .collect();
+                if kept_indices.is_empty() {
+                    continue;
+                }
+                let kept_u =
+                    DMatrix::<Complex64>::from_fn(rows.len(), kept_indices.len(), |r, col| {
+                        u[(r, kept_indices[col])]
+                    });
+                let kept_v_t =
+                    DMatrix::<Complex64>::from_fn(kept_indices.len(), columns.len(), |r, col| {
+                        v_t[(kept_indices[r], col)]
+                    });
+                let singular_values = kept_indices
+                    .iter()
+                    .map(|&index| decomposition.singular_values[index])
+                    .collect();
+                blocks.push(ChargeBlockSvd {
+                    charge,
+                    rows,
+                    columns,
+                    u: kept_u,
+                    v_t: kept_v_t,
+                    singular_values,
+                });
+            }
+
+            let cut_ranks: Vec<(i32, usize)> = blocks
+                .iter()
+                .map(|block| (block.charge, block.singular_values.len()))
+                .collect();
+            svd_rank_by_charge_and_cut.push(cut_ranks);
+            let next_bond_dimension = blocks.iter().try_fold(0_usize, |sum, block| {
+                sum.checked_add(block.singular_values.len())
+                    .ok_or(U1MpsError::DimensionOverflow)
+            })?;
+            if next_bond_dimension == 0 {
+                return Err(U1MpsError::ZeroDenseState);
+            }
+
+            let tensor_entries = left_charges
+                .len()
+                .checked_mul(2)
+                .and_then(|value| value.checked_mul(next_bond_dimension))
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let mut tensor_data = vec![Complex64::new(0.0, 0.0); tensor_entries];
+            let next_entries = next_bond_dimension
+                .checked_mul(suffix_dimension)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let mut next_current =
+                DMatrix::<Complex64>::zeros(next_bond_dimension, suffix_dimension);
+            let mut next_charges = Vec::with_capacity(next_bond_dimension);
+            let mut offset = 0;
+
+            for block in blocks {
+                let block_rank = block.singular_values.len();
+                for _ in 0..block_rank {
+                    next_charges.push(block.charge);
+                }
+                for singular_index in 0..block_rank {
+                    let new_bond = offset + singular_index;
+                    for (row_index, &(left, physical)) in block.rows.iter().enumerate() {
+                        let index = (left * 2 + physical) * next_bond_dimension + new_bond;
+                        tensor_data[index] = block.u[(row_index, singular_index)];
+                    }
+                    let singular_value = block.singular_values[singular_index];
+                    for (column_index, &suffix) in block.columns.iter().enumerate() {
+                        next_current[(new_bond, suffix)] =
+                            block.v_t[(singular_index, column_index)] * singular_value;
+                    }
+                }
+                offset += block_rank;
+            }
+
+            debug_assert_eq!(next_current.len(), next_entries);
+            let tensor = U1MpsTensor::new(left_charges, next_charges.clone(), tensor_data)?;
+            tensors.push(tensor);
+            left_charges = next_charges;
+            current = next_current;
+        }
+
+        if current.ncols() != 2 {
+            return Err(U1MpsError::NonFiniteContraction(
+                "final dense-to-MPS suffix dimension",
+            ));
+        }
+        let mut last_data = vec![Complex64::new(0.0, 0.0); left_charges.len() * 2];
+        for left in 0..left_charges.len() {
+            for physical in 0..2 {
+                if left_charges[left] + physical as i32 == total_charge {
+                    last_data[left * 2 + physical] = current[(left, physical)];
+                } else {
+                    let forbidden = current[(left, physical)].norm();
+                    if forbidden > tolerance {
+                        return Err(U1MpsError::DenseChargeLeakage {
+                            basis_index: 0,
+                            amplitude: forbidden,
+                            tolerance,
+                        });
+                    }
+                }
+            }
+        }
+        let last = U1MpsTensor::new(left_charges, vec![total_charge], last_data)?;
+        tensors.push(last);
+
+        let mut state = Self::new(tensors, total_charge, tolerance)?;
+        state.dense_input_charge_leakage_max = dense_input_charge_leakage_max;
+        state.dense_input_charge_leakage_weight = dense_input_charge_leakage_weight;
+        let reconstructed = state.to_dense(site_count)?;
+        let mut maximum_residual: f64 = 0.0;
+        let mut residual_squared = 0.0;
+        for (actual, expected) in reconstructed.iter().zip(amplitudes.iter()) {
+            let residual = (*actual - *expected).norm();
+            maximum_residual = maximum_residual.max(residual);
+            residual_squared += residual * residual;
+        }
+        state.dense_reconstruction_max_residual = Some(maximum_residual);
+        state.dense_reconstruction_l2_residual = Some(residual_squared.sqrt());
+        state.dense_svd_rank_by_charge_and_cut = Some(svd_rank_by_charge_and_cut);
+        Ok(state)
     }
 
     /// Compute the MPS norm by contracting the double-layer transfer matrices.
@@ -598,5 +946,121 @@ mod tests {
             state.to_dense(1),
             Err(U1MpsError::DenseExpansionTooLarge { .. })
         ));
+    }
+
+    #[test]
+    fn dense_fixed_charge_w_state_factorizes_by_charge_blocks_without_truncation() {
+        let amplitude = 1.0 / 3.0_f64.sqrt();
+        let mut dense = vec![Complex64::new(0.0, 0.0); 8];
+        dense[1] = Complex64::new(amplitude, 0.0);
+        dense[2] = Complex64::new(amplitude, 0.0);
+        dense[4] = Complex64::new(amplitude, 0.0);
+
+        let state = ComplexU1Mps::from_dense_fixed_charge(&dense, 3, 1, 1.0e-12).unwrap();
+        assert_eq!(state.total_charge(), 1);
+        assert_eq!(state.dense_input_charge_leakage_max(), 0.0);
+        assert_eq!(state.dense_input_charge_leakage_weight(), 0.0);
+        assert!(state.dense_reconstruction_max_residual().unwrap() <= 1.0e-10);
+        assert!(state.dense_reconstruction_l2_residual().unwrap() <= 1.0e-10);
+        assert!(state.maximum_bond_dimension() <= 2);
+        assert!((state.norm_squared(1.0e-12).unwrap() - 1.0).abs() <= 1.0e-10);
+
+        let reconstructed = state.to_dense(4).unwrap();
+        for index in 0..dense.len() {
+            assert!(
+                (reconstructed[index] - dense[index]).norm() <= 1.0e-10,
+                "basis={index}, reconstructed={:?}, expected={:?}",
+                reconstructed[index],
+                dense[index]
+            );
+        }
+    }
+
+    #[test]
+    fn dense_fixed_charge_product_state_factorizes_exactly() {
+        let mut dense = vec![Complex64::new(0.0, 0.0); 16];
+        dense[10] = Complex64::new(0.75, -0.25);
+        let state = ComplexU1Mps::from_dense_fixed_charge(&dense, 4, 2, 1.0e-12).unwrap();
+        assert_eq!(state.total_charge(), 2);
+        assert!(state.maximum_bond_dimension() <= 2);
+        assert_eq!(state.dense_svd_rank_by_charge_and_cut().unwrap().len(), 3);
+        assert!(state.dense_reconstruction_max_residual().unwrap() <= 1.0e-12);
+        assert!((state.norm_squared(1.0e-12).unwrap() - 0.625).abs() <= 1.0e-12);
+        let reconstructed = state.to_dense(8).unwrap();
+        for (actual, expected) in reconstructed.iter().zip(dense.iter()) {
+            assert!((*actual - *expected).norm() <= 1.0e-12);
+        }
+    }
+
+    #[test]
+    fn dense_fixed_charge_factorization_rejects_charge_leakage_and_bad_dimensions() {
+        let mut dense = vec![Complex64::new(0.0, 0.0); 8];
+        dense[1] = Complex64::new(1.0 / 3.0_f64.sqrt(), 0.0);
+        dense[2] = Complex64::new(1.0 / 3.0_f64.sqrt(), 0.0);
+        dense[4] = Complex64::new(1.0 / 3.0_f64.sqrt(), 0.0);
+        dense[0] = Complex64::new(1.0e-3, 0.0);
+        assert!(matches!(
+            ComplexU1Mps::from_dense_fixed_charge(&dense, 3, 1, 1.0e-6),
+            Err(U1MpsError::DenseChargeLeakage { .. })
+        ));
+
+        assert!(matches!(
+            ComplexU1Mps::from_dense_fixed_charge(&dense[..7], 3, 1, 1.0e-12),
+            Err(U1MpsError::EntryCount { .. })
+        ));
+        assert!(matches!(
+            ComplexU1Mps::from_dense_fixed_charge(&dense, 3, 4, 1.0e-12),
+            Err(U1MpsError::InvalidTotalCharge { .. })
+        ));
+    }
+
+    #[test]
+    fn dense_factorization_reports_tolerated_out_of_sector_input_leakage() {
+        let amplitude = 1.0 / 3.0_f64.sqrt();
+        let mut dense = vec![Complex64::new(0.0, 0.0); 8];
+        dense[1] = Complex64::new(amplitude, 0.0);
+        dense[2] = Complex64::new(amplitude, 0.0);
+        dense[4] = Complex64::new(amplitude, 0.0);
+        dense[0] = Complex64::new(1.0e-13, 0.0);
+
+        let state = ComplexU1Mps::from_dense_fixed_charge(&dense, 3, 1, 1.0e-12).unwrap();
+        assert!((state.dense_input_charge_leakage_max() - 1.0e-13).abs() <= 1.0e-25);
+        assert!((state.dense_input_charge_leakage_weight() - 1.0e-26).abs() <= 1.0e-38);
+        assert!((state.dense_reconstruction_max_residual().unwrap() - 1.0e-13).abs() <= 1.0e-25);
+    }
+
+    #[test]
+    fn dense_fixed_charge_factorization_preserves_tiny_positive_schmidt_weight() {
+        let tiny: f64 = 1.0e-18;
+        let large = (1.0 - tiny * tiny).sqrt();
+        let mut dense = vec![Complex64::new(0.0, 0.0); 4];
+        dense[1] = Complex64::new(large, 0.0);
+        dense[2] = Complex64::new(tiny, 0.0);
+        let state = ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12).unwrap();
+        assert_eq!(state.maximum_bond_dimension(), 2);
+        let reconstructed = state.to_dense(4).unwrap();
+        assert!((reconstructed[2].re - tiny).abs() <= 1.0e-30);
+        assert!(state.dense_reconstruction_max_residual().unwrap() <= 1.0e-15);
+    }
+
+    #[test]
+    fn dense_factorization_reports_tolerated_out_of_sector_weight_and_reconstruction_error() {
+        let mut dense = vec![Complex64::new(0.0, 0.0); 4];
+        dense[1] = Complex64::new(1.0, 0.0);
+        dense[0] = Complex64::new(1.0e-13, 0.0);
+        let state = ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12).unwrap();
+        assert!((state.dense_input_charge_leakage_max() - 1.0e-13).abs() <= 1.0e-25);
+        assert!((state.dense_input_charge_leakage_weight() - 1.0e-26).abs() <= 1.0e-38);
+        assert!((state.dense_reconstruction_max_residual().unwrap() - 1.0e-13).abs() <= 1.0e-25);
+        assert!((state.dense_reconstruction_l2_residual().unwrap() - 1.0e-13).abs() <= 1.0e-25);
+    }
+
+    #[test]
+    fn dense_factorization_rejects_zero_state_instead_of_fabricating_a_bond() {
+        let dense = vec![Complex64::new(0.0, 0.0); 4];
+        assert_eq!(
+            ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12),
+            Err(U1MpsError::ZeroDenseState)
+        );
     }
 }

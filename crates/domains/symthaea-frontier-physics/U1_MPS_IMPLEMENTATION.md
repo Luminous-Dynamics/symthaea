@@ -1,6 +1,6 @@
 # Complex U(1)-symmetric MPS state representation
 
-**Status:** the complex charge-labelled MPS state representation is source-authored; the exact-head Rust 1.96 runner is pending. Two-site gate application, charge-block SVD, TEBD, truncation receipts and scaling experiments remain unimplemented.
+**Status:** the complex charge-labelled MPS core and exact dense fixed-charge to charge-block MPS factorization are source-authored; exact-head Rust 1.96 validation is pending. Two-site gate application, TEBD gate sequencing, truncation and scaling remain unimplemented.
 
 ## Scope of this increment
 
@@ -34,11 +34,24 @@ The module also reports maximum bond dimension and selection-rule residual.
    This is represented with bond dimension 2 and total charge 1; its dense amplitudes and transfer-contracted norm are checked independently.
 3. Negative controls for nonzero forbidden-charge tensor entries, mismatched adjacent bond labels, wrong total-charge boundary, non-finite tensor entries, empty chain and over-limit dense expansion.
 
+
+## Dense fixed-charge to MPS factorization
+
+The follow-up branch adds \`ComplexU1Mps::from_dense_fixed_charge\`. At each cut, it groups local rows by the intermediate prefix charge \(q\), groups suffix columns by the complementary charge \(K-q\), and performs a separate complex SVD for each block. The left singular vectors become the site tensor; singular-value-weighted right singular vectors become the remaining suffix state.
+
+This is a charge-block factorization path with no Schmidt truncation:
+- It removes only exactly zero singular directions; every positive singular value is retained, including very small positive Schmidt weights.
+- It applies no bond cap, positive singular-value cutoff, normalization or renormalization.
+- It rejects dense components outside the declared total-charge sector when they exceed the configured tolerance.
+- It records maximum out-of-sector input amplitude, discarded out-of-sector squared weight, maximum dense reconstruction residual, L2 reconstruction residual and SVD rank by charge/cut.
+
+Tests include dense-to-MPS reconstruction of the W state, a non-normalized \(|1010\rangle\) basis state, and a tolerated tiny charge-leakage component whose loss must appear in the receipt. This is the exact bridge needed before testing TEBD gate application. The factorization is numerically faithful to the reported SVD/reconstruction residual, not a claim of symbolic exactness in floating point. Exactly-zero SVD directions are omitted as nullspace, but every positive singular value is retained.
+
 ## Explicit limitations
 
 This increment does **not** yet implement:
 - Two-site \(U(1)\)-conserving gate application.
-- Charge-sector-resolved SVD or canonicalization.
+- Canonical-form sweeps or two-site gate SVD updates with per-gate truncation receipts.
 - TEBD or nonlocal MPO evolution.
 - Per-truncation discarded-weight accounting.
 - Cumulative state-vector / reduced-state error bounds.
@@ -57,4 +70,4 @@ Primary external references:
 
 ## Claim ceiling
 
-A passing version of this increment would establish validated complex U(1)-sector-labelled MPS storage, small-N dense expansion and norm contraction. It would not establish TEBD, an efficient tensor-network simulator, black-hole evaporation, Hawking radiation, gravitational backreaction or quantum advantage.
+A passing version of these increments would establish validated complex U(1)-sector-labelled MPS storage, charge-block dense-to-MPS factorization with explicit leakage/reconstruction receipts, small-N dense expansion and norm contraction. It would not establish TEBD, an efficient tensor-network simulator, black-hole evaporation, Hawking radiation, gravitational backreaction or quantum advantage.

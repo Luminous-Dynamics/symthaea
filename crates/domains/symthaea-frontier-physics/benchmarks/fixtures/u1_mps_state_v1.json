@@ -5,9 +5,9 @@
   "created": "2026-11-13",
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
-  "status": "source_authored_runner_pending",
-  "execution_status": "Complex charge-labelled MPS storage, product-state construction, bounded dense expansion and transfer-contracted norm are source-authored; exact-head Rust 1.96 validation pending.",
-  "claim_ceiling": "Storage/selection-rule/dense-reference/norm qualification only. No two-site gates, SVD, TEBD or scaling performance claim.",
+  "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
+  "execution_status": "Complex U1 MPS representation plus dense fixed-charge to MPS charge-block SVD source-authored; exact-head Rust 1.96 validation pending.",
+  "claim_ceiling": "No two-site TEBD circuit evolution, truncation guarantee, large-N scaling or quantum advantage claim.",
   "conventions": {
     "physical_dimension": 2,
     "physical_charges": [
@@ -30,23 +30,53 @@
       "ComplexU1Mps::new",
       "ComplexU1Mps::product_state",
       "ComplexU1Mps::to_dense",
-      "ComplexU1Mps::norm_squared"
+      "ComplexU1Mps::norm_squared",
+      "ComplexU1Mps::from_dense_fixed_charge"
     ],
     "observables": [
       "total_charge",
       "selection_rule_residual",
       "maximum_bond_dimension",
       "dense_state_vector",
-      "transfer_contracted_norm_squared"
+      "transfer_contracted_norm_squared",
+      "dense_input_charge_leakage_max",
+      "dense_input_charge_leakage_weight",
+      "dense_reconstruction_max_residual",
+      "dense_reconstruction_l2_residual"
     ],
     "authored_tests": [
       "product_state_preserves_declared_total_charge_and_dense_bit_order",
       "entangled_three_qubit_one_excitation_w_state_has_charge_one",
       "constructor_rejects_amplitude_outside_u1_selection_rule",
       "constructor_rejects_internal_bond_charge_mismatch_and_wrong_total_charge",
-      "rejects_nonfinite_tensor_entries_empty_chains_and_large_dense_expansions"
+      "rejects_nonfinite_tensor_entries_empty_chains_and_large_dense_expansions",
+      "dense_fixed_charge_w_state_factorizes_by_charge_blocks_without_truncation",
+      "dense_fixed_charge_product_state_factorizes_exactly",
+      "dense_fixed_charge_factorization_rejects_charge_leakage_and_bad_dimensions",
+      "dense_factorization_reports_tolerated_out_of_sector_input_leakage",
+      "dense_fixed_charge_w_state_factorizes_by_charge_blocks_without_truncation",
+      "dense_fixed_charge_product_state_factorizes_exactly",
+      "dense_fixed_charge_factorization_rejects_charge_leakage_and_bad_dimensions",
+      "dense_factorization_reports_tolerated_out_of_sector_input_leakage",
+      "dense_fixed_charge_factorization_preserves_tiny_positive_schmidt_weight",
+      "dense_factorization_reports_tolerated_out_of_sector_weight_and_reconstruction_error",
+      "dense_factorization_rejects_zero_state_instead_of_fabricating_a_bond"
     ],
-    "workflow": ".github/workflows/u1-mps-state.yml"
+    "workflow": ".github/workflows/u1-mps-state.yml",
+    "dense_to_mps": {
+      "method": "Sequential charge-block SVD at each cut, grouped by intermediate prefix charge q and suffix charge K-q.",
+      "truncation": "No bond cap or positive singular-value cutoff. Exactly-zero singular directions are omitted as nullspace; every positive singular value is retained.",
+      "receipts": [
+        "input_charge_leakage_max",
+        "input_charge_leakage_squared_weight",
+        "dense_reconstruction_max_residual",
+        "dense_reconstruction_l2_residual",
+        "svd_rank_by_charge_and_cut"
+      ],
+      "api": "ComplexU1Mps::from_dense_fixed_charge",
+      "status": "source_authored_runner_pending",
+      "explicit_nonclaim": "No two-site gate evolution or TEBD yet."
+    }
   },
   "known_answers": [
     {
@@ -73,13 +103,45 @@
     {
       "id": "MPS-0",
       "name": "Complex U(1) MPS structure and exact small-N oracle",
-      "status": "source_authored_runner_pending",
+      "status": "source_authored_dense_charge_block_factorization_pending",
       "acceptance": [
         "boundary and adjacent-bond charge validation",
         "forbidden-sector negative control",
         "product-state dense oracle",
         "entangled W-state dense oracle",
-        "transfer-contracted norm"
+        "transfer-contracted norm",
+        "charge-block SVD factorization from exact dense fixed-charge vector",
+        "no truncation or renormalization during factorization",
+        "dense reconstruction maximum and L2 residual receipts",
+        "input charge-leakage amplitude and discarded-weight receipt",
+        "charge-block SVD factorization from exact dense fixed-charge vector",
+        "exact-zero singular directions only may be omitted",
+        "all positive singular values retained without a cutoff",
+        "dense reconstruction maximum and L2 residual receipts",
+        "input charge-leakage amplitude and discarded-weight receipt",
+        "per-cut/per-charge SVD rank receipt"
+      ]
+    },
+    {
+      "id": "MPS-1A",
+      "name": "Exact dense-to-U1-MPS charge-block factorization",
+      "status": "source_authored_dense_factorization_only_gate_TEBD_pending",
+      "acceptance": [
+        "per-cut intermediate charge-block separation",
+        "complex SVD in each block",
+        "retain all singular directions",
+        "dense reconstruction max/L2 residual",
+        "input charge leakage receipt"
+      ]
+    },
+    {
+      "id": "MPS-1B",
+      "name": "Two-site U1 gate application without truncation",
+      "status": "planned",
+      "acceptance": [
+        "gate preserves charge blocks",
+        "dense overlap at N=4..12",
+        "no truncation during gate application"
       ]
     },
     {
@@ -141,7 +203,15 @@
     "dense expansion above caller-specified maximum",
     "implicit state renormalization",
     "comparison with external backend at different gates or seeds",
-    "claim TEBD or truncation accuracy before MPS-1 through MPS-3"
+    "claim TEBD or truncation accuracy before MPS-1 through MPS-3",
+    "dense state outside declared charge sector above tolerance",
+    "silently discard tolerated out-of-sector amplitudes without recording leakage",
+    "drop small positive singular directions during exact factorization",
+    "renormalize dense or MPS input during factorization",
+    "all-zero input fabricated into a nonzero bond state",
+    "drop any positive singular value during untruncated dense factorization",
+    "discard tolerated out-of-sector input amplitudes without recording their squared weight",
+    "compare against a dense vector with mismatched MSB/LSB ordering"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -156,6 +226,16 @@
     "maximum_bond_dimension",
     "runtime",
     "peak_memory",
-    "qualification_status"
+    "qualification_status",
+    "dense_input_charge_leakage_max",
+    "dense_input_charge_leakage_weight",
+    "dense_reconstruction_max_residual",
+    "dense_reconstruction_l2_residual",
+    "svd_rank_by_charge_and_cut",
+    "dense_input_charge_leakage_max",
+    "dense_input_charge_leakage_weight",
+    "dense_reconstruction_max_residual",
+    "dense_reconstruction_l2_residual",
+    "svd_rank_by_charge_and_cut"
   ]
 }
