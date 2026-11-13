@@ -7,38 +7,170 @@
   "model_identity": "sha256:one-sided-set-model-v0.1",
   "topology_identity": "sha256:two-port-topology-v0.1",
   "operating_point_identity": "sha256:fixed-operating-point-v0.1",
-  "port_order": ["p0", "p1"],
+  "port_order": [
+    "p0",
+    "p1"
+  ],
   "dimension": 2,
   "knots": [
     {
       "knot_id": "k0",
-      "frequency": {"numerator": "0", "denominator": "1"},
+      "frequency": {
+        "numerator": "0",
+        "denominator": "1"
+      },
       "incoming_minus": null,
       "outgoing_plus": [
-        {"generator_id": "k0-plus-a", "point": [{"numerator": "0", "denominator": "1"}, {"numerator": "0", "denominator": "1"}]},
-        {"generator_id": "k0-plus-b", "point": [{"numerator": "2", "denominator": "1"}, {"numerator": "0", "denominator": "1"}]}
+        {
+          "generator_id": "k0-plus-a",
+          "point": [
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ]
+        },
+        {
+          "generator_id": "k0-plus-b",
+          "point": [
+            {
+              "numerator": "2",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ]
+        }
+      ],
+      "model_identity": "sha256:one-sided-set-model-v0.1",
+      "topology_identity": "sha256:two-port-topology-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "normalized_frequency",
+      "port_order": [
+        "p0",
+        "p1"
       ]
     },
     {
       "knot_id": "k1",
-      "frequency": {"numerator": "1", "denominator": "1"},
+      "frequency": {
+        "numerator": "1",
+        "denominator": "1"
+      },
       "incoming_minus": [
-        {"generator_id": "k1-minus-a", "point": [{"numerator": "4", "denominator": "1"}, {"numerator": "0", "denominator": "1"}]},
-        {"generator_id": "k1-minus-b", "point": [{"numerator": "4", "denominator": "1"}, {"numerator": "2", "denominator": "1"}]}
+        {
+          "generator_id": "k1-minus-a",
+          "point": [
+            {
+              "numerator": "4",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ]
+        },
+        {
+          "generator_id": "k1-minus-b",
+          "point": [
+            {
+              "numerator": "4",
+              "denominator": "1"
+            },
+            {
+              "numerator": "2",
+              "denominator": "1"
+            }
+          ]
+        }
       ],
       "outgoing_plus": [
-        {"generator_id": "k1-plus-a", "point": [{"numerator": "10", "denominator": "1"}, {"numerator": "10", "denominator": "1"}]},
-        {"generator_id": "k1-plus-b", "point": [{"numerator": "12", "denominator": "1"}, {"numerator": "10", "denominator": "1"}]}
+        {
+          "generator_id": "k1-plus-a",
+          "point": [
+            {
+              "numerator": "10",
+              "denominator": "1"
+            },
+            {
+              "numerator": "10",
+              "denominator": "1"
+            }
+          ]
+        },
+        {
+          "generator_id": "k1-plus-b",
+          "point": [
+            {
+              "numerator": "12",
+              "denominator": "1"
+            },
+            {
+              "numerator": "10",
+              "denominator": "1"
+            }
+          ]
+        }
+      ],
+      "model_identity": "sha256:one-sided-set-model-v0.1",
+      "topology_identity": "sha256:two-port-topology-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "normalized_frequency",
+      "port_order": [
+        "p0",
+        "p1"
       ]
     },
     {
       "knot_id": "k2",
-      "frequency": {"numerator": "2", "denominator": "1"},
+      "frequency": {
+        "numerator": "2",
+        "denominator": "1"
+      },
       "incoming_minus": [
-        {"generator_id": "k2-minus-a", "point": [{"numerator": "14", "denominator": "1"}, {"numerator": "10", "denominator": "1"}]},
-        {"generator_id": "k2-minus-b", "point": [{"numerator": "14", "denominator": "1"}, {"numerator": "12", "denominator": "1"}]}
+        {
+          "generator_id": "k2-minus-a",
+          "point": [
+            {
+              "numerator": "14",
+              "denominator": "1"
+            },
+            {
+              "numerator": "10",
+              "denominator": "1"
+            }
+          ]
+        },
+        {
+          "generator_id": "k2-minus-b",
+          "point": [
+            {
+              "numerator": "14",
+              "denominator": "1"
+            },
+            {
+              "numerator": "12",
+              "denominator": "1"
+            }
+          ]
+        }
       ],
-      "outgoing_plus": null
+      "outgoing_plus": null,
+      "model_identity": "sha256:one-sided-set-model-v0.1",
+      "topology_identity": "sha256:two-port-topology-v0.1",
+      "operating_point_identity": "sha256:fixed-operating-point-v0.1",
+      "frequency_unit": "normalized_frequency",
+      "port_order": [
+        "p0",
+        "p1"
+      ]
     }
   ],
   "intervals": [
@@ -49,24 +181,105 @@
       "left_endpoint_semantics": "outgoing_plus",
       "right_endpoint_semantics": "incoming_minus",
       "lambda_values": [
-        {"numerator": "0", "denominator": "1"},
-        {"numerator": "1", "denominator": "2"},
-        {"numerator": "1", "denominator": "1"}
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        }
       ],
       "expected_hulls": [
         [
-          [{"numerator": "0", "denominator": "1"}, {"numerator": "0", "denominator": "1"}],
-          [{"numerator": "2", "denominator": "1"}, {"numerator": "0", "denominator": "1"}]
+          [
+            {
+              "numerator": "0",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "2",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ]
         ],
         [
-          [{"numerator": "2", "denominator": "1"}, {"numerator": "0", "denominator": "1"}],
-          [{"numerator": "3", "denominator": "1"}, {"numerator": "0", "denominator": "1"}],
-          [{"numerator": "3", "denominator": "1"}, {"numerator": "1", "denominator": "1"}],
-          [{"numerator": "2", "denominator": "1"}, {"numerator": "1", "denominator": "1"}]
+          [
+            {
+              "numerator": "2",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "3",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "3",
+              "denominator": "1"
+            },
+            {
+              "numerator": "1",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "2",
+              "denominator": "1"
+            },
+            {
+              "numerator": "1",
+              "denominator": "1"
+            }
+          ]
         ],
         [
-          [{"numerator": "4", "denominator": "1"}, {"numerator": "0", "denominator": "1"}],
-          [{"numerator": "4", "denominator": "1"}, {"numerator": "2", "denominator": "1"}]
+          [
+            {
+              "numerator": "4",
+              "denominator": "1"
+            },
+            {
+              "numerator": "0",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "4",
+              "denominator": "1"
+            },
+            {
+              "numerator": "2",
+              "denominator": "1"
+            }
+          ]
         ]
       ]
     },
@@ -77,24 +290,105 @@
       "left_endpoint_semantics": "outgoing_plus",
       "right_endpoint_semantics": "incoming_minus",
       "lambda_values": [
-        {"numerator": "0", "denominator": "1"},
-        {"numerator": "1", "denominator": "2"},
-        {"numerator": "1", "denominator": "1"}
+        {
+          "numerator": "0",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "2"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        }
       ],
       "expected_hulls": [
         [
-          [{"numerator": "10", "denominator": "1"}, {"numerator": "10", "denominator": "1"}],
-          [{"numerator": "12", "denominator": "1"}, {"numerator": "10", "denominator": "1"}]
+          [
+            {
+              "numerator": "10",
+              "denominator": "1"
+            },
+            {
+              "numerator": "10",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "12",
+              "denominator": "1"
+            },
+            {
+              "numerator": "10",
+              "denominator": "1"
+            }
+          ]
         ],
         [
-          [{"numerator": "12", "denominator": "1"}, {"numerator": "10", "denominator": "1"}],
-          [{"numerator": "13", "denominator": "1"}, {"numerator": "10", "denominator": "1"}],
-          [{"numerator": "13", "denominator": "1"}, {"numerator": "11", "denominator": "1"}],
-          [{"numerator": "12", "denominator": "1"}, {"numerator": "11", "denominator": "1"}]
+          [
+            {
+              "numerator": "12",
+              "denominator": "1"
+            },
+            {
+              "numerator": "10",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "13",
+              "denominator": "1"
+            },
+            {
+              "numerator": "10",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "13",
+              "denominator": "1"
+            },
+            {
+              "numerator": "11",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "12",
+              "denominator": "1"
+            },
+            {
+              "numerator": "11",
+              "denominator": "1"
+            }
+          ]
         ],
         [
-          [{"numerator": "14", "denominator": "1"}, {"numerator": "10", "denominator": "1"}],
-          [{"numerator": "14", "denominator": "1"}, {"numerator": "12", "denominator": "1"}]
+          [
+            {
+              "numerator": "14",
+              "denominator": "1"
+            },
+            {
+              "numerator": "10",
+              "denominator": "1"
+            }
+          ],
+          [
+            {
+              "numerator": "14",
+              "denominator": "1"
+            },
+            {
+              "numerator": "12",
+              "denominator": "1"
+            }
+          ]
         ]
       ]
     }
@@ -102,37 +396,169 @@
   "expected": {
     "middle_knot_id": "k1",
     "incoming_left_limit": [
-      [{"numerator": "4", "denominator": "1"}, {"numerator": "0", "denominator": "1"}],
-      [{"numerator": "4", "denominator": "1"}, {"numerator": "2", "denominator": "1"}]
+      [
+        {
+          "numerator": "4",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "4",
+          "denominator": "1"
+        },
+        {
+          "numerator": "2",
+          "denominator": "1"
+        }
+      ]
     ],
     "outgoing_right_limit": [
-      [{"numerator": "10", "denominator": "1"}, {"numerator": "10", "denominator": "1"}],
-      [{"numerator": "12", "denominator": "1"}, {"numerator": "10", "denominator": "1"}]
+      [
+        {
+          "numerator": "10",
+          "denominator": "1"
+        },
+        {
+          "numerator": "10",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "12",
+          "denominator": "1"
+        },
+        {
+          "numerator": "10",
+          "denominator": "1"
+        }
+      ]
     ],
     "one_sided_sets_are_distinct": true,
     "intervals_are_adjacent": true,
     "lambda_half_hull_i0": [
-      [{"numerator": "2", "denominator": "1"}, {"numerator": "0", "denominator": "1"}],
-      [{"numerator": "3", "denominator": "1"}, {"numerator": "0", "denominator": "1"}],
-      [{"numerator": "3", "denominator": "1"}, {"numerator": "1", "denominator": "1"}],
-      [{"numerator": "2", "denominator": "1"}, {"numerator": "1", "denominator": "1"}]
+      [
+        {
+          "numerator": "2",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "3",
+          "denominator": "1"
+        },
+        {
+          "numerator": "0",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "3",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "2",
+          "denominator": "1"
+        },
+        {
+          "numerator": "1",
+          "denominator": "1"
+        }
+      ]
     ],
     "lambda_half_hull_i1": [
-      [{"numerator": "12", "denominator": "1"}, {"numerator": "10", "denominator": "1"}],
-      [{"numerator": "13", "denominator": "1"}, {"numerator": "10", "denominator": "1"}],
-      [{"numerator": "13", "denominator": "1"}, {"numerator": "11", "denominator": "1"}],
-      [{"numerator": "12", "denominator": "1"}, {"numerator": "11", "denominator": "1"}]
+      [
+        {
+          "numerator": "12",
+          "denominator": "1"
+        },
+        {
+          "numerator": "10",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "13",
+          "denominator": "1"
+        },
+        {
+          "numerator": "10",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "13",
+          "denominator": "1"
+        },
+        {
+          "numerator": "11",
+          "denominator": "1"
+        }
+      ],
+      [
+        {
+          "numerator": "12",
+          "denominator": "1"
+        },
+        {
+          "numerator": "11",
+          "denominator": "1"
+        }
+      ]
     ]
   },
   "negative_controls": [
-    {"id": "swap-endpoint-signs", "expected": "reject"},
-    {"id": "reuse-middle-outgoing-as-interval-0-right", "expected": "reject"},
-    {"id": "collapse-middle-incoming-and-outgoing", "expected": "reject-without-evidence"},
-    {"id": "missing-generator", "expected": "reject-incomplete-hull"},
-    {"id": "lambda-outside-unit-interval", "expected": "reject"},
-    {"id": "metadata-mismatch", "expected": "not-evaluable"},
-    {"id": "statistical-as-hard-set", "expected": "reject-claim-class"},
-    {"id": "sampled-polytope-as-full-containment", "expected": "reject"}
+    {
+      "id": "swap-endpoint-signs",
+      "expected": "reject"
+    },
+    {
+      "id": "reuse-middle-outgoing-as-interval-0-right",
+      "expected": "reject"
+    },
+    {
+      "id": "collapse-middle-incoming-and-outgoing",
+      "expected": "reject-without-evidence"
+    },
+    {
+      "id": "missing-generator",
+      "expected": "reject-incomplete-hull"
+    },
+    {
+      "id": "lambda-outside-unit-interval",
+      "expected": "reject"
+    },
+    {
+      "id": "metadata-mismatch",
+      "expected": "not-evaluable"
+    },
+    {
+      "id": "statistical-as-hard-set",
+      "expected": "reject-claim-class"
+    },
+    {
+      "id": "sampled-polytope-as-full-containment",
+      "expected": "reject"
+    }
   ],
   "claim_ceiling": [
     "Synthetic exact-rational 2D one-sided convex set interpolation only.",
