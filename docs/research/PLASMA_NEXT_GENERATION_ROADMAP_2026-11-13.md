@@ -251,19 +251,25 @@ This reinforces a necessary portfolio rule: process families that share "atmosph
 
 ### P0 enabler — decision-focused multifidelity experiment design
 
-[PLASMA-OED-001 #11907](https://github.com/Luminous-Dynamics/symthaea/issues/11907) / draft [PR #11910](https://github.com/Luminous-Dynamics/symthaea/pull/11910) freezes the plasma-specific application adapter for UAP-OED, OLI-EXPERIMENT and the surface-bonding programme.
+[PLASMA-OED-001 #11907](https://github.com/Luminous-Dynamics/symthaea/issues/11907) / draft [PR #11910](https://github.com/Luminous-Dynamics/symthaea/pull/11910) defines the plasma-specific application adapter to UAP-OED and OLI-EXPERIMENT.
 
-This is **not another optimizer**. UAP-OED-001 owns budget/fidelity action selection and the small-set exact oracle; UAP-OED-002 owns target utility after nuisance marginalization; UAP-OED-003 owns selected-set covariance/whitening; OLI owns model adequacy and OTHER. PLASMA-OED owns the application-specific F0–F4 measurement ladder, competing surface mechanisms, mandatory physical endpoints and product decision semantics.
+This is **not another optimizer**. UAP-OED-001 owns action selection and the small-set oracle; UAP-OED-002 owns target utility after nuisance marginalization; UAP-OED-003 owns selected-set covariance; OLI owns model adequacy and OTHER. PLASMA-OED owns the plasma measurement ladder, substrate-state requirements, physical endpoints and product-decision semantics.
 
-The benchmark changes the objective from minimum water contact angle or maximum nominal information gain to minimum cost/latency/sample use for a defensible decision:
+The objective is minimum cost/latency/sample use to a defensible decision, not minimum WCA or nominal information gain:
 - F0 wettability/process screens;
-- F1 chemistry/topography;
+- F1 chemistry/topography and material-state observations such as moisture content;
 - F2 destructive bond strength and failure locus;
 - F3 delayed/aged bond strength and retention;
 - F4 material-function preservation such as WVTR/OTR.
 
-The 10 synthetic scenarios include proxy-only abstention, low-WCA/weak-bond rejection, aging reversal, packaging barrier loss, a synthetic durable-evidence case, shared-preparation covariance omission, training-group overlap, over-budget selection, inadmissible action and inadequate model family / OTHER. The Rust audit requires action quantity/unit identity, calibration record and uncertainty, group holdout, covariance receipts, derived retention closure and an adequate model family plus registered OTHER before a product decision.
+The 9-action catalogue includes a moisture-content action. The 12 synthetic cases include proxy-only abstention, WCA/bond disagreement, aging reversal, packaging barrier loss, durable synthetic evidence, shared-preparation covariance omission, held-out group overlap, budget overflow, inadmissible action, model inadequacy, missing PA6 moisture state and a measured saturated-PA6 low-WCA/weak-bond challenge.
 
-Independent source-side replay matched 10/10 audit dispositions and product decisions (4 PASS, 3 BLOCKED, 3 REJECTED). Fifteen Rust tests are authored, but the module is not compiled/executed here. The selected action lists are synthetic placeholders; **no generic optimizer was executed and no EVSI gain, lab saving or physical product improvement is claimed**.
+A 2024 PA6 study found that dry material (<0.1 wt% water) and saturated material (3 wt%) showed no significant difference in macroscopic surface energy/contact angle, but saturated PA6 had roughly half the lap-shear strength. The S0 evaluator now binds required moisture content to a selected MOISTURE_CONTENT action, calibration identity, conditioning protocol, temperature/RH, evidence digest and a pre-plasma timestamp; missing or stale evidence forces abstention. The PA6 fixture numbers are synthetic challenges, not a reproduction of the study.
 
-The key next comparison is against fixed campaigns, random feasible sequences, contact-angle-first heuristics, generic nominal/multifidelity UAP-OED, target-marginal designs, selected-set covariance-aware design and robust decision-value / EVSI selection under the same budget. Report false accept, false reject, abstention, cost-to-decision, sample use, worst-lot/device/day regret and exact-oracle gap separately.
+The 2026 PE aging study reports that most WCA recovery occurred in the first 24 h, then slowed toward a 3–6 day plateau. Its aging data track WCA, not bond strength. A useful follow-on DOE hypothesis is immediate/0 h, 1 h, 4 h, 24 h, 72 h, 6 d and 18 d paired WCA and destructive bond outcomes, with 30/60 d points where treated-part storage is part of the production workflow. These are proposed time points, not a universal aging law.
+
+A specific 2024 polyolefin primer study reports long storage stability for its particular primer formulation in some profiles, while plasma-treated additive-bearing PE partially lost adhesion after 30 days. A June 2026 acrylate-joint paper also reports that plasma alone was insufficient for long-term water resistance in its tested system, while plasma plus an adhesion promoter improved retained strength. The physical benchmark should compare the best applicable incumbent/primer, plasma-only, primer-only and combined promoter arms where admissible, stratified by additive package and lot. Do not generalize one primer formulation to all polymers.
+
+Independent source-side replay matched 12/12 audit dispositions and product decisions (5 PASS, 4 BLOCKED, 3 REJECTED). Nineteen Rust tests are authored but not compiled/executed here. The selected action lists and PA6 values are synthetic placeholders; **no generic optimizer was executed and no EVSI gain, laboratory saving or physical product improvement is claimed**.
+
+Competitive comparisons must use fixed campaigns, random feasible sequences, contact-angle-first heuristics, nominal/multifidelity UAP-OED, target-marginal selection, covariance-aware selection and robust decision-value/EVSI selection at the same budget. Report false accepts, false rejects, abstention, cost-to-decision, sample use, worst-lot/device/day regret and exact-oracle gap separately.
