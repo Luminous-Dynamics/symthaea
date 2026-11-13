@@ -10,7 +10,7 @@
 use crate::evidence_digest::{canonical_json_sha256, sha256_hex};
 use crate::musicxml_corpus_qualification::{
     CorpusQualificationIssueV1, CorpusRegistrationV1, CorpusSampleManifestV1, CorpusSampleV1,
-    CorpusSplitRoleV1, CorpusTrackRegistrationV1, MUSICXML_CORPUS_SAMPLE_MANIFEST_SCHEMA_V1,
+    CorpusSplitRoleV1, MUSICXML_CORPUS_SAMPLE_MANIFEST_SCHEMA_V1,
     validate_corpus_registration, validate_corpus_sample_manifest,
 };
 use serde::{Deserialize, Serialize};
@@ -79,7 +79,7 @@ struct ComposerFoldPlanCommitmentV1<'a> {
     corpus_id: &'a str,
     release_id: &'a str,
     track_id: &'a str,
-    source_revision_sha256: &'a str,
+    source_pin_sha256: &'a str,
     source_inventory_sha256: &'a str,
     registration_sha256: &'a str,
     assignments: &'a [ComposerFoldGroupAssignmentV1],
@@ -157,7 +157,7 @@ fn plan_commitment(plan: &ComposerFoldPlanV1) -> Result<String, ComposerFoldIssu
         corpus_id: &plan.corpus_id,
         release_id: &plan.release_id,
         track_id: &plan.track_id,
-        source_revision_sha256: &plan.source_revision_sha256,
+        source_pin_sha256: &plan.source_pin_sha256,
         source_inventory_sha256: &plan.source_inventory_sha256,
         registration_sha256: &plan.registration_sha256,
         assignments: &plan.assignments,
@@ -419,7 +419,7 @@ pub fn generate_composer_disjoint_fold_plan(
         inventory_commitment(candidates).map_err(|issue| vec![issue])?;
     let registration_sha256 = canonical_json_sha256(registration)
         .map_err(|_| vec![ComposerFoldIssueV1::SerializationFailed])?;
-    let source_revision_sha256 = canonical_json_sha256(&(
+    let source_pin_sha256 = canonical_json_sha256(&(
         registration.source_revision_id.as_deref(),
         &registration.source_uri,
     ))
@@ -431,7 +431,7 @@ pub fn generate_composer_disjoint_fold_plan(
         corpus_id: registration.corpus_id.clone(),
         release_id: registration.release_id.clone(),
         track_id: track_id.to_string(),
-        source_revision_sha256,
+        source_pin_sha256,
         source_inventory_sha256,
         registration_sha256,
         assignments,
