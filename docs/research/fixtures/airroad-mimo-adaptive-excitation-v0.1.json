@@ -162,15 +162,15 @@
     "semantics": "deterministic_hard_set"
   },
   "prior": {
-    "H0": {
+    "H0-base": {
       "numerator": "1",
       "denominator": "3"
     },
-    "H1": {
+    "H1-delta-three": {
       "numerator": "1",
       "denominator": "3"
     },
-    "H2": {
+    "H2-delta-two": {
       "numerator": "1",
       "denominator": "3"
     }
