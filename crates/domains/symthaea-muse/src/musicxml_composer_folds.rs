@@ -187,6 +187,15 @@ pub fn generate_composer_disjoint_fold_plan(
 ) -> Result<ComposerFoldPlanV1, Vec<ComposerFoldIssueV1>> {
     let mut issues = Vec::new();
 
+    // Enforce the inventory ceiling before grouping, sorting, or cloning any
+    // sample rows. A budget violation must not still perform unbounded work.
+    if candidates.len() > MAX_COMPOSER_FOLD_SAMPLES_V1 {
+        return Err(vec![ComposerFoldIssueV1::SourceInventoryTooLarge {
+            count: candidates.len(),
+            maximum: MAX_COMPOSER_FOLD_SAMPLES_V1,
+        }]);
+    }
+
     if !(MIN_COMPOSER_FOLDS_V1..=MAX_COMPOSER_FOLDS_V1).contains(&config.fold_count) {
         issues.push(ComposerFoldIssueV1::InvalidFoldCount {
             count: config.fold_count,
@@ -714,6 +723,21 @@ mod tests {
         .contains(&ComposerFoldIssueV1::DuplicateSampleId {
             sample_id: candidates[0].sample_id.clone(),
         }));
+
+        let mut candidates = candidates(5);
+        candidates[0].reference_sha256 = "not-a-digest".into();
+        assert!(generate_composer_disjoint_fold_plan(
+            &registration,
+            "omr-composer-heldout",
+            &candidates,
+            &config(5, 'a'),
+        )
+        .unwrap_err()
+        .iter()
+        .any(|issue| matches!(
+            issue,
+            ComposerFoldIssueV1::InvalidFoldManifest { .. }
+        )));
 
         let mut candidates = candidates(5);
         candidates[0].input_relative_path = "../escape.png".into();
