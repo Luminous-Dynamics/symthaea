@@ -91,6 +91,22 @@
         "disposition": "incomplete",
         "reason": "JoiningMethodUnknown"
       }
+    },
+    {
+      "case_id": "DESIGN-012-PERMANENT-NON-TARGET-SEAM",
+      "mutation": "Permanent construction seam remains outside the declared recovery path while a replaceable joint is targeted",
+      "expected": {
+        "disposition": "complete",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "DESIGN-013-NO-TARGET-JOINTS",
+      "mutation": "Disassembly intent declares no recovery-relevant joints",
+      "expected": {
+        "disposition": "incomplete",
+        "reason": "DisassemblyIntentWithoutTargetJoints"
+      }
     }
   ]
 }
