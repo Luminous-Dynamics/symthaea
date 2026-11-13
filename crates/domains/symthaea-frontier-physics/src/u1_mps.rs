@@ -4534,4 +4534,37 @@ mod tests {
         ));
     }
 
+
+    #[test]
+    fn tiny_nonzero_hamiltonian_radius_uses_exact_sinc_branch() {
+        let hopping = 1.0e-20;
+        let time_step = 1.0e20;
+        let hamiltonian = U1TwoSiteHamiltonian::new(
+            0.0,
+            0.0,
+            0.0,
+            Complex64::new(hopping, 0.0),
+        )
+        .unwrap();
+        let gate = hamiltonian.to_gate(time_step, 1.0e-12).unwrap();
+        let input = U1TwoSiteState::new(
+            vec![0],
+            vec![1],
+            vec![
+                complex_zero(),
+                Complex64::new(1.0, 0.0),
+                complex_zero(),
+                complex_zero(),
+            ],
+            1.0e-12,
+        )
+        .unwrap();
+        let output = input.apply_gate(&gate, 1.0e-12).unwrap();
+        let dense = output.to_dense_two_qubit().unwrap();
+        assert!((dense[1].re - 1.0_f64.cos()).abs() <= 1.0e-12);
+        assert!((dense[2].im + 1.0_f64.sin()).abs() <= 1.0e-12);
+        assert!(gate.unitarity_residual() <= 1.0e-12);
+    }
+
+
 }
