@@ -1,0 +1,33 @@
+name: Battery design lifetime transfer audit v0.1
+
+on:
+  pull_request:
+    paths:
+      - "docs/transport/BATTERY_DESIGN_LIFETIME_TRANSFER_V0_1.md"
+      - "schemas/transport/battery_design_lifetime_transfer_v0_1.schema.json"
+      - "fixtures/ev_battery/battery_design_lifetime_transfer_v0_1.json"
+      - "tools/battery-design-lifetime-transfer-audit/**"
+      - ".github/workflows/battery-design-lifetime-transfer-audit.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: Check locked package metadata
+        run: cargo metadata --manifest-path tools/battery-design-lifetime-transfer-audit/Cargo.toml --locked --no-deps
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/battery-design-lifetime-transfer-audit/Cargo.toml -- --check
+      - name: Run design holdout, cutoff and censoring tests
+        run: cargo test --manifest-path tools/battery-design-lifetime-transfer-audit/Cargo.toml --locked
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path tools/battery-design-lifetime-transfer-audit/Cargo.toml --all-targets --locked -- -D warnings
