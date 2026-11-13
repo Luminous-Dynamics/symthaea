@@ -1,0 +1,41 @@
+name: AIRROAD MIMO Data Consistency Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_MIMO_DATA_CONSISTENCY_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-data-consistency-v0.1.json"
+      - "tools/airroad-mimo-data-consistency-qualifier/verify_data_consistency.py"
+      - ".github/workflows/airroad-mimo-data-consistency-reference.yml"
+  push:
+    branches:
+      - research/airroad-mimo-data-consistency-v0.1
+    paths:
+      - "docs/research/AIRROAD_MIMO_DATA_CONSISTENCY_001_V0_1.md"
+      - "docs/research/fixtures/airroad-mimo-data-consistency-v0.1.json"
+      - "tools/airroad-mimo-data-consistency-qualifier/verify_data_consistency.py"
+      - ".github/workflows/airroad-mimo-data-consistency-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-mimo-data-consistency-reference-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-rational-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute data-consistency oracle
+        run: |
+          python3 -m py_compile tools/airroad-mimo-data-consistency-qualifier/verify_data_consistency.py
+          python3 tools/airroad-mimo-data-consistency-qualifier/verify_data_consistency.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool docs/research/fixtures/airroad-mimo-data-consistency-v0.1.json > /dev/null
