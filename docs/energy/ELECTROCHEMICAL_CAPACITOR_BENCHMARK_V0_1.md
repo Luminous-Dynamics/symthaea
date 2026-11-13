@@ -167,6 +167,15 @@ Measure:
 
 The capacitor is useful only when system-level benefit exceeds the additional mass, losses, complexity and cost.
 
+### Model-informed long-range ZIHC envelope (not a physical SOTA result)
+
+Wu et al., *Advanced Science* (6 November 2024), analyse four coupled parameters in a representative ZIHC cell model: carbon loading (m_c), carbon specific capacity (Q_{g,c}), N/P and electrolyte-to-carbon ratio E/C. Their model indicates that simultaneous ranges such as (m_c=10–20\;\mathrm{mg\,cm^{-2}}), (Q_{g,c}>100\;\mathrm{mAh\,g^{-1}}), N/P <20 and E/C <5 are needed to approach >30 Wh kg⁻¹ cell energy density.
+
+**Critical boundary caveat:** the authors state that their model excludes stainless-steel casing, springs and current-collecting plates. Therefore >30 Wh kg⁻¹ is a model-derived cell-boundary design envelope, not a measured complete packaged-device result. We must add all excluded components and measured volume before comparing it with complete-device data.
+
+This yields a useful two-step target: first reproduce the 2026 measured pouch-cell comparator (10 mg cm⁻², N/P ≈16.4, 2.82 Wh kg⁻¹ based on 0.746 g total device weight); then explore the four-parameter envelope, but report the full packaged-device metric independently. Source: [Wu et al., DOI 10.1002/advs.202408997](https://doi.org/10.1002/advs.202408997).
+
+
 ## Matched SOTA targets for ZIHC
 
 - **Parity experiment:** reproduce the Wu et al. 2026 pouch-cell result on the same reported basis: 10 mg cm⁻² carbon cathode loading, N/P ≈16.4, 10 A g⁻¹, 3,000 cycles, specific capacity and Coulombic efficiency, with complete device mass accounting and a disclosed 0.746 g denominator comparator.
