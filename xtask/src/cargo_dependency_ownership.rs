@@ -559,4 +559,119 @@ mod tests {
         assert_eq!(classify("simd", &uses).0, "USED_ONLY_UNDER_FEATURE");
     }
 
+    fn root_workspace() -> Workspace {
+        Workspace {
+            path: "Cargo.toml".into(),
+            package: Some("symthaea".into()),
+            hash: "root-manifest".into(),
+            members: vec!["crates/*".into(), "xtask".into()],
+            excludes: vec!["crates/archived".into()],
+            dependencies: BTreeMap::new(),
+        }
+    }
+
+    fn member_manifest(path: &str, package: &str, uses: Vec<Use>) -> Manifest {
+        Manifest {
+            path: path.into(),
+            hash: format!("hash-{package}"),
+            package: Some(package.into()),
+            workspace_root: false,
+            uses,
+            parse_error: None,
+        }
+    }
+
+    fn workspace_use(alias: &str, section: &str) -> Use {
+        Use {
+            alias: alias.into(),
+            package_name: None,
+            section: section.into(),
+            inherited: true,
+            optional: false,
+            feature_only: false,
+        }
+    }
+
+    fn direct_use(alias: &str) -> Use {
+        Use {
+            alias: alias.into(),
+            package_name: None,
+            section: "dependencies".into(),
+            inherited: false,
+            optional: false,
+            feature_only: false,
+        }
+    }
+
+    #[test]
+    fn root_member_inheritance_is_counted_as_an_owner() {
+        let mut ws = root_workspace();
+        ws.dependencies.insert("serde".into(), Value::String("1".into()));
+        let root = Manifest {
+            path: "Cargo.toml".into(), hash: "root".into(), package: Some("symthaea".into()),
+            workspace_root: true, uses: vec![], parse_error: None,
+        };
+        let member = member_manifest("crates/core/demo/Cargo.toml", "demo", vec![workspace_use("serde", "dependencies")]);
+        let report = dependency_report("serde", &ws.dependencies["serde"], &ws, &[root, member], &[ws.clone()]);
+        assert_eq!(report.classification, "USED_IN_WORKSPACE");
+        assert_eq!(report.inheriting_manifests.len(), 1);
+        assert_eq!(report.inheriting_manifests[0].manifest, "crates/core/demo/Cargo.toml");
+    }
+
+    #[test]
+    fn direct_same_name_in_nested_workspace_does_not_inherit_root_version() {
+        let mut ws = root_workspace();
+        ws.dependencies.insert("serde".into(), Value::String("1".into()));
+        let nested = Workspace {
+            path: "crates/independent/Cargo.toml".into(), package: None,
+            hash: "nested".into(), members: vec!["crates/*".into()], excludes: vec![],
+            dependencies: BTreeMap::new(),
+        };
+        let root = Manifest {
+            path: "Cargo.toml".into(), hash: "root".into(), package: Some("symthaea".into()),
+            workspace_root: true, uses: vec![], parse_error: None,
+        };
+        let nested_member = member_manifest(
+            "crates/independent/crates/demo/Cargo.toml",
+            "demo",
+            vec![direct_use("serde")],
+        );
+        let report = dependency_report(
+            "serde", &ws.dependencies["serde"], &ws,
+            &[root, nested_member], &[ws.clone(), nested],
+        );
+        assert_eq!(report.classification, "USED_BY_NESTED_WORKSPACE");
+        assert!(report.inheriting_manifests.is_empty());
+        assert_eq!(report.same_name_non_inheriting_manifests.len(), 1);
+        assert!(!report.same_name_non_inheriting_manifests[0].inherits_this_entry);
+    }
+
+    #[test]
+    fn excluded_member_is_not_counted_as_a_workspace_inheritor() {
+        let mut ws = root_workspace();
+        ws.dependencies.insert("serde".into(), Value::String("1".into()));
+        let root = Manifest {
+            path: "Cargo.toml".into(), hash: "root".into(), package: Some("symthaea".into()),
+            workspace_root: true, uses: vec![], parse_error: None,
+        };
+        let excluded = member_manifest("crates/archived/Cargo.toml", "archived", vec![direct_use("serde")]);
+        let report = dependency_report("serde", &ws.dependencies["serde"], &ws, &[root, excluded], &[ws.clone()]);
+        assert_eq!(report.classification, "USED_BY_EXCLUDED_MEMBER");
+        assert!(report.inheriting_manifests.is_empty());
+    }
+
+    #[test]
+    fn root_dependency_without_inheritors_is_explicitly_unobserved() {
+        let mut ws = root_workspace();
+        ws.dependencies.insert("z3".into(), Value::String("0.12".into()));
+        let root = Manifest {
+            path: "Cargo.toml".into(), hash: "root".into(), package: Some("symthaea".into()),
+            workspace_root: true, uses: vec![], parse_error: None,
+        };
+        let report = dependency_report("z3", &ws.dependencies["z3"], &ws, &[root], &[ws.clone()]);
+        assert_eq!(report.classification, "UNUSED_IN_ROOT_WORKSPACE");
+        assert!(report.inheriting_manifests.is_empty());
+        assert!(report.notes.iter().any(|note| note.contains("not proof of global non-use")));
+    }
+
 }
