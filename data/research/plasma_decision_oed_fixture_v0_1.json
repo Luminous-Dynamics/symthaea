@@ -196,7 +196,8 @@
           "quantity": "water_contact_angle",
           "unit": "degree",
           "calibration_record_id": "synthetic-calibration-m1-wca",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 12
         },
         {
           "measurement_id": "m1-ftir",
@@ -213,7 +214,8 @@
           "quantity": "infrared_signature",
           "unit": "a.u.",
           "calibration_record_id": "synthetic-calibration-m1-ftir",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 0.5
         }
       ],
       "covariance_models": [
@@ -309,7 +311,8 @@
           "quantity": "water_contact_angle",
           "unit": "degree",
           "calibration_record_id": "synthetic-calibration-m2-wca",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 12
         },
         {
           "measurement_id": "m2-bond",
@@ -326,7 +329,8 @@
           "quantity": "lap_shear_strength",
           "unit": "MPa",
           "calibration_record_id": "synthetic-calibration-m2-bond",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 4.2
         },
         {
           "measurement_id": "m2-aged",
@@ -343,7 +347,8 @@
           "quantity": "aged_lap_shear_strength",
           "unit": "MPa",
           "calibration_record_id": "synthetic-calibration-m2-aged",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 3.9
         }
       ],
       "covariance_models": [],
@@ -429,7 +434,8 @@
           "quantity": "water_contact_angle",
           "unit": "degree",
           "calibration_record_id": "synthetic-calibration-m3-wca",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 15
         },
         {
           "measurement_id": "m3-bond",
@@ -446,7 +452,8 @@
           "quantity": "lap_shear_strength",
           "unit": "MPa",
           "calibration_record_id": "synthetic-calibration-m3-bond",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 6.2
         },
         {
           "measurement_id": "m3-aged",
@@ -463,7 +470,8 @@
           "quantity": "aged_lap_shear_strength",
           "unit": "MPa",
           "calibration_record_id": "synthetic-calibration-m3-aged",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 4
         }
       ],
       "covariance_models": [],
@@ -552,7 +560,8 @@
           "quantity": "water_contact_angle",
           "unit": "degree",
           "calibration_record_id": "synthetic-calibration-m4-wca",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 13
         },
         {
           "measurement_id": "m4-ftir",
@@ -569,7 +578,8 @@
           "quantity": "infrared_signature",
           "unit": "a.u.",
           "calibration_record_id": "synthetic-calibration-m4-ftir",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 0.5
         },
         {
           "measurement_id": "m4-bond",
@@ -586,7 +596,8 @@
           "quantity": "lap_shear_strength",
           "unit": "MPa",
           "calibration_record_id": "synthetic-calibration-m4-bond",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 6.3
         },
         {
           "measurement_id": "m4-aged",
@@ -603,7 +614,8 @@
           "quantity": "aged_lap_shear_strength",
           "unit": "MPa",
           "calibration_record_id": "synthetic-calibration-m4-aged",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 5.4
         },
         {
           "measurement_id": "m4-wvtr",
@@ -620,7 +632,8 @@
           "quantity": "water_vapour_transmission_ratio",
           "unit": "ratio",
           "calibration_record_id": "synthetic-calibration-m4-wvtr",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 1.6
         },
         {
           "measurement_id": "m4-otr",
@@ -637,7 +650,8 @@
           "quantity": "oxygen_transmission_ratio",
           "unit": "ratio",
           "calibration_record_id": "synthetic-calibration-m4-otr",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 1.45
         }
       ],
       "covariance_models": [
@@ -745,7 +759,8 @@
           "quantity": "water_contact_angle",
           "unit": "degree",
           "calibration_record_id": "synthetic-calibration-m5-wca",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 18
         },
         {
           "measurement_id": "m5-ftir",
@@ -762,7 +777,8 @@
           "quantity": "infrared_signature",
           "unit": "a.u.",
           "calibration_record_id": "synthetic-calibration-m5-ftir",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 0.5
         },
         {
           "measurement_id": "m5-bond",
@@ -779,7 +795,8 @@
           "quantity": "lap_shear_strength",
           "unit": "MPa",
           "calibration_record_id": "synthetic-calibration-m5-bond",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 6.2
         },
         {
           "measurement_id": "m5-aged",
@@ -796,7 +813,8 @@
           "quantity": "aged_lap_shear_strength",
           "unit": "MPa",
           "calibration_record_id": "synthetic-calibration-m5-aged",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 5.5
         }
       ],
       "covariance_models": [
@@ -893,7 +911,8 @@
           "quantity": "water_contact_angle",
           "unit": "degree",
           "calibration_record_id": "synthetic-calibration-m6-wca",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 19
         },
         {
           "measurement_id": "m6-ftir",
@@ -910,7 +929,8 @@
           "quantity": "infrared_signature",
           "unit": "a.u.",
           "calibration_record_id": "synthetic-calibration-m6-ftir",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 0.5
         },
         {
           "measurement_id": "m6-bond",
@@ -927,7 +947,8 @@
           "quantity": "lap_shear_strength",
           "unit": "MPa",
           "calibration_record_id": "synthetic-calibration-m6-bond",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 6
         },
         {
           "measurement_id": "m6-aged",
@@ -944,7 +965,8 @@
           "quantity": "aged_lap_shear_strength",
           "unit": "MPa",
           "calibration_record_id": "synthetic-calibration-m6-aged",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 5.4
         }
       ],
       "covariance_models": [],
@@ -1031,7 +1053,8 @@
           "quantity": "water_contact_angle",
           "unit": "degree",
           "calibration_record_id": "synthetic-calibration-m7-wca",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 18
         },
         {
           "measurement_id": "m7-ftir",
@@ -1048,7 +1071,8 @@
           "quantity": "infrared_signature",
           "unit": "a.u.",
           "calibration_record_id": "synthetic-calibration-m7-ftir",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 0.5
         },
         {
           "measurement_id": "m7-bond",
@@ -1065,7 +1089,8 @@
           "quantity": "lap_shear_strength",
           "unit": "MPa",
           "calibration_record_id": "synthetic-calibration-m7-bond",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 6
         },
         {
           "measurement_id": "m7-aged",
@@ -1082,7 +1107,8 @@
           "quantity": "aged_lap_shear_strength",
           "unit": "MPa",
           "calibration_record_id": "synthetic-calibration-m7-aged",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 5.3
         }
       ],
       "covariance_models": [
@@ -1249,7 +1275,8 @@
           "quantity": "water_contact_angle",
           "unit": "degree",
           "calibration_record_id": "synthetic-calibration-m9-wca",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 18
         },
         {
           "measurement_id": "m9-ftir",
@@ -1266,7 +1293,8 @@
           "quantity": "infrared_signature",
           "unit": "a.u.",
           "calibration_record_id": "synthetic-calibration-m9-ftir",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 0.5
         },
         {
           "measurement_id": "m9-bond",
@@ -1283,7 +1311,8 @@
           "quantity": "lap_shear_strength",
           "unit": "MPa",
           "calibration_record_id": "synthetic-calibration-m9-bond",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 6.2
         },
         {
           "measurement_id": "m9-aged",
@@ -1300,7 +1329,8 @@
           "quantity": "aged_lap_shear_strength",
           "unit": "MPa",
           "calibration_record_id": "synthetic-calibration-m9-aged",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 5.5
         },
         {
           "measurement_id": "m9-unapproved",
@@ -1317,7 +1347,8 @@
           "quantity": "unapproved_chemistry_signal",
           "unit": "a.u.",
           "calibration_record_id": "synthetic-calibration-m9-unapproved",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 1
         }
       ],
       "covariance_models": [
@@ -1417,7 +1448,8 @@
           "quantity": "water_contact_angle",
           "unit": "degree",
           "calibration_record_id": "synthetic-calibration-m10-wca",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 18
         },
         {
           "measurement_id": "m10-ftir",
@@ -1434,7 +1466,8 @@
           "quantity": "infrared_signature",
           "unit": "a.u.",
           "calibration_record_id": "synthetic-calibration-m10-ftir",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 0.5
         },
         {
           "measurement_id": "m10-bond",
@@ -1451,7 +1484,8 @@
           "quantity": "lap_shear_strength",
           "unit": "MPa",
           "calibration_record_id": "synthetic-calibration-m10-bond",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 6.2
         },
         {
           "measurement_id": "m10-aged",
@@ -1468,7 +1502,8 @@
           "quantity": "aged_lap_shear_strength",
           "unit": "MPa",
           "calibration_record_id": "synthetic-calibration-m10-aged",
-          "uncertainty": 0.01
+          "uncertainty": 0.01,
+          "measured_value": 5.5
         }
       ],
       "covariance_models": [
@@ -1568,7 +1603,8 @@
           "calibration_record_id": "synthetic-cal-pa6-missing-moisture-state-abstain-WCA_SCREEN",
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.01,
-          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-wca_screen"
+          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-wca_screen",
+          "measured_value": 15
         },
         {
           "measurement_id": "pa6-missing-moisture-state-abstain-ftir_chemistry",
@@ -1585,7 +1621,8 @@
           "calibration_record_id": "synthetic-cal-pa6-missing-moisture-state-abstain-FTIR_CHEMISTRY",
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.01,
-          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-ftir_chemistry"
+          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-ftir_chemistry",
+          "measured_value": 0.5
         },
         {
           "measurement_id": "pa6-missing-moisture-state-abstain-moisture_content",
@@ -1602,7 +1639,8 @@
           "calibration_record_id": "synthetic-cal-pa6-missing-moisture-state-abstain-MOISTURE_CONTENT",
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.01,
-          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-moisture_content"
+          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-moisture_content",
+          "measured_value": null
         },
         {
           "measurement_id": "pa6-missing-moisture-state-abstain-lap_shear",
@@ -1619,7 +1657,8 @@
           "calibration_record_id": "synthetic-cal-pa6-missing-moisture-state-abstain-LAP_SHEAR",
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.01,
-          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-lap_shear"
+          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-lap_shear",
+          "measured_value": 6
         },
         {
           "measurement_id": "pa6-missing-moisture-state-abstain-aged_lap_shear",
@@ -1636,7 +1675,8 @@
           "calibration_record_id": "synthetic-cal-pa6-missing-moisture-state-abstain-AGED_LAP_SHEAR",
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.01,
-          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-aged_lap_shear"
+          "raw_trace_digest": "sha256:synthetic-pa6-missing-moisture-state-abstain-aged_lap_shear",
+          "measured_value": 5.5
         }
       ],
       "covariance_models": [],
@@ -1726,7 +1766,8 @@
           "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-WCA_SCREEN",
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.01,
-          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-wca_screen"
+          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-wca_screen",
+          "measured_value": 15
         },
         {
           "measurement_id": "pa6-saturated-state-low-wca-reject-ftir_chemistry",
@@ -1743,7 +1784,8 @@
           "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-FTIR_CHEMISTRY",
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.01,
-          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-ftir_chemistry"
+          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-ftir_chemistry",
+          "measured_value": 0.5
         },
         {
           "measurement_id": "pa6-saturated-state-low-wca-reject-moisture_content",
@@ -1760,7 +1802,8 @@
           "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-MOISTURE_CONTENT",
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.01,
-          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-moisture_content"
+          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-moisture_content",
+          "measured_value": 3
         },
         {
           "measurement_id": "pa6-saturated-state-low-wca-reject-lap_shear",
@@ -1777,7 +1820,8 @@
           "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-LAP_SHEAR",
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.01,
-          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-lap_shear"
+          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-lap_shear",
+          "measured_value": 4.2
         },
         {
           "measurement_id": "pa6-saturated-state-low-wca-reject-aged_lap_shear",
@@ -1794,7 +1838,8 @@
           "calibration_record_id": "synthetic-cal-pa6-saturated-state-low-wca-reject-AGED_LAP_SHEAR",
           "calibration_status": "QUALIFIED",
           "uncertainty": 0.01,
-          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-aged_lap_shear"
+          "raw_trace_digest": "sha256:synthetic-pa6-saturated-state-low-wca-reject-aged_lap_shear",
+          "measured_value": 3.4
         }
       ],
       "covariance_models": [],
@@ -1824,7 +1869,8 @@
         "plasma_run_at_unix_ms": 1794528000000,
         "conditioning_temperature_c": 23,
         "conditioning_relative_humidity_pct": 50,
-        "condition_evidence_digest": "sha256:synthetic-pa6-condition-pa6-saturated-state-low-wca-reject"
+        "condition_evidence_digest": "sha256:synthetic-pa6-condition-pa6-saturated-state-low-wca-reject",
+        "moisture_measurement_id": "pa6-saturated-state-low-wca-reject-moisture_content"
       }
     }
   ]
