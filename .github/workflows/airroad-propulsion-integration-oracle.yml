@@ -1,0 +1,43 @@
+name: AIRROAD pinned propulsion integration oracle
+
+on:
+  pull_request:
+    paths:
+      - "tools/airroad-propulsion-integration-oracle/**"
+      - ".github/workflows/airroad-propulsion-integration-oracle.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "tools/airroad-propulsion-integration-oracle/**"
+      - ".github/workflows/airroad-propulsion-integration-oracle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-propulsion-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration-oracle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Verify formatting
+        run: cargo fmt --manifest-path tools/airroad-propulsion-integration-oracle/Cargo.toml --check
+
+      - name: Run pinned composition tests
+        run: cargo test --manifest-path tools/airroad-propulsion-integration-oracle/Cargo.toml --locked
+
+      - name: Run Clippy
+        run: cargo clippy --manifest-path tools/airroad-propulsion-integration-oracle/Cargo.toml --all-targets --locked -- -D warnings

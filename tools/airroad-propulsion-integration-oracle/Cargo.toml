@@ -1,0 +1,19 @@
+[package]
+name = "airroad-propulsion-integration-oracle"
+version = "0.2.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "Pinned synthetic composition reference for electric propulsion evidence"
+license = "AGPL-3.0-or-later"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+electric-propulsion-observation-oracle = { git = "https://github.com/Luminous-Dynamics/symthaea", rev = "d81f5b4f1ee050d677c3bae1c7733d5bfe73fa20" }
+electric-propulsion-map-oracle = { git = "https://github.com/Luminous-Dynamics/symthaea", rev = "45d6060cc6de03cc2511060b7c9f36a583c00fec" }
+electric-rotorcraft-drive-oracle = { git = "https://github.com/Luminous-Dynamics/symthaea", rev = "745d1776cd17b3af3007a38d80f5022077e4ad12" }
+electric-thermal-loss-ledger-oracle = { git = "https://github.com/Luminous-Dynamics/symthaea", rev = "2865e86a755e92a99bc534a5ea6dd13c272d8dc9" }
+
+[workspace]
