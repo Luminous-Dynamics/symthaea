@@ -542,6 +542,21 @@ fn add_trial_checks(
     if !valid_evidence(&trial.evidence, expected_kind, EvidenceTier::PhysicalTrial) {
         reasons.push(RouteReason::InvalidProcessTrialEvidence);
     }
+    if let Some(binding) = &trial.design_binding {
+        evidence_ids.push(binding.conformity_evidence.evidence_id.clone());
+        if !nonempty(&binding.product_id)
+            || !nonempty(&binding.design_revision)
+            || !nonempty(&binding.specimen_id)
+            || !valid_sha256(&binding.dossier_sha256)
+            || !valid_evidence(
+                &binding.conformity_evidence,
+                EvidenceKind::DesignRevisionConformity,
+                EvidenceTier::PhysicalTrial,
+            )
+        {
+            reasons.push(RouteReason::InvalidDesignRevisionBinding);
+        }
+    }
     match trial.outcome {
         TrialOutcome::Passed => {}
         TrialOutcome::Failed => reasons.push(RouteReason::ProcessTrialNotPassed),
@@ -989,6 +1004,7 @@ mod tests {
                 "process-lab",
                 None,
             ),
+            design_binding: None,
             mass_balance: with_balance.then(balance),
         }
     }
@@ -1562,6 +1578,56 @@ mod tests {
             qualify_recovery_route(RecoveryRoute::Downcycling, &bundle, &policy()).disposition,
             RouteDisposition::Eligible
         );
+    }
+
+    #[test]
+    fn design_linked_component_trial_binds_exact_revision_and_specimen() {
+        let mut bundle = empty_bundle();
+        let mut trial = process_trial(EvidenceKind::ComponentRecoveryTrial, true);
+        trial.design_binding = Some(DesignRevisionBinding {
+            product_id: "OVERSHIRT-01".to_owned(),
+            design_revision: "REV-A".to_owned(),
+            dossier_sha256: "c".repeat(64),
+            specimen_id: "PHYSICAL-ITEM-01".to_owned(),
+            conformity_evidence: evidence(
+                "DESIGN-CONFORMITY-01",
+                EvidenceKind::DesignRevisionConformity,
+                EvidenceTier::PhysicalTrial,
+                "inspection-lab",
+                None,
+            ),
+        });
+        bundle.process_trial = Some(trial);
+        bundle.downstream_acceptance = Some(acceptance());
+        assert_eq!(
+            qualify_recovery_route(RecoveryRoute::ComponentRecovery, &bundle, &policy())
+                .disposition,
+            RouteDisposition::Eligible
+        );
+    }
+
+    #[test]
+    fn malformed_design_revision_binding_blocks_component_claim() {
+        let mut bundle = empty_bundle();
+        let mut trial = process_trial(EvidenceKind::ComponentRecoveryTrial, true);
+        trial.design_binding = Some(DesignRevisionBinding {
+            product_id: "OVERSHIRT-01".to_owned(),
+            design_revision: "REV-A".to_owned(),
+            dossier_sha256: "not-a-digest".to_owned(),
+            specimen_id: "PHYSICAL-ITEM-01".to_owned(),
+            conformity_evidence: evidence(
+                "DESIGN-CONFORMITY-02",
+                EvidenceKind::DesignRevisionConformity,
+                EvidenceTier::PhysicalTrial,
+                "inspection-lab",
+                None,
+            ),
+        });
+        bundle.process_trial = Some(trial);
+        bundle.downstream_acceptance = Some(acceptance());
+        let result = qualify_recovery_route(RecoveryRoute::ComponentRecovery, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::InvalidDesignRevisionBinding));
     }
 
     #[test]
