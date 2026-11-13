@@ -286,8 +286,8 @@
       "publisher": "International Journal of Sustainable Engineering (Taylor & Francis)",
       "published": "2026-08-24",
       "evidence_class": "peer_reviewed_experimental_study",
-      "permitted_use": "Dynamic-load and uncertainty comparator. The paper reports a tested 54 V pack (20 series-connected 2.7 V, 100 F cells), an approximately 54 V to 33 V open-circuit voltage decline over 24 h at 25 °C in its setup, dynamic load transitions, and effective capacitance of approximately 60–77% of nominal at the highest tested discharge rates.",
-      "prohibited_inference": "Single study and setup; do not use its 24 h decline or 60–77% effective-capacitance range as a universal EDLC decay law, product rating, SOTA value, or matched commercial comparison. Preserve exact load, device, temperature, uncertainty and measurement boundaries."
+      "permitted_use": "Dynamic-load and uncertainty comparator. The paper reports a 20-cell pack of series-connected 2.7 V, 100 F cells (54 V nominal), an approximately 54 V to 33 V open-circuit voltage decline over 24 h at 25 °C in its setup, effective capacitance falling from 99% of nominal at 1 A to 77% at 10 A constant current and 60% at 200 W constant power, plus a two-branch equivalent-circuit model reducing voltage-prediction RMSE by 49%–83% across the evaluated conditions.",
+      "prohibited_inference": "Single study and setup; do not use its 24 h decline or 60%–77% high-rate effective-capacitance values as a universal EDLC decay/derating law, product rating or SOTA value. The two-branch RMSE result is in the authors' evaluated cases and is not a cross-device generalization claim. Preserve exact load, device, temperature, uncertainty and measurement boundaries."
     },
     {
       "id": "SUPERCAP-DYNAMICS-OPERANDO-REVIEW-2026",
