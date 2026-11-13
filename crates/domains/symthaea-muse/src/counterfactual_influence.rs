@@ -28,11 +28,11 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 pub const COUNTERFACTUAL_INFLUENCE_VERSION: &str =
-    "mel-mr-eval-017-counterfactual-influence-v0.1";
+    "mel-mr-eval-017-counterfactual-influence-v0.2";
 pub const REPEATABILITY_CALIBRATION_VERSION: &str =
     "mel-mr-eval-017-repeatability-calibration-v0.1";
 const CALIBRATION_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-repeatability-v1\0";
-const INFLUENCE_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-influence-v1\0";
+const INFLUENCE_DOMAIN: &[u8] = b"luminous-dynamics-mel-mr-eval-017-influence-v2\0";
 const MINIMUM_NOOP_RENDERS: usize = 3;
 const MAX_EVENT_ID_BYTES: usize = 256;
 const MAX_ARTIFACT_BYTES: usize = 64 * 1024 * 1024;
@@ -1281,14 +1281,15 @@ fn validate_input(
                 if !(0..=127).contains(&transformed) {
                     return Err(CounterfactualInfluenceError::InvalidIntervention);
                 }
-                let matches: Vec<&&PerformedEventLineage> = counterfactual_target_rows
+                let mut matches = counterfactual_target_rows
                     .iter()
-                    .filter(|candidate| candidate.descendant_ordinal == baseline.descendant_ordinal)
-                    .collect();
-                if matches.len() != 1 {
+                    .filter(|candidate| candidate.descendant_ordinal == baseline.descendant_ordinal);
+                let candidate = matches
+                    .next()
+                    .ok_or(CounterfactualInfluenceError::InvalidIntervention)?;
+                if matches.next().is_some() {
                     return Err(CounterfactualInfluenceError::InvalidIntervention);
                 }
-                let candidate = matches[0];
                 if candidate.midi_track_index != baseline.midi_track_index
                     || candidate.note_on_ordinal != baseline.note_on_ordinal
                     || candidate.midi_channel != baseline.midi_channel
@@ -2184,6 +2185,54 @@ mod tests {
         assert_eq!(
             measure_counterfactual_influence(&input, &calibration).unwrap_err(),
             CounterfactualInfluenceError::InvalidIntervention
+        );
+    }
+
+    #[test]
+    fn transposition_rejects_protected_non_target_pitch_mutation() {
+        let samples = vec![0.0f32; 128];
+        let mut midi = transpose_event_zero_midi(62);
+        let note_on = [0x90, 64, 90];
+        let note_on_index = midi
+            .windows(note_on.len())
+            .position(|window| window == note_on)
+            .unwrap();
+        midi[note_on_index + 1] = 65;
+        let note_off = [1, 0x80, 64, 0];
+        let note_off_index = midi
+            .windows(note_off.len())
+            .position(|window| window == note_off)
+            .unwrap();
+        midi[note_off_index + 2] = 65;
+
+        let render = build_render("transpose-protected-mutation", &midi, &samples);
+        let executable = render.process.executable_sha256_after.as_str();
+        let soundfont = render.process.soundfont_sha256_after.as_str();
+        assert_eq!(
+            verify_renderer_audio_binding(
+                &render.receipt,
+                RendererReceiptInputs {
+                    render_id: &render.receipt.render_id,
+                    backend: RendererBackend::FluidSynth,
+                    score_bytes: SCORE_BYTES,
+                    render_config_bytes: CONFIG_BYTES,
+                    input_midi_bytes: Some(&render.midi),
+                    performed_schedule_bytes: None,
+                    renderer_executable_sha256: Some(executable),
+                    soundfont_sha256: Some(soundfont),
+                    process_exit_code: Some(0),
+                    process_observation: Some(render.process.clone()),
+                    performed_event_map_sha256: render.receipt.performed_event_map_sha256.as_deref(),
+                    output_wav_bytes: &render.wav,
+                },
+                &render.map_bytes,
+                2,
+                &[62, 64],
+                None,
+                &audio(&samples),
+            )
+            .unwrap_err(),
+            CounterfactualInfluenceError::RendererReceiptInvalid
         );
     }
 
