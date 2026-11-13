@@ -6,17 +6,14 @@
 
 use crate::audio_event_observation::{
     AUDIO_EVENT_OBSERVATION_MAX_AUDIO_FRAMES_V1,
-    AUDIO_EVENT_OBSERVATION_MAX_INTERLEAVED_SAMPLES_V1,
-    AUDIO_EVENT_OBSERVATION_MAX_MIDI_BYTES_V1,
-    AUDIO_EVENT_OBSERVATION_MAX_NOTES_V1,
-    AUDIO_EVENT_OBSERVATION_MAX_TRACKS_V1,
-    AUDIO_EVENT_OBSERVATION_MAX_WAV_BYTES_V1,
-    AudioEventObservationIssueV1, AudioStemEventObservationReceiptV1,
-    expected_frame, observe_rendered_audio_stem_events_v1, validate_audio_stem_event_observation_v1,
+    AUDIO_EVENT_OBSERVATION_MAX_INTERLEAVED_SAMPLES_V1, AUDIO_EVENT_OBSERVATION_MAX_MIDI_BYTES_V1,
+    AUDIO_EVENT_OBSERVATION_MAX_NOTES_V1, AUDIO_EVENT_OBSERVATION_MAX_TRACKS_V1,
+    AUDIO_EVENT_OBSERVATION_MAX_WAV_BYTES_V1, AudioEventObservationIssueV1,
+    AudioStemEventObservationReceiptV1, expected_frame, observe_rendered_audio_stem_events_v1,
+    validate_audio_stem_event_observation_v1,
 };
 use crate::midi_performance::{
-    MIDI_PERFORMANCE_BINDING_DIGEST_SCHEMA_V1,
-    MIDI_PERFORMANCE_CAPABILITY_DIGEST_SCHEMA_V1,
+    MIDI_PERFORMANCE_BINDING_DIGEST_SCHEMA_V1, MIDI_PERFORMANCE_CAPABILITY_DIGEST_SCHEMA_V1,
     MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1, MIDI_PERFORMANCE_SCHEMA_V1,
     MIDI_PERFORMANCE_TICKS_PER_QUARTER_V1, MIDI_PERFORMANCE_TIMELINE_DIGEST_SCHEMA_V1,
     MidiPerformanceArtifactV1, MidiPerformanceManifestV1, MidiPerformanceTrackReceiptV1,
@@ -29,10 +26,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::Cursor;
 
 pub const PART_STEM_EVIDENCE_SCHEMA_V1: &str = "muse-part-stem-evidence-v1";
-pub const PART_STEM_BUNDLE_DIGEST_SCHEMA_V1: &str =
-    "muse-part-stem-evidence-serde-json-sha256-v1";
-pub const PART_STEM_TRACK_EVENT_SET_SCHEMA_V1: &str =
-    "muse-midi-track-event-set-json-sha256-v1";
+pub const PART_STEM_BUNDLE_DIGEST_SCHEMA_V1: &str = "muse-part-stem-evidence-serde-json-sha256-v1";
+pub const PART_STEM_TRACK_EVENT_SET_SCHEMA_V1: &str = "muse-midi-track-event-set-json-sha256-v1";
 pub const PART_STEM_RECEIPT_DIGEST_SCHEMA_V1: &str =
     "muse-part-stem-validation-receipt-serde-json-sha256-v1";
 
@@ -102,7 +97,9 @@ pub struct PartStemWavInputV1 {
 pub enum PartStemEvidenceIssueV1 {
     BundleTooLarge,
     WrongBundleSchema,
-    InvalidDigest { field: String },
+    InvalidDigest {
+        field: String,
+    },
     BundleCommitmentMismatch,
     TooManyStems,
     TooManyNotes,
@@ -116,39 +113,92 @@ pub enum PartStemEvidenceIssueV1 {
         required_end_frame: u64,
         declared_frame_count: u64,
     },
-    InvalidIdentity { field: String },
-    InvalidRenderMethod { track_index: u16 },
-    DuplicateTrackIndex { track_index: u16 },
-    DuplicateStemIdentity { track_index: u16 },
-    DuplicatePartSegment { part_id: u16, segment_id: String },
-    MissingStem { track_index: u16 },
-    UnexpectedStem { track_index: u16 },
-    StemIdentityMismatch { track_index: u16 },
-    SourceOrdinalCoverageMismatch { track_index: u16 },
-    InvalidSourceOrdinalOrder { track_index: u16 },
-    TrackEventSetMismatch { track_index: u16 },
+    InvalidIdentity {
+        field: String,
+    },
+    InvalidRenderMethod {
+        track_index: u16,
+    },
+    DuplicateTrackIndex {
+        track_index: u16,
+    },
+    DuplicateStemIdentity {
+        track_index: u16,
+    },
+    DuplicatePartSegment {
+        part_id: u16,
+        segment_id: String,
+    },
+    MissingStem {
+        track_index: u16,
+    },
+    UnexpectedStem {
+        track_index: u16,
+    },
+    StemIdentityMismatch {
+        track_index: u16,
+    },
+    SourceOrdinalCoverageMismatch {
+        track_index: u16,
+    },
+    InvalidSourceOrdinalOrder {
+        track_index: u16,
+    },
+    TrackEventSetMismatch {
+        track_index: u16,
+    },
     MidiBytesDigestMismatch,
     MidiManifestDigestMismatch,
     WrongMidiSchema,
     InvalidMidiHeader,
     InvalidMidiTempoOrMeter,
     MidiTrackCountMismatch,
-    InvalidMidiEvent { track_index: u16 },
-    MidiNoteSetMismatch { track_index: u16 },
-    MidiProgramSetMismatch { track_index: u16 },
-    InvalidNoteReceipt { ordinal: usize },
-    DuplicateSourceOrdinal { ordinal: usize },
-    WavMissing { sha256: String },
-    UnexpectedWavInput { sha256: String },
-    DuplicateWavInput { sha256: String },
-    WavTooLarge { sha256: String },
+    InvalidMidiEvent {
+        track_index: u16,
+    },
+    MidiNoteSetMismatch {
+        track_index: u16,
+    },
+    MidiProgramSetMismatch {
+        track_index: u16,
+    },
+    InvalidNoteReceipt {
+        ordinal: usize,
+    },
+    DuplicateSourceOrdinal {
+        ordinal: usize,
+    },
+    WavMissing {
+        sha256: String,
+    },
+    UnexpectedWavInput {
+        sha256: String,
+    },
+    DuplicateWavInput {
+        sha256: String,
+    },
+    WavTooLarge {
+        sha256: String,
+    },
     TotalWavBytesExceeded,
-    WavDigestMismatch { sha256: String },
-    InvalidWav { sha256: String },
-    NonFiniteAudioSample { sha256: String },
-    WavSampleCountMismatch { sha256: String },
-    WavClockMismatch { sha256: String },
-    TooManyAudioFrames { sha256: String },
+    WavDigestMismatch {
+        sha256: String,
+    },
+    InvalidWav {
+        sha256: String,
+    },
+    NonFiniteAudioSample {
+        sha256: String,
+    },
+    WavSampleCountMismatch {
+        sha256: String,
+    },
+    WavClockMismatch {
+        sha256: String,
+    },
+    TooManyAudioFrames {
+        sha256: String,
+    },
     BundleSerialization,
 }
 
@@ -177,7 +227,6 @@ pub struct PartStemValidationReceiptV1 {
     pub common_frame_count: u64,
     pub receipt_sha256: String,
 }
-
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum PartStemAudioEvidenceIssueV1 {
@@ -311,9 +360,13 @@ pub fn part_stem_bundle_commitment_v1(
     if bundle.stems.len() > PART_STEM_MAX_STEMS_V1 {
         return Err(PartStemEvidenceIssueV1::TooManyStems);
     }
-    let ordinal_count = bundle.stems.iter().try_fold(0usize, |sum, stem| {
-        sum.checked_add(stem.source_note_ordinals.len())
-    }).ok_or(PartStemEvidenceIssueV1::TooManyNotes)?;
+    let ordinal_count = bundle
+        .stems
+        .iter()
+        .try_fold(0usize, |sum, stem| {
+            sum.checked_add(stem.source_note_ordinals.len())
+        })
+        .ok_or(PartStemEvidenceIssueV1::TooManyNotes)?;
     if ordinal_count > PART_STEM_MAX_NOTES_V1 {
         return Err(PartStemEvidenceIssueV1::TooManyNotes);
     }
@@ -342,11 +395,10 @@ pub fn parse_part_stem_bundle_v1(
     serde_json::from_slice(bytes).map_err(|_| PartStemEvidenceIssueV1::BundleSerialization)
 }
 
-fn track_notes(
-    manifest: &MidiPerformanceManifestV1,
-    track_index: u16,
-) -> Vec<TrackEventNoteV1> {
-    let mut notes: Vec<_> = manifest.notes.iter()
+fn track_notes(manifest: &MidiPerformanceManifestV1, track_index: u16) -> Vec<TrackEventNoteV1> {
+    let mut notes: Vec<_> = manifest
+        .notes
+        .iter()
         .filter(|note| note.track_index == track_index)
         .map(|note| TrackEventNoteV1 {
             source_note_ordinal: note.source_note_ordinal,
@@ -397,7 +449,9 @@ fn verify_midi(
         ("manifest_sha256", midi.manifest_sha256.as_str()),
     ] {
         if !valid_sha256(value) {
-            issues.push(PartStemEvidenceIssueV1::InvalidDigest { field: field.into() });
+            issues.push(PartStemEvidenceIssueV1::InvalidDigest {
+                field: field.into(),
+            });
         }
     }
     if sha256_hex(&midi.midi_bytes) != manifest.midi_sha256 {
@@ -500,9 +554,14 @@ fn verify_midi(
                 ordinal: note.source_note_ordinal,
             });
         }
-        notes_by_track.entry(note.track_index).or_default()
-            .push((note.start_tick, note.pitch_midi, note.velocity_midi));
-        offs_by_track.entry(note.track_index).or_default()
+        notes_by_track.entry(note.track_index).or_default().push((
+            note.start_tick,
+            note.pitch_midi,
+            note.velocity_midi,
+        ));
+        offs_by_track
+            .entry(note.track_index)
+            .or_default()
             .push((note.end_tick, note.pitch_midi));
     }
 
@@ -523,9 +582,7 @@ fn verify_midi(
                     tempo_events += 1;
                 }
                 TrackEventKind::Meta(MetaMessage::TimeSignature(numerator, denominator, _, _))
-                    if tick == 0
-                        && numerator == manifest.meter_numerator
-                        && denominator == 2 =>
+                    if tick == 0 && numerator == manifest.meter_numerator && denominator == 2 =>
                 {
                     meter_events += 1;
                 }
@@ -570,8 +627,7 @@ fn verify_midi(
                         MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
                             actual_on.push((tick, key.as_int(), vel.as_int()));
                         }
-                        MidiMessage::NoteOff { key, .. }
-                        | MidiMessage::NoteOn { key, vel: _ } => {
+                        MidiMessage::NoteOff { key, .. } | MidiMessage::NoteOn { key, vel: _ } => {
                             actual_off.push((tick, key.as_int()));
                         }
                         MidiMessage::ProgramChange { program } => {
@@ -641,13 +697,20 @@ pub fn compute_midi_track_event_set_sha256_v1(
     track_index: u16,
 ) -> Result<String, Vec<PartStemEvidenceIssueV1>> {
     let programs = verify_midi(midi)?;
-    let Some(track) = midi.manifest.tracks.iter()
+    let Some(track) = midi
+        .manifest
+        .tracks
+        .iter()
         .find(|track| track.track_index == track_index)
     else {
-        return Err(vec![PartStemEvidenceIssueV1::UnexpectedStem { track_index }]);
+        return Err(vec![PartStemEvidenceIssueV1::UnexpectedStem {
+            track_index,
+        }]);
     };
     let Some(track_programs) = programs.get(&track_index) else {
-        return Err(vec![PartStemEvidenceIssueV1::MidiProgramSetMismatch { track_index }]);
+        return Err(vec![PartStemEvidenceIssueV1::MidiProgramSetMismatch {
+            track_index,
+        }]);
     };
     track_event_set_sha256_v1(&midi.manifest, track, track_programs).map_err(|issue| vec![issue])
 }
@@ -660,10 +723,7 @@ enum WavErrorV1 {
     SampleCountMismatch,
 }
 
-fn validate_wav(
-    bytes: &[u8],
-    clock: &PartStemAudioClockV1,
-) -> Result<(), WavErrorV1> {
+fn validate_wav(bytes: &[u8], clock: &PartStemAudioClockV1) -> Result<(), WavErrorV1> {
     if bytes.is_empty() || bytes.len() > PART_STEM_MAX_WAV_BYTES_V1 {
         return Err(WavErrorV1::Invalid);
     }
@@ -764,12 +824,18 @@ pub fn validate_part_stem_bundle_v1(
         ("bundle_sha256", bundle.bundle_sha256.as_str()),
     ] {
         if !valid_sha256(digest) {
-            issues.push(PartStemEvidenceIssueV1::InvalidDigest { field: field.into() });
+            issues.push(PartStemEvidenceIssueV1::InvalidDigest {
+                field: field.into(),
+            });
         }
     }
-    let bundle_ordinal_count = bundle.stems.iter().try_fold(0usize, |sum, stem| {
-        sum.checked_add(stem.source_note_ordinals.len())
-    }).unwrap_or(usize::MAX);
+    let bundle_ordinal_count = bundle
+        .stems
+        .iter()
+        .try_fold(0usize, |sum, stem| {
+            sum.checked_add(stem.source_note_ordinals.len())
+        })
+        .unwrap_or(usize::MAX);
     if bundle_ordinal_count > PART_STEM_MAX_NOTES_V1 {
         issues.push(PartStemEvidenceIssueV1::TooManyNotes);
     }
@@ -824,12 +890,17 @@ pub fn validate_part_stem_bundle_v1(
             BTreeMap::new()
         }
     };
-    let expected_tracks: BTreeMap<_, _> = midi.manifest.tracks.iter()
+    let expected_tracks: BTreeMap<_, _> = midi
+        .manifest
+        .tracks
+        .iter()
         .map(|track| (track.track_index, track))
         .collect();
     let mut expected_ordinals: BTreeMap<u16, Vec<usize>> = BTreeMap::new();
     for note in &midi.manifest.notes {
-        expected_ordinals.entry(note.track_index).or_default()
+        expected_ordinals
+            .entry(note.track_index)
+            .or_default()
             .push(note.source_note_ordinal);
     }
     for values in expected_ordinals.values_mut() {
@@ -844,9 +915,12 @@ pub fn validate_part_stem_bundle_v1(
             });
         }
     }
-    let total_wav_bytes = wav_inputs.iter().try_fold(0u64, |sum, input| {
-        sum.checked_add(input.wav_bytes.len() as u64)
-    }).unwrap_or(u64::MAX);
+    let total_wav_bytes = wav_inputs
+        .iter()
+        .try_fold(0u64, |sum, input| {
+            sum.checked_add(input.wav_bytes.len() as u64)
+        })
+        .unwrap_or(u64::MAX);
     if total_wav_bytes > PART_STEM_MAX_TOTAL_WAV_BYTES_V1 {
         issues.push(PartStemEvidenceIssueV1::TotalWavBytesExceeded);
         return Err(issues);
@@ -873,18 +947,28 @@ pub fn validate_part_stem_bundle_v1(
             ("patch_id", stem.patch_id.as_str()),
         ] {
             if !non_blank(value) {
-                issues.push(PartStemEvidenceIssueV1::InvalidIdentity { field: field.into() });
+                issues.push(PartStemEvidenceIssueV1::InvalidIdentity {
+                    field: field.into(),
+                });
             }
         }
         for (field, value) in [
-            ("renderer_binary_sha256", stem.renderer_binary_sha256.as_str()),
+            (
+                "renderer_binary_sha256",
+                stem.renderer_binary_sha256.as_str(),
+            ),
             ("patch_asset_sha256", stem.patch_asset_sha256.as_str()),
             ("render_config_sha256", stem.render_config_sha256.as_str()),
-            ("track_event_set_sha256", stem.track_event_set_sha256.as_str()),
+            (
+                "track_event_set_sha256",
+                stem.track_event_set_sha256.as_str(),
+            ),
             ("wav_sha256", stem.wav_sha256.as_str()),
         ] {
             if !valid_sha256(value) {
-                issues.push(PartStemEvidenceIssueV1::InvalidDigest { field: field.into() });
+                issues.push(PartStemEvidenceIssueV1::InvalidDigest {
+                    field: field.into(),
+                });
             }
         }
         let Some(track) = expected_tracks.get(&stem.midi_track_index) else {
@@ -903,15 +987,24 @@ pub fn validate_part_stem_bundle_v1(
         }
         if stem.source_note_ordinals.is_empty()
             || stem.source_note_ordinals.len() > PART_STEM_MAX_NOTES_V1
-            || stem.source_note_ordinals.iter().any(|ordinal| *ordinal > 1_000_000_000)
-            || stem.source_note_ordinals.windows(2).any(|pair| pair[0] >= pair[1])
+            || stem
+                .source_note_ordinals
+                .iter()
+                .any(|ordinal| *ordinal > 1_000_000_000)
+            || stem
+                .source_note_ordinals
+                .windows(2)
+                .any(|pair| pair[0] >= pair[1])
         {
             issues.push(PartStemEvidenceIssueV1::InvalidSourceOrdinalOrder {
                 track_index: stem.midi_track_index,
             });
         }
         if stem.source_note_ordinals
-            != expected_ordinals.get(&stem.midi_track_index).cloned().unwrap_or_default()
+            != expected_ordinals
+                .get(&stem.midi_track_index)
+                .cloned()
+                .unwrap_or_default()
         {
             issues.push(PartStemEvidenceIssueV1::SourceOrdinalCoverageMismatch {
                 track_index: stem.midi_track_index,
@@ -973,7 +1066,9 @@ pub fn validate_part_stem_bundle_v1(
             });
         }
     }
-    let declared_wavs: BTreeSet<_> = bundle.stems.iter()
+    let declared_wavs: BTreeSet<_> = bundle
+        .stems
+        .iter()
         .map(|stem| stem.wav_sha256.as_str())
         .collect();
     for input in wav_inputs {
@@ -1016,8 +1111,6 @@ pub fn validate_part_stem_bundle_v1(
     Ok(receipt)
 }
 
-
-
 /// Validate the complete part-stem bundle, then run the acoustic observer
 /// against exactly one validated track's isolated WAV. The output preserves
 /// both the structural admission receipt and the stem-scoped observation;
@@ -1028,30 +1121,40 @@ pub fn validate_and_observe_part_stem_v1(
     wav_inputs: &[PartStemWavInputV1],
     track_index: u16,
 ) -> Result<PartStemAudioEvidenceReceiptV1, Vec<PartStemAudioEvidenceIssueV1>> {
-    let stem_validation = validate_part_stem_bundle_v1(bundle, midi, wav_inputs)
-        .map_err(|errors| errors.into_iter()
-            .map(PartStemAudioEvidenceIssueV1::Admission)
-            .collect::<Vec<_>>())?;
+    let stem_validation =
+        validate_part_stem_bundle_v1(bundle, midi, wav_inputs).map_err(|errors| {
+            errors
+                .into_iter()
+                .map(PartStemAudioEvidenceIssueV1::Admission)
+                .collect::<Vec<_>>()
+        })?;
 
-    let Some(stem) = bundle.stems.iter()
+    let Some(stem) = bundle
+        .stems
+        .iter()
         .find(|stem| stem.midi_track_index == track_index)
     else {
-        return Err(vec![PartStemAudioEvidenceIssueV1::MissingSelectedStem { track_index }]);
+        return Err(vec![PartStemAudioEvidenceIssueV1::MissingSelectedStem {
+            track_index,
+        }]);
     };
-    let Some(wav) = wav_inputs.iter()
+    let Some(wav) = wav_inputs
+        .iter()
         .find(|input| input.wav_sha256 == stem.wav_sha256)
     else {
         return Err(vec![PartStemAudioEvidenceIssueV1::MissingWavInput {
             sha256: stem.wav_sha256.clone(),
         }]);
     };
-    let audio_observation = observe_rendered_audio_stem_events_v1(
-        &wav.wav_bytes,
-        midi,
-        track_index,
-    ).map_err(|errors| errors.into_iter()
-        .map(PartStemAudioEvidenceIssueV1::Observation)
-        .collect::<Vec<_>>())?;
+    let audio_observation =
+        observe_rendered_audio_stem_events_v1(&wav.wav_bytes, midi, track_index).map_err(
+            |errors| {
+                errors
+                    .into_iter()
+                    .map(PartStemAudioEvidenceIssueV1::Observation)
+                    .collect::<Vec<_>>()
+            },
+        )?;
 
     let mut receipt = PartStemAudioEvidenceReceiptV1 {
         schema: "muse-part-stem-audio-evidence-receipt-v1".into(),
@@ -1064,18 +1167,17 @@ pub fn validate_and_observe_part_stem_v1(
         stem_validation: &receipt.stem_validation,
         audio_observation: &receipt.audio_observation,
     };
-    let bytes = serde_json::to_vec(&commitment)
-        .map_err(|_| vec![PartStemAudioEvidenceIssueV1::Admission(
+    let bytes = serde_json::to_vec(&commitment).map_err(|_| {
+        vec![PartStemAudioEvidenceIssueV1::Admission(
             PartStemEvidenceIssueV1::BundleSerialization,
-        )])?;
+        )]
+    })?;
     receipt.receipt_sha256 = domain_sha256(
         "muse-part-stem-audio-evidence-receipt-serde-json-sha256-v1",
         &bytes,
     );
     Ok(receipt)
 }
-
-
 
 /// Replay-check a combined structural-admission + stem-observation receipt
 /// against the exact bundle, MIDI artifact and WAV byte inputs. This verifies
@@ -1088,14 +1190,17 @@ pub fn validate_part_stem_audio_evidence_receipt_v1(
     track_index: u16,
 ) -> Vec<PartStemAudioEvidenceIssueV1> {
     let mut issues = Vec::new();
-    let expected_stem_validation =
-        match validate_part_stem_bundle_v1(bundle, midi, wav_inputs) {
-            Ok(value) => Some(value),
-            Err(errors) => {
-                issues.extend(errors.into_iter().map(PartStemAudioEvidenceIssueV1::Admission));
-                None
-            }
-        };
+    let expected_stem_validation = match validate_part_stem_bundle_v1(bundle, midi, wav_inputs) {
+        Ok(value) => Some(value),
+        Err(errors) => {
+            issues.extend(
+                errors
+                    .into_iter()
+                    .map(PartStemAudioEvidenceIssueV1::Admission),
+            );
+            None
+        }
+    };
     if receipt.schema != "muse-part-stem-audio-evidence-receipt-v1" {
         issues.push(PartStemAudioEvidenceIssueV1::ReceiptSchemaMismatch);
     }
@@ -1103,13 +1208,16 @@ pub fn validate_part_stem_audio_evidence_receipt_v1(
         issues.push(PartStemAudioEvidenceIssueV1::ReceiptInputBindingMismatch);
     }
 
-    let Some(stem) = bundle.stems.iter()
+    let Some(stem) = bundle
+        .stems
+        .iter()
         .find(|stem| stem.midi_track_index == track_index)
     else {
         issues.push(PartStemAudioEvidenceIssueV1::MissingSelectedStem { track_index });
         return issues;
     };
-    let Some(wav) = wav_inputs.iter()
+    let Some(wav) = wav_inputs
+        .iter()
         .find(|input| input.wav_sha256 == stem.wav_sha256)
     else {
         issues.push(PartStemAudioEvidenceIssueV1::MissingWavInput {
@@ -1123,7 +1231,11 @@ pub fn validate_part_stem_audio_evidence_receipt_v1(
         midi,
         track_index,
     );
-    issues.extend(observation_issues.into_iter().map(PartStemAudioEvidenceIssueV1::Observation));
+    issues.extend(
+        observation_issues
+            .into_iter()
+            .map(PartStemAudioEvidenceIssueV1::Observation),
+    );
 
     let commitment = PartStemAudioEvidenceCommitmentV1 {
         schema: &receipt.schema,
@@ -1151,8 +1263,7 @@ pub fn validate_part_stem_audio_evidence_receipt_v1(
 mod tests {
     use super::*;
     use crate::midi_performance::{
-        MIDI_PERFORMANCE_BINDING_DIGEST_SCHEMA_V1,
-        MIDI_PERFORMANCE_CAPABILITY_DIGEST_SCHEMA_V1,
+        MIDI_PERFORMANCE_BINDING_DIGEST_SCHEMA_V1, MIDI_PERFORMANCE_CAPABILITY_DIGEST_SCHEMA_V1,
         MIDI_PERFORMANCE_SCHEMA_V1, MIDI_PERFORMANCE_TICKS_PER_QUARTER_V1,
         MIDI_PERFORMANCE_TIMELINE_DIGEST_SCHEMA_V1, MidiPerformanceManifestV1,
         MidiPerformanceNoteReceiptV1, MidiPerformanceTrackReceiptV1,
@@ -1160,15 +1271,12 @@ mod tests {
 
     fn midi_bytes() -> Vec<u8> {
         let tempo = vec![
-            0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20,
-            0x00, 0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08,
-            0x00, 0xff, 0x2f, 0x00,
+            0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20, 0x00, 0xff, 0x58, 0x04, 0x04, 0x02, 0x18,
+            0x08, 0x00, 0xff, 0x2f, 0x00,
         ];
         let notes = vec![
-            0x00, 0xc0, 0x00,
-            0x00, 0x90, 60, 100,
-            0x87, 0x40, 0x80, 60, 0x00,
-            0x00, 0xff, 0x2f, 0x00,
+            0x00, 0xc0, 0x00, 0x00, 0x90, 60, 100, 0x87, 0x40, 0x80, 60, 0x00, 0x00, 0xff, 0x2f,
+            0x00,
         ];
         let mut bytes = Vec::new();
         bytes.extend_from_slice(b"MThd");
@@ -1212,7 +1320,9 @@ mod tests {
         let midi_bytes = midi_bytes();
         let manifest = MidiPerformanceManifestV1 {
             schema: MIDI_PERFORMANCE_SCHEMA_V1.into(),
-            score_digest_schema: symthaea_music_theory::orchestration_timeline::ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1.into(),
+            score_digest_schema:
+                symthaea_music_theory::orchestration_timeline::ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1
+                    .into(),
             score_sha256: "a".repeat(64),
             timeline_digest_schema: MIDI_PERFORMANCE_TIMELINE_DIGEST_SCHEMA_V1.into(),
             timeline_sha256: "b".repeat(64),
@@ -1251,10 +1361,8 @@ mod tests {
             }],
         };
         let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
-        let manifest_sha256 = domain_sha256(
-            MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1,
-            &manifest_bytes,
-        );
+        let manifest_sha256 =
+            domain_sha256(MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1, &manifest_bytes);
         let midi = MidiPerformanceArtifactV1 {
             midi_bytes,
             manifest: manifest.clone(),
@@ -1262,8 +1370,7 @@ mod tests {
         };
         let wav_bytes = pcm_wav(24_000);
         let wav_sha256 = sha256_hex(&wav_bytes);
-        let track_event_set_sha256 =
-            compute_midi_track_event_set_sha256_v1(&midi, 1).unwrap();
+        let track_event_set_sha256 = compute_midi_track_event_set_sha256_v1(&midi, 1).unwrap();
         let mut bundle = PartStemEvidenceBundleV1 {
             schema: PART_STEM_EVIDENCE_SCHEMA_V1.into(),
             score_sha256: manifest.score_sha256.clone(),
@@ -1298,10 +1405,12 @@ mod tests {
         (
             bundle,
             midi,
-            vec![PartStemWavInputV1 { wav_sha256, wav_bytes }],
+            vec![PartStemWavInputV1 {
+                wav_sha256,
+                wav_bytes,
+            }],
         )
     }
-
 
     #[test]
     fn validated_bundle_flows_into_track_scoped_audio_observation() {
@@ -1317,25 +1426,17 @@ mod tests {
         assert!(valid_sha256(&receipt.receipt_sha256));
     }
 
-
-
     fn two_part_midi_bytes_same_pitch() -> Vec<u8> {
         let tempo = vec![
-            0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20,
-            0x00, 0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08,
-            0x00, 0xff, 0x2f, 0x00,
+            0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20, 0x00, 0xff, 0x58, 0x04, 0x04, 0x02, 0x18,
+            0x08, 0x00, 0xff, 0x2f, 0x00,
         ];
         let first = vec![
-            0x00, 0xc0, 0x00,
-            0x00, 0x90, 60, 90,
-            0x87, 0x40, 0x80, 60, 0x00,
-            0x00, 0xff, 0x2f, 0x00,
+            0x00, 0xc0, 0x00, 0x00, 0x90, 60, 90, 0x87, 0x40, 0x80, 60, 0x00, 0x00, 0xff, 0x2f,
+            0x00,
         ];
         let second = vec![
-            0x00, 0xc1, 24,
-            0x00, 0x91, 60, 100,
-            0x87, 0x40, 0x81, 60, 0x00,
-            0x00, 0xff, 0x2f, 0x00,
+            0x00, 0xc1, 24, 0x00, 0x91, 60, 100, 0x87, 0x40, 0x81, 60, 0x00, 0x00, 0xff, 0x2f, 0x00,
         ];
         let mut bytes = Vec::new();
         bytes.extend_from_slice(b"MThd");
@@ -1372,24 +1473,18 @@ mod tests {
         cursor.into_inner()
     }
 
-
     fn handoff_midi_bytes() -> Vec<u8> {
         let tempo = vec![
-            0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20,
-            0x00, 0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08,
-            0x00, 0xff, 0x2f, 0x00,
+            0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20, 0x00, 0xff, 0x58, 0x04, 0x04, 0x02, 0x18,
+            0x08, 0x00, 0xff, 0x2f, 0x00,
         ];
         let first = vec![
-            0x00, 0xc0, 0x00,
-            0x00, 0x90, 60, 90,
-            0x87, 0x40, 0x80, 60, 0x00,
-            0x00, 0xff, 0x2f, 0x00,
+            0x00, 0xc0, 0x00, 0x00, 0x90, 60, 90, 0x87, 0x40, 0x80, 60, 0x00, 0x00, 0xff, 0x2f,
+            0x00,
         ];
         let second = vec![
-            0x87, 0x40, 0xc1, 40,
-            0x00, 0x91, 64, 90,
-            0x87, 0x40, 0x81, 64, 0x00,
-            0x00, 0xff, 0x2f, 0x00,
+            0x87, 0x40, 0xc1, 40, 0x00, 0x91, 64, 90, 0x87, 0x40, 0x81, 64, 0x00, 0x00, 0xff, 0x2f,
+            0x00,
         ];
         let mut bytes = Vec::new();
         bytes.extend_from_slice(b"MThd");
@@ -1444,7 +1539,9 @@ mod tests {
         let midi_bytes = handoff_midi_bytes();
         let manifest = MidiPerformanceManifestV1 {
             schema: MIDI_PERFORMANCE_SCHEMA_V1.into(),
-            score_digest_schema: symthaea_music_theory::orchestration_timeline::ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1.into(),
+            score_digest_schema:
+                symthaea_music_theory::orchestration_timeline::ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1
+                    .into(),
             score_sha256: "a".repeat(64),
             timeline_digest_schema: MIDI_PERFORMANCE_TIMELINE_DIGEST_SCHEMA_V1.into(),
             timeline_sha256: "b".repeat(64),
@@ -1511,10 +1608,8 @@ mod tests {
             ],
         };
         let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
-        let manifest_sha256 = domain_sha256(
-            MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1,
-            &manifest_bytes,
-        );
+        let manifest_sha256 =
+            domain_sha256(MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1, &manifest_bytes);
         let midi = MidiPerformanceArtifactV1 {
             midi_bytes,
             manifest: manifest.clone(),
@@ -1598,7 +1693,9 @@ mod tests {
         let midi_bytes = two_part_midi_bytes_same_pitch();
         let manifest = MidiPerformanceManifestV1 {
             schema: MIDI_PERFORMANCE_SCHEMA_V1.into(),
-            score_digest_schema: symthaea_music_theory::orchestration_timeline::ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1.into(),
+            score_digest_schema:
+                symthaea_music_theory::orchestration_timeline::ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1
+                    .into(),
             score_sha256: "a".repeat(64),
             timeline_digest_schema: MIDI_PERFORMANCE_TIMELINE_DIGEST_SCHEMA_V1.into(),
             timeline_sha256: "b".repeat(64),
@@ -1665,10 +1762,8 @@ mod tests {
             ],
         };
         let manifest_bytes = serde_json::to_vec(&manifest).unwrap();
-        let manifest_sha256 = domain_sha256(
-            MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1,
-            &manifest_bytes,
-        );
+        let manifest_sha256 =
+            domain_sha256(MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1, &manifest_bytes);
         let midi = MidiPerformanceArtifactV1 {
             midi_bytes,
             manifest: manifest.clone(),
@@ -1756,7 +1851,6 @@ mod tests {
         assert_eq!(bundle.stems[0].render_method, "single_track_input");
     }
 
-
     #[test]
     fn alternate_ppq_is_rejected_even_when_midi_and_manifest_agree() {
         let (_, mut midi, _) = fixture();
@@ -1765,40 +1859,36 @@ mod tests {
         midi.manifest.ticks_per_quarter = 480;
         midi.manifest.midi_sha256 = sha256_hex(&midi.midi_bytes);
         let manifest_bytes = serde_json::to_vec(&midi.manifest).unwrap();
-        midi.manifest_sha256 = domain_sha256(
-            MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1,
-            &manifest_bytes,
-        );
+        midi.manifest_sha256 =
+            domain_sha256(MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1, &manifest_bytes);
         let issues = verify_midi(&midi).unwrap_err();
         assert!(issues.contains(&PartStemEvidenceIssueV1::WrongMidiSchema));
     }
-
 
     #[test]
     fn combined_receipt_replays_and_detects_outer_receipt_tampering() {
         let (bundle, midi, wavs) = fixture();
         let receipt = validate_and_observe_part_stem_v1(&bundle, &midi, &wavs, 1).unwrap();
-        assert!(validate_part_stem_audio_evidence_receipt_v1(
-            &receipt, &bundle, &midi, &wavs, 1
-        ).is_empty());
+        assert!(
+            validate_part_stem_audio_evidence_receipt_v1(&receipt, &bundle, &midi, &wavs, 1)
+                .is_empty()
+        );
 
         let mut tampered = receipt.clone();
         tampered.receipt_sha256 = "0".repeat(64);
-        assert!(validate_part_stem_audio_evidence_receipt_v1(
-            &tampered, &bundle, &midi, &wavs, 1
-        ).contains(&PartStemAudioEvidenceIssueV1::ReceiptDigestMismatch));
+        assert!(
+            validate_part_stem_audio_evidence_receipt_v1(&tampered, &bundle, &midi, &wavs, 1)
+                .contains(&PartStemAudioEvidenceIssueV1::ReceiptDigestMismatch)
+        );
     }
-
 
     #[test]
     fn same_pitch_contributors_remain_separately_addressable_by_track() {
         let (bundle, midi, wavs) = two_part_same_pitch_fixture();
         assert!(validate_part_stem_bundle_v1(&bundle, &midi, &wavs).is_ok());
 
-        let part_zero =
-            validate_and_observe_part_stem_v1(&bundle, &midi, &wavs, 1).unwrap();
-        let part_one =
-            validate_and_observe_part_stem_v1(&bundle, &midi, &wavs, 2).unwrap();
+        let part_zero = validate_and_observe_part_stem_v1(&bundle, &midi, &wavs, 1).unwrap();
+        let part_one = validate_and_observe_part_stem_v1(&bundle, &midi, &wavs, 2).unwrap();
 
         assert_eq!(part_zero.audio_observation.track_index, 1);
         assert_eq!(part_one.audio_observation.track_index, 2);
@@ -1806,8 +1896,14 @@ mod tests {
         assert_eq!(part_one.audio_observation.note_observations.len(), 1);
         assert_eq!(part_zero.audio_observation.note_observations[0].part_id, 0);
         assert_eq!(part_one.audio_observation.note_observations[0].part_id, 1);
-        assert_eq!(part_zero.audio_observation.note_observations[0].pitch_midi, 60);
-        assert_eq!(part_one.audio_observation.note_observations[0].pitch_midi, 60);
+        assert_eq!(
+            part_zero.audio_observation.note_observations[0].pitch_midi,
+            60
+        );
+        assert_eq!(
+            part_one.audio_observation.note_observations[0].pitch_midi,
+            60
+        );
         assert_eq!(
             part_zero.audio_observation.note_observations[0].status,
             crate::audio_event_observation::AudioEventObservationStatusV1::Measured
@@ -1816,14 +1912,15 @@ mod tests {
             part_one.audio_observation.note_observations[0].status,
             crate::audio_event_observation::AudioEventObservationStatusV1::Measured
         );
-        assert!(validate_part_stem_audio_evidence_receipt_v1(
-            &part_zero, &bundle, &midi, &wavs, 1
-        ).is_empty());
-        assert!(validate_part_stem_audio_evidence_receipt_v1(
-            &part_one, &bundle, &midi, &wavs, 2
-        ).is_empty());
+        assert!(
+            validate_part_stem_audio_evidence_receipt_v1(&part_zero, &bundle, &midi, &wavs, 1)
+                .is_empty()
+        );
+        assert!(
+            validate_part_stem_audio_evidence_receipt_v1(&part_one, &bundle, &midi, &wavs, 2)
+                .is_empty()
+        );
     }
-
 
     #[test]
     fn same_pitch_does_not_authorize_swapping_part_identity() {
@@ -1836,7 +1933,6 @@ mod tests {
             PartStemEvidenceIssueV1::StemIdentityMismatch { track_index: 1 }
         )));
     }
-
 
     #[test]
     fn non_finite_float_stem_samples_are_rejected() {
@@ -1851,7 +1947,9 @@ mod tests {
         {
             let mut writer = hound::WavWriter::new(&mut cursor, spec).unwrap();
             for index in 0..24_000 {
-                writer.write_sample(if index == 12_000 { f32::NAN } else { 0.0 }).unwrap();
+                writer
+                    .write_sample(if index == 12_000 { f32::NAN } else { 0.0 })
+                    .unwrap();
             }
             writer.finalize().unwrap();
         }
@@ -1866,10 +1964,11 @@ mod tests {
             wav_bytes,
         }];
         let issues = validate_part_stem_bundle_v1(&bundle, &midi, &wavs).unwrap_err();
-        assert!(issues.iter().any(|issue| matches!(
-            issue,
-            PartStemEvidenceIssueV1::NonFiniteAudioSample { .. }
-        )));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| matches!(issue, PartStemEvidenceIssueV1::NonFiniteAudioSample { .. }))
+        );
     }
 
     #[test]
@@ -1896,15 +1995,16 @@ mod tests {
     fn midi_note_mutation_is_rejected_after_all_outer_hashes_are_resealed() {
         let (mut bundle, mut midi, wavs) = fixture();
         let marker = [0x00, 0x90, 60, 100];
-        let position = midi.midi_bytes.windows(marker.len())
-            .position(|window| window == marker).unwrap();
+        let position = midi
+            .midi_bytes
+            .windows(marker.len())
+            .position(|window| window == marker)
+            .unwrap();
         midi.midi_bytes[position + 2] = 61;
         midi.manifest.midi_sha256 = sha256_hex(&midi.midi_bytes);
         let manifest_bytes = serde_json::to_vec(&midi.manifest).unwrap();
-        midi.manifest_sha256 = domain_sha256(
-            MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1,
-            &manifest_bytes,
-        );
+        midi.manifest_sha256 =
+            domain_sha256(MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1, &manifest_bytes);
         bundle.midi_sha256 = midi.manifest.midi_sha256.clone();
         bundle.midi_manifest_sha256 = midi.manifest_sha256.clone();
         bundle.bundle_sha256 = part_stem_bundle_commitment_v1(&bundle).unwrap();
@@ -1953,7 +2053,6 @@ mod tests {
         )));
     }
 
-
     #[test]
     fn audio_clock_must_cover_the_last_score_event() {
         let (mut bundle, midi, _) = fixture();
@@ -1977,20 +2076,15 @@ mod tests {
         )));
     }
 
-
     #[test]
     fn unknown_midi_digest_schema_is_rejected_even_when_manifest_is_resealed() {
         let (_, mut midi, _) = fixture();
         midi.manifest.timeline_digest_schema = "attacker-selected-digest-v0".into();
         let bytes = serde_json::to_vec(&midi.manifest).unwrap();
-        midi.manifest_sha256 = domain_sha256(
-            MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1,
-            &bytes,
-        );
+        midi.manifest_sha256 = domain_sha256(MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1, &bytes);
         let issues = verify_midi(&midi).unwrap_err();
         assert!(issues.contains(&PartStemEvidenceIssueV1::WrongMidiSchema));
     }
-
 
     #[test]
     fn persistent_part_identity_survives_an_instrument_handoff() {
@@ -2000,10 +2094,22 @@ mod tests {
         let second = validate_and_observe_part_stem_v1(&bundle, &midi, &wavs, 2).unwrap();
         assert_eq!(first.audio_observation.note_observations[0].part_id, 7);
         assert_eq!(second.audio_observation.note_observations[0].part_id, 7);
-        assert_eq!(first.audio_observation.note_observations[0].segment_id, "segment-A");
-        assert_eq!(second.audio_observation.note_observations[0].segment_id, "segment-B");
-        assert_eq!(first.audio_observation.note_observations[0].instrument_id, "instrument-A");
-        assert_eq!(second.audio_observation.note_observations[0].instrument_id, "instrument-B");
+        assert_eq!(
+            first.audio_observation.note_observations[0].segment_id,
+            "segment-A"
+        );
+        assert_eq!(
+            second.audio_observation.note_observations[0].segment_id,
+            "segment-B"
+        );
+        assert_eq!(
+            first.audio_observation.note_observations[0].instrument_id,
+            "instrument-A"
+        );
+        assert_eq!(
+            second.audio_observation.note_observations[0].instrument_id,
+            "instrument-B"
+        );
         assert_eq!(
             first.audio_observation.note_observations[0].status,
             crate::audio_event_observation::AudioEventObservationStatusV1::Measured
@@ -2012,12 +2118,14 @@ mod tests {
             second.audio_observation.note_observations[0].status,
             crate::audio_event_observation::AudioEventObservationStatusV1::Measured
         );
-        assert!(validate_part_stem_audio_evidence_receipt_v1(
-            &first, &bundle, &midi, &wavs, 1
-        ).is_empty());
-        assert!(validate_part_stem_audio_evidence_receipt_v1(
-            &second, &bundle, &midi, &wavs, 2
-        ).is_empty());
+        assert!(
+            validate_part_stem_audio_evidence_receipt_v1(&first, &bundle, &midi, &wavs, 1)
+                .is_empty()
+        );
+        assert!(
+            validate_part_stem_audio_evidence_receipt_v1(&second, &bundle, &midi, &wavs, 2)
+                .is_empty()
+        );
     }
 
     #[test]
@@ -2054,10 +2162,11 @@ mod tests {
         bundle.stems[0].wav_sha256 = "9".repeat(64);
         bundle.bundle_sha256 = part_stem_bundle_commitment_v1(&bundle).unwrap();
         let issues = validate_part_stem_bundle_v1(&bundle, &midi, &wavs).unwrap_err();
-        assert!(issues.iter().any(|issue| matches!(
-            issue,
-            PartStemEvidenceIssueV1::WavMissing { .. }
-        )));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| matches!(issue, PartStemEvidenceIssueV1::WavMissing { .. }))
+        );
     }
 
     #[test]
@@ -2066,10 +2175,11 @@ mod tests {
         bundle.audio_clock.sample_rate_hz = 44_100;
         bundle.bundle_sha256 = part_stem_bundle_commitment_v1(&bundle).unwrap();
         let issues = validate_part_stem_bundle_v1(&bundle, &midi, &wavs).unwrap_err();
-        assert!(issues.iter().any(|issue| matches!(
-            issue,
-            PartStemEvidenceIssueV1::WavClockMismatch { .. }
-        )));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| matches!(issue, PartStemEvidenceIssueV1::WavClockMismatch { .. }))
+        );
     }
 
     #[test]
@@ -2078,10 +2188,12 @@ mod tests {
         bundle.stems.push(bundle.stems[0].clone());
         bundle.bundle_sha256 = part_stem_bundle_commitment_v1(&bundle).unwrap();
         let issues = validate_part_stem_bundle_v1(&bundle, &midi, &wavs).unwrap_err();
-        assert!(issues.iter().any(|issue| matches!(
-            issue,
-            PartStemEvidenceIssueV1::DuplicateStemIdentity { .. }
-        )));
+        assert!(
+            issues.iter().any(|issue| matches!(
+                issue,
+                PartStemEvidenceIssueV1::DuplicateStemIdentity { .. }
+            ))
+        );
     }
 
     #[test]
@@ -2102,10 +2214,11 @@ mod tests {
         bundle.stems[0].renderer_id = "other-renderer".into();
         bundle.bundle_sha256 = part_stem_bundle_commitment_v1(&bundle).unwrap();
         let issues = validate_part_stem_bundle_v1(&bundle, &midi, &wavs).unwrap_err();
-        assert!(issues.iter().any(|issue| matches!(
-            issue,
-            PartStemEvidenceIssueV1::StemIdentityMismatch { .. }
-        )));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| matches!(issue, PartStemEvidenceIssueV1::StemIdentityMismatch { .. }))
+        );
     }
 
     #[test]

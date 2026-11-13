@@ -113,7 +113,6 @@ pub enum AudioEventObservationIssueV1 {
     TooManyAudioFrames,
 }
 
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AudioStemEventObservationReceiptV1 {
     pub schema: String,
@@ -184,7 +183,6 @@ fn manifest_sha256(
         &bytes,
     ))
 }
-
 
 fn midi_bytes_match_manifest(
     midi_bytes: &[u8],
@@ -313,13 +311,7 @@ fn midi_bytes_match_manifest(
                     match message {
                         MidiMessage::NoteOn { key, vel } if vel.as_int() > 0 => {
                             *actual_note_ons
-                                .entry((
-                                    track_index,
-                                    tick,
-                                    channel,
-                                    key.as_int(),
-                                    vel.as_int(),
-                                ))
+                                .entry((track_index, tick, channel, key.as_int(), vel.as_int()))
                                 .or_insert(0) += 1;
                         }
                         MidiMessage::NoteOff { key, .. } => {
@@ -648,10 +640,10 @@ fn observe_note(
     ppq: u16,
 ) -> AudioEventPitchObservationV1 {
     let frequency = 440.0 * 2.0f64.powf((f64::from(note.pitch_midi) - 69.0) / 12.0);
-    let start = expected_frame(note.start_tick, tempo_us, ppq, wav.info.sample_rate_hz)
-        .unwrap_or(u64::MAX);
-    let end = expected_frame(note.end_tick, tempo_us, ppq, wav.info.sample_rate_hz)
-        .unwrap_or(u64::MAX);
+    let start =
+        expected_frame(note.start_tick, tempo_us, ppq, wav.info.sample_rate_hz).unwrap_or(u64::MAX);
+    let end =
+        expected_frame(note.end_tick, tempo_us, ppq, wav.info.sample_rate_hz).unwrap_or(u64::MAX);
     let mut result = AudioEventPitchObservationV1 {
         source_note_ordinal: note.source_note_ordinal,
         part_id: note.part_id,
@@ -829,8 +821,7 @@ pub fn validate_audio_event_observation_v1(
                     info.sample_rate_hz,
                 ) == Some(observation.expected_end_frame)
         });
-        let frequency = 440.0
-            * 2.0f64.powf((f64::from(source.pitch_midi) - 69.0) / 12.0);
+        let frequency = 440.0 * 2.0f64.powf((f64::from(source.pitch_midi) - 69.0) / 12.0);
         let frequency_matches = observation.expected_frequency_hz.is_finite()
             && (observation.expected_frequency_hz - frequency).abs() <= 1e-9;
         let salience_is_finite = observation
@@ -846,8 +837,7 @@ pub fn validate_audio_event_observation_v1(
             (Some(start), Some(count)) => {
                 count > 0
                     && start >= observation.expected_start_frame
-                    && start.saturating_add(u64::from(count))
-                        <= observation.expected_end_frame
+                    && start.saturating_add(u64::from(count)) <= observation.expected_end_frame
                     && wav_info.is_some_and(|info| {
                         start.saturating_add(u64::from(count)) <= info.frame_count
                     })
@@ -879,8 +869,6 @@ pub fn validate_audio_event_observation_v1(
     }
     issues
 }
-
-
 
 /// Commitment for a track-scoped audio observation. The MIDI track index is
 /// included in the hash so an otherwise identical note list cannot be
@@ -922,7 +910,9 @@ pub fn observe_rendered_audio_stem_events_v1(
         .iter()
         .find(|track| track.track_index == track_index)
     else {
-        return Err(vec![AudioEventObservationIssueV1::UnknownTrackIndex { track_index }]);
+        return Err(vec![AudioEventObservationIssueV1::UnknownTrackIndex {
+            track_index,
+        }]);
     };
     let selected_notes: Vec<_> = midi
         .manifest
@@ -931,7 +921,9 @@ pub fn observe_rendered_audio_stem_events_v1(
         .filter(|note| note.track_index == track_index)
         .collect();
     if selected_notes.is_empty() {
-        return Err(vec![AudioEventObservationIssueV1::EmptyTrackNotes { track_index }]);
+        return Err(vec![AudioEventObservationIssueV1::EmptyTrackNotes {
+            track_index,
+        }]);
     }
     if selected_notes.iter().any(|note| {
         note.part_id != track.part_id
@@ -1044,8 +1036,7 @@ pub fn validate_audio_stem_event_observation_v1(
                     info.sample_rate_hz,
                 ) == Some(observation.expected_end_frame)
         });
-        let frequency = 440.0
-            * 2.0f64.powf((f64::from(source.pitch_midi) - 69.0) / 12.0);
+        let frequency = 440.0 * 2.0f64.powf((f64::from(source.pitch_midi) - 69.0) / 12.0);
         let frequency_matches = observation.expected_frequency_hz.is_finite()
             && (observation.expected_frequency_hz - frequency).abs() <= 1e-9;
         let salience_is_finite = observation
@@ -1061,8 +1052,7 @@ pub fn validate_audio_stem_event_observation_v1(
             (Some(start), Some(count)) => {
                 count > 0
                     && start >= observation.expected_start_frame
-                    && start.saturating_add(u64::from(count))
-                        <= observation.expected_end_frame
+                    && start.saturating_add(u64::from(count)) <= observation.expected_end_frame
                     && wav_info.is_some_and(|info| {
                         start.saturating_add(u64::from(count)) <= info.frame_count
                     })
@@ -1154,7 +1144,9 @@ mod tests {
         let midi_bytes = test_midi_bytes(pitch, end_tick);
         let mut manifest = MidiPerformanceManifestV1 {
             schema: MIDI_PERFORMANCE_SCHEMA_V1.into(),
-            score_digest_schema: symthaea_music_theory::orchestration_timeline::ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1.into(),
+            score_digest_schema:
+                symthaea_music_theory::orchestration_timeline::ORCHESTRATION_SCORE_DIGEST_SCHEMA_V1
+                    .into(),
             score_sha256: "a".repeat(64),
             timeline_digest_schema: MIDI_PERFORMANCE_TIMELINE_DIGEST_SCHEMA_V1.into(),
             timeline_sha256: "b".repeat(64),
@@ -1215,8 +1207,7 @@ mod tests {
             let mut writer = hound::WavWriter::new(&mut cursor, spec).unwrap();
             for frame in 0..(duration_secs * sample_rate as f32) as usize {
                 let sample = 0.5
-                    * (std::f32::consts::TAU * frequency_hz * frame as f32
-                        / sample_rate as f32)
+                    * (std::f32::consts::TAU * frequency_hz * frame as f32 / sample_rate as f32)
                         .sin();
                 writer.write_sample(sample).unwrap();
             }
@@ -1244,7 +1235,6 @@ mod tests {
         cursor.into_inner()
     }
 
-
     #[test]
     fn stem_scoped_observer_only_returns_the_selected_track_and_replays() {
         let midi = midi_artifact(69, 1_920);
@@ -1257,8 +1247,10 @@ mod tests {
             AudioEventObservationStatusV1::NoMeasurableSpectralEnergy
         );
         assert!(validate_audio_stem_event_observation_v1(&receipt, &wav, &midi, 1).is_empty());
-        assert!(validate_audio_stem_event_observation_v1(&receipt, &wav, &midi, 2)
-            .contains(&AudioEventObservationIssueV1::UnknownTrackIndex { track_index: 2 }));
+        assert!(
+            validate_audio_stem_event_observation_v1(&receipt, &wav, &midi, 2)
+                .contains(&AudioEventObservationIssueV1::UnknownTrackIndex { track_index: 2 })
+        );
     }
 
     #[test]
@@ -1316,8 +1308,7 @@ mod tests {
         let note = &receipt.note_observations[0];
         assert_eq!(note.status, AudioEventObservationStatusV1::Measured);
         assert!(
-            note.harmonic_salience_db.unwrap()
-                > note.fundamental_salience_db.unwrap() + 6.0,
+            note.harmonic_salience_db.unwrap() > note.fundamental_salience_db.unwrap() + 6.0,
             "octave energy should raise harmonic salience without a C4 fundamental: {note:?}"
         );
     }
@@ -1346,10 +1337,8 @@ mod tests {
         midi.midi_bytes[position + 1] = 70;
         midi.manifest.midi_sha256 = sha256_hex(&midi.midi_bytes);
         let manifest_bytes = serde_json::to_vec(&midi.manifest).unwrap();
-        midi.manifest_sha256 = domain_separated_sha256(
-            MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1,
-            &manifest_bytes,
-        );
+        midi.manifest_sha256 =
+            domain_separated_sha256(MIDI_PERFORMANCE_MANIFEST_DIGEST_SCHEMA_V1, &manifest_bytes);
         let wav = sine_wav(440.0, 1.0);
         let issues = observe_rendered_audio_events_v1(&wav, &midi).unwrap_err();
         assert!(issues.contains(&AudioEventObservationIssueV1::MidiBytesDoNotMatchManifest));
