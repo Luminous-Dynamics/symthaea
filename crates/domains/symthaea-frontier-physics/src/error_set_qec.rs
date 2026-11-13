@@ -36,8 +36,13 @@ pub struct ComplexMatrix {
 pub enum ErrorSetQecError {
     EmptyMatrix,
     DimensionOverflow,
-    EntryCount { expected: usize, actual: usize },
-    NonFiniteEntry { index: usize },
+    EntryCount {
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteEntry {
+        index: usize,
+    },
     InvalidTolerance(f64),
     EmptyErrorSet,
     InvalidErrorOperatorShape {
@@ -46,15 +51,37 @@ pub enum ErrorSetQecError {
         columns: usize,
         expected: usize,
     },
-    CodeIsometryResidual { residual: f64, tolerance: f64 },
+    CodeIsometryResidual {
+        residual: f64,
+        tolerance: f64,
+    },
     NonFiniteDiagnostic(&'static str),
-    HermiticityResidual { residual: f64, tolerance: f64 },
-    NotPositiveSemidefinite { minimum_eigenvalue: f64, allowed_negative: f64 },
-    EigenDecompositionFailed { dimension: usize },
-    InvalidHellingerRadicand { radicand: f64 },
-    CoefficientMatrixShape { columns: usize, expected: usize },
-    StrongControlNorm { frobenius_norm: f64, tolerance: f64 },
-    ChannelTracePreservationResidual { residual: f64, tolerance: f64 },
+    HermiticityResidual {
+        residual: f64,
+        tolerance: f64,
+    },
+    NotPositiveSemidefinite {
+        minimum_eigenvalue: f64,
+        allowed_negative: f64,
+    },
+    EigenDecompositionFailed {
+        dimension: usize,
+    },
+    InvalidHellingerRadicand {
+        radicand: f64,
+    },
+    CoefficientMatrixShape {
+        columns: usize,
+        expected: usize,
+    },
+    StrongControlNorm {
+        frobenius_norm: f64,
+        tolerance: f64,
+    },
+    ChannelTracePreservationResidual {
+        residual: f64,
+        tolerance: f64,
+    },
 }
 
 impl core::fmt::Display for ErrorSetQecError {
@@ -81,14 +108,20 @@ impl core::fmt::Display for ErrorSetQecError {
                 f,
                 "error operator {index} has shape {rows}x{columns}, expected {expected}x{expected}"
             ),
-            Self::CodeIsometryResidual { residual, tolerance } => write!(
+            Self::CodeIsometryResidual {
+                residual,
+                tolerance,
+            } => write!(
                 f,
                 "code embedding is not isometric: residual {residual} exceeds {tolerance}"
             ),
             Self::NonFiniteDiagnostic(name) => {
                 write!(f, "computed QEC diagnostic {name} is non-finite")
             }
-            Self::HermiticityResidual { residual, tolerance } => write!(
+            Self::HermiticityResidual {
+                residual,
+                tolerance,
+            } => write!(
                 f,
                 "Hermitian matrix residual {residual} exceeds tolerance {tolerance}"
             ),
@@ -100,7 +133,10 @@ impl core::fmt::Display for ErrorSetQecError {
                 "matrix is not positive semidefinite: minimum eigenvalue {minimum_eigenvalue}, allowed negative roundoff {allowed_negative}"
             ),
             Self::EigenDecompositionFailed { dimension } => {
-                write!(f, "Hermitian eigendecomposition did not converge for dimension {dimension}")
+                write!(
+                    f,
+                    "Hermitian eigendecomposition did not converge for dimension {dimension}"
+                )
             }
             Self::InvalidHellingerRadicand { radicand } => {
                 write!(f, "Hellinger radicand is materially negative: {radicand}")
@@ -116,7 +152,10 @@ impl core::fmt::Display for ErrorSetQecError {
                 f,
                 "strong E-control requires coefficient Frobenius norm <= 1 + {tolerance}, got {frobenius_norm}"
             ),
-            Self::ChannelTracePreservationResidual { residual, tolerance } => write!(
+            Self::ChannelTracePreservationResidual {
+                residual,
+                tolerance,
+            } => write!(
                 f,
                 "coefficient-induced channel trace-preservation residual {residual} exceeds {tolerance}"
             ),
@@ -166,7 +205,11 @@ impl ComplexMatrix {
         Self::new(
             rows,
             columns,
-            entries.iter().copied().map(|value| Complex64::new(value, 0.0)).collect(),
+            entries
+                .iter()
+                .copied()
+                .map(|value| Complex64::new(value, 0.0))
+                .collect(),
         )
     }
 
@@ -300,10 +343,8 @@ pub fn compute_error_set_qec_diagnostics(
     }
 
     // Precompute the Gram vectors E_k V[:,i], indexed [error][logical][physical].
-    let mut error_encoded = vec![
-        vec![vec![Complex64::new(0.0, 0.0); physical_dimension]; code_dimension];
-        error_count
-    ];
+    let mut error_encoded =
+        vec![vec![vec![Complex64::new(0.0, 0.0); physical_dimension]; code_dimension]; error_count];
     for error_index in 0..error_count {
         let error = &error_operators[error_index];
         for logical in 0..code_dimension {
@@ -346,9 +387,8 @@ pub fn compute_error_set_qec_diagnostics(
     let mut hermiticity_residual: f64 = 0.0;
     for row in 0..qec_dimension {
         for column in 0..qec_dimension {
-            hermiticity_residual = hermiticity_residual.max(
-                (qec_matrix.get(row, column) - qec_matrix.get(column, row).conj()).norm(),
-            );
+            hermiticity_residual = hermiticity_residual
+                .max((qec_matrix.get(row, column) - qec_matrix.get(column, row).conj()).norm());
         }
     }
 
@@ -363,12 +403,10 @@ pub fn compute_error_set_qec_diagnostics(
                 let column = logical * error_count + error_column;
                 value += qec_matrix.get(row, column);
             }
-            lambda_values[error_row * error_count + error_column] =
-                value / code_dimension as f64;
+            lambda_values[error_row * error_count + error_column] = value / code_dimension as f64;
         }
     }
-    let knill_laflamme_lambda =
-        ComplexMatrix::new(error_count, error_count, lambda_values)?;
+    let knill_laflamme_lambda = ComplexMatrix::new(error_count, error_count, lambda_values)?;
 
     let mut kl_squared = 0.0;
     for logical_row in 0..code_dimension {
@@ -414,7 +452,6 @@ pub fn compute_error_set_qec_diagnostics(
         code_isometry_residual,
     })
 }
-
 
 
 /// Support-aware square root of a Hermitian positive-semidefinite matrix.
@@ -480,13 +517,14 @@ pub fn positive_semidefinite_square_root(
     let mut hermiticity_residual: f64 = 0.0;
     for row in 0..dimension {
         for column in 0..dimension {
-            hermiticity_residual = hermiticity_residual.max(
-                (matrix.get(row, column) - matrix.get(column, row).conj()).norm(),
-            );
+            hermiticity_residual = hermiticity_residual
+                .max((matrix.get(row, column) - matrix.get(column, row).conj()).norm());
         }
     }
     if !hermiticity_residual.is_finite() {
-        return Err(ErrorSetQecError::NonFiniteDiagnostic("square-root Hermiticity"));
+        return Err(ErrorSetQecError::NonFiniteDiagnostic(
+            "square-root Hermiticity",
+        ));
     }
     if hermiticity_residual > allowed_residual {
         return Err(ErrorSetQecError::HermiticityResidual {
@@ -506,12 +544,9 @@ pub fn positive_semidefinite_square_root(
                 (matrix.get(row, column) + matrix.get(column, row).conj()) * 0.5;
         }
     }
-    let dense = DMatrix::<Complex64>::from_row_slice(
-        dimension,
-        dimension,
-        &hermitian_entries,
-    );
-    let max_iterations = 10_000usize.max(64usize.saturating_mul(dimension.saturating_mul(dimension)));
+    let dense = DMatrix::<Complex64>::from_row_slice(dimension, dimension, &hermitian_entries);
+    let max_iterations =
+        10_000usize.max(64usize.saturating_mul(dimension.saturating_mul(dimension)));
     let decomposition = dense
         .try_hermitian_eigen(tolerance, max_iterations)
         .ok_or(ErrorSetQecError::EigenDecompositionFailed { dimension })?;
@@ -527,7 +562,9 @@ pub fn positive_semidefinite_square_root(
         .copied()
         .fold(f64::NEG_INFINITY, f64::max);
     if !minimum_eigenvalue.is_finite() || !maximum_eigenvalue.is_finite() {
-        return Err(ErrorSetQecError::NonFiniteDiagnostic("Hermitian eigenvalues"));
+        return Err(ErrorSetQecError::NonFiniteDiagnostic(
+            "Hermitian eigenvalues",
+        ));
     }
     if minimum_eigenvalue < -allowed_residual {
         return Err(ErrorSetQecError::NotPositiveSemidefinite {
@@ -563,8 +600,8 @@ pub fn positive_semidefinite_square_root(
             square_root_entries[row * dimension + column] = value;
             let mut reconstructed = Complex64::new(0.0, 0.0);
             for inner in 0..dimension {
-                reconstructed += square_root_dense[(row, inner)]
-                    * square_root_dense[(inner, column)];
+                reconstructed +=
+                    square_root_dense[(row, inner)] * square_root_dense[(inner, column)];
             }
             reconstruction_squared += (reconstructed - matrix.get(row, column)).norm_sqr();
         }
@@ -573,7 +610,9 @@ pub fn positive_semidefinite_square_root(
     let reconstruction_relative_residual =
         reconstruction_squared.sqrt() / matrix.frobenius_norm().max(1.0);
     if !reconstruction_relative_residual.is_finite() {
-        return Err(ErrorSetQecError::NonFiniteDiagnostic("square-root reconstruction"));
+        return Err(ErrorSetQecError::NonFiniteDiagnostic(
+            "square-root reconstruction",
+        ));
     }
 
     Ok(PsdSquareRootDiagnostics {
@@ -639,11 +678,8 @@ pub fn compute_knill_laflamme_hellinger(
     for index in 0..diagnostics.qec_matrix.rows() {
         trace_qec_matrix += diagnostics.qec_matrix.get(index, index).re;
     }
-    let partial_trace_sqrt = partial_trace_code(
-        &qec_square_root.square_root,
-        code_dimension,
-        error_count,
-    )?;
+    let partial_trace_sqrt =
+        partial_trace_code(&qec_square_root.square_root, code_dimension, error_count)?;
     let partial_trace_sqrt_hilbert_schmidt_norm_squared = partial_trace_sqrt
         .entries()
         .iter()
@@ -671,7 +707,6 @@ pub fn compute_knill_laflamme_hellinger(
     })
 }
 
-
 /// Verify trace preservation of the channel induced by F_alpha = sum_k C_alpha,k E_k.
 ///
 /// Complete positivity is automatic for a finite Kraus representation; this
@@ -691,8 +726,10 @@ fn e_controlled_channel_trace_preservation_residual(
     }
 
     let mut kraus_operators =
-        vec![vec![Complex64::new(0.0, 0.0); physical_dimension * physical_dimension];
-            coefficient_matrix.rows()];
+        vec![
+            vec![Complex64::new(0.0, 0.0); physical_dimension * physical_dimension];
+            coefficient_matrix.rows()
+        ];
     for alpha in 0..coefficient_matrix.rows() {
         for error_index in 0..error_count {
             let coefficient = coefficient_matrix.get(alpha, error_index);
@@ -768,11 +805,10 @@ pub fn compute_strongly_controlled_petz_worst_case_bound(
             tolerance,
         });
     }
-    let channel_trace_preservation_residual =
-        e_controlled_channel_trace_preservation_residual(
-            &diagnostics.error_operators,
-            coefficient_matrix,
-        )?;
+    let channel_trace_preservation_residual = e_controlled_channel_trace_preservation_residual(
+        &diagnostics.error_operators,
+        coefficient_matrix,
+    )?;
     if channel_trace_preservation_residual > tolerance {
         return Err(ErrorSetQecError::ChannelTracePreservationResidual {
             residual: channel_trace_preservation_residual,
@@ -786,8 +822,7 @@ pub fn compute_strongly_controlled_petz_worst_case_bound(
         diagnostics.code_dimension,
         diagnostics.error_count,
     )?;
-    let partial_trace_square_root =
-        positive_semidefinite_square_root(&partial_trace_a, tolerance)?;
+    let partial_trace_square_root = positive_semidefinite_square_root(&partial_trace_a, tolerance)?;
 
     let code_dimension = diagnostics.code_dimension;
     let error_count = diagnostics.error_count;
@@ -795,8 +830,7 @@ pub fn compute_strongly_controlled_petz_worst_case_bound(
         .checked_mul(error_count)
         .ok_or(ErrorSetQecError::DimensionOverflow)?;
     let normalization = 1.0 / (code_dimension as f64).sqrt();
-    let mut deviation_entries =
-        vec![Complex64::new(0.0, 0.0); total_dimension * total_dimension];
+    let mut deviation_entries = vec![Complex64::new(0.0, 0.0); total_dimension * total_dimension];
     for logical_row in 0..code_dimension {
         for error_row in 0..error_count {
             let row = logical_row * error_count + error_row;
@@ -832,18 +866,15 @@ pub fn compute_strongly_controlled_petz_worst_case_bound(
         });
     }
 
-    let dense = DMatrix::<Complex64>::from_row_slice(
-        total_dimension,
-        total_dimension,
-        deviation.entries(),
-    );
+    let dense =
+        DMatrix::<Complex64>::from_row_slice(total_dimension, total_dimension, deviation.entries());
     let max_iterations =
         10_000usize.max(64usize.saturating_mul(total_dimension.saturating_mul(total_dimension)));
-    let eigen = dense
-        .try_hermitian_eigen(tolerance, max_iterations)
-        .ok_or(ErrorSetQecError::EigenDecompositionFailed {
+    let eigen = dense.try_hermitian_eigen(tolerance, max_iterations).ok_or(
+        ErrorSetQecError::EigenDecompositionFailed {
             dimension: total_dimension,
-        })?;
+        },
+    )?;
     let operator_norm_deviation = eigen
         .eigenvalues
         .iter()
@@ -866,10 +897,8 @@ pub fn compute_strongly_controlled_petz_worst_case_bound(
 #[cfg(test)]
 mod tests {
     use super::{
-        ComplexMatrix, ErrorSetQecError,
-        compute_error_set_qec_diagnostics,
-        compute_knill_laflamme_hellinger,
-        compute_strongly_controlled_petz_worst_case_bound,
+        ComplexMatrix, ErrorSetQecError, compute_error_set_qec_diagnostics,
+        compute_knill_laflamme_hellinger, compute_strongly_controlled_petz_worst_case_bound,
         positive_semidefinite_square_root,
     };
     use num_complex::Complex64;
@@ -899,8 +928,7 @@ mod tests {
             bit_flip_operator(2),
             bit_flip_operator(1),
         ];
-        let diagnostics =
-            compute_error_set_qec_diagnostics(&code, &errors, 1.0e-12).unwrap();
+        let diagnostics = compute_error_set_qec_diagnostics(&code, &errors, 1.0e-12).unwrap();
         assert!(diagnostics.exact_kl_within(1.0e-12));
         assert_eq!(diagnostics.error_count, 4);
         assert_eq!(diagnostics.code_dimension, 2);
@@ -939,12 +967,9 @@ mod tests {
         let code = repetition_code_isometry();
         let identity = bit_flip_operator(0);
         let duplicated_identity = bit_flip_operator(0);
-        let diagnostics = compute_error_set_qec_diagnostics(
-            &code,
-            &[identity, duplicated_identity],
-            1.0e-12,
-        )
-        .unwrap();
+        let diagnostics =
+            compute_error_set_qec_diagnostics(&code, &[identity, duplicated_identity], 1.0e-12)
+                .unwrap();
         assert!(diagnostics.exact_kl_within(1.0e-12));
         assert_eq!(
             diagnostics.knill_laflamme_lambda.get(0, 1),
@@ -1003,8 +1028,7 @@ mod tests {
         assert!(root.reconstruction_relative_residual <= 1.0e-12);
         assert!(root.minimum_eigenvalue.abs() <= 1.0e-12);
 
-        let small_positive =
-            ComplexMatrix::from_real(2, 2, &[1.0, 0.0, 0.0, 1.0e-18]).unwrap();
+        let small_positive = ComplexMatrix::from_real(2, 2, &[1.0, 0.0, 0.0, 1.0e-18]).unwrap();
         let small_root = positive_semidefinite_square_root(&small_positive, 1.0e-12).unwrap();
         assert_eq!(small_root.support_rank, 1);
         assert!(
@@ -1015,8 +1039,7 @@ mod tests {
 
     #[test]
     fn psd_square_root_rejects_materially_negative_and_nonhermitian_inputs() {
-        let indefinite =
-            ComplexMatrix::from_real(2, 2, &[1.0, 0.0, 0.0, -0.01]).unwrap();
+        let indefinite = ComplexMatrix::from_real(2, 2, &[1.0, 0.0, 0.0, -0.01]).unwrap();
         assert!(matches!(
             positive_semidefinite_square_root(&indefinite, 1.0e-12),
             Err(ErrorSetQecError::NotPositiveSemidefinite { .. })
@@ -1043,8 +1066,7 @@ mod tests {
     fn exact_kl_repetition_code_has_zero_hellinger_distance() {
         let code = repetition_code_isometry();
         let errors = bit_flip_error_set();
-        let diagnostics =
-            compute_error_set_qec_diagnostics(&code, &errors, 1.0e-12).unwrap();
+        let diagnostics = compute_error_set_qec_diagnostics(&code, &errors, 1.0e-12).unwrap();
         let hellinger = compute_knill_laflamme_hellinger(&diagnostics, 1.0e-12).unwrap();
         assert!(hellinger.distance <= 1.0e-10);
         assert!(hellinger.radicand.abs() <= 1.0e-12);
@@ -1080,19 +1102,13 @@ mod tests {
             4,
             4,
             &[
-                0.5, 0.0, 0.0, 0.0,
-                0.0, 0.5, 0.0, 0.0,
-                0.0, 0.0, 0.5, 0.0,
-                0.0, 0.0, 0.0, 0.5,
+                 0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.5,
             ],
         )
         .unwrap();
-        let bound = compute_strongly_controlled_petz_worst_case_bound(
-            &diagnostics,
-            &coefficient,
-            1.0e-12,
-        )
-        .unwrap();
+        let bound =
+            compute_strongly_controlled_petz_worst_case_bound(&diagnostics, &coefficient, 1.0e-12)
+                .unwrap();
         assert!((bound.coefficient_frobenius_norm - 1.0).abs() <= 1.0e-12);
         assert!(bound.operator_norm_deviation <= 1.0e-10);
         assert!(bound.bures_distance_upper_bound <= 1.0e-10);
@@ -1108,23 +1124,15 @@ mod tests {
             4,
             4,
             &[
-                1.0, 0.0, 0.0, 0.0,
-                0.0, 1.0, 0.0, 0.0,
-                0.0, 0.0, 1.0, 0.0,
-                0.0, 0.0, 0.0, 1.0,
+                 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0,
             ],
         )
         .unwrap();
         assert!(matches!(
-            compute_strongly_controlled_petz_worst_case_bound(
-                &diagnostics,
-                &coefficient,
-                1.0e-12
-            ),
+            compute_strongly_controlled_petz_worst_case_bound(&diagnostics, &coefficient, 1.0e-12),
             Err(ErrorSetQecError::StrongControlNorm { .. })
         ));
     }
-
 
     #[test]
     fn strong_petz_bound_requires_the_coefficient_induced_channel_to_be_tp() {
@@ -1137,10 +1145,7 @@ mod tests {
             4,
             4,
             &[
-                0.4, 0.0, 0.0, 0.0,
-                0.0, 0.4, 0.0, 0.0,
-                0.0, 0.0, 0.4, 0.0,
-                0.0, 0.0, 0.0, 0.4,
+                 0.4, 0.0, 0.0, 0.0, 0.0, 0.4, 0.0, 0.0, 0.0, 0.0, 0.4, 0.0, 0.0, 0.0, 0.0, 0.4,
             ],
         )
         .unwrap();
