@@ -1,0 +1,446 @@
+{
+  "schema": "luminous.airroad.mimo_adaptive_bernstein_mesh.v0_1",
+  "schema_version": "0.1.0",
+  "evidence_class": "synthetic_exact_rational_proof_guided_interval_refinement",
+  "model_identity": "sha256:synthetic-quartic-mimo-interpolation-curve-v0.1",
+  "topology_identity": "sha256:two-port-generator-cover-reference-v0.1",
+  "operating_point_identity": "sha256:synthetic-fixed-operating-point-v0.1",
+  "calibration_identity": "sha256:synthetic-deterministic-exact-observation-profile-v0.1",
+  "frequency_unit": "normalized_frequency",
+  "matrix_norm": "frobenius_norm",
+  "polynomial_coefficients_ascending": [
+    "0",
+    "4",
+    "-20",
+    "32",
+    "-16"
+  ],
+  "matrix_factor": [
+    [
+      {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      {
+        "numerator": "1",
+        "denominator": "1"
+      }
+    ],
+    [
+      {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      {
+        "numerator": "0",
+        "denominator": "1"
+      }
+    ]
+  ],
+  "initial_knots": [
+    {
+      "knot_id": "omega-0",
+      "omega": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "value": {
+        "numerator": "0",
+        "denominator": "1"
+      }
+    },
+    {
+      "knot_id": "omega-half",
+      "omega": {
+        "numerator": "1",
+        "denominator": "2"
+      },
+      "value": {
+        "numerator": "0",
+        "denominator": "1"
+      }
+    },
+    {
+      "knot_id": "omega-1",
+      "omega": {
+        "numerator": "1",
+        "denominator": "1"
+      },
+      "value": {
+        "numerator": "0",
+        "denominator": "1"
+      }
+    }
+  ],
+  "initial_partition": [
+    {
+      "interval_id": "I0",
+      "lower": {
+        "numerator": "0",
+        "denominator": "1"
+      },
+      "upper": {
+        "numerator": "1",
+        "denominator": "2"
+      }
+    },
+    {
+      "interval_id": "I1",
+      "lower": {
+        "numerator": "1",
+        "denominator": "2"
+      },
+      "upper": {
+        "numerator": "1",
+        "denominator": "1"
+      }
+    }
+  ],
+  "candidate_measurement_profile": {
+    "deterministic_exact_midpoint_observation": true,
+    "hard_error_radius": {
+      "numerator": "0",
+      "denominator": "1"
+    },
+    "approved_under_synthetic_protocol": true,
+    "shared_calibration_identity": "sha256:synthetic-deterministic-exact-observation-profile-v0.1"
+  },
+  "policy": {
+    "split_budget": 2,
+    "target_global_radius": {
+      "numerator": "13",
+      "denominator": "64"
+    },
+    "tie_break": "largest_bound_then_lowest_lower_endpoint_then_interval_id",
+    "split_rule": "exact_midpoint"
+  },
+  "expected_trajectory": [
+    {
+      "step": 0,
+      "selected_interval": null,
+      "partition": [
+        {
+          "lower": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "upper": {
+            "numerator": "1",
+            "denominator": "2"
+          },
+          "bernstein": [
+            "0/1",
+            "1/2",
+            "1/6",
+            "0/1",
+            "0/1"
+          ],
+          "bound": {
+            "numerator": "1",
+            "denominator": "2"
+          }
+        },
+        {
+          "lower": {
+            "numerator": "1",
+            "denominator": "2"
+          },
+          "upper": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "bernstein": [
+            "0/1",
+            "0/1",
+            "1/6",
+            "1/2",
+            "0/1"
+          ],
+          "bound": {
+            "numerator": "1",
+            "denominator": "2"
+          }
+        }
+      ],
+      "global_radius": {
+        "numerator": "1",
+        "denominator": "2"
+      }
+    },
+    {
+      "step": 1,
+      "selected_interval": "I0",
+      "inserted_knot": {
+        "omega": {
+          "numerator": "1",
+          "denominator": "4"
+        },
+        "value": {
+          "numerator": "3",
+          "denominator": "16"
+        }
+      },
+      "partition": [
+        {
+          "lower": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "upper": {
+            "numerator": "1",
+            "denominator": "4"
+          },
+          "bernstein": [
+            "0/1",
+            "13/64",
+            "19/96",
+            "7/64",
+            "0/1"
+          ],
+          "bound": {
+            "numerator": "13",
+            "denominator": "64"
+          }
+        },
+        {
+          "lower": {
+            "numerator": "1",
+            "denominator": "4"
+          },
+          "upper": {
+            "numerator": "1",
+            "denominator": "2"
+          },
+          "bernstein": [
+            "0/1",
+            "-1/64",
+            "-5/96",
+            "-3/64",
+            "0/1"
+          ],
+          "bound": {
+            "numerator": "5",
+            "denominator": "96"
+          }
+        },
+        {
+          "lower": {
+            "numerator": "1",
+            "denominator": "2"
+          },
+          "upper": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "bernstein": [
+            "0/1",
+            "0/1",
+            "1/6",
+            "1/2",
+            "0/1"
+          ],
+          "bound": {
+            "numerator": "1",
+            "denominator": "2"
+          }
+        }
+      ],
+      "global_radius": {
+        "numerator": "1",
+        "denominator": "2"
+      }
+    },
+    {
+      "step": 2,
+      "selected_interval": "I1",
+      "inserted_knot": {
+        "omega": {
+          "numerator": "3",
+          "denominator": "4"
+        },
+        "value": {
+          "numerator": "3",
+          "denominator": "16"
+        }
+      },
+      "partition": [
+        {
+          "lower": {
+            "numerator": "0",
+            "denominator": "1"
+          },
+          "upper": {
+            "numerator": "1",
+            "denominator": "4"
+          },
+          "bernstein": [
+            "0/1",
+            "13/64",
+            "19/96",
+            "7/64",
+            "0/1"
+          ],
+          "bound": {
+            "numerator": "13",
+            "denominator": "64"
+          }
+        },
+        {
+          "lower": {
+            "numerator": "1",
+            "denominator": "4"
+          },
+          "upper": {
+            "numerator": "1",
+            "denominator": "2"
+          },
+          "bernstein": [
+            "0/1",
+            "-1/64",
+            "-5/96",
+            "-3/64",
+            "0/1"
+          ],
+          "bound": {
+            "numerator": "5",
+            "denominator": "96"
+          }
+        },
+        {
+          "lower": {
+            "numerator": "1",
+            "denominator": "2"
+          },
+          "upper": {
+            "numerator": "3",
+            "denominator": "4"
+          },
+          "bernstein": [
+            "0/1",
+            "-3/64",
+            "-5/96",
+            "-1/64",
+            "0/1"
+          ],
+          "bound": {
+            "numerator": "5",
+            "denominator": "96"
+          }
+        },
+        {
+          "lower": {
+            "numerator": "3",
+            "denominator": "4"
+          },
+          "upper": {
+            "numerator": "1",
+            "denominator": "1"
+          },
+          "bernstein": [
+            "0/1",
+            "7/64",
+            "19/96",
+            "13/64",
+            "0/1"
+          ],
+          "bound": {
+            "numerator": "13",
+            "denominator": "64"
+          }
+        }
+      ],
+      "global_radius": {
+        "numerator": "13",
+        "denominator": "64"
+      }
+    }
+  ],
+  "expected": {
+    "global_radius_after_zero_splits": {
+      "numerator": "1",
+      "denominator": "2"
+    },
+    "global_radius_after_one_split": {
+      "numerator": "1",
+      "denominator": "2"
+    },
+    "global_radius_after_two_splits": {
+      "numerator": "13",
+      "denominator": "64"
+    },
+    "target_met_after_two_splits": true,
+    "initial_knot_sample_maximum": {
+      "numerator": "0",
+      "denominator": "1"
+    },
+    "five_point_sample_maximum": {
+      "numerator": "3",
+      "denominator": "16"
+    },
+    "exact_original_curve_supremum": {
+      "numerator": "1",
+      "denominator": "4"
+    },
+    "new_knot_values": {
+      "quarter": {
+        "numerator": "3",
+        "denominator": "16"
+      },
+      "three_quarters": {
+        "numerator": "3",
+        "denominator": "16"
+      }
+    }
+  },
+  "negative_controls": [
+    {
+      "id": "sampled-knot-maximum-used-as-universal-upper",
+      "expected": "reject"
+    },
+    {
+      "id": "reverse-tie-break",
+      "expected": "different-policy-identity"
+    },
+    {
+      "id": "skip-largest-certified-interval",
+      "expected": "reject-policy"
+    },
+    {
+      "id": "missing-partition-endpoint",
+      "expected": "not-established"
+    },
+    {
+      "id": "partition-gap-or-overlap",
+      "expected": "reject"
+    },
+    {
+      "id": "duplicate-knot-id",
+      "expected": "reject"
+    },
+    {
+      "id": "stale-model-or-calibration-identity",
+      "expected": "not-evaluable"
+    },
+    {
+      "id": "unapproved-midpoint",
+      "expected": "reject-proposal"
+    },
+    {
+      "id": "target-below-certified-radius-at-budget",
+      "expected": "budget-exhausted-not-pass"
+    },
+    {
+      "id": "statistical-noise-labelled-deterministic-zero",
+      "expected": "reject-claim-class"
+    },
+    {
+      "id": "missing-frequency-unit",
+      "expected": "not-evaluable"
+    }
+  ],
+  "claim_ceiling": [
+    "Synthetic exact polynomial and deterministic zero-noise midpoint observation policy only.",
+    "Bernstein convex-hull coefficients provide interval upper bounds; samples are not treated as universal upper bounds.",
+    "No physical excitation safety, actual FRF regularity, robust stability or aircraft certification is established."
+  ]
+}
