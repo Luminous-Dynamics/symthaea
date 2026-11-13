@@ -618,4 +618,99 @@ mod tests {
             .reasons
             .contains(&DesignAuditReason::JointReversibilityUnknown));
     }
+
+    fn exercise_design_case(case_id: &str) -> (&'static str, Option<&'static str>) {
+        match case_id {
+            "DESIGN-001-COMPLETE-MODULAR" => {
+                complete_modular_dossier_passes_static_topology_audit();
+                ("complete", None)
+            }
+            "DESIGN-002-DUPLICATE-COMPONENT" => {
+                duplicate_component_identity_blocks_dossier();
+                ("blocked", Some("DuplicateComponentIdentity"))
+            }
+            "DESIGN-003-DANGLING-COMPONENT" => {
+                dangling_joint_component_reference_blocks_dossier();
+                ("blocked", Some("UnknownComponentReference"))
+            }
+            "DESIGN-004-REVERSIBLE-NO-TOOL" => {
+                reversible_joint_without_tool_is_incomplete();
+                ("incomplete", Some("ReversibleJointMissingTools"))
+            }
+            "DESIGN-005-PERMANENT-CONFLICT" => {
+                permanent_joint_conflicts_with_disassembly_intent();
+                ("blocked", Some("PermanentJointConflictsWithIntent"))
+            }
+            "DESIGN-006-REPAIR-NO-MODULE" => {
+                repair_claim_requires_replaceable_module_and_instruction();
+                ("incomplete", Some("RepairIntentWithoutReplaceablePart"))
+            }
+            "DESIGN-007-DEPENDENCY-CYCLE" => {
+                circular_disassembly_dependency_blocks_dossier();
+                ("blocked", Some("CyclicDisassemblyDependencies"))
+            }
+            "DESIGN-008-JOINT-UNKNOWN" => {
+                unknown_joint_reversibility_does_not_support_disassembly_claim();
+                ("incomplete", Some("JointReversibilityUnknown"))
+            }
+            "DESIGN-009-DISASSEMBLY-NO-JOINTS" => {
+                disassembly_intent_requires_joint_topology();
+                ("incomplete", Some("DisassemblyIntentWithoutJoints"))
+            }
+            "DESIGN-010-REPLACEABLE-NO-INSTRUCTIONS" => {
+                replaceable_component_requires_instructions();
+                ("incomplete", Some("ReplaceableComponentMissingInstructions"))
+            }
+            "DESIGN-011-UNKNOWN-JOINING-METHOD" => {
+                unknown_joining_method_is_not_promoted_to_reversible_design();
+                ("incomplete", Some("JoiningMethodUnknown"))
+            }
+            other => panic!("unknown textile design corpus case: {other}"),
+        }
+    }
+
+    #[test]
+    fn synthetic_design_corpus_executes_all_topology_regressions() {
+        const CORPUS: &str = include_str!(
+            "../../../../docs/research/fixtures/textile_sort_fusion_v0_1/design_cases.example.json"
+        );
+        const SCHEMA: &str = include_str!(
+            "../../../../docs/research/fixtures/textile_sort_fusion_v0_1/design_cases.schema.json"
+        );
+
+        let corpus: serde_json::Value =
+            serde_json::from_str(CORPUS).expect("design corpus must parse as JSON");
+        let schema: serde_json::Value =
+            serde_json::from_str(SCHEMA).expect("design schema must parse as JSON");
+        assert_eq!(schema["properties"]["schema_version"]["const"], "0.1.0");
+        assert_eq!(schema["properties"]["cases"]["minItems"].as_u64(), Some(11));
+        assert_eq!(corpus["schema_version"], "0.1.0");
+        assert_eq!(corpus["corpus_id"], "TEXTILE-DESIGN-CASES-001");
+        assert_eq!(corpus["fixture_class"], "synthetic");
+
+        let cases = corpus["cases"]
+            .as_array()
+            .expect("design cases must be an array");
+        assert_eq!(cases.len(), 11, "review design corpus count changes");
+        let mut seen = BTreeSet::new();
+        for case in cases {
+            let case_id = case["case_id"]
+                .as_str()
+                .expect("case_id must be a string");
+            assert!(seen.insert(case_id), "duplicate design case {case_id}");
+            assert!(
+                case["mutation"].as_str().is_some_and(|value| !value.is_empty()),
+                "case {case_id} must declare a mutation"
+            );
+            let expected = &case["expected"];
+            let expected_disposition = expected["disposition"]
+                .as_str()
+                .expect("expected disposition must be a string");
+            let expected_reason = expected["reason"].as_str();
+            let (disposition, reason) = exercise_design_case(case_id);
+            assert_eq!(disposition, expected_disposition, "case {case_id} disposition");
+            assert_eq!(reason, expected_reason, "case {case_id} reason");
+        }
+        assert_eq!(seen.len(), 11);
+    }
 }
