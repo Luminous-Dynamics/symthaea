@@ -15,7 +15,6 @@ If a robot intervenes before a predicted event, the untreated event time is not 
 - test_reference.py — 12 regression tests.
 - report.json — deterministic output.
 - INTERPRETATION.md — result and claim boundary.
-- SHA256SUMS — artifact integrity manifest.
 
 ## Run
 
