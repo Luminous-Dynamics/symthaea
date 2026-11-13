@@ -99,9 +99,7 @@ impl CompositionEstimate {
         }
 
         if total != FRACTION_SCALE_PPM {
-            return Err(CompositionError::FractionTotalMismatch {
-                actual_ppm: total,
-            });
+            return Err(CompositionError::FractionTotalMismatch { actual_ppm: total });
         }
         if lower_total > FRACTION_SCALE_PPM || upper_total < FRACTION_SCALE_PPM {
             return Err(CompositionError::UncertaintyBoundsDoNotCoverTotal);
@@ -565,9 +563,7 @@ pub fn assess_paired_textile_observations(
 
     PairedTextileAssessment {
         pair_binding,
-        visual: visual.map(|value| {
-            assess_visual_observation(value, minimum_visual_confidence_ppm)
-        }),
+        visual: visual.map(|value| assess_visual_observation(value, minimum_visual_confidence_ppm)),
         spectral: spectral.map(|value| assess_spectral_observation(value, profile, calibration)),
     }
 }
@@ -913,13 +909,7 @@ mod tests {
     #[test]
     fn visual_only_observation_does_not_create_fibre_composition_evidence() {
         let visual = valid_visual();
-        let result = assess_paired_textile_observations(
-            Some(&visual),
-            None,
-            None,
-            None,
-            700_000,
-        );
+        let result = assess_paired_textile_observations(Some(&visual), None, None, None, 700_000);
         assert_eq!(result.pair_binding, PairBinding::MissingSpectral);
         assert_eq!(
             result.visual.as_ref().map(|value| value.disposition),
@@ -953,19 +943,13 @@ mod tests {
         visual.category = VisualGarmentCategory::Unknown;
         let result = assess_visual_observation(&visual, 700_000);
         assert_eq!(result.disposition, ObservationDisposition::Unknown);
-        assert_eq!(
-            result.reason,
-            Some(VisualAssessmentReason::CategoryUnknown)
-        );
+        assert_eq!(result.reason, Some(VisualAssessmentReason::CategoryUnknown));
 
         let mut visual = valid_visual();
         visual.presentation = VisualPresentationState::Unknown;
         let result = assess_visual_observation(&visual, 700_000);
         assert_eq!(result.disposition, ObservationDisposition::Unknown);
-        assert_eq!(
-            result.reason,
-            Some(VisualAssessmentReason::CategoryUnknown)
-        );
+        assert_eq!(result.reason, Some(VisualAssessmentReason::CategoryUnknown));
     }
 
     #[test]
@@ -1137,7 +1121,11 @@ mod tests {
         let cases = corpus["cases"]
             .as_array()
             .expect("corpus cases must be an array");
-        assert_eq!(cases.len(), 15, "corpus case count changed; review mappings");
+        assert_eq!(
+            cases.len(),
+            15,
+            "corpus case count changed; review mappings"
+        );
 
         let mut seen = BTreeSet::new();
         for case in cases {
@@ -1146,17 +1134,26 @@ mod tests {
                 .expect("every corpus case needs a string case_id");
             assert!(seen.insert(case_id), "duplicate corpus case {case_id}");
             assert!(
-                case["mutation"].as_str().is_some_and(|value| !value.is_empty()),
+                case["mutation"]
+                    .as_str()
+                    .is_some_and(|value| !value.is_empty()),
                 "case {case_id} must declare its mutation"
             );
             assert!(
-                case["invariant"].as_str().is_some_and(|value| !value.is_empty()),
+                case["invariant"]
+                    .as_str()
+                    .is_some_and(|value| !value.is_empty()),
                 "case {case_id} must declare its invariant"
             );
             let expected = case["expected"]
                 .as_object()
                 .expect("every corpus case needs expected outcome");
-            assert!(expected.get("disposition").and_then(|v| v.as_str()).is_some());
+            assert!(
+                expected
+                    .get("disposition")
+                    .and_then(|v| v.as_str())
+                    .is_some()
+            );
             assert!(expected.contains_key("reason"));
             let (disposition, reason) = exercise_corpus_case(case_id);
             assert_eq!(
@@ -1172,10 +1169,10 @@ mod tests {
         }
 
         assert_eq!(seen.len(), 15);
-        assert!(corpus["claim_ceiling"]
-            .as_str()
-            .is_some_and(|value| value.contains("Synthetic")));
+        assert!(
+            corpus["claim_ceiling"]
+                .as_str()
+                .is_some_and(|value| value.contains("Synthetic"))
+        );
     }
-
-
 }
