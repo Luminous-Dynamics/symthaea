@@ -621,12 +621,14 @@ fn campaign_report(c: &Campaign, case: &Case) -> CampaignReport {
     }
 
     let three_hydrophones = c.hydrophones.len() >= 3;
-    let hard_incomplete = reasons.iter().any(|r| {
-        r.contains("missing") || r.contains("exceeds") || r.contains("unknown")
-            || r.contains("below") || r.contains("shorter") || r.contains("lacks")
-            || r.contains("fewer") || r.contains("both port") || r.contains("not supplied")
-            || r.contains("not a substitute") || r.contains("varies beyond")
-    });
+    let hard_incomplete = category == "boundary_undefined" || category == "unknown"
+        || reasons.iter().any(|r| {
+            r.contains("missing") || r.contains("exceeds") || r.contains("unknown")
+                || r.contains("below") || r.contains("shorter") || r.contains("lacks")
+                || r.contains("fewer") || r.contains("both port") || r.contains("not supplied")
+                || r.contains("not a substitute") || r.contains("varies beyond")
+                || r.contains("classification boundary")
+        });
     let invalid = !validate_campaign_errors_empty(c, case);
     let disposition = if invalid { "INVALID" }
         else if hard_incomplete { "INCOMPLETE" }
@@ -879,6 +881,17 @@ mod tests {
     #[test] fn synthetic_fixture_never_qualifies_physical_site(){let r=audit(&case());assert_eq!(r.disposition,"INCOMPLETE");assert_eq!(r.campaign_reports[0].depth_category,"shallow");}
     #[test] fn deep_shallow_boundary_uses_max_150m_or_1p5_length(){assert_eq!(depth_boundary_m(100.0),150.0);assert_eq!(depth_boundary_m(200.0),300.0);assert_eq!(depth_category(Some(250.0),300.0),"shallow");assert_eq!(depth_category(Some(301.0),300.0),"deep");}
     #[test] fn exact_deep_shallow_boundary_is_not_classified(){assert_eq!(depth_category(Some(150.0),150.0),"boundary_undefined");}
+    #[test]
+    fn exact_depth_classification_boundary_blocks_site_eligibility() {
+        let mut input = case();
+        measured(&mut input);
+        for sample in &mut input.campaigns[0].site.water_depth_samples {
+            sample.depth_m = 150.0;
+        }
+        let report = audit(&input);
+        assert_eq!(report.campaign_reports[0].depth_category, "boundary_undefined");
+        assert_eq!(report.disposition, "INCOMPLETE");
+    }
     #[test] fn complete_three_hydrophone_campaign_is_eligible_when_measured(){let mut x=case();measured(&mut x);assert_eq!(audit(&x).disposition,"SITE_ELIGIBLE_FOR_DECLARED_MEASUREMENT");}
     #[test] fn single_hydrophone_is_conditional_not_invalid(){let mut x=case();measured(&mut x);x.campaigns[0].hydrophones.truncate(1);assert_eq!(audit(&x).disposition,"CONDITIONAL");}
     #[test] fn missing_ctd_is_incomplete(){let mut x=case();measured(&mut x);x.campaigns[0].site.ctd_profile=None;assert_eq!(audit(&x).disposition,"INCOMPLETE");}
