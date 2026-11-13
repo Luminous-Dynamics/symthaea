@@ -321,9 +321,8 @@ pub fn audit_textile_design(dossier: &TextileDesignDossier) -> DesignAudit {
             DesignIntent::Disassemblable | DesignIntent::ComponentRecovery
         )
     });
-    let has_material_traceability_intent = dossier
-        .intents
-        .contains(&DesignIntent::MaterialTraceable);
+    let has_material_traceability_intent =
+        dossier.intents.contains(&DesignIntent::MaterialTraceable);
     let has_repair_intent = dossier.intents.contains(&DesignIntent::Repairable);
 
     if has_disassembly_intent && dossier.joints.is_empty() {
@@ -352,7 +351,11 @@ pub fn audit_textile_design(dossier: &TextileDesignDossier) -> DesignAudit {
         match joint.reversibility {
             JointReversibility::Reversible => {
                 reversible_joint_count += 1;
-                if joint.access_zone.as_deref().is_none_or(|value| !nonempty(value)) {
+                if joint
+                    .access_zone
+                    .as_deref()
+                    .is_none_or(|value| !nonempty(value))
+                {
                     reasons.insert(DesignAuditReason::ReversibleJointMissingAccess);
                 }
                 if joint
@@ -370,7 +373,11 @@ pub fn audit_textile_design(dossier: &TextileDesignDossier) -> DesignAudit {
             }
             JointReversibility::ConditionallyReversible => {
                 conditional_joint_count += 1;
-                if joint.access_zone.as_deref().is_none_or(|value| !nonempty(value)) {
+                if joint
+                    .access_zone
+                    .as_deref()
+                    .is_none_or(|value| !nonempty(value))
+                {
                     reasons.insert(DesignAuditReason::ReversibleJointMissingAccess);
                 }
                 if joint
@@ -407,9 +414,7 @@ pub fn audit_textile_design(dossier: &TextileDesignDossier) -> DesignAudit {
         }
     }
 
-    if has_disassembly_intent
-        && !dossier.joints.iter().any(|joint| joint.recovery_relevant)
-    {
+    if has_disassembly_intent && !dossier.joints.iter().any(|joint| joint.recovery_relevant) {
         reasons.insert(DesignAuditReason::DisassemblyIntentWithoutTargetJoints);
     }
 
@@ -434,7 +439,12 @@ pub fn audit_textile_design(dossier: &TextileDesignDossier) -> DesignAudit {
     {
         reasons.insert(DesignAuditReason::MaterialTraceabilityIncomplete);
     }
-    if has_repair_intent && !dossier.components.iter().any(|component| component.replaceable) {
+    if has_repair_intent
+        && !dossier
+            .components
+            .iter()
+            .any(|component| component.replaceable)
+    {
         reasons.insert(DesignAuditReason::RepairIntentWithoutReplaceablePart);
     }
 
@@ -450,7 +460,10 @@ pub fn audit_textile_design(dossier: &TextileDesignDossier) -> DesignAudit {
     ];
     let disposition = if reasons.is_empty() {
         DesignAuditDisposition::Complete
-    } else if reasons.iter().any(|reason| blocked_reasons.contains(reason)) {
+    } else if reasons
+        .iter()
+        .any(|reason| blocked_reasons.contains(reason))
+    {
         DesignAuditDisposition::Blocked
     } else {
         DesignAuditDisposition::Incomplete
@@ -507,7 +520,11 @@ mod tests {
                 component("BODY-PANEL", false),
                 component("CUFF-MODULE", true),
             ],
-            joints: vec![reversible_joint("BODY-CUFF-JOINT", "BODY-PANEL", "CUFF-MODULE")],
+            joints: vec![reversible_joint(
+                "BODY-CUFF-JOINT",
+                "BODY-PANEL",
+                "CUFF-MODULE",
+            )],
             intents: vec![
                 DesignIntent::Repairable,
                 DesignIntent::Disassemblable,
@@ -531,7 +548,11 @@ mod tests {
         dossier.components.push(component("BODY-PANEL", false));
         let result = audit_textile_design(&dossier);
         assert_eq!(result.disposition, DesignAuditDisposition::Blocked);
-        assert!(result.reasons.contains(&DesignAuditReason::DuplicateComponentIdentity));
+        assert!(
+            result
+                .reasons
+                .contains(&DesignAuditReason::DuplicateComponentIdentity)
+        );
     }
 
     #[test]
@@ -540,7 +561,11 @@ mod tests {
         dossier.joints[0].component_ids[1] = "MISSING-COMPONENT".to_owned();
         let result = audit_textile_design(&dossier);
         assert_eq!(result.disposition, DesignAuditDisposition::Blocked);
-        assert!(result.reasons.contains(&DesignAuditReason::UnknownComponentReference));
+        assert!(
+            result
+                .reasons
+                .contains(&DesignAuditReason::UnknownComponentReference)
+        );
     }
 
     #[test]
@@ -549,7 +574,11 @@ mod tests {
         dossier.joints[0].required_tools.clear();
         let result = audit_textile_design(&dossier);
         assert_eq!(result.disposition, DesignAuditDisposition::Incomplete);
-        assert!(result.reasons.contains(&DesignAuditReason::ReversibleJointMissingTools));
+        assert!(
+            result
+                .reasons
+                .contains(&DesignAuditReason::ReversibleJointMissingTools)
+        );
     }
 
     #[test]
@@ -558,9 +587,11 @@ mod tests {
         dossier.joints[0].reversibility = JointReversibility::Permanent;
         let result = audit_textile_design(&dossier);
         assert_eq!(result.disposition, DesignAuditDisposition::Blocked);
-        assert!(result
-            .reasons
-            .contains(&DesignAuditReason::PermanentJointConflictsWithIntent));
+        assert!(
+            result
+                .reasons
+                .contains(&DesignAuditReason::PermanentJointConflictsWithIntent)
+        );
     }
 
     #[test]
@@ -570,9 +601,11 @@ mod tests {
         dossier.components[1].replacement_instructions_ref = None;
         let result = audit_textile_design(&dossier);
         assert_eq!(result.disposition, DesignAuditDisposition::Incomplete);
-        assert!(result
-            .reasons
-            .contains(&DesignAuditReason::RepairIntentWithoutReplaceablePart));
+        assert!(
+            result
+                .reasons
+                .contains(&DesignAuditReason::RepairIntentWithoutReplaceablePart)
+        );
     }
 
     #[test]
@@ -584,9 +617,11 @@ mod tests {
         dossier.joints.push(second);
         let result = audit_textile_design(&dossier);
         assert_eq!(result.disposition, DesignAuditDisposition::Blocked);
-        assert!(result
-            .reasons
-            .contains(&DesignAuditReason::CyclicDisassemblyDependencies));
+        assert!(
+            result
+                .reasons
+                .contains(&DesignAuditReason::CyclicDisassemblyDependencies)
+        );
     }
 
     #[test]
@@ -595,9 +630,11 @@ mod tests {
         dossier.joints.clear();
         let result = audit_textile_design(&dossier);
         assert_eq!(result.disposition, DesignAuditDisposition::Incomplete);
-        assert!(result
-            .reasons
-            .contains(&DesignAuditReason::DisassemblyIntentWithoutJoints));
+        assert!(
+            result
+                .reasons
+                .contains(&DesignAuditReason::DisassemblyIntentWithoutJoints)
+        );
     }
 
     #[test]
@@ -606,9 +643,11 @@ mod tests {
         dossier.components[1].replacement_instructions_ref = None;
         let result = audit_textile_design(&dossier);
         assert_eq!(result.disposition, DesignAuditDisposition::Incomplete);
-        assert!(result
-            .reasons
-            .contains(&DesignAuditReason::ReplaceableComponentMissingInstructions));
+        assert!(
+            result
+                .reasons
+                .contains(&DesignAuditReason::ReplaceableComponentMissingInstructions)
+        );
     }
 
     #[test]
@@ -642,7 +681,11 @@ mod tests {
         dossier.joints[0].joining_method = JoiningMethod::Unknown;
         let result = audit_textile_design(&dossier);
         assert_eq!(result.disposition, DesignAuditDisposition::Incomplete);
-        assert!(result.reasons.contains(&DesignAuditReason::JoiningMethodUnknown));
+        assert!(
+            result
+                .reasons
+                .contains(&DesignAuditReason::JoiningMethodUnknown)
+        );
     }
 
     #[test]
@@ -651,9 +694,11 @@ mod tests {
         dossier.joints[0].reversibility = JointReversibility::Unknown;
         let result = audit_textile_design(&dossier);
         assert_eq!(result.disposition, DesignAuditDisposition::Incomplete);
-        assert!(result
-            .reasons
-            .contains(&DesignAuditReason::JointReversibilityUnknown));
+        assert!(
+            result
+                .reasons
+                .contains(&DesignAuditReason::JointReversibilityUnknown)
+        );
     }
 
     fn exercise_design_case(case_id: &str) -> (&'static str, Option<&'static str>) {
@@ -696,7 +741,10 @@ mod tests {
             }
             "DESIGN-010-REPLACEABLE-NO-INSTRUCTIONS" => {
                 replaceable_component_requires_instructions();
-                ("incomplete", Some("ReplaceableComponentMissingInstructions"))
+                (
+                    "incomplete",
+                    Some("ReplaceableComponentMissingInstructions"),
+                )
             }
             "DESIGN-011-UNKNOWN-JOINING-METHOD" => {
                 unknown_joining_method_is_not_promoted_to_reversible_design();
@@ -739,12 +787,12 @@ mod tests {
         assert_eq!(cases.len(), 13, "review design corpus count changes");
         let mut seen = BTreeSet::new();
         for case in cases {
-            let case_id = case["case_id"]
-                .as_str()
-                .expect("case_id must be a string");
+            let case_id = case["case_id"].as_str().expect("case_id must be a string");
             assert!(seen.insert(case_id), "duplicate design case {case_id}");
             assert!(
-                case["mutation"].as_str().is_some_and(|value| !value.is_empty()),
+                case["mutation"]
+                    .as_str()
+                    .is_some_and(|value| !value.is_empty()),
                 "case {case_id} must declare a mutation"
             );
             let expected = &case["expected"];
@@ -753,7 +801,10 @@ mod tests {
                 .expect("expected disposition must be a string");
             let expected_reason = expected["reason"].as_str();
             let (disposition, reason) = exercise_design_case(case_id);
-            assert_eq!(disposition, expected_disposition, "case {case_id} disposition");
+            assert_eq!(
+                disposition, expected_disposition,
+                "case {case_id} disposition"
+            );
             assert_eq!(reason, expected_reason, "case {case_id} reason");
         }
         assert_eq!(seen.len(), 13);
