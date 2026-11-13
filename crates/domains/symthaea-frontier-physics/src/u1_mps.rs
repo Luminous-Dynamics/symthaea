@@ -306,7 +306,10 @@ impl core::fmt::Display for U1MpsError {
             Self::InvalidTimeStep(value) => {
                 write!(f, "time step must be finite, got {value}")
             }
-            Self::HamiltonianNotHermitian { residual, tolerance } => write!(
+            Self::HamiltonianNotHermitian {
+                residual,
+                tolerance,
+            } => write!(
                 f,
                 "two-site Hamiltonian Hermiticity residual {residual} exceeds tolerance {tolerance}"
             ),
@@ -1519,11 +1522,7 @@ impl ComplexU1Mps {
     /// Compute the full-state L2 distance using norm and transfer-environment overlap.
     ///
     /// This avoids dense-vector expansion and is valid for finite open-boundary MPS.
-    pub fn distance_l2(
-        &self,
-        other: &Self,
-        tolerance: f64,
-    ) -> Result<f64, U1MpsError> {
+    pub fn distance_l2(&self, other: &Self, tolerance: f64) -> Result<f64, U1MpsError> {
         if !tolerance.is_finite() || tolerance <= 0.0 {
             return Err(U1MpsError::InvalidTolerance(tolerance));
         }
@@ -1809,8 +1808,6 @@ impl U1TwoSiteGate {
     }
 }
 
-
-
 /// A Hermitian, U(1)-conserving nearest-neighbour two-site Hamiltonian.
 ///
 /// Basis order is |00>, |01>, |10>, |11>. The one-excitation block can mix
@@ -1825,10 +1822,7 @@ pub struct U1TwoSiteHamiltonian {
 
 impl U1TwoSiteHamiltonian {
     /// Construct a finite Hermitian Hamiltonian with exact U(1) block structure.
-    pub fn new(
-        matrix: [[Complex64; 4]; 4],
-        tolerance: f64,
-    ) -> Result<Self, U1MpsError> {
+    pub fn new(matrix: [[Complex64; 4]; 4], tolerance: f64) -> Result<Self, U1MpsError> {
         if !tolerance.is_finite() || tolerance <= 0.0 {
             return Err(U1MpsError::InvalidTolerance(tolerance));
         }
@@ -1843,11 +1837,10 @@ impl U1TwoSiteHamiltonian {
                         index: row * 4 + column,
                     });
                 }
-                hermiticity_residual = hermiticity_residual
-                    .max((value - matrix[column][row].conj()).norm());
+                hermiticity_residual =
+                    hermiticity_residual.max((value - matrix[column][row].conj()).norm());
                 if row.count_ones() != column.count_ones() {
-                    charge_conservation_residual =
-                        charge_conservation_residual.max(value.norm());
+                    charge_conservation_residual = charge_conservation_residual.max(value.norm());
                 }
             }
         }
@@ -1952,17 +1945,14 @@ impl U1TwoSiteHamiltonian {
         let mut gate = [[Complex64::new(0.0, 0.0); 4]; 4];
         gate[0][0] = Complex64::from_polar(1.0, -time_step * h00);
         gate[3][3] = Complex64::from_polar(1.0, -time_step * h11);
-        gate[1][1] =
-            midpoint_phase * Complex64::new(cosine, -sine_over_frequency * difference);
+        gate[1][1] = midpoint_phase * Complex64::new(cosine, -sine_over_frequency * difference);
         gate[1][2] = midpoint_phase * imaginary_scale * coupling;
         gate[2][1] = midpoint_phase * imaginary_scale * coupling.conj();
-        gate[2][2] =
-            midpoint_phase * Complex64::new(cosine, sine_over_frequency * difference);
+        gate[2][2] = midpoint_phase * Complex64::new(cosine, sine_over_frequency * difference);
 
         U1TwoSiteGate::new(gate, tolerance)
     }
 }
-
 
 /// Receipts from an exact charge-block split of a two-site state.
 ///
@@ -2956,8 +2946,6 @@ impl U1TeBDLayer {
     }
 }
 
-
-
 /// Second-order real-time TEBD stepper for a nearest-neighbour U(1)-conserving
 /// Hamiltonian H = sum_b h[b,b+1].
 ///
@@ -2973,10 +2961,6 @@ pub struct U1TeBDStrangStepper {
     even_half_layer: U1TeBDLayer,
     odd_full_layer: U1TeBDLayer,
 }
-
-
-
-
 
 /// Error-budget receipt that keeps distinct numerical error sources separate.
 ///
@@ -3105,7 +3089,6 @@ impl U1TeBDStrangStepper {
     pub fn odd_full_layer(&self) -> &U1TeBDLayer {
         &self.odd_full_layer
     }
-
 
     /// Compare one step at dt against two steps at dt/2.
     ///
@@ -3326,11 +3309,7 @@ impl U1TeBDStrangStepper {
             None
         };
 
-        let state = layers
-            .last()
-            .ok_or(U1MpsError::EmptyChain)?
-            .state
-            .clone();
+        let state = layers.last().ok_or(U1MpsError::EmptyChain)?.state.clone();
         let output_norm_squared = state.norm_squared(policy.tolerance)?;
         Ok(U1TeBDStrangStepResult {
             state,
@@ -3362,7 +3341,6 @@ impl U1TeBDStrangStepper {
         })
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -4495,8 +4473,6 @@ mod tests {
         }
     }
 
-
-
     fn dense_apply_two_site_gate(
         state: &[Complex64],
         site_count: usize,
@@ -4537,10 +4513,8 @@ mod tests {
         let gate_right = one_excitation_rotation();
 
         let mut exact_dense = input.to_dense(8).unwrap();
-        exact_dense =
-            dense_apply_two_site_gate(&exact_dense, 4, 0, &gate_left);
-        exact_dense =
-            dense_apply_two_site_gate(&exact_dense, 4, 2, &gate_right);
+        exact_dense = dense_apply_two_site_gate(&exact_dense, 4, 0, &gate_left);
+        exact_dense = dense_apply_two_site_gate(&exact_dense, 4, 2, &gate_right);
 
         let layer = U1TeBDLayer::new(
             4,
@@ -4564,7 +4538,12 @@ mod tests {
 
         assert!(result.global_l2_bound_qualified);
         assert_eq!(result.canonical_gauge_receipts.len(), 2);
-        assert!(result.canonical_gauge_receipts.iter().all(|receipt| receipt.qualifies(1.0e-10)));
+        assert!(
+            result
+                .canonical_gauge_receipts
+                .iter()
+                .all(|receipt| receipt.qualifies(1.0e-10))
+        );
         let certified_bound = result
             .truncation_ledger
             .cumulative_global_l2_error_upper_bound
@@ -4586,8 +4565,6 @@ mod tests {
         assert_eq!(result.output_total_charge, 2);
         assert!(result.output_selection_rule_residual <= 1.0e-10);
     }
-
-
 
     fn dense_apply_two_site_gate(
         state: &[Complex64],
@@ -4654,10 +4631,12 @@ mod tests {
 
         assert!(result.global_l2_bound_qualified);
         assert_eq!(result.canonical_gauge_receipts.len(), 2);
-        assert!(result
-            .canonical_gauge_receipts
-            .iter()
-            .all(|receipt| receipt.qualifies(1.0e-10)));
+        assert!(
+            result
+                .canonical_gauge_receipts
+                .iter()
+                .all(|receipt| receipt.qualifies(1.0e-10))
+        );
         let certified_bound = result
             .truncation_ledger
             .cumulative_global_l2_error_upper_bound
@@ -4833,12 +4812,9 @@ mod tests {
     #[test]
     fn two_site_strang_step_equals_direct_exponential_and_reverse_step() {
         let time_step = 0.37;
-        let stepper = U1TeBDStrangStepper::new(
-            vec![xy_exchange_hamiltonian(0.7)],
-            time_step,
-            1.0e-12,
-        )
-        .unwrap();
+        let stepper =
+            U1TeBDStrangStepper::new(vec![xy_exchange_hamiltonian(0.7)], time_step, 1.0e-12)
+                .unwrap();
         assert_eq!(stepper.site_count(), 2);
         assert_eq!(stepper.even_half_layer().bond_indices(), vec![0]);
         assert!(stepper.odd_full_layer().bond_indices().is_empty());
@@ -4874,29 +4850,25 @@ mod tests {
         assert!((dense[1] - Complex64::new(0.0, -sine)).norm() <= 1.0e-10);
         assert!((dense[2] - Complex64::new(cosine, 0.0)).norm() <= 1.0e-10);
 
-        let reverse = U1TeBDStrangStepper::new(
-            vec![xy_exchange_hamiltonian(0.7)],
-            -time_step,
-            1.0e-12,
-        )
-        .unwrap();
+        let reverse =
+            U1TeBDStrangStepper::new(vec![xy_exchange_hamiltonian(0.7)], -time_step, 1.0e-12)
+                .unwrap();
         let recovered = reverse.apply(&forward.state, policy).unwrap();
         assert!(recovered.global_truncation_bound_qualified);
         assert!(
-            dense_l2_distance(&input.to_dense(2).unwrap(), &recovered.state.to_dense(2).unwrap())
-                <= 1.0e-10
+            dense_l2_distance(
+                &input.to_dense(2).unwrap(),
+                &recovered.state.to_dense(2).unwrap()
+            ) <= 1.0e-10
         );
     }
-
-
 
     fn exact_three_site_xy_state(
         coupling_left: f64,
         coupling_right: f64,
         time: f64,
     ) -> Vec<Complex64> {
-        let frequency =
-            (coupling_left * coupling_left + coupling_right * coupling_right).sqrt();
+        let frequency = (coupling_left * coupling_left + coupling_right * coupling_right).sqrt();
         let cosine = (frequency * time).cos();
         let sine = (frequency * time).sin();
         let mut exact = vec![complex_zero(); 8];
@@ -4923,8 +4895,7 @@ mod tests {
         let sine = (frequency * final_time).sin();
         let mut exact = vec![complex_zero(); 8];
         exact[4] = Complex64::new(
-            1.0 + (cosine - 1.0) * coupling_left * coupling_left
-                / (frequency * frequency),
+            1.0 + (cosine - 1.0) * coupling_left * coupling_left / (frequency * frequency),
             0.0,
         );
         exact[2] = Complex64::new(0.0, -sine * coupling_left / frequency);
@@ -4966,7 +4937,10 @@ mod tests {
         let ratio_coarse = error_8 / error_16;
         let ratio_fine = error_16 / error_32;
         assert!(error_8 > error_16 && error_16 > error_32);
-        assert!((3.3..=4.8).contains(&ratio_coarse), "coarse ratio={ratio_coarse}");
+        assert!(
+            (3.3..=4.8).contains(&ratio_coarse),
+            "coarse ratio={ratio_coarse}"
+        );
         assert!((3.3..=4.8).contains(&ratio_fine), "fine ratio={ratio_fine}");
     }
 
@@ -4997,11 +4971,26 @@ mod tests {
         assert!(result.truncation_contamination_included);
         assert!(result.measured_step_doubling_defect_l2 > 0.0);
         assert!(result.error_budget.truncation_global_bound_qualified);
-        assert!(result.error_budget.canonicalization_rebase_l2_residual_sum.is_some());
-        assert!(result.error_budget.schmidt_truncation_l2_upper_bound.is_some());
+        assert!(
+            result
+                .error_budget
+                .canonicalization_rebase_l2_residual_sum
+                .is_some()
+        );
+        assert!(
+            result
+                .error_budget
+                .schmidt_truncation_l2_upper_bound
+                .is_some()
+        );
         assert_eq!(result.error_budget.hamiltonian_projection_residual_sum, 0.0);
         assert!(!result.error_budget.total_physical_error_qualified);
-        assert!(result.error_budget.total_physical_error_upper_bound.is_none());
+        assert!(
+            result
+                .error_budget
+                .total_physical_error_upper_bound
+                .is_none()
+        );
         assert!(!result.error_budget.unqualified_terms.is_empty());
         let estimate = result
             .richardson_fine_trotter_error_estimate
@@ -5009,8 +4998,7 @@ mod tests {
         assert!(estimate >= result.measured_step_doubling_defect_l2 / 3.0);
 
         let exact = exact_three_site_xy_state(coupling_left, coupling_right, time_step);
-        let measured_fine_error =
-            dense_l2_distance(&result.state.to_dense(4).unwrap(), &exact);
+        let measured_fine_error = dense_l2_distance(&result.state.to_dense(4).unwrap(), &exact);
         assert!(measured_fine_error <= estimate + 1.0e-9);
         assert_eq!(result.state.total_charge(), 1);
     }
@@ -5035,15 +5023,17 @@ mod tests {
 
         assert!(coarse.richardson_estimate_qualified);
         assert!(fine.richardson_estimate_qualified);
-        assert!(coarse.error_budget.total_physical_error_upper_bound.is_none());
+        assert!(
+            coarse
+                .error_budget
+                .total_physical_error_upper_bound
+                .is_none()
+        );
         assert!(fine.error_budget.total_physical_error_upper_bound.is_none());
-        let ratio =
-            coarse.measured_step_doubling_defect_l2 / fine.measured_step_doubling_defect_l2;
+        let ratio = coarse.measured_step_doubling_defect_l2 / fine.measured_step_doubling_defect_l2;
         assert!(
             (6.0..=10.0).contains(&ratio),
             "single-step halving should scale the local defect near 2^3, ratio={ratio}"
         );
     }
-
-
 }
