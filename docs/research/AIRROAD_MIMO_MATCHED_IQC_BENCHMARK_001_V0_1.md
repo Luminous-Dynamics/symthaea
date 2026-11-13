@@ -43,7 +43,37 @@ Spin et al., [Iteratively Convex Frequency Data-Driven Synthesis of Structured M
 
 These references broaden the comparison by separating three questions: how FRF uncertainty is estimated, how uncertainty is converted to IQC multipliers, and how finite samples support a continuous-frequency guarantee.
 
-### 2.4 Claim discipline
+### 2.4 Faithful transcription boundary
+
+The benchmark must reproduce the *actual construction* in Sections IV–V before evaluating AIRROAD additions. The paper is not simply an SDP over independent knotwise matrices.
+
+The required transcription ledger is:
+
+1. **Generalized plant.** Preserve the block partition `P = [[P_zw, P_zu], [P_yw, P_yu]]`, dimensions, input/output ordering, direct-feedthrough terms, weights and feedback sign convention at every sampled frequency. The frequency partition spans the discrete-time unit-circle half-spectrum (0=\omega_0<\cdots<\omega_{N-1}=\pi).
+
+2. **Controller representation.** Reproduce the paper's right-coprime-factor parameterization (K=UV^{-1}) and the actual affine parameterization of (V,U). Bind every factor to the same controller design iterate and normalization. Do not substitute an arbitrary transfer-matrix curve and call it controller-RCF reproduction.
+
+3. **Plant uncertainty.** Reproduce the declared per-knot uncertainty sets for all generalized-plant blocks. Track hard weighted uncertainty (P_{\mu,k}+W_{1,k}\Delta_k W_{2,k}) separately from statistical mean/covariance construction. If the stochastic construction is used, reproduce its vectorized circular complex-normal assumptions and independent frequency-point estimates as the baseline case.
+
+4. **Two different inter-frequency operators.** Preserve the distinction between:
+   - the linear set interpolation `L(P)(omega)`, formed from convex combinations of endpoint plant sets; and
+   - the one-sided piecewise-convex controller/multiplier operator (\mathcal C(S)(\omega)=(1-\lambda_\omega)S_k+\lambda_\omega S_{k+1}), with (S_k\in\operatorname{co}(\Gamma_{S,k}^{+})) and (S_{k+1}\in\operatorname{co}(\Gamma_{S,k+1}^{-})).
+
+   These one-sided endpoint sets matter: the left/right controller-factor limits at a knot need not coincide. Do not collapse them into a single continuous interpolation or silently replace them with independent closed intervals.
+
+5. **Controller-factor remainder.** The paper's Section V-C2 remainder (r_{k|k+1}=\sup_{\omega\in I_{k|k+1}}\|\mathcal L(\phi)(\omega)-\phi_\omega\|_F) concerns its constructed controller coprime-factor curve `phi`. AIRROAD #11919 currently tests the exact supremum mechanism on a synthetic 2×2 polynomial matrix curve; it is a generic known-answer primitive, not the paper's actual (V,U) factor construction.
+
+6. **Generalized closed-loop set.** Rebuild the paper's (M(\omega)) / `Gamma_M,k^±` pipeline from the generalized plant, the RCF controller factors and the one-sided piecewise-convex objects. The paper identifies bilinear products between piecewise-convex sets and then constructs a polytopic outer approximation. Reproduce that approximation, including generator ordering and all endpoint cases, before inserting AIRROAD shared coordinates.
+
+7. **Finite-dimensional IQC/SDP.** Transcribe the multiplier blocks, objective (J(\mathcal Z(\Pi_p))), all constraints, strictness, positivity domains and the universal quantifier over the endpoint generator union `Gamma_M,k+` and `Gamma_M,k+1-`. Equation dimensions, conjugate-transpose conventions, Schur-complement steps and real/complex PSD packing must be checked against the source equations. A text-extraction artefact is not an adequate source for implementing an LMI; keep the derivation and a symbolic/dimensional audit in the repository.
+
+### 2.5 Industrial reproduction boundaries
+
+The paper's wirebonder example reports 247 logarithmically spaced measured excitation frequencies, ten independent multisine realizations repeated ten times and an approximately 95.45% (2-sigma) stochastic generator region. It also interpolates the measured FRF to a 740-point logarithmic grid for visualization and controller synthesis. Its exact sequence length and sampling frequency are withheld for confidentiality. It omits inter-frequency behavior of low-order weighting filters for simplicity, while noting that the polytopic-product method could incorporate it.
+
+AIRROAD must record these facts as the published experimental protocol, not fabricate unavailable data or claim reproduction of the physical wirebonder. The public benchmark should use synthetic known-truth cases matching the method's mathematical assumptions, then disclose every difference from the industrial setup. A separate AIRROAD extension should test explicit weighting-filter inter-frequency enclosures rather than inherit the published low-order omission without analysis.
+
+### 2.6 Claim discipline
 
 - Reproducing a public synthetic mathematical case is not reproducing an industrial experiment.
 - An SDP solver returning an optimal status is not by itself an independently verified robust-stability certificate.
