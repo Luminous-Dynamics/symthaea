@@ -178,6 +178,17 @@ Implications:
 
 The programme should retain the current hard gate of **zero critical misses in the frozen hard-gate suite**. This precision calculation adds a second question: how much statistical evidence supports a low underlying miss rate? A hard-gate pass on a small curated suite is not the same as a statistically bounded low-risk claim.
 
+## 7B. Decision-time evidence admissibility overlay
+
+The benchmark now composes a separate decision-time evidence-admissibility overlay:
+- [Decision-time evidence admissibility protocol](ENGINEERING_CHANGE_DECISION_TIME_ADMISSIBILITY_OVERLAY_V0_1_2026-11-13.md)
+- [Machine-readable temporal challenge blueprints](ENGINEERING_CHANGE_DECISION_TIME_OVERLAY_V0_1.json)
+- Existing lifecycle/as-of owner: [KNOW-LIFE-001 #10600](https://github.com/Luminous-Dynamics/symthaea/issues/10600)
+
+The overlay separates world-valid-at T from available-to-the-decision-process-by K, and distinguishes source publication, canonical receipt, acquisition/ingestion, derived-index visibility and actual run-context inclusion. It adds nine public challenge blueprints and six non-compensatory temporal gates. These are overlay controls on existing #10543/#10581 claim–evidence pairs, not nine adjudicated or statistically independent new benchmark cases.
+
+A source's publication date does not prove the agent retrieved it; a service receipt does not prove an index or model incorporated it. If the evidence chain cannot establish the required temporal fact, the result remains indeterminate/unsupported. #11241 is referenced only as finance-scoped bitemporal precedent; Mycelix #5860 remains a DeSci receipt-time projection owner with its stated model/index-availability limitation.
+
 ## 8. Execution and trust prerequisites
 
 - No untrusted repository-controlled candidates/build scripts may run until [#10064](https://github.com/Luminous-Dynamics/symthaea/issues/10064) establishes an actual OS isolation boundary. Host execution is not a sandbox.
