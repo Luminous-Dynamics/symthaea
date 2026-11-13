@@ -168,6 +168,12 @@ fn validate_mission(mission: &MissionManifest) -> Result<BTreeMap<String, bool>,
         return Err(ProgressError::InvalidMissionOrder);
     }
 
+    let order_index = mission
+        .mission_order
+        .iter()
+        .enumerate()
+        .map(|(index, id)| (id.as_str(), index))
+        .collect::<BTreeMap<_, _>>();
     let mut seen_edges = BTreeSet::new();
     let mut indegree = nodes.keys().map(|id| (id.clone(), 0_usize)).collect::<BTreeMap<_, _>>();
     let mut successors: BTreeMap<String, Vec<String>> = BTreeMap::new();
@@ -178,6 +184,9 @@ fn validate_mission(mission: &MissionManifest) -> Result<BTreeMap<String, bool>,
             || !seen_edges.insert(edge.clone())
         {
             return Err(ProgressError::InvalidEdge);
+        }
+        if order_index[edge.from.as_str()] >= order_index[edge.to.as_str()] {
+            return Err(ProgressError::InvalidMissionOrder);
         }
         *indegree.get_mut(&edge.to).ok_or(ProgressError::InvalidEdge)? += 1;
         successors.entry(edge.from.clone()).or_default().push(edge.to.clone());
@@ -209,7 +218,7 @@ fn mandatory_descendants(
     mission: &MissionManifest,
     start: &str,
     mandatory: &BTreeMap<String, bool>,
-    safe_accepted: &BTreeSet<String>,
+    completed_before: &BTreeSet<String>,
 ) -> BTreeSet<String> {
     let mut successors: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for edge in &mission.edges {
@@ -226,7 +235,7 @@ fn mandatory_descendants(
     }
     visited
         .into_iter()
-        .filter(|id| mandatory.get(id) == Some(&true) && !safe_accepted.contains(id))
+        .filter(|id| mandatory.get(id) == Some(&true) && !completed_before.contains(id))
         .collect()
 }
 
@@ -391,11 +400,13 @@ pub fn evaluate_mission_progress(
     let mut continuation_prefix = 0_u16;
     let mut safe_prefix_open = true;
     let mut continuation_prefix_open = true;
+    let mut completed_before = BTreeSet::new();
 
     for id in &input.mission.mission_order {
         let evaluation = evaluations[id];
         let safe = evaluation.outcome == SubgoalOutcome::SafeAccepted;
-        let required = mandatory_descendants(&input.mission, id, &mandatory, &safe_accepted);
+        let required =
+            mandatory_descendants(&input.mission, id, &mandatory, &completed_before);
         let (qualified, continuation_unknown, feasible_count) = if safe {
             validate_continuation(evaluation, &required)?
         } else {
@@ -431,6 +442,9 @@ pub fn evaluate_mission_progress(
             mandatory_successor_count: u16::try_from(required.len()).map_err(|_| ProgressError::ArithmeticOverflow)?,
             feasible_mandatory_successor_count: feasible_count,
         });
+        if safe {
+            completed_before.insert(id.clone());
+        }
     }
 
     let mandatory_ids = mandatory.iter().filter(|(_, required)| **required).map(|(id, _)| id).collect::<Vec<_>>();
