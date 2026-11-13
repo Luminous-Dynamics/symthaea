@@ -237,6 +237,8 @@ pub struct DesignRevisionBinding {
 pub struct ProcessTrialEvidence {
     /// Trial disposition.
     pub outcome: TrialOutcome,
+    /// Physical sample/specimen identity tested in this trial.
+    pub physical_sample_id: String,
     /// Physical process-trial artifact.
     pub evidence: EvidenceRef,
     /// Optional exact design revision binding for a trial on a designed product.
@@ -383,6 +385,8 @@ pub enum RouteReason {
     ProcessTrialUnknown,
     /// Process trial evidence has the wrong role or tier.
     InvalidProcessTrialEvidence,
+    /// Physical trial has no specimen identity.
+    InvalidPhysicalTrialIdentity,
     /// Design dossier/specimen/revision binding is malformed or lacks conformity evidence.
     InvalidDesignRevisionBinding,
     /// Destructive route has no measured mass balance.
@@ -542,11 +546,15 @@ fn add_trial_checks(
     if !valid_evidence(&trial.evidence, expected_kind, EvidenceTier::PhysicalTrial) {
         reasons.push(RouteReason::InvalidProcessTrialEvidence);
     }
+    if !nonempty(&trial.physical_sample_id) {
+        reasons.push(RouteReason::InvalidPhysicalTrialIdentity);
+    }
     if let Some(binding) = &trial.design_binding {
         evidence_ids.push(binding.conformity_evidence.evidence_id.clone());
         if !nonempty(&binding.product_id)
             || !nonempty(&binding.design_revision)
             || !nonempty(&binding.specimen_id)
+            || binding.specimen_id != trial.physical_sample_id
             || !valid_sha256(&binding.dossier_sha256)
             || !valid_evidence(
                 &binding.conformity_evidence,
@@ -997,6 +1005,7 @@ mod tests {
     fn process_trial(kind: EvidenceKind, with_balance: bool) -> ProcessTrialEvidence {
         ProcessTrialEvidence {
             outcome: TrialOutcome::Passed,
+            physical_sample_id: "PHYSICAL-ITEM-01".to_owned(),
             evidence: evidence(
                 "TRIAL-01",
                 kind,
@@ -1617,6 +1626,30 @@ mod tests {
             specimen_id: "PHYSICAL-ITEM-01".to_owned(),
             conformity_evidence: evidence(
                 "DESIGN-CONFORMITY-02",
+                EvidenceKind::DesignRevisionConformity,
+                EvidenceTier::PhysicalTrial,
+                "inspection-lab",
+                None,
+            ),
+        });
+        bundle.process_trial = Some(trial);
+        bundle.downstream_acceptance = Some(acceptance());
+        let result = qualify_recovery_route(RecoveryRoute::ComponentRecovery, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::InvalidDesignRevisionBinding));
+    }
+
+    #[test]
+    fn design_conformity_must_bind_the_same_physical_sample_as_the_trial() {
+        let mut bundle = empty_bundle();
+        let mut trial = process_trial(EvidenceKind::ComponentRecoveryTrial, true);
+        trial.design_binding = Some(DesignRevisionBinding {
+            product_id: "OVERSHIRT-01".to_owned(),
+            design_revision: "REV-A".to_owned(),
+            dossier_sha256: "c".repeat(64),
+            specimen_id: "DIFFERENT-PHYSICAL-ITEM".to_owned(),
+            conformity_evidence: evidence(
+                "DESIGN-CONFORMITY-03",
                 EvidenceKind::DesignRevisionConformity,
                 EvidenceTier::PhysicalTrial,
                 "inspection-lab",
