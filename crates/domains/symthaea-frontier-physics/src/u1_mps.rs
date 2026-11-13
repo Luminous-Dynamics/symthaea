@@ -307,7 +307,7 @@ impl ComplexU1Mps {
         let mut prefix_charge = 0_i32;
         let mut tensors = Vec::with_capacity(bits.len());
         for &bit in bits {
-            let next_charge = prefix_charge + i32::from(bit);
+            let next_charge = prefix_charge + if bit { 1 } else { 0 };
             let mut data = vec![Complex64::new(0.0, 0.0); 2];
             data[usize::from(bit)] = Complex64::new(1.0, 0.0);
             tensors.push(U1MpsTensor::new(
@@ -392,8 +392,10 @@ impl ComplexU1Mps {
                 ));
             }
             let right_dimension = tensor.right_dimension();
-            let mut next =
-                vec![Complex64::new(0.0, 0.0); right_dimension * right_dimension];
+            let environment_entries = right_dimension
+                .checked_mul(right_dimension)
+                .ok_or(U1MpsError::DimensionOverflow)?;
+            let mut next = vec![Complex64::new(0.0, 0.0); environment_entries];
             for bra_left in 0..environment_dimension {
                 for ket_left in 0..environment_dimension {
                     let env = environment[bra_left * environment_dimension + ket_left];
@@ -548,18 +550,29 @@ mod tests {
     }
 
     #[test]
-    fn rejects_nonfinite_tensor_entries_empty_chains_and_dense_size_overflow() {
-        assert_eq!(
-            U1MpsTensor::new(
-                vec![0],
-                vec![0],
-                vec![Complex64::new(f64::NAN, 0.0), Complex64::new(0.0, 0.0)]
-            ),
-            Ok(U1MpsTensor::new(
-                vec![0],
-                vec![0],
-                vec![Complex64::new(f64::NAN, 0.0), Complex64::new(0.0, 0.0)]
-            ).unwrap())
-        );
-    }
-}
+    fn rejects_nonfinite_tensor_entries_empty_chains_and_large_dense_expansions() {
+        assert!(matches!(
+            ComplexU1Mps::new(Vec::new(), 0, 1.0e-12),
+            Err(U1MpsError::EmptyChain)
+        ));
+
+        let nonfinite = U1MpsTensor::new(
+            vec![0],
+            vec![0],
+            vec![
+                Complex64::new(f64::NAN, 0.0),
+                Complex64::new(0.0, 0.0),
+            ],
+        )
+        .unwrap();
+        assert!(matches!(
+            ComplexU1Mps::new(vec![nonfinite], 0, 1.0e-12),
+            Err(U1MpsError::NonFiniteTensorEntry { .. })
+        ));
+
+        let state = ComplexU1Mps::product_state(&[false, false]).unwrap();
+        assert!(matches!(
+            state.to_dense(1),
+            Err(U1MpsError::DenseExpansionTooLarge { .. })
+        ));
+    }}
