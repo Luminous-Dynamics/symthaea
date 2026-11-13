@@ -716,6 +716,14 @@ mod tests {
     }
 
     #[test]
+    fn empty_readiness_probe_profile_id_is_rejected() {
+        let mut value = fixture_value();
+        value["device_sequences"][0]["events"][1]["readiness_probe_profile_id"] = json!("");
+        let error = audit_value(value).unwrap_err().to_string();
+        assert!(error.contains("readiness_probe_profile_id"));
+    }
+
+    #[test]
     fn inconsistent_readiness_probe_identity_is_rejected() {
         let mut value = fixture_value();
         value["device_sequences"][1]["events"][1]["readiness_probe_profile_id"] = json!("OTHER-PROBE");
