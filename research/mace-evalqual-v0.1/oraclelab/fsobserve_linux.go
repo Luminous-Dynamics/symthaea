@@ -84,6 +84,7 @@ func ObserveDirectory(root string, run func() error) FSReport {
 	}
 	defer syscall.Close(fd)
 	wdPaths := map[int]string{}
+	rootInode := rootStat.Ino
 	coverage := Coverage{
 		SourceID: "linux-inotify-same-mount-regular-tree",
 		ScopeID:  abs,
@@ -105,6 +106,11 @@ func ObserveDirectory(root string, run func() error) FSReport {
 		report.Reasons = append(report.Reasons, "watch coverage is incomplete; evaluation was not run")
 		return report
 	}
+	if err := verifyRootIdentity(abs, rootStat.Dev, rootInode); err != nil {
+		report.Coverage.Complete = false
+		report.Reasons = append(report.Reasons, "root identity changed during observer setup: "+err.Error())
+		return report
+	}
 	before, err := directoryDigest(abs)
 	if err != nil {
 		report.Coverage.Complete = false
@@ -112,10 +118,22 @@ func ObserveDirectory(root string, run func() error) FSReport {
 		return report
 	}
 	report.BeforeSHA256 = before
-	// Discard setup noise and begin an invocation-local event sequence.
-	if _, _, err := drainInotify(fd, abs, wdPaths, 0); err != nil {
+	// No mutation should occur while watches are installed and the pristine
+	// baseline is captured. Any queued event blocks evaluation.
+	setupEvents, _, setupErr := drainInotify(fd, abs, wdPaths, 0)
+	if setupErr != nil || len(setupEvents) > 0 {
 		report.Coverage.Complete = false
-		report.Reasons = append(report.Reasons, "pre-evaluation event drain failed: "+err.Error())
+		report.Events = setupEvents
+		if setupErr != nil {
+			report.Reasons = append(report.Reasons, "pre-evaluation event drain failed: "+setupErr.Error())
+		} else {
+			report.Reasons = append(report.Reasons, "filesystem changed during observer setup; evaluation was not run")
+		}
+		return report
+	}
+	if err := verifyRootIdentity(abs, rootStat.Dev, rootInode); err != nil {
+		report.Coverage.Complete = false
+		report.Reasons = append(report.Reasons, "root identity changed before evaluation: "+err.Error())
 		return report
 	}
 
@@ -129,13 +147,18 @@ func ObserveDirectory(root string, run func() error) FSReport {
 		report.Reasons = append(report.Reasons, "post-evaluation event drain failed: "+drainErr.Error())
 	}
 	report.Events = events
+	if identityErr := verifyRootIdentity(abs, rootStat.Dev, rootInode); identityErr != nil {
+		report.Coverage.Complete = false
+		report.Reasons = append(report.Reasons, "root identity changed during evaluation: "+identityErr.Error())
+	}
 	report.AfterSHA256, err = directoryDigest(abs)
 	if err != nil {
 		report.Coverage.Complete = false
 		report.Reasons = append(report.Reasons, "post-evaluation snapshot failed: "+err.Error())
 		return report
 	}
-	// Catch records queued while the post-state snapshot was read.
+	// Catch events queued while the post-state snapshot was read. If new events
+	// arrive, re-snapshot once; persistent writers are outside this adapter's scope.
 	extra, _, extraErr := drainInotify(fd, abs, wdPaths, lastSeq)
 	if extraErr != nil {
 		report.Coverage.Complete = false
@@ -167,6 +190,21 @@ func ObserveDirectory(root string, run func() error) FSReport {
 	}
 	report.Status = Pass
 	return report
+}
+
+func verifyRootIdentity(root string, device, inode uint64) error {
+	info, err := os.Lstat(root)
+	if err != nil {
+		return err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.IsDir() {
+		return fmt.Errorf("root is no longer a real directory")
+	}
+	stat, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || stat.Dev != device || stat.Ino != inode {
+		return fmt.Errorf("root device/inode changed")
+	}
+	return nil
 }
 
 func callFSCallback(run func() error) (err error) {
@@ -217,8 +255,7 @@ func mountIDForPath(path string, mounts []mountEntry) (int, bool) {
 	bestID, bestLength := 0, -1
 	for _, entry := range mounts {
 		mountPath := filepath.Clean(entry.mountPath)
-		prefix := strings.TrimSuffix(mountPath, string(os.PathSeparator)) + string(os.PathSeparator)
-		if path != mountPath && !strings.HasPrefix(path, prefix) {
+		if path != mountPath && !strings.HasPrefix(path, strings.TrimSuffix(mountPath, string(os.PathSeparator))+string(os.PathSeparator)) {
 			continue
 		}
 		if len(mountPath) > bestLength {
@@ -276,7 +313,7 @@ func drainInotify(fd int, root string, wdPaths map[int]string, startSeq uint64) 
 	buf := make([]byte, 64*1024)
 	seq := startSeq
 	out := []FSEvent{}
-	headerSize := 16 // Linux wire event header: wd, mask, cookie and len.
+	headerSize := 16 // Linux inotify_event wire header: wd, mask, cookie, len (four u32 fields).
 	for {
 		n, err := syscall.Read(fd, buf)
 		if err == syscall.EAGAIN || err == syscall.EWOULDBLOCK {
@@ -295,8 +332,9 @@ func drainInotify(fd int, root string, wdPaths map[int]string, startSeq uint64) 
 			if n-offset < headerSize {
 				return out, seq, fmt.Errorf("short inotify event header")
 			}
-			// Do not cast to syscall.InotifyEvent: that Go struct includes
-			// a fixed Name array and is larger than the 16-byte kernel header.
+			// Do not cast this wire record to syscall.InotifyEvent: that Go
+			// struct includes a fixed Name array and is larger than the
+			// 16-byte Linux kernel event header.
 			wd := int(int32(binary.LittleEndian.Uint32(buf[offset : offset+4])))
 			mask := binary.LittleEndian.Uint32(buf[offset+4 : offset+8])
 			nameLen := binary.LittleEndian.Uint32(buf[offset+12 : offset+16])
@@ -305,6 +343,9 @@ func drainInotify(fd int, root string, wdPaths map[int]string, startSeq uint64) 
 				return out, seq, fmt.Errorf("truncated inotify event name")
 			}
 			nameEnd := nameStart + int(nameLen)
+			if nameEnd > n {
+				return out, seq, fmt.Errorf("truncated inotify event name")
+			}
 			nameBytes := bytes.TrimRight(buf[nameStart:nameEnd], " ")
 			base, known := wdPaths[wd]
 			if mask&syscall.IN_Q_OVERFLOW != 0 {
@@ -328,13 +369,7 @@ func drainInotify(fd int, root string, wdPaths map[int]string, startSeq uint64) 
 				return out, seq, fmt.Errorf("new directory created during evaluation; child coverage is not established")
 			}
 			seq++
-			out = append(out, FSEvent{
-				Sequence: seq,
-				Path:     filepath.ToSlash(rel),
-				Mask:     mask,
-				Kinds:    maskKinds(mask),
-				Mutation: mask&(syscall.IN_MODIFY|syscall.IN_ATTRIB|syscall.IN_CLOSE_WRITE|syscall.IN_CREATE|syscall.IN_DELETE|syscall.IN_MOVED_FROM|syscall.IN_MOVED_TO|syscall.IN_DELETE_SELF|syscall.IN_MOVE_SELF) != 0,
-			})
+			out = append(out, FSEvent{Sequence: seq, Path: filepath.ToSlash(rel), Mask: mask, Kinds: maskKinds(mask), Mutation: mask&(syscall.IN_MODIFY|syscall.IN_ATTRIB|syscall.IN_CLOSE_WRITE|syscall.IN_CREATE|syscall.IN_DELETE|syscall.IN_MOVED_FROM|syscall.IN_MOVED_TO|syscall.IN_DELETE_SELF|syscall.IN_MOVE_SELF) != 0})
 			offset = nameEnd
 		}
 	}
