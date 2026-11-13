@@ -1,0 +1,19 @@
+[package]
+name = "ieee754-enclosure-qualifier"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+description = "IEEE-754 enclosure primitives with exact-rational qualification"
+license = "AGPL-3.0-or-later"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "emit-vectors"
+path = "src/main.rs"
+
+[dependencies]
+
+[workspace]
