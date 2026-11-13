@@ -384,6 +384,7 @@
                 "electrode_basis",
                 "complete_device_weighed",
                 "module_vendor_reported",
+                "module_measured",
                 "installed_system_measured",
                 "unknown"
               ]
@@ -434,9 +435,7 @@
                     "type": "number",
                     "exclusiveMinimum": 0
                   },
-                  "included_components": {
-                    "minItems": 9
-                  }
+                  "included_components": {}
                 }
               }
             }
