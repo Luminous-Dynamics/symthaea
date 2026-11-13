@@ -2020,6 +2020,22 @@ mod tests {
         assert!(crate::musicxml_notation_events::is_legacy_missing_notation_events(
             &round_trip.notation_events
         ));
+        assert!(validate_musicxml_notation_graph_replay(
+            xml.as_bytes(),
+            "sha256:legacy-graph",
+            "score-clock",
+            &[round_trip.clone()],
+        )
+        .unwrap());
+        let mut tampered = round_trip;
+        tampered.measure_locators[0].number = Some("tampered".into());
+        assert!(!validate_musicxml_notation_graph_replay(
+            xml.as_bytes(),
+            "sha256:legacy-graph",
+            "score-clock",
+            &[tampered],
+        )
+        .unwrap());
     }
 
     #[test]
