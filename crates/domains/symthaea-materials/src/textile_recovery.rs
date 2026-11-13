@@ -1,0 +1,1191 @@
+// Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
+//! Evidence-qualified textile recovery-route contracts.
+//!
+//! This module prevents a fibre prediction from becoming a recyclability claim.
+//! It qualifies a *candidate route* only when route-specific physical evidence,
+//! mass accounting and independent receiving-process acceptance are present.
+//! It does not select a route from model scores, authenticate evidence issuers,
+//! or prove legal, safety, chemical or environmental compliance.
+
+use serde::{Deserialize, Serialize};
+
+/// Integer scale for mass fractions: one million parts represent 100%.
+pub const FRACTION_SCALE_PPM: u64 = 1_000_000;
+
+/// Candidate destination for a textile item or material lot.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RecoveryRoute {
+    /// Continue use as a garment or textile product without repair.
+    ReuseAsIs,
+    /// Repair the garment/product before returning it to use.
+    Repair,
+    /// Recover a reusable component (for example, a fastener or trim).
+    ComponentRecovery,
+    /// Mechanically open textile material into fibres.
+    MechanicalFibreRecycling,
+    /// Chemically process known polymer material into a recovered polymer stream.
+    ChemicalFibreRecycling,
+    /// Convert material into a lower-grade but explicitly accepted product stream.
+    Downcycling,
+}
+
+/// Semantic role of an evidence artifact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EvidenceKind {
+    /// Physical item/lot inventory and measured incoming mass.
+    PhysicalInventory,
+    /// Human inspection of product condition and safe-use attributes.
+    ConditionInspection,
+    /// Calibrated measurement supporting fibre composition.
+    CompositionMeasurement,
+    /// Instrument calibration record in force at acquisition.
+    CalibrationRecord,
+    /// Physical repair operation and post-repair testing.
+    RepairTrial,
+    /// Physical component harvesting/disassembly trial.
+    ComponentRecoveryTrial,
+    /// Physical mechanical-opening/recycling trial.
+    MechanicalRecyclingTrial,
+    /// Measured fibre-length distribution for an actual recovered output.
+    FibreLengthMeasurement,
+    /// Physical test of a chemical route's material/process compatibility.
+    ChemicalCompatibilityTrial,
+    /// Physical chemical-recycling process trial.
+    ChemicalRecyclingTrial,
+    /// Physical downcycling process trial.
+    DowncyclingTrial,
+    /// Acceptance/rejection decision by the downstream receiving process.
+    DownstreamAcceptance,
+}
+
+/// Evidence maturity. Higher levels do not imply cryptographic authenticity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub enum EvidenceTier {
+    /// Generated fixture with no physical specimen.
+    Synthetic,
+    /// Simulation-only result.
+    Simulation,
+    /// Model output or inference without independent physical measurement.
+    ModelInference,
+    /// Instrument measurement; calibration and source still require checking.
+    SensorMeasured,
+    /// Recorded human inspection.
+    HumanInspected,
+    /// Physical process trial on identified material.
+    PhysicalTrial,
+    /// Independent receiving-process acceptance with a distinct verifier.
+    IndependentAcceptance,
+}
+
+/// Source-bound reference to a supporting evidence artifact.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct EvidenceRef {
+    /// Stable evidence identifier.
+    pub evidence_id: String,
+    /// SHA-256 of the exact artifact bytes, lowercase hexadecimal.
+    pub sha256: String,
+    /// Evidence role.
+    pub kind: EvidenceKind,
+    /// Declared evidence maturity.
+    pub tier: EvidenceTier,
+    /// Measurement/inspection/process method identifier and version.
+    pub method_ref: String,
+    /// Organization/person responsible for creating the evidence.
+    pub issuer_id: String,
+    /// Independent verifier; required for IndependentAcceptance.
+    pub verifier_id: Option<String>,
+    /// Observation/record time in nanoseconds from a declared epoch.
+    pub observed_at_ns: u64,
+}
+
+/// Physical condition of the garment/product at inspection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProductCondition {
+    /// Fit for intended use without repair, according to the inspected criteria.
+    Wearable,
+    /// Not fit for current use but has a declared repair pathway.
+    Repairable,
+    /// Not fit for product reuse under the inspected criteria.
+    NonWearable,
+    /// Condition was not determined.
+    Unknown,
+}
+
+/// Result of a safety/hygiene inspection relevant to the declared reuse route.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum UseSafetyStatus {
+    /// The declared inspection protocol passed.
+    Passed,
+    /// The declared inspection protocol failed.
+    Failed,
+    /// Safety/hygiene was not determined.
+    Unknown,
+}
+
+/// Physical condition evidence, not a computer-vision category prediction.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConditionEvidence {
+    /// Inspected state.
+    pub condition: ProductCondition,
+    /// Safety/hygiene result for the declared intended use.
+    pub safety: UseSafetyStatus,
+    /// Human inspection evidence.
+    pub evidence: EvidenceRef,
+}
+
+/// Disposition of a composition estimate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CompositionDisposition {
+    /// Measurement passed its declared instrument/calibration admission contract.
+    Admitted,
+    /// Measurement is incomplete, out of domain or otherwise abstained.
+    Unknown,
+    /// Measurement has contradictory/malformed evidence.
+    Rejected,
+}
+
+/// Composition evidence must identify both the measurement and calibration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CompositionEvidence {
+    /// Admission disposition from the sensing contract.
+    pub disposition: CompositionDisposition,
+    /// Upper bound on fibre mass fraction that remains unidentified.
+    pub unknown_fraction_upper_ppm: u32,
+    /// Composition measurement artifact.
+    pub measurement: EvidenceRef,
+    /// Calibration record artifact.
+    pub calibration: EvidenceRef,
+}
+
+/// Result of a process trial.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TrialOutcome {
+    /// Declared process and output tests passed.
+    Passed,
+    /// A required process/output criterion failed.
+    Failed,
+    /// Outcome was not determined.
+    Unknown,
+}
+
+/// Mass categories in a physical recovery trial.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MassBalance {
+    /// Incoming mass measured for the trial.
+    pub input_mass_mg: u64,
+    /// Mass accepted into the target output stream.
+    pub accepted_output_mass_mg: u64,
+    /// Recovered reusable components.
+    pub recovered_component_mass_mg: u64,
+    /// Recovered trim or non-textile attachment mass.
+    pub recovered_trim_mass_mg: u64,
+    /// Rejected material mass.
+    pub rejected_mass_mg: u64,
+    /// Measured waste/residual mass.
+    pub waste_mass_mg: u64,
+    /// Combined expanded measurement uncertainty for the mass categories.
+    pub uncertainty_mass_mg: u64,
+}
+
+impl MassBalance {
+    /// Returns the absolute unexplained mass difference in milligrams.
+    pub fn unexplained_mass_mg(&self) -> u64 {
+        let accounted = u128::from(self.accepted_output_mass_mg)
+            + u128::from(self.recovered_component_mass_mg)
+            + u128::from(self.recovered_trim_mass_mg)
+            + u128::from(self.rejected_mass_mg)
+            + u128::from(self.waste_mass_mg);
+        let input = u128::from(self.input_mass_mg);
+        input.abs_diff(accounted).min(u128::from(u64::MAX)) as u64
+    }
+
+    /// Checks that mass closure is within declared measurement uncertainty and policy ceiling.
+    pub fn is_closed(&self, max_uncertainty_ppm: u32) -> bool {
+        if self.input_mass_mg == 0 {
+            return false;
+        }
+        let uncertainty_ppm = u128::from(self.uncertainty_mass_mg)
+            .saturating_mul(u128::from(FRACTION_SCALE_PPM))
+            / u128::from(self.input_mass_mg);
+        uncertainty_ppm <= u128::from(max_uncertainty_ppm)
+            && self.unexplained_mass_mg() <= self.uncertainty_mass_mg
+    }
+}
+
+/// Evidence that a route was physically trialled on identified material.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProcessTrialEvidence {
+    /// Trial disposition.
+    pub outcome: TrialOutcome,
+    /// Physical process-trial artifact.
+    pub evidence: EvidenceRef,
+    /// Required mass accounting for destructive routes.
+    pub mass_balance: Option<MassBalance>,
+}
+
+/// One measured fibre-length interval.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FibreLengthBin {
+    /// Inclusive lower bound of the bin, in micrometres.
+    pub lower_bound_um: u32,
+    /// Exclusive upper bound of the bin, in micrometres.
+    pub upper_bound_um: u32,
+    /// Share of recovered fibre mass in the bin, parts per million.
+    pub mass_fraction_ppm: u32,
+}
+
+/// Fibre-length distribution measured from an actual recovered material stream.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FibreLengthEvidence {
+    /// Method/standard and version used to measure fibre length.
+    pub method_ref: String,
+    /// Instrument/measurement evidence.
+    pub evidence: EvidenceRef,
+    /// Ordered non-overlapping fibre-length bins.
+    pub bins: Vec<FibreLengthBin>,
+}
+
+/// Required downstream output criteria, stated by the receiving process.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecoveryPolicy {
+    /// Maximum unresolved fibre mass fraction permitted for a candidate route.
+    pub max_unknown_fraction_ppm: u32,
+    /// Maximum mass-balance expanded uncertainty as a share of input mass.
+    pub max_mass_balance_uncertainty_ppm: u32,
+    /// Minimum fibre length required by the declared downstream spinning route.
+    pub minimum_fibre_length_um: u32,
+    /// Minimum recovered fibre mass fraction in bins meeting that length threshold.
+    pub minimum_mass_fraction_at_or_above_length_ppm: u32,
+}
+
+impl RecoveryPolicy {
+    /// Validates policy scales before they are used in route qualification.
+    pub fn validate(&self) -> bool {
+        self.max_unknown_fraction_ppm <= FRACTION_SCALE_PPM as u32
+            && self.max_mass_balance_uncertainty_ppm <= FRACTION_SCALE_PPM as u32
+            && self.minimum_fibre_length_um > 0
+            && self.minimum_mass_fraction_at_or_above_length_ppm
+                <= FRACTION_SCALE_PPM as u32
+    }
+}
+
+/// All evidence supplied for one physical item/lot.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecoveryEvidenceBundle {
+    /// Physical item/lot identifier.
+    pub lot_id: String,
+    /// Independently measured incoming mass; zero is not a valid lot.
+    pub input_mass_mg: u64,
+    /// Physical inventory evidence.
+    pub inventory: EvidenceRef,
+    /// Optional human condition/safety inspection.
+    pub condition: Option<ConditionEvidence>,
+    /// Optional calibrated material-composition evidence.
+    pub composition: Option<CompositionEvidence>,
+    /// Optional route process trial.
+    pub process_trial: Option<ProcessTrialEvidence>,
+    /// Optional measured fibre-length distribution from the actual trial output.
+    pub fibre_length: Option<FibreLengthEvidence>,
+    /// Optional chemical compatibility trial for the declared route.
+    pub chemical_compatibility: Option<EvidenceRef>,
+    /// Optional downstream acceptance record.
+    pub downstream_acceptance: Option<EvidenceRef>,
+}
+
+/// Route qualification disposition; this is not a legal or environmental certification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RouteDisposition {
+    /// Required evidence is present and all declared gates pass.
+    Eligible,
+    /// Evidence is missing, unknown or insufficient to authorize the claim.
+    InsufficientEvidence,
+    /// A declared hard criterion failed or evidence is structurally invalid.
+    Ineligible,
+}
+
+/// Stable explanation for a route assessment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum RouteReason {
+    /// Empty lot identity or zero incoming mass.
+    InvalidPhysicalInventory,
+    /// Inventory record has the wrong role, tier or malformed digest.
+    InvalidInventoryEvidence,
+    /// No condition inspection was supplied.
+    MissingConditionInspection,
+    /// Condition is incompatible with reuse as-is.
+    ProductNotWearable,
+    /// Use safety/hygiene inspection did not pass.
+    UseSafetyNotPassed,
+    /// Required physical process trial is absent.
+    MissingProcessTrial,
+    /// Process trial did not pass.
+    ProcessTrialNotPassed,
+    /// Process trial evidence has the wrong role or tier.
+    InvalidProcessTrialEvidence,
+    /// Destructive route has no measured mass balance.
+    MissingMassBalance,
+    /// Mass balance does not close within measurement uncertainty/policy.
+    MassBalanceNotClosed,
+    /// Composition measurement/calibration evidence is absent.
+    MissingCompositionEvidence,
+    /// Composition record is unknown or rejected.
+    CompositionNotAdmitted,
+    /// Unknown fibre fraction exceeds the route policy.
+    UnknownFibreFractionAbovePolicy,
+    /// Composition/calibration references are malformed or mis-typed.
+    InvalidCompositionEvidence,
+    /// Fibre-length distribution is absent.
+    MissingFibreLengthEvidence,
+    /// Fibre-length distribution is malformed or does not close to 100%.
+    InvalidFibreLengthDistribution,
+    /// Measured fibre-length distribution fails the receiving route policy.
+    FibreLengthBelowPolicy,
+    /// Chemical compatibility trial is absent.
+    MissingChemicalCompatibilityEvidence,
+    /// Chemical compatibility evidence is malformed or wrong-tier.
+    InvalidChemicalCompatibilityEvidence,
+    /// No independent downstream receiving-process acceptance is present.
+    MissingDownstreamAcceptance,
+    /// Downstream acceptance is not independent or is malformed.
+    InvalidDownstreamAcceptance,
+    /// Policy itself has impossible/out-of-range values.
+    InvalidPolicy,
+}
+
+/// Result of qualifying one candidate recovery route.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RouteAssessment {
+    /// Candidate route evaluated.
+    pub route: RecoveryRoute,
+    /// Qualification disposition.
+    pub disposition: RouteDisposition,
+    /// Stable explanation codes; empty only for Eligible.
+    pub reasons: Vec<RouteReason>,
+    /// Evidence identifiers considered by this assessment.
+    pub evidence_ids: Vec<String>,
+}
+
+fn valid_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .as_bytes()
+            .iter()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(byte))
+}
+
+fn valid_evidence(
+    evidence: &EvidenceRef,
+    expected_kind: EvidenceKind,
+    minimum_tier: EvidenceTier,
+) -> bool {
+    if evidence.kind != expected_kind
+        || evidence.tier < minimum_tier
+        || evidence.evidence_id.trim().is_empty()
+        || evidence.method_ref.trim().is_empty()
+        || evidence.issuer_id.trim().is_empty()
+        || !valid_sha256(&evidence.sha256)
+    {
+        return false;
+    }
+    if evidence.tier == EvidenceTier::IndependentAcceptance {
+        evidence
+            .verifier_id
+            .as_deref()
+            .is_some_and(|verifier| !verifier.trim().is_empty() && verifier != evidence.issuer_id)
+    } else {
+        true
+    }
+}
+
+fn require_evidence(
+    evidence: Option<&EvidenceRef>,
+    kind: EvidenceKind,
+    tier: EvidenceTier,
+    missing_reason: RouteReason,
+    invalid_reason: RouteReason,
+    reasons: &mut Vec<RouteReason>,
+    evidence_ids: &mut Vec<String>,
+) {
+    match evidence {
+        None => reasons.push(missing_reason),
+        Some(value) => {
+            evidence_ids.push(value.evidence_id.clone());
+            if !valid_evidence(value, kind, tier) {
+                reasons.push(invalid_reason);
+            }
+        }
+    }
+}
+
+fn add_trial_checks(
+    trial: Option<&ProcessTrialEvidence>,
+    expected_kind: EvidenceKind,
+    require_mass_balance: bool,
+    policy: &RecoveryPolicy,
+    reasons: &mut Vec<RouteReason>,
+    evidence_ids: &mut Vec<String>,
+) {
+    let Some(trial) = trial else {
+        reasons.push(RouteReason::MissingProcessTrial);
+        return;
+    };
+    evidence_ids.push(trial.evidence.evidence_id.clone());
+    if !valid_evidence(&trial.evidence, expected_kind, EvidenceTier::PhysicalTrial) {
+        reasons.push(RouteReason::InvalidProcessTrialEvidence);
+    }
+    match trial.outcome {
+        TrialOutcome::Passed => {}
+        TrialOutcome::Failed | TrialOutcome::Unknown => {
+            reasons.push(RouteReason::ProcessTrialNotPassed)
+        }
+    }
+    if require_mass_balance {
+        match &trial.mass_balance {
+            None => reasons.push(RouteReason::MissingMassBalance),
+            Some(balance) => {
+                if !balance.is_closed(policy.max_mass_balance_uncertainty_ppm) {
+                    reasons.push(RouteReason::MassBalanceNotClosed);
+                }
+            }
+        }
+    }
+}
+
+fn fibre_length_fraction_at_or_above(
+    evidence: &FibreLengthEvidence,
+    minimum_length_um: u32,
+) -> Option<u32> {
+    if evidence.method_ref.trim().is_empty() || evidence.bins.is_empty() {
+        return None;
+    }
+    let mut total = 0_u64;
+    let mut qualifying = 0_u64;
+    let mut previous_upper = None;
+    for bin in &evidence.bins {
+        if bin.lower_bound_um >= bin.upper_bound_um
+            || previous_upper.is_some_and(|upper| bin.lower_bound_um < upper)
+            || bin.mass_fraction_ppm > FRACTION_SCALE_PPM as u32
+        {
+            return None;
+        }
+        total += u64::from(bin.mass_fraction_ppm);
+        if bin.lower_bound_um >= minimum_length_um {
+            qualifying += u64::from(bin.mass_fraction_ppm);
+        }
+        previous_upper = Some(bin.upper_bound_um);
+    }
+    if total != FRACTION_SCALE_PPM {
+        return None;
+    }
+    Some(qualifying.min(u64::from(u32::MAX)) as u32)
+}
+
+fn add_composition_checks(
+    composition: Option<&CompositionEvidence>,
+    policy: &RecoveryPolicy,
+    reasons: &mut Vec<RouteReason>,
+    evidence_ids: &mut Vec<String>,
+) {
+    let Some(composition) = composition else {
+        reasons.push(RouteReason::MissingCompositionEvidence);
+        return;
+    };
+    evidence_ids.push(composition.measurement.evidence_id.clone());
+    evidence_ids.push(composition.calibration.evidence_id.clone());
+    if !valid_evidence(
+        &composition.measurement,
+        EvidenceKind::CompositionMeasurement,
+        EvidenceTier::SensorMeasured,
+    ) || !valid_evidence(
+        &composition.calibration,
+        EvidenceKind::CalibrationRecord,
+        EvidenceTier::SensorMeasured,
+    ) {
+        reasons.push(RouteReason::InvalidCompositionEvidence);
+    }
+    match composition.disposition {
+        CompositionDisposition::Admitted => {}
+        CompositionDisposition::Unknown | CompositionDisposition::Rejected => {
+            reasons.push(RouteReason::CompositionNotAdmitted)
+        }
+    }
+    if composition.unknown_fraction_upper_ppm > policy.max_unknown_fraction_ppm {
+        reasons.push(RouteReason::UnknownFibreFractionAbovePolicy);
+    }
+}
+
+/// Qualifies one candidate route from source-bound evidence and a declared receiving policy.
+///
+/// Missing/unknown data never promote a route. The function is deterministic and
+/// does not fetch data, invoke models or establish that any evidence issuer is truthful.
+pub fn qualify_recovery_route(
+    route: RecoveryRoute,
+    bundle: &RecoveryEvidenceBundle,
+    policy: &RecoveryPolicy,
+) -> RouteAssessment {
+    let mut reasons = Vec::new();
+    let mut evidence_ids = Vec::new();
+
+    if !policy.validate() {
+        reasons.push(RouteReason::InvalidPolicy);
+    }
+    if bundle.lot_id.trim().is_empty() || bundle.input_mass_mg == 0 {
+        reasons.push(RouteReason::InvalidPhysicalInventory);
+    }
+    evidence_ids.push(bundle.inventory.evidence_id.clone());
+    if !valid_evidence(
+        &bundle.inventory,
+        EvidenceKind::PhysicalInventory,
+        EvidenceTier::SensorMeasured,
+    ) {
+        reasons.push(RouteReason::InvalidInventoryEvidence);
+    }
+
+    match route {
+        RecoveryRoute::ReuseAsIs => {
+            let Some(condition) = &bundle.condition else {
+                reasons.push(RouteReason::MissingConditionInspection);
+                return assessment(route, reasons, evidence_ids);
+            };
+            evidence_ids.push(condition.evidence.evidence_id.clone());
+            if !valid_evidence(
+                &condition.evidence,
+                EvidenceKind::ConditionInspection,
+                EvidenceTier::HumanInspected,
+            ) {
+                reasons.push(RouteReason::MissingConditionInspection);
+            }
+            if condition.condition != ProductCondition::Wearable {
+                reasons.push(RouteReason::ProductNotWearable);
+            }
+            if condition.safety != UseSafetyStatus::Passed {
+                reasons.push(RouteReason::UseSafetyNotPassed);
+            }
+            require_evidence(
+                bundle.downstream_acceptance.as_ref(),
+                EvidenceKind::DownstreamAcceptance,
+                EvidenceTier::IndependentAcceptance,
+                RouteReason::MissingDownstreamAcceptance,
+                RouteReason::InvalidDownstreamAcceptance,
+                &mut reasons,
+                &mut evidence_ids,
+            );
+        }
+        RecoveryRoute::Repair => {
+            let Some(condition) = &bundle.condition else {
+                reasons.push(RouteReason::MissingConditionInspection);
+                return assessment(route, reasons, evidence_ids);
+            };
+            evidence_ids.push(condition.evidence.evidence_id.clone());
+            if !valid_evidence(
+                &condition.evidence,
+                EvidenceKind::ConditionInspection,
+                EvidenceTier::HumanInspected,
+            ) {
+                reasons.push(RouteReason::MissingConditionInspection);
+            }
+            if condition.condition != ProductCondition::Repairable {
+                reasons.push(RouteReason::ProductNotWearable);
+            }
+            add_trial_checks(
+                bundle.process_trial.as_ref(),
+                EvidenceKind::RepairTrial,
+                false,
+                policy,
+                &mut reasons,
+                &mut evidence_ids,
+            );
+            require_evidence(
+                bundle.downstream_acceptance.as_ref(),
+                EvidenceKind::DownstreamAcceptance,
+                EvidenceTier::IndependentAcceptance,
+                RouteReason::MissingDownstreamAcceptance,
+                RouteReason::InvalidDownstreamAcceptance,
+                &mut reasons,
+                &mut evidence_ids,
+            );
+        }
+        RecoveryRoute::ComponentRecovery => {
+            add_trial_checks(
+                bundle.process_trial.as_ref(),
+                EvidenceKind::ComponentRecoveryTrial,
+                true,
+                policy,
+                &mut reasons,
+                &mut evidence_ids,
+            );
+            require_evidence(
+                bundle.downstream_acceptance.as_ref(),
+                EvidenceKind::DownstreamAcceptance,
+                EvidenceTier::IndependentAcceptance,
+                RouteReason::MissingDownstreamAcceptance,
+                RouteReason::InvalidDownstreamAcceptance,
+                &mut reasons,
+                &mut evidence_ids,
+            );
+        }
+        RecoveryRoute::MechanicalFibreRecycling => {
+            add_composition_checks(
+                bundle.composition.as_ref(),
+                policy,
+                &mut reasons,
+                &mut evidence_ids,
+            );
+            add_trial_checks(
+                bundle.process_trial.as_ref(),
+                EvidenceKind::MechanicalRecyclingTrial,
+                true,
+                policy,
+                &mut reasons,
+                &mut evidence_ids,
+            );
+            match &bundle.fibre_length {
+                None => reasons.push(RouteReason::MissingFibreLengthEvidence),
+                Some(length) => {
+                    evidence_ids.push(length.evidence.evidence_id.clone());
+                    if !valid_evidence(
+                        &length.evidence,
+                        EvidenceKind::FibreLengthMeasurement,
+                        EvidenceTier::SensorMeasured,
+                    ) {
+                        reasons.push(RouteReason::InvalidFibreLengthDistribution);
+                    }
+                    match fibre_length_fraction_at_or_above(
+                        length,
+                        policy.minimum_fibre_length_um,
+                    ) {
+                        None => reasons.push(RouteReason::InvalidFibreLengthDistribution),
+                        Some(fraction)
+                            if fraction < policy.minimum_mass_fraction_at_or_above_length_ppm =>
+                        {
+                            reasons.push(RouteReason::FibreLengthBelowPolicy)
+                        }
+                        Some(_) => {}
+                    }
+                }
+            }
+            require_evidence(
+                bundle.downstream_acceptance.as_ref(),
+                EvidenceKind::DownstreamAcceptance,
+                EvidenceTier::IndependentAcceptance,
+                RouteReason::MissingDownstreamAcceptance,
+                RouteReason::InvalidDownstreamAcceptance,
+                &mut reasons,
+                &mut evidence_ids,
+            );
+        }
+        RecoveryRoute::ChemicalFibreRecycling => {
+            add_composition_checks(
+                bundle.composition.as_ref(),
+                policy,
+                &mut reasons,
+                &mut evidence_ids,
+            );
+            require_evidence(
+                bundle.chemical_compatibility.as_ref(),
+                EvidenceKind::ChemicalCompatibilityTrial,
+                EvidenceTier::PhysicalTrial,
+                RouteReason::MissingChemicalCompatibilityEvidence,
+                RouteReason::InvalidChemicalCompatibilityEvidence,
+                &mut reasons,
+                &mut evidence_ids,
+            );
+            add_trial_checks(
+                bundle.process_trial.as_ref(),
+                EvidenceKind::ChemicalRecyclingTrial,
+                true,
+                policy,
+                &mut reasons,
+                &mut evidence_ids,
+            );
+            require_evidence(
+                bundle.downstream_acceptance.as_ref(),
+                EvidenceKind::DownstreamAcceptance,
+                EvidenceTier::IndependentAcceptance,
+                RouteReason::MissingDownstreamAcceptance,
+                RouteReason::InvalidDownstreamAcceptance,
+                &mut reasons,
+                &mut evidence_ids,
+            );
+        }
+        RecoveryRoute::Downcycling => {
+            add_trial_checks(
+                bundle.process_trial.as_ref(),
+                EvidenceKind::DowncyclingTrial,
+                true,
+                policy,
+                &mut reasons,
+                &mut evidence_ids,
+            );
+            require_evidence(
+                bundle.downstream_acceptance.as_ref(),
+                EvidenceKind::DownstreamAcceptance,
+                EvidenceTier::IndependentAcceptance,
+                RouteReason::MissingDownstreamAcceptance,
+                RouteReason::InvalidDownstreamAcceptance,
+                &mut reasons,
+                &mut evidence_ids,
+            );
+        }
+    }
+
+    assessment(route, reasons, evidence_ids)
+}
+
+fn assessment(
+    route: RecoveryRoute,
+    reasons: Vec<RouteReason>,
+    evidence_ids: Vec<String>,
+) -> RouteAssessment {
+    let disposition = if reasons.is_empty() {
+        RouteDisposition::Eligible
+    } else if reasons.iter().any(|reason| {
+        matches!(
+            reason,
+            RouteReason::ProductNotWearable
+                | RouteReason::UseSafetyNotPassed
+                | RouteReason::ProcessTrialNotPassed
+                | RouteReason::MassBalanceNotClosed
+                | RouteReason::FibreLengthBelowPolicy
+                | RouteReason::InvalidInventoryEvidence
+                | RouteReason::InvalidProcessTrialEvidence
+                | RouteReason::InvalidCompositionEvidence
+                | RouteReason::InvalidFibreLengthDistribution
+                | RouteReason::InvalidChemicalCompatibilityEvidence
+                | RouteReason::InvalidDownstreamAcceptance
+                | RouteReason::InvalidPolicy
+                | RouteReason::InvalidPhysicalInventory
+        )
+    }) {
+        RouteDisposition::Ineligible
+    } else {
+        RouteDisposition::InsufficientEvidence
+    };
+
+    RouteAssessment {
+        route,
+        disposition,
+        reasons,
+        evidence_ids,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn evidence(
+        id: &str,
+        kind: EvidenceKind,
+        tier: EvidenceTier,
+        issuer: &str,
+        verifier: Option<&str>,
+    ) -> EvidenceRef {
+        EvidenceRef {
+            evidence_id: id.to_owned(),
+            sha256: "a".repeat(64),
+            kind,
+            tier,
+            method_ref: "METHOD-V1".to_owned(),
+            issuer_id: issuer.to_owned(),
+            verifier_id: verifier.map(str::to_owned),
+            observed_at_ns: 100,
+        }
+    }
+
+    fn policy() -> RecoveryPolicy {
+        RecoveryPolicy {
+            max_unknown_fraction_ppm: 20_000,
+            max_mass_balance_uncertainty_ppm: 10_000,
+            minimum_fibre_length_um: 12_700,
+            minimum_mass_fraction_at_or_above_length_ppm: 500_000,
+        }
+    }
+
+    fn inventory() -> EvidenceRef {
+        evidence(
+            "INV-01",
+            EvidenceKind::PhysicalInventory,
+            EvidenceTier::SensorMeasured,
+            "scale-lab",
+            None,
+        )
+    }
+
+    fn acceptance() -> EvidenceRef {
+        evidence(
+            "ACCEPT-01",
+            EvidenceKind::DownstreamAcceptance,
+            EvidenceTier::IndependentAcceptance,
+            "receiving-mill",
+            Some("independent-auditor"),
+        )
+    }
+
+    fn condition(state: ProductCondition, safety: UseSafetyStatus) -> ConditionEvidence {
+        ConditionEvidence {
+            condition: state,
+            safety,
+            evidence: evidence(
+                "COND-01",
+                EvidenceKind::ConditionInspection,
+                EvidenceTier::HumanInspected,
+                "inspector-01",
+                None,
+            ),
+        }
+    }
+
+    fn composition() -> CompositionEvidence {
+        CompositionEvidence {
+            disposition: CompositionDisposition::Admitted,
+            unknown_fraction_upper_ppm: 10_000,
+            measurement: evidence(
+                "COMP-01",
+                EvidenceKind::CompositionMeasurement,
+                EvidenceTier::SensorMeasured,
+                "nir-lab",
+                None,
+            ),
+            calibration: evidence(
+                "CAL-01",
+                EvidenceKind::CalibrationRecord,
+                EvidenceTier::SensorMeasured,
+                "metrology-lab",
+                None,
+            ),
+        }
+    }
+
+    fn balance() -> MassBalance {
+        MassBalance {
+            input_mass_mg: 1_000_000,
+            accepted_output_mass_mg: 800_000,
+            recovered_component_mass_mg: 50_000,
+            recovered_trim_mass_mg: 50_000,
+            rejected_mass_mg: 50_000,
+            waste_mass_mg: 50_000,
+            uncertainty_mass_mg: 2_000,
+        }
+    }
+
+    fn process_trial(kind: EvidenceKind, with_balance: bool) -> ProcessTrialEvidence {
+        ProcessTrialEvidence {
+            outcome: TrialOutcome::Passed,
+            evidence: evidence(
+                "TRIAL-01",
+                kind,
+                EvidenceTier::PhysicalTrial,
+                "process-lab",
+                None,
+            ),
+            mass_balance: with_balance.then(balance),
+        }
+    }
+
+    fn length() -> FibreLengthEvidence {
+        FibreLengthEvidence {
+            method_ref: "FIBRE-ARRAY-ASTM-D1440-V1".to_owned(),
+            evidence: evidence(
+                "LENGTH-01",
+                EvidenceKind::FibreLengthMeasurement,
+                EvidenceTier::SensorMeasured,
+                "fibre-lab",
+                None,
+            ),
+            bins: vec![
+                FibreLengthBin {
+                    lower_bound_um: 0,
+                    upper_bound_um: 12_700,
+                    mass_fraction_ppm: 300_000,
+                },
+                FibreLengthBin {
+                    lower_bound_um: 12_700,
+                    upper_bound_um: 25_400,
+                    mass_fraction_ppm: 500_000,
+                },
+                FibreLengthBin {
+                    lower_bound_um: 25_400,
+                    upper_bound_um: 50_000,
+                    mass_fraction_ppm: 200_000,
+                },
+            ],
+        }
+    }
+
+    fn empty_bundle() -> RecoveryEvidenceBundle {
+        RecoveryEvidenceBundle {
+            lot_id: "LOT-01".to_owned(),
+            input_mass_mg: 1_000_000,
+            inventory: inventory(),
+            condition: None,
+            composition: None,
+            process_trial: None,
+            fibre_length: None,
+            chemical_compatibility: None,
+            downstream_acceptance: None,
+        }
+    }
+
+    #[test]
+    fn reuse_requires_physical_condition_safety_and_independent_acceptance() {
+        let mut bundle = empty_bundle();
+        bundle.condition = Some(condition(ProductCondition::Wearable, UseSafetyStatus::Passed));
+        bundle.downstream_acceptance = Some(acceptance());
+        let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Eligible);
+    }
+
+    #[test]
+    fn visual_inference_cannot_substitute_for_human_condition_inspection() {
+        let mut bundle = empty_bundle();
+        bundle.condition = Some(ConditionEvidence {
+            condition: ProductCondition::Wearable,
+            safety: UseSafetyStatus::Passed,
+            evidence: evidence(
+                "VIS-01",
+                EvidenceKind::ConditionInspection,
+                EvidenceTier::ModelInference,
+                "vision-model",
+                None,
+            ),
+        });
+        bundle.downstream_acceptance = Some(acceptance());
+        let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::InsufficientEvidence);
+        assert!(result.reasons.contains(&RouteReason::MissingConditionInspection));
+    }
+
+    #[test]
+    fn failed_use_safety_blocks_reuse() {
+        let mut bundle = empty_bundle();
+        bundle.condition = Some(condition(ProductCondition::Wearable, UseSafetyStatus::Failed));
+        bundle.downstream_acceptance = Some(acceptance());
+        let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::UseSafetyNotPassed));
+    }
+
+    #[test]
+    fn repair_requires_repairable_condition_physical_trial_and_acceptance() {
+        let mut bundle = empty_bundle();
+        bundle.condition = Some(condition(ProductCondition::Repairable, UseSafetyStatus::Passed));
+        bundle.process_trial = Some(process_trial(EvidenceKind::RepairTrial, false));
+        bundle.downstream_acceptance = Some(acceptance());
+        assert_eq!(
+            qualify_recovery_route(RecoveryRoute::Repair, &bundle, &policy()).disposition,
+            RouteDisposition::Eligible
+        );
+    }
+
+    #[test]
+    fn component_recovery_requires_mass_closure_and_acceptance() {
+        let mut bundle = empty_bundle();
+        bundle.process_trial = Some(process_trial(EvidenceKind::ComponentRecoveryTrial, true));
+        bundle.downstream_acceptance = Some(acceptance());
+        assert_eq!(
+            qualify_recovery_route(RecoveryRoute::ComponentRecovery, &bundle, &policy())
+                .disposition,
+            RouteDisposition::Eligible
+        );
+    }
+
+    #[test]
+    fn mechanical_recycling_requires_composition_fibre_length_trial_and_acceptance() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        bundle.fibre_length = Some(length());
+        bundle.downstream_acceptance = Some(acceptance());
+        assert_eq!(
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy())
+                .disposition,
+            RouteDisposition::Eligible
+        );
+    }
+
+    #[test]
+    fn composition_prediction_without_sensor_evidence_cannot_authorize_recycling() {
+        let mut bundle = empty_bundle();
+        let mut composition = composition();
+        composition.measurement.tier = EvidenceTier::ModelInference;
+        bundle.composition = Some(composition);
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        bundle.fibre_length = Some(length());
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::InvalidCompositionEvidence));
+    }
+
+    #[test]
+    fn unresolved_composition_above_policy_abstains() {
+        let mut bundle = empty_bundle();
+        let mut composition = composition();
+        composition.unknown_fraction_upper_ppm = 50_000;
+        bundle.composition = Some(composition);
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        bundle.fibre_length = Some(length());
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::InsufficientEvidence);
+        assert!(result.reasons.contains(&RouteReason::UnknownFibreFractionAbovePolicy));
+    }
+
+    #[test]
+    fn missing_fibre_length_blocks_mechanical_route() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert!(result.reasons.contains(&RouteReason::MissingFibreLengthEvidence));
+    }
+
+    #[test]
+    fn short_fibre_distribution_fails_receiving_policy() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        let mut distribution = length();
+        distribution.bins = vec![
+            FibreLengthBin {
+                lower_bound_um: 0,
+                upper_bound_um: 12_700,
+                mass_fraction_ppm: 700_000,
+            },
+            FibreLengthBin {
+                lower_bound_um: 12_700,
+                upper_bound_um: 25_400,
+                mass_fraction_ppm: 300_000,
+            },
+        ];
+        bundle.fibre_length = Some(distribution);
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::FibreLengthBelowPolicy));
+    }
+
+    #[test]
+    fn malformed_fibre_bins_do_not_close() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        let mut distribution = length();
+        distribution.bins[1].mass_fraction_ppm = 400_000;
+        bundle.fibre_length = Some(distribution);
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert!(result.reasons.contains(&RouteReason::InvalidFibreLengthDistribution));
+    }
+
+    #[test]
+    fn chemical_route_requires_compatibility_trial_and_downstream_acceptance() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.chemical_compatibility = Some(evidence(
+            "CHEM-COMPAT-01",
+            EvidenceKind::ChemicalCompatibilityTrial,
+            EvidenceTier::PhysicalTrial,
+            "chemical-lab",
+            None,
+        ));
+        bundle.process_trial = Some(process_trial(EvidenceKind::ChemicalRecyclingTrial, true));
+        bundle.downstream_acceptance = Some(acceptance());
+        assert_eq!(
+            qualify_recovery_route(RecoveryRoute::ChemicalFibreRecycling, &bundle, &policy())
+                .disposition,
+            RouteDisposition::Eligible
+        );
+    }
+
+    #[test]
+    fn missing_chemical_compatibility_is_not_inferred_from_fibre_identity() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::ChemicalRecyclingTrial, true));
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::ChemicalFibreRecycling, &bundle, &policy());
+        assert!(result
+            .reasons
+            .contains(&RouteReason::MissingChemicalCompatibilityEvidence));
+    }
+
+    #[test]
+    fn unclosed_mass_balance_blocks_destructive_route() {
+        let mut bundle = empty_bundle();
+        let mut trial = process_trial(EvidenceKind::MechanicalRecyclingTrial, true);
+        trial.mass_balance.as_mut().unwrap().waste_mass_mg = 20_000;
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(trial);
+        bundle.fibre_length = Some(length());
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::MassBalanceNotClosed));
+    }
+
+    #[test]
+    fn acceptance_from_same_issuer_is_not_independent() {
+        let mut bundle = empty_bundle();
+        bundle.condition = Some(condition(ProductCondition::Wearable, UseSafetyStatus::Passed));
+        bundle.downstream_acceptance = Some(evidence(
+            "ACCEPT-SELF",
+            EvidenceKind::DownstreamAcceptance,
+            EvidenceTier::IndependentAcceptance,
+            "receiving-mill",
+            Some("receiving-mill"),
+        ));
+        let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::InvalidDownstreamAcceptance));
+    }
+
+    #[test]
+    fn synthetic_trial_cannot_be_promoted_to_physical_trial() {
+        let mut bundle = empty_bundle();
+        let mut trial = process_trial(EvidenceKind::MechanicalRecyclingTrial, true);
+        trial.evidence.tier = EvidenceTier::Synthetic;
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(trial);
+        bundle.fibre_length = Some(length());
+        bundle.downstream_acceptance = Some(acceptance());
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::InvalidProcessTrialEvidence));
+    }
+
+    #[test]
+    fn corrupted_evidence_digest_is_rejected() {
+        let mut bundle = empty_bundle();
+        bundle.condition = Some(condition(ProductCondition::Wearable, UseSafetyStatus::Passed));
+        bundle.downstream_acceptance = Some(acceptance());
+        bundle.downstream_acceptance.as_mut().unwrap().sha256 = "not-a-digest".to_owned();
+        let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::InvalidDownstreamAcceptance));
+    }
+
+    #[test]
+    fn invalid_policy_cannot_promote_route() {
+        let mut bundle = empty_bundle();
+        bundle.condition = Some(condition(ProductCondition::Wearable, UseSafetyStatus::Passed));
+        bundle.downstream_acceptance = Some(acceptance());
+        let mut invalid = policy();
+        invalid.max_unknown_fraction_ppm = 2_000_000;
+        let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &invalid);
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::InvalidPolicy));
+    }
+}
