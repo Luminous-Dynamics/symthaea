@@ -65,8 +65,8 @@ func PayloadDigest(payload []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// ValidateGroundTruth checks internal consistency of the simulator's independent
-// event ledger. It does not prove that the ledger captured every real-world effect.
+// ValidateGroundTruth checks internal consistency of a simulator-authored
+// reference ledger. It does not independently observe or prove every real-world effect.
 func ValidateGroundTruth(gt GroundTruth) error {
 	if gt.SchemaVersion != "mace-observerlab/v1" || gt.RunID == "" {
 		return fmt.Errorf("unsupported ground-truth schema or empty run_id")
