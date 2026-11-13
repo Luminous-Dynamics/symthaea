@@ -267,5 +267,26 @@
     "relation_materialization": "Mycelix #4778",
     "source_chronology": "Mycelix #5687",
     "desci_receipt_time_projection_with_claim_ceiling": "Mycelix #5860"
-  }
+  },
+  "vendor_security_overlays": [
+    {
+      "vendor": "Aras",
+      "product_platform_version": "InnovatorEdge AI 2.4",
+      "release_date": "2026-11-10",
+      "impact_analysis_agent_version": "v1.0.1",
+      "role": "security_and_authority_subprotocol_not_an_additional_accuracy_arm",
+      "controls": [
+        "pin_each_MCP_profile_endpoint_access_point_tool_set_and_enabled_state",
+        "test_stale_cached_tool_inventory_after_server_side_disable_or_tool_removal",
+        "test_cross_profile_endpoint_or_tool_substitution",
+        "recheck_End_User_identity_and_current_Innovator_permissions_at_effect_entry",
+        "require_per_call_user_confirmation_for_beta_Invoke_Innovator_Method_Tool"
+      ],
+      "source_urls": [
+        "https://docs.aras.com/aras-innovatoredge-ai-book/edge-ai-release-notes",
+        "https://docs.aras.com/aras-innovatoredge-ai-book/innovatoredge-ai-administrator-guide"
+      ],
+      "status": "documentation_only_no_tenant_or_endpoint_accessed"
+    }
+  ]
 }
