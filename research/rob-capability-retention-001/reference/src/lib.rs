@@ -199,6 +199,24 @@ pub struct ReserveObservation {
     pub not_applicable_reason: Option<String>,
 }
 
+/// Summary receipt from the independently qualified recovery-topology owner.
+///
+/// This consumes #4511 outputs; it does not rebuild route graphs, disjoint
+/// path packs, failure-domain dependencies or common-cause cut sets.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecoveryTopologyReceipt {
+    /// Evidence disposition supplied by the topology evaluator.
+    pub disposition: EvidenceDisposition,
+    /// Exact recovery-topology report digest.
+    pub report_digest: Option<String>,
+    /// Canonical physical recovery-route classes after alias collapse.
+    pub recovery_route_class_count: Option<u32>,
+    /// Failure-domain-independent routes, not merely action-distinct paths.
+    pub failure_domain_independent_route_count: Option<u32>,
+    /// Cardinality of the minimum declared common-cause failure-domain cut set.
+    pub minimum_failure_domain_cut_set_cardinality: Option<u32>,
+}
+
 /// Option-set evidence supplied by the future-option ledger owner.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct OptionSetReceipt {
@@ -216,6 +234,8 @@ pub struct OptionSetReceipt {
     pub terminal_option_set_digest: String,
     /// Count of terminal qualified continuations as reported by the option owner.
     pub terminal_qualified_option_count: u32,
+    /// Separate topological recovery-redundancy evidence from #4511.
+    pub recovery_topology: RecoveryTopologyReceipt,
 }
 
 /// Complete per-arm outcome and terminal reserve summary for one cluster.
@@ -325,6 +345,18 @@ pub struct ClusterCapabilityReport {
     /// Qualified terminal option counts from the upstream option-set receipts.
     pub baseline_terminal_option_count: Option<u32>,
     pub candidate_terminal_option_count: Option<u32>,
+    /// Canonical recovery-route class counts from #4511.
+    pub baseline_recovery_route_class_count: Option<u32>,
+    pub candidate_recovery_route_class_count: Option<u32>,
+    /// Failure-domain-independent routes; distinct from nominal route/action count.
+    pub baseline_failure_domain_independent_route_count: Option<u32>,
+    pub candidate_failure_domain_independent_route_count: Option<u32>,
+    /// Minimum declared common-cause cut-set cardinality; None means not reported.
+    pub baseline_minimum_cut_set_cardinality: Option<u32>,
+    pub candidate_minimum_cut_set_cardinality: Option<u32>,
+    /// Exact upstream topology report identities.
+    pub baseline_topology_report_digest: Option<String>,
+    pub candidate_topology_report_digest: Option<String>,
     /// Reserve comparison vector.
     pub reserve_deltas: Vec<ReserveDelta>,
     /// Critical safety violations remain separate and non-compensable.
@@ -417,6 +449,12 @@ pub enum CapabilityRetentionError {
     MissingOptionSetReceipt(String),
     /// Option-ledger evidence was explicitly rejected.
     RejectedOptionSetEvidence(String),
+    /// Recovery-topology evidence was explicitly rejected or is not applicable.
+    RejectedRecoveryTopologyEvidence(String),
+    /// Qualified recovery-topology evidence is missing a required identity/count.
+    IncompleteQualifiedRecoveryTopology(String),
+    /// Failure-domain-independent route count exceeds the canonical route count.
+    InconsistentRecoveryTopology(String),
     /// A rate or aggregate arithmetic operation overflowed.
     ArithmeticOverflow,
 }
@@ -564,6 +602,48 @@ fn validate_arm(
     Ok(())
 }
 
+fn validate_recovery_topology(
+    arm_id: &str,
+    topology: &RecoveryTopologyReceipt,
+) -> Result<(), CapabilityRetentionError> {
+    match topology.disposition {
+        EvidenceDisposition::Rejected | EvidenceDisposition::NotApplicable => {
+            return Err(CapabilityRetentionError::RejectedRecoveryTopologyEvidence(
+                arm_id.to_owned(),
+            ));
+        }
+        EvidenceDisposition::Unknown => {
+            if let Some(digest) = topology.report_digest.as_deref() {
+                if digest.trim().is_empty() {
+                    return Err(CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(
+                        arm_id.to_owned(),
+                    ));
+                }
+            }
+            return Ok(());
+        }
+        EvidenceDisposition::Qualified => {}
+    }
+
+    let report_digest = topology
+        .report_digest
+        .as_deref()
+        .filter(|value| !value.trim().is_empty());
+    let route_count = topology.recovery_route_class_count;
+    let independent_count = topology.failure_domain_independent_route_count;
+    if report_digest.is_none() || route_count.is_none() || independent_count.is_none() {
+        return Err(CapabilityRetentionError::IncompleteQualifiedRecoveryTopology(
+            arm_id.to_owned(),
+        ));
+    }
+    if independent_count.unwrap_or(0) > route_count.unwrap_or(0) {
+        return Err(CapabilityRetentionError::InconsistentRecoveryTopology(
+            arm_id.to_owned(),
+        ));
+    }
+    Ok(())
+}
+
 fn validate_option_set(
     arm_id: &str,
     options: &OptionSetReceipt,
@@ -589,6 +669,7 @@ fn validate_option_set(
             ));
         }
     }
+    validate_recovery_topology(arm_id, &options.recovery_topology)?;
     Ok(())
 }
 
@@ -922,6 +1003,10 @@ pub fn compare_work_and_terminal_capability(
         }
         if cluster.baseline.option_set.disposition == EvidenceDisposition::Unknown
             || cluster.candidate.option_set.disposition == EvidenceDisposition::Unknown
+            || cluster.baseline.option_set.recovery_topology.disposition
+                == EvidenceDisposition::Unknown
+            || cluster.candidate.option_set.recovery_topology.disposition
+                == EvidenceDisposition::Unknown
         {
             unknown = true;
         }
@@ -988,6 +1073,8 @@ pub fn compare_work_and_terminal_capability(
             } else {
                 None
             };
+        let baseline_topology = &cluster.baseline.option_set.recovery_topology;
+        let candidate_topology = &cluster.candidate.option_set.recovery_topology;
 
         reports.push(ClusterCapabilityReport {
             cluster_id: cluster.cluster_id.clone(),
@@ -1011,6 +1098,18 @@ pub fn compare_work_and_terminal_capability(
             candidate_compute_energy_milli_joules: cluster.candidate.compute_energy_milli_joules,
             baseline_terminal_option_count: baseline_option_count,
             candidate_terminal_option_count: candidate_option_count,
+            baseline_recovery_route_class_count: baseline_topology.recovery_route_class_count,
+            candidate_recovery_route_class_count: candidate_topology.recovery_route_class_count,
+            baseline_failure_domain_independent_route_count: baseline_topology
+                .failure_domain_independent_route_count,
+            candidate_failure_domain_independent_route_count: candidate_topology
+                .failure_domain_independent_route_count,
+            baseline_minimum_cut_set_cardinality: baseline_topology
+                .minimum_failure_domain_cut_set_cardinality,
+            candidate_minimum_cut_set_cardinality: candidate_topology
+                .minimum_failure_domain_cut_set_cardinality,
+            baseline_topology_report_digest: baseline_topology.report_digest.clone(),
+            candidate_topology_report_digest: candidate_topology.report_digest.clone(),
             reserve_deltas: reserves,
             baseline_critical_safety_violation_episodes: cluster
                 .baseline
@@ -1021,6 +1120,8 @@ pub fn compare_work_and_terminal_capability(
             evidence_complete: cluster.independence_disposition == EvidenceDisposition::Qualified
                 && cluster.baseline.option_set.disposition == EvidenceDisposition::Qualified
                 && cluster.candidate.option_set.disposition == EvidenceDisposition::Qualified
+                && baseline_topology.disposition == EvidenceDisposition::Qualified
+                && candidate_topology.disposition == EvidenceDisposition::Qualified
                 && cluster.baseline.work.unknown_items == 0
                 && cluster.baseline.work.held_items == 0
                 && cluster.candidate.work.unknown_items == 0
