@@ -6,7 +6,7 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "Mixed-canonical charge-block left/right sweeps and measured gauge-receipt API are source-authored. Exact-head Rust 1.96 validation pending. TEBD integration is the next stage.",
+  "execution_status": "U1 MPS core, dense factorization, local gates, exact charge-block split, explicit global-cap truncation, deterministic TEBD parity layers, mixed-canonical charge-block sweeps, measured exterior-isometry receipts and gate-quality-aware global L2 error ledger are source-authored. Exact-head Rust 1.96 harness pending.",
   "claim_ceiling": "No TEBD circuit scheduler, nonlocal MPO gates, large-N scaling or quantum advantage claim. Approximation diagnostics are local two-site split receipts only.",
   "conventions": {
     "physical_dimension": 2,
@@ -164,18 +164,31 @@
     },
     "truncation_ledger": {
       "type": "U1MpsTruncationLedger",
-      "method": "record(two_site_truncation_diagnostics)",
-      "bound": "sum_j sqrt(discarded_weight_j)",
+      "method": "record_with_canonical_gauge_and_gate",
+      "local_bound": "sum_j sqrt(discarded_weight_j) in local two-site tensor Frobenius norm",
+      "global_bound": "sum_j [canonicalization_state_reconstruction_l2 + gate_quality_error_upper + sqrt(discarded_weight_j)*left_exterior_operator_norm_upper*right_exterior_operator_norm_upper]",
+      "gate_quality_bound": {
+        "unitarity": "max(sqrt(1+delta)-1, 1-sqrt(1-delta))*||psi_before_gate||, delta=||G†G-I||_F<1",
+        "charge": "sqrt(10)*max_abs_charge_off_block_entry*||psi_before_gate|| for the ten forbidden off-block entries of a 4x4 two-qubit matrix"
+      },
       "assumptions": [
-        "interleaved gates are unitary",
-        "each truncation is an orthogonal Schmidt projection",
-        "no nonlinear normalization between truncations"
+        "each canonical gauge receipt verifies measured left/right exterior isometry residuals and state-reconstruction residual",
+        "gate unitarity and charge-conservation residuals are measured and pass policy tolerance",
+        "global bound compares to the charge-conserving polar-unitary gate represented by each accepted floating-point matrix",
+        "each local truncation is an orthogonal Schmidt projection in the qualified mixed-canonical gauge",
+        "no nonlinear renormalization between truncations",
+        "Trotter/discretization error is excluded until Hamiltonian time stepping is implemented"
       ],
       "fields": [
         "gate_count",
         "accumulated_discarded_weight",
-        "cumulative_l2_error_upper_bound",
-        "maximum_single_gate_relative_discarded_weight"
+        "cumulative_local_l2_error_bound",
+        "cumulative_canonicalization_l2_error_bound",
+        "cumulative_gate_quality_l2_error_bound",
+        "cumulative_projection_l2_error_bound",
+        "canonical_gauge_receipt_count",
+        "global_state_error_bound_qualified",
+        "global_state_error_bound_upper"
       ]
     },
     "tebd_layer_scheduler": {
@@ -186,11 +199,13 @@
         "U1TeBDLayer::apply(input,truncation_policy)"
       ],
       "schedule": "Single parity layer; parity 0 uses bonds 0,2,4,..., parity 1 uses bonds 1,3,5,...; bonds sorted ascending and unique.",
-      "execution": "Each disjoint bond applies validated U1 unitary, charge-block split and explicit global truncation policy; updates complete MPS and revalidates charge/boundaries.",
+      "execution": "For every deterministic parity-layer gate: canonicalize current MPS around target bond; measure exterior isometries; apply gate only when its unitarity and charge-conservation residuals pass the layer tolerance; split/truncate; record canonicalization, gate quality and projection contributions; revalidate entire U1 MPS.",
       "receipts": [
         "parity",
         "bond_indices",
         "gate_truncations",
+        "canonical_gauge_receipts",
+        "gate_receipts",
         "truncation_ledger",
         "input_norm_squared",
         "output_norm_squared",
@@ -205,31 +220,24 @@
         "tebd_layer_rejects_bad_parity_duplicate_and_out_of_range_bonds",
         "tebd_layer_rejects_state_with_mismatched_site_count"
       ],
-      "global_error_status": "not_qualified",
+      "global_error_status": "conditionally_qualified_only_if_every_gauge_and_gate_quality_receipt_passes",
       "reason": "A local discarded Schmidt weight is not a global state-vector residual for arbitrary MPS gauge. Require mixed-canonical exterior isometry at every truncated bond, verified by a canonicalization receipt, before upgrading sum sqrt(w_j) to a global L2 bound.",
       "nonclaims": [
         "no Hamiltonian-to-gate exponentiation",
-        "no second-order Strang even/odd/even TEBD time stepper",
-        "no mixed-canonical sweeps",
+        "no second-order Strang time-stepper",
+        "no Trotter/discretization error bound",
         "no nonlocal MPO gate application",
         "no adaptive dt",
-        "no global fidelity/circuit error guarantee"
+        "no large-N matched performance claim"
       ]
     },
     "canonical_gauge": {
       "status": "source_authored_runner_pending",
-      "api": [
-        "ComplexU1Mps::inner_product(other)",
-        "ComplexU1Mps::canonicalize_for_bond(bond,tolerance)",
-        "U1CanonicalGaugeReceipt::qualifies(tolerance)",
-        "U1CanonicalGaugeReceipt::exterior_operator_norm_product_upper_bound()"
-      ],
-      "method": "Charge-block SVD left sweep on sites [0,bond), right sweep on sites (bond+1,N). Retain all positive singular values; omit exact zeros only. Rebuild a candidate MPS transactionally before replacing the original.",
-      "receipts": [
+      "api": "ComplexU1Mps::canonicalize_for_bond(bond,tolerance)",
+      "sweeps": "Independent U(1) charge-block SVD left/right sweeps; exact zero singular values omitted, every positive value retained.",
+      "receipt": [
         "left_isometry_residuals",
         "right_isometry_residuals",
-        "maximum_left_isometry_residual",
-        "maximum_right_isometry_residual",
         "left_exterior_operator_norm_upper_bound",
         "right_exterior_operator_norm_upper_bound",
         "factorization_max_residual",
@@ -242,15 +250,30 @@
         "relative_norm_drift",
         "qualified"
       ],
-      "state_equivalence": "The L2 state-reconstruction residual is computed using the cross-MPS overlap contraction, not by dense expansion, and supports different virtual bond dimensions.",
-      "error_bound": "For a passing receipt, each site's Gram residual r bounds its physical-to-virtual map norm by sqrt(1+r). The product of site bounds gives conservative exterior map operator-norm upper bounds. Multiply local discarded Schmidt norm by the left/right exterior product and add the measured canonicalization state-reconstruction L2 residual.",
+      "transactional": true,
       "authored_tests": [
         "canonicalization_preserves_dense_state_and_qualifies_all_two_site_centers",
         "canonicalization_receipt_is_bound_to_measured_external_isometries",
         "mps_overlap_matches_norm_and_survives_gauge_rebasing",
-        "canonicalization_rejects_invalid_center_without_mutating_state"
+        "canonicalization_rejects_invalid_center_without_mutating_state",
+        "mixed_canonicalization_qualifies_both_two_site_centers_and_preserves_dense_state",
+        "mixed_canonical_sweeps_preserve_complex_dense_state_and_report_isometries",
+        "mixed_canonical_sweep_handles_left_and_right_boundary_centers",
+        "canonicalization_is_idempotent_at_a_fixed_two_site_center"
+      ]
+    },
+    "tebd_gate_quality": {
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "TEBD rejects a gate constructed using a looser tolerance than the active layer tolerance",
+        "global error ledger includes polar-unitary correction bound from gate unitarity residual",
+        "global error ledger includes charge-off-block residual bound",
+        "per-gate evidence records canonical gauge, gate quality and truncation in one object"
       ],
-      "claim_ceiling": "Gauge sweeps and receipt only. Global TEBD error certification remains disabled until every gate truncation is integrated with and checks a receipt."
+      "authored_tests": [
+        "tebd_rejects_a_gate_constructed_with_a_looser_unitarity_tolerance",
+        "tebd_global_error_receipt_includes_gate_unitarity_defect"
+      ]
     }
   },
   "known_answers": [
@@ -360,13 +383,15 @@
     },
     {
       "id": "MPS-3",
-      "name": "Truncation error receipts",
-      "status": "planned",
+      "name": "Mixed-canonical gauge receipt and global TEBD error ledger",
+      "status": "source_authored_runner_pending",
       "acceptance": [
-        "discarded squared Schmidt weight per bond/gate",
-        "bond-cap saturation explicit",
-        "normalization changes separately recorded",
-        "conservative accumulated state error"
+        "left/right charge-block isometry residuals per exterior site",
+        "canonicalization state reconstruction and norm drift measured",
+        "per-gate gate-quality defect bound included",
+        "per-gate discarded Schmidt weight scaled by exterior operator-norm bounds",
+        "global L2 bound verified against dense oracle for N<=12",
+        "any missing/bad receipt disables global qualification"
       ]
     },
     {
@@ -443,7 +468,11 @@
     "left canonical sweep produces a site with A dagger A not identity within tolerance",
     "right canonical sweep produces a site with A A dagger not identity within tolerance",
     "gauge operation fails after partially mutating the original MPS",
-    "claim exterior norm upper bound without measured Gram residual"
+    "claim exterior norm upper bound without measured Gram residual",
+    "reuse a gate constructed under a looser unitarity tolerance in a stricter TEBD layer",
+    "claim a global state-vector bound while omitting gate unitarity defect",
+    "claim a global U1 bound while omitting gate charge-off-block residual",
+    "detach per-gate truncation diagnostics from the canonical-gauge and gate-quality receipt"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -482,7 +511,6 @@
     "post_truncation_norm_squared",
     "renormalization_factor_not_applied",
     "bond_cap_binding",
-    "cumulative_l2_error_upper_bound",
     "tebd_layer_parity",
     "tebd_layer_bond_order",
     "tebd_layer_gate_count",
@@ -499,7 +527,18 @@
     "canonical_gauge_factorization_max_residual",
     "canonical_gauge_state_reconstruction_l2_residual",
     "canonical_gauge_norm_drift",
-    "canonical_gauge_qualified"
+    "canonical_gauge_qualified",
+    "cumulative_local_l2_error_bound",
+    "cumulative_canonicalization_l2_error_bound",
+    "cumulative_gate_quality_l2_error_bound",
+    "cumulative_projection_l2_error_bound",
+    "canonical_gauge_receipt_count",
+    "global_state_error_bound_qualified",
+    "global_state_error_bound_upper",
+    "gate_unitarity_distance_upper_bound",
+    "gate_charge_distance_upper_bound",
+    "per_gate_receipt_bond_index",
+    "per_gate_receipt_global_l2_error_contribution"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
