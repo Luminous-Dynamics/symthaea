@@ -5,13 +5,13 @@
 #![allow(clippy::needless_range_loop)]
 // Dense, fixed-index quantum-information contractions are explicit here.
 
- //! Generic finite-dimensional code/error-set QEC matrix construction.
- //!
- //! This module builds A[(i,k),(j,l)] = <c_i|E_k^dagger E_l|c_j> from an
- //! explicit code isometry and a finite list of physical error operators.
- //! It reports the exact Knill-Laflamme subspace projection. It does not yet
- //! compute the PSD-constrained Hellinger distance or diamond environment
- //! leakage metric required by approximate universal-recovery theorems.
+//! Generic finite-dimensional code/error-set QEC matrix construction.
+//!
+//! This module builds A[(i,k),(j,l)] = <c_i|E_k^dagger E_l|c_j> from an
+//! explicit code isometry and a finite list of physical error operators.
+//! It reports the exact Knill-Laflamme subspace projection. It does not yet
+//! compute the PSD-constrained Hellinger distance or diamond environment
+//! leakage metric required by approximate universal-recovery theorems.
 
 use num_complex::Complex64;
 
