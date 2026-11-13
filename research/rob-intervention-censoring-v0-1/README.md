@@ -8,11 +8,11 @@ If a robot intervenes before a predicted event, the untreated event time is not 
 
 ## Contents
 
-- intervention_censoring.py — typed event/censoring taxonomy, minimum censor-adjustment admission gates, simple randomized fixed-horizon intention-to-treat summary, cohort-identifiability warning.
+- intervention_censoring.py — typed event/censoring taxonomy, minimum censor-adjustment admission gates, randomized fixed-horizon intention-to-treat summary requiring pre-episode assignment receipts and both arms in each matched block, cohort-identifiability warning.
 - fixtures.json — 15 outcome-classification fixtures and 8 synthetic randomized safe-policy trials.
 - fixtures.schema.json — strict JSON Schema.
 - run_reference.py — emits report.json.
-- test_reference.py — 12 regression tests.
+- test_reference.py — 14 regression tests.
 - report.json — deterministic output.
 - INTERPRETATION.md — result and claim boundary.
 
