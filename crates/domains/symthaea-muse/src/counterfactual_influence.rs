@@ -110,8 +110,6 @@ pub struct RepeatabilityCalibration {
     pub performed_event_map_receipt_sha256: String,
     /// Exact baseline Score-to-MIDI primary-pitch inventory commitment.
     pub expected_primary_pitches_sha256: String,
-    /// Independently transformed target inventory expected in the counterfactual map.
-    pub counterfactual_expected_primary_pitches_sha256: String,
     pub baseline_schedule_sha256: String,
     pub renderer_identity_sha256: String,
     pub renderer_config_sha256: String,
@@ -471,7 +469,10 @@ pub struct CounterfactualInfluenceReport {
     pub performed_event_map_receipt_sha256: String,
     pub counterfactual_event_map_sha256: String,
     pub counterfactual_event_map_receipt_sha256: String,
+    /// Exact baseline Score-to-MIDI primary-pitch inventory commitment.
     pub expected_primary_pitches_sha256: String,
+    /// Independently transformed target inventory expected in the counterfactual map.
+    pub counterfactual_expected_primary_pitches_sha256: String,
     pub baseline_schedule_sha256: String,
     pub counterfactual_schedule_sha256: String,
     pub renderer_identity_sha256: String,
