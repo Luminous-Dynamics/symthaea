@@ -453,6 +453,12 @@ pub struct ServiceFloorAssessment {
     pub floor_profile_revision: Option<String>,
     pub floor_authority_ref: Option<String>,
     pub observation_ref: Option<String>,
+    /// Inclusive observation valid-time window, Unix seconds.
+    pub observation_valid_from_unix_seconds: Option<i64>,
+    pub observation_valid_to_unix_seconds: Option<i64>,
+    /// Evaluation clock and caller/authority-declared freshness budget.
+    pub assessed_at_unix_seconds: Option<i64>,
+    pub max_observation_age_seconds: Option<u64>,
     pub minimum_required: Option<u64>,
     pub observed_lower_bound: Option<u64>,
     pub observed_upper_bound: Option<u64>,
@@ -480,6 +486,10 @@ pub struct ServiceFloorResult {
     pub pathway_id: String,
     pub area_id: String,
     pub service_scope_id: String,
+    pub observation_valid_from_unix_seconds: Option<i64>,
+    pub observation_valid_to_unix_seconds: Option<i64>,
+    pub assessed_at_unix_seconds: Option<i64>,
+    pub max_observation_age_seconds: Option<u64>,
     pub outcome: ServiceFloorOutcome,
     pub minimum_required: Option<u64>,
     pub observed_lower_bound: Option<u64>,
@@ -495,6 +505,9 @@ pub enum ServiceFloorError {
     EmptyField(&'static str),
     InvalidCoverage { assessment_id: String },
     InvertedObservationInterval { assessment_id: String },
+    InvertedObservationWindow { assessment_id: String },
+    ObservationAfterAssessment { assessment_id: String },
+    InvalidFreshnessBudget { assessment_id: String },
 }
 
 /// Evaluate a non-compensatory service floor using conservative observation
@@ -523,6 +536,10 @@ pub fn evaluate_service_floor(
         pathway_id: input.pathway_id.clone(),
         area_id: input.area_id.clone(),
         service_scope_id: input.service_scope_id.clone(),
+        observation_valid_from_unix_seconds: input.observation_valid_from_unix_seconds,
+        observation_valid_to_unix_seconds: input.observation_valid_to_unix_seconds,
+        assessed_at_unix_seconds: input.assessed_at_unix_seconds,
+        max_observation_age_seconds: input.max_observation_age_seconds,
         outcome: ServiceFloorOutcome::Indeterminate,
         minimum_required: input.minimum_required,
         observed_lower_bound: input.observed_lower_bound,
@@ -542,6 +559,41 @@ pub fn evaluate_service_floor(
         || input.floor_authority_ref.as_deref().is_none_or(|value| value.trim().is_empty())
         || input.observation_ref.as_deref().is_none_or(|value| value.trim().is_empty())
     {
+        return Ok(indeterminate());
+    }
+
+    let (
+        Some(observation_valid_from),
+        Some(observation_valid_to),
+        Some(assessed_at),
+        Some(max_observation_age),
+    ) = (
+        input.observation_valid_from_unix_seconds,
+        input.observation_valid_to_unix_seconds,
+        input.assessed_at_unix_seconds,
+        input.max_observation_age_seconds,
+    ) else {
+        return Ok(indeterminate());
+    };
+
+    if max_observation_age == 0 {
+        return Err(ServiceFloorError::InvalidFreshnessBudget {
+            assessment_id: input.id.clone(),
+        });
+    }
+    if observation_valid_from > observation_valid_to {
+        return Err(ServiceFloorError::InvertedObservationWindow {
+            assessment_id: input.id.clone(),
+        });
+    }
+    if observation_valid_to > assessed_at {
+        return Err(ServiceFloorError::ObservationAfterAssessment {
+            assessment_id: input.id.clone(),
+        });
+    }
+    let observation_age_seconds =
+        i128::from(assessed_at) - i128::from(observation_valid_to);
+    if observation_age_seconds > i128::from(max_observation_age) {
         return Ok(indeterminate());
     }
 
@@ -592,6 +644,10 @@ pub fn evaluate_service_floor(
         pathway_id: input.pathway_id.clone(),
         area_id: input.area_id.clone(),
         service_scope_id: input.service_scope_id.clone(),
+        observation_valid_from_unix_seconds: Some(observation_valid_from),
+        observation_valid_to_unix_seconds: Some(observation_valid_to),
+        assessed_at_unix_seconds: Some(assessed_at),
+        max_observation_age_seconds: Some(max_observation_age),
         outcome,
         minimum_required: Some(minimum_required),
         observed_lower_bound: Some(observed_lower_bound),
@@ -873,6 +929,10 @@ mod tests {
             floor_profile_revision: Some("local-profile-v1".to_owned()),
             floor_authority_ref: Some("authority-profile-ref".to_owned()),
             observation_ref: Some("observation-bundle-ref".to_owned()),
+            observation_valid_from_unix_seconds: Some(1_000),
+            observation_valid_to_unix_seconds: Some(1_100),
+            assessed_at_unix_seconds: Some(1_200),
+            max_observation_age_seconds: Some(300),
             minimum_required: Some(25),
             observed_lower_bound: lower,
             observed_upper_bound: upper,
@@ -1068,6 +1128,68 @@ mod tests {
         let contract_only =
             evaluate_service_floor(&input).expect("contract-only floor evidence abstains");
         assert_eq!(contract_only.outcome, ServiceFloorOutcome::Indeterminate);
+    }
+
+    #[test]
+    fn stale_floor_observation_is_indeterminate() {
+        let mut input = service_floor(Some(100), Some(100), Some(30), Some(35));
+        input.observation_valid_to_unix_seconds = Some(100);
+        input.assessed_at_unix_seconds = Some(1_000);
+        input.max_observation_age_seconds = Some(50);
+        let result = evaluate_service_floor(&input).expect("stale evidence abstains");
+        assert_eq!(result.outcome, ServiceFloorOutcome::Indeterminate);
+    }
+
+    #[test]
+    fn missing_observation_window_or_freshness_budget_is_indeterminate() {
+        let mut input = service_floor(Some(100), Some(100), Some(30), Some(35));
+        input.observation_valid_from_unix_seconds = None;
+        let missing_window =
+            evaluate_service_floor(&input).expect("missing valid time abstains");
+        assert_eq!(missing_window.outcome, ServiceFloorOutcome::Indeterminate);
+
+        input.observation_valid_from_unix_seconds = Some(1_000);
+        input.max_observation_age_seconds = None;
+        let missing_budget =
+            evaluate_service_floor(&input).expect("missing freshness budget abstains");
+        assert_eq!(missing_budget.outcome, ServiceFloorOutcome::Indeterminate);
+    }
+
+    #[test]
+    fn observation_window_after_assessment_time_is_rejected() {
+        let mut input = service_floor(Some(100), Some(100), Some(30), Some(35));
+        input.observation_valid_to_unix_seconds = Some(1_300);
+        assert_eq!(
+            evaluate_service_floor(&input),
+            Err(ServiceFloorError::ObservationAfterAssessment {
+                assessment_id: "floor-water-area-a".to_owned()
+            })
+        );
+    }
+
+    #[test]
+    fn inverted_observation_valid_time_window_is_rejected() {
+        let mut input = service_floor(Some(100), Some(100), Some(30), Some(35));
+        input.observation_valid_from_unix_seconds = Some(1_200);
+        input.observation_valid_to_unix_seconds = Some(1_100);
+        assert_eq!(
+            evaluate_service_floor(&input),
+            Err(ServiceFloorError::InvertedObservationWindow {
+                assessment_id: "floor-water-area-a".to_owned()
+            })
+        );
+    }
+
+    #[test]
+    fn zero_freshness_budget_is_rejected() {
+        let mut input = service_floor(Some(100), Some(100), Some(30), Some(35));
+        input.max_observation_age_seconds = Some(0);
+        assert_eq!(
+            evaluate_service_floor(&input),
+            Err(ServiceFloorError::InvalidFreshnessBudget {
+                assessment_id: "floor-water-area-a".to_owned()
+            })
+        );
     }
 
 }
