@@ -808,8 +808,7 @@ fn validate_evaluations(
     }
     let mut seen_clusters = BTreeSet::new();
     let mut seen_case_manifests = BTreeSet::new();
-    let mut cluster_identity: BTreeMap<(SourceDimension, String), ClusterGroup> =
-        BTreeMap::new();
+    let mut cluster_identity: BTreeMap<(SourceDimension, String), ClusterGroup> = BTreeMap::new();
     let mut receipt_clusters: BTreeMap<String, String> = BTreeMap::new();
     let mut reports: BTreeMap<(SourceDimension, EvaluationRegime), Vec<ClusterTransferReport>> =
         BTreeMap::new();
@@ -842,9 +841,7 @@ fn validate_evaluations(
             "paired_case_manifest_digest",
             &evaluation.paired_case_manifest_digest,
         )
-        .map_err(|_| TransferGapError::MissingEvaluationIdentity(
-            evaluation.cluster_id.clone(),
-        ))?;
+        .map_err(|_| TransferGapError::MissingEvaluationIdentity(evaluation.cluster_id.clone()))?;
         require_nonempty(
             "independence_receipt_digest",
             &evaluation.independence_receipt_digest,
@@ -1033,8 +1030,12 @@ fn summarize_regime(
             .try_fold(0_u128, |acc, rate| acc.checked_add(u128::from(*rate)));
         let total = sum.ok_or(TransferGapError::ArithmeticOverflow)?;
         Some(
-            u32::try_from(total / u128::try_from(rates.len()).map_err(|_| TransferGapError::ArithmeticOverflow)?)
-                .map_err(|_| TransferGapError::ArithmeticOverflow)?,
+            u32::try_from(
+                total
+                    / u128::try_from(rates.len())
+                        .map_err(|_| TransferGapError::ArithmeticOverflow)?,
+            )
+            .map_err(|_| TransferGapError::ArithmeticOverflow)?,
         )
     };
     Ok(RegimeRateSummary {
