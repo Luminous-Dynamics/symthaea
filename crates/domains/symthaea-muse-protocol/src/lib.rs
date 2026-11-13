@@ -227,6 +227,15 @@ pub struct ImportedNotationStructureSummary {
     pub explanation: Option<String>,
 }
 
+/// Provenance of the generated audition. Source MIDI is rendered from
+/// the uploaded event stream; all other cases are reconstructed from Score.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ImportedAuditionKind {
+    SourceMidiPerformance,
+    ReconstructedScore,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ImportedWorkSummary {
     pub manifest: ContributionManifest,
@@ -238,6 +247,12 @@ pub struct ImportedWorkSummary {
     /// field existed still deserialize.
     #[serde(default)]
     pub audio_renderer: String,
+    /// SHA-256 of the exact audition.wav bytes. Absent on legacy receipts.
+    #[serde(default)]
+    pub audition_sha256: Option<String>,
+    /// Distinguishes source-MIDI event rendering from reconstructed Score audio.
+    #[serde(default)]
+    pub audition_kind: Option<ImportedAuditionKind>,
     /// Discloses that `audition.wav`'s TIMBRE is reconstructed, not
     /// preserved from the source. `parse_symbolic` extracts pitch, rhythm,
     /// tempo, meter, and voice roles into a plain `Score` -- it does not
