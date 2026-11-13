@@ -1,0 +1,62 @@
+{
+  "schema_version": "connectome-hit-probability-v1",
+  "objective": {
+    "id": "functional-output-at-least-0.8",
+    "outcome_ids": [
+      "subthreshold",
+      "hit"
+    ],
+    "outcome_values": [
+      0,
+      1
+    ],
+    "threshold": 0.8,
+    "direction": "AtLeast"
+  },
+  "ranked_experiments": [
+    {
+      "experiment_id": "hit-discriminator",
+      "score": {
+        "experiment_id": "hit-discriminator",
+        "objective_id": "functional-output-at-least-0.8",
+        "cost": 1,
+        "unresolved_prior_mass": 0.1,
+        "worst_case_scenario_id": "known-answer",
+        "best_case_scenario_id": "known-answer",
+        "worst_case_probability_of_hit": 0.56,
+        "best_case_probability_of_hit": 0.56,
+        "worst_case_probability_of_hit_per_cost": 0.56,
+        "best_case_probability_of_hit_per_cost": 0.56,
+        "scenario_probabilities": [
+          {
+            "scenario_id": "known-answer",
+            "probability_of_hit": 0.56,
+            "probability_of_hit_per_cost": 0.56
+          }
+        ]
+      }
+    },
+    {
+      "experiment_id": "mechanism-discriminator",
+      "score": {
+        "experiment_id": "mechanism-discriminator",
+        "objective_id": "functional-output-at-least-0.8",
+        "cost": 1,
+        "unresolved_prior_mass": 0.1,
+        "worst_case_scenario_id": "known-answer",
+        "best_case_scenario_id": "known-answer",
+        "worst_case_probability_of_hit": 0.5,
+        "best_case_probability_of_hit": 0.5,
+        "worst_case_probability_of_hit_per_cost": 0.5,
+        "best_case_probability_of_hit_per_cost": 0.5,
+        "scenario_probabilities": [
+          {
+            "scenario_id": "known-answer",
+            "probability_of_hit": 0.5,
+            "probability_of_hit_per_cost": 0.5
+          }
+        ]
+      }
+    }
+  ]
+}

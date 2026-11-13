@@ -1,0 +1,107 @@
+{
+  "priors": [
+    0.45,
+    0.45,
+    0.1
+  ],
+  "candidates": [
+    {
+      "id": "optimistic-brittle",
+      "cost": 1,
+      "outcomes": [
+        "response",
+        "no_response"
+      ],
+      "hypothesis_ids": [
+        "mechanism_a",
+        "mechanism_b",
+        "OTHER_OR_UNRESOLVED"
+      ],
+      "likelihood_scenarios": [
+        {
+          "id": "perfect-named",
+          "likelihoods_by_hypothesis": [
+            [
+              1,
+              0
+            ],
+            [
+              0,
+              1
+            ],
+            [
+              0.5,
+              0.5
+            ]
+          ]
+        },
+        {
+          "id": "uninformative-shared-misspecification",
+          "likelihoods_by_hypothesis": [
+            [
+              0.5,
+              0.5
+            ],
+            [
+              0.5,
+              0.5
+            ],
+            [
+              0.5,
+              0.5
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "robust",
+      "cost": 1,
+      "outcomes": [
+        "response",
+        "no_response"
+      ],
+      "hypothesis_ids": [
+        "mechanism_a",
+        "mechanism_b",
+        "OTHER_OR_UNRESOLVED"
+      ],
+      "likelihood_scenarios": [
+        {
+          "id": "calibration-a",
+          "likelihoods_by_hypothesis": [
+            [
+              0.8,
+              0.2
+            ],
+            [
+              0.2,
+              0.8
+            ],
+            [
+              0.5,
+              0.5
+            ]
+          ]
+        },
+        {
+          "id": "calibration-b",
+          "likelihoods_by_hypothesis": [
+            [
+              0.7,
+              0.3
+            ],
+            [
+              0.3,
+              0.7
+            ],
+            [
+              0.5,
+              0.5
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

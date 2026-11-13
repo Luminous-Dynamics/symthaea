@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-hit-probability-input-v1.schema.json",
+  "title": "Open-world threshold-hit experiment-design input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "priors",
+    "objective",
+    "candidates"
+  ],
+  "properties": {
+    "priors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number",
+        "minimum": 0
+      }
+    },
+    "objective": {
+      "$ref": "#/$defs/objective"
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "open-world-input.schema.json#/$defs/candidate"
+      }
+    }
+  },
+  "$defs": {
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "outcome_ids",
+        "outcome_values",
+        "threshold",
+        "direction"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "outcome_values": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number"
+          }
+        },
+        "threshold": {
+          "type": "number"
+        },
+        "direction": {
+          "enum": [
+            "AtLeast",
+            "AtMost"
+          ]
+        }
+      }
+    }
+  }
+}

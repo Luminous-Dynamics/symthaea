@@ -1,0 +1,207 @@
+{
+  "$comment": "Synthetic known-answer calibration fixture. Scores are arbitrary declared numbers, not biological observations.",
+  "config": {
+    "false_adequacy_alpha": 0.05,
+    "minimum_in_scope_acceptance": 0.8,
+    "wilson_z_critical": 1.6448536269514722
+  },
+  "in_scope_units": [
+    {
+      "unit_id": "animal-session-00",
+      "mechanism_family_id": "in-scope-family-00",
+      "nonconformity_score": 0
+    },
+    {
+      "unit_id": "animal-session-01",
+      "mechanism_family_id": "in-scope-family-01",
+      "nonconformity_score": 0.1
+    },
+    {
+      "unit_id": "animal-session-02",
+      "mechanism_family_id": "in-scope-family-02",
+      "nonconformity_score": 0.2
+    },
+    {
+      "unit_id": "animal-session-03",
+      "mechanism_family_id": "in-scope-family-03",
+      "nonconformity_score": 0.3
+    },
+    {
+      "unit_id": "animal-session-04",
+      "mechanism_family_id": "in-scope-family-04",
+      "nonconformity_score": 0.4
+    },
+    {
+      "unit_id": "animal-session-05",
+      "mechanism_family_id": "in-scope-family-05",
+      "nonconformity_score": 0.5
+    },
+    {
+      "unit_id": "animal-session-06",
+      "mechanism_family_id": "in-scope-family-06",
+      "nonconformity_score": 0.6
+    },
+    {
+      "unit_id": "animal-session-07",
+      "mechanism_family_id": "in-scope-family-07",
+      "nonconformity_score": 0.7
+    },
+    {
+      "unit_id": "animal-session-08",
+      "mechanism_family_id": "in-scope-family-08",
+      "nonconformity_score": 0.8
+    },
+    {
+      "unit_id": "animal-session-09",
+      "mechanism_family_id": "in-scope-family-09",
+      "nonconformity_score": 0.9
+    },
+    {
+      "unit_id": "animal-session-10",
+      "mechanism_family_id": "in-scope-family-10",
+      "nonconformity_score": 1
+    },
+    {
+      "unit_id": "animal-session-11",
+      "mechanism_family_id": "in-scope-family-11",
+      "nonconformity_score": 1.1
+    },
+    {
+      "unit_id": "animal-session-12",
+      "mechanism_family_id": "in-scope-family-12",
+      "nonconformity_score": 1.2
+    },
+    {
+      "unit_id": "animal-session-13",
+      "mechanism_family_id": "in-scope-family-13",
+      "nonconformity_score": 1.3
+    },
+    {
+      "unit_id": "animal-session-14",
+      "mechanism_family_id": "in-scope-family-14",
+      "nonconformity_score": 1.4
+    },
+    {
+      "unit_id": "animal-session-15",
+      "mechanism_family_id": "in-scope-family-15",
+      "nonconformity_score": 1.5
+    },
+    {
+      "unit_id": "animal-session-16",
+      "mechanism_family_id": "in-scope-family-16",
+      "nonconformity_score": 1.6
+    },
+    {
+      "unit_id": "animal-session-17",
+      "mechanism_family_id": "in-scope-family-17",
+      "nonconformity_score": 1.7
+    },
+    {
+      "unit_id": "animal-session-18",
+      "mechanism_family_id": "in-scope-family-18",
+      "nonconformity_score": 1.8
+    },
+    {
+      "unit_id": "animal-session-19",
+      "mechanism_family_id": "in-scope-family-19",
+      "nonconformity_score": 1.9
+    }
+  ],
+  "omitted_mechanism_units": [
+    {
+      "unit_id": "omitted-family-unit-00",
+      "mechanism_family_id": "omitted-family-00",
+      "nonconformity_score": 10
+    },
+    {
+      "unit_id": "omitted-family-unit-01",
+      "mechanism_family_id": "omitted-family-01",
+      "nonconformity_score": 11
+    },
+    {
+      "unit_id": "omitted-family-unit-02",
+      "mechanism_family_id": "omitted-family-02",
+      "nonconformity_score": 12
+    },
+    {
+      "unit_id": "omitted-family-unit-03",
+      "mechanism_family_id": "omitted-family-03",
+      "nonconformity_score": 13
+    },
+    {
+      "unit_id": "omitted-family-unit-04",
+      "mechanism_family_id": "omitted-family-04",
+      "nonconformity_score": 14
+    },
+    {
+      "unit_id": "omitted-family-unit-05",
+      "mechanism_family_id": "omitted-family-05",
+      "nonconformity_score": 15
+    },
+    {
+      "unit_id": "omitted-family-unit-06",
+      "mechanism_family_id": "omitted-family-06",
+      "nonconformity_score": 16
+    },
+    {
+      "unit_id": "omitted-family-unit-07",
+      "mechanism_family_id": "omitted-family-07",
+      "nonconformity_score": 17
+    },
+    {
+      "unit_id": "omitted-family-unit-08",
+      "mechanism_family_id": "omitted-family-08",
+      "nonconformity_score": 18
+    },
+    {
+      "unit_id": "omitted-family-unit-09",
+      "mechanism_family_id": "omitted-family-09",
+      "nonconformity_score": 19
+    },
+    {
+      "unit_id": "omitted-family-unit-10",
+      "mechanism_family_id": "omitted-family-10",
+      "nonconformity_score": 20
+    },
+    {
+      "unit_id": "omitted-family-unit-11",
+      "mechanism_family_id": "omitted-family-11",
+      "nonconformity_score": 21
+    },
+    {
+      "unit_id": "omitted-family-unit-12",
+      "mechanism_family_id": "omitted-family-12",
+      "nonconformity_score": 22
+    },
+    {
+      "unit_id": "omitted-family-unit-13",
+      "mechanism_family_id": "omitted-family-13",
+      "nonconformity_score": 23
+    },
+    {
+      "unit_id": "omitted-family-unit-14",
+      "mechanism_family_id": "omitted-family-14",
+      "nonconformity_score": 24
+    },
+    {
+      "unit_id": "omitted-family-unit-15",
+      "mechanism_family_id": "omitted-family-15",
+      "nonconformity_score": 25
+    },
+    {
+      "unit_id": "omitted-family-unit-16",
+      "mechanism_family_id": "omitted-family-16",
+      "nonconformity_score": 26
+    },
+    {
+      "unit_id": "omitted-family-unit-17",
+      "mechanism_family_id": "omitted-family-17",
+      "nonconformity_score": 27
+    },
+    {
+      "unit_id": "omitted-family-unit-18",
+      "mechanism_family_id": "omitted-family-18",
+      "nonconformity_score": 28
+    }
+  ]
+}

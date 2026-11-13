@@ -1,0 +1,20 @@
+{
+  "schema_version": "connectome-open-world-adequacy-v1",
+  "calibrator": {
+    "false_adequacy_alpha": 0.05,
+    "minimum_in_scope_acceptance": 0.8,
+    "wilson_z_critical": 1.6448536269514722,
+    "in_scope_unit_count": 20,
+    "omitted_mechanism_family_count": 19,
+    "lower_order_statistic_k": 1,
+    "nonconformity_threshold": 10,
+    "false_adequacy_probability_bound": 0.05,
+    "in_scope_acceptance": {
+      "accepted_in_scope_units": 20,
+      "total_in_scope_units": 20,
+      "observed_acceptance_rate": 1,
+      "one_sided_wilson_lower_bound": 0.8808421626390356
+    },
+    "usable": true
+  }
+}

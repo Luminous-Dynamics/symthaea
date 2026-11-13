@@ -1,0 +1,112 @@
+{
+  "schema_version": "connectome-decision-value-v1",
+  "decision_problem": {
+    "id": "choose-functional-output-intervention",
+    "hypothesis_ids": [
+      "mechanism_a",
+      "mechanism_b",
+      "mechanism_no_effect",
+      "OTHER_OR_UNRESOLVED"
+    ],
+    "actions": [
+      {
+        "id": "intervene",
+        "utility_by_hypothesis": [
+          2,
+          2,
+          -2,
+          -1
+        ]
+      },
+      {
+        "id": "do-not-intervene",
+        "utility_by_hypothesis": [
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  "ranked_experiments": [
+    {
+      "experiment_id": "outcome-discriminator",
+      "score": {
+        "experiment_id": "outcome-discriminator",
+        "decision_problem_id": "choose-functional-output-intervention",
+        "cost": 1,
+        "unresolved_prior_mass": 0.1,
+        "worst_case_scenario_id": "known-answer",
+        "best_case_scenario_id": "known-answer",
+        "worst_case_evsi": 0.47,
+        "best_case_evsi": 0.47,
+        "worst_case_evsi_per_cost": 0.47,
+        "best_case_evsi_per_cost": 0.47,
+        "scenario_values": [
+          {
+            "scenario_id": "known-answer",
+            "current_best_action_id": "intervene",
+            "current_expected_utility": 0.5,
+            "expected_post_experiment_utility": 0.97,
+            "expected_value_of_sample_information": 0.47,
+            "evsi_per_cost": 0.47,
+            "outcome_decisions": [
+              {
+                "outcome_id": "response",
+                "outcome_probability": 0.62,
+                "selected_action_id": "intervene",
+                "posterior_expected_utility": 1.564516129032258
+              },
+              {
+                "outcome_id": "no_response",
+                "outcome_probability": 0.38,
+                "selected_action_id": "do-not-intervene",
+                "posterior_expected_utility": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "experiment_id": "mechanism-discriminator",
+      "score": {
+        "experiment_id": "mechanism-discriminator",
+        "decision_problem_id": "choose-functional-output-intervention",
+        "cost": 1,
+        "unresolved_prior_mass": 0.1,
+        "worst_case_scenario_id": "known-answer",
+        "best_case_scenario_id": "known-answer",
+        "worst_case_evsi": 0,
+        "best_case_evsi": 0,
+        "worst_case_evsi_per_cost": 0,
+        "best_case_evsi_per_cost": 0,
+        "scenario_values": [
+          {
+            "scenario_id": "known-answer",
+            "current_best_action_id": "intervene",
+            "current_expected_utility": 0.5,
+            "expected_post_experiment_utility": 0.5,
+            "expected_value_of_sample_information": 0,
+            "evsi_per_cost": 0,
+            "outcome_decisions": [
+              {
+                "outcome_id": "response",
+                "outcome_probability": 0.5,
+                "selected_action_id": "intervene",
+                "posterior_expected_utility": 0.5
+              },
+              {
+                "outcome_id": "no_response",
+                "outcome_probability": 0.5,
+                "selected_action_id": "intervene",
+                "posterior_expected_utility": 0.5
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-adequacy-calibration-input-v1.schema.json",
+  "title": "Open-world model-adequacy calibration input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "config",
+    "in_scope_units",
+    "omitted_mechanism_units"
+  ],
+  "properties": {
+    "config": {
+      "$ref": "#/$defs/config"
+    },
+    "in_scope_units": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/calibration_unit"
+      }
+    },
+    "omitted_mechanism_units": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/calibration_unit"
+      }
+    }
+  },
+  "$defs": {
+    "config": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "false_adequacy_alpha",
+        "minimum_in_scope_acceptance",
+        "wilson_z_critical"
+      ],
+      "properties": {
+        "false_adequacy_alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "minimum_in_scope_acceptance": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "wilson_z_critical": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "calibration_unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unit_id",
+        "mechanism_family_id",
+        "nonconformity_score"
+      ],
+      "properties": {
+        "unit_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mechanism_family_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nonconformity_score": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}
