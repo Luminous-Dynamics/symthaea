@@ -94,15 +94,16 @@ Paths are required to be normalized relative paths: no absolute paths, empty com
 For each fold, the validator enforces the configured policy:
 - work-disjoint means one work group cannot appear in multiple split roles;
 - composer-disjoint means one composer group cannot appear in multiple split roles;
-- exact-artifact-disjoint means input/reference hashes cannot recur across split roles.
+- exact-artifact-disjoint means input/reference hashes and normalized relative paths cannot recur across split roles;
+- a track with `training_allowed = false` accepts only `Test` rows; `Train`, `Validation` and `Calibration` are rejected.
 
-Duplicate sample IDs, malformed lowercase SHA-256 digests, unsafe relative paths, missing required group identifiers, wrong corpus/release/track IDs, and empty manifests are blockers. The direct byte verifier repeats its own schema, duplicate-ID, path and digest checks rather than relying exclusively on the higher-level track qualifier. Exact content reuse between train and test is rejected even when group labels differ.
+Duplicate sample IDs, malformed lowercase SHA-256 digests, unsafe relative paths, missing required group identifiers, wrong corpus/release/track IDs, and empty manifests are blockers. The direct byte verifier repeats its own schema, duplicate-ID, path and digest checks rather than relying exclusively on the higher-level track qualifier. Exact content reuse between train and test is rejected even when group labels differ. Path reuse is checked separately from digest declarations, so declaring two different hashes for the same path cannot evade leakage detection.
 
 Five-fold composer-disjoint validation is representable, but this code does not generate the folds. The split generator and seed/assignment protocol must be independently frozen and committed before qualification.
 
 ## Tests authored
 
-18 focused tests currently cover:
+20 focused tests currently cover:
 - candidate registry scope separation;
 - CC BY-NC-SA refusal for commercial-reuse declarations;
 - Unknown license refusal outside external-evaluation-only;
@@ -113,6 +114,8 @@ Five-fold composer-disjoint validation is representable, but this code does not 
 - leakage remaining below SplitQualified;
 - malformed digests, duplicate IDs and wrong-track binding;
 - the unpinned MIREX task page remaining Candidate and non-commit revision strings being refused;
+- external-evaluation-only tracks refusing Train/Validation/Calibration rows;
+- the same relative path being refused across split roles even when the declared hashes differ;
 - report commitment tamper sensitivity and task/modality separation;
 - hashing actual input/reference bytes, receipt replay and tamper rejection;
 - missing/duplicate sample coverage, digest mismatches and unsafe relative paths;
