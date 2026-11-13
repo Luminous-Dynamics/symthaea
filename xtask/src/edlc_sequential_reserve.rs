@@ -664,6 +664,18 @@ mod tests {
     }
 
     #[test]
+    fn initial_standby_auxiliary_budget_is_non_compensatory() {
+        let mut value = fixture_value();
+        value["device_sequences"][0]["events"][0]["standby_auxiliary_energy_wh"] = json!(0.2);
+        value["expected"]["sequence_pass_rate"] = json!(0.0);
+        value["expected"]["sequence_passes"] = json!(0);
+        let fixture: Fixture = serde_json::from_value(value).unwrap();
+        let report = audit_fixture(&fixture).unwrap();
+        assert_eq!(report.sequence_passes, 0);
+        assert_eq!(report.events[0].interval_budget_passes, 1);
+    }
+
+    #[test]
     fn first_event_requires_initial_standby_not_applicable_probe() {
         let mut value = fixture_value();
         value["device_sequences"][0]["events"][0]["readiness_probe_status"] = json!("passed");
