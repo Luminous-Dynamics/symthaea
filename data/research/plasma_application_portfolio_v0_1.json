@@ -81,6 +81,16 @@
       "sota_anchor": "NASA 2026 small-spacecraft propulsion survey and mission heritage",
       "primary_gap": "system reliability, feed, plume, endurance and mission-level comparability",
       "evidence_ceiling": "separate propulsion qualification"
+    },
+    {
+      "id": "PLASMA-VM-001",
+      "priority": "P0_ENABLER",
+      "issue": 11847,
+      "pr": 11850,
+      "service_unit": "held-out downstream bond-quality prediction and avoided inspection/scrap cost at no increased escaped-defect risk",
+      "sota_anchor": "Industrial PCUs already provide OES/optical, power, voltage, gas flow, pressure, temperature, rotation and recipe monitoring; 2026 semiconductor-plasma reviews report virtual metrology but identify labeled data and domain transfer as barriers",
+      "primary_gap": "link calibrated upstream telemetry to actual material-lot/device/day held-out bond outcomes with calibrated uncertainty, false-accept controls and exact grid-to-bond energy boundary",
+      "evidence_ceiling": "synthetic contract only; no trained model or production quality release"
     }
   ],
   "no_longer_novel_by_itself": [
