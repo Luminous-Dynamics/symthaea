@@ -193,6 +193,28 @@ pub async fn import_music(
     contributor: &str,
     authorization: ImportAuthorization,
 ) -> Result<ImportedWorkSummary, String> {
+    import_music_with_measure_sidecar(
+        backend,
+        file,
+        title,
+        contributor,
+        authorization,
+        None,
+    )
+    .await
+}
+
+/// Import a symbolic score and, for MIDI only, an optional explicit measure
+/// sidecar. The sidecar is an annotation artifact; it is never inferred from
+/// MIDI time-signature meta-events.
+pub async fn import_music_with_measure_sidecar(
+    backend: &str,
+    file: web_sys::File,
+    title: &str,
+    contributor: &str,
+    authorization: ImportAuthorization,
+    measure_sidecar: Option<web_sys::File>,
+) -> Result<ImportedWorkSummary, String> {
     let form = web_sys::FormData::new().map_err(|_| "could not create upload form")?;
     form.append_with_blob_and_filename("file", &file, &file.name())
         .map_err(|_| "could not attach score")?;
@@ -202,6 +224,14 @@ pub async fn import_music(
         .map_err(|_| "could not attach contributor")?;
     form.append_with_str("authorization_basis", authorization.as_wire())
         .map_err(|_| "could not attach authorization")?;
+    if let Some(sidecar) = measure_sidecar {
+        form.append_with_blob_and_filename(
+            "measure_sidecar",
+            &sidecar,
+            &sidecar.name(),
+        )
+        .map_err(|_| "could not attach MIDI measure sidecar")?;
+    }
     let url = format!("{}/api/music/import", backend.trim_end_matches('/'));
     let resp = Request::post(&url)
         .body(form)
@@ -226,6 +256,13 @@ pub async fn import_music(
 pub fn imported_notation_graph_url(backend: &str, work_id: &str) -> String {
     format!(
         "{}/api/music/import/{work_id}/notation-graph",
+        backend.trim_end_matches('/')
+    )
+}
+
+pub fn imported_midi_measure_maps_url(backend: &str, work_id: &str) -> String {
+    format!(
+        "{}/api/music/import/{work_id}/midi-measure-maps",
         backend.trim_end_matches('/')
     )
 }

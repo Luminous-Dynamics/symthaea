@@ -106,6 +106,7 @@ const COMPOSE_BARS_RANGE: std::ops::RangeInclusive<usize> = 2..=36;
 const NOVELTY_FLOOR: f64 = 0.5;
 const IMPORT_ROOT: &str = "data/music/imports";
 const MAX_SYMBOLIC_IMPORT_BYTES: usize = 12 * 1024 * 1024;
+const MAX_SYMBOLIC_MEASURE_SIDECAR_BYTES: usize = 2 * 1024 * 1024;
 
 /// A per-process, monotonically increasing nonce for temp file/dir names
 /// that must not collide across concurrently-running `spawn_blocking`
@@ -984,13 +985,19 @@ async fn main() {
         .route("/api/compose", post(compose))
         .route(
             "/api/music/import",
-            post(import_music).layer(DefaultBodyLimit::max(MAX_SYMBOLIC_IMPORT_BYTES + 64 * 1024)),
+            post(import_music).layer(DefaultBodyLimit::max(
+                MAX_SYMBOLIC_IMPORT_BYTES + MAX_SYMBOLIC_MEASURE_SIDECAR_BYTES + 64 * 1024,
+            )),
         )
         .route("/api/music/imports", get(imported_works))
         .route("/api/music/import/{id}", get(imported_work))
         .route(
             "/api/music/import/{id}/notation-graph",
             get(imported_work_notation_graph),
+        )
+        .route(
+            "/api/music/import/{id}/midi-measure-maps",
+            get(imported_work_midi_measure_maps),
         )
         .route("/api/music/import/{id}/audio", get(imported_work_audio))
         .route("/api/teaching", get(teaching_summary))
@@ -2388,6 +2395,7 @@ async fn import_music(
     let mut authorization_basis_raw = None;
     let mut content_license_raw = None;
     let mut upload: Option<(String, Vec<u8>)> = None;
+    let mut measure_sidecar: Option<Vec<u8>> = None;
     while let Some(field) = multipart
         .next_field()
         .await
@@ -2407,6 +2415,24 @@ async fn import_music(
                 ));
             }
             upload = Some((filename, bytes.to_vec()));
+        } else if name == "measure_sidecar" {
+            if measure_sidecar.is_some() {
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    "only one measure_sidecar field is allowed".to_owned(),
+                ));
+            }
+            let bytes = field
+                .bytes()
+                .await
+                .map_err(|error| (StatusCode::BAD_REQUEST, error.to_string()))?;
+            if bytes.len() > MAX_SYMBOLIC_MEASURE_SIDECAR_BYTES {
+                return Err((
+                    StatusCode::PAYLOAD_TOO_LARGE,
+                    "MIDI measure sidecar exceeds 2 MiB".to_owned(),
+                ));
+            }
+            measure_sidecar = Some(bytes.to_vec());
         } else {
             let value = field
                 .text()
@@ -2483,6 +2509,12 @@ async fn import_music(
             "supported formats are MIDI, MusicXML, and Muse score JSON".to_owned(),
         )
     })?;
+    if measure_sidecar.is_some() && !matches!(&format, symthaea_muse_protocol::SymbolicImportFormat::Midi) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            "measure_sidecar is only valid with MIDI uploads".to_owned(),
+        ));
+    }
 
     // Everything from here is CPU/IO-bound (parsing, analysis, rendering,
     // hashing, filesystem writes) -- matches this codebase's own
@@ -2492,17 +2524,24 @@ async fn import_music(
     tokio::task::spawn_blocking(move || {
         let source_sha256 = sha256_hex(&source);
         let score_clock_id = format!("source-score-clock:{source_sha256}");
-        let structured = symthaea_muse::symbolic_import::parse_symbolic_with_structure(
-            &source,
-            format.clone(),
-            &score_clock_id,
-        )
+        let structured = match measure_sidecar.as_deref() {
+            Some(sidecar) => symthaea_muse::symbolic_import::parse_symbolic_with_midi_measure_sidecar(
+                &source,
+                sidecar,
+                &score_clock_id,
+            ),
+            None => symthaea_muse::symbolic_import::parse_symbolic_with_structure(
+                &source,
+                format.clone(),
+                &score_clock_id,
+            ),
+        }
         .map_err(|error| (StatusCode::UNPROCESSABLE_ENTITY, error))?;
         if structured.source_sha256 != source_sha256 {
             return Err(internal("symbolic importer source digest changed during import"));
         }
         let score = structured.score;
-        let (notation_structure, notation_graph_json) =
+        let (notation_structure, notation_artifact) =
             summarize_imported_notation_structure(
                 &source_sha256,
                 structured.notation_structure,
@@ -2510,7 +2549,13 @@ async fn import_music(
         let analysis = symthaea_muse::symbolic_import::analyze(&score);
         let score_sha256 = serialized_sha256(&score)
             .map_err(|status| (status, "could not serialize the imported score".to_owned()))?;
-        let identity_material = format!("{source_sha256}\0{title}\0{contributor}");
+        let identity_material = match measure_sidecar.as_deref() {
+            Some(sidecar) => format!(
+                "{source_sha256}\0measure-sidecar:{}\0{title}\0{contributor}",
+                sha256_hex(sidecar)
+            ),
+            None => format!("{source_sha256}\0{title}\0{contributor}"),
+        };
         let work_id = ImportedWorkId(sha256_hex(identity_material.as_bytes()));
 
         let root = Path::new(IMPORT_ROOT);
@@ -2577,8 +2622,17 @@ async fn import_music(
             std::fs::write(staging.join(format!("source.{extension}")), &source)?;
             std::fs::write(staging.join("score.json"), score_json)?;
             std::fs::write(staging.join("summary.json"), summary_json)?;
-            if let Some(notation_graph_json) = &notation_graph_json {
-                std::fs::write(staging.join("notation-graph.json"), notation_graph_json)?;
+            match &notation_artifact {
+                Some(ImportedNotationArtifact::MusicXmlGraph(bytes)) => {
+                    std::fs::write(staging.join("notation-graph.json"), bytes)?;
+                }
+                Some(ImportedNotationArtifact::MidiMeasureMaps(bytes)) => {
+                    std::fs::write(staging.join("midi-measure-maps.json"), bytes)?;
+                }
+                None => {}
+            }
+            if let Some(sidecar) = &measure_sidecar {
+                std::fs::write(staging.join("midi-measure-sidecar.json"), sidecar)?;
             }
             std::fs::write(staging.join("audition.wav"), &wav)?;
             std::fs::rename(&staging, &destination)
@@ -2610,13 +2664,18 @@ async fn import_music(
     .map(Json)
 }
 
+enum ImportedNotationArtifact {
+    MusicXmlGraph(Vec<u8>),
+    MidiMeasureMaps(Vec<u8>),
+}
+
 fn summarize_imported_notation_structure(
     source_sha256: &str,
     structure: symthaea_muse::symbolic_import::ImportedNotationStructureV1,
 ) -> Result<
     (
         symthaea_muse_protocol::ImportedNotationStructureSummary,
-        Option<Vec<u8>>,
+        Option<ImportedNotationArtifact>,
     ),
     (StatusCode, String),
 > {
@@ -2664,6 +2723,7 @@ fn summarize_imported_notation_structure(
                     status: status.into(),
                     source_sha256: source_sha256.into(),
                     graph_sha256: Some(graph_sha256),
+                    measure_map_sha256: None,
                     part_count,
                     supported_part_count,
                     unknown_part_count,
@@ -2673,7 +2733,59 @@ fn summarize_imported_notation_structure(
                     unavailable_part_ids,
                     explanation,
                 },
-                Some(graph_json),
+                Some(ImportedNotationArtifact::MusicXmlGraph(graph_json)),
+            ))
+        }
+        symthaea_muse::symbolic_import::ImportedNotationStructureV1::MidiExplicitMeasureSidecar(
+            receipt,
+        ) => {
+            let part_count = receipt.part_maps.len();
+            let mut measure_count = 0usize;
+            let mut barline_event_count = 0usize;
+            let mut non_controlling_measure_count = 0usize;
+            let mut unavailable_part_ids = Vec::new();
+            let mut supported_part_count = 0usize;
+            for part in &receipt.part_maps {
+                match &part.map.status {
+                    symthaea_muse::barline_eval::MeasureMapStatus::Supported => {
+                        supported_part_count += 1;
+                    }
+                    _ => unavailable_part_ids.push(part.part_id.clone()),
+                }
+                measure_count += part.map.measures.len();
+                barline_event_count += part.map.measures.len().saturating_sub(1);
+                non_controlling_measure_count +=
+                    part.non_controlling_measure_indices.len();
+            }
+            let unknown_part_count = part_count.saturating_sub(supported_part_count);
+            let status = if unknown_part_count == 0 && part_count > 0 {
+                "supported"
+            } else if supported_part_count > 0 {
+                "partially_unknown"
+            } else {
+                "unknown"
+            };
+            let measure_map_sha256 =
+                symthaea_muse::midi_measure_sidecar::midi_measure_sidecar_commitment(&receipt)
+                    .map_err(internal)?;
+            let sidecar_json = serde_json::to_vec_pretty(&receipt).map_err(internal)?;
+            Ok((
+                ImportedNotationStructureSummary {
+                    schema: "muse-imported-notation-structure-v1".into(),
+                    status: status.into(),
+                    source_sha256: source_sha256.into(),
+                    graph_sha256: None,
+                    measure_map_sha256: Some(measure_map_sha256),
+                    part_count,
+                    supported_part_count,
+                    unknown_part_count,
+                    measure_count,
+                    barline_event_count,
+                    non_controlling_measure_count,
+                    unavailable_part_ids,
+                    explanation: None,
+                },
+                Some(ImportedNotationArtifact::MidiMeasureMaps(sidecar_json)),
             ))
         }
         symthaea_muse::symbolic_import::ImportedNotationStructureV1::Unknown {
@@ -2684,6 +2796,7 @@ fn summarize_imported_notation_structure(
                 status: "unknown".into(),
                 source_sha256: source_sha256.into(),
                 graph_sha256: None,
+                measure_map_sha256: None,
                 part_count: 0,
                 supported_part_count: 0,
                 unknown_part_count: 0,
@@ -2703,6 +2816,7 @@ fn summarize_imported_notation_structure(
                 status: "unsupported".into(),
                 source_sha256: source_sha256.into(),
                 graph_sha256: None,
+                measure_map_sha256: None,
                 part_count: 0,
                 supported_part_count: 0,
                 unknown_part_count: 0,
@@ -2787,6 +2901,65 @@ async fn imported_work_notation_graph(
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
     }
     Ok(Json(graphs))
+}
+
+async fn imported_work_midi_measure_maps(
+    AxPath(id): AxPath<String>,
+) -> Result<Json<symthaea_muse::midi_measure_sidecar::MidiMeasureSidecarReceiptV1>, StatusCode>
+{
+    let summary = read_import_summary(&id)?;
+    let expected_digest = summary
+        .notation_structure
+        .as_ref()
+        .and_then(|structure| structure.measure_map_sha256.as_deref())
+        .ok_or(StatusCode::NOT_FOUND)?;
+    let bytes = std::fs::read(
+        Path::new(IMPORT_ROOT).join(&id).join("midi-measure-maps.json"),
+    )
+    .map_err(|error| {
+        if error.kind() == std::io::ErrorKind::NotFound {
+            StatusCode::NOT_FOUND
+        } else {
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    })?;
+    let receipt: symthaea_muse::midi_measure_sidecar::MidiMeasureSidecarReceiptV1 =
+        serde_json::from_slice(&bytes).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let actual_digest =
+        symthaea_muse::midi_measure_sidecar::midi_measure_sidecar_commitment(&receipt)
+            .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let import_dir = Path::new(IMPORT_ROOT).join(&id);
+    let raw_sidecar = std::fs::read(import_dir.join("midi-measure-sidecar.json"))
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let raw_sidecar_sha256 = sha256_hex(&raw_sidecar);
+    let mut source_path = None;
+    for entry in std::fs::read_dir(&import_dir).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)? {
+        let entry = entry.map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+        let file_name = entry.file_name();
+        if file_name.to_string_lossy().starts_with("source.") {
+            if source_path.replace(entry.path()).is_some() {
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        }
+    }
+    let source_path = source_path.ok_or(StatusCode::INTERNAL_SERVER_ERROR)?;
+    let midi_bytes = std::fs::read(source_path).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    let replay_valid = symthaea_muse::midi_measure_sidecar::validate_midi_measure_sidecar_replay(
+        &midi_bytes,
+        &raw_sidecar,
+        &receipt.score_clock_id,
+        &receipt,
+    )
+    .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+    if actual_digest.as_str() != expected_digest
+        || receipt.midi_sha256 != summary.manifest.source_sha256
+        || receipt.sidecar_sha256 != raw_sidecar_sha256
+        || sha256_hex(&midi_bytes) != summary.manifest.source_sha256
+        || !replay_valid
+    {
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+    Ok(Json(receipt))
 }
 
 async fn imported_work_audio(AxPath(id): AxPath<String>) -> Result<Response, StatusCode> {
@@ -5625,7 +5798,7 @@ mod compose_bars_contract_tests {
 
 #[cfg(test)]
 mod notation_summary_tests {
-    use super::summarize_imported_notation_structure;
+    use super::{summarize_imported_notation_structure, ImportedNotationArtifact};
     use symthaea_muse::symbolic_import::ImportedNotationStructureV1;
     use symthaea_muse_protocol::ImportedNotationStructureSummary;
 
@@ -5655,11 +5828,17 @@ mod notation_summary_tests {
         assert_eq!(summary.measure_count, 1);
         assert_eq!(summary.barline_event_count, 1);
         assert_eq!(summary.source_sha256, source_sha256);
-        let sidecar = sidecar.expect("MusicXML graph must be persisted");
+        let sidecar = match sidecar.expect("MusicXML graph must be persisted") {
+            ImportedNotationArtifact::MusicXmlGraph(bytes) => bytes,
+            ImportedNotationArtifact::MidiMeasureMaps(_) => {
+                panic!("MusicXML must persist a graph artifact")
+            }
+        };
         let decoded: Vec<symthaea_muse::musicxml_barline_adapter::MusicXmlPartNotationGraphV1> =
             serde_json::from_slice(&sidecar).unwrap();
         let digest = symthaea_muse::evidence_digest::canonical_json_sha256(&decoded).unwrap();
         assert_eq!(summary.graph_sha256.as_deref(), Some(digest.as_str()));
+        assert!(summary.measure_map_sha256.is_none());
     }
 
     #[test]
@@ -5667,7 +5846,7 @@ mod notation_summary_tests {
         let source_sha256 = "a".repeat(64);
         let (summary, sidecar): (
             ImportedNotationStructureSummary,
-            Option<Vec<u8>>,
+            Option<ImportedNotationArtifact>,
         ) = summarize_imported_notation_structure(
             &source_sha256,
             ImportedNotationStructureV1::Unknown {
@@ -5677,8 +5856,66 @@ mod notation_summary_tests {
         assert_eq!(summary.status, "unknown");
         assert_eq!(summary.source_sha256, source_sha256);
         assert!(summary.graph_sha256.is_none());
+        assert!(summary.measure_map_sha256.is_none());
         assert!(sidecar.is_none());
         assert!(summary.explanation.unwrap().contains("barline sidecar"));
     }
+
+    #[test]
+    fn midi_measure_map_summary_commits_the_normalized_sidecar_receipt() {
+        let midi: [u8; 26] = [
+            b'M', b'T', b'h', b'd', 0, 0, 0, 6, 0, 1, 0, 1, 1, 0xE0,
+            b'M', b'T', b'r', b'k', 0, 0, 0, 4, 0, 0xFF, 0x2F, 0,
+        ];
+        let midi_sha256 = symthaea_muse::evidence_digest::sha256_hex(&midi);
+        let envelope = symthaea_muse::midi_measure_sidecar::MidiMeasureSidecarV1 {
+            schema: symthaea_muse::midi_measure_sidecar::MIDI_MEASURE_SIDECAR_SCHEMA_V1.into(),
+            midi_sha256: midi_sha256.clone(),
+            ticks_per_quarter: 480,
+            score_clock_id: "midi-summary-clock".into(),
+            parts: vec![symthaea_muse::midi_measure_sidecar::MidiPartMeasureSidecarV1 {
+                part_id: "Piano".into(),
+                source_track_index: 0,
+                measures:source_channel: None,
+                measures:measures: vec![symthaea_muse::midi_measure_sidecar::MidiMeasureSpanSidecarV1 {
+                    start_tick: 0,
+                    end_tick: 1920,
+                    kind: symthaea_muse::barline_eval::MeasureKind::Regular,
+                    measure_number: Some("1".into()),
+                    source_measure_id: None,
+                    display_text: None,
+                    implicit: false,
+                    non_controlling: false,
+                }],
+            }],
+        };
+        let input = serde_json::to_vec(&envelope).unwrap();
+        let receipt = symthaea_muse::midi_measure_sidecar::parse_midi_measure_sidecar(
+            &midi, &input, "midi-summary-clock"
+        ).unwrap();
+        let (summary, artifact) = summarize_imported_notation_structure(
+            &midi_sha256,
+            ImportedNotationStructureV1::MidiExplicitMeasureSidecar(receipt),
+        ).unwrap();
+        assert_eq!(summary.status, "supported");
+        assert_eq!(summary.source_sha256, midi_sha256);
+        assert_eq!(summary.part_count, 1);
+        assert_eq!(summary.measure_count, 1);
+        assert_eq!(summary.barline_event_count, 0);
+        assert!(summary.graph_sha256.is_none());
+        let bytes = match artifact.unwrap() {
+            ImportedNotationArtifact::MidiMeasureMaps(bytes) => bytes,
+            ImportedNotationArtifact::MusicXmlGraph(_) => {
+                panic!("MIDI sidecar must persist a measure-map artifact")
+            }
+        };
+        let decoded: symthaea_muse::midi_measure_sidecar::MidiMeasureSidecarReceiptV1 =
+            serde_json::from_slice(&bytes).unwrap();
+        let digest = symthaea_muse::midi_measure_sidecar::midi_measure_sidecar_commitment(
+            &decoded
+        ).unwrap();
+        assert_eq!(summary.measure_map_sha256.as_deref(), Some(digest.as_str()));
+    }
+
 }
 

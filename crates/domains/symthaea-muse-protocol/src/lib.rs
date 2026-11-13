@@ -214,6 +214,9 @@ pub struct ImportedNotationStructureSummary {
     pub status: String,
     pub source_sha256: String,
     pub graph_sha256: Option<String>,
+    /// Canonical digest of normalized explicit MIDI measure maps, when present.
+    #[serde(default)]
+    pub measure_map_sha256: Option<String>,
     pub part_count: usize,
     pub supported_part_count: usize,
     pub unknown_part_count: usize,

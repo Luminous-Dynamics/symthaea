@@ -43,6 +43,8 @@ pub mod repeat_traversal;
 #[cfg(feature = "theory")]
 pub mod multi_axis_benchmark;
 #[cfg(feature = "theory")]
+pub mod midi_measure_sidecar;
+#[cfg(feature = "theory")]
 pub mod teaching_corpus;
 #[cfg(feature = "theory")]
 pub mod adaptive_experiment;
