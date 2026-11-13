@@ -483,10 +483,10 @@ mod tests {
         let physical = vec![vacuum, spin_up, spin_down, double];
 
         let left_bond = vec![vacuum, spin_up, spin_down, double];
-        let mut first_data = vec![zero(); 1 * 4 * 4];
-        first_data[0 * 4 + 0] = Complex64::new(1.0, 0.0);
-        first_data[1 * 4 + 1] = Complex64::new(0.5, 0.0);
-        first_data[2 * 4 + 2] = Complex64::new(0.5, 0.0);
+        let mut first_data = vec![zero(); 16];
+        first_data[0] = Complex64::new(1.0, 0.0);
+        first_data[5] = Complex64::new(0.5, 0.0);
+        first_data[10] = Complex64::new(0.5, 0.0);
         let first = AbelianChargeTensor::new(
             0,
             vec![vacuum],
@@ -497,12 +497,12 @@ mod tests {
         )
         .unwrap();
 
-        let mut second_data = vec![zero(); 4 * 4 * 1];
+        let mut second_data = vec![zero(); 16];
         // |vacuum> -> |double> and the two single-occupancy exchange paths.
-        second_data[(0 * 4 + 3) * 1] = Complex64::new(1.0, 0.0);
-        second_data[(1 * 4 + 2) * 1] = Complex64::new(1.0, 0.0);
-        second_data[(2 * 4 + 1) * 1] = Complex64::new(1.0, 0.0);
-        second_data[(3 * 4 + 0) * 1] = Complex64::new(1.0, 0.0);
+        second_data[3] = Complex64::new(1.0, 0.0);
+        second_data[6] = Complex64::new(1.0, 0.0);
+        second_data[9] = Complex64::new(1.0, 0.0);
+        second_data[12] = Complex64::new(1.0, 0.0);
         let second = AbelianChargeTensor::new(
             1,
             left_bond,
