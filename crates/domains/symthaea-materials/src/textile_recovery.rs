@@ -1260,11 +1260,7 @@ mod tests {
         bundle.downstream_acceptance = Some(item_acceptance());
         let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &policy());
         assert_eq!(result.disposition, RouteDisposition::Ineligible);
-        assert!(
-            result
-                .reasons
-                .contains(&RouteReason::UseSafetyNotPassed)
-        );
+        assert!(result.reasons.contains(&RouteReason::UseSafetyNotPassed));
     }
 
     #[test]
@@ -1578,11 +1574,7 @@ mod tests {
         let result =
             qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
         assert_eq!(result.disposition, RouteDisposition::Ineligible);
-        assert!(
-            result
-                .reasons
-                .contains(&RouteReason::MassBalanceNotClosed)
-        );
+        assert!(result.reasons.contains(&RouteReason::MassBalanceNotClosed));
     }
 
     #[test]
@@ -1697,11 +1689,7 @@ mod tests {
         let result =
             qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
         assert_eq!(result.disposition, RouteDisposition::InsufficientEvidence);
-        assert!(
-            result
-                .reasons
-                .contains(&RouteReason::ProcessTrialUnknown)
-        );
+        assert!(result.reasons.contains(&RouteReason::ProcessTrialUnknown));
     }
 
     #[test]
@@ -2008,11 +1996,7 @@ mod tests {
         bundle.downstream_acceptance = Some(item_acceptance());
         let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &policy());
         assert_eq!(result.disposition, RouteDisposition::InsufficientEvidence);
-        assert!(
-            result
-                .reasons
-                .contains(&RouteReason::UseSafetyUnknown)
-        );
+        assert!(result.reasons.contains(&RouteReason::UseSafetyUnknown));
     }
 
     #[test]
@@ -2120,10 +2104,6 @@ mod tests {
         invalid.max_unknown_fraction_ppm = 2_000_000;
         let result = qualify_recovery_route(RecoveryRoute::ReuseAsIs, &bundle, &invalid);
         assert_eq!(result.disposition, RouteDisposition::Ineligible);
-        assert!(
-            result
-                .reasons
-                .contains(&RouteReason::InvalidPolicy)
-        );
+        assert!(result.reasons.contains(&RouteReason::InvalidPolicy));
     }
 }
