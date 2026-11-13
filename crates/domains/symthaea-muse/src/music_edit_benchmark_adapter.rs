@@ -206,10 +206,6 @@ pub enum MusicEditAdapterIssueV1 {
     QualifiedWithoutEvidence,
     NonQualifiedWithEvidence,
     EmptyCapabilityBoundary,
-    EmptyScopeField(&'static str),
-    InvalidScopeDigest(&'static str),
-    DuplicateNativeMetric,
-    MissingNativeMetric,
     UnknownOperation,
 }
 
@@ -414,6 +410,10 @@ pub enum MusicEditScopeMismatchV1 {
     Scorer,
     NativeMetricSet,
     SampleManifest,
+    EmptyScopeField(&'static str),
+    InvalidScopeDigest(&'static str),
+    DuplicateNativeMetric,
+    MissingNativeMetric,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -437,8 +437,7 @@ pub fn compare_music_edit_scopes_v1(
             ("split_id", scope.split_id.as_str()),
         ] {
             if value.trim().is_empty() {
-                mismatches.push(MusicEditScopeMismatchV1::Schema);
-                let _ = (scope_name, field);
+                mismatches.push(MusicEditScopeMismatchV1::EmptyScopeField(field));
             }
         }
         for (field, digest) in [
@@ -447,17 +446,13 @@ pub fn compare_music_edit_scopes_v1(
             ("sample_manifest_sha256", scope.sample_manifest_sha256.as_str()),
         ] {
             if !is_lower_sha256(digest) {
-                mismatches.push(match field {
-                    "protocol_sha256" => MusicEditScopeMismatchV1::Protocol,
-                    "scorer_sha256" => MusicEditScopeMismatchV1::Scorer,
-                    _ => MusicEditScopeMismatchV1::SampleManifest,
-                });
+                mismatches.push(MusicEditScopeMismatchV1::InvalidScopeDigest(field));
             }
         }
         if scope.native_metric_ids.is_empty()
             || scope.native_metric_ids.iter().any(|metric| metric.trim().is_empty())
         {
-            mismatches.push(MusicEditScopeMismatchV1::NativeMetricSet);
+            mismatches.push(MusicEditScopeMismatchV1::MissingNativeMetric);
         }
         let mut unique_metrics = BTreeSet::new();
         if scope
@@ -465,7 +460,7 @@ pub fn compare_music_edit_scopes_v1(
             .iter()
             .any(|metric| !unique_metrics.insert(metric))
         {
-            mismatches.push(MusicEditScopeMismatchV1::NativeMetricSet);
+            mismatches.push(MusicEditScopeMismatchV1::DuplicateNativeMetric);
         }
     }
     if left.schema_version != right.schema_version
