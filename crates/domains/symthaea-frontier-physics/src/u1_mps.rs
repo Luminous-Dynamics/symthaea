@@ -938,6 +938,8 @@ mod tests {
         dense[10] = Complex64::new(0.75, -0.25);
         let state = ComplexU1Mps::from_dense_fixed_charge(&dense, 4, 2, 1.0e-12).unwrap();
         assert_eq!(state.total_charge(), 2);
+        assert_eq!(state.maximum_bond_dimension(), 1);
+        assert_eq!(state.dense_svd_rank_by_charge_and_cut().unwrap().len(), 3);
         assert!((state.norm_squared(1.0e-12).unwrap() - 0.625).abs() <= 1.0e-12);
         assert_eq!(state.to_dense(8).unwrap(), dense);
     }
