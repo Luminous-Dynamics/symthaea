@@ -187,6 +187,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("target_utility_owner=UAP-OED-002");
     println!("target_state=initial_bond,aged_bond,substrate_moisture");
     println!("nuisance_state=shared_sample_preparation_offset");
+    println!("surface_activation_method_reference=ASTM_D6105-04(2019)");
+    println!("rigid_plastic_lap_shear_reference=ASTM_D3163-01(2023)");
+    println!("plastic_surface_preparation_control=ASTM_D2093-03(2025)");
+    println!("moisture_temperature_aging_reference=ASTM_D1151-00(2022)");
+    println!("cyclic_aging_reference=ASTM_D1183-03(2019)");
+    println!("single_lap_interpretation_reference=ASTM_D4896-01(2024)");
+    println!("standard_compliance_claimed=false");
     println!("scenario_count={}", cor_scenarios.len());
     println!("candidate_action_count={}", cor_options.len());
     println!("budget={:.6}", config.budget);
