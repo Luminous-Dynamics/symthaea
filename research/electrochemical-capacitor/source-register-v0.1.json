@@ -196,6 +196,18 @@
       "evidence_class": "peer_reviewed_perspective_and_device_model",
       "permitted_use": "Model-informed parameter envelope: carbon loading 10–20 mg cm-2, carbon specific capacity >100 mAh g-1, N/P <20 and E/C <5 are jointly needed in the representative model to approach >30 Wh kg-1 cell energy density",
       "prohibited_inference": "The representative model explicitly excludes stainless casing, springs and current-collecting plates; >30 Wh kg-1 is not a measured complete packaged-device result or direct SOTA claim"
+    },
+    {
+      "id": "ZIHSC-DUAL-GRADIENT-2026",
+      "title": "3D-Printed Dual-Gradient Gel Electrodes Synchronize Ion Transport and Active-Site Utilization for High-Energy Zinc-Ion Hybrid Supercapacitors",
+      "url": "https://advanced.onlinelibrary.wiley.com/doi/10.1002/adfm.78804",
+      "doi": "10.1002/adfm.78804",
+      "publisher": "Advanced Functional Materials",
+      "authors": "Meng et al.",
+      "published": "2026-10-05",
+      "evidence_class": "peer_reviewed_literature",
+      "permitted_use": "Research comparator for dual-gradient MXene/polypyrrole@CNT gel electrodes; abstract-reported 42.7 mg cm-2 loading, 6.2 F cm-2 areal capacitance, 0.86 mWh cm-2 areal energy, 71.1% capacitance retention across a 40-fold current-density increase and 98.8% retention after 15,000 cycles",
+      "prohibited_inference": "Abstract does not establish complete-device gravimetric/volumetric denominator, full inactive-mass or packaging boundary, process yield, independent-lab reproducibility or commercial performance; do not infer Wh/kg or Wh/L, and do not conflate with the distinct July 2026 carbon/Zn pouch-cell comparator"
     }
   ]
 }
