@@ -470,6 +470,8 @@ pub enum TransferGapError {
     },
     /// Missing source-group assignment receipt.
     MissingSourceGroupReceipt(SourceDimension, String),
+    /// One assignment receipt was reused for different source-group identities.
+    SourceGroupReceiptReused(String),
     /// Required familiar/training or hidden partition is empty.
     EmptyRequiredGroupPartition(SourceDimension, SourcePartition),
     /// Frozen minimum source-group count is not met.
@@ -585,7 +587,8 @@ fn validate_scope(scope: &TransferScope) -> Result<(), TransferGapError> {
     if scope.split_separation_disposition == SplitSeparationDisposition::OverlapDetected {
         return Err(TransferGapError::EvaluationDataOverlap);
     }
-    if scope.familiar_reference_manifest_digest == scope.training_manifest_digest
+    if scope.training_manifest_digest == scope.calibration_manifest_digest
+        || scope.familiar_reference_manifest_digest == scope.training_manifest_digest
         || scope.familiar_reference_manifest_digest == scope.calibration_manifest_digest
         || scope.hidden_confirmatory_manifest_digest == scope.training_manifest_digest
         || scope.hidden_confirmatory_manifest_digest == scope.calibration_manifest_digest
@@ -654,6 +657,7 @@ fn validate_policies(
     assignments: &[SourceGroupAssignment],
 ) -> Result<BTreeMap<SourceDimension, ValidatedPolicy>, TransferGapError> {
     let mut validated = BTreeMap::new();
+    let mut assignment_receipts: BTreeMap<String, (SourceDimension, String)> = BTreeMap::new();
     for policy in policies {
         if validated
             .insert(
@@ -722,6 +726,26 @@ fn validate_policies(
                 dimension: assignment.dimension,
                 group_digest: assignment.group_digest.clone(),
             });
+        }
+        match assignment_receipts.get(&assignment.assignment_receipt_digest) {
+            Some(existing)
+                if existing != &(assignment.dimension, assignment.group_digest.clone()) =>
+            {
+                return Err(TransferGapError::SourceGroupReceiptReused(
+                    assignment.assignment_receipt_digest.clone(),
+                ));
+            }
+            Some(_) => {
+                return Err(TransferGapError::SourceGroupReceiptReused(
+                    assignment.assignment_receipt_digest.clone(),
+                ));
+            }
+            None => {
+                assignment_receipts.insert(
+                    assignment.assignment_receipt_digest.clone(),
+                    (assignment.dimension, assignment.group_digest.clone()),
+                );
+            }
         }
         let count = policy
             .partition_counts
@@ -1587,6 +1611,30 @@ mod tests {
     }
 
     #[test]
+    fn training_and_calibration_manifests_must_be_distinct() {
+        let mut audit = input();
+        audit.scope.calibration_manifest_digest =
+            audit.scope.training_manifest_digest.clone();
+        assert_eq!(
+            audit_transfer_gap(&audit),
+            Err(TransferGapError::ReferenceManifestAliasesFitData)
+        );
+    }
+
+    #[test]
+    fn source_group_assignment_receipt_cannot_be_reused() {
+        let mut audit = input();
+        audit.assignments[1].assignment_receipt_digest =
+            audit.assignments[0].assignment_receipt_digest.clone();
+        assert_eq!(
+            audit_transfer_gap(&audit),
+            Err(TransferGapError::SourceGroupReceiptReused(
+                "receipt-site-train-A".into()
+            ))
+        );
+    }
+
+    #[test]
     fn familiar_reference_manifest_cannot_alias_training_or_calibration() {
         let mut audit = input();
         audit.scope.familiar_reference_manifest_digest =
@@ -1782,6 +1830,12 @@ mod tests {
     #[test]
     fn minimum_cluster_and_group_counts_are_explicit() {
         let mut audit = input();
+        audit.assignments.push(SourceGroupAssignment {
+            dimension: SourceDimension::CollectionSite,
+            group_digest: "site-train-C".into(),
+            partition: SourcePartition::Training,
+            assignment_receipt_digest: "receipt-site-train-C".into(),
+        });
         audit.dimensions[0].applicability = DimensionApplicability::Required {
             minimum_familiar_groups: 3,
             minimum_hidden_groups: 2,
