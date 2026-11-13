@@ -10,7 +10,8 @@
     "A later event passes only if both its application-load service contract and its preceding recovery contract pass.",
     "A device sequence passes only if all events pass; repeated events from one serial are correlated observations, not independent devices.",
     "A readiness probe that passes while the actual application event fails is reported as a false-ready event.",
-    "The sequence pass fraction is synthetic arithmetic and is not an application availability probability or lifetime estimate."
+    "The sequence pass fraction is synthetic arithmetic and is not an application availability probability or lifetime estimate.",
+    "Every post-first-call readiness measurement uses the same frozen synthetic readiness-probe profile ID across all devices."
   ],
   "protocol": {
     "protocol_id": "SYNTHETIC-SEQUENTIAL-RESERVE-001",
@@ -49,7 +50,8 @@
           "minimum_sustained_power_w": 1.4,
           "response_latency_s": 0.4,
           "minimum_application_voltage_v": 1.08,
-          "temperature_rise_c": 4
+          "temperature_rise_c": 4,
+          "readiness_probe_profile_id": null
         },
         {
           "event_index": 2,
@@ -64,7 +66,8 @@
           "minimum_sustained_power_w": 1.2,
           "response_latency_s": 0.5,
           "minimum_application_voltage_v": 1.04,
-          "temperature_rise_c": 5
+          "temperature_rise_c": 5,
+          "readiness_probe_profile_id": "SYNTH-READINESS-PROBE-V0"
         },
         {
           "event_index": 3,
@@ -79,7 +82,8 @@
           "minimum_sustained_power_w": 1.1,
           "response_latency_s": 0.6,
           "minimum_application_voltage_v": 1.02,
-          "temperature_rise_c": 6
+          "temperature_rise_c": 6,
+          "readiness_probe_profile_id": "SYNTH-READINESS-PROBE-V0"
         }
       ]
     },
@@ -100,7 +104,8 @@
           "minimum_sustained_power_w": 1.3,
           "response_latency_s": 0.45,
           "minimum_application_voltage_v": 1.07,
-          "temperature_rise_c": 4.5
+          "temperature_rise_c": 4.5,
+          "readiness_probe_profile_id": null
         },
         {
           "event_index": 2,
@@ -115,7 +120,8 @@
           "minimum_sustained_power_w": 1.15,
           "response_latency_s": 0.55,
           "minimum_application_voltage_v": 1.03,
-          "temperature_rise_c": 5.5
+          "temperature_rise_c": 5.5,
+          "readiness_probe_profile_id": "SYNTH-READINESS-PROBE-V0"
         },
         {
           "event_index": 3,
@@ -130,7 +136,8 @@
           "minimum_sustained_power_w": 1.1,
           "response_latency_s": 0.6,
           "minimum_application_voltage_v": 1.02,
-          "temperature_rise_c": 6
+          "temperature_rise_c": 6,
+          "readiness_probe_profile_id": "SYNTH-READINESS-PROBE-V0"
         }
       ]
     },
@@ -151,7 +158,8 @@
           "minimum_sustained_power_w": 1.2,
           "response_latency_s": 0.5,
           "minimum_application_voltage_v": 1.05,
-          "temperature_rise_c": 4.8
+          "temperature_rise_c": 4.8,
+          "readiness_probe_profile_id": null
         },
         {
           "event_index": 2,
@@ -166,7 +174,8 @@
           "minimum_sustained_power_w": 1.1,
           "response_latency_s": 0.55,
           "minimum_application_voltage_v": 1.03,
-          "temperature_rise_c": 5.5
+          "temperature_rise_c": 5.5,
+          "readiness_probe_profile_id": "SYNTH-READINESS-PROBE-V0"
         },
         {
           "event_index": 3,
@@ -181,7 +190,8 @@
           "minimum_sustained_power_w": 1.1,
           "response_latency_s": 0.6,
           "minimum_application_voltage_v": 1.02,
-          "temperature_rise_c": 6
+          "temperature_rise_c": 6,
+          "readiness_probe_profile_id": "SYNTH-READINESS-PROBE-V0"
         }
       ]
     }
