@@ -12,6 +12,10 @@ cargo run --manifest-path tools/marine-robust-pareto-audit/Cargo.toml -- \
 
 The synthetic fixture must return INCOMPLETE and must not qualify a candidate for the robust frontier.
 
+## Whole-vessel objective vector
+
+The integrated scenario compares eight separate objectives on the frozen cargo-work unit: primary energy, well-to-wake GHG, underwater noise at 1 kHz, 2–5 kHz and 30–80 kHz, lifecycle cost, maintenance hours and availability. The three acoustic bands remain distinct; no broadband aggregate or scalar weighted score hides band-specific degradation. The sample 30–80 kHz limit and 95% availability floor are scenario-specific test values, not universal regulatory limits.
+
 ## Decision rules
 
 - Candidate service must match the frozen mission, vessel, route, measurement window, service/environment fingerprints and cargo-work unit.
