@@ -297,49 +297,91 @@
           "status": "unresolved",
           "audit_contract_id": "marine-biofouling-evidence-audit-v0.1",
           "audit_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-          "requirement_reference": "permit:zero-uncontained-organism-release"
+          "requirement_reference": "permit:zero-uncontained-organism-release",
+          "audited_candidate_id": "A",
+          "vessel_revision": "hull-A",
+          "propeller_revision": "prop-A",
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
         },
         {
           "gate_id": "cleaning-waste-authorization",
           "status": "unresolved",
           "audit_contract_id": "marine-biofouling-evidence-audit-v0.1",
           "audit_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000003",
-          "requirement_reference": "permit:in-water-cleaning-authorized-and-waste-captured"
+          "requirement_reference": "permit:in-water-cleaning-authorized-and-waste-captured",
+          "audited_candidate_id": "A",
+          "vessel_revision": "hull-A",
+          "propeller_revision": "prop-A",
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
         },
         {
           "gate_id": "acoustic-scale-transfer-evidence",
           "status": "unresolved",
           "audit_contract_id": "marine-acoustic-scale-transfer-audit-v0.1.0",
           "audit_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000004",
-          "requirement_reference": "measurement:scale-transfer-reviewed-on-held-out-full-scale-data"
+          "requirement_reference": "measurement:scale-transfer-reviewed-on-held-out-full-scale-data",
+          "audited_candidate_id": "A",
+          "vessel_revision": "hull-A",
+          "propeller_revision": "prop-A",
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
         },
         {
           "gate_id": "acoustic-source-identifiability",
           "status": "unresolved",
           "audit_contract_id": "marine-acoustic-source-contrast-audit-v0.1.0",
           "audit_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000005",
-          "requirement_reference": "measurement:source-state-contrast-reviewed"
+          "requirement_reference": "measurement:source-state-contrast-reviewed",
+          "audited_candidate_id": "A",
+          "vessel_revision": "hull-A",
+          "propeller_revision": "prop-A",
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
         },
         {
           "gate_id": "cavitation-intermittency-characterization",
           "status": "unresolved",
           "audit_contract_id": "marine-cavitation-intermittency-audit-v0.1.0",
           "audit_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000006",
-          "requirement_reference": "measurement:cavitation-intermittency-distribution-reviewed"
+          "requirement_reference": "measurement:cavitation-intermittency-distribution-reviewed",
+          "audited_candidate_id": "A",
+          "vessel_revision": "hull-A",
+          "propeller_revision": "prop-A",
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
         },
         {
           "gate_id": "vibration-coherence-characterization",
           "status": "unresolved",
           "audit_contract_id": "marine-vibration-coherence-audit-v0.1.0",
           "audit_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000007",
-          "requirement_reference": "measurement:vibration-coherent-pressure-component-reviewed"
+          "requirement_reference": "measurement:vibration-coherent-pressure-component-reviewed",
+          "audited_candidate_id": "A",
+          "vessel_revision": "hull-A",
+          "propeller_revision": "prop-A",
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
         },
         {
           "gate_id": "rotation-synchronous-modulation",
           "status": "unresolved",
           "audit_contract_id": "marine-rotation-synchronous-modulation-audit-v0.1.0",
           "audit_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000008",
-          "requirement_reference": "measurement:rotation-synchronous-envelope-reviewed"
+          "requirement_reference": "measurement:rotation-synchronous-envelope-reviewed",
+          "audited_candidate_id": "A",
+          "vessel_revision": "hull-A",
+          "propeller_revision": "prop-A",
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
         }
       ]
     },
@@ -467,49 +509,91 @@
           "status": "unresolved",
           "audit_contract_id": "marine-biofouling-evidence-audit-v0.1",
           "audit_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-          "requirement_reference": "permit:zero-uncontained-organism-release"
+          "requirement_reference": "permit:zero-uncontained-organism-release",
+          "audited_candidate_id": "B",
+          "vessel_revision": "hull-B",
+          "propeller_revision": "prop-B",
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
         },
         {
           "gate_id": "cleaning-waste-authorization",
           "status": "unresolved",
           "audit_contract_id": "marine-biofouling-evidence-audit-v0.1",
           "audit_receipt_sha256": "0000000000000000000000000000000000000000000000000000000000000009",
-          "requirement_reference": "permit:in-water-cleaning-authorized-and-waste-captured"
+          "requirement_reference": "permit:in-water-cleaning-authorized-and-waste-captured",
+          "audited_candidate_id": "B",
+          "vessel_revision": "hull-B",
+          "propeller_revision": "prop-B",
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
         },
         {
           "gate_id": "acoustic-scale-transfer-evidence",
           "status": "unresolved",
           "audit_contract_id": "marine-acoustic-scale-transfer-audit-v0.1.0",
           "audit_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000000a",
-          "requirement_reference": "measurement:scale-transfer-reviewed-on-held-out-full-scale-data"
+          "requirement_reference": "measurement:scale-transfer-reviewed-on-held-out-full-scale-data",
+          "audited_candidate_id": "B",
+          "vessel_revision": "hull-B",
+          "propeller_revision": "prop-B",
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
         },
         {
           "gate_id": "acoustic-source-identifiability",
           "status": "unresolved",
           "audit_contract_id": "marine-acoustic-source-contrast-audit-v0.1.0",
           "audit_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000000b",
-          "requirement_reference": "measurement:source-state-contrast-reviewed"
+          "requirement_reference": "measurement:source-state-contrast-reviewed",
+          "audited_candidate_id": "B",
+          "vessel_revision": "hull-B",
+          "propeller_revision": "prop-B",
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
         },
         {
           "gate_id": "cavitation-intermittency-characterization",
           "status": "unresolved",
           "audit_contract_id": "marine-cavitation-intermittency-audit-v0.1.0",
           "audit_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000000c",
-          "requirement_reference": "measurement:cavitation-intermittency-distribution-reviewed"
+          "requirement_reference": "measurement:cavitation-intermittency-distribution-reviewed",
+          "audited_candidate_id": "B",
+          "vessel_revision": "hull-B",
+          "propeller_revision": "prop-B",
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
         },
         {
           "gate_id": "vibration-coherence-characterization",
           "status": "unresolved",
           "audit_contract_id": "marine-vibration-coherence-audit-v0.1.0",
           "audit_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000000d",
-          "requirement_reference": "measurement:vibration-coherent-pressure-component-reviewed"
+          "requirement_reference": "measurement:vibration-coherent-pressure-component-reviewed",
+          "audited_candidate_id": "B",
+          "vessel_revision": "hull-B",
+          "propeller_revision": "prop-B",
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
         },
         {
           "gate_id": "rotation-synchronous-modulation",
           "status": "unresolved",
           "audit_contract_id": "marine-rotation-synchronous-modulation-audit-v0.1.0",
           "audit_receipt_sha256": "000000000000000000000000000000000000000000000000000000000000000e",
-          "requirement_reference": "measurement:rotation-synchronous-envelope-reviewed"
+          "requirement_reference": "measurement:rotation-synchronous-envelope-reviewed",
+          "audited_candidate_id": "B",
+          "vessel_revision": "hull-B",
+          "propeller_revision": "prop-B",
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "service_fingerprint_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "environment_fingerprint_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
         }
       ]
     }
