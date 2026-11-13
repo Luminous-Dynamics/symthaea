@@ -6,7 +6,6 @@ on:
     paths:
       - "tools/pitb-daps-graph-import/**"
       - "tools/pitb-graph-evidence/**"
-      - ".github/workflows/pitb-daps-graph-import.yml"
   workflow_dispatch:
 
 permissions:
