@@ -39,13 +39,13 @@ The module also reports maximum bond dimension and selection-rule residual.
 
 The follow-up branch adds \`ComplexU1Mps::from_dense_fixed_charge\`. At each cut, it groups local rows by the intermediate prefix charge \(q\), groups suffix columns by the complementary charge \(K-q\), and performs a separate complex SVD for each block. The left singular vectors become the site tensor; singular-value-weighted right singular vectors become the remaining suffix state.
 
-This is an exact, untruncated factorization path:
-- It retains every singular direction returned by each charge-block SVD.
-- It applies no bond cap, singular-value cutoff, normalization or renormalization.
+This is a charge-block factorization path with no Schmidt truncation:
+- It removes only exactly zero singular directions; every positive singular value is retained, including very small positive Schmidt weights.
+- It applies no bond cap, positive singular-value cutoff, normalization or renormalization.
 - It rejects dense components outside the declared total-charge sector when they exceed the configured tolerance.
-- It records maximum out-of-sector input amplitude, discarded out-of-sector squared weight, maximum dense reconstruction residual and L2 reconstruction residual.
+- It records maximum out-of-sector input amplitude, discarded out-of-sector squared weight, maximum dense reconstruction residual, L2 reconstruction residual and SVD rank by charge/cut.
 
-Tests include dense-to-MPS reconstruction of the W state, a non-normalized \(|1010\rangle\) basis state, and a tolerated tiny charge-leakage component whose loss must appear in the receipt. This is the exact bridge needed before testing TEBD gate application. The factorization is numerically exact to the reported SVD/reconstruction residual, not a claim of symbolic exactness in floating point.
+Tests include dense-to-MPS reconstruction of the W state, a non-normalized \(|1010\rangle\) basis state, and a tolerated tiny charge-leakage component whose loss must appear in the receipt. This is the exact bridge needed before testing TEBD gate application. The factorization is numerically faithful to the reported SVD/reconstruction residual, not a claim of symbolic exactness in floating point. Exactly-zero SVD directions are omitted as nullspace, but every positive singular value is retained.
 
 ## Explicit limitations
 
@@ -70,4 +70,4 @@ Primary external references:
 
 ## Claim ceiling
 
-A passing version of these increments would establish validated complex U(1)-sector-labelled MPS storage, exact fixed-charge dense-to-MPS factorization with residual receipts, small-N dense expansion and norm contraction. It would not establish TEBD, an efficient tensor-network simulator, black-hole evaporation, Hawking radiation, gravitational backreaction or quantum advantage.
+A passing version of these increments would establish validated complex U(1)-sector-labelled MPS storage, charge-block dense-to-MPS factorization with explicit leakage/reconstruction receipts, small-N dense expansion and norm contraction. It would not establish TEBD, an efficient tensor-network simulator, black-hole evaporation, Hawking radiation, gravitational backreaction or quantum advantage.
