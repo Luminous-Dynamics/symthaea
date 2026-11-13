@@ -178,6 +178,8 @@ pub enum TrialOutcome {
 pub struct MassBalance {
     /// Incoming mass measured for the trial.
     pub input_mass_mg: u64,
+    /// Exact receiver-bound identity of the accepted output lot measured below.
+    pub accepted_output_lot_id: String,
     /// Mass accepted into the target output stream.
     pub accepted_output_mass_mg: u64,
     /// Recovered reusable components.
@@ -263,6 +265,10 @@ pub struct FibreLengthBin {
 pub struct FibreLengthEvidence {
     /// Method/standard and version used to measure fibre length.
     pub method_ref: String,
+    /// Exact accepted output lot physically sampled for this distribution.
+    pub accepted_output_lot_id: String,
+    /// Exact process-trial evidence ID which generated this accepted output lot.
+    pub source_trial_evidence_id: String,
     /// Instrument/measurement evidence.
     pub evidence: EvidenceRef,
     /// Ordered non-overlapping fibre-length bins.
@@ -407,6 +413,8 @@ pub enum RouteReason {
     MissingFibreLengthEvidence,
     /// Fibre-length distribution is malformed or does not close to 100%.
     InvalidFibreLengthDistribution,
+    /// Fibre-length measurements are not bound to the exact trial and accepted output lot.
+    FibreLengthTrialBindingMismatch,
     /// Measured fibre-length distribution fails the receiving route policy.
     FibreLengthBelowPolicy,
     /// Chemical compatibility trial is absent.
@@ -582,12 +590,32 @@ fn add_trial_checks(
                 if balance.input_mass_mg != expected_input_mass_mg {
                     reasons.push(RouteReason::MassBalanceInputMismatch);
                 }
+                if !nonempty(&balance.accepted_output_lot_id) {
+                    reasons.push(RouteReason::FibreLengthTrialBindingMismatch);
+                }
                 if !balance.is_closed(policy.max_mass_balance_uncertainty_ppm) {
                     reasons.push(RouteReason::MassBalanceNotClosed);
                 }
             }
         }
     }
+}
+
+fn fibre_length_binds_to_trial(
+    evidence: &FibreLengthEvidence,
+    trial: &ProcessTrialEvidence,
+) -> bool {
+    if !nonempty(&evidence.accepted_output_lot_id)
+        || !nonempty(&evidence.source_trial_evidence_id)
+        || evidence.source_trial_evidence_id != trial.evidence.evidence_id
+    {
+        return false;
+    }
+    trial.mass_balance.as_ref().is_some_and(|balance| {
+        nonempty(&balance.accepted_output_lot_id)
+            && balance.accepted_output_lot_id == evidence.accepted_output_lot_id
+            && balance.accepted_output_mass_mg > 0
+    })
 }
 
 fn fibre_length_fraction_at_or_above(
@@ -790,6 +818,13 @@ pub fn qualify_recovery_route(
                     ) {
                         reasons.push(RouteReason::InvalidFibreLengthDistribution);
                     }
+                    let trial_binding_matches = bundle
+                        .process_trial
+                        .as_ref()
+                        .is_some_and(|trial| fibre_length_binds_to_trial(length, trial));
+                    if !trial_binding_matches {
+                        reasons.push(RouteReason::FibreLengthTrialBindingMismatch);
+                    }
                     match fibre_length_fraction_at_or_above(
                         length,
                         policy.minimum_fibre_length_um,
@@ -886,6 +921,7 @@ fn assessment(
                 | RouteReason::InvalidDesignRevisionBinding
                 | RouteReason::InvalidCompositionEvidence
                 | RouteReason::InvalidFibreLengthDistribution
+                | RouteReason::FibreLengthTrialBindingMismatch
                 | RouteReason::InvalidChemicalCompatibilityEvidence
                 | RouteReason::InvalidDownstreamAcceptance
                 | RouteReason::InvalidPolicy
@@ -1000,6 +1036,7 @@ mod tests {
     fn balance() -> MassBalance {
         MassBalance {
             input_mass_mg: 1_000_000,
+            accepted_output_lot_id: "ACCEPTED-FIBRE-LOT-01".to_owned(),
             accepted_output_mass_mg: 800_000,
             recovered_component_mass_mg: 50_000,
             recovered_trim_mass_mg: 50_000,
@@ -1028,6 +1065,8 @@ mod tests {
     fn length() -> FibreLengthEvidence {
         FibreLengthEvidence {
             method_ref: "FIBRE-ARRAY-ASTM-D1440-V1".to_owned(),
+            accepted_output_lot_id: "ACCEPTED-FIBRE-LOT-01".to_owned(),
+            source_trial_evidence_id: "TRIAL-01".to_owned(),
             evidence: evidence(
                 "LENGTH-01",
                 EvidenceKind::FibreLengthMeasurement,
@@ -1144,6 +1183,46 @@ mod tests {
                 .disposition,
             RouteDisposition::Eligible
         );
+    }
+
+    #[test]
+    fn fibre_length_evidence_must_bind_to_the_exact_physical_trial() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        bundle.fibre_length = Some(length());
+        bundle.downstream_acceptance = Some(acceptance());
+
+        bundle
+            .fibre_length
+            .as_mut()
+            .unwrap()
+            .source_trial_evidence_id = "TRIAL-OTHER".to_owned();
+
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::FibreLengthTrialBindingMismatch));
+    }
+
+    #[test]
+    fn fibre_length_evidence_must_bind_to_the_mass_balanced_accepted_output_lot() {
+        let mut bundle = empty_bundle();
+        bundle.composition = Some(composition());
+        bundle.process_trial = Some(process_trial(EvidenceKind::MechanicalRecyclingTrial, true));
+        bundle.fibre_length = Some(length());
+        bundle.downstream_acceptance = Some(acceptance());
+
+        bundle
+            .fibre_length
+            .as_mut()
+            .unwrap()
+            .accepted_output_lot_id = "UNRELATED-FIBRE-LOT".to_owned();
+
+        let result =
+            qualify_recovery_route(RecoveryRoute::MechanicalFibreRecycling, &bundle, &policy());
+        assert_eq!(result.disposition, RouteDisposition::Ineligible);
+        assert!(result.reasons.contains(&RouteReason::FibreLengthTrialBindingMismatch));
     }
 
     #[test]
