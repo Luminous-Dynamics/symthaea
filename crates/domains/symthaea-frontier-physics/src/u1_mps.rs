@@ -1723,19 +1723,20 @@ impl U1TwoSiteState {
     }
 }
 
-/// Cumulative conservative L2 error ledger for unitary gates and orthogonal
-/// Schmidt projections.
+/// Cumulative local L2 projection ledger for a sequence of two-site splits.
 ///
-/// Under these assumptions, the triangle inequality gives
-/// norm(psi_exact - psi_approx) <= sum_j sqrt(discarded_weight_j).
-/// Do not use this ledger when non-unitary operations or nonlinear
-/// normalization are inserted between gates.
+/// The sum of local sqrt(discarded_weight) values is a global state-vector
+/// error bound only when every split is performed in a mixed-canonical gauge
+/// with orthonormal exterior left/right block bases, and intervening gates are
+/// unitary. The current TEBD scheduler does not verify that canonical-gauge
+/// precondition, so global qualification remains false.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct U1MpsTruncationLedger {
     pub gate_count: usize,
     pub accumulated_discarded_weight: f64,
-    pub cumulative_l2_error_upper_bound: f64,
+    pub cumulative_local_l2_error_bound: f64,
     pub maximum_single_gate_relative_discarded_weight: f64,
+    pub global_state_error_bound_qualified: bool,
 }
 
 impl U1MpsTruncationLedger {
@@ -1756,7 +1757,7 @@ impl U1MpsTruncationLedger {
             .checked_add(1)
             .ok_or(U1MpsError::DimensionOverflow)?;
         let next_weight = self.accumulated_discarded_weight + diagnostics.discarded_weight;
-        let next_bound = self.cumulative_l2_error_upper_bound + diagnostics.discarded_weight.sqrt();
+        let next_bound = self.cumulative_local_l2_error_bound + diagnostics.discarded_weight.sqrt();
         if !next_weight.is_finite() || !next_bound.is_finite() {
             return Err(U1MpsError::NonFiniteContraction(
                 "cumulative truncation ledger",
@@ -1764,7 +1765,7 @@ impl U1MpsTruncationLedger {
         }
         self.gate_count = next_count;
         self.accumulated_discarded_weight = next_weight;
-        self.cumulative_l2_error_upper_bound = next_bound;
+        self.cumulative_local_l2_error_bound = next_bound;
         self.maximum_single_gate_relative_discarded_weight = self
             .maximum_single_gate_relative_discarded_weight
             .max(diagnostics.relative_discarded_weight);
@@ -2751,7 +2752,8 @@ mod tests {
         ledger.record(&result).unwrap();
         assert_eq!(ledger.gate_count, 2);
         assert!((ledger.accumulated_discarded_weight - 0.72).abs() <= 1.0e-12);
-        assert!((ledger.cumulative_l2_error_upper_bound - 1.2).abs() <= 1.0e-12);
+        assert!((ledger.cumulative_local_l2_error_bound - 1.2).abs() <= 1.0e-12);
+        assert!(!ledger.global_state_error_bound_qualified);
         assert!((ledger.maximum_single_gate_relative_discarded_weight - 0.36).abs() <= 1.0e-12);
     }
 
