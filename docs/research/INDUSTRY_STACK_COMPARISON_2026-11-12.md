@@ -268,3 +268,22 @@ This mirrors the Terminal-Bench maintainers' published continuous-benchmark/vers
 8. Retire or down-rank saturated/invalid tasks; do not silently combine benchmark versions.
 
 The machine-readable evidence register in `INDUSTRY_BENCHMARK_VALIDITY_REGISTER_2026-11-13.json` captures the sources and claim limitations for these anchors.
+
+## 9. Engineering lifecycle and PLM incumbents — 2026-11-13
+
+The existing benchmark portfolio underweights a now-important competitor class: purpose-built product lifecycle / engineering change platforms. Public product documentation shows AI-assisted impact analysis is already shipping.
+
+- **Siemens Teamcenter 2606 / Teamcenter X:** AI BOM agent for guided change workflows with human oversight; AI-assisted MBSE requirements checks and test recommendations; rules-based change routing and digital-thread impact analysis. Sources: https://blogs.sw.siemens.com/teamcenter/new-in-teamcenter/ and https://blogs.sw.siemens.com/teamcenter/teamcenter-2606/
+- **Aras InnovatorEdge Impact Analysis AI Agent:** v1.0.0 was announced generally available on 2026-03-23; v1.0.1 was released 2026-08-18. Its documented workflow runs five specialists and a recommendation validator over change-request context, product structures and historical change orders; users review and apply affected-item relationships. Applying recommendations leaves the change request in Draft for normal UCM governance. Source: https://docs.aras.com/aras-innovatoredge-ai-book/aras-innovatoredge-ai-agents-release-notes
+- **PTC Windchill 13.1.2:** documents upstream/downstream collection of affected local and external objects, including remote requirements. Source: https://support.ptc.com/help/windchill/r13.1.2.0/en/Windchill_Help_Center/reqmgmt/RMChangeImpact.html
+- **IBM DOORS Next 7.2:** documents requirement traceability across requirements, development and test artifacts. It is a requirements-management adjunct, not a complete PLM comparator by itself. Source: https://www.ibm.com/docs/en/engineering-lifecycle-management-suite/doors-next/7.2.0?topic=requirements-managing
+
+### Strategic correction
+
+We must not claim Luminous invented AI-assisted change impact, multi-agent engineering review, human-in-the-loop recommendations, or traceable change workflows. The Aras product is a direct comparison target, while Siemens is a serious BOM/MBSE workflow competitor.
+
+Our differentiation hypothesis should be narrower and harder to fake: **independently qualified claim–evidence applicability**. The system must say, for each claim–evidence pair, whether identity/equivalence/exact recalculation justifies preservation, whether review/reverification/physical evidence/external approval is required, or whether the answer is unknown/unsupported. It must measure both missed critical consequences and unnecessary requalification, preserve source/target generations and scoped witnesses, and leave engineering authority with the existing system of record and professionals.
+
+The new [Engineering Lifecycle / PLM Competitor Register](ENGINEERING_LIFECYCLE_COMPETITOR_REGISTER_2026-11-13.md) and [Engineering Change Experiment Preregistration](ENG_CHANGE_EXPERIMENT_PREREGISTRATION_V0_1_2026-11-13.md) make this testable. They compose #10543, #10581, #11772, #10619/#10624 and canonical benchmark receipt owners; they do not add another impact graph, evidence authority, task universe, judge or receipt.
+
+**Evidence boundary:** all competitor descriptions are public vendor documentation. No PLM system was provisioned or benchmarked. Public documents do not establish the complete internal capability boundary of these configured products, so undocumented behavior is marked unknown rather than assumed absent.
