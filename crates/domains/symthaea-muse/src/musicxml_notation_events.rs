@@ -999,6 +999,22 @@ mod tests {
         ));
     }
 
+
+    #[test]
+    fn event_extent_beyond_explicit_measure_span_withholds_all_events() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>20</duration></note>
+        </measure></part></score-partwise>"#;
+        let events = parse(xml);
+        assert!(matches!(
+            events.status,
+            MusicXmlNotationEventsStatusV1::Unknown { .. }
+        ));
+        assert!(events.note_events.is_empty());
+        assert!(events.attribute_events.is_empty());
+    }
+
     #[test]
     fn grace_chord_members_share_onset_without_inventing_duration() {
         let xml = r#"<score-partwise><part id="P1"><measure number="1">
