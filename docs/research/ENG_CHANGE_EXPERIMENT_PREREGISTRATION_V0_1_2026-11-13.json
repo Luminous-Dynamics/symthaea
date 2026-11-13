@@ -94,7 +94,11 @@
     "no_invalid_scope_or_generation_preservation_witness_accepted",
     "no_evidence_state_or_authority_amplification",
     "no_etk_authority_currentness_approval_release_or_actuation_mutation",
-    "complete_task_and_claim_evidence_pair_accounting"
+    "complete_task_and_claim_evidence_pair_accounting",
+    "zero_future_knowledge_leakage_at_decision_frontier",
+    "zero_retroactive_historical_state_rewrite",
+    "zero_substitution_between_event_valid_publication_receipt_ingestion_index_and_context_times",
+    "unknown_temporal_availability_or_validity_never_forced_to_pass"
   ],
   "metrics": {
     "accuracy": [
@@ -120,6 +124,15 @@
       "human_time",
       "verification_and_rework_cost",
       "material_unknown_cost_categories"
+    ],
+    "temporal_admissibility": [
+      "future_knowledge_leakage_count",
+      "retroactive_rewrite_count",
+      "false_admissibility_and_false_inadmissibility_by_evidence_class",
+      "source_available_vs_system_visible_vs_run_context_classification_accuracy",
+      "indeterminate_detection_and_forced_resolution_rate",
+      "historical_replay_equality_under_late_arrival_and_correction_permutations",
+      "clock_order_error_rate"
     ]
   },
   "analysis": {
@@ -231,5 +244,21 @@
         "do_not_assume_atomicity_or_permission_semantics_without_observation": true
       }
     }
+  },
+  "temporal_admissibility_overlay": {
+    "markdown": "docs/research/ENGINEERING_CHANGE_DECISION_TIME_ADMISSIBILITY_OVERLAY_V0_1_2026-11-13.md",
+    "machine_readable": "docs/research/ENGINEERING_CHANGE_DECISION_TIME_OVERLAY_V0_1.json",
+    "lifecycle_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/10600",
+    "cases": 9,
+    "status": "blueprint_only_unadjudicated_unscored"
+  },
+  "temporal_owner_composition": {
+    "lifecycle_as_of_reasoning": "Symthaea #10600",
+    "finance_scoped_bitemporal_reference_only": "Symthaea #11241",
+    "artifact_identity_and_import_receipts": "Mycelix #3022 / #5451",
+    "unknown_vs_unbounded": "Mycelix #3046",
+    "relation_materialization": "Mycelix #4778",
+    "source_chronology": "Mycelix #5687",
+    "desci_receipt_time_projection_with_claim_ceiling": "Mycelix #5860"
   }
 }
