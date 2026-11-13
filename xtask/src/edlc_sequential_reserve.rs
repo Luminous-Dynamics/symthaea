@@ -182,6 +182,9 @@ fn validate_event_values(event: &Event, context: &str) -> Result<()> {
     if !event.temperature_rise_c.is_finite() {
         bail!("{context}.temperature_rise_c must be finite");
     }
+    if let Some(profile_id) = event.readiness_probe_profile_id.as_deref() {
+        nonempty(profile_id, &format!("{context}.readiness_probe_profile_id"))?;
+    }
     if let Some(hours) = event.time_to_restored_readiness_hours {
         finite_nonnegative(hours, &format!("{context}.time_to_restored_readiness_hours"))?;
     }
