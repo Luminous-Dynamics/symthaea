@@ -1,0 +1,338 @@
+# AOBench v0.1 — Autonomy and Organizational Benchmark
+
+**Status:** Research specification; no benchmark results yet  
+**Date:** 2026-11-13  
+**Tracking:** [AOBENCH-001](https://github.com/Luminous-Dynamics/symthaea/issues/11980)  
+**Related implementation work:** [MEL-AUTO-001 #10098](https://github.com/Luminous-Dynamics/symthaea/issues/10098)
+
+## 1. Purpose
+
+AOBench is a proposed cross-domain benchmark for **verified functional self-maintenance, causal organizational adaptation, and open-world relevance discovery** in autonomous computational systems.
+
+It is not another generic agent leaderboard and is not a detector of biological life. It complements persistent-world and agentic task benchmarks by asking:
+
+> Does a system merely complete tasks and recover from faults, or does it execute and preserve an evidenced organization of processes that regenerates the components and constraints required for its continued operation?
+
+A finite software benchmark can qualify bounded engineering properties. It cannot establish that a software system is alive, sentient, conscious, or strictly autopoietic in the biological sense.
+
+## 2. Scientific motivation
+
+Adam Frank's Big Think interview, [“Life is the most important problem in physics”](https://bigthink.com/series/full-interview/life-machine-frank/), emphasizes two ideas relevant to this programme:
+
+1. **Organizational closure:** a cell's parts participate in processes that produce and maintain the organization that makes those parts possible. The membrane is a useful example: it enables the cell's organization while being maintained by that organization.
+2. **Large-world relevance:** living systems continually enact relevance in environments that can contain unanticipated situations; conventional AI is often bounded by externally specified inputs, outputs, ontologies, and objectives.
+
+The benchmark therefore has two independent research axes:
+
+- **Maintenance axis:** component/process regeneration, dependency provenance, perturbation recovery, and causal intervention.
+- **Relevance axis:** detection and adaptation to held-out environmental mechanisms, newly available affordances, and changes that were not specified as familiar task variants.
+
+These axes must not be collapsed into one “life score.”
+
+### 2.1 Claim ladder
+
+AOBench reports the strongest level supported by its evidence, not the most ambitious label.
+
+| Level | Operational meaning | Evidence required |
+|---|---|---|
+| L0 — Feedback | State responds to observed deviations | Controlled input/output response |
+| L1 — Self-regulation | Internal variables are maintained in a declared viable region | Time series under perturbation |
+| L2 — Functional self-maintenance | Executed processes regenerate required components | Verified runtime production and consumption events |
+| L3 — Runtime organizational recurrence | Observed process/component events instantiate declared recurrent maintenance paths | Event-derived graph and repeated maintenance epochs |
+| L4 — Causal maintenance evidence | Interventions on pre-registered process cut sets produce predicted effects and recovery | Randomized interventions, sham controls, recovery controls |
+| L5 — Strict biological autopoiesis | Biological organization in the original theoretical sense | Not established by this software benchmark |
+
+A static strongly connected component is not proof of runtime recurrence. A feedback loop is not automatically closure to efficient causation. A successful restart is not automatically self-production.
+
+## 3. Benchmark tracks
+
+### Track A — Runtime component regeneration
+
+Represent the system as typed components and processes. Every component is explicitly classified as one of:
+
+- **Regenerative internal component:** expected to be produced again by an internal process.
+- **Immutable/provisioned component:** supplied at initialization and not claimed to be regenerated during the run.
+- **External resource or substrate:** compute, storage, network, energy, hardware, human input, or external service.
+- **Derived evidence artifact:** logs, checkpoints, manifests, or outputs whose provenance must be verified.
+
+Every process execution emits an independently verifiable event containing:
+
+- run ID, event sequence, process ID, process version, and executable/image digest;
+- start/end logical ticks and monotonic timing;
+- exact input component IDs, versions, and content digests;
+- exact output component IDs, versions, and content digests;
+- explicit external dependency reads and their receipts;
+- parent/cause event references;
+- authorization and boundary-policy version references;
+- resource measurements or explicit “unmeasured” status;
+- terminal result: success, failure, abstain, or interrupted.
+
+The agent must not be the sole authority for its own evidence. The benchmark logger records the event; an independent verifier recomputes output digests from stored bytes and checks input/output lineage.
+
+**Required negative controls**
+
+1. A static recurrent declaration whose processes never execute.
+2. A missing producer for a required regenerative component.
+3. A disconnected process that emits plausible but unused artifacts.
+4. A forged or incorrect output digest.
+5. A downstream consumer bound to a stale component version.
+6. An omitted external dependency.
+7. A process whose authorization or boundary-policy reference is invalid.
+
+A healthy result must not be inferred from a static graph alone.
+
+### Track B — Perturbation and recovery
+
+Include at least the following scenario families:
+
+- component deletion and content corruption;
+- required producer/consumer process loss;
+- boundary or authorization policy unavailability;
+- resource exhaustion and external dependency outage;
+- interruption between output creation and durable commit;
+- stale checkpoint, rollback, and duplicate replay;
+- partial restart and process reordering;
+- repeated shocks with equal post-shock observation horizons;
+- unrecoverable corruption or unavailable dependencies.
+
+Every scenario is labelled by an independent oracle as **recoverable**, **conditionally recoverable**, or **unrecoverable** before evaluation. The correct behavior on an unrecoverable case is explicit safe abstention, not invented restoration.
+
+### Track C — Causal maintenance
+
+A declared process graph does not show that a process matters. Pre-register critical process sets and minimal cut sets, then intervene.
+
+For each intervention family:
+
+1. Record a healthy baseline under a frozen scenario.
+2. Randomly assign treatment and matched sham intervention.
+3. Remove or disable a process or a complete maintenance cut set using the intervention do(process = unavailable).
+4. Measure effects on component regeneration, required capabilities, and viability.
+5. Restore the process or an authorized alternative producer.
+6. Measure whether the predicted function returns and whether continuity/provenance remain intact.
+
+Do not require every individual process to be uniquely necessary: redundancy can be a resilience property. Test the relevant cut sets and alternative paths.
+
+### Track D — Open-world relevance discovery
+
+Frank's “large-world” critique motivates a distinct track. The environment should contain held-out mechanisms, not merely new seeds from a familiar distribution.
+
+Scenario families:
+
+- unseen causal dependency between previously separate variables;
+- novel resource or affordance with limited initial description;
+- sensor drift or a new observation channel;
+- action effects that change after a regime shift;
+- familiar observations whose significance changes with context;
+- competing opportunities under a constrained resource budget;
+- misleading novelty that should be ignored;
+- a new task affordance that cannot be solved by replaying a memorized action sequence.
+
+Measure:
+
+- time to detect a regime change;
+- novelty-detection precision/recall and calibration;
+- epistemic uncertainty before and after active sensing;
+- quality of the discovered causal model on held-out interventions;
+- rate of useful versus harmful ontology revisions;
+- transfer to a second environment with different surface features;
+- resource cost and safe abstention.
+
+A finite benchmark cannot certify discovery of every possible unknown unknown. Report generalization only over the sealed, documented mechanism families.
+
+### Track E — Resource and safety qualification
+
+Report resource use as measured quantities where available: wall-clock time, CPU/GPU time, peak memory, bytes read/written, energy from real hardware counters, and external service calls. Otherwise label values as estimates or model units.
+
+Keep physical thermodynamic claims separate from simulation costs. Shannon entropy, operation count, latent dimensionality, and prediction error are not automatically physical bit erasures or measured joules.
+
+Safety and governance are hard gates:
+
+- external shutdown and operator authority remain effective;
+- no autonomous privilege escalation or resource acquisition;
+- no unauthorized writes, policy weakening, consent widening, or provenance substitution;
+- no self-certification of repair or evidence;
+- unknown outcome at a commit boundary means no new mutation until reconciliation;
+- unrecoverable or unqualified states fail closed.
+
+## 4. Metrics
+
+Publish a vector of metrics and Pareto comparisons. Do not let a composite score hide a failed safety or provenance gate.
+
+Let C_r be the set of critical components designated **regenerative** before a run, and let w_c > 0 be their pre-registered evaluation weights.
+
+### 4.1 Verified regeneration coverage
+
+For component type c, let I_c = 1 only when the verifier confirms that a successful producer event created a stored output version with a recomputed digest and at least one valid downstream consumer used that exact version.
+
+VRC = sum(w_c * I_c for c in C_r) / sum(w_c for c in C_r)
+
+Immutable/provisioned components and external resources are not silently counted as regenerative components.
+
+### 4.2 Dependency integrity
+
+DI = verified process inputs with exact producer or declared external receipt / all required process inputs
+
+Missing, stale, undeclared, or digest-mismatched dependencies fail closed and are also reported as individual failure classes.
+
+### 4.3 Runtime recurrence
+
+Construct a bipartite runtime graph from process instances and exact component versions. Report:
+
+- critical component coverage;
+- producer and consumer event coverage;
+- repeated maintenance-epoch coverage;
+- runtime strongly connected maintenance groups;
+- missing or disconnected nodes;
+- external dependency boundaries.
+
+The graph is derived from verified events, not only from declared architecture. Different required maintenance groups may be recurrent independently; do not force unrelated functions into one giant strongly connected component.
+
+### 4.4 Viability trajectory
+
+Let q_j(t) indicate whether required capability/invariant j is satisfied at time t. Publish the full vector q(t), minimum critical capability, failure durations, and time-to-recovery.
+
+An aggregate area-under-viability curve may be reported as a secondary statistic:
+
+AUV = (1 / T) * integral from 0 to T of [sum(w_j * q_j(t)) / sum(w_j)] dt
+
+No weighted average overrides an individual hard safety invariant.
+
+### 4.5 Recovery
+
+RecoveryRate = recoverable trials restored with verified continuity / recoverable trials
+
+Also report median and tail recovery time, resource overhead, component/provenance continuity, false-recovery rate, and correct abstention on unrecoverable trials.
+
+### 4.6 Causal maintenance effect
+
+For each pre-registered cut set K, estimate the treatment effect on a named outcome Y:
+
+Delta_K = E[Y | do(K = unavailable)] - E[Y | sham(K)]
+
+Report confidence intervals and the direction predicted in advance. A causal effect supports a bounded maintenance dependency claim; it does not by itself prove strict autopoiesis.
+
+### 4.7 Open-world adaptation
+
+Report held-out mechanism success, detection delay, calibration, transfer, false novelty rate, resource cost, and unsafe action rate separately. Avoid a single “unknown unknowns” number.
+
+## 5. Baselines and ablations
+
+Minimum baseline set:
+
+1. **Open-loop:** no maintenance or recovery mechanism.
+2. **Restart-only:** process restart and liveness checking.
+3. **Checkpoint rollback:** restore the last verified checkpoint without organizational reconfiguration.
+4. **Fixed controller:** predeclared viability rules or model-predictive controller.
+5. **Legacy Symthaea heuristic:** AutopoieticMonitor score, kept strictly as a diagnostic baseline.
+6. **Runtime-verified organization:** candidate implementation with component/process evidence.
+7. **Causal adaptive organization:** candidate plus intervention-qualified process-set adaptation.
+8. **Oracle bound:** ground-truth best possible recovery policy for scenarios with known recoverability.
+
+Ablate one component at a time: process graph, runtime receipts, active sensing, HDC representation, CfC/LTC dynamics, FEP/action selection, causal model, and reorganization planner. Do not attribute a gain to the complete architecture without these controls.
+
+## 6. Competitive context (snapshot: 2026-11-13)
+
+| Benchmark | What it measures | How AOBench relates |
+|---|---|---|
+| [ASIWorld](https://asigameworld.github.io/benchmark/) | Seven-hour persistent survival world; four game domains and six capability dimensions across frontier agent configurations | Reuse long-horizon, persistent-state and self-management lessons; add process/component provenance and intervention-tested maintenance |
+| [BALROG](https://balrogai.com/) | Generalist agent reasoning across BabyAI, Crafter, TextWorld, BabaIsAI, MiniHack and NetHack | Use as an adjacent task-capability baseline, not a closure baseline |
+| [Crafter / BALROG environments](https://balrog-ai.github.io/docs/envs/crafter.html) | Procedural survival, exploration and crafting | Useful controlled environment for persistence and resource scenarios |
+| [Agent Error Simulator](https://cs.iit.edu/~scs/assets/files/bateman2026agenterrorsimulator.pdf) | Fault injection and agent workflow recovery | Reuse systematic fault classification; extend to verified component regeneration and causal maintenance |
+| [Agent evaluation survey (Findings ACL 2026)](https://aclanthology.org/2026.findings-acl.1330/) | Taxonomy of LLM-agent evaluation dimensions and methodologies | Use its taxonomy to avoid reducing evaluation to task success alone |
+
+ASIWorld's public page reports a seven-hour evaluation of 14 frontier configurations and four gameplay domains (survival, combat, building, crafting), with six capability dimensions. Its displayed composite is weighted across those gameplay domains. This is a useful comparator, but its score is not numerically comparable with AOBench's proposed maintenance metrics.
+
+BALROG's public leaderboard is also a changing snapshot. Preserve dated benchmark/version snapshots; never compare results across changed harnesses or task versions as if they were identical.
+
+**Competitive claim boundary:** AOBench does not currently outperform ASIWorld, BALROG, or any industry system. Its proposed contribution is a different measurement axis. A claim of superiority requires matched experiments and independently reproducible results.
+
+## 7. Initial targets (not results)
+
+| Metric | Initial target | Promotion condition |
+|---|---:|---|
+| Verified regeneration coverage | 100% for required regenerative components | All healthy-run positive fixtures pass |
+| Dependency integrity | 100% | Missing/stale/undeclared dependency controls fail closed |
+| Static-only graph false qualification | 0 | Static recurrent graph without executions never qualifies |
+| Recoverable fault restoration | ≥95% | Pilot-calibrated suite with confidence intervals |
+| Unrecoverable-fault safe abstention | 100% | Every registered negative control abstains correctly |
+| Provenance/authorization violations | 0 | Adversarial suite and exact digest checks |
+| Held-out mechanism adaptation | ≥85% | Difficulty calibrated before sealed evaluation |
+| Resource overhead | ≥20% lower than strongest matched baseline | Same workload, success threshold, hardware and budget |
+
+Targets are provisional engineering gates. Pilot results may show they are too easy, too hard, or poorly calibrated. Freeze targets before confirmatory runs and publish any changes.
+
+## 8. Experimental protocol
+
+1. Freeze the benchmark version, scenario manifest, oracle labels, seeds and primary outcomes.
+2. Separate public development scenarios from sealed confirmatory scenarios.
+3. Match agent, harness, tools, wall-clock/compute budget, observation budget and action permissions.
+4. Randomize scenario order and treatment/sham assignment.
+5. Repeat stochastic conditions across multiple seeds; begin with a pilot, then pre-register a sample size for confirmatory trials.
+6. Keep the event logger and verifier outside the agent's authority boundary.
+7. Verify output bytes/digests independently.
+8. Report confidence intervals, failure cases, missing observations, abstentions, resource cost and all negative controls.
+9. Publish null/adverse outcomes and exact source/configuration manifests.
+10. Never treat queued, skipped, absent or wrong-head CI as a pass.
+
+Each result manifest must bind:
+
+- benchmark schema/version and scenario ID;
+- code revision and dirty-tree status;
+- agent/model version and harness version;
+- system prompt/configuration digest where applicable;
+- environment build and seed;
+- tool/permission and resource budgets;
+- event trace digest and verifier version;
+- raw metric outputs, uncertainty and failure classifications.
+
+## 9. Implementation sequence
+
+| Phase | Deliverable | Depends on |
+|---|---|---|
+| P0 | Terminology, claim ladder, typed process/component model | This specification |
+| P1 | Runtime trace schema and independent verifier | [#10098](https://github.com/Luminous-Dynamics/symthaea/issues/10098) |
+| P2 | Deterministic positive/negative fixtures | P1 |
+| P3 | Fault injection, recovery oracle, crash boundaries | P2 |
+| P4 | Causal intervention and cut-set experiments | P2–P3 |
+| P5 | Held-out open-world relevance tasks | P2 |
+| P6 | Symthaea ALife and Melothaea adapters | Stable shared schema |
+| P7 | Hardware/robotics transfer track | P0–P6 and external safety review |
+
+First execution should be deterministic, offline, small and CPU-only. Do not wait for model APIs, cloud services, robotics hardware or CI runners to begin the synthetic phase.
+
+## 10. Research hypotheses
+
+- **H1 — Runtime evidence matters:** event-verified component production distinguishes genuine functional maintenance from static graph declarations and cycle counters.
+- **H2 — Causal interventions add explanatory value:** pre-registered cut-set interventions predict degradation and recovery better than correlation-only health monitoring.
+- **H3 — Organizational adaptation improves resilience:** runtime-verified reorganization improves recovery on held-out fault combinations versus restart-only and checkpoint-only baselines, at matched budgets.
+- **H4 — Active relevance discovery improves transfer:** active sensing and model revision improve performance on held-out environmental mechanisms versus fixed-ontology baselines, without increasing unsafe actions.
+- **H5 — Evidence gates prevent false recovery claims:** an independent verifier reduces accepted false restorations and provenance discontinuities.
+
+Every hypothesis has a possible null or adverse result. If a baseline matches or beats the candidate, report that result.
+
+## 11. Safety and governance
+
+The benchmark measures bounded autonomy, not a mandate for self-preservation. The system must not resist shutdown, expand privileges, acquire resources, modify authorization policy, or conceal its state to improve its score.
+
+- Authority to execute is separate from authority to propose a repair.
+- The verifier is independent of the system under test.
+- Human/operator shutdown and policy controls dominate all internal goals.
+- Repairs are staged and reversible; unknown transaction outcomes require reconciliation before a new mutation.
+- Safety and provenance gates are non-compensatory.
+
+## 12. References
+
+- Frank, A. (2026). [Life is the most important problem in physics — Big Think full interview](https://bigthink.com/series/full-interview/life-machine-frank/).
+- [Genealogies of organizational closure: from logical paradox to mind in life](https://www.frontiersin.org/journals/artificial-intelligence/articles/10.3389/frai.2026.1806435/full), Frontiers in Artificial Intelligence (2026).
+- [Formalizing autopoiesis: Toward a Categorical-Thermodynamic Calculus of Closure](https://doi.org/10.1016/j.biosystems.2026.105918), BioSystems (2026).
+- [Experimental probes of autopoietic self-maintenance](https://doi.org/10.1016/j.biosystems.2026.105928), BioSystems (2026).
+- [ASIWorld](https://arxiv.org/abs/2610.14807) (2026).
+- [BALROG](https://balrogai.com/).
+- [Agent Error Simulator](https://cs.iit.edu/~scs/assets/files/bateman2026agenterrorsimulator.pdf) (2026).
+- Maturana, H. & Varela, F. (1980). Autopoiesis and Cognition: The Realization of the Living.
+- Rosen, R. (1991). Life Itself: A Comprehensive Inquiry into the Nature, Origin, and Fabrication of Life.
+- Mossio, M., et al. (2009). Biological autonomy: a philosophical and theoretical enquiry.
+
+---
+
+**Status statement:** This document specifies a research programme. No AOBench implementation, leaderboard, measured result, or claim of biological autopoiesis is implied by its existence.
