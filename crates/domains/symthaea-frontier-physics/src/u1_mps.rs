@@ -100,6 +100,10 @@ pub enum U1MpsError {
         residual: f64,
         tolerance: f64,
     },
+    GateChargeConservationResidual {
+        residual: f64,
+        tolerance: f64,
+    },
     TwoSiteBondMismatch,
     TwoSiteShapeMismatch,
     TwoSiteDenseExpansionRequiresOpenBoundaries,
@@ -235,6 +239,10 @@ impl core::fmt::Display for U1MpsError {
             } => write!(
                 f,
                 "two-site gate unitarity residual {residual} exceeds tolerance {tolerance}"
+            ),
+            Self::GateChargeConservationResidual { residual, tolerance } => write!(
+                f,
+                "two-site gate charge-conservation residual {residual} exceeds tolerance {tolerance}"
             ),
             Self::TwoSiteBondMismatch => write!(
                 f,
@@ -2450,6 +2458,9 @@ pub struct U1MpsTruncationLedger {
     pub gate_count: usize,
     pub accumulated_discarded_weight: f64,
     pub cumulative_local_l2_error_bound: f64,
+    pub cumulative_canonicalization_l2_error_bound: f64,
+    pub cumulative_gate_quality_l2_error_bound: f64,
+    pub cumulative_projection_l2_error_bound: f64,
     pub maximum_single_gate_relative_discarded_weight: f64,
     pub canonical_gauge_receipt_count: usize,
     pub global_state_error_bound_qualified: bool,
@@ -2490,8 +2501,7 @@ impl U1MpsTruncationLedger {
     }
 
     /// Record local tensor truncation diagnostics without claiming a global
-    /// state-vector bound. A caller must supply a qualified gauge receipt for
-    /// every gate to enable the global ledger.
+    /// state-vector bound.
     pub fn record(
         &mut self,
         diagnostics: &U1TwoSiteTruncationDiagnostics,
@@ -2502,22 +2512,93 @@ impl U1MpsTruncationLedger {
         Ok(())
     }
 
-    /// Record a truncation with a measured mixed-canonical gauge receipt.
-    ///
-    /// The global contribution is bounded by the canonicalization state-change
-    /// residual plus sqrt(discarded_weight) times the product of the exterior
-    /// block-map operator-norm upper bounds. Every gate in a sequence must use
-    /// this method with a qualified receipt; otherwise the global guarantee is
-    /// disabled.
+    /// Compatibility helper for callers that have already established an
+    /// exactly unitary, charge-conserving two-site gate. Production TEBD should
+    /// use record_with_canonical_gauge_and_gate so gate defects are included.
     pub fn record_with_canonical_gauge(
         &mut self,
         diagnostics: &U1TwoSiteTruncationDiagnostics,
         receipt: &U1CanonicalGaugeReceipt,
         tolerance: f64,
     ) -> Result<(), U1MpsError> {
+        self.record_with_gate_error_bounds(
+            diagnostics,
+            receipt,
+            0.0,
+            0.0,
+            receipt.input_norm_squared,
+            tolerance,
+        )
+    }
+
+    /// Record a truncation with a measured mixed-canonical gauge receipt and
+    /// explicitly measured gate quality. The matrix residuals are converted
+    /// into conservative operator-error bounds before they enter the ledger.
+    pub fn record_with_canonical_gauge_and_gate(
+        &mut self,
+        diagnostics: &U1TwoSiteTruncationDiagnostics,
+        receipt: &U1CanonicalGaugeReceipt,
+        gate: &U1TwoSiteGate,
+        tolerance: f64,
+    ) -> Result<(), U1MpsError> {
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        let unitarity_residual = gate.unitarity_residual();
+        let charge_residual = gate.charge_conservation_residual();
+        if !unitarity_residual.is_finite() || unitarity_residual > tolerance {
+            return Err(U1MpsError::GateUnitarityResidual {
+                residual: unitarity_residual,
+                tolerance,
+            });
+        }
+        if !charge_residual.is_finite() || charge_residual > tolerance {
+            return Err(U1MpsError::GateChargeConservationResidual {
+                residual: charge_residual,
+                tolerance,
+            });
+        }
+        self.record_with_gate_error_bounds(
+            diagnostics,
+            receipt,
+            unitarity_residual,
+            charge_residual,
+            receipt.input_norm_squared,
+            tolerance,
+        )
+    }
+
+    fn record_with_gate_error_bounds(
+        &mut self,
+        diagnostics: &U1TwoSiteTruncationDiagnostics,
+        receipt: &U1CanonicalGaugeReceipt,
+        gate_unitarity_residual: f64,
+        gate_charge_residual: f64,
+        pre_gate_norm_squared: f64,
+        tolerance: f64,
+    ) -> Result<(), U1MpsError> {
         let prior_count = self.gate_count;
         let prior_qualified = self.global_state_error_bound_qualified;
         let prior_bound = self.global_state_error_bound_upper;
+
+        if !pre_gate_norm_squared.is_finite() || pre_gate_norm_squared < 0.0 {
+            return Err(U1MpsError::NonFiniteContraction(
+                "pre-gate norm in canonical error ledger",
+            ));
+        }
+        if !gate_unitarity_residual.is_finite()
+            || gate_unitarity_residual < 0.0
+            || gate_unitarity_residual >= 1.0
+            || !gate_charge_residual.is_finite()
+            || gate_charge_residual < 0.0
+        {
+            self.global_state_error_bound_qualified = false;
+            self.global_state_error_bound_upper = None;
+            return Err(U1MpsError::NonFiniteContraction(
+                "gate quality residual in canonical error ledger",
+            ));
+        }
+
         self.record_local(diagnostics)?;
         self.canonical_gauge_receipt_count = self
             .canonical_gauge_receipt_count
@@ -2530,10 +2611,26 @@ impl U1MpsTruncationLedger {
             return Ok(());
         }
 
+        // If ||G†G-I||₂ <= delta, the polar-unitary correction is bounded by
+        // max(sqrt(1+delta)-1, 1-sqrt(1-delta)). The supplied Frobenius
+        // residual upper-bounds the spectral norm residual.
+        let delta = gate_unitarity_residual;
+        let unitary_distance_upper =
+            ((1.0 + delta).sqrt() - 1.0).max(1.0 - (1.0 - delta).sqrt());
+        // Ten charge-off-diagonal entries exist in a 4x4 two-qubit gate.
+        // sqrt(10) times their maximum magnitude bounds their Frobenius norm.
+        let charge_distance_upper = 10.0_f64.sqrt() * gate_charge_residual;
+        let gate_quality_error = (unitary_distance_upper + charge_distance_upper)
+            * pre_gate_norm_squared.sqrt();
         let projection_error = diagnostics.discarded_weight.sqrt()
             * receipt.exterior_operator_norm_product_upper_bound();
-        let contribution = receipt.state_reconstruction_l2_residual + projection_error;
-        if !contribution.is_finite() {
+        let canonicalization_error = receipt.state_reconstruction_l2_residual;
+        let contribution =
+            canonicalization_error + gate_quality_error + projection_error;
+        if !contribution.is_finite()
+            || !unitary_distance_upper.is_finite()
+            || !charge_distance_upper.is_finite()
+        {
             return Err(U1MpsError::NonFiniteContraction(
                 "canonical-gauge global truncation contribution",
             ));
@@ -2552,6 +2649,9 @@ impl U1MpsTruncationLedger {
         if let Some(bound) = next_bound {
             self.global_state_error_bound_qualified = true;
             self.global_state_error_bound_upper = Some(bound);
+            self.cumulative_canonicalization_l2_error_bound += canonicalization_error;
+            self.cumulative_gate_quality_l2_error_bound += gate_quality_error;
+            self.cumulative_projection_l2_error_bound += projection_error;
         } else {
             self.global_state_error_bound_qualified = false;
             self.global_state_error_bound_upper = None;
@@ -2700,9 +2800,10 @@ impl U1TeBDLayer {
             )?;
             let evolved_pair = pair.apply_gate(&entry.gate, policy.tolerance)?;
             let truncation = evolved_pair.split_truncated(policy)?;
-            truncation_ledger.record_with_canonical_gauge(
+            truncation_ledger.record_with_canonical_gauge_and_gate(
                 &truncation,
                 &gauge_receipt,
+                &entry.gate,
                 policy.tolerance,
             )?;
             state.tensors[bond] = truncation.left_tensor.clone();
