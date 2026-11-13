@@ -14,7 +14,7 @@ use std::fmt::Write as _;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FiniteGroupV1 {
     pub group_id: String,
     pub identity: usize,
@@ -22,7 +22,7 @@ pub struct FiniteGroupV1 {
 }
 
 /// Left-action convention: p_g(p_h(x)) = p_(g*h)(x).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FiniteActionV1 {
     pub action_id: String,
     pub group: FiniteGroupV1,
@@ -30,7 +30,7 @@ pub struct FiniteActionV1 {
 }
 
 /// Exact task fields required to be invariant before pruning.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CandidateSemanticsV1 {
     pub in_search_domain: bool,
     pub admissible: bool,
@@ -41,14 +41,14 @@ pub struct CandidateSemanticsV1 {
     pub output_equivalence_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SearchProblemV1 {
     pub problem_id: String,
     pub candidate_ids: Vec<String>,
     pub semantics: Vec<CandidateSemanticsV1>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QualificationBudgetV1 {
     pub maximum_group_order: usize,
     pub maximum_candidates: usize,
@@ -67,7 +67,7 @@ impl Default for QualificationBudgetV1 {
 
 /// Canonical content commitments for the exact problem/action/resource inputs.
 /// A digest binds identity; it does not replace independent certificate replay.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct InputCommitmentV1 {
     pub schema_version: String,
     pub canonicalization_id: String,
@@ -201,17 +201,23 @@ pub fn input_commitment_v1(
     })
 }
 
+pub fn canonical_certificate_sha256(
+    certificate: &QuotientCertificateV1,
+) -> Result<String, QuotientErrorV1> {
+    canonical_json_sha256("luminous.symmetry_quotient.certificate.v1", certificate)
+}
+
 #[cfg(test)]
 fn canonical_json_for_test(value: &serde_json::Value) -> Result<Vec<u8>, QuotientErrorV1> {
     canonical_json_bytes(value)
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PruningAuthorityV1 {
     ExactFiniteGroupAndExactTaskSemanticPreservation,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MemberWitnessV1 {
     pub candidate_index: usize,
     pub candidate_id: String,
@@ -219,7 +225,7 @@ pub struct MemberWitnessV1 {
     pub inverse_group_element: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OrbitV1 {
     pub representative_index: usize,
     pub representative_id: String,
@@ -228,7 +234,7 @@ pub struct OrbitV1 {
     pub stabilizer_group_elements: Vec<usize>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CertificateEvidenceV1 {
     pub group_axiom_checks: usize,
     pub action_law_checks: usize,
@@ -241,7 +247,7 @@ pub struct CertificateEvidenceV1 {
     pub complete_domain_cover: bool,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QuotientCertificateV1 {
     pub schema_version: u32,
     pub input_commitment: InputCommitmentV1,
@@ -270,9 +276,11 @@ pub enum CompileOutcomeV1 {
     Blocked(TaskInvarianceViolationV1),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct VerificationReceiptV1 {
     pub input_commitment: InputCommitmentV1,
+    /// Canonical SHA-256 of the exact serialized certificate artifact.
+    pub certificate_sha256: String,
     pub problem_id: String,
     pub action_id: String,
     pub group_id: String,
@@ -946,8 +954,10 @@ pub fn verify_certificate(
         return Err(QuotientErrorV1::EvidenceCountMismatch);
     }
 
+    let certificate_sha256 = canonical_certificate_sha256(certificate)?;
     Ok(VerificationReceiptV1 {
         input_commitment: expected_input_commitment,
+        certificate_sha256,
         problem_id: problem.problem_id.clone(),
         action_id: action.action_id.clone(),
         group_id: action.group.group_id.clone(),
@@ -1166,6 +1176,30 @@ mod tests {
         assert_ne!(first.budget_sha256, changed.budget_sha256);
         assert_eq!(first.problem_sha256, changed.problem_sha256);
         assert_eq!(first.action_sha256, changed.action_sha256);
+    }
+
+    #[test]
+    fn certificate_round_trips_as_canonical_json_and_receipt_hashes_exact_artifact() {
+        let (problem, action, certificate) = authorized_fixture();
+        let bytes = canonical_json_bytes(&certificate).unwrap();
+        let decoded: QuotientCertificateV1 = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(decoded, certificate);
+        assert_eq!(
+            canonical_certificate_sha256(&decoded).unwrap(),
+            canonical_certificate_sha256(&certificate).unwrap()
+        );
+
+        let receipt = verify_certificate(
+            &problem,
+            &action,
+            &decoded,
+            QualificationBudgetV1::default()
+        )
+        .unwrap();
+        assert_eq!(
+            receipt.certificate_sha256,
+            canonical_certificate_sha256(&certificate).unwrap()
+        );
     }
 
     #[test]
@@ -1530,7 +1564,7 @@ mod tests {
     #[test]
     fn mismatched_input_commitment_is_rejected_before_replay() {
         let (problem, action, mut certificate) = authorized_fixture();
-        certificate.input_commitment.problem_sha256.replace_range(0..1, "f");
+        certificate.input_commitment.problem_sha256 = "0".repeat(64);
         assert_eq!(
             verify_certificate(
                 &problem,
