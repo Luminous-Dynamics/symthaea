@@ -49,11 +49,11 @@ Include converter and protection losses at the installed-system boundary where a
 
 Measure:
 - time to restored readiness;
-- readiness-probe result and exact probe profile;
+- readiness-probe result and exact, frozen probe-profile ID;
 - source-side replenishment energy;
 - auxiliary energy used during the idle/recovery interval.
 
-A voltage rebound is not, by itself, proof that usable energy or power has recovered. The readiness probe must measure an application-relevant capability. Its own energy, disturbance, latency and impact on the next event must be characterized; use a matched control or an identical probe on all devices. Do not silently let the probe consume reserve without accounting for it.
+A voltage rebound is not, by itself, proof that usable energy or power has recovered. Every later call must reference a non-empty readiness-probe profile ID; the same probe ID is required across compared devices. The readiness probe must measure an application-relevant capability. Its own energy, disturbance, latency and impact on the next event must be characterized; use a matched control or an identical probe on all devices. Do not silently let the probe consume reserve without accounting for it.
 
 A false-ready event occurs when the readiness probe reports ready but the subsequent actual application event fails its service contract.
 
