@@ -55,7 +55,7 @@ The canonical source is crates/domains/symthaea-muse/src/counterfactual_influenc
 
 ## Deterministic tests authored
 
-The module now contains twelve test functions. The additional transposition cases cover:
+The module now contains thirteen test functions, including an exhaustive finite-domain property test over all 128 MIDI pitches, all signed deltas -127..=127, and both target indices. The additional transposition cases cover:
 
 1. exact +2-semitone target transformation with preserved lineage/timing and replay-verifiable influence report;
 2. a valid renderer receipt for +3 semitones falsely declared as +2, which must reject;
