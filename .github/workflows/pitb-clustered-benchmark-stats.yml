@@ -6,7 +6,6 @@ on:
     paths:
       - "tools/pitb-clustered-benchmark-stats/**"
       - "tools/pitb-sorrydb-audit/schema/sorrydb-proof-run-v0.schema.json"
-      - ".github/workflows/pitb-clustered-benchmark-stats.yml"
   workflow_dispatch:
 
 permissions:
