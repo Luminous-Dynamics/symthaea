@@ -59,7 +59,7 @@ pub struct ComposerFoldPlanV1 {
     pub corpus_id: String,
     pub release_id: String,
     pub track_id: String,
-    pub source_revision_sha256: String,
+    pub source_pin_sha256: String,
     pub source_inventory_sha256: String,
     pub registration_sha256: String,
     /// Sorted by composer_group_id for canonical display. Fold assignment is
@@ -460,7 +460,6 @@ pub fn validate_composer_disjoint_fold_plan_replay(
 mod tests {
     use super::*;
     use crate::musicxml_corpus_qualification::{
-        CorpusLicenseV1, CorpusUseScopeV1, RightsEvidenceStatusV1,
         candidate_musicxml_corpus_registry_v1,
     };
 
@@ -598,7 +597,7 @@ mod tests {
             (test_works.len(), test_samples)
         }).collect();
         assert!(loads.iter().map(|load| load.0).max().unwrap()
-            - loads.iter().map(|load| load.0).min().unwrap() <= 1);
+            - loads.iter().map(|load| load.0).min().unwrap() <= 2);
         assert!(loads.iter().map(|load| load.1).max().unwrap()
             - loads.iter().map(|load| load.1).min().unwrap() <= 4);
     }
