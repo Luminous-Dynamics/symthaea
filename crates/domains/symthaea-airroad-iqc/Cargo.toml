@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-airroad-iqc"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+license = "AGPL-3.0-or-later"
+description = "Evidence-preserving MIMO IQC and semidefinite backend primitives for AIRROAD"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
