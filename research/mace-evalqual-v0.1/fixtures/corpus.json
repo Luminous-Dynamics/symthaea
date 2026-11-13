@@ -1,0 +1,79 @@
+{
+  "schema_version": "mace-evalqual/v1",
+  "benchmark": {
+    "name": "mace-evalqual-demonstrator",
+    "version": "0.1.0",
+    "revision": "mace-demonstrator-revision-1",
+    "split": "synthetic-qualification-fixtures",
+    "task_set_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "sampling": {
+    "design": "fixed_adversarial_corpus",
+    "unit": "fixture",
+    "independence_caveat": "These hand-authored fixtures are clustered within task families and are not an IID sample. No population-level error-rate inference is permitted."
+  },
+  "fixtures": [
+    {
+      "id": "file-reference",
+      "task_id": "file-task-1",
+      "task_family": "file-write",
+      "kind": "positive",
+      "expected": {"task_result": "pass", "effect_assurance_result": "pass", "benchmark_integrity_result": "pass"}
+    },
+    {
+      "id": "file-noop",
+      "task_id": "file-task-1",
+      "task_family": "file-write",
+      "kind": "negative",
+      "mutation_family": "no-op",
+      "target_dimension": "task",
+      "baseline_fixture_id": "file-reference",
+      "paired_fixture_id": "file-noop-removed",
+      "expected": {"task_result": "fail", "effect_assurance_result": "not_applicable", "benchmark_integrity_result": "pass"}
+    },
+    {
+      "id": "file-noop-removed",
+      "task_id": "file-task-1",
+      "task_family": "file-write",
+      "kind": "condition_removed",
+      "baseline_fixture_id": "file-reference",
+      "paired_fixture_id": "file-noop",
+      "expected": {"task_result": "pass", "effect_assurance_result": "pass", "benchmark_integrity_result": "pass"}
+    },
+    {
+      "id": "file-representation-twin",
+      "task_id": "file-task-1",
+      "task_family": "file-write",
+      "kind": "representation_twin",
+      "baseline_fixture_id": "file-reference",
+      "expected": {"task_result": "pass", "effect_assurance_result": "pass", "benchmark_integrity_result": "pass"}
+    },
+    {
+      "id": "payment-reference",
+      "task_id": "payment-task-1",
+      "task_family": "payment",
+      "kind": "positive",
+      "expected": {"task_result": "pass", "effect_assurance_result": "pass", "benchmark_integrity_result": "pass"}
+    },
+    {
+      "id": "payment-wrong-principal",
+      "task_id": "payment-task-1",
+      "task_family": "payment",
+      "kind": "negative",
+      "mutation_family": "principal-substitution",
+      "target_dimension": "effect_assurance",
+      "baseline_fixture_id": "payment-reference",
+      "paired_fixture_id": "payment-principal-removed",
+      "expected": {"task_result": "pass", "effect_assurance_result": "fail", "benchmark_integrity_result": "pass"}
+    },
+    {
+      "id": "payment-principal-removed",
+      "task_id": "payment-task-1",
+      "task_family": "payment",
+      "kind": "condition_removed",
+      "baseline_fixture_id": "payment-reference",
+      "paired_fixture_id": "payment-wrong-principal",
+      "expected": {"task_result": "pass", "effect_assurance_result": "pass", "benchmark_integrity_result": "pass"}
+    }
+  ]
+}
