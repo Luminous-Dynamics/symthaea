@@ -529,8 +529,8 @@ fn audit_schema(root: &Path) -> Result<()> {
     {
         bail!("readiness_probe_profile_id must allow string and null types");
     }
-    if schema["$defs"]["deviceSequence"]["allOf"].as_array().map_or(true, |rules| rules.len() < 2)
-        || schema["$defs"]["event"]["allOf"].as_array().map_or(true, |rules| rules.len() < 2)
+    if schema["$defs"]["deviceSequence"]["allOf"].as_array().is_none_or(|rules| rules.len() < 2)
+        || schema["$defs"]["event"]["allOf"].as_array().is_none_or(|rules| rules.len() < 2)
     {
         bail!("sequence schema must encode measured/censored and readiness-probe conditional invariants");
     }
