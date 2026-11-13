@@ -5970,6 +5970,16 @@ mod notation_summary_tests {
         assert_eq!(summary.unknown_part_count, 0);
         assert_eq!(summary.measure_count, 1);
         assert_eq!(summary.barline_event_count, 1);
+        assert_eq!(summary.notation_event_count, 1);
+        assert_eq!(summary.notation_supported_part_count, 1);
+        assert_eq!(summary.notation_unknown_part_count, 0);
+        assert_eq!(summary.rest_event_count, 1);
+        assert_eq!(summary.grace_note_count, 0);
+        assert_eq!(summary.tuplet_notation_count, 0);
+        assert_eq!(summary.sound_tie_count, 0);
+        assert_eq!(summary.visual_tie_count, 0);
+        assert_eq!(summary.voice_assignment_count, 0);
+        assert_eq!(summary.staff_assignment_count, 0);
         assert_eq!(summary.source_sha256, source_sha256);
         let sidecar = match sidecar.expect("MusicXML graph must be persisted") {
             ImportedNotationArtifact::MusicXmlGraph(bytes) => bytes,
@@ -6019,8 +6029,8 @@ mod notation_summary_tests {
             parts: vec![symthaea_muse::midi_measure_sidecar::MidiPartMeasureSidecarV1 {
                 part_id: "Piano".into(),
                 source_track_index: 0,
-                measures:source_channel: None,
-                measures:measures: vec![symthaea_muse::midi_measure_sidecar::MidiMeasureSpanSidecarV1 {
+                source_channel: None,
+                measures: vec![symthaea_muse::midi_measure_sidecar::MidiMeasureSpanSidecarV1 {
                     start_tick: 0,
                     end_tick: 1920,
                     kind: symthaea_muse::barline_eval::MeasureKind::Regular,
