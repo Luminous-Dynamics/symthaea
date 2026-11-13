@@ -578,21 +578,6 @@ impl<const K: usize> AbelianChargeBlockPlan<K> {
                 .map(|&index| decomposition.singular_values[index])
                 .collect::<Vec<_>>();
 
-            for row in 0..block.rows.len() {
-                for column in 0..block.columns.len() {
-                    let mut reconstructed = Complex64::new(0.0, 0.0);
-                    for mode in 0..singular_values.len() {
-                        reconstructed += left_vectors[(row, mode)]
-                            * singular_values[mode]
-                            * right_vectors_t[(mode, column)];
-                    }
-                    let residual = (reconstructed - matrix[(row, column)]).norm();
-                    reconstruction_max_residual =
-                        reconstruction_max_residual.max(residual);
-                    reconstruction_squared += residual * residual;
-                }
-            }
-
             factors.push(BlockFactor {
                 charge: block.intermediate_charge,
                 rows: block.rows.clone(),
