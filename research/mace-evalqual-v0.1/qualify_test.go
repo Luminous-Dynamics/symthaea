@@ -250,7 +250,7 @@ func TestManifestMustMatchPinnedBenchmark(t *testing.T) {
 
 func TestIIDZeroErrorBoundIsExplicitAndCorrect(t *testing.T) {
 	c := testCorpus()
-	c.Sampling = SamplingPlan{Design: "iid_random", Unit: "independent task draw", FrameSHA256: digestByte("8"), SelectionSeed: "seed-1", SelectionMethod: "uniform draw without replacement", IndependenceCaveat: "Assume independent task-level draws for this illustrative sample."}
+	c.Sampling = SamplingPlan{Design: "iid_random", Unit: "independent task draw", FrameSHA256: digestByte("8"), SelectionSeed: "seed-1", SelectionMethod: "uniform independent draw with replacement", IndependenceCaveat: "Assume independent task-level draws for this illustrative sample."}
 	m := testManifest(c)
 	cb, mb := marshal(t, c), marshal(t, m)
 	o := testObservations(c, m, cb, mb)
