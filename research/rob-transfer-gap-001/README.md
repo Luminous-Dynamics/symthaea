@@ -45,7 +45,12 @@ Unknown episodes remain in the scheduled denominator and make the affected dimen
 
 ## Transfer-gap vector
 
-Rates are calculated within each independent cluster. Cluster rates are then equally weighted in the descriptive mean so a high-volume source cannot dominate the result with correlated episodes.
+Rates are calculated within each independent cluster. The report now presents two distinct descriptive weighting views:
+
+1. **Cluster-equal:** each independent cluster rate receives equal weight. This prevents episodes within one cluster from dominating through volume.
+2. **Source-group-equal:** cluster rates are averaged within each source group first, then each source group receives equal weight. This prevents a site, morphology, operator or dataset source with more independent clusters from dominating merely because it contributed more clusters.
+
+Both views include their own transfer gaps and candidate-vs-baseline difference-in-differences, alongside min/max group and cluster rates. Neither replaces independent-cluster inference in #11807. The views expose a weighting sensitivity; neither should be selected post hoc as the favourable headline. The preregistered inferential estimand and sampling design remain responsible for confirmatory claims.
 
 For outcome axis y:
 
@@ -60,7 +65,7 @@ Candidate improvement relative to baseline:
 
 Positive difference-in-differences indicates a less negative observed source-transfer gap for the candidate under this frozen scope. This is descriptive only; it is not a causal claim, confidence interval or p-value.
 
-The report includes per-cluster rates, source group counts, cluster counts, episodes, min/max rates, per-axis familiar/hidden rates, transfer gaps and difference-in-differences.
+The report includes per-cluster rates, source-group-equal rates, source group counts, cluster counts, episodes, min/max cluster and group rates, per-axis familiar/hidden rates, both transfer-gap views and both difference-in-differences.
 
 ## Statistical boundary
 
@@ -68,7 +73,7 @@ The crate does not run statistical inference. Source groups, independent cluster
 
 ## Running the reference
 
-The package is dependency-free and isolated from the Symthaea root Cargo workspace. The reference currently has 27 authored deterministic tests; they remain unqualified until the exact-head Rust 1.96 workflow completes:
+The package is dependency-free and isolated from the Symthaea root Cargo workspace. The reference currently has 28 authored deterministic tests; they remain unqualified until the exact-head Rust 1.96 workflow completes:
 
     cargo fmt --manifest-path research/rob-transfer-gap-001/reference/Cargo.toml -- --check
     cargo test --locked --manifest-path research/rob-transfer-gap-001/reference/Cargo.toml
