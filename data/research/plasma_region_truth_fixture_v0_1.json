@@ -7,60 +7,10 @@
   "description": "Synthetic evidence-support and registration contract fixture. PASS is not product acceptance.",
   "cases": [
     {
-      "id": "PIXEL_LEAKAGE",
-      "expected": "REJECTED",
-      "support_class": "AREA",
-      "claim_level": "area",
-      "evidence_class": "PHYSICAL",
-      "requires_physical": true,
-      "claimed_independent_count": 1,
-      "geometry_revision": "geom-v1",
-      "exposure_geometry_revision": "geom-v1",
-      "source_frame": "article-frame-v1",
-      "target_frame": "surface-frame-v1",
-      "exposure_frame": "surface-frame-v1",
-      "transform_id": "transform-v1",
-      "transform_calibration_id": "cal-transform-v1",
-      "registration_bound_mm": 0.15,
-      "allowed_registration_bound_mm": 0.3,
-      "decision_margin_mm": 1,
-      "observation_start_ms": 100,
-      "observation_end_ms": 200,
-      "exposure_start_ms": 120,
-      "exposure_end_ms": 180,
-      "time_uncertainty_ms": 5,
-      "footprint_id": "footprint-v1",
-      "support_area_mm2": 25,
-      "has_weighting": true,
-      "train_groups": [
-        "specimen-shared",
-        "lot-train-A"
-      ],
-      "test_groups": [
-        "specimen-shared",
-        "lot-test-B"
-      ],
-      "critical_unknown_regions": 0,
-      "critical_failed_regions": 0,
-      "whole_area_mean_passes": true,
-      "acceptance_claim": false,
-      "aggregate_operator_mode": "NONE",
-      "aggregate_operator_validated": false,
-      "independent_local_truth": false,
-      "shared_common_cause": false,
-      "covariance_receipt_present": false,
-      "source_observation_ids": [
-        "obs-pixel_leakage"
-      ],
-      "support_ids": [
-        "support-pixel_leakage"
-      ]
-    },
-    {
-      "id": "SPECIMEN_TO_PIXEL_SMEAR",
-      "expected": "REJECTED",
+      "id": "AGGREGATE_OPERATOR",
+      "expected": "BLOCKED",
       "support_class": "SPECIMEN",
-      "claim_level": "point",
+      "claim_level": "field",
       "evidence_class": "PHYSICAL",
       "requires_physical": true,
       "claimed_independent_count": 1,
@@ -94,16 +44,16 @@
       "critical_failed_regions": 0,
       "whole_area_mean_passes": true,
       "acceptance_claim": false,
-      "aggregate_operator_mode": "NONE",
+      "aggregate_operator_mode": "INVERSE_RECONSTRUCTION",
       "aggregate_operator_validated": false,
       "independent_local_truth": false,
       "shared_common_cause": false,
       "covariance_receipt_present": false,
       "source_observation_ids": [
-        "obs-specimen_to_pixel_smear"
+        "obs-aggregate_operator"
       ],
       "support_ids": [
-        "support-specimen_to_pixel_smear"
+        "support-aggregate_operator"
       ]
     },
     {
@@ -157,10 +107,10 @@
       ]
     },
     {
-      "id": "REGISTRATION_BOUNDARY",
+      "id": "AREA_TO_SPECIMEN_NO_AGGREGATION",
       "expected": "BLOCKED",
       "support_class": "AREA",
-      "claim_level": "area",
+      "claim_level": "specimen",
       "evidence_class": "PHYSICAL",
       "requires_physical": true,
       "claimed_independent_count": 1,
@@ -171,9 +121,9 @@
       "exposure_frame": "surface-frame-v1",
       "transform_id": "transform-v1",
       "transform_calibration_id": "cal-transform-v1",
-      "registration_bound_mm": 0.65,
+      "registration_bound_mm": 0.15,
       "allowed_registration_bound_mm": 0.3,
-      "decision_margin_mm": 0.5,
+      "decision_margin_mm": 1,
       "observation_start_ms": 100,
       "observation_end_ms": 200,
       "exposure_start_ms": 120,
@@ -200,10 +150,164 @@
       "shared_common_cause": false,
       "covariance_receipt_present": false,
       "source_observation_ids": [
-        "obs-registration_boundary"
+        "obs-area_to_specimen_no_aggregation"
       ],
       "support_ids": [
-        "support-registration_boundary"
+        "support-area_to_specimen_no_aggregation"
+      ]
+    },
+    {
+      "id": "COMPLETE_SYNTHETIC",
+      "expected": "PASS",
+      "support_class": "AREA",
+      "claim_level": "area",
+      "evidence_class": "SYNTHETIC",
+      "requires_physical": false,
+      "claimed_independent_count": 1,
+      "geometry_revision": "geom-v1",
+      "exposure_geometry_revision": "geom-v1",
+      "source_frame": "article-frame-v1",
+      "target_frame": "surface-frame-v1",
+      "exposure_frame": "surface-frame-v1",
+      "transform_id": "transform-v1",
+      "transform_calibration_id": "cal-transform-v1",
+      "registration_bound_mm": 0.15,
+      "allowed_registration_bound_mm": 0.3,
+      "decision_margin_mm": 1,
+      "observation_start_ms": 100,
+      "observation_end_ms": 200,
+      "exposure_start_ms": 120,
+      "exposure_end_ms": 180,
+      "time_uncertainty_ms": 5,
+      "footprint_id": "footprint-v1",
+      "support_area_mm2": 25,
+      "has_weighting": true,
+      "train_groups": [
+        "specimen-train-01",
+        "lot-train-A"
+      ],
+      "test_groups": [
+        "specimen-test-01",
+        "lot-test-B"
+      ],
+      "critical_unknown_regions": 0,
+      "critical_failed_regions": 0,
+      "whole_area_mean_passes": true,
+      "acceptance_claim": false,
+      "aggregate_operator_mode": "NONE",
+      "aggregate_operator_validated": false,
+      "independent_local_truth": false,
+      "shared_common_cause": false,
+      "covariance_receipt_present": false,
+      "source_observation_ids": [
+        "obs-complete_synthetic"
+      ],
+      "support_ids": [
+        "support-complete_synthetic"
+      ]
+    },
+    {
+      "id": "CORRELATED_SPATIAL_SUPPORT",
+      "expected": "REJECTED",
+      "support_class": "AREA",
+      "claim_level": "area",
+      "evidence_class": "PHYSICAL",
+      "requires_physical": true,
+      "claimed_independent_count": 4,
+      "geometry_revision": "geom-v1",
+      "exposure_geometry_revision": "geom-v1",
+      "source_frame": "article-frame-v1",
+      "target_frame": "surface-frame-v1",
+      "exposure_frame": "surface-frame-v1",
+      "transform_id": "transform-v1",
+      "transform_calibration_id": "cal-transform-v1",
+      "registration_bound_mm": 0.15,
+      "allowed_registration_bound_mm": 0.3,
+      "decision_margin_mm": 1,
+      "observation_start_ms": 100,
+      "observation_end_ms": 200,
+      "exposure_start_ms": 120,
+      "exposure_end_ms": 180,
+      "time_uncertainty_ms": 5,
+      "footprint_id": "footprint-v1",
+      "support_area_mm2": 25,
+      "has_weighting": true,
+      "train_groups": [
+        "specimen-train-01",
+        "lot-train-A"
+      ],
+      "test_groups": [
+        "specimen-test-01",
+        "lot-test-B"
+      ],
+      "critical_unknown_regions": 0,
+      "critical_failed_regions": 0,
+      "whole_area_mean_passes": true,
+      "acceptance_claim": false,
+      "aggregate_operator_mode": "NONE",
+      "aggregate_operator_validated": false,
+      "independent_local_truth": false,
+      "shared_common_cause": true,
+      "covariance_receipt_present": false,
+      "source_observation_ids": [
+        "obs-correlated_spatial_support"
+      ],
+      "support_ids": [
+        "support-correlated_spatial_support"
+      ]
+    },
+    {
+      "id": "DUPLICATE_SUPPORT",
+      "expected": "REJECTED",
+      "support_class": "AREA",
+      "claim_level": "area",
+      "evidence_class": "PHYSICAL",
+      "requires_physical": true,
+      "claimed_independent_count": 3,
+      "geometry_revision": "geom-v1",
+      "exposure_geometry_revision": "geom-v1",
+      "source_frame": "article-frame-v1",
+      "target_frame": "surface-frame-v1",
+      "exposure_frame": "surface-frame-v1",
+      "transform_id": "transform-v1",
+      "transform_calibration_id": "cal-transform-v1",
+      "registration_bound_mm": 0.15,
+      "allowed_registration_bound_mm": 0.3,
+      "decision_margin_mm": 1,
+      "observation_start_ms": 100,
+      "observation_end_ms": 200,
+      "exposure_start_ms": 120,
+      "exposure_end_ms": 180,
+      "time_uncertainty_ms": 5,
+      "footprint_id": "footprint-v1",
+      "support_area_mm2": 25,
+      "has_weighting": true,
+      "train_groups": [
+        "specimen-train-01",
+        "lot-train-A"
+      ],
+      "test_groups": [
+        "specimen-test-01",
+        "lot-test-B"
+      ],
+      "critical_unknown_regions": 0,
+      "critical_failed_regions": 0,
+      "whole_area_mean_passes": true,
+      "acceptance_claim": false,
+      "aggregate_operator_mode": "NONE",
+      "aggregate_operator_validated": false,
+      "independent_local_truth": false,
+      "shared_common_cause": false,
+      "covariance_receipt_present": false,
+      "source_observation_ids": [
+        "obs-duplicate",
+        "obs-duplicate",
+        "obs-distinct"
+      ],
+      "support_ids": [
+        "support-duplicate",
+        "support-duplicate",
+        "support-distinct"
       ]
     },
     {
@@ -257,10 +361,10 @@
       ]
     },
     {
-      "id": "UNKNOWN_REGION",
-      "expected": "BLOCKED",
-      "support_class": "AREA",
-      "claim_level": "area",
+      "id": "FIELD_SUPPORT",
+      "expected": "PASS",
+      "support_class": "FIELD",
+      "claim_level": "field",
       "evidence_class": "PHYSICAL",
       "requires_physical": true,
       "claimed_independent_count": 1,
@@ -279,9 +383,9 @@
       "exposure_start_ms": 120,
       "exposure_end_ms": 180,
       "time_uncertainty_ms": 5,
-      "footprint_id": "footprint-v1",
-      "support_area_mm2": 25,
-      "has_weighting": true,
+      "footprint_id": null,
+      "support_area_mm2": 0,
+      "has_weighting": false,
       "train_groups": [
         "specimen-train-01",
         "lot-train-A"
@@ -290,21 +394,26 @@
         "specimen-test-01",
         "lot-test-B"
       ],
-      "critical_unknown_regions": 2,
+      "critical_unknown_regions": 0,
       "critical_failed_regions": 0,
       "whole_area_mean_passes": true,
-      "acceptance_claim": true,
+      "acceptance_claim": false,
       "aggregate_operator_mode": "NONE",
       "aggregate_operator_validated": false,
       "independent_local_truth": false,
       "shared_common_cause": false,
       "covariance_receipt_present": false,
       "source_observation_ids": [
-        "obs-unknown_region"
+        "obs-field_support"
       ],
       "support_ids": [
-        "support-unknown_region"
-      ]
+        "support-field_support"
+      ],
+      "field_scope_id": "surface-region-v1",
+      "field_sampling_plan_id": "sample-plan-v1",
+      "field_interpolation_method": "none-direct-samples",
+      "field_spatial_resolution_mm": 1,
+      "field_unmapped_region_count": 0
     },
     {
       "id": "GEOMETRY_REVISION_MISMATCH",
@@ -354,106 +463,6 @@
       ],
       "support_ids": [
         "support-geometry_revision_mismatch"
-      ]
-    },
-    {
-      "id": "TIME_SUPPORT_MISMATCH",
-      "expected": "BLOCKED",
-      "support_class": "AREA",
-      "claim_level": "area",
-      "evidence_class": "PHYSICAL",
-      "requires_physical": true,
-      "claimed_independent_count": 1,
-      "geometry_revision": "geom-v1",
-      "exposure_geometry_revision": "geom-v1",
-      "source_frame": "article-frame-v1",
-      "target_frame": "surface-frame-v1",
-      "exposure_frame": "surface-frame-v1",
-      "transform_id": "transform-v1",
-      "transform_calibration_id": "cal-transform-v1",
-      "registration_bound_mm": 0.15,
-      "allowed_registration_bound_mm": 0.3,
-      "decision_margin_mm": 1,
-      "observation_start_ms": 500,
-      "observation_end_ms": 600,
-      "exposure_start_ms": 100,
-      "exposure_end_ms": 200,
-      "time_uncertainty_ms": 5,
-      "footprint_id": "footprint-v1",
-      "support_area_mm2": 25,
-      "has_weighting": true,
-      "train_groups": [
-        "specimen-train-01",
-        "lot-train-A"
-      ],
-      "test_groups": [
-        "specimen-test-01",
-        "lot-test-B"
-      ],
-      "critical_unknown_regions": 0,
-      "critical_failed_regions": 0,
-      "whole_area_mean_passes": true,
-      "acceptance_claim": false,
-      "aggregate_operator_mode": "NONE",
-      "aggregate_operator_validated": false,
-      "independent_local_truth": false,
-      "shared_common_cause": false,
-      "covariance_receipt_present": false,
-      "source_observation_ids": [
-        "obs-time_support_mismatch"
-      ],
-      "support_ids": [
-        "support-time_support_mismatch"
-      ]
-    },
-    {
-      "id": "CORRELATED_SPATIAL_SUPPORT",
-      "expected": "REJECTED",
-      "support_class": "AREA",
-      "claim_level": "area",
-      "evidence_class": "PHYSICAL",
-      "requires_physical": true,
-      "claimed_independent_count": 4,
-      "geometry_revision": "geom-v1",
-      "exposure_geometry_revision": "geom-v1",
-      "source_frame": "article-frame-v1",
-      "target_frame": "surface-frame-v1",
-      "exposure_frame": "surface-frame-v1",
-      "transform_id": "transform-v1",
-      "transform_calibration_id": "cal-transform-v1",
-      "registration_bound_mm": 0.15,
-      "allowed_registration_bound_mm": 0.3,
-      "decision_margin_mm": 1,
-      "observation_start_ms": 100,
-      "observation_end_ms": 200,
-      "exposure_start_ms": 120,
-      "exposure_end_ms": 180,
-      "time_uncertainty_ms": 5,
-      "footprint_id": "footprint-v1",
-      "support_area_mm2": 25,
-      "has_weighting": true,
-      "train_groups": [
-        "specimen-train-01",
-        "lot-train-A"
-      ],
-      "test_groups": [
-        "specimen-test-01",
-        "lot-test-B"
-      ],
-      "critical_unknown_regions": 0,
-      "critical_failed_regions": 0,
-      "whole_area_mean_passes": true,
-      "acceptance_claim": false,
-      "aggregate_operator_mode": "NONE",
-      "aggregate_operator_validated": false,
-      "independent_local_truth": false,
-      "shared_common_cause": true,
-      "covariance_receipt_present": false,
-      "source_observation_ids": [
-        "obs-correlated_spatial_support"
-      ],
-      "support_ids": [
-        "support-correlated_spatial_support"
       ]
     },
     {
@@ -557,10 +566,160 @@
       ]
     },
     {
-      "id": "AGGREGATE_OPERATOR",
+      "id": "PIXEL_LEAKAGE",
+      "expected": "REJECTED",
+      "support_class": "AREA",
+      "claim_level": "area",
+      "evidence_class": "PHYSICAL",
+      "requires_physical": true,
+      "claimed_independent_count": 1,
+      "geometry_revision": "geom-v1",
+      "exposure_geometry_revision": "geom-v1",
+      "source_frame": "article-frame-v1",
+      "target_frame": "surface-frame-v1",
+      "exposure_frame": "surface-frame-v1",
+      "transform_id": "transform-v1",
+      "transform_calibration_id": "cal-transform-v1",
+      "registration_bound_mm": 0.15,
+      "allowed_registration_bound_mm": 0.3,
+      "decision_margin_mm": 1,
+      "observation_start_ms": 100,
+      "observation_end_ms": 200,
+      "exposure_start_ms": 120,
+      "exposure_end_ms": 180,
+      "time_uncertainty_ms": 5,
+      "footprint_id": "footprint-v1",
+      "support_area_mm2": 25,
+      "has_weighting": true,
+      "train_groups": [
+        "specimen-shared",
+        "lot-train-A"
+      ],
+      "test_groups": [
+        "specimen-shared",
+        "lot-test-B"
+      ],
+      "critical_unknown_regions": 0,
+      "critical_failed_regions": 0,
+      "whole_area_mean_passes": true,
+      "acceptance_claim": false,
+      "aggregate_operator_mode": "NONE",
+      "aggregate_operator_validated": false,
+      "independent_local_truth": false,
+      "shared_common_cause": false,
+      "covariance_receipt_present": false,
+      "source_observation_ids": [
+        "obs-pixel_leakage"
+      ],
+      "support_ids": [
+        "support-pixel_leakage"
+      ]
+    },
+    {
+      "id": "POINT_SUPPORT",
+      "expected": "PASS",
+      "support_class": "POINT",
+      "claim_level": "point",
+      "evidence_class": "PHYSICAL",
+      "requires_physical": true,
+      "claimed_independent_count": 1,
+      "geometry_revision": "geom-v1",
+      "exposure_geometry_revision": "geom-v1",
+      "source_frame": "article-frame-v1",
+      "target_frame": "surface-frame-v1",
+      "exposure_frame": "surface-frame-v1",
+      "transform_id": "transform-v1",
+      "transform_calibration_id": "cal-transform-v1",
+      "registration_bound_mm": 0.15,
+      "allowed_registration_bound_mm": 0.3,
+      "decision_margin_mm": 1,
+      "observation_start_ms": 100,
+      "observation_end_ms": 200,
+      "exposure_start_ms": 120,
+      "exposure_end_ms": 180,
+      "time_uncertainty_ms": 5,
+      "footprint_id": "point-footprint-v1",
+      "support_area_mm2": 0.25,
+      "has_weighting": true,
+      "train_groups": [
+        "specimen-train-01",
+        "lot-train-A"
+      ],
+      "test_groups": [
+        "specimen-test-01",
+        "lot-test-B"
+      ],
+      "critical_unknown_regions": 0,
+      "critical_failed_regions": 0,
+      "whole_area_mean_passes": true,
+      "acceptance_claim": false,
+      "aggregate_operator_mode": "NONE",
+      "aggregate_operator_validated": false,
+      "independent_local_truth": false,
+      "shared_common_cause": false,
+      "covariance_receipt_present": false,
+      "source_observation_ids": [
+        "obs-point_support"
+      ],
+      "support_ids": [
+        "support-point_support"
+      ]
+    },
+    {
+      "id": "REGISTRATION_BOUNDARY",
       "expected": "BLOCKED",
+      "support_class": "AREA",
+      "claim_level": "area",
+      "evidence_class": "PHYSICAL",
+      "requires_physical": true,
+      "claimed_independent_count": 1,
+      "geometry_revision": "geom-v1",
+      "exposure_geometry_revision": "geom-v1",
+      "source_frame": "article-frame-v1",
+      "target_frame": "surface-frame-v1",
+      "exposure_frame": "surface-frame-v1",
+      "transform_id": "transform-v1",
+      "transform_calibration_id": "cal-transform-v1",
+      "registration_bound_mm": 0.65,
+      "allowed_registration_bound_mm": 0.3,
+      "decision_margin_mm": 0.5,
+      "observation_start_ms": 100,
+      "observation_end_ms": 200,
+      "exposure_start_ms": 120,
+      "exposure_end_ms": 180,
+      "time_uncertainty_ms": 5,
+      "footprint_id": "footprint-v1",
+      "support_area_mm2": 25,
+      "has_weighting": true,
+      "train_groups": [
+        "specimen-train-01",
+        "lot-train-A"
+      ],
+      "test_groups": [
+        "specimen-test-01",
+        "lot-test-B"
+      ],
+      "critical_unknown_regions": 0,
+      "critical_failed_regions": 0,
+      "whole_area_mean_passes": true,
+      "acceptance_claim": false,
+      "aggregate_operator_mode": "NONE",
+      "aggregate_operator_validated": false,
+      "independent_local_truth": false,
+      "shared_common_cause": false,
+      "covariance_receipt_present": false,
+      "source_observation_ids": [
+        "obs-registration_boundary"
+      ],
+      "support_ids": [
+        "support-registration_boundary"
+      ]
+    },
+    {
+      "id": "SPECIMEN_SUPPORT",
+      "expected": "PASS",
       "support_class": "SPECIMEN",
-      "claim_level": "field",
+      "claim_level": "specimen",
       "evidence_class": "PHYSICAL",
       "requires_physical": true,
       "claimed_independent_count": 1,
@@ -594,26 +753,26 @@
       "critical_failed_regions": 0,
       "whole_area_mean_passes": true,
       "acceptance_claim": false,
-      "aggregate_operator_mode": "INVERSE_RECONSTRUCTION",
+      "aggregate_operator_mode": "NONE",
       "aggregate_operator_validated": false,
       "independent_local_truth": false,
       "shared_common_cause": false,
       "covariance_receipt_present": false,
       "source_observation_ids": [
-        "obs-aggregate_operator"
+        "obs-specimen_support"
       ],
       "support_ids": [
-        "support-aggregate_operator"
+        "support-specimen_support"
       ]
     },
     {
-      "id": "DUPLICATE_SUPPORT",
+      "id": "SPECIMEN_TO_PIXEL_SMEAR",
       "expected": "REJECTED",
-      "support_class": "AREA",
-      "claim_level": "area",
+      "support_class": "SPECIMEN",
+      "claim_level": "point",
       "evidence_class": "PHYSICAL",
       "requires_physical": true,
-      "claimed_independent_count": 3,
+      "claimed_independent_count": 1,
       "geometry_revision": "geom-v1",
       "exposure_geometry_revision": "geom-v1",
       "source_frame": "article-frame-v1",
@@ -628,6 +787,56 @@
       "observation_end_ms": 200,
       "exposure_start_ms": 120,
       "exposure_end_ms": 180,
+      "time_uncertainty_ms": 5,
+      "footprint_id": null,
+      "support_area_mm2": 0,
+      "has_weighting": false,
+      "train_groups": [
+        "specimen-train-01",
+        "lot-train-A"
+      ],
+      "test_groups": [
+        "specimen-test-01",
+        "lot-test-B"
+      ],
+      "critical_unknown_regions": 0,
+      "critical_failed_regions": 0,
+      "whole_area_mean_passes": true,
+      "acceptance_claim": false,
+      "aggregate_operator_mode": "NONE",
+      "aggregate_operator_validated": false,
+      "independent_local_truth": false,
+      "shared_common_cause": false,
+      "covariance_receipt_present": false,
+      "source_observation_ids": [
+        "obs-specimen_to_pixel_smear"
+      ],
+      "support_ids": [
+        "support-specimen_to_pixel_smear"
+      ]
+    },
+    {
+      "id": "TIME_SUPPORT_MISMATCH",
+      "expected": "BLOCKED",
+      "support_class": "AREA",
+      "claim_level": "area",
+      "evidence_class": "PHYSICAL",
+      "requires_physical": true,
+      "claimed_independent_count": 1,
+      "geometry_revision": "geom-v1",
+      "exposure_geometry_revision": "geom-v1",
+      "source_frame": "article-frame-v1",
+      "target_frame": "surface-frame-v1",
+      "exposure_frame": "surface-frame-v1",
+      "transform_id": "transform-v1",
+      "transform_calibration_id": "cal-transform-v1",
+      "registration_bound_mm": 0.15,
+      "allowed_registration_bound_mm": 0.3,
+      "decision_margin_mm": 1,
+      "observation_start_ms": 500,
+      "observation_end_ms": 600,
+      "exposure_start_ms": 100,
+      "exposure_end_ms": 200,
       "time_uncertainty_ms": 5,
       "footprint_id": "footprint-v1",
       "support_area_mm2": 25,
@@ -650,23 +859,19 @@
       "shared_common_cause": false,
       "covariance_receipt_present": false,
       "source_observation_ids": [
-        "obs-duplicate",
-        "obs-duplicate",
-        "obs-distinct"
+        "obs-time_support_mismatch"
       ],
       "support_ids": [
-        "support-duplicate",
-        "support-duplicate",
-        "support-distinct"
+        "support-time_support_mismatch"
       ]
     },
     {
-      "id": "COMPLETE_SYNTHETIC",
-      "expected": "PASS",
+      "id": "UNKNOWN_REGION",
+      "expected": "BLOCKED",
       "support_class": "AREA",
       "claim_level": "area",
-      "evidence_class": "SYNTHETIC",
-      "requires_physical": false,
+      "evidence_class": "PHYSICAL",
+      "requires_physical": true,
       "claimed_independent_count": 1,
       "geometry_revision": "geom-v1",
       "exposure_geometry_revision": "geom-v1",
@@ -694,20 +899,20 @@
         "specimen-test-01",
         "lot-test-B"
       ],
-      "critical_unknown_regions": 0,
+      "critical_unknown_regions": 2,
       "critical_failed_regions": 0,
       "whole_area_mean_passes": true,
-      "acceptance_claim": false,
+      "acceptance_claim": true,
       "aggregate_operator_mode": "NONE",
       "aggregate_operator_validated": false,
       "independent_local_truth": false,
       "shared_common_cause": false,
       "covariance_receipt_present": false,
       "source_observation_ids": [
-        "obs-complete_synthetic"
+        "obs-unknown_region"
       ],
       "support_ids": [
-        "support-complete_synthetic"
+        "support-unknown_region"
       ]
     }
   ]
