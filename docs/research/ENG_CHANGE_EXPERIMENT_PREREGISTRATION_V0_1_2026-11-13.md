@@ -206,3 +206,8 @@ A source's publication date does not prove the agent retrieved it; a service rec
 - This preregistration introduces no scores, gold labels, sealed holdout, vendor result, execution authorization or new receipt.
 
 **Next gate:** secure two qualified independent assessors and a bounded design-family sample, then adjudicate the pilot labels under #10581 before any candidate output is evaluated.
+
+
+### Aras platform 2.4 security configuration (not an extra score arm)
+
+The Aras Impact Analysis AI Agent remains v1.0.1; the broader InnovatorEdge AI platform has a separate 2.4 release dated 2026-11-10. Where a licensed V2 Aras trial also exposes the Edge AI MCP Server, pin the platform version and each MCP profile's endpoint, Access Point, enabled state, published tool set, authentication mode and CIAM/Innovator permission snapshot. Record whether the client presents a cached tool list and whether it was refreshed. Test profile disablement, tool removal, Access Point/permission drift, cross-profile tool substitution and the beta Invoke Innovator Method Tool's per-call confirmation. This is a security/authority subprotocol, not an additional engineering-change accuracy arm; no failure is inferred from documentation alone.
