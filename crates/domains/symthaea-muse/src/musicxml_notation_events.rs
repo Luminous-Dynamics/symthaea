@@ -21,7 +21,8 @@ const MAX_SOURCE_TREE_DEPTH: usize = 32;
 const MAX_SOURCE_TREE_NODES: usize = 500_000;
 
 /// A recursively retained XML element. Attributes and child order follow the
-/// source document; text is retained as trimmed text when present.
+/// source document. The convenience text field is trimmed; ordered mixed
+/// content retains exact text-node values and element positions.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MusicXmlSourceNodeV1 {
     pub element: String,
@@ -268,6 +269,9 @@ pub fn parse_musicxml_part_notation_events(
     part_id: &str,
     measure_spans: &[MeasureSpan],
 ) -> MusicXmlPartNotationEventsV1 {
+    if part_id.trim().is_empty() {
+        return unknown(part_id, "empty MusicXML part identity");
+    }
     match parse_part_events(part, part_id, measure_spans) {
         Ok((note_events, attribute_events, auxiliary_events, cursor_moves)) => MusicXmlPartNotationEventsV1 {
             schema: MUSICXML_NOTATION_EVENTS_SCHEMA_V1.into(),
@@ -392,10 +396,8 @@ fn parse_part_events(
                         ));
                     }
                 };
-                if is_grace && performed_duration.is_some() {
-                    // Preserve a nonstandard duration if present, but never
-                    // advance the score cursor for a grace note.
-                }
+                // A grace note may retain a source duration annotation, but
+                // it never advances the score cursor (the branch below enforces it).
 
                 let (note_onset, chord_anchor_source_order) = if is_chord_member {
                     let anchor = chord_anchor.as_ref().ok_or_else(|| {
