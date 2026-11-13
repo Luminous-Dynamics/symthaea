@@ -1,0 +1,308 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-coherent-noise-v0.1.0.schema.json",
+  "title": "Marine coherent-noise audit v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "evidence_kind",
+    "source",
+    "cross_spectral_convention",
+    "reference_channel",
+    "hydrophone_channel",
+    "acquisition",
+    "operating_point_receipt_sha256",
+    "service_fingerprint_sha256",
+    "environment_fingerprint_sha256",
+    "minimum_average_count",
+    "minimum_coherence",
+    "bins"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_kind": {
+      "enum": [
+        "synthetic",
+        "measured"
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/sourceEvidence"
+    },
+    "cross_spectral_convention": {
+      "const": "reference_times_conjugate_hydrophone"
+    },
+    "reference_channel": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/channel"
+        },
+        {
+          "not": {
+            "properties": {
+              "signal_kind": {
+                "const": "hydrophone_pressure"
+              }
+            },
+            "required": [
+              "signal_kind"
+            ]
+          }
+        }
+      ]
+    },
+    "hydrophone_channel": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/channel"
+        },
+        {
+          "properties": {
+            "signal_kind": {
+              "const": "hydrophone_pressure"
+            }
+          },
+          "required": [
+            "signal_kind"
+          ]
+        }
+      ]
+    },
+    "acquisition": {
+      "$ref": "#/$defs/acquisition"
+    },
+    "operating_point_receipt_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "service_fingerprint_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "environment_fingerprint_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "minimum_average_count": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "minimum_coherence": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1
+    },
+    "bins": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/spectralBin"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
+    },
+    "sourceEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "citation",
+        "raw_data_sha256",
+        "rights_status",
+        "independently_reviewed"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "rights_status": {
+          "enum": [
+            "public_or_permitted",
+            "unknown",
+            "restricted"
+          ]
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instrument_id",
+        "signal_kind",
+        "unit",
+        "location_id",
+        "orientation",
+        "calibration_certificate_sha256",
+        "raw_trace_sha256",
+        "sample_rate_hz",
+        "total_sample_count",
+        "segment_length_samples",
+        "fft_length_samples",
+        "overlap_fraction",
+        "window_function",
+        "average_count"
+      ],
+      "properties": {
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "signal_kind": {
+          "enum": [
+            "shaft_acceleration",
+            "bearing_acceleration",
+            "gearbox_acceleration",
+            "prime_mover_acceleration",
+            "structural_vibration",
+            "shaft_torsion",
+            "hydrophone_pressure"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "location_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "orientation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "raw_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "sample_rate_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "total_sample_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "segment_length_samples": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "fft_length_samples": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "overlap_fraction": {
+          "type": "number",
+          "minimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "window_function": {
+          "type": "string",
+          "minLength": 1
+        },
+        "average_count": {
+          "type": "integer",
+          "minimum": 2
+        }
+      }
+    },
+    "acquisition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "timebase_receipt_sha256",
+        "alignment_receipt_sha256",
+        "alignment_offset_s",
+        "alignment_expanded_uncertainty_s",
+        "maximum_alignment_uncertainty_s",
+        "operating_condition_id"
+      ],
+      "properties": {
+        "timebase_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "alignment_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "alignment_offset_s": {
+          "type": "number"
+        },
+        "alignment_expanded_uncertainty_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maximum_alignment_uncertainty_s": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "operating_condition_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "spectralBin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bin_id",
+        "fft_bin_index",
+        "center_frequency_hz",
+        "reference_auto_psd",
+        "hydrophone_auto_psd_upa2_per_hz",
+        "cross_spectral_real",
+        "cross_spectral_imag"
+      ],
+      "properties": {
+        "bin_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fft_bin_index": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "center_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "reference_auto_psd": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "hydrophone_auto_psd_upa2_per_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "cross_spectral_real": {
+          "type": "number"
+        },
+        "cross_spectral_imag": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}
