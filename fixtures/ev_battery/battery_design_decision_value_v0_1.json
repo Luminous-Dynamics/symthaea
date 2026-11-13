@@ -1,0 +1,106 @@
+{
+  "schema_version": "0.1.0",
+  "case_id": "SYNTH-LFP-DESIGN-CHOICE-001",
+  "decision_loss_unit": "normalized_mission_loss",
+  "alternatives": [
+    { "alternative_id": "DESIGN-A" },
+    { "alternative_id": "DESIGN-B" },
+    { "alternative_id": "ABSTAIN" }
+  ],
+  "worlds": [
+    {
+      "world_id": "WORLD-A",
+      "prior_probability": 0.5,
+      "losses": [
+        { "alternative_id": "DESIGN-A", "loss": 0, "feasible": true },
+        { "alternative_id": "DESIGN-B", "loss": 10, "feasible": true },
+        { "alternative_id": "ABSTAIN", "loss": 6, "feasible": true }
+      ]
+    },
+    {
+      "world_id": "WORLD-B",
+      "prior_probability": 0.5,
+      "losses": [
+        { "alternative_id": "DESIGN-A", "loss": 10, "feasible": true },
+        { "alternative_id": "DESIGN-B", "loss": 0, "feasible": true },
+        { "alternative_id": "ABSTAIN", "loss": 6, "feasible": true }
+      ]
+    }
+  ],
+  "probability_basis": {
+    "model_id": "SYNTHETIC-EXACT-PRIOR",
+    "calibration_evidence_id": "CALIBRATION-KNOWN-TRUTH",
+    "validity_domain": "two-world synthetic fixture only",
+    "calibration_profile": "exact by construction"
+  },
+  "evidence": [
+    {
+      "evidence_id": "CALIBRATION-KNOWN-TRUTH",
+      "source_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "evidence_class": "synthetic_known_truth",
+      "admission": "admitted_for_evaluation",
+      "claim_scope": "synthetic world and likelihood probabilities",
+      "validity_domain": "fixture only"
+    },
+    {
+      "evidence_id": "EXPERIMENT-ESTIMATES",
+      "source_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "evidence_class": "synthetic_known_truth",
+      "admission": "admitted_for_evaluation",
+      "claim_scope": "synthetic experiment outcome likelihoods",
+      "validity_domain": "fixture only"
+    }
+  ],
+  "experiments": [
+    {
+      "experiment_id": "HIGH-ENTROPY-IRRELEVANT",
+      "evidence_id": "EXPERIMENT-ESTIMATES",
+      "decision_loss_cost": 0.0,
+      "cost_usd": 50.0,
+      "duration_hours": 1.0,
+      "material_grams": 0.5,
+      "risk_class": "low",
+      "outcomes_by_world": [
+        {
+          "world_id": "WORLD-A",
+          "outcomes": [
+            { "outcome_id": "RESULT-A", "probability": 0.5, "disposition": "observed" },
+            { "outcome_id": "RESULT-B", "probability": 0.5, "disposition": "observed" }
+          ]
+        },
+        {
+          "world_id": "WORLD-B",
+          "outcomes": [
+            { "outcome_id": "RESULT-A", "probability": 0.5, "disposition": "observed" },
+            { "outcome_id": "RESULT-B", "probability": 0.5, "disposition": "observed" }
+          ]
+        }
+      ]
+    },
+    {
+      "experiment_id": "DECISION-BOUNDARY",
+      "evidence_id": "EXPERIMENT-ESTIMATES",
+      "decision_loss_cost": 0.5,
+      "cost_usd": 100.0,
+      "duration_hours": 2.0,
+      "material_grams": 1.0,
+      "risk_class": "low",
+      "outcomes_by_world": [
+        {
+          "world_id": "WORLD-A",
+          "outcomes": [
+            { "outcome_id": "RESULT-A", "probability": 0.9, "disposition": "observed" },
+            { "outcome_id": "RESULT-B", "probability": 0.1, "disposition": "observed" }
+          ]
+        },
+        {
+          "world_id": "WORLD-B",
+          "outcomes": [
+            { "outcome_id": "RESULT-A", "probability": 0.1, "disposition": "observed" },
+            { "outcome_id": "RESULT-B", "probability": 0.9, "disposition": "observed" }
+          ]
+        }
+      ]
+    }
+  ]
+}
