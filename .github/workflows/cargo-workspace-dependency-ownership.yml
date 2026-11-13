@@ -1,0 +1,89 @@
+name: Cargo workspace dependency ownership audit
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "xtask/Cargo.toml"
+      - "xtask/src/**"
+      - ".github/workflows/cargo-workspace-dependency-ownership.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cargo-dependency-ownership-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Rust 1.100 manifest ownership census
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact PR source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install exact Rust 1.100.0
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup set profile minimal
+          rustup toolchain install 1.100.0 --profile minimal
+          rustup run 1.100.0 rustc -Vv | tee "$RUNNER_TEMP/rustc-version.txt"
+          rustup run 1.100.0 cargo -Vv | tee "$RUNNER_TEMP/cargo-version.txt"
+          grep -F 'rustc 1.100.0 ' "$RUNNER_TEMP/rustc-version.txt"
+          grep -F 'cargo 1.100.0 ' "$RUNNER_TEMP/cargo-version.txt"
+
+      - name: Run focused xtask ownership unit tests
+        run: cargo +1.100.0 test --locked -p xtask cargo_dependency_ownership
+
+      - name: Generate deterministic JSON and Markdown ownership reports
+        shell: bash
+        run: |
+          set -euo pipefail
+          LOCK_BEFORE="$(sha256sum Cargo.lock | awk '{print $1}')"
+          cargo +1.100.0 run --locked -p xtask -- \
+            cargo-dependency-ownership \
+            --json "$RUNNER_TEMP/cargo_workspace_dependency_ownership.json" \
+            --markdown "$RUNNER_TEMP/CARGO_WORKSPACE_DEPENDENCY_OWNERSHIP.md"
+          LOCK_AFTER="$(sha256sum Cargo.lock | awk '{print $1}')"
+          [[ "$LOCK_BEFORE" == "$LOCK_AFTER" ]]
+          jq -e '
+            .schema == "luminous.cargo-workspace-dependency-ownership.v1"
+            and .git_commit != ""
+            and .cargo_version == "cargo 1.100.0 (3acc79c0c 2026-11-05)"
+            and (.workspaces | length) > 0
+            and (.scanned_manifest_count > 0)
+          ' "$RUNNER_TEMP/cargo_workspace_dependency_ownership.json" > /dev/null
+          {
+            echo "## Cargo dependency ownership census"
+            echo
+            echo "- Commit: $(git rev-parse HEAD)"
+            echo "- Cargo.lock SHA-256: $LOCK_AFTER"
+            echo "- Manifests scanned: $(jq -r '.scanned_manifest_count' "$RUNNER_TEMP/cargo_workspace_dependency_ownership.json")"
+            echo "- Workspaces: $(jq -r '.workspaces | length' "$RUNNER_TEMP/cargo_workspace_dependency_ownership.json")"
+            echo "- Parse errors: $(jq -r '.parse_errors | length' "$RUNNER_TEMP/cargo_workspace_dependency_ownership.json")"
+            echo
+            echo "See the uploaded JSON for per-workspace classifications and exact owner paths."
+            echo "Parse errors and unresolved ownership remain visible; no dependency is removed."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify no manifest or lockfile changes
+        run: git diff --exit-code -- Cargo.toml Cargo.lock xtask/Cargo.toml
+
+      - name: Upload ownership census
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: cargo-workspace-dependency-ownership-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/cargo_workspace_dependency_ownership.json
+            ${{ runner.temp }}/CARGO_WORKSPACE_DEPENDENCY_OWNERSHIP.md
+          if-no-files-found: warn
+          retention-days: 30

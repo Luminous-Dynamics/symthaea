@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+mod cargo_dependency_ownership;
 mod crate_status;
 mod duplicate_scan;
 mod manifest;
@@ -35,6 +36,14 @@ enum Commands {
         strict: bool,
         #[arg(long, default_value = "docs/crate-status.toml")]
         registry: PathBuf,
+    },
+    /// Emit a deterministic owner map for every workspace.dependencies declaration.
+    /// This is an audit only; it never edits manifests or lockfiles.
+    CargoDependencyOwnership {
+        #[arg(long, default_value = "docs/research/evidence/cargo_workspace_dependency_ownership_v1.json")]
+        json: PathBuf,
+        #[arg(long, default_value = "docs/research/CARGO_WORKSPACE_DEPENDENCY_OWNERSHIP_V1.md")]
+        markdown: PathBuf,
     },
     RhnSweep {
         #[arg(long, default_value = "1024")]
@@ -71,6 +80,15 @@ enum Commands {
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     match cli.command {
+        Commands::CargoDependencyOwnership { json, markdown } => {
+            let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .expect("xtask lives one level below the workspace root")
+                .to_path_buf();
+            let json_path = if json.is_absolute() { json } else { root.join(json) };
+            let markdown_path = if markdown.is_absolute() { markdown } else { root.join(markdown) };
+            cargo_dependency_ownership::run(&root, &json_path, &markdown_path)?;
+        }
         Commands::RhnSweep {
             dims,
             objects,
