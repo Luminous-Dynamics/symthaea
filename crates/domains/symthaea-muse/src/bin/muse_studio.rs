@@ -2392,7 +2392,7 @@ fn materialize_source_midi_audition(
         .map_err(|_| SourceMidiAuditionError::TemporaryFile)?;
     let read_back = match std::fs::read(&path) {
         Ok(value) => value,
-        Err(error) => {
+        Err(_) => {
             let _ = std::fs::remove_file(&path);
             return Err(SourceMidiAuditionError::TemporaryFile);
         }
