@@ -1689,7 +1689,9 @@ mod tests {
         )
         .unwrap();
         let dense = pair.to_dense_two_qubit().unwrap();
-        assert_eq!(dense, state.to_dense(2).unwrap().try_into().unwrap());
+        let dense_vec = state.to_dense(2).unwrap();
+        let dense_from_state: [Complex64; 4] = dense_vec.try_into().unwrap();
+        assert_eq!(dense, dense_from_state);
         assert!(pair.selection_rule_residual() <= 1.0e-12);
     }
 
@@ -2056,7 +2058,7 @@ mod tests {
 
     #[test]
     fn exact_two_site_split_retains_tiny_positive_schmidt_amplitude() {
-        let tiny = 1.0e-18;
+        let tiny: f64 = 1.0e-18;
         let large = (1.0 - tiny * tiny).sqrt();
         let state = U1TwoSiteState::new(
             vec![0],
