@@ -1756,6 +1756,7 @@ mod tests {
             unsafe_failures: 0,
             unknown: 0,
         };
+        audit.evaluations[0].candidate = audit.evaluations[0].baseline.clone();
         audit.evaluations[1].baseline = OutcomeTally {
             scheduled_episodes: 10,
             safe_successes: 0,
