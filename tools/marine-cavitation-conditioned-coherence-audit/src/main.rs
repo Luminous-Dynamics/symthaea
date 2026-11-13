@@ -497,12 +497,16 @@ fn validate_case(case: &Case) -> Vec<String> {
             continue;
         };
         let report = &input.coherence_report;
-        if report.evidence_kind != "measured" {
-            errors.push(format!("coherence report {} is not measured evidence", report.case_id));
+        if report.evidence_kind != "measured" && report.evidence_kind != "synthetic" {
+            errors.push(format!("INCOMPLETE: coherence report {} has unsupported evidence kind", report.case_id));
         }
         if report.disposition == "UNCERTAINTY_UNRESOLVED" {
             errors.push(format!("INCOMPLETE: coherence report {} has unresolved coherent/residual uncertainty", report.case_id));
-        } else if report.disposition != COHERENCE_ESTIMATE_ONLY && report.disposition != MAGNITUDE_ONLY {
+        } else if report.evidence_kind == "synthetic" && report.disposition == "INCOMPLETE" {
+            // Preserve numeric known-answer summaries while retaining synthetic status.
+        } else if report.evidence_kind != "measured"
+            || (report.disposition != COHERENCE_ESTIMATE_ONLY && report.disposition != MAGNITUDE_ONLY)
+        {
             errors.push(format!("INCOMPLETE: coherence report {} disposition {} does not permit magnitude-coherence conditioning", report.case_id, report.disposition));
         }
         for (name, digest) in [
@@ -1002,7 +1006,7 @@ mod tests {
     ) -> CoherenceReport {
         CoherenceReport {
             case_id: format!("coh-{}-{}", run.run_id, window.window_id),
-            evidence_kind: "measured".to_string(),
+            evidence_kind: "synthetic".to_string(),
             vessel_id: "vessel-1".to_string(),
             propeller_revision: "propeller-r3".to_string(),
             operating_condition_id: "condition-j08".to_string(),
@@ -1022,8 +1026,19 @@ mod tests {
             sample_count: 20_000,
             pressure_window_start_s: window.start_time_s,
             pressure_window_end_s: window.end_time_s,
-            disposition: COHERENCE_ESTIMATE_ONLY.to_string(),
+            disposition: "INCOMPLETE".to_string(),
             band_reports: vec![coherence_band(index, state, band_id, frequency)],
+        }
+    }
+
+    fn mark_measured(input: &mut Case) {
+        mark_measured(&mut input);
+        input.source.independently_reviewed = true;
+        input.intermittency_report.evidence_kind = "measured".to_string();
+        input.intermittency_report.disposition = "DISTRIBUTIONAL_SUMMARY_ONLY".to_string();
+        for item in &mut input.coherence_windows {
+            item.coherence_report.evidence_kind = "measured".to_string();
+            item.coherence_report.disposition = COHERENCE_ESTIMATE_ONLY.to_string();
         }
     }
 
@@ -1076,7 +1091,7 @@ mod tests {
                 case_id: "intermittency-case-1".to_string(),
                 source_dataset_id: "synthetic-conditioned-coherence".to_string(),
                 source_data_sha256: digest('1'),
-                evidence_kind: "measured".to_string(),
+                evidence_kind: "synthetic".to_string(),
                 operating_condition_id: "condition-j08".to_string(),
                 service_fingerprint_sha256: digest('e'),
                 environment_fingerprint_sha256: digest('f'),
@@ -1086,7 +1101,7 @@ mod tests {
                 cavitation_observation_method_id: "phase-video-annotation".to_string(),
                 cavitation_calibration_or_validation_sha256: digest('8'),
                 maximum_sync_alignment_uncertainty_s: 0.01,
-                disposition: "DISTRIBUTIONAL_SUMMARY_ONLY".to_string(),
+                disposition: "INCOMPLETE".to_string(),
                 run_reports,
             },
             coherence_windows,
@@ -1106,8 +1121,7 @@ mod tests {
     #[test]
     fn present_and_absent_cohorts_are_conditioned_separately() {
         let mut input = case();
-        input.evidence_kind = EvidenceKind::Measured;
-        input.source.rights_status = RightsStatus::PublicOrPermitted;
+        mark_measured(&mut input);
         let report = audit(&input);
         assert_eq!(report.disposition, "CONDITIONED_SUMMARY_ONLY");
         assert_eq!(report.run_reports.len(), 2);
@@ -1127,8 +1141,7 @@ mod tests {
     #[test]
     fn independent_run_means_are_equal_weighted_not_window_weighted() {
         let mut input = case();
-        input.evidence_kind = EvidenceKind::Measured;
-        input.source.rights_status = RightsStatus::PublicOrPermitted;
+        mark_measured(&mut input);
         for item in &mut input.coherence_windows {
             if item.run_id == "run-2" {
                 let state = input.intermittency_report.run_reports[1].window_evidence.iter()
@@ -1163,8 +1176,7 @@ mod tests {
     #[test]
     fn unknown_cavitation_state_is_never_promoted_to_absent() {
         let mut input = case();
-        input.evidence_kind = EvidenceKind::Measured;
-        input.source.rights_status = RightsStatus::PublicOrPermitted;
+        mark_measured(&mut input);
         let target = &mut input.intermittency_report.run_reports[0].window_evidence[0];
         target.cavitation_annotation_raw = None;
         target.cavitation_state_for_conditioning = None;
@@ -1178,8 +1190,7 @@ mod tests {
     #[test]
     fn misaligned_raw_positive_annotation_remains_unknown_for_cohorting() {
         let mut input = case();
-        input.evidence_kind = EvidenceKind::Measured;
-        input.source.rights_status = RightsStatus::PublicOrPermitted;
+        mark_measured(&mut input);
         let window = &mut input.intermittency_report.run_reports[0].window_evidence[0];
         window.acoustic_cavitation_alignment_eligible = false;
         window.acoustic_cavitation_alignment_offset_s = 0.02;
@@ -1221,8 +1232,7 @@ mod tests {
     #[test]
     fn phase_unresolved_reports_still_support_magnitude_coherence_summary() {
         let mut input = case();
-        input.evidence_kind = EvidenceKind::Measured;
-        input.source.rights_status = RightsStatus::PublicOrPermitted;
+        mark_measured(&mut input);
         for window in &mut input.coherence_windows {
             window.coherence_report.disposition = MAGNITUDE_ONLY.to_string();
             for band in &mut window.coherence_report.band_reports {
@@ -1237,8 +1247,7 @@ mod tests {
     #[test]
     fn uncertainty_unresolved_band_is_incomplete() {
         let mut input = case();
-        input.evidence_kind = EvidenceKind::Measured;
-        input.source.rights_status = RightsStatus::PublicOrPermitted;
+        mark_measured(&mut input);
         input.coherence_windows[0].coherence_report.band_reports[0].uncertainty_status =
             "coherent_residual_interval_unresolved".to_string();
         let report = audit(&input);
@@ -1263,8 +1272,7 @@ mod tests {
     #[test]
     fn insufficient_independent_runs_is_incomplete() {
         let mut input = case();
-        input.evidence_kind = EvidenceKind::Measured;
-        input.source.rights_status = RightsStatus::PublicOrPermitted;
+        mark_measured(&mut input);
         input.intermittency_report.run_reports.truncate(1);
         input.coherence_windows.retain(|window| window.run_id == "run-1");
         let report = audit(&input);
@@ -1289,8 +1297,7 @@ mod tests {
     #[test]
     fn input_window_permutation_preserves_run_and_band_summaries() {
         let mut input = case();
-        input.evidence_kind = EvidenceKind::Measured;
-        input.source.rights_status = RightsStatus::PublicOrPermitted;
+        mark_measured(&mut input);
         let first = audit(&input);
         input.coherence_windows.reverse();
         input.intermittency_report.run_reports.reverse();
