@@ -549,7 +549,8 @@ mod tests {
             Use { alias: "serde".into(), package_name: None, section: "build-dependencies".into(),
                 inherited: true, optional: false, feature_only: false },
         ];
-        assert_eq!(classify("serde", &uses).0, "USED_ONLY_BY_BUILD_OR_TEST_TARGET");
+        let refs: Vec<&Use> = uses.iter().collect();
+        assert_eq!(classify("serde", &refs).0, "USED_ONLY_BY_BUILD_OR_TEST_TARGET");
     }
 
     #[test]
@@ -558,7 +559,8 @@ mod tests {
             alias: "simd".into(), package_name: None, section: "dependencies".into(),
             inherited: true, optional: true, feature_only: true,
         }];
-        assert_eq!(classify("simd", &uses).0, "USED_ONLY_UNDER_FEATURE");
+        let refs: Vec<&Use> = uses.iter().collect();
+        assert_eq!(classify("simd", &refs).0, "USED_ONLY_UNDER_FEATURE");
     }
 
     fn root_workspace() -> Workspace {
