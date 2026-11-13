@@ -1631,13 +1631,12 @@ impl U1TwoSiteState {
         )?;
 
         let mut retained_rank_by_charge = Vec::new();
-        for (index, charge) in retained_middle_charges.iter().copied().enumerate() {
+        for charge in retained_middle_charges.iter().copied() {
             if !retained_rank_by_charge.iter().any(|(existing, _)| *existing == charge) {
                 let count = retained_middle_charges
                     .iter()
                     .filter(|candidate| **candidate == charge)
                     .count();
-                let _ = index;
                 retained_rank_by_charge.push((charge, count));
             }
         }
@@ -1731,7 +1730,10 @@ impl U1MpsTruncationLedger {
 
 #[cfg(test)]
 mod tests {
-    use super::{ComplexU1Mps, U1MpsError, U1MpsTensor, U1TwoSiteGate, U1TwoSiteState};
+    use super::{
+        ComplexU1Mps, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
+        U1TwoSiteGate, U1TwoSiteState, U1TwoSiteTruncationPolicy,
+    };
     use num_complex::Complex64;
 
     #[test]
@@ -2432,4 +2434,162 @@ mod tests {
             Err(U1MpsError::InvalidTolerance(0.0))
         );
     }
+
+    fn single_excitation_pair(large: f64, small: f64) -> U1TwoSiteState {
+        U1TwoSiteState::new(
+            vec![0],
+            vec![1],
+            vec![
+                complex_zero(),
+                Complex64::new(large, 0.0),
+                Complex64::new(small, 0.0),
+                complex_zero(),
+            ],
+            1.0e-12,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn truncated_split_applies_global_bond_cap_and_reports_discarded_weight() {
+        let state = single_excitation_pair(0.8, 0.6);
+        let result = state
+            .split_truncated(U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 1,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+
+        assert_eq!(result.total_singular_value_count, 2);
+        assert_eq!(result.retained_singular_value_count, 1);
+        assert_eq!(result.bond_cap_discarded_singular_value_count, 1);
+        assert_eq!(result.cutoff_discarded_singular_value_count, 0);
+        assert!(result.bond_cap_binding);
+        assert!((result.total_schmidt_weight - 1.0).abs() <= 1.0e-12);
+        assert!((result.retained_schmidt_weight - 0.64).abs() <= 1.0e-12);
+        assert!((result.bond_cap_discarded_weight - 0.36).abs() <= 1.0e-12);
+        assert!((result.discarded_weight - 0.36).abs() <= 1.0e-12);
+        assert!((result.relative_discarded_weight - 0.36).abs() <= 1.0e-12);
+        assert!((result.pre_truncation_norm_squared - 1.0).abs() <= 1.0e-12);
+        assert!((result.post_truncation_norm_squared - 0.64).abs() <= 1.0e-12);
+        assert!((result.renormalization_factor_to_restore_original_norm - 1.25).abs() <= 1.0e-12);
+        assert!(result.reconstruction_l2_residual >= 0.6 - 1.0e-12);
+    }
+
+    #[test]
+    fn truncated_split_relative_cutoff_is_separate_from_bond_cap() {
+        let state = single_excitation_pair(0.8, 0.6);
+        let result = state
+            .split_truncated(U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 8,
+                relative_singular_value_cutoff: 0.8,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        assert_eq!(result.retained_singular_value_count, 1);
+        assert_eq!(result.cutoff_discarded_singular_value_count, 1);
+        assert_eq!(result.bond_cap_discarded_singular_value_count, 0);
+        assert!(!result.bond_cap_binding);
+        assert!((result.cutoff_discarded_weight - 0.36).abs() <= 1.0e-12);
+        assert!(result.bond_cap_discarded_weight.abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn truncated_split_keeps_u1_charge_and_does_not_renormalize() {
+        let state = single_excitation_pair(0.8, 0.6);
+        let result = state
+            .split_truncated(U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 1,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        assert_eq!(result.left_tensor.right_dimension(), 1);
+        assert_eq!(result.right_tensor.left_dimension(), 1);
+        assert_eq!(
+            result.left_tensor.right_charges(),
+            result.right_tensor.left_charges()
+        );
+        let norm_squared = result
+            .left_tensor
+            .data()
+            .iter()
+            .map(|value| value.norm_sqr())
+            .sum::<f64>();
+        assert!(norm_squared <= 1.0 + 1.0e-12);
+        assert!((norm_squared - 0.64).abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn truncation_ledger_sums_per_gate_l2_residuals_conservatively() {
+        let state = single_excitation_pair(0.8, 0.6);
+        let result = state
+            .split_truncated(U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 1,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+        let mut ledger = U1MpsTruncationLedger::default();
+        ledger.record(&result).unwrap();
+        ledger.record(&result).unwrap();
+        assert_eq!(ledger.gate_count, 2);
+        assert!((ledger.accumulated_discarded_weight - 0.72).abs() <= 1.0e-12);
+        assert!((ledger.cumulative_l2_error_upper_bound - 1.2).abs() <= 1.0e-12);
+        assert!((ledger.maximum_single_gate_relative_discarded_weight - 0.36).abs() <= 1.0e-12);
+    }
+
+    #[test]
+    fn truncation_ledger_rejects_nonfinite_receipts() {
+        let mut ledger = U1MpsTruncationLedger::default();
+        let mut state = U1TwoSiteState::new(
+            vec![0],
+            vec![1],
+            vec![complex_zero(), Complex64::new(1.0, 0.0), complex_zero(), complex_zero()],
+            1.0e-12,
+        )
+        .unwrap()
+        .split_truncated(U1TwoSiteTruncationPolicy {
+            max_bond_dimension: 2,
+            relative_singular_value_cutoff: 0.0,
+            tolerance: 1.0e-12,
+        })
+        .unwrap();
+        state.discarded_weight = f64::NAN;
+        assert!(ledger.record(&state).is_err());
+    }
+
+    #[test]
+    fn truncated_split_rejects_invalid_policy_fields() {
+        let state = single_excitation_pair(0.8, 0.6);
+        for policy in [
+            U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 0,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: 1.0e-12,
+            },
+            U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 1,
+                relative_singular_value_cutoff: -0.1,
+                tolerance: 1.0e-12,
+            },
+            U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 1,
+                relative_singular_value_cutoff: 1.1,
+                tolerance: 1.0e-12,
+            },
+            U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 1,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: f64::NAN,
+            },
+        ] {
+            assert!(matches!(
+                state.split_truncated(policy),
+                Err(U1MpsError::InvalidTruncationPolicy { .. })
+            ));
+        }
+    }
+
 }
