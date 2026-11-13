@@ -209,11 +209,14 @@ fn evaluate_case(case: &Value) -> Result<&'static str> {
             .get("claimed_life_quantile")
             .and_then(Value::as_str)
             .is_some_and(|value| !value.is_empty());
-        if event_count == 0
-            && quantile_claimed
-            && !boolean(case, "observed_quantile_supported")?
-        {
-            return Ok("REJECTED");
+        if quantile_claimed {
+            // S0 has no qualified life-quantile estimator. A zero-event cohort
+            // cannot identify a finite median/q90; a nonzero-event cohort still
+            // needs a future source-bound, independently qualified curve receipt.
+            if event_count == 0 {
+                return Ok("REJECTED");
+            }
+            return Ok("BLOCKED");
         }
     }
 
