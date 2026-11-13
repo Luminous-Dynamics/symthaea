@@ -2765,3 +2765,76 @@ mod tests {
         assert!(back.source_note_id.is_none());
     }
 }
+
+
+#[cfg(test)]
+mod imported_audition_compatibility_tests {
+    use super::*;
+
+    fn legacy_summary_json() -> serde_json::Value {
+        serde_json::json!({
+            "manifest": {
+                "work_id": "fixture-import-id",
+                "title": "Fixture MIDI",
+                "contributor": "Fixture contributor",
+                "declared_authorship": false,
+                "source_format": "Midi",
+                "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "score_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "contribution_scope": "private_project",
+                "content_license": "all_rights_reserved",
+                "imported_at_unix_ms": 1
+            },
+            "analysis": {
+                "source_native": true,
+                "inferred_territory": null,
+                "tempo_bpm": 120.0,
+                "meter": 4,
+                "tonic": "C",
+                "note_count": 1,
+                "voice_count": 1,
+                "duration_seconds": 0.5,
+                "motifs": [],
+                "sections": [],
+                "unresolved_interpretations": []
+            },
+            "audio_available": true,
+            "audio_renderer": "fluidsynth"
+        })
+    }
+
+    #[test]
+    fn legacy_import_summary_defaults_to_unverified_audition_and_no_digest() {
+        let summary: ImportedWorkSummary =
+            serde_json::from_value(legacy_summary_json()).unwrap();
+        assert_eq!(
+            summary.audition_kind,
+            ImportedAuditionKind::LegacyUnverified
+        );
+        assert!(summary.audition_wav_sha256.is_none());
+    }
+
+    #[test]
+    fn new_source_midi_summary_round_trips_typed_kind_and_wav_digest() {
+        let mut value = legacy_summary_json();
+        value["audition_kind"] = serde_json::json!("source_midi_performance");
+        value["audition_wav_sha256"] = serde_json::json!(
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        );
+        let summary: ImportedWorkSummary = serde_json::from_value(value).unwrap();
+        assert_eq!(
+            summary.audition_kind,
+            ImportedAuditionKind::SourceMidiPerformance
+        );
+        assert_eq!(
+            summary.audition_wav_sha256.as_deref(),
+            Some("cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc")
+        );
+    }
+
+    #[test]
+    fn reconstructed_score_kind_has_explicit_wire_value() {
+        let encoded = serde_json::to_string(&ImportedAuditionKind::ReconstructedScore).unwrap();
+        assert_eq!(encoded, "\"reconstructed_score\"");
+    }
+}
