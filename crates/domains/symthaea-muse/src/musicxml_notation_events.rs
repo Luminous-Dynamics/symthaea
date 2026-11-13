@@ -252,6 +252,7 @@ fn unknown(part_id: &str, reason: impl Into<String>) -> MusicXmlPartNotationEven
         },
         note_events: Vec::new(),
         attribute_events: Vec::new(),
+        auxiliary_events: Vec::new(),
         cursor_moves: Vec::new(),
     }
 }
@@ -1140,8 +1141,8 @@ mod tests {
         let events = parse(xml);
         supported(&events);
         assert_eq!(events.auxiliary_events.len(), 2);
-        assert_eq!(events.auxiliary_events[0].score_offset, RationalBeat::new(3, 1).unwrap());
-        assert_eq!(events.auxiliary_events[1].score_offset, RationalBeat::new(0, 1).unwrap());
+        assert_eq!(events.auxiliary_events[0].score_offset, RationalBeat::new(5, 2).unwrap());
+        assert_eq!(events.auxiliary_events[1].score_offset, RationalBeat::new(3, 2).unwrap());
         assert_eq!(events.auxiliary_events[0].source.element, "direction");
         assert_eq!(events.auxiliary_events[1].source.element, "harmony");
         assert!(events.auxiliary_events[0].source.children.iter().any(|node| node.element == "sound"));
