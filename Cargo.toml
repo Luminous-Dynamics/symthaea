@@ -20,9 +20,21 @@ exclude = [
     # `nixward` path dependency. Keep it out of the workspace and build it
     # standalone (`cargo build -p nixward-web` from its own directory).
     "crates/core/nixward-web",
+    # The public checkout currently exposes this glob-matched directory without a Cargo manifest.
+    # Exclude it explicitly so targeted package metadata can be resolved; remove once it is a crate.
+    "crates/core/symthaea",
+    # Source-only prototypes with no Cargo.toml are not workspace packages yet.
+    "crates/core/symthaea-iit",
+    "crates/core/symthaea-observation-attestation",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
     "crates/domains/symthaea-spore/fuzz",
+    # Source-only / placeholder domain directories with no package manifest.
+    # Keep the workspace glob intact while those modules remain outside Cargo.
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/domains/symthaea-dishwasher-design",
+    "crates/domains/symthaea-rea-compat",
+    "crates/domains/symthaea-rea-evidence-verifier",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
     # ARCHIVED 2026-07-16 (vision review P2.2): real SigLIP/Moondream/ocrs ONNX

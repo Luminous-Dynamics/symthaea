@@ -42,6 +42,8 @@ pub mod analysis_crosscheck;
 pub mod analyst;
 pub mod audio_analyzer;
 #[cfg(feature = "theory")]
+pub mod audio_event_observation;
+#[cfg(feature = "theory")]
 pub mod blinded_study;
 pub mod choreography;
 #[cfg(feature = "clap-fad")]
@@ -124,9 +126,13 @@ pub mod methodology_plan;
 pub mod midi;
 pub mod midi_loader;
 #[cfg(feature = "theory")]
+pub mod midi_performance;
+#[cfg(feature = "theory")]
 pub mod musical_policy;
 pub mod neural_melody;
 pub mod notation;
+#[cfg(feature = "theory")]
+pub mod part_stem_evidence;
 #[cfg(feature = "theory")]
 pub mod participant_evidence;
 #[cfg(feature = "theory")]
@@ -203,10 +209,6 @@ pub mod study_runner;
 pub mod synth;
 #[cfg(feature = "theory")]
 pub mod temporal_confirmatory;
-#[cfg(feature = "theory")]
-pub mod midi_performance;
-#[cfg(feature = "theory")]
-pub mod audio_event_observation;
 #[cfg(feature = "theory")]
 pub mod theory_realize;
 pub mod training;
