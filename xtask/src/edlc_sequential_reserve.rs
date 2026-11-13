@@ -310,9 +310,9 @@ fn audit_fixture(fixture: &Fixture) -> Result<AuditReport> {
         }
 
         valid_sequences += 1;
-        if sequence.events.is_empty() {
+        if sequence.events.len() < 2 {
             bail!(
-                "measured sequence {} must contain ordered events",
+                "measured sequence {} must contain at least two ordered calls",
                 sequence.physical_device_serial
             );
         }
@@ -448,6 +448,9 @@ fn audit_fixture(fixture: &Fixture) -> Result<AuditReport> {
 
     if valid_sequences == 0 {
         bail!("no valid measured or failed device sequences remain");
+    }
+    if reference_signature.is_none() {
+        bail!("at least one fully measured sequence is required to define the frozen event profile");
     }
 
     let sequence_pass_rate = sequence_passes_count as f64 / valid_sequences as f64;
@@ -630,6 +633,15 @@ mod tests {
         assert_eq!(report.sequence_pass_rate, 0.5);
         assert_eq!(report.events[1].recovery_passes, 1);
         assert_eq!(report.events[1].event_gate_passes, 1);
+    }
+
+    #[test]
+    fn sequence_requires_at_least_two_calls() {
+        let mut value = fixture_value();
+        value["device_sequences"][0]["events"].as_array_mut().unwrap().pop();
+        value["device_sequences"][1]["events"].as_array_mut().unwrap().pop();
+        let error = audit_value(value).unwrap_err().to_string();
+        assert!(error.contains("at least two ordered calls"));
     }
 
     #[test]
