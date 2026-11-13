@@ -95,6 +95,7 @@ pub struct MusicXmlNotationEvaluationReportV1 {
     pub reference_note_event_count: usize,
     pub prediction_note_event_count: usize,
     pub note_event_presence: MusicXmlNotationMetricV1,
+    pub note_onset_error: MusicXmlNotationErrorDistributionV1,
     pub written_pitch_spelling: MusicXmlNotationAccuracyV1,
     pub rest_semantics: MusicXmlNotationAccuracyV1,
     pub unpitched_display: MusicXmlNotationAccuracyV1,
@@ -205,6 +206,16 @@ fn metric(
     }
 }
 
+fn rational_is_canonical(value: RationalBeat) -> bool {
+    RationalBeat::new(value.numerator(), value.denominator())
+        .is_ok_and(|canonical| canonical == value)
+}
+
+fn span_contains(span: &crate::barline_eval::MeasureSpan, value: RationalBeat) -> bool {
+    value.compare_exact(span.start) != Ordering::Less
+        && value.compare_exact(span.end) != Ordering::Greater
+}
+
 fn validate_graph(
     graph: &MusicXmlPartNotationGraphV1,
     side: &str,
@@ -251,6 +262,20 @@ fn validate_graph(
             reason: "supported score clock has no measure spans".into(),
         });
     }
+    let mut previous_end = None;
+    for span in &graph.map.measures {
+        if !rational_is_canonical(span.start)
+            || !rational_is_canonical(span.end)
+            || span.start.compare_exact(span.end) != Ordering::Less
+            || previous_end.is_some_and(|end| end != span.start)
+        {
+            return Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure {
+                side: side.into(),
+                reason: "measure spans are noncanonical, empty, overlapping or discontinuous".into(),
+            });
+        }
+        previous_end = Some(span.end);
+    }
     let note_count = graph.notation_events.note_events.len();
     let other_count = graph
         .notation_events
@@ -272,10 +297,25 @@ fn validate_graph(
         if event.part_id != graph.part_id
             || event.source_measure_index >= graph.map.measures.len()
             || !orders.insert(event.source_order)
+            || !rational_is_canonical(event.score_offset)
+            || !span_contains(
+                &graph.map.measures[event.source_measure_index],
+                event.score_offset,
+            )
+            || event.performed_duration.is_some_and(|duration| {
+                !rational_is_canonical(duration)
+                    || duration.numerator() == 0
+                    || event.score_offset
+                        .checked_add(duration)
+                        .is_err_or(|end| {
+                            end.compare_exact(graph.map.measures[event.source_measure_index].end)
+                                == Ordering::Greater
+                        })
+            })
         {
             return Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure {
                 side: side.into(),
-                reason: "invalid note-event part/measure/source-order binding".into(),
+                reason: "invalid note-event part/measure/source-order/coordinate binding".into(),
             });
         }
     }
@@ -283,6 +323,8 @@ fn validate_graph(
         if event.part_id != graph.part_id
             || event.measure_index >= graph.map.measures.len()
             || !orders.insert(event.source_order)
+            || !rational_is_canonical(event.score_offset)
+            || !span_contains(&graph.map.measures[event.measure_index], event.score_offset)
         {
             return Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure {
                 side: side.into(),
@@ -294,6 +336,8 @@ fn validate_graph(
         if event.part_id != graph.part_id
             || event.measure_index >= graph.map.measures.len()
             || !orders.insert(event.source_order)
+            || !rational_is_canonical(event.score_offset)
+            || !span_contains(&graph.map.measures[event.measure_index], event.score_offset)
         {
             return Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure {
                 side: side.into(),
@@ -302,15 +346,47 @@ fn validate_graph(
         }
     }
     for event in &graph.notation_events.cursor_moves {
+        let in_span = event.measure_index < graph.map.measures.len()
+            && rational_is_canonical(event.score_offset_before)
+            && rational_is_canonical(event.score_offset_after)
+            && rational_is_canonical(event.duration)
+            && span_contains(
+                &graph.map.measures[event.measure_index],
+                event.score_offset_before,
+            )
+            && span_contains(
+                &graph.map.measures[event.measure_index],
+                event.score_offset_after,
+            );
+        let duration_matches_direction = match event.direction.as_str() {
+            "backup" => event.score_offset_after
+                .checked_sub(event.score_offset_before)
+                .is_ok_and(|distance| distance == event.duration),
+            "forward" => event.score_offset_before
+                .checked_sub(event.score_offset_after)
+                .is_ok_and(|distance| distance == event.duration),
+            _ => false,
+        };
         if event.part_id != graph.part_id
             || event.measure_index >= graph.map.measures.len()
             || !orders.insert(event.source_order)
+            || !in_span
+            || !duration_matches_direction
+            || event.duration.numerator() == 0
         {
             return Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure {
                 side: side.into(),
                 reason: "invalid cursor-move part/measure/source-order binding".into(),
             });
         }
+    }
+    if orders.len() != total
+        || orders.iter().copied().enumerate().any(|(expected, observed)| expected != observed)
+    {
+        return Err(MusicXmlNotationEvaluationErrorV1::InvalidGraphStructure {
+            side: side.into(),
+            reason: "source-event order must be unique and contiguous across event families".into(),
+        });
     }
     Ok(())
 }
@@ -631,6 +707,25 @@ fn note_pair_dimensions(
     ))
 }
 
+fn note_onset_error(
+    reference: &MusicXmlPartNotationEventsV1,
+    prediction: &MusicXmlPartNotationEventsV1,
+    pairs: &[(usize, usize)],
+    tolerance: RationalBeat,
+) -> Result<MusicXmlNotationErrorDistributionV1, MusicXmlNotationEvaluationErrorV1> {
+    let mut errors = Vec::with_capacity(pairs.len());
+    let mut within = 0usize;
+    for &(reference_index, prediction_index) in pairs {
+        let gold = reference.note_events[reference_index].score_offset;
+        let predicted = prediction.note_events[prediction_index].score_offset;
+        if exact_within(gold, predicted, tolerance)? {
+            within += 1;
+        }
+        errors.push(absolute_error_beats(gold, predicted)?);
+    }
+    Ok(error_distribution(&mut errors, within))
+}
+
 fn source_tree_accuracy<A, B, F>(
     reference: &[A],
     prediction: &[B],
@@ -662,6 +757,7 @@ struct ReportBodyV1<'a> {
     reference_note_event_count: usize,
     prediction_note_event_count: usize,
     note_event_presence: &'a MusicXmlNotationMetricV1,
+    note_onset_error: &'a MusicXmlNotationErrorDistributionV1,
     written_pitch_spelling: &'a MusicXmlNotationAccuracyV1,
     rest_semantics: &'a MusicXmlNotationAccuracyV1,
     unpitched_display: &'a MusicXmlNotationAccuracyV1,
@@ -705,6 +801,7 @@ fn report_commitment(
         reference_note_event_count: report.reference_note_event_count,
         prediction_note_event_count: report.prediction_note_event_count,
         note_event_presence: &report.note_event_presence,
+        note_onset_error: &report.note_onset_error,
         written_pitch_spelling: &report.written_pitch_spelling,
         rest_semantics: &report.rest_semantics,
         unpitched_display: &report.unpitched_display,
@@ -744,6 +841,13 @@ pub fn evaluate_musicxml_notation_graphs(
     prediction: &MusicXmlPartNotationGraphV1,
     config: MusicXmlNotationEvaluationConfigV1,
 ) -> Result<MusicXmlNotationEvaluationReportV1, MusicXmlNotationEvaluationErrorV1> {
+    if !rational_is_canonical(config.position_tolerance)
+        || !rational_is_canonical(config.duration_tolerance)
+    {
+        return Err(MusicXmlNotationEvaluationErrorV1::InvalidConfiguration {
+            field: "tolerances must be canonical nonnegative rational beats".into(),
+        });
+    }
     if config.maximum_events_per_part == 0
         || config.maximum_events_per_part > MUSICXML_NOTATION_EVALUATION_MAX_EVENTS_V1
         || config.maximum_candidate_pairs == 0
@@ -897,6 +1001,12 @@ pub fn evaluate_musicxml_notation_graphs(
             predicted.note_events.len(),
             note_pairs.len(),
         ),
+        note_onset_error: note_onset_error(
+            gold,
+            predicted,
+            &note_pairs,
+            config.position_tolerance,
+        )?,
         written_pitch_spelling,
         rest_semantics,
         unpitched_display,
