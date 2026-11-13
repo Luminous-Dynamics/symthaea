@@ -1,0 +1,634 @@
+{
+  "benchmark_id": "ENG-DESIGN-CHANGE-QUAL-001",
+  "version": "0.1.0",
+  "updated_at": "2026-11-05",
+  "status": "public_blueprint_specification_only",
+  "task_count": 24,
+  "task_families": [
+    {
+      "id": "A-representation",
+      "name": "Non-semantic and representation-preserving changes",
+      "case_ids": [
+        "EDC-A01",
+        "EDC-A02",
+        "EDC-A03",
+        "EDC-A04"
+      ]
+    },
+    {
+      "id": "B-geometry-interface",
+      "name": "Geometry, feature and interface changes",
+      "case_ids": [
+        "EDC-B01",
+        "EDC-B02",
+        "EDC-B03",
+        "EDC-B04"
+      ]
+    },
+    {
+      "id": "C-material-component",
+      "name": "Material, component and supply-chain changes",
+      "case_ids": [
+        "EDC-C01",
+        "EDC-C02",
+        "EDC-C03",
+        "EDC-C04"
+      ]
+    },
+    {
+      "id": "D-requirement-operation",
+      "name": "Load, operating condition and requirement changes",
+      "case_ids": [
+        "EDC-D01",
+        "EDC-D02",
+        "EDC-D03",
+        "EDC-D04"
+      ]
+    },
+    {
+      "id": "E-process-metrology",
+      "name": "Process, manufacturing and inspection changes",
+      "case_ids": [
+        "EDC-E01",
+        "EDC-E02",
+        "EDC-E03",
+        "EDC-E04"
+      ]
+    },
+    {
+      "id": "F-software-authority",
+      "name": "Software, control, external authority and rollback changes",
+      "case_ids": [
+        "EDC-F01",
+        "EDC-F02",
+        "EDC-F03",
+        "EDC-F04"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "EDC-A01",
+      "family_id": "A-representation",
+      "title": "Documentation-only wording update",
+      "candidate_visible_scenario": "Edit explanatory prose while exact requirement, geometry, parameter, interface and configuration identities remain unchanged.",
+      "changed_subjects": [
+        "documentation_text"
+      ],
+      "evaluation_axes": [
+        "impact_precision",
+        "applicability_correctness",
+        "over_requalification"
+      ],
+      "critical_impact_control": false,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-A02",
+      "family_id": "A-representation",
+      "title": "Qualified unit representation conversion",
+      "candidate_visible_scenario": "Convert one dimension from mm to inches with an exact unit/frame equivalence witness and unchanged physical quantity.",
+      "changed_subjects": [
+        "quantity_representation",
+        "unit_binding",
+        "frame_binding"
+      ],
+      "evaluation_axes": [
+        "impact_precision",
+        "preservation_witness_validity",
+        "provenance_integrity"
+      ],
+      "critical_impact_control": false,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-A03",
+      "family_id": "A-representation",
+      "title": "Canonical graph reserialization",
+      "candidate_visible_scenario": "Reorder equivalent semantic graph nodes and relations under a declared canonicalization profile; source bytes change.",
+      "changed_subjects": [
+        "serialization_order",
+        "source_digest"
+      ],
+      "evaluation_axes": [
+        "semantic_identity",
+        "provenance_integrity",
+        "deterministic_replay"
+      ],
+      "critical_impact_control": false,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-A04",
+      "family_id": "A-representation",
+      "title": "Lossy geometry export",
+      "candidate_visible_scenario": "Export the same intended solid through an approximate or lossy representation without an admitted equivalence witness.",
+      "changed_subjects": [
+        "geometry_export",
+        "representation_precision"
+      ],
+      "evaluation_axes": [
+        "impact_completeness",
+        "applicability_correctness",
+        "unknown_handling"
+      ],
+      "critical_impact_control": true,
+      "ambiguity_control": true,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-B01",
+      "family_id": "B-geometry-interface",
+      "title": "Cosmetic feature outside proven dependency cone",
+      "candidate_visible_scenario": "Change a non-functional cosmetic radius outside a proven structural/interface dependency cone; review surface finish if relevant.",
+      "changed_subjects": [
+        "cosmetic_geometry"
+      ],
+      "evaluation_axes": [
+        "impact_precision",
+        "preservation_witness_validity",
+        "over_requalification"
+      ],
+      "critical_impact_control": false,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-B02",
+      "family_id": "B-geometry-interface",
+      "title": "Load-bearing cross-section reduction",
+      "candidate_visible_scenario": "Reduce a load-bearing cross-section while retaining the same part identity and surrounding assembly interfaces.",
+      "changed_subjects": [
+        "structural_geometry",
+        "section_property"
+      ],
+      "evaluation_axes": [
+        "impact_completeness",
+        "applicability_correctness",
+        "critical_impact_recall"
+      ],
+      "critical_impact_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-B03",
+      "family_id": "B-geometry-interface",
+      "title": "Mating datum frame change",
+      "candidate_visible_scenario": "Move or rotate one mating datum while other dimensions remain numerically identical.",
+      "changed_subjects": [
+        "datum",
+        "reference_frame",
+        "assembly_interface"
+      ],
+      "evaluation_axes": [
+        "impact_completeness",
+        "unknown_handling",
+        "applicability_correctness"
+      ],
+      "critical_impact_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-B04",
+      "family_id": "B-geometry-interface",
+      "title": "Feature history breaks downstream edit intent",
+      "candidate_visible_scenario": "Keep the initial solid within geometry tolerance but alter feature dependencies so a required semantic edit no longer preserves the specified relation.",
+      "changed_subjects": [
+        "feature_history",
+        "semantic_parameter_dependency"
+      ],
+      "evaluation_axes": [
+        "semantic_edit_preservation",
+        "impact_completeness",
+        "applicability_correctness"
+      ],
+      "critical_impact_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-C01",
+      "family_id": "C-material-component",
+      "title": "Material property substitution",
+      "candidate_visible_scenario": "Substitute a same-sized material with different modulus, thermal or environmental properties.",
+      "changed_subjects": [
+        "material_identity",
+        "material_property_profile"
+      ],
+      "evaluation_axes": [
+        "impact_completeness",
+        "applicability_correctness",
+        "critical_impact_recall"
+      ],
+      "critical_impact_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-C02",
+      "family_id": "C-material-component",
+      "title": "Manufacturer variant or revision change",
+      "candidate_visible_scenario": "Change exact component manufacturer variant/revision while the visible geometry remains equivalent.",
+      "changed_subjects": [
+        "component_variant",
+        "manufacturer_revision"
+      ],
+      "evaluation_axes": [
+        "impact_completeness",
+        "article_identity",
+        "applicability_correctness"
+      ],
+      "critical_impact_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-C03",
+      "family_id": "C-material-component",
+      "title": "Supplier or lot change",
+      "candidate_visible_scenario": "Change supplier or lot under the same nominal part number; preserve design subject but update realized article lineage.",
+      "changed_subjects": [
+        "supplier_identity",
+        "lot_identity",
+        "supply_provenance"
+      ],
+      "evaluation_axes": [
+        "impact_precision",
+        "traceability",
+        "applicability_correctness"
+      ],
+      "critical_impact_control": false,
+      "ambiguity_control": true,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-C04",
+      "family_id": "C-material-component",
+      "title": "Approved exact substitution with bounded witness",
+      "candidate_visible_scenario": "Replace a component with an approved exact variant and explicit equivalence witness limited to stated interfaces/properties.",
+      "changed_subjects": [
+        "component_variant",
+        "approved_equivalence_witness"
+      ],
+      "evaluation_axes": [
+        "preservation_witness_validity",
+        "impact_precision",
+        "applicability_correctness"
+      ],
+      "critical_impact_control": false,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-D01",
+      "family_id": "D-requirement-operation",
+      "title": "Load or duty-cycle change",
+      "candidate_visible_scenario": "Change load magnitude, direction or duty cycle while holding nominal geometry constant.",
+      "changed_subjects": [
+        "load_profile",
+        "duty_cycle"
+      ],
+      "evaluation_axes": [
+        "impact_completeness",
+        "critical_impact_recall",
+        "applicability_correctness"
+      ],
+      "critical_impact_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-D02",
+      "family_id": "D-requirement-operation",
+      "title": "Environmental requirement change",
+      "candidate_visible_scenario": "Change temperature, humidity, vibration, ingress or EMI requirement without changing the drawing.",
+      "changed_subjects": [
+        "environmental_requirement",
+        "operating_envelope"
+      ],
+      "evaluation_axes": [
+        "impact_completeness",
+        "applicability_correctness",
+        "unknown_handling"
+      ],
+      "critical_impact_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-D03",
+      "family_id": "D-requirement-operation",
+      "title": "Hard requirement threshold revision",
+      "candidate_visible_scenario": "Change a hard requirement limit or governing requirement revision while reusing a prior test artifact.",
+      "changed_subjects": [
+        "requirement_revision",
+        "acceptance_threshold"
+      ],
+      "evaluation_axes": [
+        "impact_completeness",
+        "stale_evidence_detection",
+        "applicability_correctness"
+      ],
+      "critical_impact_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-D04",
+      "family_id": "D-requirement-operation",
+      "title": "Preference-only trade-space change",
+      "candidate_visible_scenario": "Change a non-binding aesthetic or preference objective without changing hard requirements or physical constraints.",
+      "changed_subjects": [
+        "preference_objective"
+      ],
+      "evaluation_axes": [
+        "impact_precision",
+        "over_requalification",
+        "hard_requirement_non_amplification"
+      ],
+      "critical_impact_control": false,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-E01",
+      "family_id": "E-process-metrology",
+      "title": "Manufacturing route or capability change",
+      "candidate_visible_scenario": "Change machine/process route with nominal CAD fixed and altered capability limits.",
+      "changed_subjects": [
+        "process_route",
+        "machine_capability_profile"
+      ],
+      "evaluation_axes": [
+        "impact_completeness",
+        "manufacturing_applicability",
+        "inspection_obligations"
+      ],
+      "critical_impact_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-E02",
+      "family_id": "E-process-metrology",
+      "title": "Tolerance zone or datum interpretation change",
+      "candidate_visible_scenario": "Change tolerance/datum interpretation for an existing dimension and preserve nominal CAD geometry.",
+      "changed_subjects": [
+        "tolerance_profile",
+        "datum_interpretation"
+      ],
+      "evaluation_axes": [
+        "impact_completeness",
+        "metrology_applicability",
+        "stale_evidence_detection"
+      ],
+      "critical_impact_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-E03",
+      "family_id": "E-process-metrology",
+      "title": "Inspection instrument or calibration profile change",
+      "candidate_visible_scenario": "Change the instrument, calibration state or uncertainty profile underlying a previous measurement.",
+      "changed_subjects": [
+        "instrument_identity",
+        "calibration_profile",
+        "uncertainty_profile"
+      ],
+      "evaluation_axes": [
+        "impact_completeness",
+        "measurement_applicability",
+        "stale_evidence_detection"
+      ],
+      "critical_impact_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-E04",
+      "family_id": "E-process-metrology",
+      "title": "Assembly process access or tool path change",
+      "candidate_visible_scenario": "Change fastener insertion sequence, tool access or connector mating process with final geometry unchanged.",
+      "changed_subjects": [
+        "assembly_sequence",
+        "tool_access_envelope"
+      ],
+      "evaluation_axes": [
+        "impact_completeness",
+        "manufacturing_applicability",
+        "over_requalification"
+      ],
+      "critical_impact_control": false,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-F01",
+      "family_id": "F-software-authority",
+      "title": "Controller software or runtime change",
+      "candidate_visible_scenario": "Change controller software/runtime configuration while mechanical geometry remains identical.",
+      "changed_subjects": [
+        "software_artifact",
+        "runtime_configuration"
+      ],
+      "evaluation_axes": [
+        "impact_completeness",
+        "claim_separation",
+        "applicability_correctness"
+      ],
+      "critical_impact_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-F02",
+      "family_id": "F-software-authority",
+      "title": "Sensor mapping or calibration change",
+      "candidate_visible_scenario": "Change sensor channel mapping, offset or calibration that supports derived observations and control decisions.",
+      "changed_subjects": [
+        "sensor_mapping",
+        "calibration_profile"
+      ],
+      "evaluation_axes": [
+        "impact_completeness",
+        "measurement_applicability",
+        "stale_evidence_detection"
+      ],
+      "critical_impact_control": true,
+      "ambiguity_control": false,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-F03",
+      "family_id": "F-software-authority",
+      "title": "External standard edition change",
+      "candidate_visible_scenario": "Change an external standard edition/applicability profile without changing engineering article.",
+      "changed_subjects": [
+        "external_standard_revision",
+        "applicability_profile"
+      ],
+      "evaluation_axes": [
+        "impact_completeness",
+        "authority_scope",
+        "unknown_handling"
+      ],
+      "critical_impact_control": false,
+      "ambiguity_control": true,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    },
+    {
+      "id": "EDC-F04",
+      "family_id": "F-software-authority",
+      "title": "Rollback to an exact prior design generation",
+      "candidate_visible_scenario": "Restore an exact prior generation after a newer one was evaluated, while checking current incidents, calibration and configuration applicability.",
+      "changed_subjects": [
+        "design_generation",
+        "rollback_relation",
+        "current_context"
+      ],
+      "evaluation_axes": [
+        "historical_evidence_integrity",
+        "applicability_correctness",
+        "stale_evidence_detection"
+      ],
+      "critical_impact_control": true,
+      "ambiguity_control": true,
+      "gold_status": "not_yet_adjudicated",
+      "score_status": "not_scored",
+      "disposition_contract": "per_claim_evidence_item",
+      "materialization_status": "blueprint_only"
+    }
+  ],
+  "terminal_dispositions": [
+    "PreservedByIdentity",
+    "PreservedByQualifiedEquivalence",
+    "PreservedByExactRecalculation",
+    "RequiresApplicabilityReview",
+    "RequiresVerification",
+    "RequiresPhysicalEvidence",
+    "RequiresHumanOrExternalApproval",
+    "NotPreserved",
+    "UnknownImpact",
+    "Unsupported"
+  ],
+  "score_dimensions": [
+    "impact_completeness",
+    "impact_precision",
+    "applicability_correctness",
+    "preservation_witness_validity",
+    "unknown_handling",
+    "efficiency",
+    "integrity"
+  ],
+  "hard_gates": [
+    "zero_missed_critical_impacts_on_adjudicated_synthetic_controls",
+    "zero_stale_evidence_false_current_dispositions",
+    "no_authority_escalation_from_benchmark_output",
+    "all_cases_accounted"
+  ],
+  "baseline_arms": [
+    "full_requalification_after_each_change",
+    "naive_byte_or_field_diff",
+    "static_dependency_graph_only",
+    "qualified_semantic_delta_plus_impact_path_projection",
+    "full_evidence_applicability_assessment_with_selective_clarification",
+    "qualified_human_systems_engineering_review",
+    "commercial_mbse_or_plm_where_same_task_comparison_is_possible"
+  ],
+  "ownership": {
+    "delta_semantics": "https://github.com/Luminous-Dynamics/symthaea/issues/6117",
+    "systems_engineering": "https://github.com/Luminous-Dynamics/symthaea/issues/3677",
+    "repository_code_impact": "https://github.com/Luminous-Dynamics/symthaea/issues/10173",
+    "cad_history": "https://github.com/Luminous-Dynamics/symthaea/issues/10510",
+    "hardware_topology": "https://github.com/Luminous-Dynamics/symthaea/issues/10530",
+    "tolerance_metrology": "https://github.com/Luminous-Dynamics/symthaea/issues/4883",
+    "component_identity": "https://github.com/Luminous-Dynamics/symthaea/issues/4877",
+    "as_built_realization": "https://github.com/Luminous-Dynamics/symthaea/issues/4859",
+    "manufacturing_value": "https://github.com/Luminous-Dynamics/symthaea/issues/7608"
+  },
+  "custody": {
+    "candidate_visible_blueprints": true,
+    "gold_labels_adjudicated": false,
+    "sealed_holdout_created": false,
+    "evaluator_outside_candidate_workspace_required": true,
+    "untrusted_execution_authorized": false,
+    "execution_authorized": false,
+    "physical_testing_authorized": false
+  },
+  "claim_ceiling": "Public scenario blueprints only. No gold-labelled result, candidate score, ETK decision, design approval, manufacturing release, physical validation, safety, regulatory or professional qualification is established."
+}
