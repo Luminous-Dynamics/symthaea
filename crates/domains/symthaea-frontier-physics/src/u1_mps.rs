@@ -260,7 +260,7 @@ impl core::fmt::Display for U1MpsError {
             ),
             Self::InvalidTeBDParity(parity) => {
                 write!(f, "TEBD layer parity must be 0 or 1, got {parity}")
-            },
+            }
             Self::TeBDGateOutOfRange {
                 bond_index,
                 site_count,
@@ -268,16 +268,13 @@ impl core::fmt::Display for U1MpsError {
                 f,
                 "TEBD gate bond {bond_index} is out of range for {site_count} sites"
             ),
-            Self::TeBDGateWrongParity {
-                bond_index,
-                parity,
-            } => write!(
+            Self::TeBDGateWrongParity { bond_index, parity } => write!(
                 f,
                 "TEBD gate bond {bond_index} does not belong to parity-{parity} layer"
             ),
             Self::DuplicateTeBDGate { bond_index } => {
                 write!(f, "TEBD layer contains duplicate gate on bond {bond_index}")
-            },
+            }
             Self::TeBDLayerSiteCountMismatch {
                 layer_sites,
                 state_sites,
@@ -1773,8 +1770,6 @@ impl U1MpsTruncationLedger {
     }
 }
 
-
-
 /// One nearest-neighbour two-site gate attached to a bond index.
 #[derive(Debug, Clone, PartialEq)]
 pub struct U1TeBDGate {
@@ -1936,12 +1931,11 @@ impl U1TeBDLayer {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::{
-        ComplexU1Mps, U1MpsError, U1MpsTensor, U1MpsTruncationLedger, U1TeBDGate,
-        U1TeBDLayer, U1TwoSiteGate, U1TwoSiteState, U1TwoSiteTruncationPolicy,
+        ComplexU1Mps, U1MpsError, U1MpsTensor, U1MpsTruncationLedger, U1TeBDGate, U1TeBDLayer,
+        U1TwoSiteGate, U1TwoSiteState, U1TwoSiteTruncationPolicy,
     };
     use num_complex::Complex64;
 
@@ -2862,12 +2856,8 @@ mod tests {
     #[test]
     fn tebd_odd_layer_executes_one_gate_and_tracks_local_discarded_weight() {
         let input = ComplexU1Mps::product_state(&[false, true, false]).unwrap();
-        let layer = U1TeBDLayer::new(
-            3,
-            1,
-            vec![U1TeBDGate::new(1, U1TwoSiteGate::swap())],
-        )
-        .unwrap();
+        let layer =
+            U1TeBDLayer::new(3, 1, vec![U1TeBDGate::new(1, U1TwoSiteGate::swap())]).unwrap();
         let result = layer
             .apply(
                 &input,
@@ -2935,5 +2925,4 @@ mod tests {
             })
         ));
     }
-
 }
