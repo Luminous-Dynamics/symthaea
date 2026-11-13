@@ -53,6 +53,7 @@ pub enum ErrorSetQecError {
     InvalidHellingerRadicand { radicand: f64 },
     CoefficientMatrixShape { columns: usize, expected: usize },
     StrongControlNorm { frobenius_norm: f64, tolerance: f64 },
+    ChannelTracePreservationResidual { residual: f64, tolerance: f64 },
 }
 
 impl core::fmt::Display for ErrorSetQecError {
@@ -113,6 +114,10 @@ impl core::fmt::Display for ErrorSetQecError {
             } => write!(
                 f,
                 "strong E-control requires coefficient Frobenius norm <= 1 + {tolerance}, got {frobenius_norm}"
+            ),
+            Self::ChannelTracePreservationResidual { residual, tolerance } => write!(
+                f,
+                "coefficient-induced channel trace-preservation residual {residual} exceeds {tolerance}"
             ),
         }
     }
@@ -198,6 +203,7 @@ pub struct ErrorSetQecDiagnostics {
     pub code_dimension: usize,
     pub physical_dimension: usize,
     pub error_count: usize,
+    pub error_operators: Vec<ComplexMatrix>,
     pub qec_matrix: ComplexMatrix,
     /// Error-space matrix lambda minimizing ||A - I_K tensor lambda||_F.
     pub knill_laflamme_lambda: ComplexMatrix,
@@ -398,6 +404,7 @@ pub fn compute_error_set_qec_diagnostics(
         code_dimension,
         physical_dimension,
         error_count,
+        error_operators: error_operators.to_vec(),
         qec_matrix,
         knill_laflamme_lambda,
         hermiticity_residual,
@@ -445,6 +452,7 @@ pub struct StronglyControlledPetzWorstCaseBound {
     pub bures_distance_upper_bound: f64,
     pub operator_norm_deviation: f64,
     pub coefficient_frobenius_norm: f64,
+    pub channel_trace_preservation_residual: f64,
     pub qec_square_root: PsdSquareRootDiagnostics,
     pub partial_trace_square_root: PsdSquareRootDiagnostics,
     pub deviation_hermiticity_residual: f64,
@@ -648,6 +656,66 @@ pub fn compute_knill_laflamme_hellinger(
     })
 }
 
+
+/// Verify trace preservation of the channel induced by F_alpha = sum_k C_alpha,k E_k.
+///
+/// Complete positivity is automatic for a finite Kraus representation; this
+/// function checks sum_alpha F_alpha^dagger F_alpha = I and returns the maximum
+/// absolute matrix-entry residual.
+fn e_controlled_channel_trace_preservation_residual(
+    error_operators: &[ComplexMatrix],
+    coefficient_matrix: &ComplexMatrix,
+) -> Result<f64, ErrorSetQecError> {
+    let physical_dimension = error_operators[0].rows();
+    let error_count = error_operators.len();
+    if coefficient_matrix.columns() != error_count {
+        return Err(ErrorSetQecError::CoefficientMatrixShape {
+            columns: coefficient_matrix.columns(),
+            expected: error_count,
+        });
+    }
+
+    let mut kraus_operators =
+        vec![vec![Complex64::new(0.0, 0.0); physical_dimension * physical_dimension];
+            coefficient_matrix.rows()];
+    for alpha in 0..coefficient_matrix.rows() {
+        for error_index in 0..error_count {
+            let coefficient = coefficient_matrix.get(alpha, error_index);
+            for row in 0..physical_dimension {
+                for column in 0..physical_dimension {
+                    kraus_operators[alpha][row * physical_dimension + column] +=
+                        coefficient * error_operators[error_index].get(row, column);
+                }
+            }
+        }
+    }
+
+    let mut maximum_residual: f64 = 0.0;
+    for row in 0..physical_dimension {
+        for column in 0..physical_dimension {
+            let mut value = Complex64::new(0.0, 0.0);
+            for kraus in &kraus_operators {
+                for output in 0..physical_dimension {
+                    value += kraus[output * physical_dimension + row].conj()
+                        * kraus[output * physical_dimension + column];
+                }
+            }
+            let expected = if row == column {
+                Complex64::new(1.0, 0.0)
+            } else {
+                Complex64::new(0.0, 0.0)
+            };
+            maximum_residual = maximum_residual.max((value - expected).norm());
+        }
+    }
+    if !maximum_residual.is_finite() {
+        return Err(ErrorSetQecError::NonFiniteDiagnostic(
+            "coefficient-induced channel TP",
+        ));
+    }
+    Ok(maximum_residual)
+}
+
 /// Compute the strongly E-controlled worst-case Petz bound from Theorem 11.
 ///
 /// The caller supplies the Kraus expansion coefficient matrix C with
@@ -672,6 +740,17 @@ pub fn compute_strongly_controlled_petz_worst_case_bound(
     if coefficient_frobenius_norm > 1.0 + tolerance {
         return Err(ErrorSetQecError::StrongControlNorm {
             frobenius_norm: coefficient_frobenius_norm,
+            tolerance,
+        });
+    }
+    let channel_trace_preservation_residual =
+        e_controlled_channel_trace_preservation_residual(
+            &diagnostics.error_operators,
+            coefficient_matrix,
+        )?;
+    if channel_trace_preservation_residual > tolerance {
+        return Err(ErrorSetQecError::ChannelTracePreservationResidual {
+            residual: channel_trace_preservation_residual,
             tolerance,
         });
     }
@@ -752,6 +831,7 @@ pub fn compute_strongly_controlled_petz_worst_case_bound(
         bures_distance_upper_bound,
         operator_norm_deviation,
         coefficient_frobenius_norm,
+        channel_trace_preservation_residual,
         qec_square_root,
         partial_trace_square_root,
         deviation_hermiticity_residual: hermiticity_residual,
