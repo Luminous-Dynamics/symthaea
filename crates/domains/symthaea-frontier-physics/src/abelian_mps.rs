@@ -471,6 +471,23 @@ mod tests {
             q(i32::MIN, 0).checked_sub(q(1, 0)),
             Err(AbelianChargeError::ChargeOverflow { component: 0 })
         ));
+        assert!(matches!(
+            AbelianCharge::<0>::new([]),
+            Err(AbelianChargeError::ZeroChargeRank)
+        ));
+        let maximum = AbelianCharge::new([i32::MAX, 0]).unwrap();
+        let increment = q(1, 0);
+        assert!(matches!(
+            AbelianChargeTensor::new(
+                0,
+                vec![maximum],
+                vec![increment],
+                vec![maximum],
+                vec![zero()],
+                1.0e-12,
+            ),
+            Err(AbelianChargeError::ChargeOverflow { component: 0 })
+        ));
     }
 
     #[test]
