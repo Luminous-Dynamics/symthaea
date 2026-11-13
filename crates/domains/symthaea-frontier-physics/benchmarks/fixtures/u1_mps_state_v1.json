@@ -6,7 +6,7 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "U1 MPS core, charge-block factorization/splitting, truncation receipts, mixed-canonical gauge receipts, canonical-gauge-weighted global TEBD truncation ledger, analytic U1 Hamiltonian exponentiation, second-order Strang evolution, MPS transfer-overlap step-doubling and typed separated error-budget receipts are source-authored. Latest exact-head Rust 1.96 validation pending.",
+  "execution_status": "Scalar U(1) MPS/TEBD, canonical-gauge truncation receipts, Strang evolution and step-doubling diagnostics are source-authored with exact-head Rust validation pending. A separate generic U(1)^K charge-vector tensor/sector-block contract is source-authored; generic K-charge SVD and evolution are not yet implemented.",
   "claim_ceiling": "The step-doubling Richardson quantity is an asymptotic estimate, not a formal Trotter upper theorem. Hamiltonian projection, canonicalization drift, Schmidt truncation and step-doubling defect remain separate. total_physical_error_upper_bound remains None; no interval arithmetic, total physical error proof, SOTA performance or quantum-advantage claim.",
   "conventions": {
     "physical_dimension": 2,
@@ -366,6 +366,54 @@
       "total_physical_error_upper_bound": null,
       "total_physical_error_qualified": false,
       "rationale": "Trotter Richardson value is asymptotic, f64 residuals are not interval-enclosed, and Hamiltonian projection residual is a separate input/data correction."
+    },
+    "abelian_multicharge": {
+      "status": "source_authored_runner_pending",
+      "module": "abelian_mps",
+      "generic_types": [
+        "AbelianCharge<const K: usize>",
+        "AbelianChargeTensor<const K: usize>",
+        "AbelianMps<const K: usize>",
+        "AbelianChargeBlock<const K: usize>",
+        "AbelianChargeBlockPlan<const K: usize>"
+      ],
+      "invariants": [
+        "component-wise checked charge addition/subtraction",
+        "local selection rule q_right = q_left + q_physical_vector",
+        "charge-zero left MPS boundary",
+        "declared K-vector total charge at right boundary",
+        "exact adjacent virtual charge-vector identity",
+        "two-site row/column partition by full intermediate K-vector"
+      ],
+      "example_convention": {
+        "name": "(particle_number, twice_Sz)",
+        "local_basis": {
+          "vacuum": [
+            0,
+            0
+          ],
+          "spin_up": [
+            1,
+            1
+          ],
+          "spin_down": [
+            1,
+            -1
+          ],
+          "double_occupancy": [
+            2,
+            0
+          ]
+        }
+      },
+      "authored_tests": [
+        "charge_vectors_add_subtract_and_detect_component_overflow",
+        "two_charge_mps_enforces_both_particle_number_and_spin_selection_rules",
+        "two_site_block_plan_partitions_joint_charge_vectors_without_cross_sector_pairs",
+        "joint_charge_tensor_rejects_forbidden_cross_sector_amplitude",
+        "joint_charge_mps_rejects_bond_mismatch_and_wrong_total_charge"
+      ],
+      "claim_boundary": "Generic structural U(1)^K charge-vector tensor validation and two-site block planning only. No generic charge-block SVD, truncation, TEBD or non-Abelian fusion trees yet."
     }
   },
   "known_answers": [
@@ -593,6 +641,19 @@
         "total physical error upper bound remains None while Trotter or floating-point terms are not formal bounds",
         "failed gauge receipts suppress the relevant truncation bound and Richardson qualification"
       ]
+    },
+    {
+      "id": "MPS-11",
+      "name": "Generic U(1)^K multi-charge tensor invariants and block planner",
+      "status": "source_authored_runner_pending",
+      "acceptance": [
+        "checked K-vector charge arithmetic and overflow negative controls",
+        "arbitrary local physical basis with component-wise selection rule",
+        "MPS boundaries and virtual bonds preserve every charge component",
+        "two-site row and column sets grouped by identical intermediate charge vector",
+        "dense/small known-answer fixture for (particle_number,2Sz)",
+        "generic sector-wise SVD is a later milestone, not claimed here"
+      ]
     }
   ],
   "negative_controls": [
@@ -652,7 +713,12 @@
     "qualify step-doubling estimate when any canonical gauge receipt fails",
     "populate total physical error field from an asymptotic Richardson estimate alone",
     "sum Hamiltonian projection, truncation and Trotter terms without recording each source or qualification",
-    "report a qualified total physical error while interval roundoff and Trotter upper bounds are missing"
+    "report a qualified total physical error while interval roundoff and Trotter upper bounds are missing",
+    "component-wise charge overflow wraps silently",
+    "physical basis entry satisfies one U(1) component but violates another",
+    "two-site SVD planner pairs different intermediate charge vectors",
+    "adjacent MPS tensors carry equal scalar sum but different charge vectors",
+    "claim generic multi-charge TEBD before sector-wise SVD and error receipts exist"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -743,7 +809,14 @@
     "richardson_estimate_qualified",
     "total_physical_error_upper_bound",
     "total_physical_error_qualified",
-    "unqualified_terms"
+    "unqualified_terms",
+    "abelian_charge_rank_K",
+    "abelian_total_charge_vector",
+    "abelian_physical_charge_basis",
+    "abelian_selection_rule_residual",
+    "abelian_virtual_charge_vectors_by_bond",
+    "abelian_two_site_intermediate_charge_blocks",
+    "abelian_charge_overflow_negative_control"
   ],
   "competitive_baseline_matrix": {
     "quimb": {
