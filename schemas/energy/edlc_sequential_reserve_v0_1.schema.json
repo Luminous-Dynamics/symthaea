@@ -206,7 +206,8 @@
         "minimum_sustained_power_w",
         "response_latency_s",
         "minimum_application_voltage_v",
-        "temperature_rise_c"
+        "temperature_rise_c",
+        "readiness_probe_profile_id"
       ],
       "properties": {
         "event_index": {
@@ -265,6 +266,13 @@
         },
         "temperature_rise_c": {
           "type": "number"
+        },
+        "readiness_probe_profile_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
         }
       }
     },
