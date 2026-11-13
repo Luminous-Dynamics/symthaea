@@ -6,7 +6,7 @@
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
   "status": "u1_mps_dense_charge_block_factorization_source_authored_pending_validation",
-  "execution_status": "Complex U1 MPS state representation, charge-block dense factorization, U1 two-site gates, exact two-site split, and explicit truncation/error-ledger source are authored. Exact-head Rust 1.96 validation pending.",
+  "execution_status": "Complex U1 MPS storage, fixed-charge dense factorization, validated local gates, exact charge-block split, truncation policy/ledger and deterministic even/odd TEBD layer executor are source-authored. Exact-head Rust 1.96 harness pending.",
   "claim_ceiling": "No TEBD circuit scheduler, nonlocal MPO gates, large-N scaling or quantum advantage claim. Approximation diagnostics are local two-site split receipts only.",
   "conventions": {
     "physical_dimension": 2,
@@ -177,6 +177,44 @@
         "cumulative_l2_error_upper_bound",
         "maximum_single_gate_relative_discarded_weight"
       ]
+    },
+    "tebd_layer_scheduler": {
+      "status": "source_authored_runner_pending",
+      "api": [
+        "U1TeBDGate::new(bond_index,gate)",
+        "U1TeBDLayer::new(site_count,parity,gates)",
+        "U1TeBDLayer::apply(input,truncation_policy)"
+      ],
+      "schedule": "Single parity layer; parity 0 uses bonds 0,2,4,..., parity 1 uses bonds 1,3,5,...; bonds sorted ascending and unique.",
+      "execution": "Each disjoint bond applies validated U1 unitary, charge-block split and explicit global truncation policy; updates complete MPS and revalidates charge/boundaries.",
+      "receipts": [
+        "parity",
+        "bond_indices",
+        "gate_truncations",
+        "truncation_ledger",
+        "input_norm_squared",
+        "output_norm_squared",
+        "input_total_charge",
+        "output_total_charge",
+        "output_selection_rule_residual",
+        "global_l2_bound_qualified"
+      ],
+      "authored_tests": [
+        "tebd_even_layer_executes_sorted_disjoint_swaps_and_preserves_charge",
+        "tebd_odd_layer_executes_one_gate_and_tracks_local_discarded_weight",
+        "tebd_layer_rejects_bad_parity_duplicate_and_out_of_range_bonds",
+        "tebd_layer_rejects_state_with_mismatched_site_count"
+      ],
+      "global_error_status": "not_qualified",
+      "reason": "A local discarded Schmidt weight is not a global state-vector residual for arbitrary MPS gauge. Require mixed-canonical exterior isometry at every truncated bond, verified by a canonicalization receipt, before upgrading sum sqrt(w_j) to a global L2 bound.",
+      "nonclaims": [
+        "no Hamiltonian-to-gate exponentiation",
+        "no second-order Strang even/odd/even TEBD time stepper",
+        "no mixed-canonical sweeps",
+        "no nonlocal MPO gate application",
+        "no adaptive dt",
+        "no global fidelity/circuit error guarantee"
+      ]
     }
   },
   "known_answers": [
@@ -344,7 +382,13 @@
     "cutoff weight conflated with bond-cap discarded weight",
     "implicit renormalization changes amplitudes without receipt",
     "cumulative L2 ledger reports root-sum-square instead of triangle-inequality sum",
-    "apply unitary-gate ledger bound across an unreported non-unitary operation"
+    "apply unitary-gate ledger bound across an unreported non-unitary operation",
+    "TEBD layer contains a bond from the wrong parity",
+    "TEBD layer contains duplicate/overlapping bond",
+    "TEBD layer applies a gate out of range",
+    "TEBD layer changes total U1 charge",
+    "claim global L2 state error without canonical exterior isometry receipt",
+    "implicitly renormalize TEBD state after local truncation"
   ],
   "required_receipt_fields": [
     "source_sha",
@@ -383,7 +427,15 @@
     "post_truncation_norm_squared",
     "renormalization_factor_not_applied",
     "bond_cap_binding",
-    "cumulative_l2_error_upper_bound"
+    "cumulative_l2_error_upper_bound",
+    "tebd_layer_parity",
+    "tebd_layer_bond_order",
+    "tebd_layer_gate_count",
+    "tebd_layer_input_norm_squared",
+    "tebd_layer_output_norm_squared",
+    "tebd_layer_input_total_charge",
+    "tebd_layer_output_total_charge",
+    "tebd_layer_global_l2_bound_qualified"
   ],
   "competitive_baseline_matrix": {
     "quimb": {

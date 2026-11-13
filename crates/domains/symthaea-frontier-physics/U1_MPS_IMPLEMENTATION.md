@@ -89,16 +89,30 @@ The new approximate path is separate from \`split_exact\`:
 
 The benchmark suite must compare against Quimb CircuitMPS with matched gate sequence, qubit ordering, initial vector, precision, cutoff semantics, bond cap, and hardware. Quimb already exposes maximum bond dimension, cutoffs, swap-and-split gate contraction, and norm-based fidelity/error estimates. ITensor already provides Abelian QN block-sparse MPS and automatic symmetry enforcement. The proposed advantage is not the novelty of MPS or U(1) conservation; it is the auditable end-to-end receipt for each symmetry-sector operation and the separation of approximation sources.
 
+
+## Deterministic even/odd TEBD layer executor
+
+The new scheduler composes the local gate, exact charge-aware contraction, and explicit truncation components:
+
+- \`U1TeBDLayer::new(site_count, parity, gates)\` validates parity \(p\in\{0,1\}\), bond range, uniqueness and parity membership, then sorts gates by bond index.
+- A parity layer contains only disjoint nearest-neighbour bonds (even: 0,2,4,…; odd: 1,3,5,…).
+- \`U1TeBDLayer::apply\` applies each validated two-site unitary, performs a charge-block split and the requested global truncation policy, then revalidates the entire MPS.
+- The result includes input/output norm squared, total charge, output selection-rule residual, bond order, per-gate truncation receipts and the local truncation ledger.
+- There is no implicit renormalization.
+
+**Important error-bound qualification:** the sum of local \(\sqrt{w_j}\) values is not automatically a global state-vector bound for an arbitrary MPS gauge. The global triangle-inequality bound requires a mixed-canonical representation with orthonormal exterior left and right block bases at each truncation, as well as unitary gates and no nonlinear renormalization between projections. This scheduler currently returns \`global_l2_bound_qualified = false\`. A canonicalization sweep and a machine-checkable gauge receipt are required before upgrading that claim.
+
+This is a layer executor, not yet a complete TEBD time-stepper: second-order even/odd/even or odd/even/odd Trotter composition, Hamiltonian-to-gate exponentiation, adaptive time stepping, and a global canonical-gauge error certificate remain future increments.
+
 ## Explicit limitations
 
 This increment does **not** yet implement:
-- Full TEBD gate sequencing, nonlocal MPO evolution and circuit-level state-error qualification.
-- TEBD or nonlocal MPO evolution.
-- Per-truncation discarded-weight accounting.
-- Cumulative state-vector / reduced-state error bounds.
-- Any N=16–64 scaling or matched Quimb/ITensor performance claim.
+- Second-order even/odd/even or odd/even/odd Trotter time-stepper and Hamiltonian gate generation.
+- Mixed-canonical gauge sweeps with machine-checkable exterior-isometry receipts.
+- Global circuit-level state-vector and reduced-state error bounds.
+- Nonlocal MPO evolution, adaptive time stepping and any N=16–64 scaling or matched Quimb/ITensor performance claim.
 
-Those are the next stages. The implementation should add them in this order: two-site TEBD gate scheduler, canonical-form sweeps, cumulative circuit-level error qualification, then controlled scaling against Quimb and ITensor.
+Those are the next stages. The implementation should add them in this order: Hamiltonian-to-gate generation and Strang layer composition, mixed-canonical sweeps and gauge receipts, global circuit-level error qualification, then controlled scaling against Quimb and ITensor.
 
 ## Competitive benchmark policy
 
@@ -111,4 +125,4 @@ Primary external references:
 
 ## Claim ceiling
 
-A passing version of these increments would establish validated complex U(1)-sector-labelled MPS storage, charge-block dense-to-MPS factorization with explicit leakage/reconstruction receipts, small-N dense expansion and norm contraction. It would not establish TEBD, an efficient tensor-network simulator, black-hole evaporation, Hawking radiation, gravitational backreaction or quantum advantage.
+A passing version of these increments would establish validated complex U(1)-sector-labelled MPS storage, charge-block dense-to-MPS factorization with explicit leakage/reconstruction receipts, small-N dense expansion and norm contraction. It now includes a deterministic nearest-neighbour layer executor, but it does not yet establish a complete TEBD time-stepper, globally certified circuit error, an efficient large-scale tensor-network simulator, black-hole evaporation, Hawking radiation, gravitational backreaction or quantum advantage.
