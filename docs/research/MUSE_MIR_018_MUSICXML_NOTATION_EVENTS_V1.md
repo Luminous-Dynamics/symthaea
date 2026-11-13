@@ -78,7 +78,7 @@ Resource budgets:
 
 ## Tests authored
 
-### Notation-event parser (11 tests)
+### Notation-event parser (12 tests)
 
 - rest and measure-rest, grace, cue, unpitched, microtonal pitch spelling, voice/staff and instrument ID;
 - chord member onset anchoring and no cursor advance;
@@ -87,6 +87,7 @@ Resource budgets:
 - score-order key/clef attribute changes at exact beat offsets;
 - backup/forward movement across simultaneous voices;
 - source order and unknown extension retention;
+- event extent beyond the explicit measure span withholds all partial events;
 - ambiguous chord / invalid duration fail-closed behavior;
 - grace-chord grouping;
 - ordered mixed text/element content;
