@@ -60,8 +60,8 @@
       "publisher": "IEC",
       "published": "2025-02-13",
       "evidence_class": "international_standard",
-      "permitted_use": "Power-application EDLC characteristics and test reference",
-      "prohibited_inference": "Not a battery standard"
+      "permitted_use": "EDLC power-application performance, leakage-current measurement and quality-assessment reference; publicly searchable excerpt specifies 20 °C ± 2 °C, rated voltage through protective resistor ≤1 000 Ω, ≥12 h pre-discharge and 24 h electrification unless otherwise agreed; use the controlled normative standard and applicable detail specification for physical testing",
+      "prohibited_inference": "A 24 h leakage-current test is not multi-month calendar life, voltage-hold lifetime or independent device qualification; requirements depend on the applicable detail specification and product/application boundary"
     },
     {
       "id": "UL-810A-2026",
