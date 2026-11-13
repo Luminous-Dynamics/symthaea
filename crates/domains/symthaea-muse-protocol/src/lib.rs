@@ -228,6 +228,20 @@ pub struct ImportedNotationStructureSummary {
     #[serde(default)]
     pub notation_event_count: usize,
     #[serde(default)]
+    pub notation_auxiliary_event_count: usize,
+    #[serde(default)]
+    pub notation_attribute_event_count: usize,
+    #[serde(default)]
+    pub notation_cursor_move_count: usize,
+    #[serde(default)]
+    pub unpitched_event_count: usize,
+    #[serde(default)]
+    pub cue_note_count: usize,
+    #[serde(default)]
+    pub chord_member_count: usize,
+    #[serde(default)]
+    pub time_modification_count: usize,
+    #[serde(default)]
     pub notation_supported_part_count: usize,
     #[serde(default)]
     pub notation_unknown_part_count: usize,
