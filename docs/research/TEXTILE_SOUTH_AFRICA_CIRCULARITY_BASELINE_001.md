@@ -26,7 +26,14 @@ UNEP's InTex Phase II in Africa runs through 2028 and includes South Africa. Sou
 
 Source: https://www.unep.org/en/intex
 
-This is a potential collaboration and data-alignment context, not an endorsement, agreement, dataset licence or proof that a partnership is available.
+The related 2026 call for proposals sought an implementing team for an open-access national textile LCI database and an EPR feasibility study. The original deadline on the UNEP page was 4 September 2026; the Life Cycle Initiative subsequently announced an extension to 27 September 2026. Both dates have passed. The published call required a not-for-profit/government/university-type lead applicant, with additional experts permitted in individual capacity. Do not treat the call as currently open, assume a for-profit lead would have qualified, or claim that Luminous Dynamics was selected.
+
+Call and extension references:
+- https://www.unep.org/zh-hans/node/203899
+- https://www.lifecycleinitiative.org/call-for-proposals-for-intex-south-africa-2026/
+- Life Cycle Initiative announcement of the extension: https://www.linkedin.com/company/life-cycle-initiative/
+
+This is a potential future collaboration and data-alignment context, not an endorsement, agreement, dataset licence or proof that a partnership is available.
 
 ### 2.2 Draft National Waste Management Strategy 2026
 
