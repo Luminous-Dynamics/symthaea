@@ -247,6 +247,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         .iter()
         .map(String::as_str)
         .collect();
+    let independent_exact_missing =
+        missing_mandatory_actions(&independent_exact.selected_option_ids);
 
     // Known-answer controls for this frozen synthetic profile:
     // independent-row greedy over-credits the correlated proxy pair, while
@@ -258,7 +260,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     assert!(correlated_ids.contains("MOISTURE_CONTENT"));
     assert!(!correlated_ids.contains("FTIR_CHEMISTRY"));
     assert_eq!(correlated_ids, correlated_exact_ids);
+    assert!(independent_exact_missing.is_empty());
     assert!(!independent_missing.is_empty());
+    assert!(
+        correlated_greedy.expected_information_gain_nats
+            > independent_greedy.expected_information_gain_nats + 0.1
+    );
     assert!(correlated_missing.is_empty());
     assert!(
         independent_exact.expected_information_gain_nats
