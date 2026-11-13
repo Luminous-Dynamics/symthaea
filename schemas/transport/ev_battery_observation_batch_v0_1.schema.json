@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/transport/ev-battery-observation-batch/0.1",
+  "title": "EV battery observation batch v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "batch_id",
+    "asset",
+    "clock",
+    "scope_inventory",
+    "calibrations",
+    "observations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "ev-battery-observation-batch/0.1"
+    },
+    "batch_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vehicle_ref",
+        "vehicle_configuration_digest",
+        "pack_ref",
+        "pack_configuration_digest",
+        "bms_hardware_revision",
+        "bms_firmware_revision",
+        "chemistry",
+        "max_observable_resolution",
+        "current_sign_convention"
+      ],
+      "properties": {
+        "vehicle_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vehicle_configuration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "pack_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pack_configuration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "bms_hardware_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bms_firmware_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "chemistry": {
+          "enum": [
+            "lfp",
+            "lmfp",
+            "nmc",
+            "nca",
+            "lco",
+            "sodium_ion",
+            "other",
+            "unknown"
+          ]
+        },
+        "max_observable_resolution": {
+          "enum": [
+            "pack",
+            "module",
+            "cell"
+          ]
+        },
+        "current_sign_convention": {
+          "const": "positive_discharge"
+        }
+      }
+    },
+    "clock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clock_ref",
+        "time_uncertainty_ms",
+        "max_transport_delay_ms"
+      ],
+      "properties": {
+        "clock_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "time_uncertainty_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_transport_delay_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "scope_inventory": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "resolution",
+          "subject_ref"
+        ],
+        "properties": {
+          "resolution": {
+            "enum": [
+              "pack",
+              "module",
+              "cell"
+            ]
+          },
+          "subject_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "calibrations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "calibration_ref",
+          "sensor_ref",
+          "revision",
+          "digest",
+          "valid_from",
+          "valid_until"
+        ],
+        "properties": {
+          "calibration_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sensor_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "revision": {
+            "type": "string",
+            "minLength": 1
+          },
+          "digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "observation_id",
+          "sensor_ref",
+          "channel",
+          "measurement_class",
+          "subject_resolution",
+          "subject_ref",
+          "value",
+          "unit",
+          "sampled_at",
+          "received_at",
+          "monotonic_sequence",
+          "calibration_ref",
+          "quality"
+        ],
+        "properties": {
+          "observation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sensor_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "channel": {
+            "enum": [
+              "voltage",
+              "current",
+              "temperature",
+              "soc",
+              "charge_power",
+              "discharge_power"
+            ]
+          },
+          "measurement_class": {
+            "enum": [
+              "direct_sensor_observation",
+              "bms_reported_value",
+              "derived_estimate",
+              "model_prediction",
+              "simulation_output",
+              "synthetic_fixture",
+              "vendor_claim"
+            ]
+          },
+          "subject_resolution": {
+            "enum": [
+              "pack",
+              "module",
+              "cell"
+            ]
+          },
+          "subject_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sampled_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "monotonic_sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "calibration_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quality": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "state",
+              "flags"
+            ],
+            "properties": {
+              "state": {
+                "enum": [
+                  "valid",
+                  "suspect",
+                  "invalid",
+                  "out_of_domain",
+                  "unavailable"
+                ]
+              },
+              "flags": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "stale",
+                    "out_of_order",
+                    "duplicate_sequence",
+                    "clock_skew",
+                    "calibration_expired",
+                    "calibration_not_yet_valid",
+                    "sensor_fault",
+                    "range_violation",
+                    "missing_value",
+                    "conflicting_source",
+                    "out_of_domain",
+                    "transport_delay",
+                    "unknown_origin"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
