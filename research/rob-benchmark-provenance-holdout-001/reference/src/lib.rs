@@ -398,6 +398,8 @@ pub enum HoldoutAuditError {
     MissingCaseReceipt(String),
     /// One cluster has contradictory receipt or disposition identities.
     ClusterReceiptMismatch(String),
+    /// A cluster-independence receipt is reused for distinct cluster identities.
+    ReusedClusterIndependenceReceipt(String),
     /// Independence evidence was explicitly rejected.
     RejectedIndependenceEvidence(String),
     /// No paired cases were supplied.
@@ -649,6 +651,7 @@ fn validate_cases(
     let mut paired_case_manifests = BTreeSet::new();
     let mut cluster_receipts: BTreeMap<String, (String, IndependenceDisposition)> =
         BTreeMap::new();
+    let mut receipt_clusters: BTreeMap<String, String> = BTreeMap::new();
     let mut by_group: BTreeMap<GroupKey, Vec<&PairedCase>> = BTreeMap::new();
 
     for case in cases {
@@ -679,6 +682,21 @@ fn validate_cases(
             return Err(HoldoutAuditError::RejectedIndependenceEvidence(
                 case.cluster_id.clone(),
             ));
+        }
+
+        match receipt_clusters.get(&case.independence_receipt_digest) {
+            Some(existing_cluster) if existing_cluster != &case.cluster_id => {
+                return Err(HoldoutAuditError::ReusedClusterIndependenceReceipt(
+                    case.independence_receipt_digest.clone(),
+                ));
+            }
+            Some(_) => {}
+            None => {
+                receipt_clusters.insert(
+                    case.independence_receipt_digest.clone(),
+                    case.cluster_id.clone(),
+                );
+            }
         }
 
         match cluster_receipts.get(&case.cluster_id) {
@@ -1358,6 +1376,18 @@ mod tests {
         audit.cases[1].independence_receipt_digest = "cluster-B-receipt".into();
         let report = audit_source_holdouts(&audit).unwrap();
         assert_eq!(report.dimensions[0].groups[0].independent_cluster_count, 2);
+    }
+
+    #[test]
+    fn independence_receipt_cannot_be_reused_for_distinct_clusters() {
+        let mut audit = input();
+        audit.cases[1].cluster_id = "cluster-B".into();
+        assert_eq!(
+            audit_source_holdouts(&audit),
+            Err(HoldoutAuditError::ReusedClusterIndependenceReceipt(
+                "cluster-A-receipt".into()
+            ))
+        );
     }
 
     #[test]
