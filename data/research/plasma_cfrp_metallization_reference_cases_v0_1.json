@@ -169,5 +169,54 @@
       "claim": "a CZM simulation output is a measured interface strength",
       "expected_disposition": "REJECTED"
     }
+  ],
+  "qualification_boundary": {
+    "lsp_compliance_established": false,
+    "aircraft_certification_established": false,
+    "standards_crosswalk": [
+      {
+        "standard": "SAE_ARP5412C",
+        "revision_date": "2024-10-01",
+        "role": "aircraft lightning environment and related test waveforms",
+        "url": "https://saemobilus.sae.org/standards/arp5412c-aircraft-lightning-environment-related-test-waveforms"
+      },
+      {
+        "standard": "SAE_ARP5416B",
+        "revision_date": "2025-03-25",
+        "role": "aircraft lightning direct-effects and indirect-effects test methods; authority approves damage/pass criteria",
+        "url": "https://saemobilus.sae.org/standards/arp5416b-aircraft-lightning-test-methods"
+      },
+      {
+        "standard": "FAA_AC_20-107B_Change_1",
+        "role": "composite aircraft structure guidance; lightning effectiveness demonstrated by tests or analysis supported by tests",
+        "url": "https://www.faa.gov/documentLibrary/media/Advisory_Circular/AC_20-107B_with_change_1.pdf"
+      },
+      {
+        "standard": "ASTM_C633-24",
+        "role": "thermal-spray coating adhesion/cohesion test; coupon-level comparison only",
+        "url": "https://store.astm.org/standards/c633"
+      },
+      {
+        "standard": "ASTM_D4541-22",
+        "role": "portable pull-off test whose scope is coatings on metal substrates; do not assume suitability for CFRP or source-paper method",
+        "url": "https://store.astm.org/standards/d4541"
+      }
+    ]
+  },
+  "interface_design_hypotheses": [
+    {
+      "hypothesis_id": "CFRP-IFACE-H1",
+      "description": "Test whether a separately identified sequence/spatially selective treatment can combine mechanical interlocking associated with epoxy recession/fibre exposure and chemical functionalization associated with polar surface groups while preserving laminate properties.",
+      "status": "UNTESTED_RESEARCH_HYPOTHESIS",
+      "required_controls": [
+        "untreated",
+        "conventional_preparation",
+        "air_only",
+        "argon_only",
+        "sequential_or_spatial_combination",
+        "over_treatment_damage_control"
+      ],
+      "luminous_reproduction": false
+    }
   ]
 }
