@@ -68,7 +68,7 @@ It:
 - Fails on queue overflow, watch invalidation, unknown descriptors, new subdirectories, root replacement and event-drain errors.
 - Captures a deterministic before/after tree digest as a second signal. Mutation events still reject transient writes whose final bytes are restored.
 
-The local test set exercises read-only evaluation, persistent writes, transient write/restore, transient create/delete, nested paths, symlink rejection, dynamic-directory coverage loss, callback panic, root replacement, mount-ID path selection and actual `/proc/self/mountinfo` parsing.
+The local test set exercises read-only evaluation, persistent writes, transient write/restore, transient create/delete, nested paths, symlink rejection, dynamic-directory coverage loss, callback panic, root replacement, mount-ID path selection and actual `/proc/self/mountinfo` parsing. Separate child-process tests also verify that persistent and write-then-restore mutations from a child process are observed after the callback joins the child.
 
 **Trust boundary:** Linux inotify is a host-kernel event source, not an isolated or remote witness. The callback must wait for every child process/writer to finish. The adapter excludes symlinks, special files and newly created subdirectories; it does not independently measure remote service state, ACL/xattr contents or privileged activity outside the watched tree. Mount identity depends on the current mount namespace and `/proc/self/mountinfo`. A dishonest or compromised kernel/privileged host can still hide activity. Therefore a local `pass` is limited to this declared filesystem scope and is not proof of production observer completeness.
 
