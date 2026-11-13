@@ -961,7 +961,6 @@ mod tests {
             MusicXmlNotationEventsStatusV1::Unknown { .. }
         ));
     }
-}
 
     #[test]
     fn grace_chord_members_share_onset_without_inventing_duration() {
@@ -1013,4 +1012,4 @@ mod tests {
         assert_eq!(events.cursor_moves[0].staff.as_deref(), Some("2"));
         assert_eq!(events.cursor_moves[0].source.element, "forward");
     }
-
+}
