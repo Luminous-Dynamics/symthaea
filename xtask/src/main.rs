@@ -6,6 +6,7 @@ mod duplicate_scan;
 mod manifest;
 mod plasma_energy_audit;
 mod plasma_surface_bondability;
+mod plasma_virtual_metrology;
 mod rhn_sweep;
 
 #[derive(Parser)]
@@ -91,6 +92,16 @@ enum Commands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Offline validator for synthetic plasma telemetry-to-product virtual metrology.
+    #[command(name = "plasma-virtual-metrology-audit")]
+    PlasmaVirtualMetrologyAudit {
+        #[arg(long, default_value = "data/research/plasma_virtual_metrology_fixture_v0_1.json")]
+        fixture: PathBuf,
+        /// Emit stable structured JSON instead of the human-readable summary.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -155,6 +166,10 @@ fn main() -> anyhow::Result<()> {
         Commands::PlasmaSurfaceBondabilityAudit { fixture, json } => {
             let report = plasma_surface_bondability::run_audit(&fixture)?;
             plasma_surface_bondability::print_report(&report, json)?;
+        }
+        Commands::PlasmaVirtualMetrologyAudit { fixture, json } => {
+            let report = plasma_virtual_metrology::run_audit(&fixture)?;
+            plasma_virtual_metrology::print_report(&report, json)?;
         }
         Commands::DuplicateScan { registry } => {
             let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
