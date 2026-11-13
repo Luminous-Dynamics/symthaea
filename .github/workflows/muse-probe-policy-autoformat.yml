@@ -1,0 +1,49 @@
+name: MUSE Probe Policy Campaign Autoformat
+
+on:
+  push:
+    branches:
+      - "research/mel-mr-eval-026-paired-campaign-20261113"
+    paths:
+      - "crates/domains/symthaea-muse/src/probe_policy_campaign.rs"
+      - ".github/workflows/muse-probe-policy-autoformat.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: muse-probe-policy-autoformat
+  cancel-in-progress: true
+
+jobs:
+  format-and-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format the campaign module
+        run: rustfmt --edition 2024 crates/domains/symthaea-muse/src/probe_policy_campaign.rs
+
+      - name: Commit formatting only when changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- crates/domains/symthaea-muse/src/probe_policy_campaign.rs; then
+            echo "Campaign module is already formatted."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add crates/domains/symthaea-muse/src/probe_policy_campaign.rs
+          git commit -m "style(muse): apply pinned rustfmt to probe campaign"
+          git push origin HEAD:${GITHUB_REF_NAME}
