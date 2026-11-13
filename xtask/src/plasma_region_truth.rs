@@ -89,11 +89,32 @@ fn evaluate_case(case: &Value) -> Result<&'static str> {
     if support == "AREA" && claim == "point" {
         return Ok("REJECTED");
     }
+    if support == "AREA" && claim == "specimen" {
+        let mode = string(case, "aggregate_operator_mode")?;
+        let validated = boolean(case, "aggregate_operator_validated")?;
+        let coverage = case
+            .get("aggregate_coverage_fraction")
+            .and_then(Value::as_f64)
+            .unwrap_or(0.0);
+        if mode != "AREA_TO_SPECIMEN" || !validated || coverage < 1.0 {
+            return Ok("BLOCKED");
+        }
+    }
     if support == "POINT" && matches!(claim, "area" | "field") {
         return Ok("BLOCKED");
     }
     if support == "FIELD" && claim == "point" {
         return Ok("BLOCKED");
+    }
+    if support == "FIELD" && claim == "field" {
+        if string(case, "field_scope_id")?.is_empty()
+            || string(case, "field_sampling_plan_id")?.is_empty()
+            || string(case, "field_interpolation_method")?.is_empty()
+            || number(case, "field_spatial_resolution_mm")? <= 0.0
+            || number(case, "field_unmapped_region_count")? > 0.0
+        {
+            return Ok("BLOCKED");
+        }
     }
     if support == "INFERRED" && claim != "field" {
         return Ok("REJECTED");
@@ -255,8 +276,8 @@ mod tests {
     #[test]
     fn frozen_fixture_matches_all_expected_dispositions() {
         let counts = audit_json(FIXTURE).expect("fixture should pass its known-answer audit");
-        assert_eq!(counts.get("PASS"), Some(&2));
-        assert_eq!(counts.get("BLOCKED"), Some(&4));
+        assert_eq!(counts.get("PASS"), Some(&5));
+        assert_eq!(counts.get("BLOCKED"), Some(&5));
         assert_eq!(counts.get("REJECTED"), Some(&8));
     }
 
@@ -294,6 +315,32 @@ mod tests {
             .find(|case| case["id"] == "DUPLICATE_SUPPORT")
             .expect("known case");
         assert_eq!(evaluate_case(case).expect("evaluate"), "REJECTED");
+    }
+
+
+    #[test]
+    fn point_field_and_specimen_supports_are_admitted_at_their_declared_level() {
+        let root: Value = serde_json::from_str(FIXTURE).expect("valid fixture");
+        let cases = root["cases"].as_array().expect("cases");
+        for id in ["POINT_SUPPORT", "FIELD_SUPPORT", "SPECIMEN_SUPPORT"] {
+            let case = cases
+                .iter()
+                .find(|case| case["id"] == id)
+                .expect("known case");
+            assert_eq!(evaluate_case(case).expect("evaluate"), "PASS");
+        }
+    }
+
+    #[test]
+    fn area_to_specimen_claim_requires_a_validated_full_support_operator() {
+        let root: Value = serde_json::from_str(FIXTURE).expect("valid fixture");
+        let case = root["cases"]
+            .as_array()
+            .expect("cases")
+            .iter()
+            .find(|case| case["id"] == "AREA_TO_SPECIMEN_NO_AGGREGATION")
+            .expect("known case");
+        assert_eq!(evaluate_case(case).expect("evaluate"), "BLOCKED");
     }
 
     #[test]
