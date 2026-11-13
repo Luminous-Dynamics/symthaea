@@ -611,11 +611,6 @@ fn validate_case(case: &Case) -> Vec<String> {
     if case.coherence_windows.is_empty() {
         errors.push("INCOMPLETE: no per-window coherence reports were supplied".to_string());
     }
-    if case.intermittency_report.evidence_kind != "measured"
-        || case.intermittency_report.disposition != "DISTRIBUTIONAL_SUMMARY_ONLY"
-    {
-        errors.push("INCOMPLETE: intermittency report is not a measured, distributionally eligible receipt".to_string());
-    }
     errors
 }
 
@@ -856,6 +851,20 @@ fn audit(case: &Case) -> AuditReport {
     let alignment_unknown = run_reports.iter().any(|run| run.cavitation_unknown_windows > 0);
     if alignment_unknown {
         reasons.push("INCOMPLETE: unresolved or missing cavitation annotations remain unconditioned and prevent a complete two-cohort comparison".to_string());
+    }
+    if case.evidence_kind == EvidenceKind::Synthetic {
+        reasons.push("INCOMPLETE: synthetic input evidence cannot qualify physical conditioned coherence".to_string());
+    }
+    if case.source.rights_status != RightsStatus::PublicOrPermitted {
+        reasons.push("INCOMPLETE: source rights are not established as public_or_permitted".to_string());
+    }
+    if !case.source.independently_reviewed {
+        reasons.push("INCOMPLETE: source metadata has not been independently reviewed".to_string());
+    }
+    if case.intermittency_report.evidence_kind != "measured"
+        || case.intermittency_report.disposition != "DISTRIBUTIONAL_SUMMARY_ONLY"
+    {
+        reasons.push("INCOMPLETE: embedded intermittency report is not measured, distributionally eligible evidence".to_string());
     }
 
     let has_incomparable = reasons.iter().any(|reason| reason.starts_with("INCOMPARABLE:"));
