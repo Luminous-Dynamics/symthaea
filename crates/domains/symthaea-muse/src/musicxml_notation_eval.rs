@@ -1402,6 +1402,36 @@ mod tests {
     }
 
     #[test]
+    fn unknown_measure_map_and_mismatched_canonicalization_refuse_evaluation() {
+        let reference = graph(fixture_xml());
+        let mut prediction = reference.clone();
+        prediction.map.status = MeasureMapStatus::Unknown {
+            reason: "unsupported boundary".into(),
+        };
+        assert_eq!(
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()),
+            Err(MusicXmlNotationEvaluationErrorV1::PredictionMeasureMapUnavailable)
+        );
+        prediction = reference.clone();
+        prediction.map.canonicalization_version = "future-map-version".into();
+        assert_eq!(
+            evaluate_musicxml_notation_graphs(&reference, &prediction, default_config()),
+            Err(MusicXmlNotationEvaluationErrorV1::MeasureCanonicalizationMismatch)
+        );
+    }
+
+    #[test]
+    fn matching_scan_budget_bounds_augmenting_path_work() {
+        let reference = graph(fixture_xml());
+        let mut config = default_config();
+        config.maximum_matching_scans = 1;
+        assert!(matches!(
+            evaluate_musicxml_notation_graphs(&reference, &reference, config),
+            Err(MusicXmlNotationEvaluationErrorV1::MatchingWorkBudgetExceeded { .. })
+        ));
+    }
+
+    #[test]
     fn unknown_notation_layer_refuses_a_perfect_score() {
         let reference = graph(fixture_xml());
         let mut prediction = reference.clone();
