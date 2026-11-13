@@ -5,7 +5,7 @@ Standalone Rust CLI for offline, fail-closed verification of local textile bench
 ## Safety and claim boundaries
 
 - No network access or dataset download is implemented. The tool never fetches a URL.
-- It does not decide legal rights. A human review must set rights.status to reviewed, name the reviewer and date, record the exact license-text SHA-256, and explicitly list permitted operations before a receipt can be issued.
+- It does not decide legal rights. A human review must set rights.status to reviewed, name the reviewer and date, record the exact license-text SHA-256, include the matching license file as a role=license_text inventory entry, bind its local path, and explicitly list permitted operations before a receipt can be issued.
 - Pending and rejected rights states fail closed.
 - The verifier checks local file path containment, source-provided SHA-256, file length, duplicate source/local paths and the exact manifest bytes.
 - It rejects absolute paths, parent traversal and symlink escapes from the dataset root.
