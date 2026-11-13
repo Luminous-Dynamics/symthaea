@@ -152,6 +152,8 @@ struct Measurement {
 #[serde(deny_unknown_fields)]
 struct SubstrateCondition {
     condition_id: String,
+    sample_lineage_ref: String,
+    material_interface_ref: String,
     conditioning_protocol_id: String,
     moisture_content_wt_pct: f64,
     moisture_measurement_method: String,
@@ -639,6 +641,8 @@ fn evaluate_scenario(
             ),
             Some(condition) => {
                 let condition_fields_valid = !condition.condition_id.trim().is_empty()
+                    && !condition.sample_lineage_ref.trim().is_empty()
+                    && !condition.material_interface_ref.trim().is_empty()
                     && !condition.conditioning_protocol_id.trim().is_empty()
                     && !condition.moisture_measurement_method.trim().is_empty()
                     && !condition.moisture_measurement_receipt_id.trim().is_empty()
@@ -996,6 +1000,18 @@ mod tests {
         let report = audit_fixture_json(&changed.to_string()).expect("mutated fixture parses");
         let result = result_for(&report, "pa6-saturated-state-low-wca-reject");
         assert_eq!(result.audit_disposition, AuditDisposition::Rejected);
+        assert_eq!(result.product_decision, ProductDecision::Abstain);
+    }
+
+    #[test]
+    fn missing_canonical_sample_or_interface_reference_blocks_pa6_decision() {
+        let value: serde_json::Value = serde_json::from_str(FIXTURE).expect("fixture JSON");
+        let mut changed = value;
+        changed["scenarios"][11]["substrate_condition"]["sample_lineage_ref"] =
+            serde_json::json!("");
+        let report = audit_fixture_json(&changed.to_string()).expect("mutated fixture parses");
+        let result = result_for(&report, "pa6-saturated-state-low-wca-reject");
+        assert_eq!(result.audit_disposition, AuditDisposition::Blocked);
         assert_eq!(result.product_decision, ProductDecision::Abstain);
     }
 
