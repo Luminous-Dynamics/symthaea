@@ -2345,18 +2345,83 @@ fn symbolic_import_format(filename: &str) -> Option<symthaea_muse_protocol::Symb
     }
 }
 
-/// Real FluidSynth render for an imported work's audition -- imported
-/// pieces have no `Style`/`CompositionSpec` of their own (they were
-/// PARSED, not composed), so this reuses `export_score_midi`'s clean-grid
-/// symbolic path with a fixed `Style::Classical` instrument palette purely
-/// for timbre (NOT a neutral/generic placeholder -- it's a genuine
-/// string-trio orchestration choice, see `instrumentation_note` on
-/// `ImportedWorkSummary` for the disclosure this implies); every note's
-/// pitch/rhythm/voice-role in the exported MIDI comes from the imported
-/// score unchanged. Falls back to the native in-crate synth (disclosed via
-/// the returned renderer name) when FluidSynth is unavailable, matching
-/// `/api/compose`'s own established fallback convention -- never silent,
-/// always disclosed.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum SourceMidiAuditionError {
+    MalformedMidi(String),
+    SequentialFormatUnsupported,
+    TemporaryFile(String),
+    SourceBytesChanged,
+}
+
+/// Only simultaneous-sequence SMF Format 0/1 can be used as a source
+/// performance audition. Format 2 contains independent sequences and cannot
+/// be rendered as one combined performance without an explicit traversal
+/// policy. Parsing the MIDI here does not rewrite it.
+fn validate_source_midi_audition(bytes: &[u8]) -> Result<(), SourceMidiAuditionError> {
+    let smf = midly::Smf::parse(bytes)
+        .map_err(|error| SourceMidiAuditionError::MalformedMidi(error.to_string()))?;
+    match smf.header.format {
+        midly::Format::SingleTrack | midly::Format::Parallel => Ok(()),
+        midly::Format::Sequential => Err(SourceMidiAuditionError::SequentialFormatUnsupported),
+    }
+}
+
+/// Materialize the exact uploaded bytes for FluidSynth. The read-back
+/// equality check is deliberate: the source path is not re-exported from the
+/// note-centric Score, normalized, or otherwise rewritten before rendering.
+fn materialize_source_midi_audition(
+    bytes: &[u8],
+) -> Result<std::path::PathBuf, SourceMidiAuditionError> {
+    validate_source_midi_audition(bytes)?;
+    let path = std::env::temp_dir().join(format!(
+        "muse_source_import_{}.mid",
+        unique_temp_suffix()
+    ));
+    std::fs::write(&path, bytes)
+        .map_err(|error| SourceMidiAuditionError::TemporaryFile(error.to_string()))?;
+    let read_back = match std::fs::read(&path) {
+        Ok(value) => value,
+        Err(error) => {
+            let _ = std::fs::remove_file(&path);
+            return Err(SourceMidiAuditionError::TemporaryFile(error.to_string()));
+        }
+    };
+    if read_back != bytes {
+        let _ = std::fs::remove_file(&path);
+        return Err(SourceMidiAuditionError::SourceBytesChanged);
+    }
+    Ok(path)
+}
+
+/// Render exact source MIDI bytes through FluidSynth when available. None
+/// means the renderer is unavailable or produced no output; callers must
+/// fall back to a reconstructed Score audition and disclose that fact.
+fn render_source_midi_audition(
+    source_midi_bytes: &[u8],
+) -> Result<Option<Vec<u8>>, SourceMidiAuditionError> {
+    let path = materialize_source_midi_audition(source_midi_bytes)?;
+    if symthaea_muse::fluid_render::available().is_none() {
+        let _ = std::fs::remove_file(&path);
+        return Ok(None);
+    }
+    let rendered =
+        symthaea_muse::fluid_render::render_midi_to_wav(&path, SAMPLE_RATE, None);
+    // Detect ordinary path replacement/mutation during rendering. This does
+    // not protect against a malicious host that restores the bytes between
+    // observations; stronger guarantees require a trusted execution boundary.
+    let unchanged = std::fs::read(&path)
+        .map(|bytes| bytes == source_midi_bytes)
+        .unwrap_or(false);
+    let _ = std::fs::remove_file(&path);
+    if !unchanged {
+        return Err(SourceMidiAuditionError::SourceBytesChanged);
+    }
+    Ok(rendered)
+}
+
+/// Reconstructed-score FluidSynth/native path. This is used for MusicXML,
+/// MuseScore JSON, unsupported MIDI formats, or unavailable/failed source
+/// MIDI rendering; it is not represented as a source-performance replay.
 fn render_import_audition(
     score: &symthaea_music_theory::Score,
 ) -> Result<(Vec<u8>, &'static str), (StatusCode, String)> {
@@ -2385,9 +2450,10 @@ async fn import_music(
     mut multipart: Multipart,
 ) -> Result<Json<symthaea_muse_protocol::ImportedWorkSummary>, (StatusCode, String)> {
     use symthaea_muse_protocol::{
-        AuthorizationBasis, ContributionManifest, ContributionScope, ImportedNotationStructureSummary,
-        ImportedWorkId, ImportedWorkSummary, MusicalContentLicense,
-        default_instrumentation_note,
+        AuthorizationBasis, ContributionManifest, ContributionScope,
+        ImportedAuditionKind, ImportedNotationStructureSummary, ImportedWorkId,
+        ImportedWorkSummary, MusicalContentLicense, default_instrumentation_note,
+        source_midi_instrumentation_note,
     };
 
     let mut title = None;
@@ -2590,19 +2656,48 @@ async fn import_music(
             attribution: Vec::new(),
             imported_at_unix_ms: unix_time_ms(),
         };
-        // Imported music is never passed through Muse's compositional
-        // grammar/style-preset pipeline (progression, phrase structure,
-        // form) -- only `Style::Classical`'s fixed instrument palette is
-        // used, purely to pick a timbre for playback (see
-        // `render_import_audition`'s doc comment and
-        // `instrumentation_note` below for why this still isn't neutral).
-        let (wav, audio_renderer) = render_import_audition(&score)?;
+        // Source MIDI is a performance artifact, not merely a note-centric
+        // Score. Preserve its exact event stream for the audition when the
+        // source is a supported simultaneous-sequence SMF and FluidSynth is
+        // available. MusicXML/MuseScore and unsupported/failed MIDI fall
+        // back to an explicitly reconstructed Score rendition.
+        let (wav, audio_renderer, audition_kind, instrumentation_note) =
+            if matches!(&format, symthaea_muse_protocol::SymbolicImportFormat::Midi) {
+                match render_source_midi_audition(&source) {
+                    Ok(Some(wav)) => (
+                        wav,
+                        "fluidsynth",
+                        ImportedAuditionKind::SourceMidiPerformance,
+                        source_midi_instrumentation_note(),
+                    ),
+                    Ok(None) | Err(_) => {
+                        let (wav, renderer) = render_import_audition(&score)?;
+                        (
+                            wav,
+                            renderer,
+                            ImportedAuditionKind::ReconstructedScore,
+                            default_instrumentation_note(),
+                        )
+                    }
+                }
+            } else {
+                let (wav, renderer) = render_import_audition(&score)?;
+                (
+                    wav,
+                    renderer,
+                    ImportedAuditionKind::ReconstructedScore,
+                    default_instrumentation_note(),
+                )
+            };
+        let audition_wav_sha256 = sha256_hex(&wav);
         let summary = ImportedWorkSummary {
             manifest,
             analysis,
             audio_available: true,
             audio_renderer: audio_renderer.to_string(),
-            instrumentation_note: default_instrumentation_note(),
+            audition_kind,
+            audition_wav_sha256: Some(audition_wav_sha256),
+            instrumentation_note,
             notation_structure: Some(notation_structure),
         };
 
