@@ -141,6 +141,17 @@ pub enum U1MpsError {
         residual: f64,
         tolerance: f64,
     },
+    InvalidTimeStep(f64),
+    HamiltonianNotHermitian {
+        residual: f64,
+        tolerance: f64,
+    },
+    HamiltonianChargeLeakage {
+        output_charge: u32,
+        input_charge: u32,
+        amplitude: f64,
+        tolerance: f64,
+    },
 }
 
 impl core::fmt::Display for U1MpsError {
@@ -291,6 +302,22 @@ impl core::fmt::Display for U1MpsError {
             } => write!(
                 f,
                 "canonical gauge residual {residual} exceeds qualification tolerance {tolerance}"
+            ),
+            Self::InvalidTimeStep(value) => {
+                write!(f, "time step must be finite, got {value}")
+            }
+            Self::HamiltonianNotHermitian { residual, tolerance } => write!(
+                f,
+                "two-site Hamiltonian Hermiticity residual {residual} exceeds tolerance {tolerance}"
+            ),
+            Self::HamiltonianChargeLeakage {
+                output_charge,
+                input_charge,
+                amplitude,
+                tolerance,
+            } => write!(
+                f,
+                "two-site Hamiltonian couples charge {input_charge} to {output_charge} with amplitude {amplitude}, tolerance {tolerance}"
             ),
             Self::DenseChargeLeakage {
                 basis_index,
@@ -1743,6 +1770,140 @@ impl U1TwoSiteGate {
         }
     }
 }
+
+
+
+/// A Hermitian, U(1)-conserving nearest-neighbour two-site Hamiltonian.
+///
+/// Basis order is |00>, |01>, |10>, |11>. The one-excitation block can mix
+/// |01> and |10>, while the zero- and two-excitation sectors are one-dimensional.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TwoSiteHamiltonian {
+    matrix: [[Complex64; 4]; 4],
+    hermiticity_residual: f64,
+    charge_conservation_residual: f64,
+}
+
+impl U1TwoSiteHamiltonian {
+    /// Construct a finite Hermitian Hamiltonian with exact U(1) block structure.
+    pub fn new(
+        matrix: [[Complex64; 4]; 4],
+        tolerance: f64,
+    ) -> Result<Self, U1MpsError> {
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        let mut hermiticity_residual: f64 = 0.0;
+        let mut charge_conservation_residual: f64 = 0.0;
+        for row in 0_usize..4 {
+            for column in 0_usize..4 {
+                let value = matrix[row][column];
+                if !value.re.is_finite() || !value.im.is_finite() {
+                    return Err(U1MpsError::NonFiniteTensorEntry {
+                        site: 0,
+                        index: row * 4 + column,
+                    });
+                }
+                hermiticity_residual = hermiticity_residual
+                    .max((value - matrix[column][row].conj()).norm());
+                if row.count_ones() != column.count_ones() {
+                    charge_conservation_residual =
+                        charge_conservation_residual.max(value.norm());
+                }
+            }
+        }
+        if hermiticity_residual > tolerance {
+            return Err(U1MpsError::HamiltonianNotHermitian {
+                residual: hermiticity_residual,
+                tolerance,
+            });
+        }
+        if charge_conservation_residual > tolerance {
+            let witness = (0_usize..4)
+                .flat_map(|output| (0_usize..4).map(move |input| (output, input)))
+                .find(|(output, input)| {
+                    (*output).count_ones() != (*input).count_ones()
+                        && matrix[*output][*input].norm() > tolerance
+                })
+                .unwrap_or((0, 0));
+            return Err(U1MpsError::HamiltonianChargeLeakage {
+                output_charge: witness.0.count_ones(),
+                input_charge: witness.1.count_ones(),
+                amplitude: matrix[witness.0][witness.1].norm(),
+                tolerance,
+            });
+        }
+
+        Ok(Self {
+            matrix,
+            hermiticity_residual,
+            charge_conservation_residual,
+        })
+    }
+
+    pub fn matrix(&self) -> &[[Complex64; 4]; 4] {
+        &self.matrix
+    }
+
+    pub fn hermiticity_residual(&self) -> f64 {
+        self.hermiticity_residual
+    }
+
+    pub fn charge_conservation_residual(&self) -> f64 {
+        self.charge_conservation_residual
+    }
+
+    /// Build exp(-i * time_step * H) by an analytic 1x1 + 2x2 charge-block
+    /// exponential. No generic eigensolver or cross-sector mixing is used.
+    pub fn real_time_gate(
+        &self,
+        time_step: f64,
+        tolerance: f64,
+    ) -> Result<U1TwoSiteGate, U1MpsError> {
+        if !time_step.is_finite() {
+            return Err(U1MpsError::InvalidTimeStep(time_step));
+        }
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+
+        let h00 = self.matrix[0][0].re;
+        let h11 = self.matrix[3][3].re;
+        let a = self.matrix[1][1].re;
+        let d = self.matrix[2][2].re;
+        let coupling = self.matrix[1][2];
+        let midpoint = 0.5 * (a + d);
+        let difference = 0.5 * (a - d);
+        let frequency = (difference * difference + coupling.norm_sqr()).sqrt();
+        if !frequency.is_finite() {
+            return Err(U1MpsError::NonFiniteContraction(
+                "two-site Hamiltonian block frequency",
+            ));
+        }
+
+        let angle = time_step * frequency;
+        let cosine = angle.cos();
+        let sine_over_frequency = if frequency == 0.0 {
+            time_step
+        } else {
+            angle.sin() / frequency
+        };
+        let midpoint_phase = Complex64::from_polar(1.0, -time_step * midpoint);
+        let imaginary_scale = Complex64::new(0.0, -sine_over_frequency);
+        let mut gate = [[Complex64::new(0.0, 0.0); 4]; 4];
+        gate[0][0] = Complex64::from_polar(1.0, -time_step * h00);
+        gate[3][3] = Complex64::from_polar(1.0, -time_step * h11);
+        gate[1][1] =
+            midpoint_phase * Complex64::new(cosine, -sine_over_frequency * difference);
+        gate[1][2] = midpoint_phase * imaginary_scale * coupling;
+        gate[2][1] = midpoint_phase * imaginary_scale * coupling.conj();
+        gate[2][2] =
+            midpoint_phase * Complex64::new(cosine, sine_over_frequency * difference);
+
+        U1TwoSiteGate::new(gate, tolerance)
+    }
+}
+
 
 /// Receipts from an exact charge-block split of a two-site state.
 ///
