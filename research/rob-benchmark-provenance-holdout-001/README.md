@@ -77,3 +77,8 @@ The package is dependency-free and isolated from the Symthaea root Cargo workspa
     cargo clippy --locked --manifest-path research/rob-benchmark-provenance-holdout-001/reference/Cargo.toml --all-targets -- -D warnings
 
 The exact-head Rust 1.96 GitHub Actions workflow is the qualification gate. Authored tests are not PASS until the dedicated workflow succeeds.
+
+
+## Exact-head status
+
+Dedicated qualification status is recorded in the PR conversation and must be read from the exact tested commit. A green result from this isolated crate is not a root-workspace, dataset, benchmark, physical, or safety qualification.
