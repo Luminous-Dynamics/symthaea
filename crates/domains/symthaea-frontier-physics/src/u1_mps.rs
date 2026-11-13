@@ -444,12 +444,19 @@ impl U1CanonicalGaugeReceipt {
             && self.qualified
             && self.maximum_left_isometry_residual <= tolerance
             && self.maximum_right_isometry_residual <= tolerance
+            && self.factorization_max_residual.is_finite()
             && self.factorization_max_residual <= tolerance
+            && self.factorization_l2_residual.is_finite()
+            && self.state_reconstruction_l2_residual.is_finite()
             && self.state_reconstruction_l2_residual <= tolerance
+            && self.relative_norm_drift.is_finite()
             && self.relative_norm_drift <= tolerance
+            && self.selection_rule_residual.is_finite()
             && self.selection_rule_residual <= tolerance
             && self.left_exterior_operator_norm_upper_bound.is_finite()
+            && self.left_exterior_operator_norm_upper_bound >= 1.0
             && self.right_exterior_operator_norm_upper_bound.is_finite()
+            && self.right_exterior_operator_norm_upper_bound >= 1.0
     }
 
     pub fn exterior_operator_norm_product_upper_bound(&self) -> f64 {
@@ -1098,7 +1105,7 @@ impl ComplexU1Mps {
         let qualified = maximum_left_isometry_residual <= tolerance
             && maximum_right_isometry_residual <= tolerance
             && factorization_stats.max_residual <= tolerance
-            && state_reconstruction_l2_residual <= tolerance * scale.sqrt()
+            && state_reconstruction_l2_residual <= tolerance
             && relative_norm_drift <= tolerance
             && candidate.selection_rule_residual <= tolerance
             && left_exterior_operator_norm_upper_bound.is_finite()
