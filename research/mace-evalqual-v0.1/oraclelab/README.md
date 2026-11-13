@@ -54,3 +54,22 @@ The next production step is a non-destructive adapter whose state snapshot comes
 The package uses only the Go standard library. The local reference tests cover read-only evaluation, persistent mutation, transient write/restore, missing observer events, incomplete/uninstrumented coverage, scope and attribution mismatch, grader errors and panics, repeatability, order invariance and state-revision changes.
 
 Local results are recorded in the parent PR's `RESULTS.md`. All fixtures are synthetic.
+
+
+## Linux filesystem observer adapter (prototype)
+
+On Linux, `fsobserve_linux.go` provides `ObserveDirectory`, a real local-kernel observation adapter for an existing, symlink-free regular directory tree.
+
+It:
+- Installs recursive inotify directory watches before the evaluator callback.
+- Pins the root device/inode and resolves nested paths against `/proc/self/mountinfo` mount IDs, rejecting different or unknown mount boundaries.
+- Refuses to run when the initial tree contains symlinks, special files, unwatchable paths or unsupported mount boundaries.
+- Decodes the Linux 16-byte inotify wire header explicitly (rather than casting to Go's larger `syscall.InotifyEvent` struct).
+- Fails on queue overflow, watch invalidation, unknown descriptors, new subdirectories, root replacement and event-drain errors.
+- Captures a deterministic before/after tree digest as a second signal. Mutation events still reject transient writes whose final bytes are restored.
+
+The local test set exercises read-only evaluation, persistent writes, transient write/restore, transient create/delete, nested paths, symlink rejection, dynamic-directory coverage loss, callback panic, root replacement, mount-ID path selection and actual `/proc/self/mountinfo` parsing.
+
+**Trust boundary:** Linux inotify is a host-kernel event source, not an isolated or remote witness. The callback must wait for every child process/writer to finish. The adapter excludes symlinks, special files and newly created subdirectories; it does not independently measure remote service state, ACL/xattr contents or privileged activity outside the watched tree. Mount identity depends on the current mount namespace and `/proc/self/mountinfo`. A dishonest or compromised kernel/privileged host can still hide activity. Therefore a local `pass` is limited to this declared filesystem scope and is not proof of production observer completeness.
+
+The in-memory oracle harness and this Linux filesystem adapter are separate experiments. The latter does not yet integrate the evaluator with a disposable service, real database transaction log or durable broker.
