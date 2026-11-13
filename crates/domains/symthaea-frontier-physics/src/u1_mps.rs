@@ -2870,6 +2870,8 @@ impl U1TeBDLayer {
         let state = ComplexU1Mps::new(tensors, input_total_charge, policy.tolerance)?;
         let output_norm_squared = state.norm_squared(policy.tolerance)?;
         let global_l2_bound_qualified = if self.gates.is_empty() {
+            truncation_ledger.global_state_error_bound_qualified = true;
+            truncation_ledger.cumulative_global_l2_error_upper_bound = Some(0.0);
             true
         } else {
             truncation_ledger.global_state_error_bound_qualified
@@ -2895,11 +2897,183 @@ impl U1TeBDLayer {
     }
 }
 
+
+
+/// Second-order real-time TEBD stepper for a nearest-neighbour U(1)-conserving
+/// Hamiltonian H = sum_b h[b,b+1].
+///
+/// One step applies exp(-i dt H_even/2), exp(-i dt H_odd), exp(-i dt H_even/2).
+/// The truncation bound is reported separately from Trotter error; this type
+/// does not claim a total error bound against the exact continuous-time flow.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDStrangStepper {
+    site_count: usize,
+    time_step: f64,
+    tolerance: f64,
+    even_half_layer: U1TeBDLayer,
+    odd_full_layer: U1TeBDLayer,
+}
+
+/// One second-order TEBD time step, with truncation and Trotter status separated.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDStrangStepResult {
+    pub state: ComplexU1Mps,
+    pub time_step: f64,
+    pub trotter_order: u8,
+    pub layers: Vec<U1TeBDLayerResult>,
+    pub input_norm_squared: f64,
+    pub output_norm_squared: f64,
+    pub total_charge: i32,
+    pub global_truncation_l2_error_upper_bound: Option<f64>,
+    pub global_truncation_bound_qualified: bool,
+    /// Always None until an independent Trotter error estimator is implemented.
+    pub trotter_error_bound: Option<f64>,
+    pub trotter_error_qualified: bool,
+}
+
+impl U1TeBDStrangStepper {
+    /// Build a nearest-neighbour Strang stepper from one Hamiltonian per bond.
+    ///
+    /// The bond Hamiltonian vector has length N-1 and fixes the spatial order.
+    /// A negative finite time step is allowed and represents reverse evolution.
+    pub fn new(
+        bond_hamiltonians: Vec<U1TwoSiteHamiltonian>,
+        time_step: f64,
+        tolerance: f64,
+    ) -> Result<Self, U1MpsError> {
+        if bond_hamiltonians.is_empty() {
+            return Err(U1MpsError::EmptyChain);
+        }
+        if !time_step.is_finite() {
+            return Err(U1MpsError::InvalidTimeStep(time_step));
+        }
+        if !tolerance.is_finite() || tolerance <= 0.0 {
+            return Err(U1MpsError::InvalidTolerance(tolerance));
+        }
+        let site_count = bond_hamiltonians
+            .len()
+            .checked_add(1)
+            .ok_or(U1MpsError::DimensionOverflow)?;
+
+        let mut even_gates = Vec::new();
+        let mut odd_gates = Vec::new();
+        for (bond, hamiltonian) in bond_hamiltonians.iter().enumerate() {
+            if bond % 2 == 0 {
+                even_gates.push(U1TeBDGate::new(
+                    bond,
+                    hamiltonian.real_time_gate(0.5 * time_step, tolerance)?,
+                ));
+            } else {
+                odd_gates.push(U1TeBDGate::new(
+                    bond,
+                    hamiltonian.real_time_gate(time_step, tolerance)?,
+                ));
+            }
+        }
+
+        let even_half_layer = U1TeBDLayer::new(site_count, 0, even_gates)?;
+        let odd_full_layer = U1TeBDLayer::new(site_count, 1, odd_gates)?;
+        Ok(Self {
+            site_count,
+            time_step,
+            tolerance,
+            even_half_layer,
+            odd_full_layer,
+        })
+    }
+
+    pub const fn site_count(&self) -> usize {
+        self.site_count
+    }
+
+    pub const fn time_step(&self) -> f64 {
+        self.time_step
+    }
+
+    pub fn even_half_layer(&self) -> &U1TeBDLayer {
+        &self.even_half_layer
+    }
+
+    pub fn odd_full_layer(&self) -> &U1TeBDLayer {
+        &self.odd_full_layer
+    }
+
+    /// Execute one even-half / odd-full / even-half second-order step.
+    ///
+    /// The returned global truncation bound is the sum of the three layer
+    /// bounds only if every gauge receipt qualifies. Trotter error from the
+    /// product formula is not included and remains explicitly unqualified.
+    pub fn apply(
+        &self,
+        input: &ComplexU1Mps,
+        policy: U1TwoSiteTruncationPolicy,
+    ) -> Result<U1TeBDStrangStepResult, U1MpsError> {
+        if input.site_count() != self.site_count {
+            return Err(U1MpsError::TeBDLayerSiteCountMismatch {
+                layer_sites: self.site_count,
+                state_sites: input.site_count(),
+            });
+        }
+        let input_norm_squared = input.norm_squared(policy.tolerance)?;
+        let total_charge = input.total_charge();
+
+        let even_first = self.even_half_layer.apply(input, policy)?;
+        let odd_middle = self.odd_full_layer.apply(&even_first.state, policy)?;
+        let even_last = self.even_half_layer.apply(&odd_middle.state, policy)?;
+
+        let layers = vec![even_first, odd_middle, even_last];
+        let global_truncation_bound_qualified =
+            layers.iter().all(|layer| layer.global_l2_bound_qualified);
+        let global_truncation_l2_error_upper_bound = if global_truncation_bound_qualified {
+            let mut cumulative = 0.0;
+            for layer in &layers {
+                let bound = layer
+                    .truncation_ledger
+                    .cumulative_global_l2_error_upper_bound
+                    .ok_or(U1MpsError::NonFiniteContraction(
+                        "missing per-layer global truncation bound",
+                    ))?;
+                cumulative += bound;
+            }
+            if !cumulative.is_finite() {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "cumulative Strang truncation bound",
+                ));
+            }
+            Some(cumulative)
+        } else {
+            None
+        };
+
+        let state = layers
+            .last()
+            .ok_or(U1MpsError::EmptyChain)?
+            .state
+            .clone();
+        let output_norm_squared = state.norm_squared(policy.tolerance)?;
+        Ok(U1TeBDStrangStepResult {
+            state,
+            time_step: self.time_step,
+            trotter_order: 2,
+            layers,
+            input_norm_squared,
+            output_norm_squared,
+            total_charge,
+            global_truncation_l2_error_upper_bound,
+            global_truncation_bound_qualified,
+            trotter_error_bound: None,
+            trotter_error_qualified: false,
+        })
+    }
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::{
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
-        U1TeBDGate, U1TeBDLayer, U1TwoSiteGate, U1TwoSiteState, U1TwoSiteTruncationPolicy,
+        U1TeBDGate, U1TeBDLayer, U1TeBDStrangStepper, U1TwoSiteGate, U1TwoSiteHamiltonian,
+        U1TwoSiteState, U1TwoSiteTruncationPolicy,
     };
     use num_complex::Complex64;
 
