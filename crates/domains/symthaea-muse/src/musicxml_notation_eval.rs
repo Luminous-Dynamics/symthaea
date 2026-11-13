@@ -630,30 +630,36 @@ fn absolute_error_beats(
     Ok(difference.as_beats())
 }
 
+#[derive(Debug, Clone)]
+struct NotePairDimensionsV1 {
+    written_pitch_spelling: MusicXmlNotationAccuracyV1,
+    rest_semantics: MusicXmlNotationAccuracyV1,
+    unpitched_display: MusicXmlNotationAccuracyV1,
+    duration_presence: MusicXmlNotationAccuracyV1,
+    duration_error: MusicXmlNotationErrorDistributionV1,
+    written_type_and_dots: MusicXmlNotationAccuracyV1,
+    voice_assignment: MusicXmlNotationAccuracyV1,
+    voice_reference_unassigned_count: usize,
+    voice_unexpected_assignment_count: usize,
+    staff_assignment: MusicXmlNotationAccuracyV1,
+    staff_reference_unassigned_count: usize,
+    staff_unexpected_assignment_count: usize,
+    instrument_assignment: MusicXmlNotationAccuracyV1,
+    instrument_reference_unassigned_count: usize,
+    instrument_unexpected_assignment_count: usize,
+    sound_tie_semantics: MusicXmlNotationAccuracyV1,
+    visual_tie_semantics: MusicXmlNotationAccuracyV1,
+    time_modification: MusicXmlNotationAccuracyV1,
+    tuplet_notation: MusicXmlNotationAccuracyV1,
+    full_note_source_subtree: MusicXmlNotationAccuracyV1,
+}
+
 fn note_pair_dimensions(
     reference: &MusicXmlPartNotationEventsV1,
     prediction: &MusicXmlPartNotationEventsV1,
     pairs: &[(usize, usize)],
     config: &MusicXmlNotationEvaluationConfigV1,
-) -> Result<
-    (
-        MusicXmlNotationAccuracyV1,
-        MusicXmlNotationAccuracyV1,
-        MusicXmlNotationAccuracyV1,
-        MusicXmlNotationAccuracyV1,
-        MusicXmlNotationErrorDistributionV1,
-        MusicXmlNotationAccuracyV1,
-        MusicXmlNotationAccuracyV1,
-        MusicXmlNotationAccuracyV1,
-        MusicXmlNotationAccuracyV1,
-        MusicXmlNotationAccuracyV1,
-        MusicXmlNotationAccuracyV1,
-        MusicXmlNotationAccuracyV1,
-        MusicXmlNotationAccuracyV1,
-        MusicXmlNotationAccuracyV1,
-    ),
-    MusicXmlNotationEvaluationErrorV1,
-> {
+) -> Result<NotePairDimensionsV1, MusicXmlNotationEvaluationErrorV1> {
     let mut pitch_samples = 0;
     let mut pitch_correct = 0;
     let mut rest_samples = 0;
@@ -668,10 +674,16 @@ fn note_pair_dimensions(
     let mut written_correct = 0;
     let mut voice_samples = 0;
     let mut voice_correct = 0;
+    let mut voice_reference_unassigned_count = 0;
+    let mut voice_unexpected_assignment_count = 0;
     let mut staff_samples = 0;
     let mut staff_correct = 0;
+    let mut staff_reference_unassigned_count = 0;
+    let mut staff_unexpected_assignment_count = 0;
     let mut instrument_samples = 0;
     let mut instrument_correct = 0;
+    let mut instrument_reference_unassigned_count = 0;
+    let mut instrument_unexpected_assignment_count = 0;
     let mut sound_tie_samples = 0;
     let mut sound_tie_correct = 0;
     let mut visual_tie_samples = 0;
@@ -687,7 +699,10 @@ fn note_pair_dimensions(
         let gold = &reference.note_events[reference_index];
         let predicted = &prediction.note_events[prediction_index];
         match (&gold.kind, &predicted.kind) {
-            (MusicXmlNotationEventKindV1::Pitched(gold_pitch), MusicXmlNotationEventKindV1::Pitched(predicted_pitch)) => {
+            (
+                MusicXmlNotationEventKindV1::Pitched(gold_pitch),
+                MusicXmlNotationEventKindV1::Pitched(predicted_pitch),
+            ) => {
                 pitch_samples += 1;
                 if written_pitch_equal(gold_pitch, predicted_pitch) {
                     pitch_correct += 1;
@@ -742,18 +757,47 @@ fn note_pair_dimensions(
         if gold.written_type == predicted.written_type && gold.dot_count == predicted.dot_count {
             written_correct += 1;
         }
-        voice_samples += 1;
-        if gold.voice == predicted.voice {
-            voice_correct += 1;
+
+        match &gold.voice {
+            Some(_) => {
+                voice_samples += 1;
+                if gold.voice == predicted.voice {
+                    voice_correct += 1;
+                }
+            }
+            None => {
+                voice_reference_unassigned_count += 1;
+                if predicted.voice.is_some() {
+                    voice_unexpected_assignment_count += 1;
+                }
+            }
         }
-        staff_samples += 1;
-        if gold.staff == predicted.staff {
-            staff_correct += 1;
+        match &gold.staff {
+            Some(_) => {
+                staff_samples += 1;
+                if gold.staff == predicted.staff {
+                    staff_correct += 1;
+                }
+            }
+            None => {
+                staff_reference_unassigned_count += 1;
+                if predicted.staff.is_some() {
+                    staff_unexpected_assignment_count += 1;
+                }
+            }
         }
-        instrument_samples += 1;
-        if gold.instrument_ids == predicted.instrument_ids {
-            instrument_correct += 1;
+        if gold.instrument_ids.is_empty() {
+            instrument_reference_unassigned_count += 1;
+            if !predicted.instrument_ids.is_empty() {
+                instrument_unexpected_assignment_count += 1;
+            }
+        } else {
+            instrument_samples += 1;
+            if gold.instrument_ids == predicted.instrument_ids {
+                instrument_correct += 1;
+            }
         }
+
         sound_tie_samples += 1;
         if gold.sound_ties == predicted.sound_ties {
             sound_tie_correct += 1;
@@ -776,22 +820,28 @@ fn note_pair_dimensions(
         }
     }
 
-    Ok((
-        accuracy(pitch_samples, pitch_correct),
-        accuracy(rest_samples, rest_correct),
-        accuracy(unpitched_samples, unpitched_correct),
-        accuracy(duration_presence_samples, duration_presence_correct),
-        error_distribution(&mut duration_errors, duration_within),
-        accuracy(written_samples, written_correct),
-        accuracy(voice_samples, voice_correct),
-        accuracy(staff_samples, staff_correct),
-        accuracy(instrument_samples, instrument_correct),
-        accuracy(sound_tie_samples, sound_tie_correct),
-        accuracy(visual_tie_samples, visual_tie_correct),
-        accuracy(time_mod_samples, time_mod_correct),
-        accuracy(tuplet_samples, tuplet_correct),
-        accuracy(source_samples, source_correct),
-    ))
+    Ok(NotePairDimensionsV1 {
+        written_pitch_spelling: accuracy(pitch_samples, pitch_correct),
+        rest_semantics: accuracy(rest_samples, rest_correct),
+        unpitched_display: accuracy(unpitched_samples, unpitched_correct),
+        duration_presence: accuracy(duration_presence_samples, duration_presence_correct),
+        duration_error: error_distribution(&mut duration_errors, duration_within),
+        written_type_and_dots: accuracy(written_samples, written_correct),
+        voice_assignment: accuracy(voice_samples, voice_correct),
+        voice_reference_unassigned_count,
+        voice_unexpected_assignment_count,
+        staff_assignment: accuracy(staff_samples, staff_correct),
+        staff_reference_unassigned_count,
+        staff_unexpected_assignment_count,
+        instrument_assignment: accuracy(instrument_samples, instrument_correct),
+        instrument_reference_unassigned_count,
+        instrument_unexpected_assignment_count,
+        sound_tie_semantics: accuracy(sound_tie_samples, sound_tie_correct),
+        visual_tie_semantics: accuracy(visual_tie_samples, visual_tie_correct),
+        time_modification: accuracy(time_mod_samples, time_mod_correct),
+        tuplet_notation: accuracy(tuplet_samples, tuplet_correct),
+        full_note_source_subtree: accuracy(source_samples, source_correct),
+    })
 }
 
 fn note_onset_error(
