@@ -547,7 +547,7 @@ pub fn positive_semidefinite_square_root(
     let max_iterations =
         10_000usize.max(64usize.saturating_mul(dimension.saturating_mul(dimension)));
     let decomposition = dense
-        .try_hermitian_eigen(tolerance, max_iterations)
+        .try_symmetric_eigen(tolerance, max_iterations)
         .ok_or(ErrorSetQecError::EigenDecompositionFailed { dimension })?;
 
     let minimum_eigenvalue = decomposition
@@ -869,7 +869,7 @@ pub fn compute_strongly_controlled_petz_worst_case_bound(
         DMatrix::<Complex64>::from_row_slice(total_dimension, total_dimension, deviation.entries());
     let max_iterations =
         10_000usize.max(64usize.saturating_mul(total_dimension.saturating_mul(total_dimension)));
-    let eigen = dense.try_hermitian_eigen(tolerance, max_iterations).ok_or(
+    let eigen = dense.try_symmetric_eigen(tolerance, max_iterations).ok_or(
         ErrorSetQecError::EigenDecompositionFailed {
             dimension: total_dimension,
         },
