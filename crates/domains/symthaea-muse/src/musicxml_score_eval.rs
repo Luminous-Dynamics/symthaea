@@ -1114,7 +1114,7 @@ fn augment(
         });
     }
     for prediction_index in &adjacency[gold_index] {
-        *scans = scans.checked_add(1).ok_or(
+        *scans = (*scans).checked_add(1).ok_or(
             MusicXmlScoreEvaluationErrorV1::ArithmeticOverflow,
         )?;
         if *scans > config.maximum_edge_scans {
@@ -1469,6 +1469,8 @@ mod tests {
             reason: "fixture is intentionally unsupported".into(),
         };
         prediction[0].notation_events.note_events.clear();
+        prediction[0].notation_events.attribute_events.clear();
+        prediction[0].notation_events.cursor_moves.clear();
         let outcome = evaluate_musicxml_score_graphs(
             &gold,
             &prediction,
@@ -1530,6 +1532,15 @@ mod tests {
         let (gold, mut prediction) = pair();
         prediction[0].part_id = "P2".into();
         prediction[0].notation_events.part_id = "P2".into();
+        for event in &mut prediction[0].notation_events.note_events {
+            event.part_id = "P2".into();
+        }
+        for event in &mut prediction[0].notation_events.attribute_events {
+            event.part_id = "P2".into();
+        }
+        for event in &mut prediction[0].notation_events.cursor_moves {
+            event.part_id = "P2".into();
+        }
         prediction[0].map.source_id = "prediction#P2".into();
         let result = report(&gold, &prediction, &MusicXmlScoreEvaluationConfigV1::default());
         assert_eq!(result.part_presence.false_positives, 1);
