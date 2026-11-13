@@ -594,12 +594,13 @@ fn left_canonicalize_site(
 
         let row_count = block.nrows();
         let column_count = block.ncols();
-        let decomposition = block.try_svd(true, true, tolerance, max_iterations).ok_or(
-            U1MpsError::SvdFailed {
-                rows: row_count,
-                columns: column_count,
-            },
-        )?;
+        let decomposition =
+            block
+                .try_svd(true, true, tolerance, max_iterations)
+                .ok_or(U1MpsError::SvdFailed {
+                    rows: row_count,
+                    columns: column_count,
+                })?;
         let u = decomposition.u.ok_or(U1MpsError::SvdFailed {
             rows: row_count,
             columns: column_count,
@@ -626,10 +627,12 @@ fn left_canonicalize_site(
             continue;
         }
 
-        let kept_u =
-            DMatrix::<Complex64>::from_fn(rows.len(), kept.len(), |row, column| u[(row, kept[column])]);
-        let kept_v_t =
-            DMatrix::<Complex64>::from_fn(kept.len(), columns.len(), |row, column| v_t[(kept[row], column)]);
+        let kept_u = DMatrix::<Complex64>::from_fn(rows.len(), kept.len(), |row, column| {
+            u[(row, kept[column])]
+        });
+        let kept_v_t = DMatrix::<Complex64>::from_fn(kept.len(), columns.len(), |row, column| {
+            v_t[(kept[row], column)]
+        });
         let singular_values = kept
             .iter()
             .map(|&index| decomposition.singular_values[index])
@@ -788,12 +791,13 @@ fn right_canonicalize_site(
 
         let row_count = block.nrows();
         let column_count = block.ncols();
-        let decomposition = block.try_svd(true, true, tolerance, max_iterations).ok_or(
-            U1MpsError::SvdFailed {
-                rows: row_count,
-                columns: column_count,
-            },
-        )?;
+        let decomposition =
+            block
+                .try_svd(true, true, tolerance, max_iterations)
+                .ok_or(U1MpsError::SvdFailed {
+                    rows: row_count,
+                    columns: column_count,
+                })?;
         let u = decomposition.u.ok_or(U1MpsError::SvdFailed {
             rows: row_count,
             columns: column_count,
@@ -820,10 +824,12 @@ fn right_canonicalize_site(
             continue;
         }
 
-        let kept_u =
-            DMatrix::<Complex64>::from_fn(rows.len(), kept.len(), |row, column| u[(row, kept[column])]);
-        let kept_v_t =
-            DMatrix::<Complex64>::from_fn(kept.len(), columns.len(), |row, column| v_t[(kept[row], column)]);
+        let kept_u = DMatrix::<Complex64>::from_fn(rows.len(), kept.len(), |row, column| {
+            u[(row, kept[column])]
+        });
+        let kept_v_t = DMatrix::<Complex64>::from_fn(kept.len(), columns.len(), |row, column| {
+            v_t[(kept[row], column)]
+        });
         let singular_values = kept
             .iter()
             .map(|&index| decomposition.singular_values[index])
@@ -3870,9 +3876,12 @@ mod tests {
         let receipt = state.canonicalize_for_bond(0, 1.0e-10).unwrap();
         assert!(receipt.qualifies(1.0e-10));
 
-        let pair =
-            U1TwoSiteState::from_adjacent_tensors(&state.tensors()[0], &state.tensors()[1], 1.0e-12)
-                .unwrap();
+        let pair = U1TwoSiteState::from_adjacent_tensors(
+            &state.tensors()[0],
+            &state.tensors()[1],
+            1.0e-12,
+        )
+        .unwrap();
         let compressed = pair
             .split_truncated(U1TwoSiteTruncationPolicy {
                 max_bond_dimension: 1,
@@ -3913,9 +3922,12 @@ mod tests {
         assert!(receipt.qualifies(1.0e-10));
         receipt.qualified = false;
 
-        let pair =
-            U1TwoSiteState::from_adjacent_tensors(&state.tensors()[0], &state.tensors()[1], 1.0e-12)
-                .unwrap();
+        let pair = U1TwoSiteState::from_adjacent_tensors(
+            &state.tensors()[0],
+            &state.tensors()[1],
+            1.0e-12,
+        )
+        .unwrap();
         let compressed = pair
             .split_truncated(U1TwoSiteTruncationPolicy {
                 max_bond_dimension: 1,
