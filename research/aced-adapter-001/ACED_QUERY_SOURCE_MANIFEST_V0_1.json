@@ -1,0 +1,154 @@
+{
+  "schema_version": "aced-query-source-manifest-v0.2",
+  "benchmark_id": "ACED-QUERY-ADAPTER-001",
+  "status": "pinned_query_metadata_only_no_candidate_world_payloads",
+  "upstream": {
+    "repository": "https://github.com/Rose-STL-Lab/ACED-Bench",
+    "commit": "998dc692bfcf5574e5319d67f1cea9c170569d80",
+    "license": "MIT",
+    "paper": "https://arxiv.org/abs/2610.14381",
+    "paper_revision": "v2",
+    "paper_revision_date": "2026-11-08"
+  },
+  "artifacts": {
+    "inventory_path": "research/aced-adapter-001/upstream/aced_query_world_inventory.json",
+    "inventory_sha256": "46976235b1a2c6226b7f4c5ccc1259fd839d1b4bb172744d0a53864630a86b27",
+    "upstream_checksums_path": "data/SHA256SUMS",
+    "upstream_checksums_git_blob_sha": "f14afb97a6b7979c737e5465c2fee26beca81e9b",
+    "upstream_checksums_sha256": "7b30d8c48945aff0df36e080e6c0f2fd80831f7291656d57499e1ca2026f8915"
+  },
+  "track_counts": {
+    "core_struct": 10,
+    "core_decision": 60,
+    "guess_struct": 30,
+    "guess_decision": 48
+  },
+  "distributions": {
+    "core_struct": {
+      "count": 10,
+      "domains": {
+        "Criminal_Justice": 2,
+        "Education": 2,
+        "Hospital_data": 1,
+        "Labor_&_Policy": 1,
+        "Screening_&_diagnosis": 1,
+        "Social_Science": 1,
+        "Treatment_effectiveness": 1,
+        "User_Behavior": 1
+      },
+      "families": {
+        "random_graph": 10
+      },
+      "scenario_subtypes": {
+        "none": 10
+      }
+    },
+    "core_decision": {
+      "count": 60,
+      "domains": {
+        "Criminal_Justice": 12,
+        "Education": 12,
+        "Hospital_data": 14,
+        "Labor_and_Policy": 8,
+        "Screening_and_diagnosis": 5,
+        "Social_Science": 3,
+        "Treatment_effectiveness": 4,
+        "User_Behavior": 2
+      },
+      "families": {
+        "invalid_premise": 12,
+        "mediator_structure_direct_and_mediated": 3,
+        "mediator_structure_mediated_only": 3,
+        "mediator_structure_not_mediator": 3,
+        "mediator_structure_which_mediator": 3,
+        "safety_constrained": 12,
+        "satisficing": 12,
+        "subgroup_robust": 12
+      },
+      "scenario_subtypes": {
+        "none": 50,
+        "valid_proposed_intervention": 6,
+        "wrong_side_intervention": 4
+      }
+    },
+    "guess_struct": {
+      "count": 30,
+      "domains": {
+        "Criminal_Justice": 3,
+        "Education": 5,
+        "Hospital_data": 5,
+        "Labor_&_Policy": 3,
+        "Screening_&_diagnosis": 4,
+        "Social_Science": 3,
+        "Treatment_effectiveness": 4,
+        "User_Behavior": 3
+      },
+      "families": {
+        "random_graph": 30
+      },
+      "scenario_subtypes": {
+        "none": 30
+      }
+    },
+    "guess_decision": {
+      "count": 48,
+      "domains": {
+        "Labor_and_Policy": 2,
+        "Screening_and_diagnosis": 9,
+        "Social_Science": 2,
+        "Treatment_effectiveness": 11,
+        "User_Behavior": 7,
+        "Criminal_Justice": 7,
+        "Education": 4,
+        "Hospital_data": 6
+      },
+      "families": {
+        "invalid_premise": 6,
+        "mediator_structure_direct_and_mediated": 3,
+        "mediator_structure_mediated_only": 3,
+        "mediator_structure_not_mediator": 3,
+        "mediator_structure_which_mediator": 3,
+        "safety_constrained": 15,
+        "satisficing": 10,
+        "subgroup_robust": 5
+      },
+      "scenario_subtypes": {
+        "none": 48
+      }
+    }
+  },
+  "split_relationships": {
+    "core_struct_guess_struct_exact_content_overlap": 10,
+    "core_decision_guess_decision_exact_content_overlap": 0,
+    "core_decision_guess_decision_filename_collision_count": 2,
+    "core_decision_guess_decision_filename_collision_files": [
+      "world_safety_constrained_Hospital_data_n10_seed3202.json",
+      "world_safety_constrained_Screening_and_diagnosis_n10_seed3000.json"
+    ],
+    "total_track_entries": 148,
+    "unique_payload_sha256_count": 138,
+    "uniqueness_note": "The 10 core_struct payloads are exact content duplicates in guess_struct. Two core_decision and guess_decision rows share a filename but have different Git blob and SHA-256 digests; they are distinct payloads and their full track paths must remain separate. There are 148 track entries and 138 unique payload digests. Do not infer identity from filename alone or pool overlapping track entries as independent."
+  },
+  "candidate_data_boundary": {
+    "copied_payloads": false,
+    "candidate_visible_world_files": false,
+    "files_are_metadata_only": true,
+    "metadata_fields": [
+      "track",
+      "file",
+      "path",
+      "git_blob_sha",
+      "bytes",
+      "sha256",
+      "domain",
+      "task_family",
+      "scenario_subtype",
+      "seed",
+      "variables_n",
+      "edge_k",
+      "sample_n"
+    ],
+    "evaluator_note": "World JSON files contain answer-bearing causal data. Keep full payloads and hidden scoring in an evaluator-only process. Candidate agents must use a controlled tool interface and must not mount raw Query world files."
+  },
+  "claim_ceiling": "This manifest qualifies upstream metadata, payload checksums, taxonomy distributions and content-identity relationships only. It does not reproduce the Query grader or run models."
+}

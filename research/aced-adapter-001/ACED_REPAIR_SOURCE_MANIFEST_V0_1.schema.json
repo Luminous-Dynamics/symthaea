@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/aced-adapter-001/ACED_REPAIR_SOURCE_MANIFEST_V0_1.schema.json",
+  "title": "ACED-Repair pinned upstream source manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "status",
+    "upstream",
+    "artifacts",
+    "split_contract",
+    "expected_distribution",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "aced-repair-upstream-source-manifest-v0.1"
+    },
+    "benchmark_id": {
+      "const": "ACED-REPAIR-ADAPTER-001"
+    },
+    "status": {
+      "const": "pinned_upstream_inventory_only_no_model_trials"
+    },
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit",
+        "license",
+        "paper",
+        "paper_revision",
+        "paper_revision_date"
+      ],
+      "properties": {
+        "repository": {
+          "const": "https://github.com/Rose-STL-Lab/ACED-Bench"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "license": {
+          "const": "MIT"
+        },
+        "paper": {
+          "const": "https://arxiv.org/abs/2610.14381"
+        },
+        "paper_revision": {
+          "const": "v2"
+        },
+        "paper_revision_date": {
+          "const": "2026-11-08"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "test_index_path",
+        "test_index_git_blob_sha",
+        "test_index_sha256",
+        "eval_index_path",
+        "eval_index_git_blob_sha",
+        "eval_index_sha256",
+        "data_sha256_manifest_path",
+        "data_sha256_manifest_git_blob_sha",
+        "data_sha256_manifest_sha256"
+      ],
+      "properties": {
+        "test_index_path": {
+          "const": "data/repair/test/index.json"
+        },
+        "test_index_git_blob_sha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "test_index_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "eval_index_path": {
+          "const": "data/repair/eval/index.json"
+        },
+        "eval_index_git_blob_sha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "eval_index_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "data_sha256_manifest_path": {
+          "const": "data/SHA256SUMS"
+        },
+        "data_sha256_manifest_git_blob_sha": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "data_sha256_manifest_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "split_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "test_index_rows",
+        "eval_index_rows",
+        "eval_is_subset_of_test",
+        "subset_identity",
+        "unique_seed_scope",
+        "payload_policy"
+      ],
+      "properties": {
+        "test_index_rows": {
+          "const": 540
+        },
+        "eval_index_rows": {
+          "const": 54
+        },
+        "eval_is_subset_of_test": {
+          "const": true
+        },
+        "subset_identity": {
+          "type": "string"
+        },
+        "unique_seed_scope": {
+          "type": "string"
+        },
+        "payload_policy": {
+          "type": "string"
+        }
+      }
+    },
+    "expected_distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "test",
+        "eval"
+      ],
+      "properties": {
+        "test": {
+          "$ref": "#/$defs/distribution"
+        },
+        "eval": {
+          "$ref": "#/$defs/distribution"
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "distribution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total",
+        "domains",
+        "archetypes"
+      ],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "domains": {
+          "type": "object",
+          "minProperties": 10,
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "archetypes": {
+          "type": "object",
+          "minProperties": 9,
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    }
+  }
+}

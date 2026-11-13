@@ -1,0 +1,471 @@
+{
+  "protocol_id": "ACED-REPAIR-EXPERIMENT-SELECTOR-001",
+  "version": "0.1.0",
+  "status": "preregistered_comparison_protocol_not_model_results",
+  "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11598",
+  "pinned_upstream_commit": "998dc692bfcf5574e5319d67f1cea9c170569d80",
+  "official_budget": {
+    "experiments_per_world": 15,
+    "turns_per_world": 32
+  },
+  "objective": "Measure whether experiment selection and stopping policies improve intervention utility and mechanism recovery at equal experimental budgets, rather than maximizing information gain or final answer confidence in isolation.",
+  "primary_estimands": [
+    "paired difference in accepted outcome versus the official upstream-compatible agent",
+    "paired difference in benefit_recovered and intervention regret",
+    "area under utility-recovery-versus-experiment-budget curve",
+    "premature_stop regret and unnecessary_experiment cost",
+    "worst-archetype and worst-domain treatment effects"
+  ],
+  "policy_arms": [
+    {
+      "id": "official_aced",
+      "name": "Official ACED agent",
+      "role": "Primary external reference; preserve upstream prompt, tool contract, budget and grader where licensing and execution permit."
+    },
+    {
+      "id": "random_valid",
+      "name": "Random valid intervention",
+      "role": "Control for unguided exploration; sample only within declared valid actuator and dose bounds."
+    },
+    {
+      "id": "greedy_eig",
+      "name": "Greedy expected information gain",
+      "role": "Select the affordable experiment with greatest expected reduction in uncertainty over a preregistered hypothesis/mechanism posterior."
+    },
+    {
+      "id": "greedy_evsi",
+      "name": "Expected value of sample information",
+      "role": "Select the experiment with greatest expected improvement in downstream decision utility after observing its result, net of declared experiment cost."
+    },
+    {
+      "id": "risk_adjusted_evsi",
+      "name": "Risk-adjusted EVSI",
+      "role": "Subtract intervention hazard, irreversibility and subgroup downside using predeclared loss terms; use safe read-only measurements where intervention risk is material."
+    },
+    {
+      "id": "adaptive_selector",
+      "name": "Adaptive evidence-gated selector",
+      "role": "Choose among measurement, intervention, replication, dose search, subgroup probe, clarification and stop based on evidence state, decision sensitivity and remaining budget. No oracle access."
+    },
+    {
+      "id": "bounded_sequential_evsi",
+      "name": "Bounded adaptive policy-tree EVSI",
+      "role": "Exact finite-horizon lookahead over the declared discrete hypotheses and candidate probes; re-evaluates stopping/next experiment after every outcome. The horizon and candidate set are predeclared; compare against greedy one-step EIG/EVSI, robust EVSI, random-valid and the official ACED agent."
+    }
+  ],
+  "design_controls": {
+    "matched_unit": "Same pinned world, model snapshot, system prompt, tool schema, serving context, decoding settings, token budget, 15-experiment limit and 32-turn limit within each paired comparison.",
+    "randomization": "Randomize arm execution order and model-call order within each world; keep all treatments for one world in the same statistical cluster.",
+    "seeds": "Precommit world, intervention-sampling, agent and evaluation seeds; include them in a receipt before model execution.",
+    "information_boundary": "The candidate receives only the scenario and tool outputs. It never receives the hidden SCM, true intervention, oracle dose, battery/scoring roles, or the split index.",
+    "no_hindsight": "Record predicted outcome distributions and expected information/value before every experiment; never backfill predictions after observing outcomes.",
+    "stopping": "A stop must bind the evidence state and current best action. Evaluate expected marginal value of the best available additional experiment after cost and risk; retain abstain/unknown when decision value is unresolved.",
+    "official_score": "Never alter the official ACED grader or official metric definitions. New metrics remain a separate scorecard."
+  },
+  "required_scenario_families": [
+    "one experiment is highly informative about a non-decisive variable",
+    "a low-entropy experiment changes the optimal intervention",
+    "a confounded observational correlation is overturned by a targeted intervention",
+    "multiple independent causes require more than one effective lever",
+    "the correct actuator is found but the optimal dose lies in a narrow window",
+    "synergistic effects require a joint intervention",
+    "a surrogate/instrument measurement is informative but not directly actionable",
+    "subgroup effects reverse the population-average policy",
+    "new contradictory evidence requires replication or source reconciliation",
+    "all remaining experiments have negative expected net decision value",
+    "one remaining experiment has high value only for a minority subgroup",
+    "an intervention can cause irreversible or high-cost harm"
+  ],
+  "metrics": [
+    {
+      "name": "benefit_recovered",
+      "definition": "Preserve official ACED ratio of improvement versus oracle fix."
+    },
+    {
+      "name": "intervention_regret",
+      "definition": "Difference between true objective under chosen intervention and oracle objective."
+    },
+    {
+      "name": "utility_auc_budget",
+      "definition": "Area under best-achieved true utility as a function of experiment count; evaluated by hidden oracle after run."
+    },
+    {
+      "name": "expected_value_calibration",
+      "definition": "Proper-score/calibration comparison of pre-registered predicted experiment value versus realized decision-relevant value where estimable."
+    },
+    {
+      "name": "decision_relevant_information",
+      "definition": "Change in optimal downstream action or expected utility attributable to an observation, distinct from generic entropy reduction."
+    },
+    {
+      "name": "premature_stop_regret",
+      "definition": "Counterfactual decision regret when the agent stops while at least one affordable experiment has positive net expected decision value."
+    },
+    {
+      "name": "unnecessary_experiment_cost",
+      "definition": "Declared experiment cost incurred after further evidence cannot improve the decision beyond a preregistered materiality threshold."
+    },
+    {
+      "name": "experiment_efficiency",
+      "definition": "Benefit recovered or regret reduction per experiment, turn, tool call, token and unit cost."
+    },
+    {
+      "name": "worst_group_regret",
+      "definition": "Maximum subgroup/domain/archetype regret; prevents average gains from hiding fragile policies."
+    },
+    {
+      "name": "unsupported_mechanism_claim_rate",
+      "definition": "Rate of mechanism claims not supported by the observations/interventions available before commitment."
+    }
+  ],
+  "statistical_plan": {
+    "primary_unit": "World-level matched paired difference; all seeds and repeated model runs remain clustered by upstream world identity.",
+    "reporting": "Per-world raw results, paired mean/median, confidence intervals, effect sizes, complete denominators, missing/timeout/invalid cases and per-archetype/per-domain results.",
+    "multiplicity": "Predeclare primary outcomes and control family-wise error or false discovery for secondary subgroup comparisons.",
+    "sample_size": "The 54-world upstream evaluation set is an initial external evaluation, not automatically powered for every domain subgroup. Confirmatory work must use a preregistered power analysis and account for only five or six eval worlds in most domains.",
+    "independence": "Do not treat the evaluation subset and parent test inventory as independent samples."
+  },
+  "claim_ceiling": "This protocol proposes matched experiment-selection and stopping comparisons. No policy arm has been run here. No EVSI advantage, SOTA superiority, safety or causal reasoning competence is claimed.",
+  "executable_reference_selector": {
+    "module": "research/aced-adapter-001/qualifier/src/decision_value.rs",
+    "status": "implemented_synthetic_unit_test_reference_not_model_trial",
+    "methods": [
+      {
+        "id": "expected_information_gain",
+        "objective": "Expected reduction in predictive uncertainty, measured in bits. It is deliberately not combined arithmetically with utility-valued experiment costs.",
+        "known_limitation": "Measures uncertainty reduction, not whether learning changes the best action; a bit-valued score is not commensurable with utility without a separately calibrated conversion."
+      },
+      {
+        "id": "expected_value_of_sample_information",
+        "objective": "Expected improvement in optimal downstream action utility after an observation, minus experiment cost, both measured in the declared utility scale.",
+        "known_limitation": "Does not account for intervention risk unless a separate risk term is added."
+      },
+      {
+        "id": "risk_adjusted_evsi",
+        "objective": "Expected improvement in optimal downstream action utility minus experiment cost and a preregistered risk-aversion coefficient times experiment risk.",
+        "known_limitation": "The coefficient and risk measure are task-specific assumptions and must be declared before trial execution."
+      }
+    ],
+    "counterexample": "Three hypotheses have prior [0.45, 0.45, 0.10]. Two hypotheses recommend the same action; the low-probability third hypothesis recommends another action. A probe that separates the first two hypotheses reduces entropy but does not change the optimal action. A noisier signal that discriminates the third hypothesis has lower entropy gain but positive decision value. A perfect-information intervention can have higher raw EVSI but be rejected when its declared risk penalty exceeds its value.",
+    "negative_controls": [
+      "malformed likelihoods fail closed",
+      "negative net value returns stop/no experiment",
+      "deterministic identifier tie-break",
+      "risk-adjusted EVSI rejects the high-risk perfect-information experiment in the synthetic counterexample"
+    ],
+    "claim_ceiling": "Purely synthetic algorithmic reference and unit tests. No ACED worlds, hidden world payloads, external data, model calls or human evaluations are executed by this module.",
+    "selection_score_units": {
+      "expected_information_gain": "bits",
+      "expected_value_of_sample_information": "utility",
+      "risk_adjusted_evsi": "utility",
+      "comparison_rule": "Compare candidates only within the same selection method and declared unit system. Do not rank EIG bits directly against EVSI utility scores."
+    }
+  },
+  "prospective_experiment_trace": {
+    "schema": "EXPERIMENT_VALUE_TRACE_V0_1.schema.json",
+    "rust_module": "qualifier/src/experiment_trace.rs",
+    "status": "reusable_synthetic_trace_validator_not_yet_connected_to_model_runner",
+    "event_types": {
+      "experiment_proposal": "Pre-observation commitment to experiment_plan_sha256, belief digest, selector, predicted outcomes, EIG in bits, EVSI in utility, risk, risk-aversion coefficient, cost in utility, and selector-specific predicted_selection_score.",
+      "experiment_observation": "Append-only later record referencing exactly one proposal event, with observed/failed/unknown status, evaluator-resolved outcome class and output digest when observed, and actual cost. Failed/unknown attempts remain in the event log but are excluded from proper-score denominators.",
+      "stop": "Terminal reason and evidence-state digest; it is rejected if any proposal lacks an observation/failure/unknown reconciliation event."
+    },
+    "integrity_rules": [
+      "Events use zero-based contiguous sequence numbers and a previous-event SHA-256 chain.",
+      "Event digest covers canonical JSON for event ID, sequence, event type, previous digest and payload; the digest field itself is excluded.",
+      "Proposal event IDs and experiment IDs are unique; every observation references one prior proposal exactly once.",
+      "Observed, failed and unknown attempts are all recorded; missing outcomes are not silently dropped.",
+      "Predicted selection score must match the selector's dimensional contract: EIG score = EIG bits; EVSI score = EVSI minus cost; risk-adjusted EVSI score = EVSI minus cost minus risk_aversion*predicted_risk.",
+      "No new experiment proposals or observations are permitted after stop."
+    ],
+    "trust_boundary": "A self-contained hash chain detects changes relative to a trusted checkpoint but does not prove event time or signer identity. Model-run use requires an independently operated append-only recorder that signs or timestamps the proposal digest before the experiment is executed.",
+    "claim_ceiling": "The current module validates synthetic plan structure and digest binding against supplied plan objects, plus internal trace consistency and forecast scores. It does not provide trusted timestamps, signer identity, WORM storage, candidate isolation or proof that external execution matched the plan; those need independently anchored proposal events and execution receipts.",
+    "metrics": {
+      "brier_score": "For observed outcomes, sum squared differences across the preregistered categorical outcome space between predicted probabilities and one-hot evaluator-resolved outcome. Lower is better.",
+      "log_loss": "For observed outcomes with nonzero forecast probability, -ln(probability assigned to the observed class). An observed zero-probability class is represented as infinite/unavailable log loss and counted separately; no silent epsilon clipping.",
+      "denominator": "Only completed observations with an independently resolved outcome class enter Brier/log-loss denominators. Failed/unknown attempts remain visible and receive separate counts; they are not silently discarded.",
+      "adjudication": "Observed outcome class must be determined from the immutable observation by the independent evaluator, under a predeclared outcome taxonomy. The model does not choose its own realized label."
+    },
+    "experiment_plan_binding": {
+      "digest_field": "experiment_plan_sha256",
+      "status": "schema_and_digest_verifier_implemented_in_rust_library",
+      "canonicalization": "SHA-256 over deterministic canonical JSON with recursively lexicographically sorted object keys, preserved array order and no insignificant whitespace.",
+      "required_plan_fields": [
+        "target and causal question / hypothesis",
+        "intervention and treatment values",
+        "control / comparison design",
+        "randomization or allocation procedure when applicable",
+        "measurement variables, measurement timing and outcome taxonomy",
+        "numeric sample design: planned total units, standardized effect size, two-sided alpha, target power, and named power method",
+        "budget, cost model, safety limits and reversible/irreversible effect classification",
+        "predeclared stop, continue, replicate and conflict-resolution rules",
+        "expected confounders, selection effects and known identification assumptions",
+        "a preregistered supported control arm and seeded randomized allocation method"
+      ],
+      "immutability_rule": "The full plan artifact must be durably recorded before an experiment is authorized or executed. The digest in experiment_proposal binds to that exact artifact. Any plan change requires a new proposal event and new plan digest; do not overwrite the prior artifact.",
+      "verification_rule": "The Rust function validate_trace_with_plans(trace, plan_artifacts) validates each closed plan's required nested objects and recomputes canonical SHA-256; every proposal digest must resolve to exactly one supplied plan artifact, and proposal experiment_id must equal plan_id. Altered plan artifacts and ID mismatches fail closed.",
+      "claim_ceiling": "A plan digest is not proof of prospective timing or execution fidelity. Trusted timestamp/signature anchoring and an independent execution observer are still required.",
+      "schema": "ACED_EXPERIMENT_PLAN_V0_2.schema.json",
+      "rust_fixture": "qualifier/tests/fixtures/aced_experiment_plan_v0_2.json",
+      "power_design": {
+        "module": "qualifier/src/power_design.rs",
+        "method": "two_sided_equal_allocation_independent_means_normal_approximation",
+        "validated_parameters": [
+          "standardized effect size (Cohen's d)",
+          "two-sided alpha",
+          "target power",
+          "even total planned units"
+        ],
+        "outputs": [
+          "required units per arm",
+          "required total units",
+          "approximate achieved power at planned sample size"
+        ],
+        "example": {
+          "standardized_effect_size": 0.5,
+          "alpha": 0.05,
+          "target_power": 0.8,
+          "required_units_per_arm": 63,
+          "required_total_units": 126,
+          "approximate_achieved_power": 0.8013
+        },
+        "claim_limit": "A normal-approximation planning calculator for independent, equal-allocation, continuous outcomes. Not a substitute for design-specific power analysis for clustered, paired, binary, ordinal, survival, adaptive, sequential, repeated-look or multiplicity-adjusted experiments.",
+        "primary_endpoint_requirement": "The plan must declare primary_outcome.scale=continuous and estimand=difference_in_means; the variable must appear in measurement.variables. Categorical forecast labels are a separate outcome taxonomy and must not be confused with the endpoint scale used in the power calculation.",
+        "metrics": [
+          "planned_units_per_arm",
+          "required_units_per_arm",
+          "achieved_power_at_planned_n",
+          "underpowered_plan_rejection_rate",
+          "effect_size_sensitivity",
+          "allocation/control fidelity",
+          "sample-size cost per decision-relevant information unit"
+        ]
+      },
+      "supported_designs": {
+        "allocation_methods": [
+          "seeded_randomized_pair_assignment",
+          "blocked_seeded_randomization"
+        ],
+        "control_kinds": [
+          "matched_no_intervention_control",
+          "active_control",
+          "sham_control"
+        ],
+        "rejection_examples": [
+          "uncontrolled_total_effect",
+          "no_control"
+        ],
+        "limitation": "These are the only controlled randomized designs accepted by plan v0.2. Observational designs, crossover/paired analyses and adaptive randomization require separate schemas and design-specific power methods; they must not be relabeled as this design."
+      }
+    }
+  },
+  "external_benchmark_crosswalk": [
+    {
+      "name": "Causal-Discovery-Bench",
+      "url": "https://arxiv.org/abs/2611.09934",
+      "reported": "3,802 episodes; 13 models from 5 vendors; 40 metrics grouped into 7 families; paper attributes 94.5% of evaluated errors to experiment design rather than inference.",
+      "design_implication": "Add sequential experiment-design, resource-aware testing, conflicting-evidence and stop/commit metrics. Preserve per-decision forecasts."
+    },
+    {
+      "name": "Heuresis",
+      "url": "https://arxiv.org/abs/2610.22846",
+      "reported": "Anonymous simulated datasets over six mechanism families. Reported GPT-6.1 Sol +14 adjacency-F1 points and Claude Opus 5.5 +7.4 on hardest family over best algorithm. Paper says code/data will be released.",
+      "design_implication": "Separate fixed algorithm, algorithm router and data-driven graph repair. Require edge-level change receipts bound to evidence."
+    },
+    {
+      "name": "CausalGame",
+      "url": "https://proceedings.mlr.press/v306/chen26l.html",
+      "reported": "14 interactive causal game settings and 29 frontier models; includes hidden confounding, selection bias and noisy measurements.",
+      "design_implication": "Add these bias families as distinct robustness strata; do not conflate game score with hidden-SCM causal repair."
+    },
+    {
+      "name": "FIRE-Bench",
+      "url": "https://proceedings.mlr.press/v306/wang26d.html",
+      "reported": "ICML 2026 full-cycle insight rediscovery; strongest reported frontier agent below 50 F1 with high run-to-run variance.",
+      "design_implication": "Add reproducible full-cycle rediscovery, multi-run variance and experiment-design/execution/evidence attribution."
+    },
+    {
+      "name": "ScienceAgentBench",
+      "url": "https://proceedings.iclr.cc/paper_files/paper/2025/hash/f12b4df26344f3be803c06b555252efe-Abstract-Conference.html",
+      "reported": "102 tasks from 44 peer-reviewed publications, validated by 9 experts; best reported independent solve rate 32.4% under its three-attempt protocol.",
+      "design_implication": "Use as a verified scientific-program analysis crosswalk, not an active-experiment result."
+    },
+    {
+      "name": "SDABench",
+      "url": "https://arxiv.org/abs/2607.11079",
+      "reported": "527 real-data and 6,000 synthetic instances; six analytical capabilities and five scientific domains; 15 LLMs.",
+      "design_implication": "Use for descriptive/exploratory/inferential/predictive/causal/mechanistic capability decomposition, subject to source and artifact audit."
+    }
+  ],
+  "stagewise_evaluation_ladder": [
+    "supplied-evidence inference and assumption selection",
+    "single decision-relevant experiment design",
+    "sequential experiment design under finite resource budgets",
+    "conflicting-evidence resolution and justified stop/commit",
+    "complete scientific rediscovery or causal repair trajectory",
+    "independent oracle validation and artifact/evidence provenance"
+  ],
+  "trajectory_failure_attribution": [
+    "experiment choice: information gain versus downstream value",
+    "measurement/protocol: statistical power, measurement quality and intervention validity",
+    "resource accounting: budget, cost, tool failures and time",
+    "belief update: likelihood calibration, contradictory evidence and subgroup heterogeneity",
+    "decision: dose/combination, utility, risk and uncertainty",
+    "stopping: premature stop, delayed stop and unreconciled effects",
+    "execution: tool/sandbox failures, reproducibility and observer mismatch",
+    "reporting: unsupported mechanism claims, citations and evidence-to-claim alignment",
+    "design adequacy: underpowered sample, invalid allocation, multiplicity, repeated looks and measurement error"
+  ],
+  "forecast_quality": {
+    "scores": [
+      "multiclass Brier score",
+      "log loss",
+      "reliability diagrams / per-outcome calibration bins",
+      "sharpness and outcome-frequency baselines"
+    ],
+    "caveat": "Brier score combines reliability/calibration, resolution/discrimination and outcome uncertainty; it is not a pure calibration metric. Report reliability diagrams or a proper decomposition alongside proper scores where sample size permits.",
+    "zero_probability": "An observed outcome assigned zero forecast probability remains an explicit infinite-log-loss event; do not silently clip.",
+    "denominators": "Observed outcomes only for proper scores; failed/unknown attempts remain separately counted, not silently dropped."
+  },
+  "robust_model_uncertainty": {
+    "status": "implemented_reference_module_synthetic_tests_not_model_trial",
+    "module": "qualifier/src/robust_decision_value.rs",
+    "method": "Set-based lower-envelope EVSI across at least two predeclared plausible decision models. For each experiment, evaluate EVSI under every scenario and choose the experiment maximizing the minimum(EVSI - fixed_cost - declared_risk_penalty).",
+    "scenario_fields": [
+      "scenario_id",
+      "prior",
+      "action_utilities",
+      "experiments_and_outcome_likelihoods"
+    ],
+    "invariants": [
+      "scenario identities are unique and non-empty",
+      "each scenario declares the exact same experiment ID set",
+      "the same experiment has the same cost and risk exposure across scenarios",
+      "every scenario's priors, utility tables and likelihood distributions pass the existing selector validation",
+      "the remaining budget and risk aversion are finite and non-negative"
+    ],
+    "outputs": [
+      "scenario_count",
+      "minimum_evsi",
+      "maximum_evsi",
+      "minimum_scenario_net_value",
+      "maximum_scenario_net_value",
+      "mean_scenario_net_value_descriptive_only"
+    ],
+    "selection_policy": "No model probability is assigned to scenarios. The descriptive arithmetic mean must not be reported as expected value. Selection uses the worst-case net value and stops if no candidate clears the predeclared positive threshold.",
+    "preregistration": "Freeze the scenario set and its source before observing experiment outcomes. Derive the set from independent calibration, held-out parameter uncertainty or declared prior/likelihood/utility bounds. Report scenario coverage, sensitivity to set construction and worst-case outcomes.",
+    "limitations": [
+      "Finite declared scenario set only; no guarantee outside it.",
+      "May be conservative; compare as a separate arm against nominal EVSI and EIG.",
+      "Requires utility scales to be commensurate across scenarios.",
+      "Does not solve sequential multi-stage planning or general POMDPs.",
+      "Synthetic module tests are not ACED results."
+    ]
+  },
+  "query_track_extension": {
+    "status": "metadata_inventory_qualified_protocol_defined_no_query_model_trial",
+    "source_manifest": "ACED_QUERY_SOURCE_MANIFEST_V0_1.json",
+    "inventory": "upstream/aced_query_world_inventory.json",
+    "official_tracks": {
+      "core_struct": {
+        "worlds": 10,
+        "questions": 60
+      },
+      "core_decision": {
+        "worlds": 60,
+        "questions": 60
+      },
+      "guess_struct": {
+        "worlds": 30,
+        "questions": 180
+      },
+      "guess_decision": {
+        "worlds": 48,
+        "questions": 48
+      }
+    },
+    "official_candidate_arms": [
+      "active",
+      "active_code",
+      "modular"
+    ],
+    "official_comparator": "guess_only",
+    "official_budget": {
+      "outer_turns": 4,
+      "active_code_inner_rounds": 8,
+      "modular_code_rounds": 5
+    },
+    "official_score_preservation": {
+      "structural": [
+        "overall_accuracy",
+        "set_question_precision_recall_f1",
+        "by_category",
+        "by_question_type",
+        "by_difficulty",
+        "by_n_nodes"
+      ],
+      "decision": [
+        "overall_accuracy",
+        "by_archetype",
+        "by_sub_variant",
+        "safety_constraint_pass",
+        "subgroup_min_improvement",
+        "invalid_premise_judgment_and_alternative_quality"
+      ]
+    },
+    "evaluator_parser_sensitivity": {
+      "concern": "The official structural and decision evaluators use an LLM AnswerExtractor to map verbose output into answer types or JSON. Parser variance must not be conflated with agent reasoning quality.",
+      "requirements": [
+        "Pin the extraction-model ID/revision, prompt, temperature, output budget and provider for official reproduction.",
+        "Store the candidate raw answer and the extracted structured answer separately with independent digests.",
+        "For a strict-JSON diagnostic arm, use a deterministic schema parser and report parse failures separately; do not change the official score.",
+        "Re-score a stratified blinded sample with an independent parser/human adjudicator; report disagreement and adjudicator uncertainty.",
+        "Keep evaluator-only world and gold fields outside candidate context."
+      ]
+    },
+    "measurement_validity_diagnostic": {
+      "module": "qualifier/src/categorical_shift.rs",
+      "status": "implemented_reference_module_synthetic_tests_not_model_trial",
+      "method": "Wilson score intervals for each categorical proportion plus Newcombe score interval for the intervention-minus-reference proportion difference; total-variation distance is reported separately.",
+      "controls": [
+        "Equal absolute shifts at small and large sample sizes must produce different interval widths.",
+        "Use a preregistered familywise critical z value and preserve all variable/category comparisons.",
+        "Keep minimum practical effect size separate from interval exclusion of zero.",
+        "Do not call distribution shift causal without a valid randomized or otherwise identified intervention contrast.",
+        "For repeated/adaptive looks, use a sequentially valid method rather than reusing a fixed-look critical value."
+      ],
+      "claim_ceiling": "A shift diagnostic reports categorical sample differences and model-based intervals. It does not prove causal effects, intervention randomization or agent competence."
+    },
+    "split_and_analysis": {
+      "track_entries": 148,
+      "unique_payloads": 138,
+      "exact_structural_core_guess_overlap": 10,
+      "exact_decision_core_guess_overlap": 0,
+      "decision_basename_collisions_with_different_payloads": 2,
+      "analysis_unit": "Unique content-addressed world identity. Keep full track path and task identity; never infer content identity from filename alone.",
+      "reporting": "Report each official track separately and cluster paired uncertainty by content-addressed world. The 10 exact structural payload repeats must not count as independent worlds across core and guess tracks."
+    },
+    "claim_ceiling": "No Query agent trial or Query SOTA claim is made by this protocol or metadata inventory. This extension defines a controlled future comparison only."
+  },
+  "sequential_planning_extension": {
+    "status": "implemented_synthetic_algorithm_tests_not_aced_model_trial",
+    "module": "qualifier/src/sequential_decision_value.rs",
+    "method": "Bounded dynamic programming over a finite discrete hypothesis model. At each node, compare the stop value with every affordable unused experiment. For each observation outcome, Bayes-update the prior and recursively select the next experiment or stop. Subtract experiment cost and declared risk penalty.",
+    "returned_plan": "Nested policy tree whose branches contain outcome, branch probability and continuation; root summary reports expected value, expected experiment count, expected cost and risk penalty.",
+    "preregistered_controls": [
+      "The candidate probe set, priors, likelihoods, action utilities, costs, risk penalties, horizon and stopping threshold are frozen before the first observation.",
+      "All proposed probes are validated before budget filtering, including unaffordable probes.",
+      "Each probe may occur at most once on a path; every outcome branch must have a defined continuation or explicit stop.",
+      "At every node, stop remains a legal action and wins whenever no probe clears the predeclared minimum net value.",
+      "Compare one-step EIG, one-step EVSI, risk-adjusted EVSI, finite-set robust EVSI and bounded sequential EVSI under matched model information and experiment budgets."
+    ],
+    "counterexample": "Four equally likely hypotheses: H1/H2 favour action A, H3/H4 favour action B. Probe alpha partitions {H1,H3}/{H2,H4}; probe beta partitions {H1,H4}/{H2,H3}. Each individual probe leaves the action posterior at 50/50 and has zero one-step EVSI, but the pair of outcomes identifies the correct action. Two-step lookahead should discover the complementary sequence.",
+    "limitations": [
+      "Exact enumeration grows exponentially with horizon and outcome branching.",
+      "Finite discrete hypothesis and known likelihood assumptions only.",
+      "Does not model observation noise uncertainty unless scenarios are explicitly represented.",
+      "Does not solve an unbounded POMDP or continuous intervention optimization.",
+      "Synthetic unit tests are algorithm checks, not an ACED benchmark or model result."
+    ]
+  }
+}

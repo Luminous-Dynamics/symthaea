@@ -1,0 +1,76 @@
+{
+  "schema_version": "aced-experiment-plan-v0.1",
+  "plan_id": "probe-1",
+  "benchmark_id": "ACED-REPAIR-ADAPTER-001",
+  "target": {
+    "question": "Does actuator A causally improve the declared synthetic objective under the current identified hypothesis set?",
+    "hypothesis_ids": [
+      "h-actionable",
+      "h-nonactionable"
+    ]
+  },
+  "intervention": {
+    "kind": "bounded_synthetic_do_intervention",
+    "target_ref": "ACTUATOR-A",
+    "treatment_spec": "Set the actuator to its preregistered middle dose for the declared observation interval."
+  },
+  "control": {
+    "kind": "matched_no_intervention_control",
+    "description": "Observe a fresh matched sample with no actuator change under the same measurement procedure.",
+    "control_variables": [
+      "ambient_load",
+      "baseline_configuration",
+      "measurement_window"
+    ]
+  },
+  "allocation": {
+    "method": "seeded_randomized_pair_assignment",
+    "unit": "independent_world_batch",
+    "seed_commitment_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "measurement": {
+    "variables": [
+      "primary_objective",
+      "safety_indicator"
+    ],
+    "timepoints": [
+      "baseline",
+      "post_intervention"
+    ],
+    "outcome_taxonomy": [
+      "positive",
+      "negative"
+    ]
+  },
+  "sample": {
+    "planned_units": 40,
+    "power_assumptions": "Planning assumption: minimum detectable standardized effect 0.5 at nominal 0.8 power; verify with the actual design before execution."
+  },
+  "budget": {
+    "max_experiments": 1,
+    "max_turns": 2,
+    "max_cost_units": 10
+  },
+  "safety": {
+    "risk_class": "low_synthetic",
+    "reversibility": "reversible",
+    "maximum_exposure": 0.1,
+    "stop_conditions": [
+      "Any independent safety indicator exceeds its preregistered bound.",
+      "A read-back cannot reconcile the target state."
+    ]
+  },
+  "identification_assumptions": [
+    "Matched batches differ only by the randomized intervention assignment.",
+    "The outcome taxonomy and measurement process are fixed before execution."
+  ],
+  "confounders_and_selection": [
+    "Ambient load is measured and held balanced across treatment and control.",
+    "Selection into the observed sample must not depend on post-intervention outcome."
+  ],
+  "stop_rules": {
+    "premature_stop_rule": "Stop only when no available experiment has positive preregistered net decision value or a safety condition requires stopping.",
+    "continue_rule": "Continue only while an authorized, reconciled and affordable experiment remains with positive net decision value.",
+    "conflict_resolution_rule": "Conflicting primary and independent observations move the run to unknown until a new independent read reconciles state."
+  }
+}

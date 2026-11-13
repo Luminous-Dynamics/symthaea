@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/aced-adapter-001/ACED_REPAIR_INDEX_V0_1.schema.json",
+  "title": "ACED-Repair upstream world index row schema v0.1",
+  "description": "Metadata-only upstream index. This schema intentionally excludes compressed world payload and hidden oracle fields.",
+  "type": "array",
+  "minItems": 1,
+  "maxItems": 540,
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "file",
+      "domain",
+      "archetype",
+      "seed"
+    ],
+    "properties": {
+      "file": {
+        "type": "string",
+        "minLength": 1,
+        "pattern": "^world_[A-Za-z0-9_-]+\\.json\\.gz$"
+      },
+      "domain": {
+        "enum": [
+          "clinical",
+          "fermentation",
+          "agronomy",
+          "aquaculture",
+          "battery",
+          "bioprocess",
+          "catalysis",
+          "datacenter",
+          "semiconductor",
+          "watertreatment"
+        ]
+      },
+      "archetype": {
+        "enum": [
+          "confounded_chain",
+          "collider_selection",
+          "competing_causes",
+          "confounded_reversal",
+          "dose_window",
+          "hidden_subtype",
+          "instrument_only",
+          "surrogate_trap",
+          "synergy_pair"
+        ]
+      },
+      "seed": {
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  }
+}

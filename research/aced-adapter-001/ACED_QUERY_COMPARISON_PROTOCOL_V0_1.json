@@ -1,0 +1,197 @@
+{
+  "protocol_id": "ACED-QUERY-COMPARISON-001",
+  "version": "0.1.0",
+  "status": "preregistered_comparison_design_not_model_results",
+  "upstream": {
+    "repository": "https://github.com/Rose-STL-Lab/ACED-Bench",
+    "commit": "998dc692bfcf5574e5319d67f1cea9c170569d80",
+    "paper": "https://arxiv.org/abs/2610.14381",
+    "paper_revision": "v2",
+    "paper_revision_date": "2026-11-08",
+    "license": "MIT"
+  },
+  "source_artifacts": {
+    "metadata_manifest": "ACED_QUERY_SOURCE_MANIFEST_V0_1.json",
+    "metadata_inventory": "upstream/aced_query_world_inventory.json",
+    "metadata_inventory_sha256": "46976235b1a2c6226b7f4c5ccc1259fd839d1b4bb172744d0a53864630a86b27",
+    "upstream_sha256sums_sha256": "7b30d8c48945aff0df36e080e6c0f2fd80831f7291656d57499e1ca2026f8915",
+    "metadata_only": true
+  },
+  "track_to_question_projection": {
+    "world_inventory_counts": {
+      "core_struct": 10,
+      "core_decision": 60,
+      "guess_struct": 30,
+      "guess_decision": 48
+    },
+    "active_agent_questions": {
+      "core_list_queries": 10,
+      "core_decision_tasks": 60,
+      "core_total": 70,
+      "qual_questions": 50
+    },
+    "guess_only_questions": {
+      "core_list_queries": 30,
+      "core_decision_tasks": 48,
+      "core_total": 78,
+      "qual_questions": 150
+    },
+    "derivation": {
+      "core_struct": "10 world files x 6 questions each = 60 questions: 10 all_causes_of/all_effects_of list tasks and 50 yes/no qualification questions.",
+      "core_decision": "60 decision worlds x 1 task = 60 decision Core tasks.",
+      "guess_struct": "30 world files x 6 questions each = 180 questions: 30 list-query Core tasks and 150 Qual questions.",
+      "guess_decision": "48 decision worlds x 1 task = 48 decision Core tasks."
+    },
+    "interpretation": "World-file rows, questions and benchmark scoring denominators are separate units. Never report 148 world entries as 148 agent tasks or add Core/Guess task counts as independent worlds."
+  },
+  "official_resource_regimes": [
+    {
+      "id": "four_turn",
+      "name": "Official four-turn interface",
+      "max_outer_turns": 4,
+      "arms": [
+        "active",
+        "active_code",
+        "modular",
+        "guess_only"
+      ],
+      "score_split": [
+        "Core",
+        "Qual"
+      ],
+      "note": "The paper's primary ACED-Query comparison."
+    },
+    {
+      "id": "sample_budget",
+      "name": "Samp5k sampled-row budget",
+      "max_outer_turns": null,
+      "max_sampled_rows_per_task": 5000,
+      "arms": [
+        "active",
+        "active_code",
+        "modular"
+      ],
+      "score_split": [
+        "Core",
+        "Qual"
+      ],
+      "note": "Separate resource ablation. Do not compare to four-turn results as if turn and sample budgets were equivalent."
+    }
+  ],
+  "agent_arms": [
+    {
+      "id": "active",
+      "description": "Observational/interventional sampling and model reasoning; no Python analysis."
+    },
+    {
+      "id": "active_code",
+      "description": "Single-prompt active agent with Python analysis of returned samples; inner-code rounds are budgeted separately."
+    },
+    {
+      "id": "modular",
+      "description": "Separate INIT, CODE, ANALYSIS and DESIGN stages."
+    },
+    {
+      "id": "guess_only",
+      "description": "No data access; separately scored on its own larger Core and Qual question sets."
+    },
+    {
+      "id": "question_targeted_active_learning",
+      "description": "Reproduce the paper's classical question-targeted active-learning procedure as a strong algorithmic baseline; match its interface and resource use and document code/seed."
+    },
+    {
+      "id": "symthaea_evidence_gated",
+      "description": "Symthaea hypothesis/experiment/value-of-information/evidence-retention/decision pipeline; no hidden PGM or oracle access."
+    }
+  ],
+  "published_comparators": {
+    "best_reported_active_agent": {
+      "name": "Claude Opus 5.5 Modular",
+      "core_accuracy": 0.94,
+      "qual_accuracy": 0.98,
+      "source": "https://arxiv.org/abs/2610.14381",
+      "note": "Published external result, not reproduced by Symthaea."
+    },
+    "question_targeted_active_learning": {
+      "core_accuracy": 0.96,
+      "qual_accuracy": 1,
+      "source": "https://arxiv.org/abs/2610.14381",
+      "note": "Classical procedure under the paper's four-turn interface; it is a required baseline, not a language-model result."
+    },
+    "sample_budget_ablation": {
+      "result": "Active+Code improves decision-task accuracy in 8 of 9 model cells, by 7.3 percentage points on average, under the 5,000 sampled-row regime versus the four-turn baseline.",
+      "source": "https://arxiv.org/abs/2610.14381",
+      "note": "Published ablation result; separate resource regime."
+    }
+  },
+  "evaluator_reproduction": {
+    "preserve_official_structural_and_decision_evaluators": true,
+    "request_parser_model": "us.anthropic.claude-opus-4-6-v1",
+    "parser_identity_source": "src/aced_query/run_agent_batch.py and run_model.sh",
+    "pin_parser_model_prompt_temperature_output_limit_and_revision": true,
+    "preserve_candidate_raw_response": true,
+    "preserve_extracted_structured_answer": true,
+    "preserve_official_tolerance_and_exact_match_rules": true,
+    "report_parse_failures_separately": true,
+    "diagnostic_parser_arm": "Strict typed JSON / deterministic parser is an additional lane only; never substitute its score for the official evaluator.",
+    "independent_adjudication": "Blindly adjudicate a stratified sample of raw outputs and extracted answers; report parser disagreement, extraction error and human agreement separately."
+  },
+  "primary_metrics": {
+    "core": [
+      "official Core accuracy",
+      "exact list-query match",
+      "decision correctness",
+      "decision regret where oracle utility admits it",
+      "safety-constrained success",
+      "mediator-task correctness",
+      "satisficing acceptance",
+      "invalid-premise judgment and alternative quality",
+      "subgroup-minimum improvement"
+    ],
+    "qual": [
+      "official Qual accuracy",
+      "causal-effect answer accuracy",
+      "marginal-independence accuracy",
+      "conditional-independence accuracy"
+    ],
+    "trajectory": [
+      "evidence acquisition rate",
+      "evidence retention conditional on acquisition",
+      "ignored-strong-evidence rate",
+      "turns after first sufficient-evidence event",
+      "queries per correct task",
+      "samples per correct task",
+      "sample and token cost"
+    ],
+    "measurement_validity": [
+      "total-variation distance",
+      "per-category signed proportion difference",
+      "Newcombe interval from Wilson score intervals",
+      "false shift alerts under null",
+      "detection power at preregistered effect sizes"
+    ]
+  },
+  "statistical_design": {
+    "unit": "Question-level paired comparisons nested within content-addressed world; bootstrap/resample by world rather than treating questions from one PGM as independent.",
+    "pairing": "Same model snapshot and agent arm answer the same active Core/Qual task identities for paired four-turn comparisons. Guess-only is scored on its separate larger official task sets.",
+    "overlap_control": "10 core_struct payloads are exact duplicates in guess_struct; two decision-track filenames collide but payload digests differ. Keep full track path, task ID and payload SHA-256. Do not treat duplicated worlds or tasks as independent.",
+    "parser_control": "Keep parser model/revision/prompt fixed across candidate agents; parser-variant results are a separate diagnostic factorial.",
+    "model_control": "Pin provider/model snapshot, reasoning settings, temperature, system prompt, tools, output token budget, serving date and retries.",
+    "cost_control": "Report model tokens, tool calls, samples, code execution rounds, wall-clock, parser calls and monetary cost.",
+    "confidence_intervals": "Use world-clustered bootstrap intervals; preserve complete denominators, skipped tasks, timeouts, invalid answers and parser failures.",
+    "multiplicity": "Predeclare Core and Qual primary outcomes; correct secondary archetype/question-type comparisons for multiplicity."
+  },
+  "proposed_targets": {
+    "baseline_reproduction": "Reproduce the official 0.94 Core / 0.98 Qual best-agent result and 0.96 / 1.00 question-targeted active-learning result within uncertainty before any superiority claim.",
+    "primary_stretch": "Match or exceed 0.96 Core and retain 1.00 Qual under the same four-turn interface, while improving hardest decision and graph-size strata; confirm on independently generated seeds.",
+    "budget_normalized": "On the 5,000-row arm, match or improve the paper's Active+Code decision-task results at lower cost or better worst-group accuracy; do not conflate row budget with turn budget.",
+    "safety": "Zero violations on held-out safety-constrained negative controls; report false denials and utility/regret separately."
+  },
+  "security_boundary": [
+    "Candidate agents see only scenario text, variable metadata, non-intervenability annotations, declared question and their own returned sample outputs.",
+    "Hidden PGM, CPDs, graph edges, generator seed, oracle answer, scoring roles and evaluator state remain outside the candidate process.",
+    "No untrusted candidate code runs in the host process or inside the upstream process-only sandbox. Candidate code execution requires a separately qualified isolated microVM/sandbox.",
+    "The upstream parser and world model are evaluator services; all requests and responses are typed, budgeted and receipted."
+  ],
+  "claim_ceiling": "The protocol records official ACED-Query reproduction requirements and new diagnostics. The world metadata qualifier does not execute agents, reproduce paper results, prove sandbox security or establish a Symthaea SOTA result."
+}

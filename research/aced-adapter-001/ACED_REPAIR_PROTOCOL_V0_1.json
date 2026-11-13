@@ -1,0 +1,76 @@
+{
+  "protocol_id": "ACED-REPAIR-ADAPTER-001",
+  "version": "0.1.0",
+  "status": "upstream_inventory_qualification_only",
+  "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11598",
+  "causal_parent": "https://github.com/Luminous-Dynamics/symthaea/issues/11505",
+  "upstream_commit": "998dc692bfcf5574e5319d67f1cea9c170569d80",
+  "benchmark_source": "MIT-licensed upstream ACED-Bench v2",
+  "primary_suite": "ACED-Repair",
+  "task_budget": {
+    "experiments": 15,
+    "turns": 32
+  },
+  "inventory": {
+    "test_worlds": 540,
+    "eval_worlds": 54,
+    "causal_archetypes": 9,
+    "domains": 10,
+    "test_balance": "60 per archetype",
+    "eval_balance": "6 per archetype",
+    "split_semantics": "Evaluation is a selected subset of the test index, not a disjoint independent sample."
+  },
+  "candidate_visible_fields": [
+    "public scenario description",
+    "permitted measurement outputs",
+    "permitted intervention outputs",
+    "candidate-visible evidence ledger",
+    "remaining experiment budget",
+    "remaining turn budget"
+  ],
+  "evaluator_only_fields": [
+    "compressed world payload",
+    "hidden SCM truth",
+    "oracle intervention and dose",
+    "scoring battery",
+    "ground-truth roles",
+    "hidden objective",
+    "grader state"
+  ],
+  "security_controls": [
+    "No hidden world or grader files in candidate filesystem or process mounts.",
+    "No network, credentials, cloud metadata, host sockets or ambient host mounts in candidate sandbox.",
+    "Candidate code execution only in an independently controlled Firecracker/gVisor or equivalently isolated environment.",
+    "The upstream code sandbox is a restricted process safeguard and is not treated as a security boundary.",
+    "Unknown tool outcome or failed reconciliation blocks subsequent state mutation until reconciled."
+  ],
+  "upstream_reproduction": {
+    "official_budgets": "15 experiments / 32 turns per world",
+    "required_source_check": "Run upstream prepare_dataset.sh against its data/SHA256SUMS before official world execution.",
+    "preserve_official_metrics": [
+      "accepted",
+      "part_a_utility_ok",
+      "part_b_battery_ok",
+      "benefit_recovered",
+      "battery_fraction",
+      "recommended_utility",
+      "gold_utility"
+    ]
+  },
+  "reporting_axes": [
+    "accepted rate",
+    "utility threshold pass rate",
+    "mechanism/battery score",
+    "benefit recovered",
+    "intervention regret",
+    "true-lever discovery",
+    "correct dose/combination rate",
+    "experiment efficiency",
+    "unsupported mechanism claims",
+    "worst-archetype and worst-domain performance",
+    "per-world failures and incomplete denominators",
+    "p50/p95 cost and latency"
+  ],
+  "no_aggregate_score": true,
+  "claim_ceiling": "A PASS qualifies pinned index bytes, metadata distribution and eval-subset identity only. It does not qualify world payload integrity, model behavior, official grader reproduction, sandbox security or causal repair competence."
+}
