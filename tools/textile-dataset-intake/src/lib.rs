@@ -59,6 +59,7 @@ pub enum RightsStatus {
 pub struct RightsReview {
     pub status: RightsStatus,
     pub license_url: String,
+    pub license_text_local_path: Option<String>,
     pub license_text_sha256: Option<String>,
     pub reviewed_by: Option<String>,
     pub reviewed_at_utc: Option<String>,
@@ -225,11 +226,34 @@ fn validate_manifest_shape(manifest: &DatasetManifest) -> Result<()> {
         {
             return fail("reviewed rights status requires the license-text SHA-256");
         }
+        if manifest
+            .rights
+            .license_text_local_path
+            .as_deref()
+            .is_none_or(|value| !nonempty(value))
+        {
+            return fail("reviewed rights status requires the local license-text path");
+        }
+        let license_path = manifest.rights.license_text_local_path.as_deref().unwrap();
+        let license_entry = manifest
+            .files
+            .iter()
+            .find(|entry| entry.local_path == license_path && entry.role == "license_text")
+            .ok_or_else(|| IntakeError(
+                "reviewed rights status must bind to a license_text file in the manifest inventory"
+                    .to_owned(),
+            ))?;
+        if Some(license_entry.sha256.as_str()) != manifest.rights.license_text_sha256.as_deref() {
+            return fail("license-text SHA-256 does not match the inventoried license_text file");
+        }
     }
     if manifest.rights.status == RightsStatus::Pending
-        && (manifest.rights.reviewed_by.is_some() || manifest.rights.reviewed_at_utc.is_some())
+        && (manifest.rights.reviewed_by.is_some()
+            || manifest.rights.reviewed_at_utc.is_some()
+            || manifest.rights.license_text_local_path.is_some()
+            || manifest.rights.license_text_sha256.is_some())
     {
-        return fail("pending rights review cannot contain reviewer completion fields");
+        return fail("pending rights review cannot contain reviewer completion fields or a completed license binding");
     }
 
     let mut source_paths = BTreeSet::new();
@@ -436,7 +460,8 @@ mod tests {
             fs::create_dir_all(&root).unwrap();
             let file_bytes = b"specimen_id,wavelength_nm,absorbance\nS-001,900,0.42\n";
             fs::write(root.join("spectra.csv"), file_bytes).unwrap();
-            let rights_text = b"NIST-compatible terms fixture for unit testing only";
+            let rights_text = b"Synthetic fixture license text for unit testing only";
+            fs::write(root.join("license.txt"), rights_text).unwrap();
             let manifest = base.join("manifest.json");
             let receipt = base.join("receipt.json");
             let outside = base.join("outside.csv");
@@ -457,6 +482,7 @@ mod tests {
                 rights: RightsReview {
                     status: RightsStatus::Reviewed,
                     license_url: "https://example.invalid/license".to_owned(),
+                    license_text_local_path: Some("license.txt".to_owned()),
                     license_text_sha256: Some(sha256_bytes(rights_text)),
                     reviewed_by: Some("unit-test".to_owned()),
                     reviewed_at_utc: Some("2026-11-13T00:00:00Z".to_owned()),
@@ -464,13 +490,22 @@ mod tests {
                     attribution: "Synthetic test fixture; not a real dataset".to_owned(),
                     notes: "Test terms only".to_owned(),
                 },
-                files: vec![DatasetFile {
-                    source_path: "Spectroscopy/Source_A/spectra.csv".to_owned(),
-                    local_path: "spectra.csv".to_owned(),
-                    sha256: sha256_bytes(file_bytes),
-                    size_bytes: file_bytes.len() as u64,
-                    role: "nir_absorbance".to_owned(),
-                }],
+                files: vec![
+                    DatasetFile {
+                        source_path: "Spectroscopy/Source_A/spectra.csv".to_owned(),
+                        local_path: "spectra.csv".to_owned(),
+                        sha256: sha256_bytes(file_bytes),
+                        size_bytes: file_bytes.len() as u64,
+                        role: "nir_absorbance".to_owned(),
+                    },
+                    DatasetFile {
+                        source_path: "license.txt".to_owned(),
+                        local_path: "license.txt".to_owned(),
+                        sha256: sha256_bytes(rights_text),
+                        size_bytes: rights_text.len() as u64,
+                        role: "license_text".to_owned(),
+                    },
+                ],
                 claim_ceiling: "synthetic_fixture_integrity_only".to_owned(),
             };
             fs::write(&manifest, serde_json::to_vec_pretty(&manifest_value).unwrap()).unwrap();
@@ -524,6 +559,20 @@ mod tests {
         manifest.rights.status = RightsStatus::Rejected;
         manifest.rights.reviewed_by = Some("reviewer".to_owned());
         manifest.rights.reviewed_at_utc = Some("2026-11-13T00:00:00Z".to_owned());
+        fixture.write_manifest(&manifest);
+        assert!(build_receipt(&fixture.manifest, &fixture.root, "benchmark_reproduction").is_err());
+    }
+
+    #[test]
+    fn reviewed_rights_must_bind_the_exact_inventoried_license_file() {
+        let fixture = Fixture::new();
+        let mut manifest = fixture.manifest_value();
+        manifest.rights.license_text_sha256 = Some("0".repeat(64));
+        fixture.write_manifest(&manifest);
+        assert!(build_receipt(&fixture.manifest, &fixture.root, "benchmark_reproduction").is_err());
+
+        manifest = fixture.manifest_value();
+        manifest.rights.license_text_local_path = Some("missing-license.txt".to_owned());
         fixture.write_manifest(&manifest);
         assert!(build_receipt(&fixture.manifest, &fixture.root, "benchmark_reproduction").is_err());
     }
