@@ -1,0 +1,595 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-facility-transfer-v0.1.0.schema.json",
+  "title": "Spatial acoustic facility transfer calibration v0.1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "evidence_kind",
+    "source",
+    "facility",
+    "condition",
+    "projector",
+    "receiver",
+    "scope",
+    "aggregation_method_id",
+    "aggregation_method_sha256",
+    "aggregation_tolerance_db",
+    "maximum_spatial_spread_db",
+    "maximum_repeatability_sd_db",
+    "minimum_repeats_per_position",
+    "positions",
+    "bands"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_kind": {
+      "enum": [
+        "synthetic",
+        "measured"
+      ]
+    },
+    "source": {
+      "$ref": "#/$defs/source"
+    },
+    "facility": {
+      "$ref": "#/$defs/facility"
+    },
+    "condition": {
+      "$ref": "#/$defs/condition"
+    },
+    "projector": {
+      "$ref": "#/$defs/projector"
+    },
+    "receiver": {
+      "$ref": "#/$defs/receiver"
+    },
+    "scope": {
+      "enum": [
+        "whole_propeller_disc",
+        "restricted_sector"
+      ]
+    },
+    "aggregation_method_id": {
+      "const": "equal_weight_arithmetic_mean_db_across_positions"
+    },
+    "aggregation_method_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "aggregation_tolerance_db": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "maximum_spatial_spread_db": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "maximum_repeatability_sd_db": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "minimum_repeats_per_position": {
+      "type": "integer",
+      "minimum": 2
+    },
+    "positions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/position"
+      }
+    },
+    "bands": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "whole_propeller_disc"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "positions": {
+            "minItems": 5
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "scope": {
+            "const": "restricted_sector"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "positions": {
+            "minItems": 3
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "projector": {
+            "properties": {
+              "source_level_basis": {
+                "const": "manufacturer_free_field_tvr"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "projector": {
+            "properties": {
+              "source_basis_additional_u95_db": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "condition": {
+            "properties": {
+              "water_state": {
+                "enum": [
+                  "still_water_unpressurized",
+                  "other"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "condition": {
+            "properties": {
+              "condition_transfer_additional_u95_db": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "citation",
+        "raw_data_sha256",
+        "rights_status",
+        "independently_reviewed"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_data_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "rights_status": {
+          "enum": [
+            "public_or_permitted",
+            "unknown",
+            "restricted"
+          ]
+        },
+        "independently_reviewed": {
+          "type": "boolean"
+        }
+      }
+    },
+    "facility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "facility_id",
+        "revision_id",
+        "test_section_geometry_sha256",
+        "coordinate_frame_id"
+      ],
+      "properties": {
+        "facility_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "test_section_geometry_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "coordinate_frame_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "condition_id",
+        "condition_fingerprint_sha256",
+        "water_state",
+        "temperature_c",
+        "absolute_pressure_kpa",
+        "gas_content_mg_l",
+        "cavitation_susceptibility_alpha",
+        "flow_speed_m_s",
+        "free_surface_present",
+        "free_surface_distance_m",
+        "condition_evidence_sha256",
+        "condition_transfer_additional_u95_db"
+      ],
+      "properties": {
+        "condition_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "condition_fingerprint_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "water_state": {
+          "enum": [
+            "operating_condition",
+            "still_water_unpressurized",
+            "other",
+            "unknown"
+          ]
+        },
+        "temperature_c": {
+          "type": "number"
+        },
+        "absolute_pressure_kpa": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "gas_content_mg_l": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cavitation_susceptibility_alpha": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "flow_speed_m_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "free_surface_present": {
+          "type": "boolean"
+        },
+        "free_surface_distance_m": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "condition_evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "condition_transfer_additional_u95_db": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "projector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "instrument_id",
+        "serial_or_revision",
+        "projector_type",
+        "signal_id",
+        "signal_type",
+        "drive_chain_id",
+        "drive_chain_calibration_sha256",
+        "source_level_basis",
+        "source_level_basis_reference_sha256",
+        "source_basis_additional_u95_db"
+      ],
+      "properties": {
+        "instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "serial_or_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "projector_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "signal_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "signal_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "drive_chain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "drive_chain_calibration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_level_basis": {
+          "enum": [
+            "independently_measured",
+            "manufacturer_free_field_tvr",
+            "nominal_unverified",
+            "unknown"
+          ]
+        },
+        "source_level_basis_reference_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_basis_additional_u95_db": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "receiver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hydrophone_instrument_id",
+        "hydrophone_calibration_certificate_sha256",
+        "acquisition_chain_id",
+        "acquisition_chain_calibration_sha256",
+        "x_m",
+        "y_m",
+        "z_m",
+        "orientation_yaw_deg",
+        "orientation_pitch_deg",
+        "orientation_roll_deg",
+        "position_uncertainty_m"
+      ],
+      "properties": {
+        "hydrophone_instrument_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "hydrophone_calibration_certificate_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "acquisition_chain_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "acquisition_chain_calibration_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "x_m": {
+          "type": "number"
+        },
+        "y_m": {
+          "type": "number"
+        },
+        "z_m": {
+          "type": "number"
+        },
+        "orientation_yaw_deg": {
+          "type": "number"
+        },
+        "orientation_pitch_deg": {
+          "type": "number"
+        },
+        "orientation_roll_deg": {
+          "type": "number"
+        },
+        "position_uncertainty_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "position_id",
+        "x_m",
+        "y_m",
+        "z_m",
+        "radial_position_ratio",
+        "azimuth_deg",
+        "orientation_yaw_deg",
+        "orientation_pitch_deg",
+        "orientation_roll_deg",
+        "position_uncertainty_m",
+        "repeats"
+      ],
+      "properties": {
+        "position_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "x_m": {
+          "type": "number"
+        },
+        "y_m": {
+          "type": "number"
+        },
+        "z_m": {
+          "type": "number"
+        },
+        "radial_position_ratio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1.05
+        },
+        "azimuth_deg": {
+          "type": "number"
+        },
+        "orientation_yaw_deg": {
+          "type": "number"
+        },
+        "orientation_pitch_deg": {
+          "type": "number"
+        },
+        "orientation_roll_deg": {
+          "type": "number"
+        },
+        "position_uncertainty_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "repeats": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/repeat"
+          }
+        }
+      }
+    },
+    "repeat": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repeat_id",
+        "timebase_receipt_sha256",
+        "raw_input_trace_sha256",
+        "raw_output_trace_sha256",
+        "bands"
+      ],
+      "properties": {
+        "repeat_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timebase_receipt_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "raw_input_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "raw_output_trace_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "bands": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/bandMeasurement"
+          }
+        }
+      }
+    },
+    "bandMeasurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "band_id",
+        "center_frequency_hz",
+        "input_quantity_id",
+        "output_quantity_id",
+        "bandwidth_id",
+        "spectrum_representation_id",
+        "input_source_level_db",
+        "input_source_level_u95_db",
+        "output_received_spl_db",
+        "output_received_spl_u95_db"
+      ],
+      "properties": {
+        "band_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "center_frequency_hz": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "input_quantity_id": {
+          "const": "source_level_db_re_1upa2_m2"
+        },
+        "output_quantity_id": {
+          "const": "received_spl_db_re_1upa2"
+        },
+        "bandwidth_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "spectrum_representation_id": {
+          "enum": [
+            "power_spectrum",
+            "power_spectral_density"
+          ]
+        },
+        "input_source_level_db": {
+          "type": "number"
+        },
+        "input_source_level_u95_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "output_received_spl_db": {
+          "type": "number"
+        },
+        "output_received_spl_u95_db": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    }
+  }
+}
