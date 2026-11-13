@@ -1,0 +1,228 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rob-fep-thermo-001/fixtures/decision_sufficiency_v0_1.schema.json",
+  "title": "Decision-sufficiency horizon known answers v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "status",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "protocol_id": {
+      "const": "ROB-DECISION-SUFFICIENCY-001"
+    },
+    "status": {
+      "const": "synthetic_known_answers_only"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "uniqueItems": true,
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DS01_OLD_OBSERVATION_STILL_DECISION_SUFFICIENT"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DS02_FRESH_OBSERVATION_DECISION_INSUFFICIENT"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DS03_LOW_EXPECTED_REGRET_BUT_NOT_ROBUSTLY_ADMISSIBLE"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "DS04_OOD_UNCALIBRATED_DECISION_HORIZON_UNKNOWN"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ],
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "nullable_number": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "aoi_ms",
+        "max_hard_aoi_ms",
+        "regret_ucb_task_loss_units",
+        "epsilon_task_loss_units",
+        "robust_action_common_admissible",
+        "model_coverage_calibrated",
+        "in_distribution",
+        "certificate_current",
+        "thermal_bound_current",
+        "actuator_bound_current",
+        "deadline_slack_ms",
+        "decision_horizon_ms"
+      ],
+      "properties": {
+        "aoi_ms": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "max_hard_aoi_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "regret_ucb_task_loss_units": {
+          "$ref": "#/$defs/nullable_number"
+        },
+        "epsilon_task_loss_units": {
+          "type": "number",
+          "minimum": 0
+        },
+        "robust_action_common_admissible": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "model_coverage_calibrated": {
+          "type": "boolean"
+        },
+        "in_distribution": {
+          "type": "boolean"
+        },
+        "certificate_current": {
+          "type": "boolean"
+        },
+        "thermal_bound_current": {
+          "type": "boolean"
+        },
+        "actuator_bound_current": {
+          "type": "boolean"
+        },
+        "deadline_slack_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "decision_horizon_ms": {
+          "$ref": "#/$defs/nullable_number"
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "decision_sufficient",
+        "commitment_extension_allowed",
+        "actuation_authorized"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "decision_sufficient_within_declared_horizon",
+            "decision_insufficient_shorten_or_reobserve",
+            "robust_admissibility_blocks_extension",
+            "decision_horizon_unknown_no_extension"
+          ]
+        },
+        "decision_sufficient": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "commitment_extension_allowed": {
+          "type": "boolean"
+        },
+        "actuation_authorized": {
+          "const": false
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "description",
+        "inputs",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "enum": [
+            "DS01_OLD_OBSERVATION_STILL_DECISION_SUFFICIENT",
+            "DS02_FRESH_OBSERVATION_DECISION_INSUFFICIENT",
+            "DS03_LOW_EXPECTED_REGRET_BUT_NOT_ROBUSTLY_ADMISSIBLE",
+            "DS04_OOD_UNCALIBRATED_DECISION_HORIZON_UNKNOWN"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputs": {
+          "$ref": "#/$defs/inputs"
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      }
+    }
+  }
+}

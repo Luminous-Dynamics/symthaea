@@ -1,0 +1,406 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rob-fep-thermo-001/fixtures/entropy_exergy_v0_1.schema.json",
+  "title": "ROB-FEP-THERMO-001 entropy and exergy synthetic known answers v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "status",
+    "assumptions",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "protocol_id": {
+      "const": "ROB-FEP-THERMO-001-ENTROPY-EXERGY"
+    },
+    "status": {
+      "const": "synthetic_known_answers_only"
+    },
+    "assumptions": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 7,
+      "maxItems": 7,
+      "uniqueItems": true,
+      "items": {
+        "oneOf": [
+          {
+            "$ref": "#/$defs/valid_transfer"
+          },
+          {
+            "$ref": "#/$defs/invalid_transfer"
+          },
+          {
+            "$ref": "#/$defs/incomplete_boundary"
+          },
+          {
+            "$ref": "#/$defs/model_relative_path_ratio"
+          },
+          {
+            "$ref": "#/$defs/interval_transfer"
+          }
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "valid_transfer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "kind",
+        "inputs",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "enum": [
+            "EE01_EQUAL_TEMPERATURE_REVERSIBLE_LIMIT",
+            "EE02_FINITE_HOT_TO_COLD_TRANSFER"
+          ]
+        },
+        "kind": {
+          "const": "two_reservoir_heat_transfer"
+        },
+        "inputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "heat_j",
+            "hot_temperature_k",
+            "cold_temperature_k",
+            "environment_temperature_k"
+          ],
+          "properties": {
+            "heat_j": {
+              "type": "number",
+              "minimum": 0
+            },
+            "hot_temperature_k": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "cold_temperature_k": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "environment_temperature_k": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "entropy_generated_j_per_k",
+            "exergy_destroyed_j"
+          ],
+          "properties": {
+            "status": {
+              "const": "valid"
+            },
+            "entropy_generated_j_per_k": {
+              "type": "number",
+              "minimum": 0
+            },
+            "exergy_destroyed_j": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "invalid_transfer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "kind",
+        "inputs",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "enum": [
+            "EE03_NONPOSITIVE_ABSOLUTE_TEMPERATURE",
+            "EE04_REVERSED_PASSIVE_HEAT_FLOW_SIGN"
+          ]
+        },
+        "kind": {
+          "const": "two_reservoir_heat_transfer"
+        },
+        "inputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "heat_j",
+            "hot_temperature_k",
+            "cold_temperature_k",
+            "environment_temperature_k"
+          ],
+          "properties": {
+            "heat_j": {
+              "type": "number"
+            },
+            "hot_temperature_k": {
+              "type": "number"
+            },
+            "cold_temperature_k": {
+              "type": "number"
+            },
+            "environment_temperature_k": {
+              "type": "number"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "entropy_generated_j_per_k",
+            "exergy_destroyed_j"
+          ],
+          "properties": {
+            "status": {
+              "const": "invalid_input"
+            },
+            "entropy_generated_j_per_k": {
+              "type": "null"
+            },
+            "exergy_destroyed_j": {
+              "type": "null"
+            }
+          }
+        }
+      }
+    },
+    "incomplete_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "kind",
+        "inputs",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "const": "EE05_INCOMPLETE_CONTROL_VOLUME_BOUNDARY"
+        },
+        "kind": {
+          "const": "open_control_volume_incomplete"
+        },
+        "inputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "required_heat_port_ids",
+            "observed_heat_port_ids"
+          ],
+          "properties": {
+            "required_heat_port_ids": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "observed_heat_port_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "entropy_generated_j_per_k",
+            "exergy_destroyed_j"
+          ],
+          "properties": {
+            "status": {
+              "const": "unknown_incomplete_boundary"
+            },
+            "entropy_generated_j_per_k": {
+              "type": "null"
+            },
+            "exergy_destroyed_j": {
+              "type": "null"
+            }
+          }
+        }
+      }
+    },
+    "model_relative_path_ratio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "kind",
+        "inputs",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "const": "EE06_MODEL_RELATIVE_PATH_RATIO_ONLY"
+        },
+        "kind": {
+          "const": "model_relative_path_ratio"
+        },
+        "inputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "log_forward_reverse_probability_ratio"
+          ],
+          "properties": {
+            "log_forward_reverse_probability_ratio": {
+              "type": "number"
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reported_value",
+            "unit",
+            "physical_entropy_generation"
+          ],
+          "properties": {
+            "status": {
+              "const": "dimensionless_only"
+            },
+            "reported_value": {
+              "type": "number"
+            },
+            "unit": {
+              "const": "1"
+            },
+            "physical_entropy_generation": {
+              "const": "not_identified"
+            }
+          }
+        }
+      }
+    },
+    "interval_transfer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "kind",
+        "inputs",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "const": "EE07_INTERVAL_PROPAGATION"
+        },
+        "kind": {
+          "const": "interval_two_reservoir_heat_transfer"
+        },
+        "inputs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "heat_j_interval",
+            "hot_temperature_k_interval",
+            "cold_temperature_k_interval",
+            "environment_temperature_k"
+          ],
+          "properties": {
+            "heat_j_interval": {
+              "$ref": "#/$defs/number_interval_nonnegative"
+            },
+            "hot_temperature_k_interval": {
+              "$ref": "#/$defs/positive_number_interval"
+            },
+            "cold_temperature_k_interval": {
+              "$ref": "#/$defs/positive_number_interval"
+            },
+            "environment_temperature_k": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "entropy_generated_j_per_k_interval",
+            "exergy_destroyed_j_interval"
+          ],
+          "properties": {
+            "status": {
+              "const": "valid_interval"
+            },
+            "entropy_generated_j_per_k_interval": {
+              "$ref": "#/$defs/number_interval_nonnegative"
+            },
+            "exergy_destroyed_j_interval": {
+              "$ref": "#/$defs/number_interval_nonnegative"
+            }
+          }
+        }
+      }
+    },
+    "number_interval_nonnegative": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number",
+          "minimum": 0
+        },
+        {
+          "type": "number",
+          "minimum": 0
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "positive_number_interval": {
+      "type": "array",
+      "prefixItems": [
+        {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      ],
+      "minItems": 2,
+      "maxItems": 2
+    }
+  }
+}

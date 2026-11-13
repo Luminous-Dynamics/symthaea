@@ -1,0 +1,385 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/rob-fep-thermo-001/fixtures/action_chunk_alignment_v0_1.schema.json",
+  "title": "Real-time action-chunk temporal alignment known answers v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_id",
+    "status",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "protocol_id": {
+      "const": "ROB-REALTIME-COGNITION-001-ACTION-CHUNK"
+    },
+    "status": {
+      "const": "synthetic_known_answers_only"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "uniqueItems": true,
+      "allOf": [
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AC01_ALIGNED_CHUNK_ELIGIBLE"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AC02_MODEL_DIGEST_MISMATCH"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AC03_OBSERVATION_ANCHOR_MISMATCH"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AC04_CLOCK_MAPPING_UNKNOWN"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AC05_OBSERVATION_TOO_STALE"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AC06_CHUNK_EXPIRED"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AC07_ACTION_DEADLINE_MISSED"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AC08_EXECUTED_PREFIX_MISMATCH"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AC09_QUEUE_UNDERFLOW_FALLBACK"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        },
+        {
+          "contains": {
+            "type": "object",
+            "properties": {
+              "case_id": {
+                "const": "AC10_CHUNK_BOUNDARY_DISCONTINUITY"
+              }
+            },
+            "required": [
+              "case_id"
+            ]
+          },
+          "minContains": 1,
+          "maxContains": 1
+        }
+      ],
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "nullable_integer": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_digest",
+        "current_model_digest",
+        "source_observation_digest",
+        "current_anchor_observation_digest",
+        "planned_prefix_digest",
+        "executed_prefix_digest",
+        "planned_start_index",
+        "next_action_index",
+        "source_clock_domain",
+        "application_clock_domain",
+        "source_observation_time_ns",
+        "source_observation_uncertainty_ns",
+        "application_time_ns",
+        "application_time_uncertainty_ns",
+        "clock_offset_lower_ns",
+        "clock_offset_upper_ns",
+        "max_observation_age_ns",
+        "expires_at_ns",
+        "deadline_ns",
+        "queue_depth",
+        "minimum_queue_depth",
+        "queue_underflow",
+        "boundary_error_micrometers",
+        "max_boundary_error_micrometers"
+      ],
+      "properties": {
+        "model_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "current_model_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_observation_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "current_anchor_observation_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "planned_prefix_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executed_prefix_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "planned_start_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "next_action_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_clock_domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "application_clock_domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_observation_time_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "source_observation_uncertainty_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "application_time_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "application_time_uncertainty_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "clock_offset_lower_ns": {
+          "$ref": "#/$defs/nullable_integer"
+        },
+        "clock_offset_upper_ns": {
+          "$ref": "#/$defs/nullable_integer"
+        },
+        "max_observation_age_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expires_at_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "deadline_ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "queue_depth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minimum_queue_depth": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "queue_underflow": {
+          "type": "boolean"
+        },
+        "boundary_error_micrometers": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max_boundary_error_micrometers": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "disposition",
+        "eligible_for_independent_projection",
+        "actuation_authorized"
+      ],
+      "properties": {
+        "disposition": {
+          "enum": [
+            "eligible_for_independent_projection",
+            "model_digest_mismatch",
+            "observation_anchor_mismatch",
+            "clock_mapping_unknown",
+            "observation_too_stale",
+            "chunk_expired",
+            "action_deadline_missed",
+            "executed_prefix_mismatch",
+            "queue_underflow_fallback",
+            "chunk_boundary_discontinuity"
+          ]
+        },
+        "eligible_for_independent_projection": {
+          "type": "boolean"
+        },
+        "actuation_authorized": {
+          "const": false
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "description",
+        "inputs",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "enum": [
+            "AC01_ALIGNED_CHUNK_ELIGIBLE",
+            "AC02_MODEL_DIGEST_MISMATCH",
+            "AC03_OBSERVATION_ANCHOR_MISMATCH",
+            "AC04_CLOCK_MAPPING_UNKNOWN",
+            "AC05_OBSERVATION_TOO_STALE",
+            "AC06_CHUNK_EXPIRED",
+            "AC07_ACTION_DEADLINE_MISSED",
+            "AC08_EXECUTED_PREFIX_MISMATCH",
+            "AC09_QUEUE_UNDERFLOW_FALLBACK",
+            "AC10_CHUNK_BOUNDARY_DISCONTINUITY"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inputs": {
+          "$ref": "#/$defs/inputs"
+        },
+        "expected": {
+          "$ref": "#/$defs/expected"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,111 @@
+# Viability- and thermodynamics-constrained action commitment horizon
+
+Owner: [ROB-ADAPTIVE-COMMIT-HORIZON-001 / #11581](https://github.com/Luminous-Dynamics/symthaea/issues/11581).
+
+This is a benchmark/reference contract, not a new runtime controller. It composes qualified bounds from #4117, #4610, #4206/#4179, #4083/#4382, #4588/#4511, and the real-time timing contract #11561.
+
+## The missing control variable
+
+Many action-chunk systems use a fixed number of actions before replanning. Others adapt replan timing to task progress, or decouple a slow world model from a fast action model. These are useful but different choices.
+
+This workstream makes the **committed prefix length** a state/evidence-dependent decision. A long prefix reduces inference calls but leaves less opportunity to react to new observations. A short prefix consumes more compute and may create idle/transition overhead. The correct choice must honor the most restrictive qualified physical and informational bound.
+
+## Reference rule
+
+Each upstream owner supplies an integer upper bound in control ticks, under a frozen model/config/calibration identity:
+
+- `N_proposal`: available proposal/chunk length;
+- `N_freshness`: maximum continuation before observation/certificate freshness expires;
+- `N_deadline`: actions executable before the hard deadline after reserving measured compute/projection/communication time;
+- `N_risk`: largest contiguous prefix for which #4232 has already preallocated immutable risk across every required step/constraint event; the one-step marginal chance bounds from #4010 and the family-wise finite-horizon budget from #4232 remain separately qualified;
+- `N_thermal`: maximum prefix whose qualified per-node thermal upper bounds remain inside limits;
+- `N_actuator`: maximum prefix inside torque/current/voltage/response authority;
+- `N_dynamics`: maximum prefix supported by qualified set-valued dynamics/contact assumptions;
+- `N_viability`: maximum prefix preserving observation-constrained common future continuations and safe-stop;
+- `N_queue`: number of already available/committable queued actions;
+- `N_continuity`: maximum prefix with qualified chunk/prefix boundary continuity.
+
+For complete, fresh, qualified inputs:
+
+`N_commit = min(N_proposal, N_freshness, N_deadline, N_risk, N_thermal, N_actuator, N_dynamics, N_viability, N_queue, N_continuity)`
+
+Do not combine these into a learned scalar. Preserve all binding constraints, including ties.
+
+If a required bound is Unknown, stale or digest-mismatched, do not treat it as infinity, a very large number or a permissive default. Return Unknown/hold/replan/fallback. If the minimum is zero, no new prefix is eligible; a separately qualified fallback/safe-stop path takes over.
+
+A positive result is only `EligibleForIndependentProjection`. The complete prefix still must pass #4382 projection, #4117 current certificate validation and #2836 serialized controller-boundary dispatch. This benchmark never authorizes actuation.
+
+## Literature: keep the mechanisms distinct
+
+- TempoWAM (https://arxiv.org/abs/2608.09492) uses progress monitoring and adaptive replanning; it reports 26.9% fewer inferences on easy real-world tasks without loss of success and +13.3 points on difficult tasks.
+- AHA-WAM (https://arxiv.org/abs/2606.09811) decouples low-frequency world planning from high-frequency action generation. Its authors explicitly clarify that horizon-adaptive refers to temporal decoupling, not online commitment-prefix length adjustment.
+- Streaming-WAM (https://arxiv.org/abs/2609.28927) action-conditions future visual prediction on the fixed prefix already committed during asynchronous inference; it reports 98.35% average LIBERO success and 2.93x lower mean episode time than Fast-WAM in its comparison.
+- Reuse-then-Refine latent action chunks (https://proceedings.mlr.press/v306/wang26lj.html) addresses high-frequency temporal/spatial consistency and asynchronous chunk boundaries, with three real-world contact-rich tasks.
+
+These results differ in platform, dataset, task, action frequency and training. They are separate comparator arms, not a pooled leaderboard.
+
+## Benchmark and metrics
+
+Compare fixed K, synchronous hold, progress-triggered TempoWAM-style replan, AHA-WAM-style temporal decoupling, Streaming-WAM-style committed-prefix conditioning, Reuse-then-Refine, viability-only, thermal/actuator-only and full bottleneck horizon. Also compare the integrated horizon plus EVSI/compute-aware observation scheduling.
+
+Measure safe-success, task quality, commitment-length distribution, replans/inference calls, idle/hold time, end-to-end latency, chunk discontinuities, queue underflow, temperature/derating, energy/service, observation-constrained recovery options, RTA rejections and adverse outcomes. Analyze at episode level; control ticks are not independent samples.
+
+## Synthetic corpus
+
+`fixtures/adaptive_commit_horizon_v0_1.json` and `fixtures/adaptive_commit_horizon_v0_1.schema.json` contain 15 finite cases. The strict schema requires every case identity exactly once and requires each bound to be either qualified with a finite nonnegative integer or explicitly Unknown/stale/digest-mismatched with no numeric limit.
+
+Cases include binding queue, thermal and viability caps; Unknown/stale/provenance failures; zero deadline; stable long horizon; progress-only overcommit; and ties between hard limits.
+
+## Claim boundary
+
+A passing fixture verifies only the min-of-qualified-bounds reference semantics for the finite corpus. It does not validate any physical bound, thermal estimator, clock, dynamics model, actuator capability, viability calculation or controller. No hardware or SOTA improvement is claimed.
+
+
+## Exact known-answer note
+
+The 21-case corpus has been fetched back and replayed. The ten required bounds include finite-horizon risk spending. AH20 shows a preallocated risk cap binding at two ticks; AH21 shows that an unallocated/Unknown risk budget blocks new-prefix eligibility. The stable long-horizon case has two ties: freshness and queue, both at 20 ticks. This is synthetic reference arithmetic only.
+
+
+## Composition preconditions: one context, prefix-closed caps
+
+The minimum rule is sound only if every qualified cap is an upper bound over the same candidate prefix and the same frozen evidence context. Each cap must bind the same context digest covering at least the mission/state snapshot, action-chunk and executed-prefix identity, policy/model bundle, uncertainty/operating envelope, clock-map/calibration identity and control period. A cap derived under a different context is a provenance mismatch; do not take the minimum of individually plausible but mutually incompatible numbers.
+
+Each cap must also be **prefix-closed**: every intermediate tick from 1 through the reported cap satisfies that cap's constraint. A thermal model that checks only the final temperature after the horizon is not sufficient; likewise, a viability cap must preserve admissible continuation/safe-stop throughout the committed prefix, not merely at its endpoint. If a source cannot provide a prefix-closed bound, mark it invalid/Unknown and require a different proof or a more conservative representation.
+
+The fixture schema now requires a context digest and prefix-closure declaration for every bound. Two additional cases reject a mixed action/model context and a non-prefix-closed thermal cap. The corpus contains 17 cases; the fetched-back semantic replay verifies the minimum and all binding ties for every fully qualified/coherent case.
+
+
+## Two-stage horizon decision: propose, then physically cap
+
+Do not ask one method to solve every part of the horizon problem. First, a candidate selector proposes a preferred replan/commit horizon based on its own evidence:
+- fixed-K schedule;
+- task-progress monitor (TempoWAM);
+- phase/low-speed transition detector (PACE);
+- action-expert stability and continuity memory (ChunkTrust);
+- world-model or policy proposal;
+- other learned/adaptive selector.
+
+Second, the common physical/evidence envelope clips the candidate:
+`N_commit = min(N_candidate, N_freshness, N_deadline, N_risk, N_thermal, N_actuator, N_dynamics, N_viability, N_queue, N_continuity)`.
+
+This allows a fair test of different horizon proposal algorithms while giving each the same independent physical constraint wrapper. The proposal algorithm can recommend less than the maximum eligible horizon; it can never make the physical cap larger.
+
+The new fixture corpus contains 19 cases. AH18 shows a PACE-style 12-tick proposal clipped to 4 ticks by thermal headroom. AH19 shows a ChunkTrust-style 14-tick proposal clipped to 3 ticks by observation-constrained viability. These are synthetic semantics, not measured PACE/ChunkTrust reproductions.
+
+
+## Executable Rust reference
+
+The dependency-free reference combiner is at [adaptive-horizon-reference/src/lib.rs](./adaptive-horizon-reference/src/lib.rs). It consumes upstream caps only; it does not estimate them. Eleven tests cover min/ties, Unknown/stale/context mismatch/prefix closure, model/prefix identity mismatch, zero horizon, minimum threshold and non-authorization. A dedicated Rust 1.96 workflow runs format, test and strict Clippy on this branch. The code has been source-audited and fetched back; no Rust pass is claimed until the exact-head workflow succeeds.
+
+
+## Probabilistic risk is separate from robust viability
+
+The risk cap is consumed from Symtropy #4232, not inferred by the horizon selector. #4010 owns one-step marginal chance admission; #4232 owns finite-horizon family-wise alpha allocation and non-recycling; #4588 owns robust observation-constrained future mobility. These answer different questions and must remain separate:
+
+- **Chance-risk budget:** how much preallocated probabilistic violation budget remains for the declared finite horizon under qualified marginal-tail assumptions.
+- **Robust viability:** whether every physically possible successor in the declared set-valued envelope retains a permitted continuation.
+- **Thermal/actuator/dynamics caps:** whether every intermediate prefix step remains within qualified physical limits.
+
+Define `N_risk` as the largest contiguous next-action prefix for which every required step × constraint event already has an immutable preallocation from #4232, bound to the same episode, candidate, model, calibration, clock and context digest. A one-step alpha value cannot be reused at each footfall. Skipped allocations are not transferred to later steps; consumed allocations are not returned; uncertain execution reconciliation blocks further risk claims. If the ledger cannot provide a complete prefix-closed allocation, risk status is Unknown and no new commitment is eligible.
+
+A risk cap does not make a physically nonviable action safe, and a robustly viable action does not automatically satisfy a probabilistic family-wise risk target. The two predicates must both be reported.

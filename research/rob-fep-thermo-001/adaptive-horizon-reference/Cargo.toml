@@ -1,0 +1,12 @@
+[package]
+name = "adaptive-horizon-reference"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0 OR MIT"
+publish = false
+description = "Deterministic research reference for qualified action commitment horizon"
+
+[workspace]
+
+[lib]
+path = "src/lib.rs"
