@@ -8,41 +8,48 @@
 - Language/runtime: Go 1.23.2
 - Host: Linux/amd64, kernel 6.18.57
 - Implementation and tests: Go standard library only
-- Public source branch: research/mace-evalqual-v0.1 (stacked on the benchmark-integrity protocol branch)
+- Public source branch: research/mace-evalqual-v0.1 (draft PR #11965, stacked on PR #11921)
 
 ## Local checks
 
 | Check | Result |
 |---|---|
 | gofmt | Pass; no unformatted Go files |
-| go test -count=1 ./... | Pass; 14 test functions |
+| go test -count=1 ./... | Pass; 16 test functions |
 | go test -count=1 -race ./... | Pass |
 | go vet ./... | Pass |
 | CLI build | Pass |
 | CLI validate on demo corpus/manifest | Pass |
 | CLI score on complete demo observations | Pass; exit 0 |
-| Draft 2020-12 schema validation | Pass for local schema/fixture pairs with jsonschema 4.26.0 |
-| Core package statement coverage | 73.3% |
+| Draft 2020-12 schema validation | Pass for all three schema/fixture pairs with jsonschema 4.26.0 |
+| Core package statement coverage | 73.7% |
 
 The CLI package has no isolated Go unit tests; verify.sh exercises both CLI subcommands end-to-end on synthetic fixtures.
 
 ## Demonstrator output
 
-- Fixtures: 7
-- Exact expected/observed three-axis matches: 7/7
-- Positive fixtures: 2
-- Negative fixtures: 2
-- Condition-removed pairs: 2/2
+- Fixtures: 10
+- Exact expected/observed three-axis matches: 10/10
+- Positive fixtures: 3
+- Negative fixtures: 3
+- Condition-removed pairs: 3/3
 - Representation-invariance pairs: 1/1
-- False accepts: 0 across the two fixed negative fixtures
+- False accepts: 0 across the three fixed negative fixtures
 - False rejects: 0
 - Unexpected indeterminates: 0
 - Population inference: not permitted; the corpus is fixed and synthetic
+- Example report digest: a5ae6242b29d6ef4f33c904babffe4c3ea9f2a27dd33e04c07a4fbac4a7b439c
 
-The examples include a no-op that must fail task utility and a principal-substitution mutation that must fail effect assurance while task utility remains successful. These are declared synthetic expected outcomes, not observations from an external agent or real payment system.
+The examples include a no-op task failure, wrong-principal effect failure while task utility passes, and grader-tampering benchmark-integrity failure while task utility passes. These are synthetic expected/observed fixture vectors, not real external-agent results or live payment/grader tests.
+
+## Input digests
+
+- Corpus: 9aa3da88418e0e44511f2da57efc38057c66546d75cc7620b0fdffa0318de4be
+- Run manifest: 5fe2ff681e99d919516ed0ffdaebe8d585a9f7093dfa40354e6ae6b7c59495d6
+- Observations: d66742e7ad677cd5e7d333f66ca4f188a1be028cb2877249cbc67b2cd00ac66f
 
 ## Claim boundary
 
-This implementation validates a benchmark adapter's declared fixture catalogue, exact input-byte bindings, typed three-axis outcomes and paired metamorphic relations. It does not launch/sandbox tasks; verify grader behavior in an actual benchmark; prove task/oracle semantics; authenticate producers; prove source independence; observe all OS/API/filesystem/network events; or qualify the durable one-shot broker.
+This implementation validates a benchmark adapter's declared fixture catalogue, exact input-byte bindings, typed three-axis outcomes and paired metamorphic relations. It does not launch or sandbox tasks; verify grader behavior in a real benchmark; prove task/oracle semantics; authenticate producers; establish oracle independence; observe all OS/API/filesystem/network events; or qualify the durable one-shot broker.
 
 No benchmark leaderboard, SOTA, deployment-safety or production-readiness result is claimed.
