@@ -386,6 +386,164 @@ impl MobilityScenarioSet {
     }
 }
 
+
+/// A locally authorized, version-bound minimum service requirement.
+///
+/// floor_authority_ref identifies the authority/profile that supplied the
+/// threshold; this crate does not decide whether that authority is legally
+/// valid. observation_ref identifies the admitted evidence used for the
+/// interval. Missing references or incomplete coverage prohibit a positive
+/// "meets floor" outcome.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServiceFloorAssessment {
+    pub id: String,
+    pub service_scope_id: String,
+    pub metric: String,
+    pub unit: String,
+    pub floor_profile_revision: Option<String>,
+    pub floor_authority_ref: Option<String>,
+    pub observation_ref: Option<String>,
+    pub minimum_required: Option<u64>,
+    pub observed_lower_bound: Option<u64>,
+    pub observed_upper_bound: Option<u64>,
+    /// Count of covered service units (e.g. metered connections or households).
+    /// This is an aggregate count, not an individual identity or location.
+    pub coverage_numerator: Option<u64>,
+    pub coverage_denominator: Option<u64>,
+    pub evidence_class: EvidenceClass,
+    pub qualification: AssessmentQualification,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ServiceFloorOutcome {
+    MeetsFloor,
+    BreachedFloor,
+    /// A breach is observed in the covered subset, but full-scope coverage is
+    /// incomplete; do not generalize it to the entire service scope.
+    ObservedBreach,
+    Indeterminate,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServiceFloorResult {
+    pub assessment_id: String,
+    pub service_scope_id: String,
+    pub outcome: ServiceFloorOutcome,
+    pub minimum_required: Option<u64>,
+    pub observed_lower_bound: Option<u64>,
+    pub observed_upper_bound: Option<u64>,
+    pub coverage_numerator: Option<u64>,
+    pub coverage_denominator: Option<u64>,
+    pub evidence_class: EvidenceClass,
+    pub qualification: AssessmentQualification,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ServiceFloorError {
+    EmptyField(&'static str),
+    InvalidCoverage { assessment_id: String },
+    InvertedObservationInterval { assessment_id: String },
+}
+
+/// Evaluate a non-compensatory service floor using conservative observation
+/// bounds. Full coverage is required to conclude that a floor is met or that
+/// the complete declared scope is below the floor. A breach observed in a
+/// partial subset remains visible as ObservedBreach; positive claims never
+/// generalize from partial coverage.
+pub fn evaluate_service_floor(
+    input: &ServiceFloorAssessment,
+) -> Result<ServiceFloorResult, ServiceFloorError> {
+    if input.id.trim().is_empty() {
+        return Err(ServiceFloorError::EmptyField("assessment id"));
+    }
+    if input.service_scope_id.trim().is_empty() {
+        return Err(ServiceFloorError::EmptyField("service scope id"));
+    }
+    if input.metric.trim().is_empty() {
+        return Err(ServiceFloorError::EmptyField("metric"));
+    }
+    if input.unit.trim().is_empty() {
+        return Err(ServiceFloorError::EmptyField("unit"));
+    }
+
+    let indeterminate = || ServiceFloorResult {
+        assessment_id: input.id.clone(),
+        service_scope_id: input.service_scope_id.clone(),
+        outcome: ServiceFloorOutcome::Indeterminate,
+        minimum_required: input.minimum_required,
+        observed_lower_bound: input.observed_lower_bound,
+        observed_upper_bound: input.observed_upper_bound,
+        coverage_numerator: input.coverage_numerator,
+        coverage_denominator: input.coverage_denominator,
+        evidence_class: input.evidence_class,
+        qualification: input.qualification,
+    };
+
+    if input.evidence_class == EvidenceClass::Unknown
+        || input.qualification == AssessmentQualification::Unknown
+        || input.floor_profile_revision.as_deref().is_none_or(str::is_empty)
+        || input.floor_authority_ref.as_deref().is_none_or(str::is_empty)
+        || input.observation_ref.as_deref().is_none_or(str::is_empty)
+    {
+        return Ok(indeterminate());
+    }
+
+    let (
+        Some(minimum_required),
+        Some(observed_lower_bound),
+        Some(observed_upper_bound),
+        Some(coverage_numerator),
+        Some(coverage_denominator),
+    ) = (
+        input.minimum_required,
+        input.observed_lower_bound,
+        input.observed_upper_bound,
+        input.coverage_numerator,
+        input.coverage_denominator,
+    )
+    else {
+        return Ok(indeterminate());
+    };
+
+    if coverage_denominator == 0
+        || coverage_numerator == 0
+        || coverage_numerator > coverage_denominator
+    {
+        return Err(ServiceFloorError::InvalidCoverage {
+            assessment_id: input.id.clone(),
+        });
+    }
+    if observed_lower_bound > observed_upper_bound {
+        return Err(ServiceFloorError::InvertedObservationInterval {
+            assessment_id: input.id.clone(),
+        });
+    }
+
+    let full_coverage = coverage_numerator == coverage_denominator;
+    let outcome = if full_coverage && observed_lower_bound >= minimum_required {
+        ServiceFloorOutcome::MeetsFloor
+    } else if full_coverage && observed_upper_bound < minimum_required {
+        ServiceFloorOutcome::BreachedFloor
+    } else if observed_upper_bound < minimum_required {
+        ServiceFloorOutcome::ObservedBreach
+    } else {
+        ServiceFloorOutcome::Indeterminate
+    };
+
+    Ok(ServiceFloorResult {
+        assessment_id: input.id.clone(),
+        service_scope_id: input.service_scope_id.clone(),
+        outcome,
+        minimum_required: Some(minimum_required),
+        observed_lower_bound: Some(observed_lower_bound),
+        observed_upper_bound: Some(observed_upper_bound),
+        coverage_numerator: Some(coverage_numerator),
+        coverage_denominator: Some(coverage_denominator),
+        evidence_class: input.evidence_class,
+        qualification: input.qualification,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -632,6 +790,121 @@ mod tests {
                 assessment_id: "unrelated-assessment".to_owned(),
                 pathway_id: "path-a".to_owned(),
                 area_id: "unrelated".to_owned()
+            })
+        );
+    }
+
+    fn service_floor(
+        coverage_numerator: Option<u64>,
+        coverage_denominator: Option<u64>,
+        lower: Option<u64>,
+        upper: Option<u64>,
+    ) -> ServiceFloorAssessment {
+        ServiceFloorAssessment {
+            id: "floor-water-area-a".to_owned(),
+            service_scope_id: "community-cell-a".to_owned(),
+            metric: "delivered_potable_water_per_person_day".to_owned(),
+            unit: "L/person/day".to_owned(),
+            floor_profile_revision: Some("local-profile-v1".to_owned()),
+            floor_authority_ref: Some("authority-profile-ref".to_owned()),
+            observation_ref: Some("observation-bundle-ref".to_owned()),
+            minimum_required: Some(25),
+            observed_lower_bound: lower,
+            observed_upper_bound: upper,
+            coverage_numerator,
+            coverage_denominator,
+            evidence_class: EvidenceClass::Observed,
+            qualification: AssessmentQualification::ReferenceMatched,
+        }
+    }
+
+    #[test]
+    fn complete_coverage_and_lower_bound_above_floor_meets_floor() {
+        let input = service_floor(Some(100), Some(100), Some(27), Some(31));
+        let result = evaluate_service_floor(&input).expect("valid floor interval");
+        assert_eq!(result.outcome, ServiceFloorOutcome::MeetsFloor);
+    }
+
+    #[test]
+    fn complete_coverage_and_upper_bound_below_floor_confirms_breach() {
+        let input = service_floor(Some(100), Some(100), Some(12), Some(20));
+        let result = evaluate_service_floor(&input).expect("valid floor interval");
+        assert_eq!(result.outcome, ServiceFloorOutcome::BreachedFloor);
+    }
+
+    #[test]
+    fn partial_coverage_preserves_observed_breach_without_generalizing_scope() {
+        let input = service_floor(Some(10), Some(100), Some(12), Some(20));
+        let result = evaluate_service_floor(&input).expect("valid partial evidence");
+        assert_eq!(result.outcome, ServiceFloorOutcome::ObservedBreach);
+    }
+
+    #[test]
+    fn partial_coverage_never_proves_that_the_floor_is_met() {
+        let input = service_floor(Some(10), Some(100), Some(27), Some(31));
+        let result = evaluate_service_floor(&input).expect("valid partial evidence");
+        assert_eq!(result.outcome, ServiceFloorOutcome::Indeterminate);
+    }
+
+    #[test]
+    fn an_interval_crossing_the_floor_is_indeterminate() {
+        let input = service_floor(Some(100), Some(100), Some(20), Some(30));
+        let result = evaluate_service_floor(&input).expect("valid uncertain interval");
+        assert_eq!(result.outcome, ServiceFloorOutcome::Indeterminate);
+    }
+
+    #[test]
+    fn missing_floor_authority_or_observation_cannot_pass() {
+        let mut input = service_floor(Some(100), Some(100), Some(30), Some(35));
+        input.floor_authority_ref = None;
+        let first = evaluate_service_floor(&input).expect("missing authority is indeterminate");
+        assert_eq!(first.outcome, ServiceFloorOutcome::Indeterminate);
+
+        input.floor_authority_ref = Some("authority-profile-ref".to_owned());
+        input.observation_ref = None;
+        let second = evaluate_service_floor(&input).expect("missing observation is indeterminate");
+        assert_eq!(second.outcome, ServiceFloorOutcome::Indeterminate);
+    }
+
+    #[test]
+    fn unknown_evidence_cannot_pass_a_service_floor() {
+        let mut input = service_floor(Some(100), Some(100), Some(30), Some(35));
+        input.evidence_class = EvidenceClass::Unknown;
+        let result = evaluate_service_floor(&input).expect("unknown evidence is indeterminate");
+        assert_eq!(result.outcome, ServiceFloorOutcome::Indeterminate);
+    }
+
+    #[test]
+    fn missing_threshold_or_coverage_is_indeterminate() {
+        let mut input = service_floor(Some(100), Some(100), Some(30), Some(35));
+        input.minimum_required = None;
+        let no_floor = evaluate_service_floor(&input).expect("missing threshold is indeterminate");
+        assert_eq!(no_floor.outcome, ServiceFloorOutcome::Indeterminate);
+
+        input.minimum_required = Some(25);
+        input.coverage_numerator = None;
+        let no_coverage = evaluate_service_floor(&input).expect("missing coverage is indeterminate");
+        assert_eq!(no_coverage.outcome, ServiceFloorOutcome::Indeterminate);
+    }
+
+    #[test]
+    fn invalid_coverage_is_rejected() {
+        let input = service_floor(Some(101), Some(100), Some(30), Some(35));
+        assert_eq!(
+            evaluate_service_floor(&input),
+            Err(ServiceFloorError::InvalidCoverage {
+                assessment_id: "floor-water-area-a".to_owned()
+            })
+        );
+    }
+
+    #[test]
+    fn inverted_observation_interval_is_rejected() {
+        let input = service_floor(Some(100), Some(100), Some(35), Some(30));
+        assert_eq!(
+            evaluate_service_floor(&input),
+            Err(ServiceFloorError::InvertedObservationInterval {
+                assessment_id: "floor-water-area-a".to_owned()
             })
         );
     }
