@@ -21,6 +21,14 @@ exclude = [
     "crates/core/symthaea-observation-attestation",
     # Orphan test-only IIT research directory; not a Cargo package on this branch.
     "crates/core/symthaea-iit",
+    # Source-only architecture research modules; not admitted as Cargo packages yet.
+    "crates/domains/symthaea-architecture-engineering",
+    # Source-only dishwasher observer prototype with docs but no Cargo package.
+    "crates/domains/symthaea-dishwasher-design",
+    # REA compatibility Rust prototype awaiting a package manifest and dependency contract.
+    "crates/domains/symthaea-rea-compat",
+    # README-only verifier proposal; see REA-RUST-038 / #10791 for implementation decision.
+    "crates/domains/symthaea-rea-evidence-verifier",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it
