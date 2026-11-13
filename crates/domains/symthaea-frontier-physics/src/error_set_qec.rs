@@ -14,10 +14,11 @@
 //!
 //! using the Gram vectors E_k |c_i>. It computes the best Hilbert-Schmidt
 //! projection onto the exact Knill-Laflamme form I_K tensor lambda. The Gram
-//! construction makes A positive semidefinite in exact arithmetic; this module
-//! deliberately does not claim a floating-point minimum-eigenvalue certificate,
-//! a Hellinger distance, an environment-leakage diamond norm, or an approximate
-//! universal Petz recovery map.
+//! construction makes A positive semidefinite in exact arithmetic. The module
+//! also computes a support-aware Hermitian PSD square root, the closed-form
+//! Knill-Laflamme Hellinger metric, and the Theorem-11 Petz Bures upper bound for
+//! strongly E-controlled CPTP channel families. It does not implement the
+//! environment-leakage diamond norm or the error-set Petz recovery channel.
 
 use nalgebra::DMatrix;
 use num_complex::Complex64;
