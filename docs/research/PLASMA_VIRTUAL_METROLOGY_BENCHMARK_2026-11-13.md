@@ -128,3 +128,16 @@ All values are invented. They validate only linkage and refusal logic, not the l
 
 No duplicate calibration registry, generic ML engine, experiment optimizer, material registry, evidence receipt or hardware-control authority is introduced.
 
+
+## Rust-native S0 contract audit
+
+The synthetic fixture is checked by:
+
+    cargo run -p xtask -- plasma-virtual-metrology-audit
+    cargo run -p xtask -- plasma-virtual-metrology-audit --json
+
+The evaluator checks run/specimen identity, exact device configuration digest, required telemetry channels, raw-trace and calibration identity, calibration status, sensor time offset, complete grid-to-service energy boundary, downstream test identity, synthetic-vs-physical evidence boundary, OOD material abstention, group-holdout provenance and virtual-metrology false accepts/rejects.
+
+Twelve Rust unit tests are authored. Independent source-side JavaScript replay of the fetched 10-scenario JSON matched 10/10 frozen dispositions: one PASS, three REJECTED and six BLOCKED. The deliberately high-confidence IN_SPEC prediction with a synthetic bond below the acceptance threshold is explicitly caught as a false accept and REJECTED.
+
+**Execution status:** all three branch files are fetched back; fixture JSON parses; independent replay matched all ten dispositions. The current authoring environment has no Cargo/Rust toolchain, so the Rust module and 12 tests remain uncompiled/unexecuted. No trained model, original industrial data, measured process prediction, scrap reduction or quality-release performance is claimed.
