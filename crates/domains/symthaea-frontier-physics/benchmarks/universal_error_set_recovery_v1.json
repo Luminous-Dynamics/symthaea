@@ -5,8 +5,8 @@
   "created": "2026-11-13",
   "repository": "Luminous-Dynamics/symthaea",
   "owner": "symthaea-frontier-physics",
-  "status": "exact_bit_flip_baseline_source_authored",
-  "execution_status": "source_authored_tests_pending_exact_head_runner",
+  "status": "exact_bit_flip_baseline_passed_rust_1_96",
+  "execution_status": "Exact-head Rust 1.96 formatting, Clippy and complete frontier-physics crate tests passed; general approximate universal recovery remains unimplemented.",
   "claim_ceiling": "The implemented baseline is exact three-qubit repetition-code correction for stochastic mixtures of {I,X0,X1,X2}. The general approximate error-set Petz theorem and its Hellinger/environment-leakage certificates are not implemented.",
   "references": [
     {
@@ -76,14 +76,31 @@
       "invalid_probability_vectors_are_rejected_without_renormalization"
     ],
     "workflow": ".github/workflows/universal-error-set-recovery.yml",
-    "status": "source_authored_runner_pending",
-    "explicit_limitation": "Stochastic mixtures only; not arbitrary coherent E-controlled channel Kraus expansions and not the general approximate universal Petz map."
+    "status": "rust_1_96_passed",
+    "explicit_limitation": "Stochastic mixtures only; not arbitrary coherent E-controlled channel Kraus expansions and not the general approximate universal Petz map.",
+    "validation_receipt": {
+      "source_head": "50404c09b1f7e7e79c91fa7a38b47716309b6b2e",
+      "workflow_run_id": 43379096248,
+      "toolchain": "Rust 1.96.0",
+      "formatting": "passed",
+      "clippy": "passed",
+      "crate_test_result": "153 passed; 0 failed",
+      "universal_recovery_tests": [
+        "single_fixed_recovery_corrects_each_error_set_member",
+        "one_recovery_corrects_uniform_and_asymmetric_noise_mixtures",
+        "fixed_decoder_is_independent_of_the_channel_probability_vector",
+        "frozen_probability_family_has_unit_fidelity_for_every_member",
+        "invalid_probability_vectors_are_rejected_without_renormalization"
+      ],
+      "deterministic_probability_sweep_size": 64,
+      "claim_ceiling": "Exact three-qubit repetition-code recovery for stochastic mixtures of {I,X0,X1,X2}. No general approximate error-set theorem implementation."
+    }
   },
   "benchmark_ladder": [
     {
       "id": "UR-0",
       "name": "Exact three-qubit bit-flip control",
-      "status": "source_authored_runner_pending",
+      "status": "passed_rust_1_96",
       "acceptance": [
         "exact KL matrix residual",
         "TP recovery",
