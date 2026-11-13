@@ -37,6 +37,8 @@ pub mod barline_eval;
 #[cfg(feature = "theory")]
 pub mod musicxml_barline_adapter;
 #[cfg(feature = "theory")]
+pub mod musicxml_notation_events;
+#[cfg(feature = "theory")]
 pub mod symbolic_import;
 #[cfg(feature = "theory")]
 pub mod repeat_traversal;
