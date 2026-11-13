@@ -1077,6 +1077,21 @@ pub fn compare_work_and_terminal_capability(
             };
         let baseline_topology = &cluster.baseline.option_set.recovery_topology;
         let candidate_topology = &cluster.candidate.option_set.recovery_topology;
+        let evidence_complete = cluster.independence_disposition == EvidenceDisposition::Qualified
+            && cluster.baseline.option_set.disposition == EvidenceDisposition::Qualified
+            && cluster.candidate.option_set.disposition == EvidenceDisposition::Qualified
+            && baseline_topology.disposition == EvidenceDisposition::Qualified
+            && candidate_topology.disposition == EvidenceDisposition::Qualified
+            && cluster.baseline.work.unknown_items == 0
+            && cluster.baseline.work.held_items == 0
+            && cluster.candidate.work.unknown_items == 0
+            && cluster.candidate.work.held_items == 0
+            && reserves.iter().all(|delta| {
+                matches!(
+                    delta.disposition,
+                    EvidenceDisposition::Qualified | EvidenceDisposition::NotApplicable
+                )
+            });
 
         reports.push(ClusterCapabilityReport {
             cluster_id: cluster.cluster_id.clone(),
@@ -1119,21 +1134,7 @@ pub fn compare_work_and_terminal_capability(
             candidate_critical_safety_violation_episodes: cluster
                 .candidate
                 .critical_safety_violation_episodes,
-            evidence_complete: cluster.independence_disposition == EvidenceDisposition::Qualified
-                && cluster.baseline.option_set.disposition == EvidenceDisposition::Qualified
-                && cluster.candidate.option_set.disposition == EvidenceDisposition::Qualified
-                && baseline_topology.disposition == EvidenceDisposition::Qualified
-                && candidate_topology.disposition == EvidenceDisposition::Qualified
-                && cluster.baseline.work.unknown_items == 0
-                && cluster.baseline.work.held_items == 0
-                && cluster.candidate.work.unknown_items == 0
-                && cluster.candidate.work.held_items == 0
-                && reserves.iter().all(|delta| {
-                    matches!(
-                        delta.disposition,
-                        EvidenceDisposition::Qualified | EvidenceDisposition::NotApplicable
-                    )
-                }),
+            evidence_complete,
         });
     }
 
