@@ -2942,8 +2942,31 @@ pub struct U1TeBDStrangStepper {
     site_count: usize,
     time_step: f64,
     tolerance: f64,
+    bond_hamiltonians: Vec<U1TwoSiteHamiltonian>,
     even_half_layer: U1TeBDLayer,
     odd_full_layer: U1TeBDLayer,
+}
+
+
+
+/// Richardson step-doubling diagnostic for a second-order Strang integrator.
+///
+/// measured_step_doubling_defect_l2 is the norm distance between one coarse
+/// step and two half steps. When all canonical-gauge truncation receipts qualify,
+/// the returned Richardson estimate includes the coarse and fine truncation
+/// contamination budget. It is an asymptotic estimator, not a formal Trotter
+/// theorem; it should be calibrated against exact small-chain solutions.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDStepDoublingResult {
+    pub state: ComplexU1Mps,
+    pub time_step: f64,
+    pub trotter_order: u8,
+    pub measured_step_doubling_defect_l2: f64,
+    pub coarse_truncation_error_upper_bound: Option<f64>,
+    pub fine_truncation_error_upper_bound: Option<f64>,
+    pub richardson_fine_trotter_error_estimate: Option<f64>,
+    pub richardson_estimate_qualified: bool,
+    pub truncation_contamination_included: bool,
 }
 
 /// One second-order TEBD time step, with truncation and Trotter status separated.
@@ -3009,6 +3032,7 @@ impl U1TeBDStrangStepper {
             site_count,
             time_step,
             tolerance,
+            bond_hamiltonians,
             even_half_layer,
             odd_full_layer,
         })
@@ -3028,6 +3052,71 @@ impl U1TeBDStrangStepper {
 
     pub fn odd_full_layer(&self) -> &U1TeBDLayer {
         &self.odd_full_layer
+    }
+
+
+    /// Compare one step at dt against two steps at dt/2.
+    ///
+    /// The returned state is the two-half-step fine solution. The Richardson
+    /// estimate is (coarse_fine_defect + coarse_truncation_bound +
+    /// fine_truncation_bound) / 3, where the denominator is 2^p - 1 for
+    /// second order p=2. This is an asymptotic diagnostic, not a formal bound;
+    /// the added truncation terms prevent compression loss from being
+    /// misreported as Trotter error.
+    pub fn apply_with_step_doubling(
+        &self,
+        input: &ComplexU1Mps,
+        policy: U1TwoSiteTruncationPolicy,
+    ) -> Result<U1TeBDStepDoublingResult, U1MpsError> {
+        let coarse = self.apply(input, policy)?;
+        let half_stepper = Self::new(
+            self.bond_hamiltonians.clone(),
+            0.5 * self.time_step,
+            self.tolerance,
+        )?;
+        let fine_first = half_stepper.apply(input, policy)?;
+        let fine_second = half_stepper.apply(&fine_first.state, policy)?;
+        let defect = coarse
+            .state
+            .distance_l2(&fine_second.state, policy.tolerance)?;
+
+        let coarse_bound = coarse.global_truncation_l2_error_upper_bound;
+        let fine_bound = match (
+            fine_first.global_truncation_l2_error_upper_bound,
+            fine_second.global_truncation_l2_error_upper_bound,
+        ) {
+            (Some(first), Some(second)) => Some(first + second),
+            _ => None,
+        };
+        let richardson_estimate_qualified = coarse.global_truncation_bound_qualified
+            && fine_first.global_truncation_bound_qualified
+            && fine_second.global_truncation_bound_qualified
+            && coarse_bound.is_some()
+            && fine_bound.is_some();
+
+        let richardson_fine_trotter_error_estimate = if richardson_estimate_qualified {
+            let combined = defect + coarse_bound.unwrap_or(0.0) + fine_bound.unwrap_or(0.0);
+            if !combined.is_finite() {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "step-doubling Richardson error estimate",
+                ));
+            }
+            Some(combined / 3.0)
+        } else {
+            None
+        };
+
+        Ok(U1TeBDStepDoublingResult {
+            state: fine_second.state,
+            time_step: self.time_step,
+            trotter_order: 2,
+            measured_step_doubling_defect_l2: defect,
+            coarse_truncation_error_upper_bound: coarse_bound,
+            fine_truncation_error_upper_bound: fine_bound,
+            richardson_fine_trotter_error_estimate,
+            richardson_estimate_qualified,
+            truncation_contamination_included: coarse_bound.is_some() && fine_bound.is_some(),
+        })
     }
 
     /// Execute one even-half / odd-full / even-half second-order step.
