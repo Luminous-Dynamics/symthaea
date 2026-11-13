@@ -50,7 +50,11 @@
       "numerator": "1",
       "denominator": "2"
     },
-    "bound_scope": "complete_declared_band"
+    "bound_scope": "complete_declared_band",
+    "bound_model_identity": "sha256:synthetic-cubic-residual-family-v0.1",
+    "bound_operating_point_identity": "sha256:synthetic-operating-point-v0.1",
+    "bound_frequency_unit": "normalized_frequency",
+    "evidence_reference": "sha256:synthetic-derivative-proof-v0.1"
   },
   "samples": [
     {
@@ -66,7 +70,8 @@
       "hard_error_radius": {
         "numerator": "1",
         "denominator": "100"
-      }
+      },
+      "uncertainty_semantics": "deterministic_hard_interval"
     },
     {
       "sample_id": "omega-half",
@@ -81,7 +86,8 @@
       "hard_error_radius": {
         "numerator": "1",
         "denominator": "100"
-      }
+      },
+      "uncertainty_semantics": "deterministic_hard_interval"
     },
     {
       "sample_id": "omega-1",
@@ -96,7 +102,8 @@
       "hard_error_radius": {
         "numerator": "1",
         "denominator": "100"
-      }
+      },
+      "uncertainty_semantics": "deterministic_hard_interval"
     }
   ],
   "sample_coverage": {
