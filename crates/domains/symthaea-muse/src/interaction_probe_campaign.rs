@@ -1138,7 +1138,7 @@ mod tests {
     fn family_and_topology_holdouts_must_match_the_preregistered_split() {
         let config = config();
         let mut fixtures = fixtures(&config);
-        fixtures[4].split = CampaignSplit::Development;
+        fixtures[2].split = CampaignSplit::Development;
         assert_eq!(
             build_interaction_probe_campaign(&fixtures, &config).unwrap_err(),
             InteractionProbeCampaignError::FixtureSplitDoesNotMatchPreregisteredHoldout
