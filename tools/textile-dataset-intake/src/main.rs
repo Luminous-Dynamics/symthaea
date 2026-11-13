@@ -4,10 +4,11 @@
 
 use std::env;
 use std::path::PathBuf;
+use textile_dataset_intake::nir_sort::parse_nir_sort_filename;
 use textile_dataset_intake::{build_receipt, verify_receipt, write_receipt};
 
 fn usage() -> &'static str {
-    "Usage:\n  textile-dataset-intake verify --manifest FILE --root DIR --operation USE --out RECEIPT.json\n  textile-dataset-intake verify-receipt --manifest FILE --root DIR --receipt RECEIPT.json\n\nNo command downloads data. The verifier only reads files already present under --root."
+    "Usage:\n  textile-dataset-intake verify --manifest FILE --root DIR --operation USE --out RECEIPT.json\n  textile-dataset-intake verify-receipt --manifest FILE --root DIR --receipt RECEIPT.json\n  textile-dataset-intake inspect-nir-sort-name --file PATH\n\nNo command downloads data. The verifier only reads files already present under --root."
 }
 
 fn option(args: &[String], name: &str) -> Result<String, String> {
@@ -55,6 +56,15 @@ fn run() -> Result<(), String> {
                 verified.dataset_id,
                 verified.verified_files.len()
             );
+            Ok(())
+        }
+        "inspect-nir-sort-name" => {
+            let file = option(&args, "--file")?;
+            let identity = parse_nir_sort_filename(&file)
+                .map_err(|error| error.to_string())?;
+            let json = serde_json::to_string_pretty(&identity)
+                .map_err(|error| format!("cannot encode identity as JSON: {error}"))?;
+            println!("{json}");
             Ok(())
         }
         _ => Err(usage().to_owned()),
