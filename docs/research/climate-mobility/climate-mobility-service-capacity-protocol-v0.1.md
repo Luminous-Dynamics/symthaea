@@ -153,6 +153,26 @@ Use established specialist models as references or adapters where appropriate. E
 
 Water accounting must use multiple indicators. Non-revenue water (NRW) alone cannot separate physical leakage, apparent/commercial losses and authorised unbilled consumption. Use a complete water balance, infrastructure leakage index (ILI), pressure/continuity, quality, energy, affordability and service-floor measures together.
 
+### Protected service-floor semantics
+
+A service-capacity calculation and a protected minimum-service-floor assessment are different claims. A capacity surplus is not proof of delivered service, legal compliance, safety, affordability or destination suitability.
+
+Every floor assessment must bind:
+- an exact, versioned floor profile and the responsible authority/reference;
+- a named aggregate service scope (such as a declared community cell), metric and unit;
+- the exact observation bundle and its validity/coverage;
+- a conservative observed lower/upper interval;
+- covered and total units for the declared scope;
+- the evidence class, qualification level and limitations.
+
+Use non-compensatory evidence semantics:
+- **Meets floor:** full declared-scope coverage and the observed lower bound is at least the authorised threshold.
+- **Breached floor:** full declared-scope coverage and the observed upper bound is below the authorised threshold.
+- **Observed breach:** the covered subset is definitely below the threshold, but coverage is incomplete; do not generalise to the whole scope.
+- **Indeterminate:** evidence, authority, threshold, unit, validity or coverage is incomplete, or the uncertainty interval crosses the threshold.
+
+Unknown thresholds are never guessed from a global benchmark. Where the applicable legal or community-approved threshold is not confirmed, the result remains indeterminate. The v0.1 fixture uses arbitrary synthetic units and is not a South African water-rights or minimum-service determination.
+
 ## 8. Benchmark protocol
 
 All benchmark cases must be versioned, content-addressed, comparable and independently reproducible. Separate synthetic contract mechanics, analytic/reference correctness, published benchmark agreement, held-out local validation and prospective operational evaluation.
@@ -313,3 +333,16 @@ A passing synthetic evaluator demonstrates contract and arithmetic behavior on i
 - US EPA, WNTR documentation: https://usepa.github.io/WNTR/
 - South African Government, Gauteng water challenges (13 February 2026): https://www.gov.za/news/media-statements/gauteng-provincial-government-addresses-water-challenges-13-feb-2026
 - South African DWS, 2026 Budget Speech water security statement: https://www.dws.gov.za/Communications/MinisterSpeeches/2026/speech%20-%20Budget%20speech%20May%202026.pdf
+
+
+## 14. Research update — 13 November 2026
+
+Newer evidence strengthens the Johannesburg pilot rationale while reinforcing the need to keep service, mobility and rights claims separate:
+
+- Johannesburg Water's 29 October 2026 statement reports high demand and excessive draw-off limiting reservoir/tower recovery, low pressure and intermittent/prolonged outages in multiple named supply systems. This is an operator statement about system conditions and active interventions; it is not a customer-level measured time series.
+- The South African Human Rights Commission's 2 November 2026 statement on its Gauteng water-services inquiry identifies interconnected failures across the water-service value chain, including ageing infrastructure, losses, maintenance, storage/pumping capacity, electricity, wastewater treatment, skills and finance. It also warns against normalising recurring tanker delivery as an inferior permanent service.
+- SAnews reported on 3 November 2026 that DWS warned of El Niño-related 2026/27 summer pressure, heat-driven demand, and high Gauteng consumption and loss context. This is a risk/stress context, not a quantified local inflow forecast for a particular sub-catchment.
+- A September 2026 systematic review of 244 climate-(im)mobility articles finds persistent disciplinary separation, quantitative emphasis on large-scale movement, underrepresentation of internal/intra-regional mobility and local context, and weaker treatment of immobility and lived agency in predominantly quantitative studies.
+- The OECD's March 2026 migration forecasters' toolkit says gravity models can explain some historical flows but typically struggle with trend breaks and forced displacement; it cautions against treating a model family as a universal temporal forecaster.
+
+Pilot implication: treat Johannesburg's near-term problem first as a measurable delivered-service and infrastructure-reliability problem. Mobility research should consume those qualified service trajectories as one input, while separately incorporating agency, livelihoods, housing, rights and receiving-place capacity. Do not conflate the 2026 pressure episode with a climate-attributed migration event.
