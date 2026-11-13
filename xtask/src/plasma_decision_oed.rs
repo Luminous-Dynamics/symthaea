@@ -762,66 +762,76 @@ mod tests {
 
     #[test]
     fn proxy_only_plan_cannot_accept_a_product() {
-        let result = result_for(&report(), "proxy-only-abstain");
+        let report = report();
+        let result = result_for(&report, "proxy-only-abstain");
         assert_eq!(result.audit_disposition, AuditDisposition::Blocked);
         assert_eq!(result.product_decision, ProductDecision::Abstain);
     }
 
     #[test]
     fn low_contact_angle_does_not_override_weak_bond() {
-        let result = result_for(&report(), "contact-angle-trap-reject");
+        let report = report();
+        let result = result_for(&report, "contact-angle-trap-reject");
         assert_eq!(result.audit_disposition, AuditDisposition::Pass);
         assert_eq!(result.product_decision, ProductDecision::RejectWindow);
     }
 
     #[test]
     fn immediate_pass_does_not_override_aging_reversal() {
-        let result = result_for(&report(), "aging-reversal-reject");
+        let report = report();
+        let result = result_for(&report, "aging-reversal-reject");
         assert_eq!(result.product_decision, ProductDecision::RejectWindow);
     }
 
     #[test]
     fn packaging_barrier_loss_rejects_otherwise_strong_bond() {
-        let result = result_for(&report(), "packaging-barrier-tradeoff-reject");
+        let report = report();
+        let result = result_for(&report, "packaging-barrier-tradeoff-reject");
         assert_eq!(result.product_decision, ProductDecision::RejectWindow);
     }
 
     #[test]
     fn complete_durable_multifidelity_fixture_accepts_synthetically() {
-        let result = result_for(&report(), "durable-multifidelity-accept-synthetic");
+        let report = report();
+        let result = result_for(&report, "durable-multifidelity-accept-synthetic");
         assert_eq!(result.audit_disposition, AuditDisposition::Pass);
         assert_eq!(result.product_decision, ProductDecision::AcceptWindow);
     }
 
     #[test]
     fn shared_preparation_without_covariance_receipt_blocks() {
-        let result = result_for(&report(), "unmodelled-shared-preparation-abstain");
+        let report = report();
+        let result = result_for(&report, "unmodelled-shared-preparation-abstain");
         assert_eq!(result.audit_disposition, AuditDisposition::Blocked);
         assert_eq!(result.product_decision, ProductDecision::Abstain);
     }
 
     #[test]
     fn training_group_overlap_rejects_the_selection_receipt() {
-        let result = result_for(&report(), "training-group-overlap-blocked");
+        let report = report();
+        let result = result_for(&report, "training-group-overlap-blocked");
         assert_eq!(result.audit_disposition, AuditDisposition::Rejected);
         assert_eq!(result.product_decision, ProductDecision::Abstain);
     }
 
     #[test]
     fn over_budget_selection_is_rejected() {
-        let result = result_for(&report(), "over-budget-proposal-rejected");
+        let report = report();
+        let result = result_for(&report, "over-budget-proposal-rejected");
         assert_eq!(result.audit_disposition, AuditDisposition::Rejected);
     }
 
     #[test]
     fn inadmissible_action_is_rejected() {
-        let result = result_for(&report(), "inadmissible-action-abstain");
+        let report = report();
+        let result = result_for(&report, "inadmissible-action-abstain");
         assert_eq!(result.audit_disposition, AuditDisposition::Rejected);
     }
 
     #[test]
     fn inadequate_model_family_forces_other_and_abstention() {
-        let result = result_for(&report(), "model-family-inadequate-abstain");
+        let report = report();
+        let result = result_for(&report, "model-family-inadequate-abstain");
         assert_eq!(result.audit_disposition, AuditDisposition::Blocked);
         assert_eq!(result.product_decision, ProductDecision::Abstain);
     }
