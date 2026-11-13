@@ -350,8 +350,12 @@ pub enum RouteReason {
     MissingConditionInspection,
     /// Condition is incompatible with reuse as-is.
     ProductNotWearable,
-    /// Use safety/hygiene inspection did not pass.
+    /// Product condition was not determined by the inspection.
+    ProductConditionUnknown,
+    /// Use safety/hygiene inspection failed.
     UseSafetyNotPassed,
+    /// Use safety/hygiene status was not determined.
+    UseSafetyUnknown,
     /// Required physical process trial is absent.
     MissingProcessTrial,
     /// Process trial failed.
