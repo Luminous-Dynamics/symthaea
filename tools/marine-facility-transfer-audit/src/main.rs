@@ -155,6 +155,10 @@ struct Repeat {
 struct BandMeasurement {
     band_id: String,
     center_frequency_hz: f64,
+    input_quantity_id: String,
+    output_quantity_id: String,
+    bandwidth_id: String,
+    spectrum_representation_id: String,
     input_source_level_db: f64,
     input_source_level_u95_db: f64,
     output_received_spl_db: f64,
@@ -189,6 +193,11 @@ struct AuditReport {
 #[derive(Debug, Serialize)]
 struct BandSummary {
     band_id: String,
+    center_frequency_hz: f64,
+    input_quantity_id: String,
+    output_quantity_id: String,
+    bandwidth_id: String,
+    spectrum_representation_id: String,
     position_count: usize,
     repeat_count: usize,
     aggregate_transfer_function_db: f64,
@@ -370,6 +379,11 @@ fn validate(case: &Case) -> Vec<String> {
     {
         errors.push("optional gas, susceptibility or free-surface measurement is invalid".to_string());
     }
+    if case.condition.gas_content_mg_l.is_none()
+        && case.condition.cavitation_susceptibility_alpha.is_none()
+    {
+        errors.push("calibration requires gas-content or cavitation-susceptibility evidence".to_string());
+    }
     if case.condition.free_surface_present != case.condition.free_surface_distance_m.is_some() {
         errors.push("free-surface presence and distance evidence must agree".to_string());
     }
@@ -452,6 +466,10 @@ fn validate(case: &Case) -> Vec<String> {
                     errors.push(format!("position {} repeat {} has unknown/duplicate band {}", position.position_id, repeat.repeat_id, measurement.band_id));
                 }
                 if !finite_positive(measurement.center_frequency_hz)
+                    || measurement.input_quantity_id != "source_level_db_re_1upa2_m2"
+                    || measurement.output_quantity_id != "received_spl_db_re_1upa2"
+                    || measurement.bandwidth_id.trim().is_empty()
+                    || measurement.spectrum_representation_id.trim().is_empty()
                     || !measurement.input_source_level_db.is_finite()
                     || !measurement.output_received_spl_db.is_finite()
                     || !finite_positive(measurement.input_source_level_u95_db)
@@ -480,6 +498,22 @@ fn validate(case: &Case) -> Vec<String> {
             }) {
                 errors.push(format!("band {band} frequency changes across positions/repeats"));
             }
+        }
+        let mut semantic_signatures = BTreeSet::new();
+        for position in &case.positions {
+            for repeat in &position.repeats {
+                if let Some(sample) = repeat.bands.iter().find(|sample| &sample.band_id == band) {
+                    semantic_signatures.insert((
+                        sample.input_quantity_id.clone(),
+                        sample.output_quantity_id.clone(),
+                        sample.bandwidth_id.clone(),
+                        sample.spectrum_representation_id.clone(),
+                    ));
+                }
+            }
+        }
+        if semantic_signatures.len() != 1 {
+            errors.push(format!("band {band} mixes quantity, bandwidth or spectral-representation semantics"));
         }
     }
     errors
@@ -540,8 +574,16 @@ fn audit(case: &Case) -> AuditReport {
             let repeatable = mean_repeat_sd.is_some_and(|value| value <= case.maximum_repeatability_sd_db);
             let spatially_representative = spatial_range <= case.maximum_spatial_spread_db && repeatable;
             let repeat_count = case.positions.iter().map(|position| position.repeats.len()).sum();
+            let first_measurement = case.positions[0].repeats[0].bands.iter()
+                .find(|sample| &sample.band_id == band)
+                .expect("band coverage validated");
             band_summaries.push(BandSummary {
                 band_id: band.clone(),
+                center_frequency_hz: first_measurement.center_frequency_hz,
+                input_quantity_id: first_measurement.input_quantity_id.clone(),
+                output_quantity_id: first_measurement.output_quantity_id.clone(),
+                bandwidth_id: first_measurement.bandwidth_id.clone(),
+                spectrum_representation_id: first_measurement.spectrum_representation_id.clone(),
                 position_count: case.positions.len(),
                 repeat_count,
                 aggregate_transfer_function_db: aggregate,
@@ -684,6 +726,10 @@ mod tests {
                 bands: vec![BandMeasurement {
                     band_id: "band-1000hz".to_string(),
                     center_frequency_hz: 1000.0,
+                    input_quantity_id: "source_level_db_re_1upa2_m2".to_string(),
+                    output_quantity_id: "received_spl_db_re_1upa2".to_string(),
+                    bandwidth_id: "one_third_octave".to_string(),
+                    spectrum_representation_id: "power_spectrum".to_string(),
                     input_source_level_db: 100.0,
                     input_source_level_u95_db: 0.05,
                     output_received_spl_db: 100.0 + transfer,
@@ -922,6 +968,9 @@ mod tests {
     fn source_and_receiver_measurement_lineage_is_preserved() {
         let report = audit(&case());
         assert_eq!(report.facility_revision_id, "tunnel-rev-a");
+        assert_eq!(report.band_summaries[0].input_quantity_id, "source_level_db_re_1upa2_m2");
+        assert_eq!(report.band_summaries[0].output_quantity_id, "received_spl_db_re_1upa2");
+        assert_eq!(report.band_summaries[0].bandwidth_id, "one_third_octave");
         assert_eq!(report.source_projector_id, "synthetic-projector");
         assert_eq!(report.coordinate_frame_id, "propeller-disc-frame");
         assert_eq!(report.condition_fingerprint_sha256, digest('d'));
@@ -944,6 +993,31 @@ mod tests {
         let report = audit(&case());
         assert_eq!(report.disposition, "INCOMPLETE");
         assert!(report.reasons.iter().any(|reason| reason.contains("synthetic evidence")));
+    }
+
+    #[test]
+    fn mismatched_power_spectral_density_and_band_power_are_not_mixed() {
+        let mut input = case();
+        input.positions[0].repeats[0].bands[0].spectrum_representation_id = "power_spectral_density".to_string();
+        assert_eq!(audit(&input).disposition, "INVALID");
+    }
+
+    #[test]
+    fn gas_or_cavitation_susceptibility_must_be_recorded() {
+        let mut input = case();
+        input.condition.gas_content_mg_l = None;
+        input.condition.cavitation_susceptibility_alpha = None;
+        let report = audit(&input);
+        assert_eq!(report.disposition, "INCOMPLETE");
+    }
+
+    #[test]
+    fn whole_disc_positions_must_cover_multiple_azimuth_sectors() {
+        let mut input = case();
+        for position in &mut input.positions {
+            position.azimuth_deg = 10.0 + position.position_id[9..].parse::<f64>().unwrap();
+        }
+        assert_eq!(audit(&input).disposition, "INCOMPLETE");
     }
 
     #[test]
