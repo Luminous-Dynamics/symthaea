@@ -432,8 +432,8 @@ mod tests {
     #[test]
     fn duplicate_physical_serial_is_rejected() {
         let mut value = fixture();
-        let first = value["records"][0].clone();
-        let mut duplicate = first;
+        value["records"][0]["design"]["physical_device_serial"] = json!("MODULE-REFERENCE-001");
+        let mut duplicate = value["records"][0].clone();
         duplicate["record_id"] = json!("duplicate-eaton-record");
         value["records"].as_array_mut().unwrap().push(duplicate);
         assert!(audit_fixture_value(&value).is_err());
