@@ -83,6 +83,10 @@ struct ObjectiveDefinition {
     metric_id: String,
     direction: Direction,
     unit: String,
+    measurement_basis: Option<String>,
+    reference_distance_m: Option<f64>,
+    frequency_band_id: Option<String>,
+    bandwidth_convention: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -97,6 +101,10 @@ struct HardGateDefinition {
     required_audit_contract_id: Option<String>,
     requirement_reference: String,
     non_compensable: bool,
+    measurement_basis: Option<String>,
+    reference_distance_m: Option<f64>,
+    frequency_band_id: Option<String>,
+    bandwidth_convention: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -138,6 +146,10 @@ struct MetricObservation {
     calibration_or_validation_sha256: String,
     timebase_receipt_sha256: String,
     operating_point_receipt_sha256: String,
+    measurement_basis: Option<String>,
+    reference_distance_m: Option<f64>,
+    frequency_band_id: Option<String>,
+    bandwidth_convention: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -207,6 +219,10 @@ struct MetricIntervalReport {
     calibration_or_validation_sha256: String,
     timebase_receipt_sha256: String,
     operating_point_receipt_sha256: String,
+    measurement_basis: Option<String>,
+    reference_distance_m: Option<f64>,
+    frequency_band_id: Option<String>,
+    bandwidth_convention: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -222,6 +238,10 @@ struct GateResult {
     audit_contract_id: Option<String>,
     audit_receipt_sha256: Option<String>,
     requirement_reference: String,
+    measurement_basis: Option<String>,
+    reference_distance_m: Option<f64>,
+    frequency_band_id: Option<String>,
+    bandwidth_convention: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -282,6 +302,35 @@ fn is_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
+fn valid_acoustic_context(
+    basis: &Option<String>,
+    reference_distance_m: Option<f64>,
+    frequency_band_id: &Option<String>,
+    bandwidth_convention: &Option<String>,
+) -> bool {
+    match (basis.as_deref(), reference_distance_m, frequency_band_id, bandwidth_convention) {
+        (None, None, None, None) => true,
+        (Some("underwater_source_level"), Some(distance), Some(band), Some(bandwidth)) => {
+            finite_positive(distance) && !band.trim().is_empty() && !bandwidth.trim().is_empty()
+        }
+        _ => false,
+    }
+}
+
+fn acoustic_context_matches(
+    left: (&Option<String>, Option<f64>, &Option<String>, &Option<String>),
+    right: (&Option<String>, Option<f64>, &Option<String>, &Option<String>),
+) -> bool {
+    left.0 == right.0
+        && match (left.1, right.1) {
+            (None, None) => true,
+            (Some(a), Some(b)) => (a - b).abs() <= 1.0e-9,
+            _ => false,
+        }
+        && left.2 == right.2
+        && left.3 == right.3
+}
+
 fn finite_positive(value: f64) -> bool {
     value.is_finite() && value > 0.0
 }
@@ -337,6 +386,19 @@ fn validate_case(case: &Case) -> Vec<String> {
         {
             errors.push("objective metric IDs must be non-empty and unique and objective units must be declared".to_string());
         }
+        let context = (
+            &objective.measurement_basis,
+            objective.reference_distance_m,
+            &objective.frequency_band_id,
+            &objective.bandwidth_convention,
+        );
+        if objective.metric_id.starts_with("acoustic_") {
+            if !valid_acoustic_context(context.0, context.1, context.2, context.3) {
+                errors.push(format!("acoustic objective {} requires underwater_source_level, reference distance, frequency band and bandwidth convention", objective.metric_id));
+            }
+        } else if !acoustic_context_matches(context, (&None, None, &None, &None)) {
+            errors.push(format!("non-acoustic objective {} must not declare an acoustic basis", objective.metric_id));
+        }
     }
 
     let mut gate_ids = BTreeSet::new();
@@ -351,6 +413,23 @@ fn validate_case(case: &Case) -> Vec<String> {
         }
         if !gate.non_compensable {
             errors.push(format!("gate {} is not marked non_compensable", gate.gate_id));
+        }
+        let gate_context = (
+            &gate.measurement_basis,
+            gate.reference_distance_m,
+            &gate.frequency_band_id,
+            &gate.bandwidth_convention,
+        );
+        if gate.evaluation == GateEvaluation::ExternalAuditReceipt {
+            if !acoustic_context_matches(gate_context, (&None, None, &None, &None)) {
+                errors.push(format!("external receipt gate {} must not declare a metric acoustic basis", gate.gate_id));
+            }
+        } else if gate.metric_id.as_deref().is_some_and(|metric_id| metric_id.starts_with("acoustic_")) {
+            if !valid_acoustic_context(gate_context.0, gate_context.1, gate_context.2, gate_context.3) {
+                errors.push(format!("acoustic gate {} requires underwater_source_level, reference distance, frequency band and bandwidth convention", gate.gate_id));
+            }
+        } else if !acoustic_context_matches(gate_context, (&None, None, &None, &None)) {
+            errors.push(format!("non-acoustic gate {} must not declare an acoustic basis", gate.gate_id));
         }
         match gate.evaluation {
             GateEvaluation::MetricUpperBound | GateEvaluation::MetricLowerBound => {
@@ -436,6 +515,19 @@ fn validate_case(case: &Case) -> Vec<String> {
             if metric.operating_point_receipt_sha256 != candidate.operating_point_receipt_sha256 {
                 errors.push(format!("candidate {} metric {} is not bound to its candidate operating-point receipt", candidate.candidate_id, metric.metric_id));
             }
+            let metric_context = (
+                &metric.measurement_basis,
+                metric.reference_distance_m,
+                &metric.frequency_band_id,
+                &metric.bandwidth_convention,
+            );
+            if metric.metric_id.starts_with("acoustic_") {
+                if !valid_acoustic_context(metric_context.0, metric_context.1, metric_context.2, metric_context.3) {
+                    errors.push(format!("candidate {} acoustic metric {} requires underwater_source_level, reference distance, band and bandwidth convention", candidate.candidate_id, metric.metric_id));
+                }
+            } else if !acoustic_context_matches(metric_context, (&None, None, &None, &None)) {
+                errors.push(format!("candidate {} non-acoustic metric {} must not declare an acoustic basis", candidate.candidate_id, metric.metric_id));
+            }
         }
         for expected in &required_metric_ids {
             if !metric_ids.contains(expected) {
@@ -443,18 +535,31 @@ fn validate_case(case: &Case) -> Vec<String> {
             }
         }
         for objective in &case.objectives {
-            if let Some(observation) = candidate.metrics.iter().find(|metric| metric.metric_id == objective.metric_id)
-                && observation.unit != objective.unit
-            {
-                errors.push(format!("candidate {} objective {} unit differs from its declared objective unit", candidate.candidate_id, objective.metric_id));
+            if let Some(observation) = candidate.metrics.iter().find(|metric| metric.metric_id == objective.metric_id) {
+                if observation.unit != objective.unit {
+                    errors.push(format!("candidate {} objective {} unit differs from its declared objective unit", candidate.candidate_id, objective.metric_id));
+                }
+                if !acoustic_context_matches(
+                    (&observation.measurement_basis, observation.reference_distance_m, &observation.frequency_band_id, &observation.bandwidth_convention),
+                    (&objective.measurement_basis, objective.reference_distance_m, &objective.frequency_band_id, &objective.bandwidth_convention),
+                ) {
+                    errors.push(format!("candidate {} objective {} acoustic basis/reference/band differs from declared objective", candidate.candidate_id, objective.metric_id));
+                }
             }
         }
         for gate in &case.hard_gates {
             if let Some(metric_id) = &gate.metric_id
                 && let Some(observation) = candidate.metrics.iter().find(|metric| &metric.metric_id == metric_id)
-                && gate.unit.as_deref() != Some(observation.unit.as_str())
             {
-                errors.push(format!("candidate {} metric gate {} unit differs from its declared gate unit", candidate.candidate_id, gate.gate_id));
+                if gate.unit.as_deref() != Some(observation.unit.as_str()) {
+                    errors.push(format!("candidate {} metric gate {} unit differs from its declared gate unit", candidate.candidate_id, gate.gate_id));
+                }
+                if !acoustic_context_matches(
+                    (&observation.measurement_basis, observation.reference_distance_m, &observation.frequency_band_id, &observation.bandwidth_convention),
+                    (&gate.measurement_basis, gate.reference_distance_m, &gate.frequency_band_id, &gate.bandwidth_convention),
+                ) {
+                    errors.push(format!("candidate {} metric gate {} acoustic basis/reference/band differs from its metric", candidate.candidate_id, gate.gate_id));
+                }
             }
         }
         for observed in &metric_ids {
@@ -530,6 +635,15 @@ fn validate_case(case: &Case) -> Vec<String> {
                         if (observed.confidence_level - baseline.confidence_level).abs() > 1.0e-12 {
                             errors.push(format!(
                                 "objective {} uses different expanded-uncertainty confidence levels across candidates",
+                                objective.metric_id
+                            ));
+                        }
+                        if !acoustic_context_matches(
+                            (&observed.measurement_basis, observed.reference_distance_m, &observed.frequency_band_id, &observed.bandwidth_convention),
+                            (&baseline.measurement_basis, baseline.reference_distance_m, &baseline.frequency_band_id, &baseline.bandwidth_convention),
+                        ) {
+                            errors.push(format!(
+                                "objective {} uses different acoustic source-level reference/band context across candidates",
                                 objective.metric_id
                             ));
                         }
@@ -649,6 +763,10 @@ fn evaluate_candidate(case: &Case, candidate: &Candidate) -> EvaluatedCandidate 
             audit_contract_id: receipt.map(|value| value.audit_contract_id.clone()),
             audit_receipt_sha256: receipt.map(|value| value.audit_receipt_sha256.clone()),
             requirement_reference: gate.requirement_reference.clone(),
+            measurement_basis: gate.measurement_basis.clone(),
+            reference_distance_m: gate.reference_distance_m,
+            frequency_band_id: gate.frequency_band_id.clone(),
+            bandwidth_convention: gate.bandwidth_convention.clone(),
         });
     }
 
@@ -678,6 +796,10 @@ fn evaluate_candidate(case: &Case, candidate: &Candidate) -> EvaluatedCandidate 
             calibration_or_validation_sha256: metric.calibration_or_validation_sha256.clone(),
             timebase_receipt_sha256: metric.timebase_receipt_sha256.clone(),
             operating_point_receipt_sha256: metric.operating_point_receipt_sha256.clone(),
+            measurement_basis: metric.measurement_basis.clone(),
+            reference_distance_m: metric.reference_distance_m,
+            frequency_band_id: metric.frequency_band_id.clone(),
+            bandwidth_convention: metric.bandwidth_convention.clone(),
         })
         .collect();
 
