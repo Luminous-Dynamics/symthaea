@@ -41,10 +41,19 @@ pub struct U1MpsTensor {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum U1MpsError {
     EmptyChain,
-    EmptyBond { site: usize, side: &'static str },
+    EmptyBond {
+        site: usize,
+        side: &'static str,
+    },
     DimensionOverflow,
-    EntryCount { expected: usize, actual: usize },
-    NonFiniteTensorEntry { site: usize, index: usize },
+    EntryCount {
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteTensorEntry {
+        site: usize,
+        index: usize,
+    },
     InvalidTolerance(f64),
     LeftBoundary { dimension: usize, charge: Option<i32> },
     RightBoundary {
@@ -65,7 +74,10 @@ pub enum U1MpsError {
     NonFiniteContraction(&'static str),
     ComplexNormResidual { imaginary_part: f64, tolerance: f64 },
     NegativeNormSquared(f64),
-    InvalidTotalCharge { total_charge: i32, site_count: usize },
+    InvalidTotalCharge {
+        total_charge: i32,
+        site_count: usize,
+    },
     ZeroDenseState,
     DenseChargeLeakage {
         basis_index: usize,
