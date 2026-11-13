@@ -4695,6 +4695,15 @@ mod tests {
             valid.real_time_gate(f64::INFINITY, 1.0e-12),
             Err(U1MpsError::InvalidTimeStep(_))
         ));
+
+        let mut slightly_leaking = *valid.matrix();
+        slightly_leaking[0][1] = Complex64::new(1.0e-13, 0.0);
+        slightly_leaking[1][0] = Complex64::new(1.0e-13, 0.0);
+        let projected = U1TwoSiteHamiltonian::new(slightly_leaking, 1.0e-12).unwrap();
+        assert!(projected.charge_conservation_residual() > 0.0);
+        assert!((projected.projection_residual() - 2.0_f64.sqrt() * 1.0e-13).abs() <= 1.0e-26);
+        let projected_gate = projected.real_time_gate(0.2, 1.0e-12).unwrap();
+        assert_eq!(projected_gate.charge_conservation_residual(), 0.0);
     }
 
     #[test]
@@ -4722,6 +4731,10 @@ mod tests {
         assert!(!forward.trotter_error_qualified);
         assert_eq!(forward.trotter_error_bound, None);
         assert_eq!(forward.layers.len(), 3);
+        assert_eq!(forward.bond_hamiltonian_hermiticity_residuals.len(), 1);
+        assert_eq!(forward.bond_hamiltonian_charge_residuals.len(), 1);
+        assert_eq!(forward.bond_hamiltonian_projection_residuals.len(), 1);
+        assert!(forward.bond_hamiltonian_projection_residuals[0] <= 1.0e-12);
         assert!(forward.layers[1].gate_truncations.is_empty());
         assert!(forward.layers[1].global_l2_bound_qualified);
         assert_eq!(
