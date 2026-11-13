@@ -22,42 +22,74 @@
     {
       "metric_id": "energy_per_cargo_work",
       "direction": "minimize",
-      "unit": "kWh_per_1000_tonne_nm"
+      "unit": "kWh_per_1000_tonne_nm",
+      "measurement_basis": null,
+      "reference_distance_m": null,
+      "frequency_band_id": null,
+      "bandwidth_convention": null
     },
     {
       "metric_id": "well_to_wake_ghg_per_cargo_work",
       "direction": "minimize",
-      "unit": "kgCO2e_per_1000_tonne_nm"
+      "unit": "kgCO2e_per_1000_tonne_nm",
+      "measurement_basis": null,
+      "reference_distance_m": null,
+      "frequency_band_id": null,
+      "bandwidth_convention": null
     },
     {
       "metric_id": "acoustic_1khz",
       "direction": "minimize",
-      "unit": "dB_re_1uPa_at_declared_reference"
+      "unit": "dB_re_1uPa_at_declared_reference",
+      "measurement_basis": "underwater_source_level",
+      "reference_distance_m": 1,
+      "frequency_band_id": "one-third-octave-1khz",
+      "bandwidth_convention": "one_third_octave"
     },
     {
       "metric_id": "acoustic_2_5khz",
       "direction": "minimize",
-      "unit": "dB_re_1uPa_at_declared_reference"
+      "unit": "dB_re_1uPa_at_declared_reference",
+      "measurement_basis": "underwater_source_level",
+      "reference_distance_m": 1,
+      "frequency_band_id": "one-third-octave-2_5khz",
+      "bandwidth_convention": "one_third_octave"
     },
     {
       "metric_id": "acoustic_30_80khz",
       "direction": "minimize",
-      "unit": "dB_re_1uPa_at_declared_reference"
+      "unit": "dB_re_1uPa_at_declared_reference",
+      "measurement_basis": "underwater_source_level",
+      "reference_distance_m": 1,
+      "frequency_band_id": "30_80khz",
+      "bandwidth_convention": "constant_bandwidth"
     },
     {
       "metric_id": "lifecycle_cost",
       "direction": "minimize",
-      "unit": "USD_per_1000_tonne_nm"
+      "unit": "USD_per_1000_tonne_nm",
+      "measurement_basis": null,
+      "reference_distance_m": null,
+      "frequency_band_id": null,
+      "bandwidth_convention": null
     },
     {
       "metric_id": "maintenance_hours_per_cargo_work",
       "direction": "minimize",
-      "unit": "hours_per_1000_tonne_nm"
+      "unit": "hours_per_1000_tonne_nm",
+      "measurement_basis": null,
+      "reference_distance_m": null,
+      "frequency_band_id": null,
+      "bandwidth_convention": null
     },
     {
       "metric_id": "availability",
       "direction": "maximize",
-      "unit": "fraction"
+      "unit": "fraction",
+      "measurement_basis": null,
+      "reference_distance_m": null,
+      "frequency_band_id": null,
+      "bandwidth_convention": null
     }
   ],
   "hard_gates": [
@@ -70,7 +102,11 @@
       "unit": "dB_re_1uPa_at_declared_reference",
       "required_audit_contract_id": null,
       "requirement_reference": "operator-limit:acoustic-1khz",
-      "non_compensable": true
+      "non_compensable": true,
+      "measurement_basis": "underwater_source_level",
+      "reference_distance_m": 1,
+      "frequency_band_id": "one-third-octave-1khz",
+      "bandwidth_convention": "one_third_octave"
     },
     {
       "gate_id": "biosecurity-release",
@@ -81,7 +117,11 @@
       "unit": null,
       "required_audit_contract_id": "marine-biofouling-evidence-audit-v0.1",
       "requirement_reference": "permit:zero-uncontained-organism-release",
-      "non_compensable": true
+      "non_compensable": true,
+      "measurement_basis": null,
+      "reference_distance_m": null,
+      "frequency_band_id": null,
+      "bandwidth_convention": null
     },
     {
       "gate_id": "cleaning-waste-authorization",
@@ -92,7 +132,11 @@
       "unit": null,
       "required_audit_contract_id": "marine-biofouling-evidence-audit-v0.1",
       "requirement_reference": "permit:in-water-cleaning-authorized-and-waste-captured",
-      "non_compensable": true
+      "non_compensable": true,
+      "measurement_basis": null,
+      "reference_distance_m": null,
+      "frequency_band_id": null,
+      "bandwidth_convention": null
     },
     {
       "gate_id": "acoustic-scale-transfer-evidence",
@@ -103,7 +147,11 @@
       "unit": null,
       "required_audit_contract_id": "marine-acoustic-scale-transfer-audit-v0.1.0",
       "requirement_reference": "measurement:scale-transfer-reviewed-on-held-out-full-scale-data",
-      "non_compensable": true
+      "non_compensable": true,
+      "measurement_basis": null,
+      "reference_distance_m": null,
+      "frequency_band_id": null,
+      "bandwidth_convention": null
     },
     {
       "gate_id": "acoustic-source-identifiability",
@@ -114,7 +162,11 @@
       "unit": null,
       "required_audit_contract_id": "marine-acoustic-source-contrast-audit-v0.1.0",
       "requirement_reference": "measurement:source-state-contrast-reviewed",
-      "non_compensable": true
+      "non_compensable": true,
+      "measurement_basis": null,
+      "reference_distance_m": null,
+      "frequency_band_id": null,
+      "bandwidth_convention": null
     },
     {
       "gate_id": "cavitation-intermittency-characterization",
@@ -125,7 +177,11 @@
       "unit": null,
       "required_audit_contract_id": "marine-cavitation-intermittency-audit-v0.1.0",
       "requirement_reference": "measurement:cavitation-intermittency-distribution-reviewed",
-      "non_compensable": true
+      "non_compensable": true,
+      "measurement_basis": null,
+      "reference_distance_m": null,
+      "frequency_band_id": null,
+      "bandwidth_convention": null
     },
     {
       "gate_id": "vibration-coherence-characterization",
@@ -136,7 +192,11 @@
       "unit": null,
       "required_audit_contract_id": "marine-vibration-coherence-audit-v0.1.0",
       "requirement_reference": "measurement:vibration-coherent-pressure-component-reviewed",
-      "non_compensable": true
+      "non_compensable": true,
+      "measurement_basis": null,
+      "reference_distance_m": null,
+      "frequency_band_id": null,
+      "bandwidth_convention": null
     },
     {
       "gate_id": "rotation-synchronous-modulation",
@@ -147,7 +207,11 @@
       "unit": null,
       "required_audit_contract_id": "marine-rotation-synchronous-modulation-audit-v0.1.0",
       "requirement_reference": "measurement:rotation-synchronous-envelope-reviewed",
-      "non_compensable": true
+      "non_compensable": true,
+      "measurement_basis": null,
+      "reference_distance_m": null,
+      "frequency_band_id": null,
+      "bandwidth_convention": null
     },
     {
       "gate_id": "acoustic-30-80khz-maximum",
@@ -158,7 +222,11 @@
       "unit": "dB_re_1uPa_at_declared_reference",
       "required_audit_contract_id": null,
       "requirement_reference": "operator-limit:acoustic-30-80khz",
-      "non_compensable": true
+      "non_compensable": true,
+      "measurement_basis": "underwater_source_level",
+      "reference_distance_m": 1,
+      "frequency_band_id": "30_80khz",
+      "bandwidth_convention": "constant_bandwidth"
     },
     {
       "gate_id": "availability-minimum",
@@ -169,7 +237,11 @@
       "unit": "fraction",
       "required_audit_contract_id": null,
       "requirement_reference": "service-contract:minimum-availability",
-      "non_compensable": true
+      "non_compensable": true,
+      "measurement_basis": null,
+      "reference_distance_m": null,
+      "frequency_band_id": null,
+      "bandwidth_convention": null
     }
   ],
   "candidates": [
@@ -204,7 +276,11 @@
           "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "measurement_basis": null,
+          "reference_distance_m": null,
+          "frequency_band_id": null,
+          "bandwidth_convention": null
         },
         {
           "metric_id": "well_to_wake_ghg_per_cargo_work",
@@ -216,7 +292,11 @@
           "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "measurement_basis": null,
+          "reference_distance_m": null,
+          "frequency_band_id": null,
+          "bandwidth_convention": null
         },
         {
           "metric_id": "acoustic_1khz",
@@ -228,7 +308,11 @@
           "raw_data_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
           "calibration_or_validation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
           "timebase_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "measurement_basis": "underwater_source_level",
+          "reference_distance_m": 1,
+          "frequency_band_id": "one-third-octave-1khz",
+          "bandwidth_convention": "one_third_octave"
         },
         {
           "metric_id": "acoustic_2_5khz",
@@ -240,7 +324,11 @@
           "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "measurement_basis": "underwater_source_level",
+          "reference_distance_m": 1,
+          "frequency_band_id": "one-third-octave-2_5khz",
+          "bandwidth_convention": "one_third_octave"
         },
         {
           "metric_id": "acoustic_30_80khz",
@@ -252,7 +340,11 @@
           "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "measurement_basis": "underwater_source_level",
+          "reference_distance_m": 1,
+          "frequency_band_id": "30_80khz",
+          "bandwidth_convention": "constant_bandwidth"
         },
         {
           "metric_id": "lifecycle_cost",
@@ -264,7 +356,11 @@
           "raw_data_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
           "calibration_or_validation_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
           "timebase_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
-          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "measurement_basis": null,
+          "reference_distance_m": null,
+          "frequency_band_id": null,
+          "bandwidth_convention": null
         },
         {
           "metric_id": "maintenance_hours_per_cargo_work",
@@ -276,7 +372,11 @@
           "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "measurement_basis": null,
+          "reference_distance_m": null,
+          "frequency_band_id": null,
+          "bandwidth_convention": null
         },
         {
           "metric_id": "availability",
@@ -288,7 +388,11 @@
           "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+          "operating_point_receipt_sha256": "3333333333333333333333333333333333333333333333333333333333333333",
+          "measurement_basis": null,
+          "reference_distance_m": null,
+          "frequency_band_id": null,
+          "bandwidth_convention": null
         }
       ],
       "gate_receipts": [
@@ -416,7 +520,11 @@
           "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "measurement_basis": null,
+          "reference_distance_m": null,
+          "frequency_band_id": null,
+          "bandwidth_convention": null
         },
         {
           "metric_id": "well_to_wake_ghg_per_cargo_work",
@@ -428,7 +536,11 @@
           "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "measurement_basis": null,
+          "reference_distance_m": null,
+          "frequency_band_id": null,
+          "bandwidth_convention": null
         },
         {
           "metric_id": "acoustic_1khz",
@@ -440,7 +552,11 @@
           "raw_data_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
           "calibration_or_validation_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
           "timebase_receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
-          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "measurement_basis": "underwater_source_level",
+          "reference_distance_m": 1,
+          "frequency_band_id": "one-third-octave-1khz",
+          "bandwidth_convention": "one_third_octave"
         },
         {
           "metric_id": "acoustic_2_5khz",
@@ -452,7 +568,11 @@
           "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "measurement_basis": "underwater_source_level",
+          "reference_distance_m": 1,
+          "frequency_band_id": "one-third-octave-2_5khz",
+          "bandwidth_convention": "one_third_octave"
         },
         {
           "metric_id": "acoustic_30_80khz",
@@ -464,7 +584,11 @@
           "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "measurement_basis": "underwater_source_level",
+          "reference_distance_m": 1,
+          "frequency_band_id": "30_80khz",
+          "bandwidth_convention": "constant_bandwidth"
         },
         {
           "metric_id": "lifecycle_cost",
@@ -476,7 +600,11 @@
           "raw_data_sha256": "7777777777777777777777777777777777777777777777777777777777777777",
           "calibration_or_validation_sha256": "8888888888888888888888888888888888888888888888888888888888888888",
           "timebase_receipt_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
-          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "measurement_basis": null,
+          "reference_distance_m": null,
+          "frequency_band_id": null,
+          "bandwidth_convention": null
         },
         {
           "metric_id": "maintenance_hours_per_cargo_work",
@@ -488,7 +616,11 @@
           "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "measurement_basis": null,
+          "reference_distance_m": null,
+          "frequency_band_id": null,
+          "bandwidth_convention": null
         },
         {
           "metric_id": "availability",
@@ -500,7 +632,11 @@
           "raw_data_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           "calibration_or_validation_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           "timebase_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+          "operating_point_receipt_sha256": "4444444444444444444444444444444444444444444444444444444444444444",
+          "measurement_basis": null,
+          "reference_distance_m": null,
+          "frequency_band_id": null,
+          "bandwidth_convention": null
         }
       ],
       "gate_receipts": [
