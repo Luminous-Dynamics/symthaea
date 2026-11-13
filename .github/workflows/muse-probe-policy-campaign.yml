@@ -78,6 +78,8 @@ jobs:
             diff -u /tmp/muse-campaign-lock/Cargo.lock.committed Cargo.lock \
               > /tmp/muse-campaign-lock/Cargo.lock.diff || true
             cp Cargo.lock /tmp/muse-campaign-lock/Cargo.lock.candidate
+            # Diagnostic only: restore committed lock before every --locked test.
+            cp /tmp/muse-campaign-lock/Cargo.lock.committed Cargo.lock
           else
             status=$?
             cp /tmp/muse-campaign-lock/Cargo.lock.committed Cargo.lock
