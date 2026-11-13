@@ -69,7 +69,7 @@ The NIST catalog describes 113 fabric specimens:
 - 11 post-consumer textiles;
 - 12 pre-consumer textiles.
 
-The accompanying Scientific Data paper describes NIR-SORT versions 1.0 and 2.0, a sample library of 113 fabrics and 61 fibre specimens, with experimental metadata, machine exports and example post-processed data. Keep the fabric and fibre specimen populations distinct in the intake manifest; do not treat them as 174 independent garment specimens.
+The accompanying Scientific Data paper describes NIR-SORT versions 1.0 and 2.0, a sample library of 113 fabrics and a separate fibre-specimen library. NIST's NIR-SORT 2.0 release notes report 61 new custom-blend specimens, a new handheld profile (Handheld_F), and a standoff benchtop experiment (Standoff_Q). Keep fabric specimens, fibre references, and replicate spectra as distinct entities in the intake manifest; never count replicates as independent specimens.
 
 Nominally seven NIR replicates per fabric specimen are described, using:
 - a benchtop instrument covering 833–2500 nm;
