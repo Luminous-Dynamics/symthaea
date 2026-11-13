@@ -17,8 +17,8 @@
 //! 10. **Quantum Darwinism** — Emergence of classicality from decoherence
 
 pub mod black_hole_information;
-pub mod error_set_qec;
 pub mod dmrg;
+pub mod error_set_qec;
 pub mod holographic;
 pub mod information_geometry;
 pub mod nonequilibrium_thermo;
@@ -27,5 +27,5 @@ pub mod quantum_darwinism;
 pub mod quantum_error_correction;
 pub mod stochastic_qed;
 pub mod tensor_networks;
-pub mod universal_recovery;
 pub mod topological_qft;
+pub mod universal_recovery;
