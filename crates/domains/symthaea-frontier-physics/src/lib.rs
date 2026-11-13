@@ -27,4 +27,5 @@ pub mod quantum_error_correction;
 pub mod stochastic_qed;
 pub mod tensor_networks;
 pub mod universal_recovery;
+pub mod universal_error_set;
 pub mod topological_qft;

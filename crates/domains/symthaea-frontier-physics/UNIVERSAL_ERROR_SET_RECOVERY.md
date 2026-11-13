@@ -90,6 +90,12 @@ Tests cover each one-hot error, uniform and asymmetric mixtures, a frozen 64-mem
 
 **Claim ceiling:** this is an exact-KL bit-flip control for stochastic mixtures of four declared unitary errors. It is not the general approximate error-set Petz algorithm from the new paper, does not compute the Hellinger or diamond environment-leakage distances, and does not validate arbitrary E-controlled coefficient matrices.
 
+## Generic QEC-matrix implementation slice
+
+The child branch `research/universal-error-set-qec-matrix-20261113` adds `src/universal_error_set.rs` with a validated complex code isometry, a finite set of dense physical error operators, and a generic QEC matrix builder. The builder computes \(A_{(i,k),(j,l)}=\\langle c_i|E_k^\\dagger E_l|c_j\\rangle\), checks the code-isometry orthonormality contract, reports QEC-matrix Hermiticity, and projects onto the exact linear Knill–Laflamme subspace \(I_K\\otimes\\lambda\). The projection is the Frobenius-orthogonal linear projection; it does **not** solve the PSD-constrained minimization for the approximate Hellinger metric, nor does it compute a diamond norm. The dense combined QEC dimension is explicitly capped at 1024.
+
+Four authored tests cover the exact repetition-code QEC identity, complex non-unitary error operators, invalid code/error inputs, and dimension/dense-allocation limits. Their status remains source-authored until the new branch's exact-head Rust 1.96 workflow passes.
+
 ## The larger research programme
 
 | ID | Milestone | Required evidence |
