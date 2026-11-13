@@ -218,6 +218,20 @@ The paradigm is to co-design **finite sodium inventory, current distribution, so
 
 The existing sodium chemistry parent remains [SODIUM-BATTERY-MISSION-001 #11694](https://github.com/Luminous-Dynamics/symthaea/issues/11694); the new focused child is [ZERO-EXCESS-SODIUM-INVENTORY-001 #11879](https://github.com/Luminous-Dynamics/symthaea/issues/11879). It owns practical Coulombic-efficiency and inventory accounting, not a duplicate sodium materials engine.
 
+### 2.7 EDLC reliability: energy available after standby, not merely cycle life
+
+A further EDLC qualification gap is **voltage-hold / standby service**. A device may retain nominal capacitance while leakage, self-discharge, ESR growth, voltage instability or packaging faults reduce the energy and power actually available when the load arrives. The primary application metric should therefore be measured usable discharge energy after a declared standby history:
+
+E_available(t_idle, T, V_hold, prior_history)
+
+Measure terminal voltage and current through the representative discharge load after standby; do not infer useful Wh from open-circuit voltage alone. Include the converter, balancing, monitoring and protection standby draw at installed-system boundary.
+
+IEC 62391-2:2025 gives a leakage-current baseline for power-application EDLCs. Its searchable excerpt specifies 20 °C ± 2 °C, rated voltage applied through a protective resistor of at most 1 000 Ω, a pre-test discharge of at least 12 h unless otherwise agreed, and 24 h electrification unless otherwise agreed. The applicable detail specification determines the leakage-current requirement. This is a standardized leakage measurement, not a multi-month standby-life guarantee; use the controlled normative standard and manufacturer detail specification for physical testing.
+
+The focused child experiment is [EDLC-STANDBY-SERVICE-001 #11908](https://github.com/Luminous-Dynamics/symthaea/issues/11908), under [EDLC-REFERENCE-001 #11852](https://github.com/Luminous-Dynamics/symthaea/issues/11852). It adds matched open-circuit and voltage-hold arms, post-standby load delivery, leakage/ESR evolution, lower-tail statistical service and a partner brief. A synthetic known-answer trace fixture validates trapezoidal leakage-charge and terminal V×I discharge-energy arithmetic only. It is not a physical measurement or lifetime model.
+
+A review titled “Reliability-by-design for deployable next-generation supercapacitors” (DOI 10.1016/j.pmatsci.2026.101843) surfaced with inconsistent indexed publication metadata (one record reports 2026; another reports March 2027). Its status is unresolved as of this frontier date; do not treat it as an established November 2026 publication or date-sensitive SOTA comparator until reconciled.
+
 ## Sources
 
 - IEA, *Global EV Outlook 2026*, battery deployment and chemistry context: https://www.iea.org/reports/global-ev-outlook-2026/electric-vehicle-batteries
