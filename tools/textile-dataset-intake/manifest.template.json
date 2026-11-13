@@ -1,0 +1,25 @@
+{
+  "schema_version": "textile-data-intake-v0.1",
+  "dataset_id": "NIST-NIR-SORT",
+  "dataset_version": "2.0",
+  "source": {
+    "title": "Near Infrared Spectra of Origin-defined and Real-world Textiles (NIR-SORT)",
+    "publisher": "National Institute of Standards and Technology",
+    "landing_page": "https://data.nist.gov/od/id/mds2-3325",
+    "doi": "10.18126/61v0-rf98",
+    "version": "2.0",
+    "retrieved_at_utc": ""
+  },
+  "rights": {
+    "status": "pending",
+    "license_url": "https://data.nist.gov/od/ds/ark:/88434/mds2-3325/license.txt",
+    "license_text_sha256": null,
+    "reviewed_by": null,
+    "reviewed_at_utc": null,
+    "permitted_uses": [],
+    "attribution": "National Institute of Standards and Technology (NIST); cite the dataset DOI and version.",
+    "notes": "Template only. NIST license and attribution terms are documented in source files, but no import or distribution approval is asserted by this file. Record local source files and source-provided SHA-256 values before changing status to reviewed."
+  },
+  "files": [],
+  "claim_ceiling": "Source inventory and file-integrity verification only; not model performance, calibration qualification or downstream recycling acceptance."
+}
