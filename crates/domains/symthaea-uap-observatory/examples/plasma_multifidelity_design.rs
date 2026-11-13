@@ -182,9 +182,19 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("benchmark=PLASMA_UAP_OED_CORRELATED_PREPARATION_V0");
     println!("evidence_class=SYNTHETIC");
+    println!("application_profile=PLASMA-OED-001");
+    println!("selection_policy=TARGET_MARGINAL_EIG_PER_COST_V0");
     println!("optimizer_owner=UAP-OED-001");
-    println!("covariance_owner=UAP-OED-003");
     println!("target_utility_owner=UAP-OED-002");
+    println!("covariance_owner=UAP-OED-003");
+    println!("model_adequacy_owner=OLI-EXPERIMENT-001");
+    println!("source_uap_branch=research/causal-temporal-physics-v0.1");
+    println!("budgeted_design_git_blob_sha1=ed3d0286e706eaee9bb670e7e5e62f8ff01894b8");
+    println!("correlated_design_git_blob_sha1=4aebc5e80afe3b2258db04b441cda072c4edde1d");
+    println!("uap_crate_api_git_blob_sha1=aafaffcbc7d9aa1cef462ace453d2d173136b8d8");
+    println!("candidate_catalogue_id=PLASMA_PA6_F0_F3_ACTIONS_V0");
+    println!("scenario_manifest_id=PA6_DRY_AND_HYGROSCOPIC_EQUAL_WEIGHT_V0");
+    println!("covariance_model_id=PA6_SHARED_PREPARATION_BLOCK_COVARIANCE_V0");
     println!("target_state=initial_bond,aged_bond,substrate_moisture");
     println!("nuisance_state=shared_sample_preparation_offset");
     println!("surface_activation_method_reference=ASTM_D6105-04(2019)");
@@ -305,6 +315,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("automatic_experiment_execution=false");
     println!("automatic_quality_release=false");
     println!("physical_measurements=false");
+    println!("physical_authority=NONE");
     println!("claim_ceiling=synthetic selector composition only");
     Ok(())
 }
