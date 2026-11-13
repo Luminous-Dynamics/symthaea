@@ -9,7 +9,7 @@ on:
       - .github/workflows/u1-tebd-strang-time-stepper.yml
   pull_request:
     branches:
-      - research/u1-tebd-strang-time-stepper-20261113
+      - research/u1-tebd-global-error-ledger-20261113
     paths:
       - crates/domains/symthaea-frontier-physics/src/u1_mps.rs
       - .github/workflows/u1-tebd-strang-time-stepper.yml
