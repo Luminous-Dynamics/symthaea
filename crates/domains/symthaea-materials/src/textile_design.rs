@@ -95,6 +95,9 @@ pub struct DesignJoint {
     pub joint_id: String,
     /// Components connected by this joint; at least two are required.
     pub component_ids: Vec<String>,
+    /// Whether this joint must be traversed for the declared disassembly/component-recovery intent.
+    /// Permanently joined construction outside the target recovery path is allowed.
+    pub recovery_relevant: bool,
     /// Joining method.
     pub joining_method: JoiningMethod,
     /// Reversibility declaration.
@@ -185,6 +188,8 @@ pub enum DesignAuditReason {
     RepairIntentWithoutReplaceablePart,
     /// Disassembly/component-recovery intent has no declared joints.
     DisassemblyIntentWithoutJoints,
+    /// Disassembly/component-recovery intent identifies no recovery-relevant joints.
+    DisassemblyIntentWithoutTargetJoints,
     /// A reversible joint has no accessible product zone.
     ReversibleJointMissingAccess,
     /// A reversible joint has no operation/method.
@@ -390,16 +395,22 @@ pub fn audit_textile_design(dossier: &TextileDesignDossier) -> DesignAudit {
             }
             JointReversibility::Permanent => {
                 permanent_joint_count += 1;
-                if has_disassembly_intent {
+                if has_disassembly_intent && joint.recovery_relevant {
                     reasons.insert(DesignAuditReason::PermanentJointConflictsWithIntent);
                 }
             }
             JointReversibility::Unknown => {
-                if has_disassembly_intent {
+                if has_disassembly_intent && joint.recovery_relevant {
                     reasons.insert(DesignAuditReason::JointReversibilityUnknown);
                 }
             }
         }
+    }
+
+    if has_disassembly_intent
+        && !dossier.joints.iter().any(|joint| joint.recovery_relevant)
+    {
+        reasons.insert(DesignAuditReason::DisassemblyIntentWithoutTargetJoints);
     }
 
     for joint in &dossier.joints {
@@ -475,6 +486,7 @@ mod tests {
         DesignJoint {
             joint_id: id.to_owned(),
             component_ids: vec![left.to_owned(), right.to_owned()],
+            recovery_relevant: true,
             joining_method: JoiningMethod::Lockstitch,
             reversibility: JointReversibility::Reversible,
             access_zone: Some("SIDE-SEAM".to_owned()),
@@ -597,6 +609,31 @@ mod tests {
         assert!(result
             .reasons
             .contains(&DesignAuditReason::ReplaceableComponentMissingInstructions));
+    }
+
+    #[test]
+    fn permanent_non_target_seam_is_allowed_when_target_path_is_declared() {
+        let mut dossier = valid_dossier();
+        dossier.joints[0].recovery_relevant = false;
+        dossier.joints[0].reversibility = JointReversibility::Permanent;
+        let mut target = reversible_joint("REPLACEABLE-CUFF-JOINT", "BODY-PANEL", "CUFF-MODULE");
+        target.recovery_relevant = true;
+        dossier.joints.push(target);
+        let result = audit_textile_design(&dossier);
+        assert_eq!(result.disposition, DesignAuditDisposition::Complete);
+        assert_eq!(result.permanent_joint_count, 1);
+        assert_eq!(result.reversible_joint_count, 1);
+    }
+
+    #[test]
+    fn disassembly_intent_must_name_recovery_relevant_joints() {
+        let mut dossier = valid_dossier();
+        dossier.joints[0].recovery_relevant = false;
+        let result = audit_textile_design(&dossier);
+        assert_eq!(result.disposition, DesignAuditDisposition::Incomplete);
+        assert!(result.reasons.contains(
+            &DesignAuditReason::DisassemblyIntentWithoutTargetJoints
+        ));
     }
 
     #[test]
