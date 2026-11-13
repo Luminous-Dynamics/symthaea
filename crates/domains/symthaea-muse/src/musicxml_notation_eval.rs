@@ -230,16 +230,19 @@ fn written_pitch_equal(
     if left.step != right.step || left.octave != right.octave {
         return false;
     }
-    match (&left.alter, &right.alter) {
-        (None, None) => true,
-        (Some(left), Some(right)) => match (
-            canonical_decimal(left),
-            canonical_decimal(right),
-        ) {
-            (Some(left), Some(right)) => left == right,
-            _ => left == right,
-        },
-        _ => false,
+    let left_alter = left
+        .alter
+        .as_deref()
+        .map(canonical_decimal)
+        .unwrap_or(Some((0, 1)));
+    let right_alter = right
+        .alter
+        .as_deref()
+        .map(canonical_decimal)
+        .unwrap_or(Some((0, 1)));
+    match (left_alter, right_alter) {
+        (Some(left), Some(right)) => left == right,
+        _ => left.alter == right.alter,
     }
 }
 
@@ -1355,6 +1358,22 @@ mod tests {
             "<step>C</step><alter>0</alter><octave>4</octave>",
             "<step>C</step><alter>0.000</alter><octave>4</octave>",
         ));
+        let report = evaluate_musicxml_notation_graphs(
+            &reference,
+            &prediction,
+            default_config(),
+        )
+        .unwrap();
+        assert_eq!(report.written_pitch_spelling.accuracy, Some(1.0));
+    }
+
+    #[test]
+    fn omitted_and_explicit_zero_alterations_are_the_same_written_pitch() {
+        let reference = graph(&fixture_xml().replace(
+            "<step>C</step><alter>0</alter><octave>4</octave>",
+            "<step>C</step><octave>4</octave>",
+        ));
+        let prediction = graph(fixture_xml());
         let report = evaluate_musicxml_notation_graphs(
             &reference,
             &prediction,
