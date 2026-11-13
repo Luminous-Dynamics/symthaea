@@ -144,6 +144,35 @@ For the held-out study:
 
 A result is descriptive/exploratory until the #10619/#10624 requirements for matched comparison, non-inferiority, superiority or Pareto dominance are met.
 
+## 7A. Zero-event miss-rate precision: hard-gate planning aid
+
+This section quantifies what a zero-miss result would and would not establish. It is **prospective sample-size guidance, not a result**.
+
+For (n) independent critical cases with zero observed misses, the exact one-sided 95% binomial upper confidence bound on the underlying miss probability is:
+
+[
+p_{upper}=1-0.05^{1/n}
+]
+
+| Independent critical cases | Observed misses | One-sided 95% upper bound on miss probability |
+|---:|---:|---:|
+| 24 | 0 | 11.735% |
+| 60 | 0 | 4.870% |
+| 100 | 0 | 2.951% |
+| 299 | 0 | 0.997% |
+| 300 | 0 | 0.994% |
+| 600 | 0 | 0.498% |
+
+Implications:
+
+- Even if the 24-case pilot eventually records zero critical misses, its one-sided 95% upper bound is about **11.7%** under the independent-binomial assumption. That is nowhere near evidence for a low miss probability; the pilot remains a feasibility, rubric, variance and cost exercise.
+- To place the one-sided 95% upper bound below **1%** after observing zero misses requires at least **299 independent critical cases**. This is a high-assurance planning target, not an industry standard, certification threshold or claim that 299 correlated mutations are sufficient.
+- Cases sharing the same design family, source artifact, base configuration or change lineage are not automatically independent. Report the nominal case count and the number/structure of independent design-family and lineage clusters. The exact binomial bound above is valid only under its independence and fixed-sampling assumptions; the confirmatory analysis must also report cluster-aware uncertainty and sensitivity.
+- If one or more misses occur, do not use the zero-event table. Report the observed numerator and denominator with an exact binomial interval and cluster-aware analysis.
+- Do not collapse all criticality strata into a single denominator if the sampling design or risk profile differs materially. Report critical-impact families and high-severity classes separately, including missing/unsupported cases and all eligible denominators.
+
+The programme should retain the current hard gate of **zero critical misses in the frozen hard-gate suite**. This precision calculation adds a second question: how much statistical evidence supports a low underlying miss rate? A hard-gate pass on a small curated suite is not the same as a statistically bounded low-risk claim.
+
 ## 8. Execution and trust prerequisites
 
 - No untrusted repository-controlled candidates/build scripts may run until [#10064](https://github.com/Luminous-Dynamics/symthaea/issues/10064) establishes an actual OS isolation boundary. Host execution is not a sandbox.
