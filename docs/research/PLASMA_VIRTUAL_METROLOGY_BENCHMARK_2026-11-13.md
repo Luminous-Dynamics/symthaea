@@ -136,8 +136,13 @@ The synthetic fixture is checked by:
     cargo run -p xtask -- plasma-virtual-metrology-audit
     cargo run -p xtask -- plasma-virtual-metrology-audit --json
 
-The evaluator checks run/specimen identity, exact device configuration digest, required telemetry channels, raw-trace and calibration identity, calibration status, sensor time offset, complete grid-to-service energy boundary, downstream test identity, synthetic-vs-physical evidence boundary, OOD material abstention, group-holdout provenance and virtual-metrology false accepts/rejects.
+The evaluator checks run/specimen identity, exact device configuration digest, required telemetry channels, raw-trace and calibration identity, calibration status, sensor time offset, exact grid-to-service energy-boundary identity and completeness, downstream test identity, synthetic-vs-physical evidence boundary, OOD material abstention, group-holdout provenance and virtual-metrology false accepts/rejects.
 
-Twelve Rust unit tests are authored. Independent source-side JavaScript replay of the fetched 10-scenario JSON matched 10/10 frozen dispositions: one PASS, three REJECTED and six BLOCKED. The deliberately high-confidence IN_SPEC prediction with a synthetic bond below the acceptance threshold is explicitly caught as a false accept and REJECTED.
+Thirteen Rust unit tests are authored. Independent source-side JavaScript replay of the fetched 10-scenario JSON matched 10/10 frozen dispositions: one PASS, three REJECTED and six BLOCKED. The deliberately high-confidence IN_SPEC prediction with a synthetic bond below the acceptance threshold is explicitly caught as a false accept and REJECTED.
 
 **Execution status:** all three branch files are fetched back; fixture JSON parses; independent replay matched all ten dispositions. The current authoring environment has no Cargo/Rust toolchain, so the Rust module and 12 tests remain uncompiled/unexecuted. No trained model, original industrial data, measured process prediction, scrap reduction or quality-release performance is claimed.
+
+
+### Frozen energy-boundary identity
+
+The fixture root now freezes `GRID_TO_ACCEPTED_BOND_V1`. Every run must use the same complete grid-to-accepted-bond perimeter. A run that substitutes a generator-only or other narrower perimeter is REJECTED even if its local energy record says complete. A thirteenth Rust test mutates the energy-boundary identity and verifies refusal. Independent replay still matches 10/10 scenario dispositions (1 PASS, 3 REJECTED, 6 BLOCKED).
