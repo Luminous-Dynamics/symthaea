@@ -1,0 +1,270 @@
+{
+  "schema_version": "change-impact-gold-record-v1.1",
+  "visibility": "evaluator_only",
+  "record_id": "synthetic-temporal-schema-example-001",
+  "case_id": "SYNTH-TEMP-001",
+  "pair_id": "SYNTH-PAIR-001",
+  "claim_ref": "synthetic://engineering-claim/structural-capacity",
+  "evidence_ref": "synthetic://evidence/analysis-report-v3",
+  "source_generation": {
+    "generation_ref": "synthetic://design/generation-17",
+    "semantic_snapshot_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "target_generation": {
+    "generation_ref": "synthetic://design/generation-18",
+    "semantic_snapshot_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "transformation_ref": "synthetic://change/load-profile-update",
+  "transformation_digest": "sha256:3333333333333333333333333333333333333333333333333333333333333333",
+  "source_evidence_class": "analytical",
+  "dependency_contract": {
+    "contract_ref": "https://github.com/Luminous-Dynamics/symthaea/issues/10543",
+    "revision": "synthetic-fixture-v0.1",
+    "profile_digest": "sha256:4444444444444444444444444444444444444444444444444444444444444444"
+  },
+  "dependency_paths": [
+    {
+      "path_id": "synthetic-path-001",
+      "relation_ref": "synthetic://dependency/load-profile-to-capacity-claim",
+      "relation_authority": "fixture_local_synthetic",
+      "semantic_role": "load-dependent-analysis-input",
+      "from_ref": "synthetic://design/load-profile",
+      "to_ref": "synthetic://claim/structural-capacity",
+      "is_qualified_nonimpact_witness": false
+    }
+  ],
+  "expected_disposition": "RequiresVerification",
+  "required_follow_up_obligations": [
+    {
+      "obligation_type": "verification",
+      "owner_ref": "synthetic://owner/structural-verification",
+      "reason": "The changed load profile requires a new analysis under this synthetic example.",
+      "mandatory": true,
+      "requirement_ref": "synthetic://requirement/structural-capacity",
+      "verification_method_ref": "synthetic://method/structural-analysis"
+    }
+  ],
+  "criticality": {
+    "class": "major",
+    "hard_gate": false,
+    "consequence_class": "synthetic-structural-example",
+    "rationale": "Schema fixture only; not a real engineering case."
+  },
+  "rationale_codes": [
+    "LOAD_OR_DUTY_CHANGED",
+    "NEW_EVIDENCE_REQUIRED"
+  ],
+  "assessor_records": [
+    {
+      "assessor_ref": "SYNTHETIC-ASSESSOR-A",
+      "domain_qualification": [
+        "schema-fixture-only"
+      ],
+      "independent_disposition": "RequiresVerification",
+      "rationale": "Synthetic structural fixture label A; not a human adjudication.",
+      "supporting_refs": [
+        "synthetic://evidence/manifest-001"
+      ],
+      "conflict_declared": false,
+      "reviewed_at": "2026-11-13T10:00:00Z",
+      "assessor_record_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "temporal_admissibility_label": {
+        "evidence_validity_at_target_time": "valid",
+        "source_availability": "admissible",
+        "system_availability": "available",
+        "run_context_presence": "included",
+        "rights_at_decision": "permitted",
+        "rights_at_replay": "permitted",
+        "rationale": "Synthetic schema-only label A.",
+        "supporting_refs": [
+          "synthetic://temporal/evidence-001"
+        ],
+        "reason_codes": []
+      }
+    },
+    {
+      "assessor_ref": "SYNTHETIC-ASSESSOR-B",
+      "domain_qualification": [
+        "schema-fixture-only"
+      ],
+      "independent_disposition": "RequiresVerification",
+      "rationale": "Synthetic structural fixture label B; not a human adjudication.",
+      "supporting_refs": [
+        "synthetic://evidence/manifest-001"
+      ],
+      "conflict_declared": false,
+      "reviewed_at": "2026-11-13T10:01:00Z",
+      "assessor_record_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "temporal_admissibility_label": {
+        "evidence_validity_at_target_time": "valid",
+        "source_availability": "admissible",
+        "system_availability": "available",
+        "run_context_presence": "included",
+        "rights_at_decision": "permitted",
+        "rights_at_replay": "permitted",
+        "rationale": "Synthetic schema-only label B.",
+        "supporting_refs": [
+          "synthetic://temporal/evidence-001"
+        ],
+        "reason_codes": []
+      }
+    }
+  ],
+  "adjudication": {
+    "state": "pending",
+    "initial_agreement": false,
+    "rationale": "Fixture is unadjudicated and unsealed; synthetic assessor identifiers are not people."
+  },
+  "seal_state": {
+    "state": "unsealed"
+  },
+  "claim_ceiling": "evaluation_label_only_no_etk_authority_or_release",
+  "notes": [
+    "Synthetic schema example only. Does not represent two actual assessors, a sealed gold label, source truth, engineering validation or a benchmark result."
+  ],
+  "temporal_admissibility": {
+    "schema_version": "decision-time-evidence-admissibility-v0.1",
+    "target_world_time": {
+      "state": "known",
+      "instant": {
+        "instant": "2026-11-12T12:00:00Z",
+        "precision": "second",
+        "clock_source": "synthetic-fixture-clock",
+        "observation_ref": "synthetic://clock/target-T"
+      }
+    },
+    "decision_frontier": {
+      "instant": {
+        "instant": "2026-11-13T09:00:00Z",
+        "precision": "second",
+        "clock_source": "synthetic-fixture-clock",
+        "observation_ref": "synthetic://clock/frontier-K"
+      },
+      "boundary": "inclusive",
+      "frontier_ref": "synthetic://frontier/K-001"
+    },
+    "declared_principal_ref": "synthetic://principal/engineering-reviewer",
+    "rights_profile_ref": "synthetic://rights/profile-001",
+    "source_version": {
+      "identity_state": "known",
+      "version_ref": "synthetic://evidence/analysis-report-v3",
+      "identity_evidence_ref": "synthetic://source/version-register-001",
+      "bytes_state": "captured",
+      "artifact_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "byte_capture_evidence_ref": "synthetic://capture/analysis-report-v3"
+    },
+    "evidence_validity": {
+      "lower": {
+        "state": "known",
+        "instant": {
+          "instant": "2026-01-01T00:00:00Z",
+          "precision": "second",
+          "clock_source": "synthetic-fixture-clock",
+          "observation_ref": "synthetic://clock/valid-from"
+        }
+      },
+      "upper": {
+        "state": "unbounded"
+      }
+    },
+    "availability": {
+      "source_publication": {
+        "state": "observed",
+        "observation": {
+          "instant": "2026-11-12T08:00:00Z",
+          "precision": "second",
+          "clock_source": "synthetic-publisher-record",
+          "observation_ref": "synthetic://availability/publication"
+        }
+      },
+      "issuer_availability": {
+        "state": "observed",
+        "observation": {
+          "instant": "2026-11-12T08:05:00Z",
+          "precision": "second",
+          "clock_source": "synthetic-issuer-record",
+          "observation_ref": "synthetic://availability/issuer"
+        }
+      },
+      "canonical_record_receipt": {
+        "state": "observed",
+        "observation": {
+          "instant": "2026-11-12T08:10:00Z",
+          "precision": "second",
+          "clock_source": "synthetic-record-service",
+          "observation_ref": "synthetic://availability/receipt"
+        }
+      },
+      "acquisition_ingestion": {
+        "state": "observed",
+        "observation": {
+          "instant": "2026-11-12T08:30:00Z",
+          "precision": "second",
+          "clock_source": "synthetic-ingest-service",
+          "observation_ref": "synthetic://availability/ingestion"
+        }
+      },
+      "derived_materialization": {
+        "state": "observed",
+        "observation": {
+          "instant": "2026-11-12T08:45:00Z",
+          "precision": "second",
+          "clock_source": "synthetic-index-service",
+          "observation_ref": "synthetic://availability/materialization"
+        }
+      },
+      "run_context_inclusion": {
+        "state": "included",
+        "run_ref": "synthetic://run/run-001",
+        "manifest_digest": "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "evidence_ref": "synthetic://evidence/analysis-report-v3",
+        "observed_at": {
+          "instant": "2026-11-13T08:59:00Z",
+          "precision": "second",
+          "clock_source": "synthetic-run-context-manifest",
+          "observation_ref": "synthetic://run/context-manifest-001"
+        }
+      }
+    },
+    "rights": {
+      "at_decision": {
+        "state": "permitted",
+        "rights_profile_ref": "synthetic://rights/profile-001",
+        "assessment_ref": "synthetic://rights/assessment-decision",
+        "evidence_ref": "synthetic://rights/receipt-decision",
+        "assessed_at": {
+          "instant": "2026-11-13T08:50:00Z",
+          "precision": "second",
+          "clock_source": "synthetic-rights-service",
+          "observation_ref": "synthetic://rights/clock-decision"
+        }
+      },
+      "at_replay_or_query": {
+        "state": "permitted",
+        "rights_profile_ref": "synthetic://rights/profile-001",
+        "assessment_ref": "synthetic://rights/assessment-replay",
+        "evidence_ref": "synthetic://rights/receipt-replay",
+        "assessed_at": {
+          "instant": "2026-11-13T10:00:00Z",
+          "precision": "second",
+          "clock_source": "synthetic-rights-service",
+          "observation_ref": "synthetic://rights/clock-replay"
+        }
+      }
+    },
+    "outcome": {
+      "evidence_validity_at_target_time": "valid",
+      "source_availability": "admissible",
+      "system_availability": "available",
+      "run_context_presence": "included",
+      "rights_at_decision": "permitted",
+      "rights_at_replay": "permitted"
+    },
+    "temporal_adjudication": {
+      "state": "pending",
+      "initial_agreement": false,
+      "rationale": "Synthetic fixture only; no actual assessor agreement is claimed."
+    },
+    "claim_ceiling": "temporal_admissibility_only_no_source_truth_or_authority"
+  }
+}
