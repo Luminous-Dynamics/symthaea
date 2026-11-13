@@ -991,5 +991,6 @@
       "material_in_model_domain": true,
       "expected_disposition": "BLOCKED"
     }
-  ]
+  ],
+  "energy_boundary_contract_id": "GRID_TO_ACCEPTED_BOND_V1"
 }
