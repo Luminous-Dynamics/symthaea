@@ -1,0 +1,312 @@
+{
+  "schema_version": "luminous.financial-sequence-stream.v0-dev",
+  "stream_id": "dev.synthetic.supplier-correction.0001",
+  "qualification": "development_public_non_qualifying",
+  "purpose": "Exercise point-in-time evidence revision without hindsight rewriting.",
+  "principal_profile_id": "synthetic-public-research-profile",
+  "rights_profile_id": "synthetic-sequential-development-only",
+  "temporal_profile": "exact_instants_synthetic_only",
+  "entities": [
+    {
+      "entity_id": "SYN-BUYER-01",
+      "entity_type": "fictional_buyer"
+    },
+    {
+      "entity_id": "SYN-SUPPLIER-01",
+      "entity_type": "fictional_supplier"
+    },
+    {
+      "entity_id": "SYN-COMPONENT-01",
+      "entity_type": "fictional_critical_component"
+    },
+    {
+      "entity_id": "SYN-SHIPMENT-001",
+      "entity_type": "fictional_shipment"
+    }
+  ],
+  "events": [
+    {
+      "event_id": "EVT-001",
+      "evidence_id": "ev.seq.supplier-status.original.0001",
+      "event_kind": "supplier_status_report",
+      "source": {
+        "source_id": "synthetic-terminal-authority",
+        "source_record_id": "AUTH-BULLETIN-001",
+        "source_version_id": "AUTH-BULLETIN-001-v1",
+        "revision_group_id": "REV-AUTH-BULLETIN-001",
+        "provenance_family_id": "FAM-TERMINAL-AUTHORITY"
+      },
+      "times": {
+        "observed_at": "2026-09-30T09:00:00Z",
+        "published_at": "2026-09-30T09:00:00Z",
+        "known_at": "2026-09-30T09:15:00Z",
+        "retrieved_at": "2026-09-30T09:16:00Z",
+        "valid_from": "2026-09-30T09:00:00Z",
+        "valid_until": "2026-10-02T08:30:00Z"
+      },
+      "rights": {
+        "profile_id": "synthetic-sequential-development-only",
+        "disposition": "synthetic_authorized_placeholder",
+        "proof_status": "synthetic_fixture_only"
+      },
+      "subjects": [
+        "SYN-SUPPLIER-01",
+        "SYN-SHIPMENT-001",
+        "SYN-COMPONENT-01"
+      ],
+      "supersedes_evidence_ids": [],
+      "payload": {
+        "reported_status": "shipment_suspension",
+        "reported_delay_hours": null,
+        "reason": "loading_system_fault",
+        "shipment_id": "SYN-SHIPMENT-001",
+        "notes": "Initial authority bulletin; later corrected by its source."
+      }
+    },
+    {
+      "event_id": "EVT-002",
+      "evidence_id": "ev.seq.supplier-status.correction.0001",
+      "event_kind": "source_correction",
+      "source": {
+        "source_id": "synthetic-terminal-authority",
+        "source_record_id": "AUTH-BULLETIN-001",
+        "source_version_id": "AUTH-BULLETIN-001-v2",
+        "revision_group_id": "REV-AUTH-BULLETIN-001",
+        "provenance_family_id": "FAM-TERMINAL-AUTHORITY"
+      },
+      "times": {
+        "observed_at": "2026-10-02T08:00:00Z",
+        "published_at": "2026-10-02T08:00:00Z",
+        "known_at": "2026-10-02T08:30:00Z",
+        "retrieved_at": "2026-10-02T08:31:00Z",
+        "valid_from": "2026-09-30T09:00:00Z",
+        "valid_until": null
+      },
+      "rights": {
+        "profile_id": "synthetic-sequential-development-only",
+        "disposition": "synthetic_authorized_placeholder",
+        "proof_status": "synthetic_fixture_only"
+      },
+      "subjects": [
+        "SYN-SUPPLIER-01",
+        "SYN-SHIPMENT-001",
+        "SYN-COMPONENT-01"
+      ],
+      "supersedes_evidence_ids": [
+        "ev.seq.supplier-status.original.0001"
+      ],
+      "payload": {
+        "reported_status": "shipment_delayed",
+        "reported_delay_hours": 24,
+        "reason": "loading_system_fault_cleared",
+        "shipment_id": "SYN-SHIPMENT-001",
+        "correction_note": "Original bulletin incorrectly described a suspension; source corrects this to an expected 24-hour delay."
+      }
+    },
+    {
+      "event_id": "EVT-003",
+      "evidence_id": "ev.seq.buyer-purchase-share.0001",
+      "event_kind": "buyer_supplier_relationship_observation",
+      "source": {
+        "source_id": "synthetic-buyer-procurement",
+        "source_record_id": "BUYER-VENDOR-MASTER-007",
+        "source_version_id": "BUYER-VENDOR-MASTER-007-v1",
+        "revision_group_id": "REV-BUYER-VENDOR-007",
+        "provenance_family_id": "FAM-BUYER-PROCUREMENT"
+      },
+      "times": {
+        "observed_at": "2026-10-03T08:00:00Z",
+        "published_at": "2026-10-03T08:00:00Z",
+        "known_at": "2026-10-03T08:15:00Z",
+        "retrieved_at": "2026-10-03T08:16:00Z",
+        "valid_from": "2026-10-03T08:00:00Z",
+        "valid_until": null
+      },
+      "rights": {
+        "profile_id": "synthetic-sequential-development-only",
+        "disposition": "synthetic_authorized_placeholder",
+        "proof_status": "synthetic_fixture_only"
+      },
+      "subjects": [
+        "SYN-BUYER-01",
+        "SYN-SUPPLIER-01",
+        "SYN-COMPONENT-01"
+      ],
+      "supersedes_evidence_ids": [],
+      "payload": {
+        "relationship": "buys_critical_component_from",
+        "component_id": "SYN-COMPONENT-01",
+        "purchase_share": 0.35,
+        "share_unit": "fraction_of_buyer_purchases_for_this_component",
+        "not_share_of": "total_procurement_spend_or_revenue"
+      }
+    },
+    {
+      "event_id": "EVT-004",
+      "evidence_id": "ev.seq.supplier-status.mirror.0001",
+      "event_kind": "syndicated_source_copy",
+      "source": {
+        "source_id": "synthetic-industry-news-mirror",
+        "source_record_id": "NEWS-COPY-991",
+        "source_version_id": "NEWS-COPY-991-v1",
+        "revision_group_id": "REV-NEWS-COPY-991",
+        "provenance_family_id": "FAM-TERMINAL-AUTHORITY"
+      },
+      "times": {
+        "observed_at": "2026-10-03T10:00:00Z",
+        "published_at": "2026-10-03T10:00:00Z",
+        "known_at": "2026-10-03T10:05:00Z",
+        "retrieved_at": "2026-10-03T10:06:00Z",
+        "valid_from": "2026-09-30T09:00:00Z",
+        "valid_until": null
+      },
+      "rights": {
+        "profile_id": "synthetic-sequential-development-only",
+        "disposition": "synthetic_authorized_placeholder",
+        "proof_status": "synthetic_fixture_only"
+      },
+      "subjects": [
+        "SYN-SUPPLIER-01",
+        "SYN-SHIPMENT-001"
+      ],
+      "supersedes_evidence_ids": [],
+      "payload": {
+        "copied_from": "AUTH-BULLETIN-001-v2",
+        "copied_content": "shipment_delayed_24h",
+        "independent_reporting": false
+      }
+    },
+    {
+      "event_id": "EVT-005",
+      "evidence_id": "ev.seq.buyer-inventory-buffer.0001",
+      "event_kind": "buyer_inventory_observation",
+      "source": {
+        "source_id": "synthetic-buyer-warehouse-system",
+        "source_record_id": "WMS-SNAPSHOT-2026-10-04-0800",
+        "source_version_id": "WMS-SNAPSHOT-2026-10-04-0800-v1",
+        "revision_group_id": "REV-WMS-2026-10-04-0800",
+        "provenance_family_id": "FAM-BUYER-WAREHOUSE"
+      },
+      "times": {
+        "observed_at": "2026-10-04T08:00:00Z",
+        "published_at": "2026-10-04T08:30:00Z",
+        "known_at": "2026-10-04T08:40:00Z",
+        "retrieved_at": "2026-10-04T08:41:00Z",
+        "valid_from": "2026-10-04T08:00:00Z",
+        "valid_until": "2026-10-05T08:00:00Z"
+      },
+      "rights": {
+        "profile_id": "synthetic-sequential-development-only",
+        "disposition": "synthetic_authorized_placeholder",
+        "proof_status": "synthetic_fixture_only"
+      },
+      "subjects": [
+        "SYN-BUYER-01",
+        "SYN-COMPONENT-01"
+      ],
+      "supersedes_evidence_ids": [],
+      "payload": {
+        "component_id": "SYN-COMPONENT-01",
+        "inventory_coverage": 14,
+        "coverage_unit": "business_days",
+        "measurement_scope": "the specified critical component only"
+      }
+    },
+    {
+      "event_id": "EVT-006",
+      "evidence_id": "ev.seq.shipment-receipt.0001",
+      "event_kind": "shipment_outcome",
+      "source": {
+        "source_id": "synthetic-carrier-tracking",
+        "source_record_id": "CARRIER-TRACK-S001",
+        "source_version_id": "CARRIER-TRACK-S001-v1",
+        "revision_group_id": "REV-CARRIER-S001",
+        "provenance_family_id": "FAM-CARRIER-TRACKING"
+      },
+      "times": {
+        "observed_at": "2026-10-05T11:30:00Z",
+        "published_at": "2026-10-05T12:00:00Z",
+        "known_at": "2026-10-05T12:15:00Z",
+        "retrieved_at": "2026-10-05T12:16:00Z",
+        "valid_from": "2026-10-05T11:30:00Z",
+        "valid_until": null
+      },
+      "rights": {
+        "profile_id": "synthetic-sequential-development-only",
+        "disposition": "synthetic_authorized_placeholder",
+        "proof_status": "synthetic_fixture_only"
+      },
+      "subjects": [
+        "SYN-SHIPMENT-001",
+        "SYN-SUPPLIER-01",
+        "SYN-BUYER-01",
+        "SYN-COMPONENT-01"
+      ],
+      "supersedes_evidence_ids": [],
+      "payload": {
+        "shipment_id": "SYN-SHIPMENT-001",
+        "actual_arrival_at": "2026-10-05T11:30:00Z",
+        "delivery_deadline_for_forecast": "2026-10-05T12:00:00Z",
+        "arrived_by_deadline": true
+      }
+    }
+  ],
+  "frontiers": [
+    {
+      "frontier_id": "F0",
+      "decision_at": "2026-10-01T12:00:00Z",
+      "newly_admissible_event_ids": [
+        "EVT-001"
+      ]
+    },
+    {
+      "frontier_id": "F1",
+      "decision_at": "2026-10-02T09:00:00Z",
+      "newly_admissible_event_ids": [
+        "EVT-002"
+      ]
+    },
+    {
+      "frontier_id": "F2",
+      "decision_at": "2026-10-03T09:00:00Z",
+      "newly_admissible_event_ids": [
+        "EVT-003"
+      ]
+    },
+    {
+      "frontier_id": "F3",
+      "decision_at": "2026-10-03T11:00:00Z",
+      "newly_admissible_event_ids": [
+        "EVT-004"
+      ]
+    },
+    {
+      "frontier_id": "F4",
+      "decision_at": "2026-10-04T09:00:00Z",
+      "newly_admissible_event_ids": [
+        "EVT-005"
+      ]
+    },
+    {
+      "frontier_id": "F5",
+      "decision_at": "2026-10-05T12:30:00Z",
+      "newly_admissible_event_ids": [
+        "EVT-006"
+      ]
+    }
+  ],
+  "prequential_forecast_task": {
+    "forecast_id": "FC-S001-ARRIVAL-BY-DEADLINE",
+    "question": "Will SYN-SHIPMENT-001 arrive by 2026-10-05T12:00:00Z?",
+    "issue_at_frontiers": [
+      "F1",
+      "F2",
+      "F3",
+      "F4"
+    ],
+    "outcome_event_id": "EVT-006",
+    "outcome_known_at": "2026-10-05T12:15:00Z",
+    "resolution_rule": "true only if actual_arrival_at <= 2026-10-05T12:00:00Z",
+    "scoring": "Brier/log score only for probability forecasts committed before outcome_known_at; no score if no retained pre-outcome forecast exists."
+  }
+}
