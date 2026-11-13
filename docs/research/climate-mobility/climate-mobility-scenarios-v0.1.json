@@ -34,7 +34,7 @@
       "pathway_id": "stay-adapt-a",
       "pathway_type": "in_place_adaptation",
       "origin_area_id": "origin-a",
-      "destination_area_id": "origin-a",
+      "destination_area_id": null,
       "moved_persons": 0,
       "return_persons": 0,
       "climate_attribution": "not_claimed",
@@ -192,7 +192,9 @@
         "The threshold and measurement units are arbitrary synthetic contract constants, not a legal or community-approved service standard.",
         "Only 10 of 100 synthetic coverage units are represented; the observed breach must not be generalized to the full service scope.",
         "No actual water-delivery, health, affordability, or household measurement is represented."
-      ]
+      ],
+      "pathway_id": "voluntary-move-a-b",
+      "area_id": "destination-b"
     }
   ]
 }
