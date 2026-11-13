@@ -136,6 +136,22 @@ This requires a sharper AIRROAD output contract:
 
 MathWorks documents that a robust-stability margin above 1 means stable for all values of the modeled uncertainty, while below 1 means there exist values that destabilize. That is not the same proposition as "every member is unstable." AIRROAD must compare these results separately and preserve the witness identity and exact pole evidence.
 
+
+### Exact one-parameter robust-margin calibration case
+
+The three-port fixture now also freezes a one-sided real-parameter uncertainty:
+
+    gamma = 1/16 + rho*(1/16)*delta
+    delta in [0,1]
+
+The analytic stability boundary is gamma=1/8, so the exact normalized robust-stability margin is:
+
+    rho_star = (1/8 - 1/16)/(1/16) = 1
+
+At rho=1/2, the entire set is below the boundary and is robustly stable. At rho=1, the set reaches a marginal zero pole at delta=1. At rho=2, the set contains both stable members and an unstable witness gamma=3/16; it is NOT_ESTABLISHED as a universal set disposition, not ROBUSTLY_UNSTABLE.
+
+This fixture calibrates three distinct outputs against an exact oracle: a guaranteed stable range below the margin, the marginal boundary at the margin, and an existential destabilization witness beyond it. It is directly suitable for comparing a MATLAB `robstab` lower/upper margin bracket and `wcu`/substituted-pole result without conflating the witness with universal instability.
+
 ### Additional baselines
 
 - **IQC Toolbox / IQClab** provides worst-case stability/performance analysis for uncertainty and nonlinearities using integral quadratic constraints. It is an important complementary baseline for dynamic/nonlinear uncertainty, not simply another frequency-sweep solver: https://iqctoolbox.github.io/iqcToolbox/ and https://www.ll.mit.edu/partner-us/available-technologies/integral-quadratic-constraints-iqc-toolbox
