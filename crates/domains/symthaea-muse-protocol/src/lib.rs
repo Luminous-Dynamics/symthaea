@@ -227,7 +227,6 @@ pub struct ImportedNotationStructureSummary {
     pub explanation: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
 /// What the imported-work audition actually represents.
 ///
 /// Older persisted summaries predate this distinction. They deserialize as
@@ -247,6 +246,7 @@ pub enum ImportedAuditionKind {
     ReconstructedScore,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ImportedWorkSummary {
     pub manifest: ContributionManifest,
     pub analysis: ImportedWorkAnalysis,
