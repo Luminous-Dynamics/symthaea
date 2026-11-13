@@ -18,10 +18,14 @@ This is separate from polymer/adhesive bondability. Do not pool the results with
 
 Kim et al., *Effect of atmospheric pressure plasma treatments for enhanced adhesion of arc-sprayed zinc coatings on CFRP substrates*, Composites Part A: Applied Science and Manufacturing, Volume 206 (July 2026), article 109797, DOI: https://doi.org/10.1016/j.compositesa.2026.109797.
 
-The indexed abstract and university publication record report:
-- Atmospheric-pressure air and argon plasma pretreatments applied to CFRP before arc-sprayed zinc.
+The publisher's indexed full-text record and university publication entry establish the following:
+- Commercial thermosetting epoxy-based CFRP laminate coupons measured 24 × 24 × 3 mm, supplied by Gwangseong Tech Co. Ltd. (Korea).
+- The laminate used carbon-fibre prepreg with the SIGRAPREG epoxy resin system developed by SGL Carbon; nine plies in an orthogonal woven 0°/90° configuration.
+- Atmospheric-pressure air and argon plasma pretreatments were applied before arc-sprayed zinc.
+- One explicitly described morphology condition is Air_30_10 (30 mm nozzle stand-off, 10 passes). This is a reported test condition, **not evidence that it is the best-performing or recommended condition**.
 - Argon treatment ablated some surface epoxy and exposed carbon fibres, supporting mechanical interlocking between the substrate and incoming zinc.
 - Air plasma added oxygen-containing –OH / –COOH surface functional groups, increased polar surface energy (reported as 72.08 mJ/m²) and was interpreted as supporting hydrogen bonding with ZnO species.
+- The paper reports that plasma did not significantly alter microscale roughness; it discusses grit blasting as a source of topographic change. Whether grit blasting was applied to every comparison arm, and the exact sequence, still require methods-level verification.
 - Maximum pull-off adhesion of 4.21 ± 0.12 MPa for the most intense air-plasma condition, an 84% increase over the untreated CFRP comparator.
 - A shift from adhesive toward predominantly cohesive failure.
 - Cohesive-zone modelling was used to investigate interfacial response and delamination resistance.
@@ -39,9 +43,10 @@ A second 2026 paper examines atmospheric plasma spray metallization of thermoset
 
 The accessible abstract / publication metadata establish the headline result and mechanisms but do not fully establish every item required for independent reproduction. The following remain to be extracted from the full methods and supplementary data before protocol equivalence can be claimed:
 
-- Exact CFRP manufacturer, fibre/resin system, layup, fibre orientation, cure, thickness, surface finish, material lot and preconditioning.
-- Exact abrasive / mechanical pretreatment (if used), and sequence relative to plasma.
-- Exact plasma article, process gas/purity, nozzle, treatment standoff, traverse, pass count, power measurement boundary, waveform, and treatment-to-spray delay.
+- The source identifies a 24 × 24 × 3 mm, nine-ply orthogonal 0°/90° SIGRAPREG epoxy/CFRP coupon supplied by Gwangseong Tech; the exact commercial laminate grade, fibre grade, prepreg batch/lot, fibre volume fraction, cure history and coupon-to-panel variability remain to be reconstructed.
+- The source explicitly names an Air_30_10 morphology condition (30 mm stand-off, 10 passes); the full air/argon design matrix, exact winning setting and treatment repeatability must be extracted from all methods/results tables before a matched reconstruction.
+- Exact abrasive / mechanical pretreatment (if used), whether grit-blasting was applied to every comparison arm, and the sequence relative to plasma remain to be verified from the complete methods.
+- Exact plasma article, process gas/purity/flow, nozzle, treatment traverse/speed, power measurement boundary, waveform, and treatment-to-spray delay remain to be extracted.
 - Zinc wire/feedstock composition and lot, arc-spray equipment identity, spray distance, deposition conditions, traverse, coating thickness and post-treatment.
 - Pull-off test standard, dolly geometry, fixture adhesive, cure, loading rate, specimen dimensions, replicate count, censoring / invalid specimens and failure-area classification.
 - Raw replicate-level adhesion values and uncertainty construction.
@@ -179,3 +184,35 @@ ASTM C633-24 remains the more directly relevant thermal-spray adhesion/cohesion 
 The published study suggests two distinguishable mechanisms: argon-associated epoxy recession/fibre exposure and air-plasma-associated polar functionalization. A new research hypothesis is whether a carefully characterized **sequential or spatially selective interface treatment** can combine useful mechanical interlocking and chemical affinity while keeping resin recession and laminate damage below the application-specific limit.
 
 This is an experiment-selection hypothesis, not a recommended process recipe. It must be tested against air-only, argon-only, conventional preparation and untreated controls under identical coating deposition, coating thickness and failure analysis. The interaction term must be preregistered; a combined sequence must not be credited with synergy unless the independent comparison and uncertainty support it.
+
+
+## 13. Spatially co-registered interface metrology — new opportunity
+
+The source study already uses SEM, AFM, 3D profilometry, contact angle/surface energy, FTIR, XPS, pull-off adhesion and failure-surface image analysis. A stronger next-generation benchmark should preserve these as **co-registered spatial evidence**, not as unrelated panel-level averages.
+
+For each exact panel/lot, define a common coordinate frame and map:
+- surface resin coverage, fibre exposure and fibre/resin damage;
+- local surface chemistry / polar functionality and contamination;
+- local topography / roughness at declared spatial scales;
+- zinc coating thickness, porosity, cracks and local delamination;
+- local sheet resistance / electrical continuity;
+- destructive adhesion pull-off results and failure locus at identified witness sites;
+- laminate residual properties on matched witness coupons.
+
+The research question becomes:
+
+> Can a spatially resolved interface-state representation predict where a conductive coating will fail, lose electrical continuity or damage the laminate—and does it generalize to a new panel/lot?
+
+This is a stronger route to outcome prediction than fitting a single panel-average contact-angle or adhesion value. It can support risk-directed destructive inspection while retaining destructive tests as ground truth.
+
+Do not use nearby SEM/XPS/AFM witness points as independent random rows. Hold out entire panels, material lots and production days. Destructive pull-off sites and non-destructive measurement sites must have an explicit spatial correspondence/uncertainty model; a nearby measurement is not automatically the same physical interface.
+
+Proposed spatial metrics (after metrology resolution and uncertainty are frozen):
+- area-weighted mapping coverage and unmapped-area fraction;
+- calibration/registration residual between measurement modalities;
+- local prediction interval coverage for adhesion / sheet resistance;
+- defect localization precision/recall and worst-region false-negative rate;
+- spatial holdout transfer to unseen panels and lots;
+- reduction in destructive samples only at a declared escaped-defect risk bound.
+
+This is an untested measurement architecture, not a demonstrated ability to replace destructive qualification.
