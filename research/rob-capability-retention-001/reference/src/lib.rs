@@ -365,40 +365,19 @@ pub enum CapabilityRetentionError {
     /// Duplicate reserve policy component.
     DuplicateReservePolicyComponent(ReserveKind),
     /// Missing required reserve policy component in an arm summary.
-    MissingReserveObservation {
-        arm_id: String,
-        kind: ReserveKind,
-    },
+    MissingReserveObservation { arm_id: String, kind: ReserveKind },
     /// Duplicate reserve observation.
-    DuplicateReserveObservation {
-        arm_id: String,
-        kind: ReserveKind,
-    },
+    DuplicateReserveObservation { arm_id: String, kind: ReserveKind },
     /// Reserve evidence contradicts its policy applicability.
-    ReserveApplicabilityMismatch {
-        arm_id: String,
-        kind: ReserveKind,
-    },
+    ReserveApplicabilityMismatch { arm_id: String, kind: ReserveKind },
     /// NotApplicable dimension lacks a reason or has an unexpected value.
-    InvalidNotApplicableReserve {
-        arm_id: String,
-        kind: ReserveKind,
-    },
+    InvalidNotApplicableReserve { arm_id: String, kind: ReserveKind },
     /// Qualified reserve lacks a conservative bound or source receipt.
-    IncompleteQualifiedReserve {
-        arm_id: String,
-        kind: ReserveKind,
-    },
+    IncompleteQualifiedReserve { arm_id: String, kind: ReserveKind },
     /// Explicitly rejected reserve evidence.
-    RejectedReserveEvidence {
-        arm_id: String,
-        kind: ReserveKind,
-    },
+    RejectedReserveEvidence { arm_id: String, kind: ReserveKind },
     /// Arm does not match the common operating scope.
-    ArmScopeMismatch {
-        arm_id: String,
-        field: &'static str,
-    },
+    ArmScopeMismatch { arm_id: String, field: &'static str },
     /// Candidate and baseline identifiers are not distinct.
     DuplicateArmId(String),
     /// Duplicate or empty cluster identity.
@@ -412,15 +391,9 @@ pub enum CapabilityRetentionError {
     /// Paired work manifests differ between candidate and baseline.
     PairingMismatch(String),
     /// Work categories do not exactly cover the scheduled denominator.
-    InvalidWorkTally {
-        arm_id: String,
-        cluster_id: String,
-    },
+    InvalidWorkTally { arm_id: String, cluster_id: String },
     /// No scheduled available robot time.
-    ZeroAvailableRobotTime {
-        arm_id: String,
-        cluster_id: String,
-    },
+    ZeroAvailableRobotTime { arm_id: String, cluster_id: String },
     /// Candidate/baseline option sets did not start from the same qualified set.
     StartingOptionSetMismatch(String),
     /// Required option-set identity or ledger receipt is absent.
@@ -476,7 +449,10 @@ fn validate_scope(
             "reserve_policy_digest",
             scope.reserve_policy_digest.as_str(),
         ),
-        ("reserve_policy.policy_digest", policy.policy_digest.as_str()),
+        (
+            "reserve_policy.policy_digest",
+            policy.policy_digest.as_str(),
+        ),
     ] {
         require_nonempty(name, value)?;
     }
@@ -515,7 +491,10 @@ fn validate_arm(
 ) -> Result<(), CapabilityRetentionError> {
     for (name, value) in [
         ("arm_id", manifest.arm_id.as_str()),
-        ("model_artifact_digest", manifest.model_artifact_digest.as_str()),
+        (
+            "model_artifact_digest",
+            manifest.model_artifact_digest.as_str(),
+        ),
         ("policy_digest", manifest.policy_digest.as_str()),
         ("harness_digest", manifest.harness_digest.as_str()),
     ] {
@@ -572,7 +551,10 @@ fn validate_option_set(
     arm_id: &str,
     options: &OptionSetReceipt,
 ) -> Result<(), CapabilityRetentionError> {
-    if matches!(options.disposition, EvidenceDisposition::Rejected | EvidenceDisposition::NotApplicable) {
+    if matches!(
+        options.disposition,
+        EvidenceDisposition::Rejected | EvidenceDisposition::NotApplicable
+    ) {
         return Err(CapabilityRetentionError::RejectedOptionSetEvidence(
             arm_id.to_owned(),
         ));
@@ -664,9 +646,11 @@ fn validate_reserves(
                     kind: *kind,
                 });
             }
-            (ReserveApplicability::NotApplicable { reason }, EvidenceDisposition::NotApplicable)
-                if !reason.trim().is_empty()
-                    && observation.not_applicable_reason.as_deref() == Some(reason.as_str()) =>
+            (
+                ReserveApplicability::NotApplicable { reason },
+                EvidenceDisposition::NotApplicable,
+            ) if !reason.trim().is_empty()
+                && observation.not_applicable_reason.as_deref() == Some(reason.as_str()) =>
             {
                 if observation.terminal_lower_bound.is_some()
                     || observation.source_receipt_digest.is_some()
@@ -728,18 +712,18 @@ fn reserve_deltas(
                 });
             }
             ReserveApplicability::Required { minimum_floor, .. } => {
-                let base = baseline
-                    .get(kind)
-                    .ok_or(CapabilityRetentionError::ReserveApplicabilityMismatch {
+                let base = baseline.get(kind).ok_or(
+                    CapabilityRetentionError::ReserveApplicabilityMismatch {
                         arm_id: "baseline".into(),
                         kind: *kind,
-                    })?;
-                let cand = candidate
-                    .get(kind)
-                    .ok_or(CapabilityRetentionError::ReserveApplicabilityMismatch {
+                    },
+                )?;
+                let cand = candidate.get(kind).ok_or(
+                    CapabilityRetentionError::ReserveApplicabilityMismatch {
                         arm_id: "candidate".into(),
                         kind: *kind,
-                    })?;
+                    },
+                )?;
                 let disposition = if base.disposition == EvidenceDisposition::Unknown
                     || cand.disposition == EvidenceDisposition::Unknown
                 {
@@ -805,9 +789,7 @@ pub fn compare_work_and_terminal_capability(
             "paired_work_manifest_digest",
             &cluster.paired_work_manifest_digest,
         )
-        .map_err(|_| CapabilityRetentionError::MissingClusterReceipt(
-            cluster.cluster_id.clone(),
-        ))?;
+        .map_err(|_| CapabilityRetentionError::MissingClusterReceipt(cluster.cluster_id.clone()))?;
         require_nonempty(
             "independence_receipt_digest",
             &cluster.independence_receipt_digest,
@@ -910,20 +892,18 @@ pub fn compare_work_and_terminal_capability(
             cluster.candidate.work.accepted_items,
             cluster.candidate.available_robot_minutes,
         )?;
-        let baseline_option_count = if cluster.baseline.option_set.disposition
-            == EvidenceDisposition::Qualified
-        {
-            Some(cluster.baseline.option_set.terminal_qualified_option_count)
-        } else {
-            None
-        };
-        let candidate_option_count = if cluster.candidate.option_set.disposition
-            == EvidenceDisposition::Qualified
-        {
-            Some(cluster.candidate.option_set.terminal_qualified_option_count)
-        } else {
-            None
-        };
+        let baseline_option_count =
+            if cluster.baseline.option_set.disposition == EvidenceDisposition::Qualified {
+                Some(cluster.baseline.option_set.terminal_qualified_option_count)
+            } else {
+                None
+            };
+        let candidate_option_count =
+            if cluster.candidate.option_set.disposition == EvidenceDisposition::Qualified {
+                Some(cluster.candidate.option_set.terminal_qualified_option_count)
+            } else {
+                None
+            };
 
         reports.push(ClusterCapabilityReport {
             cluster_id: cluster.cluster_id.clone(),
@@ -932,8 +912,7 @@ pub fn compare_work_and_terminal_capability(
             candidate_accepted_items: cluster.candidate.work.accepted_items,
             baseline_work_rate_milli_per_hour: baseline_rate,
             candidate_work_rate_milli_per_hour: candidate_rate,
-            work_rate_delta_milli_per_hour: i128::from(candidate_rate)
-                - i128::from(baseline_rate),
+            work_rate_delta_milli_per_hour: i128::from(candidate_rate) - i128::from(baseline_rate),
             baseline_human_intervention_minutes: cluster.baseline.human_intervention_minutes,
             candidate_human_intervention_minutes: cluster.candidate.human_intervention_minutes,
             baseline_electrical_energy_milli_wh: cluster.baseline.electrical_energy_milli_wh,
@@ -1141,16 +1120,14 @@ mod tests {
             reserve_policy: reserve_policy(),
             baseline_manifest: manifest("baseline"),
             candidate_manifest: manifest("candidate"),
-            clusters: vec![
-                PairedCapabilityCluster {
-                    cluster_id: "cluster-A".into(),
-                    paired_work_manifest_digest: "paired-work-A".into(),
-                    independence_receipt_digest: "independence-A".into(),
-                    independence_disposition: EvidenceDisposition::Qualified,
-                    baseline: arm_summary(7, 60, 20_000, 9_000, 2),
-                    candidate: arm_summary(8, 60, 18_000, 8_000, 2),
-                },
-            ],
+            clusters: vec![PairedCapabilityCluster {
+                cluster_id: "cluster-A".into(),
+                paired_work_manifest_digest: "paired-work-A".into(),
+                independence_receipt_digest: "independence-A".into(),
+                independence_disposition: EvidenceDisposition::Qualified,
+                baseline: arm_summary(7, 60, 20_000, 9_000, 2),
+                candidate: arm_summary(8, 60, 18_000, 8_000, 2),
+            }],
         }
     }
 
@@ -1163,10 +1140,7 @@ mod tests {
         );
         assert_eq!(report.clusters[0].baseline_accepted_items, 7);
         assert_eq!(report.clusters[0].candidate_accepted_items, 8);
-        assert_eq!(
-            report.clusters[0].work_rate_delta_milli_per_hour,
-            1_000
-        );
+        assert_eq!(report.clusters[0].work_rate_delta_milli_per_hour, 1_000);
         assert!(!report.actuation_authorized);
     }
 
@@ -1199,7 +1173,9 @@ mod tests {
     #[test]
     fn any_candidate_critical_safety_event_vetoes_positive_disposition() {
         let mut audit = input();
-        audit.clusters[0].candidate.critical_safety_violation_episodes = 1;
+        audit.clusters[0]
+            .candidate
+            .critical_safety_violation_episodes = 1;
         let report = compare_work_and_terminal_capability(&audit).unwrap();
         assert_eq!(
             report.disposition,
@@ -1267,7 +1243,11 @@ mod tests {
     #[test]
     fn missing_option_ledger_receipt_is_rejected() {
         let mut audit = input();
-        audit.clusters[0].candidate.option_set.ledger_receipt_digest.clear();
+        audit.clusters[0]
+            .candidate
+            .option_set
+            .ledger_receipt_digest
+            .clear();
         assert!(matches!(
             compare_work_and_terminal_capability(&audit),
             Err(CapabilityRetentionError::MissingOptionSetReceipt(_))
@@ -1289,8 +1269,10 @@ mod tests {
     #[test]
     fn starting_option_sets_must_be_identical_for_paired_comparison() {
         let mut audit = input();
-        audit.clusters[0].candidate.option_set.starting_option_set_digest =
-            "different-start".into();
+        audit.clusters[0]
+            .candidate
+            .option_set
+            .starting_option_set_digest = "different-start".into();
         assert_eq!(
             compare_work_and_terminal_capability(&audit),
             Err(CapabilityRetentionError::StartingOptionSetMismatch(
@@ -1426,7 +1408,10 @@ mod tests {
         let mut audit = input();
         audit.clusters[0].candidate.available_robot_minutes = 30;
         let report = compare_work_and_terminal_capability(&audit).unwrap();
-        assert_eq!(report.clusters[0].candidate_work_rate_milli_per_hour, 16_000);
+        assert_eq!(
+            report.clusters[0].candidate_work_rate_milli_per_hour,
+            16_000
+        );
     }
 
     #[test]
