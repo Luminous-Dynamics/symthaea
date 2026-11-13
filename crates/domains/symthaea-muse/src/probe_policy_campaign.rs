@@ -1149,6 +1149,68 @@ mod tests {
     }
 
     #[test]
+    fn linear_fir_support_includes_the_exact_convolution_tail() {
+        let config = small_config();
+        let fixture =
+            generate_fixture(InteractionFamily::LinearFirTail, 6, &config).unwrap();
+        let oracle = build_factorial_ground_truth(
+            &fixture.events,
+            &fixture.effect,
+            &config.factorial_config,
+        )
+        .unwrap();
+        assert_eq!(oracle.output_frame_count, config.frame_count + 4);
+        assert_ne!(fixture.events.last().unwrap().samples[config.frame_count - 1], 0.0);
+        let last_support = fixture.supports.last().unwrap();
+        assert_eq!(
+            last_support.acoustic_support[0].end_frame,
+            oracle.output_frame_count as u64
+        );
+        assert!(last_support.acoustic_support[0].end_frame > config.frame_count as u64);
+    }
+
+    #[test]
+    fn null_scene_risk_is_cluster_macro_not_seed_budget_pseudoreplication() {
+        let config = small_config();
+        let report = build_probe_policy_campaign(&config).unwrap();
+        let summary = report
+            .null_scene_false_discovery
+            .iter()
+            .find(|summary| {
+                summary.family == InteractionFamily::AdditiveNull
+                    && summary.policy == ProbeSelectionPolicy::UniformRandom
+            })
+            .unwrap();
+        assert_eq!(summary.composition_count, 7);
+        assert!(summary.evaluated_rows > summary.composition_count);
+        assert_eq!(
+            summary.bootstrap_replicates,
+            config.bootstrap_replicates
+        );
+        let selection_rate = summary
+            .composition_macro_any_selection_rate
+            .expect("at least one independent all-null composition");
+        assert!((0.0..=1.0).contains(&selection_rate));
+        let burden = summary
+            .composition_macro_false_positive_pairs_per_row
+            .expect("false-positive burden is measured per composition");
+        assert!(burden >= 0.0);
+        assert_eq!(
+            summary.any_selection_rate_bootstrap_95pct_lower.is_some(),
+            true
+        );
+        assert_eq!(
+            summary.any_selection_rate_bootstrap_95pct_upper.is_some(),
+            true
+        );
+        assert!(
+            summary.any_selection_rate_bootstrap_95pct_lower.unwrap()
+                <= summary.any_selection_rate_bootstrap_95pct_upper.unwrap()
+        );
+        assert_eq!(summary.false_discovery_rate, Some(1.0));
+    }
+
+    #[test]
     fn campaign_pairs_policies_on_same_compositions_and_seeds() {
         let report = build_probe_policy_campaign(&small_config()).unwrap();
         let primary = report
