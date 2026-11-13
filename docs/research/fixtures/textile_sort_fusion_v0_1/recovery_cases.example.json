@@ -219,6 +219,30 @@
         "disposition": "eligible",
         "reason": null
       }
+    },
+    {
+      "case_id": "ROUTE-028-DESIGN-REVISION-BOUND",
+      "mutation": "Physical component trial binds exact product, revision, dossier digest and specimen",
+      "expected": {
+        "disposition": "eligible",
+        "reason": null
+      }
+    },
+    {
+      "case_id": "ROUTE-029-DESIGN-DOSSIER-DIGEST-INVALID",
+      "mutation": "Design-linked physical trial carries malformed dossier digest",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidDesignRevisionBinding"
+      }
+    },
+    {
+      "case_id": "ROUTE-030-DESIGN-SPECIMEN-MISMATCH",
+      "mutation": "Design conformity refers to a different physical specimen than the trial",
+      "expected": {
+        "disposition": "ineligible",
+        "reason": "InvalidDesignRevisionBinding"
+      }
     }
   ]
 }
