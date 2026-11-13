@@ -1,0 +1,172 @@
+{
+  "schema_version": "0.1.0",
+  "scenario_set_id": "synthetic-two-area-water-capacity-001",
+  "evidence_class": "synthetic",
+  "time_frame": {
+    "basis": "synthetic_steps",
+    "start": 0,
+    "end": 1,
+    "step": 1,
+    "step_unit": "synthetic_step"
+  },
+  "areas": [
+    {
+      "area_id": "origin-a",
+      "role": "origin",
+      "boundary_reference": null,
+      "boundary_revision": null,
+      "crs": "SYNTHETIC_NO_CRS",
+      "spatial_scale": "abstract_area",
+      "evidence_class": "synthetic"
+    },
+    {
+      "area_id": "destination-b",
+      "role": "destination",
+      "boundary_reference": null,
+      "boundary_revision": null,
+      "crs": "SYNTHETIC_NO_CRS",
+      "spatial_scale": "abstract_area",
+      "evidence_class": "synthetic"
+    }
+  ],
+  "pathways": [
+    {
+      "pathway_id": "stay-adapt-a",
+      "pathway_type": "in_place_adaptation",
+      "origin_area_id": "origin-a",
+      "destination_area_id": "origin-a",
+      "moved_persons": 0,
+      "return_persons": 0,
+      "climate_attribution": "not_claimed",
+      "decision_state": "scenario_only",
+      "is_recommendation": false,
+      "assumption_ids": [
+        "A-STAY-001"
+      ],
+      "notes": "Synthetic alternative: people remain in place while a declared water-capacity intervention is tested. This is not an intervention recommendation."
+    },
+    {
+      "pathway_id": "voluntary-move-a-b",
+      "pathway_type": "voluntary_migration",
+      "origin_area_id": "origin-a",
+      "destination_area_id": "destination-b",
+      "moved_persons": 1000,
+      "return_persons": 0,
+      "climate_attribution": "not_claimed",
+      "decision_state": "scenario_only",
+      "is_recommendation": false,
+      "assumption_ids": [
+        "A-MOVE-001",
+        "A-WATER-001",
+        "A-HOUSING-001"
+      ],
+      "notes": "Synthetic alternative: 1,000 persons arrive at destination-b. The count is a scenario input, not observed or forecast migration."
+    }
+  ],
+  "service_assessments": [
+    {
+      "assessment_id": "stay-origin-water",
+      "pathway_id": "stay-adapt-a",
+      "area_id": "origin-a",
+      "domain": "drinking_water",
+      "metric": "reliable_potable_delivery",
+      "unit": "m3/day",
+      "baseline_demand": 500,
+      "incremental_demand": 0,
+      "baseline_capacity": 480,
+      "capacity_adjustment": 40,
+      "expected_total_demand": 500,
+      "expected_available_capacity": 520,
+      "expected_shortfall": 0,
+      "expected_outcome": "meets_floor",
+      "evidence_class": "synthetic",
+      "result_scope": "synthetic_contract_only",
+      "source_ref_ids": [
+        "SYNTHETIC-001"
+      ]
+    },
+    {
+      "assessment_id": "move-destination-water",
+      "pathway_id": "voluntary-move-a-b",
+      "area_id": "destination-b",
+      "domain": "drinking_water",
+      "metric": "reliable_potable_delivery",
+      "unit": "m3/day",
+      "baseline_demand": 500,
+      "incremental_demand": 50,
+      "baseline_capacity": 520,
+      "capacity_adjustment": 0,
+      "expected_total_demand": 550,
+      "expected_available_capacity": 520,
+      "expected_shortfall": 30,
+      "expected_outcome": "breaches_floor",
+      "evidence_class": "synthetic",
+      "result_scope": "synthetic_contract_only",
+      "source_ref_ids": [
+        "SYNTHETIC-001"
+      ]
+    },
+    {
+      "assessment_id": "move-destination-housing",
+      "pathway_id": "voluntary-move-a-b",
+      "area_id": "destination-b",
+      "domain": "housing",
+      "metric": "habitable_households",
+      "unit": "households",
+      "baseline_demand": 4000,
+      "incremental_demand": 500,
+      "baseline_capacity": 4500,
+      "capacity_adjustment": 0,
+      "expected_total_demand": 4500,
+      "expected_available_capacity": 4500,
+      "expected_shortfall": 0,
+      "expected_outcome": "meets_floor",
+      "evidence_class": "synthetic",
+      "result_scope": "synthetic_contract_only",
+      "source_ref_ids": [
+        "SYNTHETIC-001"
+      ]
+    }
+  ],
+  "source_manifest": [
+    {
+      "source_id": "SYNTHETIC-001",
+      "publisher": "Luminous Dynamics research fixture",
+      "source_type": "synthetic_fixture",
+      "version": "0.1.0",
+      "uri": null,
+      "content_sha256": null,
+      "role": "contract_arithmetic",
+      "evidence_class": "synthetic"
+    }
+  ],
+  "assumptions": [
+    {
+      "assumption_id": "A-STAY-001",
+      "statement": "The in-place adaptation alternative adds 40 m3/day of synthetic reliable potable delivery capacity. This is arithmetic test data, not a costed or feasible engineering intervention.",
+      "evidence_class": "synthetic"
+    },
+    {
+      "assumption_id": "A-MOVE-001",
+      "statement": "The voluntary-movement alternative declares 1,000 arrivals as a scenario input. It is not an empirical count, probability, forecast or recommendation.",
+      "evidence_class": "synthetic"
+    },
+    {
+      "assumption_id": "A-WATER-001",
+      "statement": "The synthetic incremental potable-water demand is 0.05 m3/person/day. This is a fixture constant only, not a normative service threshold or local demand estimate.",
+      "evidence_class": "synthetic"
+    },
+    {
+      "assumption_id": "A-HOUSING-001",
+      "statement": "The synthetic household conversion is 0.5 additional households per arriving person; it is not a demographic estimate.",
+      "evidence_class": "synthetic"
+    }
+  ],
+  "limitations": [
+    "No real geographic boundaries, coordinates, climate forcing, population observations, migration events, utility data or community preferences are represented.",
+    "Only drinking-water delivery and habitable-household capacity are included; all other service domains remain unassessed.",
+    "The expected outcomes test arithmetic and contract behavior only. They do not establish potable-water safety, housing habitability or receiving-place suitability.",
+    "The fixture does not assign probabilities to pathways and does not infer climate attribution."
+  ],
+  "claim_ceiling": "Synthetic arithmetic and schema behavior only; not a real city assessment, migration forecast, engineering validation or relocation recommendation."
+}
