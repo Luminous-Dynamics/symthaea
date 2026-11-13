@@ -330,3 +330,7 @@ Open an issue on GitHub for research discussions.
 ---
 
 *"The study of consciousness is the study of what makes us us."*
+
+### Engineering lifecycle benchmarking
+- [Engineering lifecycle / PLM competitor register](ENGINEERING_LIFECYCLE_COMPETITOR_REGISTER_2026-11-13.md) — Siemens, Aras, PTC and IBM capability map.
+- [Engineering change experiment preregistration](ENG_CHANGE_EXPERIMENT_PREREGISTRATION_V0_1_2026-11-13.md) — matched arms, independent gold adjudication, hard gates, full cost and statistical design.
