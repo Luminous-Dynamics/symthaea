@@ -177,6 +177,7 @@ struct CorpusByteVerificationCommitmentV1<'a> {
 
 /// Borrowed file bytes. The caller resolves the declared relative paths under
 /// a controlled corpus root and streams one pair at a time into the verifier.
+#[derive(Clone, Copy)]
 pub struct CorpusArtifactBytesV1<'a> {
     pub sample_id: &'a str,
     pub input_relative_path: &'a str,
@@ -711,10 +712,14 @@ where
             });
             continue;
         };
-        if !is_safe_relative_path(&sample.input_relative_path)
-            || !is_safe_relative_path(&sample.reference_relative_path)
-        {
+        if !is_safe_relative_path(&sample.input_relative_path) {
             issues.push(CorpusQualificationIssueV1::InvalidInputPath {
+                sample_id: artifact.sample_id.to_string(),
+            });
+            continue;
+        }
+        if !is_safe_relative_path(&sample.reference_relative_path) {
+            issues.push(CorpusQualificationIssueV1::InvalidReferencePath {
                 sample_id: artifact.sample_id.to_string(),
             });
             continue;
