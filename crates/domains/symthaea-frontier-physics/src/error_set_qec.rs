@@ -760,7 +760,13 @@ pub fn compute_strongly_controlled_petz_worst_case_bound(
 
 #[cfg(test)]
 mod tests {
-    use super::{ComplexMatrix, ErrorSetQecError, compute_error_set_qec_diagnostics};
+    use super::{
+        ComplexMatrix, ErrorSetQecError,
+        compute_error_set_qec_diagnostics,
+        compute_knill_laflamme_hellinger,
+        compute_strongly_controlled_petz_worst_case_bound,
+        positive_semidefinite_square_root,
+    };
     use num_complex::Complex64;
 
     fn repetition_code_isometry() -> ComplexMatrix {
@@ -874,4 +880,144 @@ mod tests {
             Err(ErrorSetQecError::InvalidTolerance(0.0))
         );
     }
+
+    fn bit_flip_error_set() -> Vec<ComplexMatrix> {
+        vec![
+            bit_flip_operator(0),
+            bit_flip_operator(4),
+            bit_flip_operator(2),
+            bit_flip_operator(1),
+        ]
+    }
+
+    #[test]
+    fn psd_square_root_preserves_rank_deficiency_without_positive_flooring() {
+        let rank_one = ComplexMatrix::from_real(2, 2, &[1.0, 1.0, 1.0, 1.0]).unwrap();
+        let root = positive_semidefinite_square_root(&rank_one, 1.0e-12).unwrap();
+        assert_eq!(root.support_rank, 1);
+        assert!(root.reconstruction_relative_residual <= 1.0e-12);
+        assert!(root.minimum_eigenvalue.abs() <= 1.0e-12);
+
+        let small_positive =
+            ComplexMatrix::from_real(2, 2, &[1.0, 0.0, 0.0, 1.0e-18]).unwrap();
+        let small_root = positive_semidefinite_square_root(&small_positive, 1.0e-12).unwrap();
+        assert_eq!(small_root.support_rank, 1);
+        assert!(
+            (small_root.square_root.get(1, 1).re - 1.0e-9).abs() <= 1.0e-20,
+            "small positive eigenvalue was floored or discarded"
+        );
+    }
+
+    #[test]
+    fn psd_square_root_rejects_materially_negative_and_nonhermitian_inputs() {
+        let indefinite =
+            ComplexMatrix::from_real(2, 2, &[1.0, 0.0, 0.0, -0.01]).unwrap();
+        assert!(matches!(
+            positive_semidefinite_square_root(&indefinite, 1.0e-12),
+            Err(ErrorSetQecError::NotPositiveSemidefinite { .. })
+        ));
+
+        let nonhermitian = ComplexMatrix::new(
+            2,
+            2,
+            vec![
+                Complex64::new(1.0, 0.0),
+                Complex64::new(0.0, 1.0),
+                Complex64::new(0.0, 0.0),
+                Complex64::new(1.0, 0.0),
+            ],
+        )
+        .unwrap();
+        assert!(matches!(
+            positive_semidefinite_square_root(&nonhermitian, 1.0e-12),
+            Err(ErrorSetQecError::HermiticityResidual { .. })
+        ));
+    }
+
+    #[test]
+    fn exact_kl_repetition_code_has_zero_hellinger_distance() {
+        let code = repetition_code_isometry();
+        let errors = bit_flip_error_set();
+        let diagnostics =
+            compute_error_set_qec_diagnostics(&code, &errors, 1.0e-12).unwrap();
+        let hellinger = compute_knill_laflamme_hellinger(&diagnostics, 1.0e-12).unwrap();
+        assert!(hellinger.distance <= 1.0e-10);
+        assert!(hellinger.radicand.abs() <= 1.0e-12);
+        assert_eq!(hellinger.qec_square_root.support_rank, 8);
+        assert!(hellinger.qec_square_root.reconstruction_relative_residual <= 1.0e-10);
+    }
+
+    #[test]
+    fn phase_error_negative_control_has_positive_hellinger_distance() {
+        let code = repetition_code_isometry();
+        let identity = bit_flip_operator(0);
+        let mut phase_entries = vec![Complex64::new(0.0, 0.0); 8 * 8];
+        for basis in 0..8 {
+            phase_entries[basis * 8 + basis] =
+                Complex64::new(if basis & 4 == 0 { 1.0 } else { -1.0 }, 0.0);
+        }
+        let phase = ComplexMatrix::new(8, 8, phase_entries).unwrap();
+        let diagnostics =
+            compute_error_set_qec_diagnostics(&code, &[identity, phase], 1.0e-12).unwrap();
+        let hellinger = compute_knill_laflamme_hellinger(&diagnostics, 1.0e-12).unwrap();
+        assert!(hellinger.distance > 0.1);
+    }
+
+    #[test]
+    fn exact_kl_repetition_code_has_zero_strong_petz_bound() {
+        let code = repetition_code_isometry();
+        let errors = bit_flip_error_set();
+        let diagnostics =
+            compute_error_set_qec_diagnostics(&code, &errors, 1.0e-12).unwrap();
+        // 0.5*I_4 has Frobenius norm 1 and satisfies the stronger
+        // coefficient-matrix constraint ||C||_2 <= 1.
+        let coefficient = ComplexMatrix::from_real(
+            4,
+            4,
+            &[
+                0.5, 0.0, 0.0, 0.0,
+                0.0, 0.5, 0.0, 0.0,
+                0.0, 0.0, 0.5, 0.0,
+                0.0, 0.0, 0.0, 0.5,
+            ],
+        )
+        .unwrap();
+        let bound = compute_strongly_controlled_petz_worst_case_bound(
+            &diagnostics,
+            &coefficient,
+            1.0e-12,
+        )
+        .unwrap();
+        assert!((bound.coefficient_frobenius_norm - 1.0).abs() <= 1.0e-12);
+        assert!(bound.operator_norm_deviation <= 1.0e-10);
+        assert!(bound.bures_distance_upper_bound <= 1.0e-10);
+    }
+
+    #[test]
+    fn strong_petz_bound_rejects_coefficients_outside_schatten_two_ball() {
+        let code = repetition_code_isometry();
+        let errors = bit_flip_error_set();
+        let diagnostics =
+            compute_error_set_qec_diagnostics(&code, &errors, 1.0e-12).unwrap();
+        let coefficient = ComplexMatrix::from_real(
+            4,
+            4,
+            &[
+                1.0, 0.0, 0.0, 0.0,
+                0.0, 1.0, 0.0, 0.0,
+                0.0, 0.0, 1.0, 0.0,
+                0.0, 0.0, 0.0, 1.0,
+            ],
+        )
+        .unwrap();
+        assert!(matches!(
+            compute_strongly_controlled_petz_worst_case_bound(
+                &diagnostics,
+                &coefficient,
+                1.0e-12
+            ),
+            Err(ErrorSetQecError::StrongControlNorm { .. })
+        ));
+    }
+
 }
