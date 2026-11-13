@@ -595,6 +595,31 @@ mod tests {
         );
     }
 
+    #[test]
+    fn published_schema_and_manifest_template_are_parseable_and_fail_closed() {
+        const SCHEMA: &str = include_str!("../manifest.schema.json");
+        const TEMPLATE: &str = include_str!("../manifest.template.json");
+        let schema: serde_json::Value = serde_json::from_str(SCHEMA).unwrap();
+        let template: DatasetManifest = serde_json::from_str(TEMPLATE).unwrap();
+
+        assert_eq!(
+            schema["properties"]["schema_version"]["const"],
+            MANIFEST_SCHEMA_VERSION
+        );
+        assert_eq!(template.schema_version, MANIFEST_SCHEMA_VERSION);
+        assert_eq!(template.dataset_id, "NIST-NIR-SORT");
+        assert_eq!(template.rights.status, RightsStatus::Pending);
+        assert!(template.files.is_empty());
+        assert!(
+            build_receipt(
+                Path::new("manifest.template.json"),
+                Path::new("."),
+                "benchmark_reproduction"
+            )
+            .is_err()
+        );
+    }
+
     #[cfg(unix)]
     #[test]
     fn symlink_escape_from_dataset_root_is_rejected() {
