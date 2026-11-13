@@ -102,7 +102,7 @@ Use whole material-lot, device/configuration and production-day holdouts from PL
 
 ## 8. S0 fixture scenarios
 
-The machine-readable fixture contains eight known-answer cases:
+The machine-readable fixture now contains ten known-answer cases:
 1. proxy-only plan: low WCA but no bond/aging evidence -> ABSTAIN;
 2. contact-angle trap: low WCA but bond fails -> REJECT_WINDOW;
 3. aging reversal: initial bond passes but aged bond fails -> REJECT_WINDOW;
@@ -110,7 +110,9 @@ The machine-readable fixture contains eight known-answer cases:
 5. valid multifidelity evidence across independent training holdouts -> ACCEPT_WINDOW (synthetic only);
 6. shared sample-preparation signal without admitted covariance model -> ABSTAIN;
 7. training/holdout group overlap -> BLOCKED / ABSTAIN;
-8. over-budget action portfolio -> REJECTED proposal / ABSTAIN.
+8. over-budget action portfolio -> REJECTED proposal / ABSTAIN;
+9. inadmissible experiment action -> REJECTED proposal / ABSTAIN;
+10. inadequate model family despite otherwise passing outcomes -> BLOCKED / ABSTAIN.
 
 The evaluator checks action identity, admissibility, costs, latency, sample budget, measurement provenance, calibration state, holdout disjointness, covariance references, mandatory endpoint coverage and decision gates. It does **not** rank candidate actions or claim an optimizer win; those are owned by UAP-OED.
 
@@ -160,3 +162,25 @@ No synthetic outcome, model prediction, contact angle, plasma-state alarm or vir
 ## 12. Claim ceiling
 
 A software PASS validates only the synthetic application contract and its fail-closed dispositions. It does not establish a physical mechanism, process window, stronger bond, longer service life, reduced laboratory cost, industrial savings, model performance or hardware qualification.
+
+
+## 13. S0 implementation and source-side replay — 13 November 2026
+
+Created [PLASMA-OED-001 #11907](https://github.com/Luminous-Dynamics/symthaea/issues/11907), branch `research/plasma-decision-oed-v0-1`, and the following files:
+- `docs/research/PLASMA_DECISION_FOCUSED_OED_BENCHMARK_2026-11-13.md`;
+- `data/research/plasma_decision_oed_fixture_v0_1.json`;
+- `xtask/src/plasma_decision_oed.rs`;
+- `xtask/src/main.rs` command: `plasma-decision-oed-audit`.
+
+The nine-action catalogue represents F0–F4 measurement classes, artificial costs/latencies/sample counts, endpoint coverage and admissibility. The synthetic selection receipt points to UAP-OED-001; it is an input to the domain evaluator, **not an executed optimizer result**.
+
+The ten scenarios freeze:
+- 4 audit PASS / product REJECT_WINDOW or ACCEPT_WINDOW cases;
+- 3 BLOCKED / ABSTAIN cases;
+- 3 REJECTED proposal / ABSTAIN cases.
+
+Independent source-side JavaScript replay of the exact fetched JSON matched **10/10** audit dispositions and product decisions. It checked selected-action catalogue membership, cost/latency/specimen closure, calibration and raw-trace identity, lot/device/day group disjointness, sample-preparation and independence-group covariance receipt coverage, mandatory product endpoint coverage, model adequacy / OTHER registration, and the bond/aging/barrier decision floors.
+
+Thirteen Rust unit tests are authored. The authoring environment has no Cargo, rustc or rustfmt, so this module has not been compiled, formatted, linted or executed. No hosted CI result is claimed.
+
+The fixture is synthetic-only; it does not establish a useful measurement schedule, a real EVSI ranking, physical bond performance, lab savings, a process window or experiment authority. The next integration should consume a real UAP-OED selection result and its exact source/covariance/model-adequacy receipts without copying the generic selector.
