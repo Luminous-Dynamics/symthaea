@@ -35,7 +35,15 @@ The paper defines an inter-frequency remainder as a supremum. Dense offline samp
 
 Spin et al., [Iteratively Convex Frequency Data-Driven Synthesis of Structured MIMO Controllers](https://arxiv.org/abs/2610.19756), submitted 14 October 2026. This provides a useful comparator for structured feedback/feedforward controller parameterizations, multiple performance objectives, and industrial wirebonder validation. It must not be conflated with the primary uncertainty-set reproduction.
 
-### 2.3 Claim discipline
+### 2.3 Other relevant literature baselines
+
+- Gupta, Klauser and Karimi, [Non-parametric IQC multipliers in data-driven robust controller synthesis](https://doi.org/10.1016/j.automatica.2025.112608), *Automatica* 183 (January 2026). This is a direct MIMO frequency-response/IQC synthesis comparator with non-parametric multipliers and robust stability/performance objectives. Include it in the method ledger; do not assume it solves the same finite-sampled uncertainty/interpolation problem as the October 2026 preprint.
+- Steffensen, Tcherniak and Thomsen, [Uncertainty in frequency response function estimates in experimental modal analysis](https://doi.org/10.1016/j.jsv.2025.119168), *Journal of Sound and Vibration* 614 (10 October 2025). This develops covariance expressions for H1/H2/Hv FRF estimators and considers covariance between output channels. Use it as an adjacent measurement-uncertainty baseline; explicitly test whether and how cross-frequency/common-calibration dependence is represented rather than assuming that the paper covers it.
+- The 2023 IFAC paper [Data-driven IQC-Based Uncertainty Modelling for Robust Control Design](https://doi.org/10.1016/j.ifacol.2023.10.1244) is a useful earlier uncertainty-set baseline (ellipsoidal FRF consistency and IQC conversion), although its abstract describes a SISO setting.
+
+These references broaden the comparison by separating three questions: how FRF uncertainty is estimated, how uncertainty is converted to IQC multipliers, and how finite samples support a continuous-frequency guarantee.
+
+### 2.4 Claim discipline
 
 - Reproducing a public synthetic mathematical case is not reproducing an industrial experiment.
 - An SDP solver returning an optimal status is not by itself an independently verified robust-stability certificate.
@@ -118,7 +126,9 @@ Clarabel documents a positive-semidefinite triangular cone; SCS documents real a
 
 - [SINTEF Vector Fitting / Matrix Fitting Toolbox](https://www.sintef.no/en/software/vector-fitting/) — multi-port rational FRF fitting and passive macromodelling; this is an identification/model-reduction baseline, not a robust-stability proof.
 - [MATLAB Robust Control Toolbox](https://www.mathworks.com/products/robust.html) — uncertain-model worst-case analysis, robust stability, H-infinity and mu synthesis. Compare on a common state-space/parametric-uncertainty projection where available; do not pretend this is the same method as sampled-FRF IQC synthesis.
-- Published 2026 sampled-FRF IQC method — primary method-level comparator.
+- Published 2026 sampled-FRF IQC method — primary finite-data/full-band method-level comparator.
+- Gupta et al. non-parametric IQC multipliers — direct MIMO multiplier-design comparator.
+- Steffensen et al. FRF estimator covariance — measurement-uncertainty comparator.
 - AIRROAD — dependency-preserving evidence representation and proof-guided refinement extension.
 
 ## 5. Frozen corpus
@@ -197,6 +207,9 @@ This V0.1 file is a research protocol only. It does not implement the IQC SDP, r
 
 - Spin et al. (2026), [Robust Data-Driven Controller Synthesis from Sampled and Uncertain Frequency Response Estimates using IQCs](https://arxiv.org/abs/2610.20248).
 - Spin et al. (2026), [Iteratively Convex Frequency Data-Driven Synthesis of Structured MIMO Controllers](https://arxiv.org/abs/2610.19756).
+- Gupta, Klauser and Karimi (2026), [Non-parametric IQC multipliers in data-driven robust controller synthesis](https://doi.org/10.1016/j.automatica.2025.112608).
+- Steffensen, Tcherniak and Thomsen (2025), [Uncertainty in frequency response function estimates in experimental modal analysis](https://doi.org/10.1016/j.jsv.2025.119168).
+- [Data-driven IQC-Based Uncertainty Modelling for Robust Control Design (2023)](https://doi.org/10.1016/j.ifacol.2023.10.1244).
 - [SINTEF Vector Fitting / Matrix Fitting Toolbox](https://www.sintef.no/en/software/vector-fitting/).
 - [MathWorks Robust Control Toolbox](https://www.mathworks.com/products/robust.html).
 - [Clarabel cone types](https://clarabel.org/stable/api_cone_types/).
