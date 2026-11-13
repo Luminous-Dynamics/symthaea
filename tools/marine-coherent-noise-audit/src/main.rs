@@ -392,6 +392,7 @@ fn compute_bin(bin: &SpectralBin, threshold: f64) -> Result<BinReport, String> {
     };
     Ok(BinReport {
         bin_id: bin.bin_id.clone(),
+        fft_bin_index: bin.fft_bin_index,
         center_frequency_hz: bin.center_frequency_hz,
         reference_auto_psd: bin.reference_auto_psd,
         hydrophone_auto_psd_upa2_per_hz: bin.hydrophone_auto_psd_upa2_per_hz,
@@ -468,6 +469,9 @@ fn audit(case: &Case) -> AuditReport {
         },
         operating_condition_id: case.acquisition.operating_condition_id.clone(),
         operating_point_receipt_sha256: case.operating_point_receipt_sha256.clone(),
+        cross_spectral_convention: "reference_times_conjugate_hydrophone",
+        frequency_resolution_hz: case.reference_channel.sample_rate_hz
+            / case.reference_channel.fft_length_samples as f64,
         service_fingerprint_sha256: case.service_fingerprint_sha256.clone(),
         environment_fingerprint_sha256: case.environment_fingerprint_sha256.clone(),
         timebase_receipt_sha256: case.acquisition.timebase_receipt_sha256.clone(),
