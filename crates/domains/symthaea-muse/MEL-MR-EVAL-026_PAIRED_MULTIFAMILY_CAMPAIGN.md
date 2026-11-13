@@ -82,7 +82,7 @@ The code preserves all raw policy rows and per-composition clusters so targets c
 
 ## Tests authored
 
-Six tests cover:
+Seven tests cover:
 1. Event-count/family coverage and the two frozen holdouts.
 2. Paired same-composition / same-seed comparisons and cluster-bootstrap output.
 3. Support-view corruption without changing the factorial oracle input truth.
