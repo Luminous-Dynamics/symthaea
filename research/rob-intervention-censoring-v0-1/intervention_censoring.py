@@ -182,11 +182,13 @@ def intention_to_treat_summary(
     }
     if not groups[control_policy] or not groups[candidate_policy]:
         return {"estimable": False, "reason": "one_policy_arm_empty"}
+    matched_block_count = 0
     if any(e.assignment_design == "randomized_blocked" for e in selected):
         control_blocks = {e.assignment_block_id for e in groups[control_policy]}
         candidate_blocks = {e.assignment_block_id for e in groups[candidate_policy]}
         if control_blocks != candidate_blocks:
             return {"estimable": False, "reason": "blocked_randomization_missing_arm_within_block"}
+        matched_block_count = len(control_blocks)
 
     def summarize(group: list[Episode]) -> dict[str, Any]:
         n = len(group)
@@ -212,6 +214,11 @@ def intention_to_treat_summary(
         "candidate": candidate,
         "candidate_minus_control_risk_difference": candidate["adverse_risk"] - control["adverse_risk"],
         "individual_counterfactuals_identified": False,
+        "randomization_integrity": {
+            "assignment_precedes_time_zero": all(e.assignment_precedes_time_zero for e in selected),
+            "randomization_receipt_valid": all(e.randomization_receipt_valid for e in selected),
+            "matched_block_count": matched_block_count,
+        },
         "uncertainty_interval": None,
         "note": "Descriptive synthetic point estimate only; use preregistered episode/article-clustered inference for confirmatory claims.",
     }
