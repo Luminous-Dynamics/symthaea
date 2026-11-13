@@ -243,6 +243,8 @@ pub enum CorpusQualificationIssueV1 {
     ComposerLeakage { fold_id: String, composer_group_id: String },
     WorkLeakage { fold_id: String, work_group_id: String },
     ExactArtifactLeakage { fold_id: String, digest: String },
+    PathLeakage { fold_id: String, path: String },
+    NonTestSplitNotPermitted { sample_id: String, split: CorpusSplitRoleV1 },
     WrongProtocolSchema,
     EmptyEvaluatorSchema,
     InvalidProtocolDigest { field: String },
@@ -444,6 +446,9 @@ pub fn validate_corpus_sample_manifest(
     let mut composer_splits: BTreeMap<(String, String), CorpusSplitRoleV1> = BTreeMap::new();
     let mut work_splits: BTreeMap<(String, String), CorpusSplitRoleV1> = BTreeMap::new();
     let mut artifact_splits: BTreeMap<(String, String), CorpusSplitRoleV1> = BTreeMap::new();
+    // A path is an artifact identity too. Checking only its declared digest
+    // would miss one path incorrectly declared with two different hashes.
+    let mut path_splits: BTreeMap<(String, String), CorpusSplitRoleV1> = BTreeMap::new();
 
     for sample in &manifest.samples {
         if sample.sample_id.trim().is_empty() {
@@ -459,6 +464,12 @@ pub fn validate_corpus_sample_manifest(
                 sample_id: sample.sample_id.clone(),
             });
         }
+        if !track.training_allowed && sample.split != CorpusSplitRoleV1::Test {
+            issues.push(CorpusQualificationIssueV1::NonTestSplitNotPermitted {
+                sample_id: sample.sample_id.clone(),
+                split: sample.split,
+            });
+        }
         if !is_safe_relative_path(&sample.input_relative_path) {
             issues.push(CorpusQualificationIssueV1::InvalidInputPath {
                 sample_id: sample.sample_id.clone(),
@@ -468,6 +479,30 @@ pub fn validate_corpus_sample_manifest(
             issues.push(CorpusQualificationIssueV1::InvalidReferencePath {
                 sample_id: sample.sample_id.clone(),
             });
+        }
+        if is_safe_relative_path(&sample.input_relative_path) {
+            let key = (sample.fold_id.clone(), sample.input_relative_path.clone());
+            if path_splits
+                .insert(key.clone(), sample.split)
+                .is_some_and(|previous| previous != sample.split)
+            {
+                issues.push(CorpusQualificationIssueV1::PathLeakage {
+                    fold_id: key.0,
+                    path: key.1,
+                });
+            }
+        }
+        if is_safe_relative_path(&sample.reference_relative_path) {
+            let key = (sample.fold_id.clone(), sample.reference_relative_path.clone());
+            if path_splits
+                .insert(key.clone(), sample.split)
+                .is_some_and(|previous| previous != sample.split)
+            {
+                issues.push(CorpusQualificationIssueV1::PathLeakage {
+                    fold_id: key.0,
+                    path: key.1,
+                });
+            }
         }
         if !is_sha256(&sample.input_sha256) {
             issues.push(CorpusQualificationIssueV1::InvalidInputDigest {
@@ -1532,4 +1567,70 @@ mod tests {
             mirex.tracks[1].external_protocol_label
         );
     }
+
+    #[test]
+    fn external_evaluation_only_track_rejects_train_validation_and_calibration_rows() {
+        let registration = registration("mirex-2026-quartets");
+        let track = registration
+            .tracks
+            .iter()
+            .find(|track| track.track_id == "blind-audio-to-score")
+            .unwrap();
+        let manifest = sample_manifest(
+            &registration,
+            &track.track_id,
+            vec![
+                sample("train", "fold-1", CorpusSplitRoleV1::Train, "composer-a", "work-a", '1', '2'),
+                sample("validation", "fold-1", CorpusSplitRoleV1::Validation, "composer-b", "work-b", '3', '4'),
+                sample("calibration", "fold-1", CorpusSplitRoleV1::Calibration, "composer-c", "work-c", '5', '6'),
+                sample("test", "fold-1", CorpusSplitRoleV1::Test, "composer-d", "work-d", '7', '8'),
+            ],
+        );
+        let issues = validate_corpus_sample_manifest(&registration, track, &manifest);
+        for (sample_id, split) in [
+            ("train", CorpusSplitRoleV1::Train),
+            ("validation", CorpusSplitRoleV1::Validation),
+            ("calibration", CorpusSplitRoleV1::Calibration),
+        ] {
+            assert!(issues.contains(&CorpusQualificationIssueV1::NonTestSplitNotPermitted {
+                sample_id: sample_id.into(),
+                split,
+            }));
+        }
+        assert!(!issues.iter().any(|issue| matches!(
+            issue,
+            CorpusQualificationIssueV1::NonTestSplitNotPermitted {
+                sample_id,
+                ..
+            } if sample_id == "test"
+        )));
+    }
+
+    #[test]
+    fn a_declared_path_cannot_cross_splits_even_with_different_hashes() {
+        let registration = registration("ossq-omr");
+        let track = &registration.tracks[0];
+        let mut first = sample(
+            "train-sample", "fold-1", CorpusSplitRoleV1::Train,
+            "composer-a", "work-a", '1', '2'
+        );
+        let mut second = sample(
+            "test-sample", "fold-1", CorpusSplitRoleV1::Test,
+            "composer-b", "work-b", '3', '4'
+        );
+        first.input_relative_path = "shared/source.png".into();
+        second.input_relative_path = "shared/source.png".into();
+        let manifest = sample_manifest(&registration, &track.track_id, vec![first, second]);
+        let issues = validate_corpus_sample_manifest(&registration, track, &manifest);
+        assert!(issues.contains(&CorpusQualificationIssueV1::PathLeakage {
+            fold_id: "fold-1".into(),
+            path: "shared/source.png".into(),
+        }));
+        // Different declarations for the same path cannot hide the conflict.
+        assert!(!issues.iter().any(|issue| matches!(
+            issue,
+            CorpusQualificationIssueV1::ExactArtifactLeakage { .. }
+        )));
+    }
+
 }
