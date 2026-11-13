@@ -23,6 +23,8 @@ These dimensions are not collapsed into a weighted score. A payment can satisfy 
 - cmd/mace-evalqual: offline CLI.
 - fixtures/: synthetic demonstration corpus, pinned manifest and corresponding observations.
 - qualify_test.go: deterministic adversarial and statistical-semantics tests.
+- qualify_grader_mutation_test.go: grader-integrity negative-control and condition-removal tests.
+- schemas/: Draft 2020-12 structural schemas; cross-record invariants are enforced by the Go validator.
 - verify.sh: format, tests, race detector, vet, build and demo CLI checks.
 
 ## Run
@@ -49,6 +51,8 @@ Supported kinds:
 - representation_twin: varies an irrelevant representation while preserving semantic outcome.
 
 A negative case names a positive baseline and a condition-removed twin. Links are reciprocal, and all three share the same task and family. Every family must include at least one positive, negative and condition-removed case. These relations make it harder for a reject-everything grader to qualify or for a negative control to change several conditions at once.
+
+The ten-fixture synthetic demonstration exercises all three failure dimensions: a no-op task failure, wrong-principal effect failure, and grader-test tampering that fails benchmark integrity while task utility remains successful. Each negative has a condition-removed twin.
 
 The corpus declares expected outcomes; it does not execute candidates. A benchmark-specific adapter must run the reference, no-op, mutated and condition-removed cases, query its native grader and independent state/event oracle, and produce observations in the declared format.
 
