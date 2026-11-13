@@ -29,9 +29,11 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Format the isolated AIRROAD crate
-        run: cargo fmt --manifest-path crates/domains/symthaea-airroad-iqc/Cargo.toml --package symthaea-airroad-iqc -- --check
-      - name: Run isolated unit tests
-        run: cargo test --manifest-path crates/domains/symthaea-airroad-iqc/Cargo.toml --package symthaea-airroad-iqc
-      - name: Run isolated Clippy
-        run: cargo clippy --manifest-path crates/domains/symthaea-airroad-iqc/Cargo.toml --package symthaea-airroad-iqc --all-targets -- -D warnings
+      - name: Format the isolated source without resolving the workspace
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-airroad-iqc/src/lib.rs
+      - name: Compile and run isolated unit tests
+        run: |
+          rustc --edition 2024 --test crates/domains/symthaea-airroad-iqc/src/lib.rs -o "$RUNNER_TEMP/airroad-hermitian-tests"
+          "$RUNNER_TEMP/airroad-hermitian-tests"
+      - name: Run isolated Clippy without resolving the workspace
+        run: clippy-driver --edition 2024 --crate-name symthaea_airroad_iqc --crate-type lib --deny warnings crates/domains/symthaea-airroad-iqc/src/lib.rs
