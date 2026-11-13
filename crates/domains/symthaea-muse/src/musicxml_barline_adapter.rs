@@ -579,6 +579,7 @@ pub fn parse_musicxml_part_notation_graph(
                 non_controlling_measure_indices: Vec::new(),
                 barline_events: Vec::new(),
                 playback_controls: Vec::new(),
+                notation_events: parse_musicxml_part_notation_events(part, part_id, &[]),
             }),
         }
     }
@@ -588,8 +589,9 @@ pub fn parse_musicxml_part_notation_graph(
 
 /// Canonical SHA-256 commitment to one parsed per-part notation graph.
 ///
-/// The commitment includes the measure map, non-controlling flags and every
-/// barline event. It is a content digest, not a signature or source-authenticity
+/// The commitment includes the measure map, non-controlling flags, barline
+/// events, playback controls and exact MusicXML notation-event layer. It is
+/// a content digest, not a signature or source-authenticity
 /// proof.
 pub fn musicxml_notation_graph_commitment(
     graph: &MusicXmlPartNotationGraphV1,
