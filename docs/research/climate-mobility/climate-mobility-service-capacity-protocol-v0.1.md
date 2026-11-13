@@ -162,7 +162,7 @@ Every floor assessment must bind:
 - an exact, versioned floor profile and the responsible authority/reference;
 - a named aggregate service scope (such as a declared community cell), metric and unit;
 - the exact observation bundle and its validity/coverage;
-- the observation-valid-from and observation-valid-to timestamps, the assessment timestamp, and a maximum observation-age budget supplied by the versioned policy; missing timing or stale observations remain indeterminate, future/inverted windows are rejected;
+- the observation-valid-from and observation-valid-to timestamps, the assessment timestamp, and a maximum observation-age budget bound to a named, versioned freshness-policy reference; missing timing or stale observations remain indeterminate, future/inverted windows are rejected;
 - a conservative observed lower/upper interval;
 - covered and total units for the declared scope;
 - the evidence class, qualification level and limitations.
