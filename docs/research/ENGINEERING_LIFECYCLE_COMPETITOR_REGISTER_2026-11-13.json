@@ -41,15 +41,19 @@
       "vendor": "Aras",
       "products": [
         "Aras Innovator UCM",
-        "InnovatorEdge AI Impact Analysis Agent"
+        "InnovatorEdge AI Impact Analysis Agent",
+        "InnovatorEdge AI platform 2.4 (released 2026-11-10; platform version, not Impact Analysis Agent version)"
       ],
-      "source_revision_or_date": "Impact Analysis AI Agent v1.0.0 general availability announced 2026-03-23; v1.0.1 release notes 2026-08-18",
+      "source_revision_or_date": "Impact Analysis AI Agent v1.0.0 general availability announced 2026-03-23; v1.0.1 release notes 2026-08-18; InnovatorEdge AI platform 2.4 release notes 2026-11-10",
       "capabilities": [
         "five AI specialist agents analyze change-request context, product structure and historical change orders",
         "a recommendation validator consolidates the affected-item recommendation set",
         "recommendations carry suggested Revise/Release/Obsolete action and rationale",
         "human reviews and selectively applies affected-item relationships",
-        "applied rationale is written into the change record; the change request remains in Draft and normal UCM approval continues"
+        "applied rationale is written into the change record; the change request remains in Draft and normal UCM approval continues",
+        "multiple MCP Server profiles per tenant, each with independent endpoint URL, Access Point, published-tool selection and enabled/disabled state",
+        "Edge AI MCP Server calls use End User authentication under the signed-in user's Innovator permissions",
+        "beta Invoke Innovator Method Tool is available for external AI clients when exposed by Edge API and requires per-call user confirmation"
       ],
       "benchmark_relevance": "Most directly documented AI change-impact comparator; a mandatory target for the industrial-change pilot if a licensed, representative environment can be accessed.",
       "prerequisites_or_known_boundaries": [
@@ -62,13 +66,19 @@
         "Public documentation does not report independent gold-set accuracy, critical impact recall, evidence-applicability confusion matrix, human time or cost per accepted result.",
         "The configured account needs read/update access to Change Requests and read access to Affected Items (Parts, CADs and Documents); record the effective principal and permissions at analysis and apply time.",
         "The optional Analysis Instructions field is free text intended to focus/constrain one session; it is task context, not an authority, approval or declassification grant.",
-        "Benchmark only the selected relationships the user explicitly applies; verify the Change Request remains Draft and record the observed effects rather than assuming undocumented transactional or permission semantics."
+        "Benchmark only the selected relationships the user explicitly applies; verify the Change Request remains Draft and record the observed effects rather than assuming undocumented transactional or permission semantics.",
+        "Distinguish Impact Analysis AI Agent v1.0.1 from InnovatorEdge AI platform 2.4; do not label the agent itself v2.4.",
+        "Record every MCP profile endpoint, Access Point, tool-set revision/digest, enabled state, user/CIAM role, authentication mode and current Innovator permission snapshot in a licensed trial.",
+        "The administrator guide says Claude caches its connector tool list and does not re-read it on every call; test whether stale cached tools are rejected at effect entry after a profile/tool/permission change.",
+        "Test cross-profile endpoint/tool substitution and beta method invocation without explicit per-call confirmation. The guide describes configuration controls, not a reproduced attack or proof of a runtime flaw."
       ],
       "evidence_class": "vendor_release_notes_and_user_documentation",
       "sources": [
         "https://docs.aras.com/aras-innovatoredge-ai-book/aras-innovatoredge-ai-agents-release-notes",
         "https://docs.aras.com/aras-innovatoredge-ai-book/impact-analysis-ai-agent-user-guide",
-        "https://docs.aras.com/unified-change-management-beta"
+        "https://docs.aras.com/unified-change-management-beta",
+        "https://docs.aras.com/aras-innovatoredge-ai-book/edge-ai-release-notes",
+        "https://docs.aras.com/aras-innovatoredge-ai-book/innovatoredge-ai-administrator-guide"
       ],
       "eligibility": "conditional_vendor_arm_no_access_or_run_claimed"
     },
@@ -130,7 +140,9 @@
     "AI-assisted change-impact recommendations are now a documented commercial capability, not a unique Luminous category.",
     "The Aras Impact Analysis AI Agent is a direct comparator and must be included before making a broad claim that Luminous is ahead of industry AI-assisted change impact.",
     "Public materials reviewed do not establish whether these products provide the exact ten-state claim-evidence applicability contract owned by Symthaea #10581; absence from public documentation is not proof that the feature is absent.",
-    "No vendor access, tenant, license, implementation, benchmark task, price quote or performance result was obtained in this research pass."
+    "No vendor access, tenant, license, implementation, benchmark task, price quote or performance result was obtained in this research pass.",
+    "Aras InnovatorEdge AI platform 2.4 documents profile-scoped MCP endpoints and tool sets, plus beta method invocation with per-call confirmation; the security boundary now includes stale client tool discovery and current effect-entry authorization.",
+    "A cached client tool list is not a server authorization decision. A trial must test current server-side effect enforcement after profile disablement, tool removal, Access Point change and user permission revocation."
   ],
   "differentiation_hypothesis": [
     "Move beyond an affected-item list to claim–evidence pair decisions with scoped preservation witnesses, exact recalculation, review, retest, physical evidence, external approval, unknown and unsupported states.",
@@ -138,7 +150,8 @@
     "Independently reconstruct why each affected claim/evidence decision is valid, using evidence manifests and owner-qualified semantics rather than only a model-generated rationale.",
     "Preserve the system of record and professional approval authority; the agent proposes applicability obligations but does not approve, release, sign or actuate.",
     "Operate across vendor boundaries while retaining exact source identity, version, evidence provenance and unsupported semantics.",
-    "Compete on total cost per independently accepted engineering-change assessment, including human review, integration, rework and verification."
+    "Compete on total cost per independently accepted engineering-change assessment, including human review, integration, rework and verification.",
+    "Treat tool discovery and cached tool inventories as untrusted proposals; independently verify current endpoint/profile/tool/identity/permission at effect entry and reconstruct the resulting effect."
   ],
   "benchmark_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/10543",
   "gold_protocol_owner": "https://github.com/Luminous-Dynamics/symthaea/issues/10581",
