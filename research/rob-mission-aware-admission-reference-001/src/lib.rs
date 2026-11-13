@@ -1064,6 +1064,11 @@ mod tests {
         audit.decision_admission_mode = DecisionAdmissionMode::ReplanWithLocalFallback;
         audit.decision_sufficiency.as_mut().unwrap().disposition =
             DecisionSufficiencyDisposition::Insufficient;
+        audit
+            .decision_sufficiency
+            .as_mut()
+            .unwrap()
+            .remaining_sufficient_ticks = None;
         audit.local_fallback_ready = false;
         let report = admit_batch(SchedulerPolicy::Luminous, &cursor(), budget(), &[audit]).unwrap();
         assert_eq!(
