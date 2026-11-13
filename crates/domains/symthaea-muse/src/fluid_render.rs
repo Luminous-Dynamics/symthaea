@@ -19,6 +19,9 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static SOURCE_MIDI_TEMP_NONCE: AtomicU64 = AtomicU64::new(1);
 
 /// The consciousness-state color mapped into FluidSynth settings — so the
 /// Studio's state sliders keep DOING something under the soundfont
@@ -99,6 +102,43 @@ pub fn available() -> Option<(PathBuf, PathBuf)> {
                 .find(|p| p.is_file())
         })?;
     Some((binary, soundfont))
+}
+
+/// Whether these exact bytes are a supported simultaneous-sequence SMF
+/// (Format 0 or 1). Format 2 contains independent sequential patterns and
+/// cannot be treated as one shared performance timeline.
+fn source_midi_bytes_supported(bytes: &[u8]) -> bool {
+    matches!(
+        midly::Smf::parse(bytes).map(|smf| smf.header.format),
+        Ok(midly::Format::SingleTrack | midly::Format::Parallel)
+    )
+}
+
+/// Render the exact uploaded MIDI bytes through FluidSynth without
+/// reconstructing or re-exporting the note-centric Score. The source bytes are
+/// written unchanged to a unique temporary file, rendered, and then removed.
+/// This is a soundfont rendering of the MIDI performance events, not a
+/// recreation of the original acoustic recording.
+pub fn render_midi_bytes_to_wav(
+    midi_bytes: &[u8],
+    sample_rate: u32,
+    color: Option<RenderColor>,
+) -> Option<Vec<u8>> {
+    if sample_rate == 0 || !source_midi_bytes_supported(midi_bytes) {
+        return None;
+    }
+    // Check renderer availability before creating any temporary artifacts.
+    available()?;
+    let nonce = SOURCE_MIDI_TEMP_NONCE.fetch_add(1, Ordering::Relaxed);
+    let path = std::env::temp_dir().join(format!(
+        "muse_source_midi_{}_{}.mid",
+        std::process::id(),
+        nonce
+    ));
+    std::fs::write(&path, midi_bytes).ok()?;
+    let rendered = render_midi_to_wav(&path, sample_rate, color);
+    let _ = std::fs::remove_file(&path);
+    rendered
 }
 
 /// Render a Standard MIDI File to MASTERED 16-bit stereo WAV bytes via
@@ -388,4 +428,48 @@ mod tests {
         assert!(master_wav(&silent).is_none());
         std::fs::remove_file(&silent).ok();
     }
+
+    #[test]
+    fn source_midi_support_accepts_format_zero_and_one_but_rejects_format_two() {
+        fn midi(format: u16, track_count: u16) -> Vec<u8> {
+            let mut bytes = Vec::new();
+            bytes.extend_from_slice(b"MThd");
+            bytes.extend_from_slice(&6_u32.to_be_bytes());
+            bytes.extend_from_slice(&format.to_be_bytes());
+            bytes.extend_from_slice(&track_count.to_be_bytes());
+            bytes.extend_from_slice(&480_u16.to_be_bytes());
+            for _ in 0..track_count {
+                bytes.extend_from_slice(b"MTrk");
+                bytes.extend_from_slice(&4_u32.to_be_bytes());
+                bytes.extend_from_slice(&[0, 0xFF, 0x2F, 0]);
+            }
+            bytes
+        }
+        assert!(source_midi_bytes_supported(&midi(0, 1)));
+        assert!(source_midi_bytes_supported(&midi(1, 2)));
+        assert!(!source_midi_bytes_supported(&midi(2, 2)));
+        assert!(!source_midi_bytes_supported(b"not a MIDI file"));
+    }
+
+    #[test]
+    fn source_midi_render_rejects_invalid_input_before_environment_lookup() {
+        assert!(render_midi_bytes_to_wav(b"bad", 44_100, None).is_none());
+        let midi = {
+            let mut bytes = Vec::new();
+            bytes.extend_from_slice(b"MThd");
+            bytes.extend_from_slice(&6_u32.to_be_bytes());
+            bytes.extend_from_slice(&2_u16.to_be_bytes());
+            bytes.extend_from_slice(&2_u16.to_be_bytes());
+            bytes.extend_from_slice(&480_u16.to_be_bytes());
+            for _ in 0..2 {
+                bytes.extend_from_slice(b"MTrk");
+                bytes.extend_from_slice(&4_u32.to_be_bytes());
+                bytes.extend_from_slice(&[0, 0xFF, 0x2F, 0]);
+            }
+            bytes
+        };
+        assert!(render_midi_bytes_to_wav(&midi, 44_100, None).is_none());
+        assert!(render_midi_bytes_to_wav(&midi, 0, None).is_none());
+    }
+
 }
