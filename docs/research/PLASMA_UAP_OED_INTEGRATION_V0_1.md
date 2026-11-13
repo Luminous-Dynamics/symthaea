@@ -149,6 +149,16 @@ The candidate rows, priors, covariance and costs are embedded in the versioned R
 
 GoBOED (Go et al.), *Goal-driven Bayesian Optimal Experimental Design for Robust Decision-Making Under Model Uncertainty* (arXiv preprint, 25 May 2026; arXiv:2605.26093), couples a Bayesian posterior surrogate to a robust downstream decision layer. Its central lesson is that uncertainty in parameter directions irrelevant to the decision can waste experiment budget. It evaluates source localization, epidemic control and pharmacokinetic control; it is not a plasma/materials benchmark.
 
+A second current comparator is the additive robust Bayesian likelihood planner in [REA PR #10105](https://github.com/Luminous-Dynamics/symthaea/pull/10105) / [REA-RUST-013 #10101](https://github.com/Luminous-Dynamics/symthaea/issues/10101). It supports expected, worst-case and lower-tail CVaR EIG over caller-supplied finite likelihood scenarios, top-1/top-3 ranking stability and explicit unstable-ranking abstention. Its claim ceiling is that the scenarios and likelihoods are caller-supplied and not authenticated/calibrated by the planner.
+
+This is complementary to, not interchangeable with, the UAP Gaussian-Jacobian API:
+- use UAP-OED for continuous target/nuisance sensitivity, geometry, target-marginal EIG and selected-set Gaussian residual covariance;
+- use the REA robust likelihood API for finite predicted-outcome distributions of competing surface-mechanism hypotheses where such likelihood rows are justified;
+- use OLI/CTGP for adequacy, discrepancy and OTHER/open-world challenges;
+- use the plasma application adapter for physical endpoint coverage, material state, cost/sample budgets and abstention.
+
+Do not collapse EIG nats from different observation likelihoods into one score or treat the finite REA scenario set as a universal uncertainty guarantee.
+
 The fair plasma comparison is therefore:
 - nominal target-marginal EIG using UAP-OED-002;
 - selected-set covariance-aware EIG using UAP-OED-003;
