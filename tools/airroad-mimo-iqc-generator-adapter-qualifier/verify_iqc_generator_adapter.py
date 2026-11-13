@@ -48,6 +48,28 @@ def partition_valid(intervals: list[tuple[Fraction, Fraction]],
     )
 
 
+
+def coordinate_scope_valid(coordinate: dict, required_frequencies: list[str],
+                           required_elements: set[str]) -> bool:
+    return (
+        set(coordinate.get("applies_to_frequency_ids", [])) == set(required_frequencies)
+        and set(coordinate.get("applies_to_matrix_elements", [])) == required_elements
+        and len(coordinate.get("applies_to_matrix_elements", [])) == len(required_elements)
+    )
+
+
+def knot_identity_valid(knot: dict, data: dict) -> bool:
+    return (
+        knot.get("model_identity") == data.get("model_identity")
+        and knot.get("topology_identity") == data.get("topology_identity")
+        and knot.get("operating_point_identity") == data.get("operating_point_identity")
+        and knot.get("acquisition_root_identity") == data.get("acquisition_root_identity")
+        and knot.get("calibration_certificate_identity") == data.get("calibration_certificate_identity")
+        and knot.get("frequency_unit") == data.get("frequency_unit")
+        and knot.get("port_order") == data.get("port_order")
+    )
+
+
 def main() -> None:
     data = json.loads(FIXTURE.read_text(encoding="utf-8"))
     assert data["schema"] == "luminous.airroad.mimo_iqc_shared_generator_adapter.v0_1"
@@ -73,13 +95,15 @@ def main() -> None:
     assert theta["acquisition_root_identity"] == data["acquisition_root_identity"]
     assert theta["calibration_certificate_identity"] == data["calibration_certificate_identity"]
     assert theta["applies_to_frequency_ids"] == ["omega-1", "omega-2"]
-    assert set(theta["applies_to_matrix_elements"]) == {"G11", "G12", "G21", "G22"}
+    required_elements = {"G11", "G12", "G21", "G22"}
+    assert coordinate_scope_valid(theta, ["omega-1", "omega-2"], required_elements)
 
     knots = data["frequency_knots"]
     assert len(knots) == 2
     assert [item["frequency_id"] for item in knots] == ["omega-1", "omega-2"]
     assert [q(item["omega"]) for item in knots] == [Fraction(1), Fraction(2)]
     assert all(item["shared_coordinate_id"] == theta_id for item in knots)
+    assert all(knot_identity_valid(item, data) for item in knots)
 
     nominal = []
     generators = []
@@ -152,12 +176,22 @@ def main() -> None:
     # Counterfactuals: distinct IDs with equal numeric domain are not shared.
     cf = data["counterfactuals"]
     assert cf["second_frequency_coordinate_id"] != theta_id
+    incomplete_scope = dict(theta)
+    incomplete_scope["applies_to_matrix_elements"] = cf["incomplete_matrix_element_scope"]
+    assert not coordinate_scope_valid(incomplete_scope, ["omega-1", "omega-2"], required_elements)
+    assert cf["unknown_dependency_status"] == "UNKNOWN"
     assert q(cf["understated_remainder_radius"]) < exact_max
     gap = [(q(x["lower"]), q(x["upper"])) for x in cf["interval_gap"]]
     assert not partition_valid(gap, omega_lo, omega_hi)
     assert cf["stale_calibration_identity"] != data["calibration_certificate_identity"]
     assert cf["stale_topology_identity"] != data["topology_identity"]
     assert cf["statistical_semantics"] != "deterministic_hard_set"
+    assert all(knot_identity_valid({**item, "topology_identity": cf["stale_topology_identity"]}, data) is False for item in knots)
+    adapter_output = data["adapter_output"]
+    assert adapter_output["artifact_type"] == "evidence_qualified_joint_frequency_generator_set"
+    assert adapter_output["controller_synthesis_performed"] is False
+    assert adapter_output["iqc_feasibility_claim"] is False
+    assert adapter_output["robust_stability_claim"] is False
 
     controls = {item["id"]: item["expected"] for item in data["negative_controls"]}
     assert controls["same-coordinate-id-at-both-knots"] == "joint-affine-relation-exact"
