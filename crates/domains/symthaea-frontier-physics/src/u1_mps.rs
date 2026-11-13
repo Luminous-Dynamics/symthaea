@@ -4118,4 +4118,83 @@ mod tests {
         assert!(ledger.global_state_error_bound_upper.is_none());
     }
 
+
+    #[test]
+    fn mixed_canonical_sweeps_preserve_complex_dense_state_and_report_isometries() {
+        let mut dense = vec![Complex64::new(0.0, 0.0); 16];
+        dense[3] = Complex64::new(0.3, 0.1);
+        dense[5] = Complex64::new(-0.2, 0.25);
+        dense[6] = Complex64::new(0.4, -0.1);
+        dense[9] = Complex64::new(0.1, 0.3);
+        dense[10] = Complex64::new(-0.35, 0.2);
+        dense[12] = Complex64::new(0.2, -0.15);
+        let norm = dense.iter().map(|value| value.norm_sqr()).sum::<f64>().sqrt();
+        for value in &mut dense {
+            *value /= norm;
+        }
+
+        let mut state = ComplexU1Mps::from_dense_fixed_charge(&dense, 4, 2, 1.0e-12).unwrap();
+        let before = state.to_dense(8).unwrap();
+        let input_norm = state.norm_squared(1.0e-12).unwrap();
+        let receipt = state.canonicalize_for_bond(1, 1.0e-10).unwrap();
+
+        assert_eq!(receipt.bond, 1);
+        assert_eq!(receipt.site_count, 4);
+        assert_eq!(receipt.total_charge, 2);
+        assert_eq!(receipt.left_isometry_residuals.len(), 1);
+        assert_eq!(receipt.right_isometry_residuals.len(), 1);
+        assert!(receipt.maximum_left_isometry_residual <= 1.0e-10);
+        assert!(receipt.maximum_right_isometry_residual <= 1.0e-10);
+        assert!(receipt.factorization_max_residual <= 1.0e-10);
+        assert!(receipt.relative_norm_drift <= 1.0e-10);
+        assert!(receipt.qualifies(1.0e-10));
+        assert!(receipt.exterior_operator_norm_product_upper_bound() >= 1.0);
+        assert_eq!(state.total_charge(), 2);
+        assert!(state.selection_rule_residual() <= 1.0e-10);
+        assert!((state.norm_squared(1.0e-10).unwrap() - input_norm).abs() <= 1.0e-10);
+
+        let after = state.to_dense(8).unwrap();
+        for (index, (actual, expected)) in after.iter().zip(before.iter()).enumerate() {
+            assert!(
+                (*actual - *expected).norm() <= 1.0e-10,
+                "basis={index}, actual={actual:?}, expected={expected:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn mixed_canonical_sweep_handles_left_and_right_boundary_centers() {
+        let dense = [
+            Complex64::new(0.0, 0.0),
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.5, 0.0),
+            Complex64::new(0.0, 0.0),
+        ];
+        let mut left_center = ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12).unwrap();
+        let left_receipt = left_center.canonicalize_for_bond(0, 1.0e-10).unwrap();
+        assert!(left_receipt.left_isometry_residuals.is_empty());
+        assert_eq!(left_receipt.right_isometry_residuals.len(), 0);
+        assert!(left_receipt.qualifies(1.0e-10));
+
+        let mut right_center = ComplexU1Mps::from_dense_fixed_charge(&dense, 2, 1, 1.0e-12).unwrap();
+        let right_receipt = right_center.canonicalize_for_bond(0, 1.0e-10).unwrap();
+        assert!(right_receipt.qualifies(1.0e-10));
+        assert!(right_center.selection_rule_residual() <= 1.0e-10);
+    }
+
+    #[test]
+    fn mixed_canonicalization_rejects_invalid_center_and_tolerance_without_mutation() {
+        let mut state = ComplexU1Mps::product_state(&[true, false, true, false]).unwrap();
+        let before = state.to_dense(8).unwrap();
+        assert!(matches!(
+            state.canonicalize_for_bond(3, 1.0e-12),
+            Err(U1MpsError::TwoSiteShapeMismatch)
+        ));
+        assert!(matches!(
+            state.canonicalize_for_bond(0, 0.0),
+            Err(U1MpsError::InvalidTolerance(0.0))
+        ));
+        assert_eq!(state.to_dense(8).unwrap(), before);
+    }
+
 }
