@@ -13,7 +13,7 @@ use crate::evidence_digest::canonical_json_sha256;
 use crate::musicxml_barline_adapter::MusicXmlPartNotationGraphV1;
 use crate::musicxml_notation_events::{
     MusicXmlNotationEventKindV1, MusicXmlNotationEventV1, MusicXmlNotationEventsStatusV1,
-    MusicXmlPartNotationEventsV1, MusicXmlSourceNodeV1, MusicXmlTieV1,
+    MusicXmlPartNotationEventsV1, MusicXmlTieV1,
 };
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -86,7 +86,7 @@ pub enum MusicXmlScoreEvaluationErrorV1 {
     SerializationFailed,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicXmlScoreMetricV1 {
     pub gold_count: usize,
     pub prediction_count: usize,
@@ -101,7 +101,7 @@ pub struct MusicXmlScoreMetricV1 {
     pub f1: Option<f64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicXmlScoreAgreementV1 {
     pub compared: usize,
     pub agreements: usize,
@@ -112,7 +112,7 @@ pub struct MusicXmlScoreAgreementV1 {
     pub accuracy: Option<f64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicXmlAttributeEditSummaryV1 {
     pub gold_event_count: usize,
     pub prediction_event_count: usize,
@@ -121,7 +121,7 @@ pub struct MusicXmlAttributeEditSummaryV1 {
     pub normalized_edit_rate: Option<f64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MusicXmlScoreEvaluationReportV1 {
     pub evaluator_version: String,
     pub matching_algorithm: String,
@@ -170,7 +170,7 @@ pub enum MusicXmlScoreEvaluationUnavailableReasonV1 {
     NoComparableNotationEventParts,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum MusicXmlScoreEvaluationOutcomeV1 {
     Evaluated(MusicXmlScoreEvaluationReportV1),
     Unavailable {
@@ -286,21 +286,6 @@ impl Agreement {
             prediction_unlabelled: self.prediction_unlabelled,
             accuracy: (self.compared > 0)
                 .then(|| self.agreements as f64 / self.compared as f64),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct ScorePoint {
-    numerator: i64,
-    denominator: i64,
-}
-
-impl From<RationalBeat> for ScorePoint {
-    fn from(value: RationalBeat) -> Self {
-        Self {
-            numerator: value.numerator(),
-            denominator: value.denominator(),
         }
     }
 }
