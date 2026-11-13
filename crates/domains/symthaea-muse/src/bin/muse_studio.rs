@@ -2359,7 +2359,39 @@ fn symbolic_import_format(filename: &str) -> Option<symthaea_muse_protocol::Symb
 /// always disclosed.
 fn render_import_audition(
     score: &symthaea_music_theory::Score,
-) -> Result<(Vec<u8>, &'static str), (StatusCode, String)> {
+    source_bytes: &[u8],
+    format: &symthaea_muse_protocol::SymbolicImportFormat,
+) -> Result<
+    (
+        Vec<u8>,
+        &'static str,
+        symthaea_muse_protocol::ImportedAuditionKind,
+        String,
+    ),
+    (StatusCode, String),
+> {
+    use symthaea_muse_protocol::ImportedAuditionKind;
+
+    // A MIDI upload already contains the performance event stream. Render
+    // those exact bytes first; re-exporting the flattened Score would discard
+    // source tempo/event timing, velocities and program/controller events.
+    if matches!(format, symthaea_muse_protocol::SymbolicImportFormat::Midi) {
+        if let Some(wav) = symthaea_muse::fluid_render::render_midi_bytes_to_wav(
+            source_bytes,
+            SAMPLE_RATE,
+            None,
+        ) {
+            return Ok((
+                wav,
+                "fluidsynth",
+                ImportedAuditionKind::SourceMidiPerformance,
+                "source MIDI event stream rendered through FluidSynth and the configured soundfont; this is a synthesized rendering of MIDI performance data, not the original acoustic recording".into(),
+            ));
+        }
+    }
+
+    // MusicXML and MuseScore JSON provide notation/Score data, not an original
+    // acoustic performance. Their audition is a disclosed reconstruction.
     if symthaea_muse::fluid_render::available().is_some() {
         let path =
             std::env::temp_dir().join(format!("muse_import_audition_{}.mid", unique_temp_suffix()));
@@ -2373,12 +2405,35 @@ fn render_import_audition(
         .and_then(|()| symthaea_muse::fluid_render::render_midi_to_wav(&path, SAMPLE_RATE, None));
         let _ = std::fs::remove_file(&path);
         if let Some(wav) = fluid_wav {
-            return Ok((wav, "fluidsynth"));
+            return Ok((
+                wav,
+                "fluidsynth",
+                ImportedAuditionKind::ReconstructedScore,
+                default_instrumentation_note(),
+            ));
         }
     }
     let rendered =
         symthaea_muse::theory_realize::realize(score, &MusicalState::default(), SAMPLE_RATE);
-    Ok((wav_bytes(&rendered.audio).map_err(internal)?, "native"))
+    Ok((
+        wav_bytes(&rendered.audio).map_err(internal)?,
+        "native",
+        ImportedAuditionKind::ReconstructedScore,
+        default_instrumentation_note(),
+    ))
+}
+
+fn verify_imported_audition_bytes(
+    summary: &symthaea_muse_protocol::ImportedWorkSummary,
+    bytes: &[u8],
+) -> Result<bool, StatusCode> {
+    match summary.audition_sha256.as_deref() {
+        Some(expected) if sha256_hex(bytes) == expected => Ok(true),
+        Some(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        // Old summaries predate audio commitments and are explicitly reported
+        // as unverified through the absent optional digest.
+        None => Ok(false),
+    }
 }
 
 async fn import_music(
@@ -2596,13 +2651,17 @@ async fn import_music(
         // used, purely to pick a timbre for playback (see
         // `render_import_audition`'s doc comment and
         // `instrumentation_note` below for why this still isn't neutral).
-        let (wav, audio_renderer) = render_import_audition(&score)?;
+        let (wav, audio_renderer, audition_kind, instrumentation_note) =
+            render_import_audition(&score, &source, &format)?;
+        let audition_sha256 = sha256_hex(&wav);
         let summary = ImportedWorkSummary {
             manifest,
             analysis,
             audio_available: true,
             audio_renderer: audio_renderer.to_string(),
-            instrumentation_note: default_instrumentation_note(),
+            audition_sha256: Some(audition_sha256),
+            audition_kind: Some(audition_kind),
+            instrumentation_note,
             notation_structure: Some(notation_structure),
         };
 
@@ -2963,9 +3022,10 @@ async fn imported_work_midi_measure_maps(
 }
 
 async fn imported_work_audio(AxPath(id): AxPath<String>) -> Result<Response, StatusCode> {
-    read_import_summary(&id)?;
-    let bytes = std::fs::read(Path::new(IMPORT_ROOT).join(id).join("audition.wav"))
+    let summary = read_import_summary(&id)?;
+    let bytes = std::fs::read(Path::new(IMPORT_ROOT).join(&id).join("audition.wav"))
         .map_err(|_| StatusCode::NOT_FOUND)?;
+    let _integrity_verified = verify_imported_audition_bytes(&summary, &bytes)?;
     Ok(([(header::CONTENT_TYPE, "audio/wav")], bytes).into_response())
 }
 
@@ -5915,6 +5975,36 @@ mod notation_summary_tests {
             &decoded
         ).unwrap();
         assert_eq!(summary.measure_map_sha256.as_deref(), Some(digest.as_str()));
+    }
+
+
+    #[test]
+    fn audition_audio_receipt_accepts_exact_bytes_and_rejects_tampering() {
+        let mut summary: symthaea_muse_protocol::ImportedWorkSummary =
+            serde_json::from_value(serde_json::json!({
+                "manifest": {},
+                "analysis": {},
+                "audio_available": true,
+                "audio_renderer": "fluidsynth",
+                "audition_sha256": sha256_hex(b"source-midi-render"),
+                "audition_kind": "source_midi_performance",
+                "instrumentation_note": "source MIDI event stream",
+                "notation_structure": null
+            }))
+            .unwrap_or_else(|_| panic!("test fixture should be expanded only if required protocol fields change"));
+        assert_eq!(
+            verify_imported_audition_bytes(&summary, b"source-midi-render"),
+            Ok(true)
+        );
+        assert_eq!(
+            verify_imported_audition_bytes(&summary, b"tampered-render"),
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        );
+        summary.audition_sha256 = None;
+        assert_eq!(
+            verify_imported_audition_bytes(&summary, b"legacy-render"),
+            Ok(false)
+        );
     }
 
 }
