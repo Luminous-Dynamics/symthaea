@@ -46,6 +46,7 @@ struct Protocol {
 #[serde(deny_unknown_fields)]
 struct Stratum {
     stratum_id: String,
+    load_profile_id: String,
     standby_duration_hours: f64,
     event_arrival_weight: f64,
     requirements: Requirements,
@@ -282,6 +283,7 @@ fn audit_fixture(fixture: &Fixture) -> Result<AuditReport> {
     for stratum in &fixture.strata {
         let context = format!("stratum.{}", stratum.stratum_id);
         nonempty(&stratum.stratum_id, "stratum.stratum_id")?;
+        nonempty(&stratum.load_profile_id, "stratum.load_profile_id")?;
         if !stratum_ids.insert(stratum.stratum_id.clone()) {
             bail!("duplicate mission stratum id {}", stratum.stratum_id);
         }
@@ -501,6 +503,13 @@ mod tests {
         assert_eq!(report.strata[0].service_passes, 4);
         assert_eq!(report.strata[1].service_passes, 3);
         assert_eq!(report.strata[2].service_passes, 2);
+    }
+
+    #[test]
+    fn each_mission_stratum_requires_a_load_profile_identity() {
+        let mut value = fixture_value();
+        value["strata"][1]["load_profile_id"] = json!("");
+        assert!(audit_value(value).is_err());
     }
 
     #[test]
