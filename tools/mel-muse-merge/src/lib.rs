@@ -355,8 +355,8 @@ pub fn analyze_merge(
         );
     }
 
-    let read_write = intersects(&left.writes, &right.reads)
-        || intersects(&right.writes, &left.reads);
+    let read_write =
+        intersects(&left.writes, &right.reads) || intersects(&right.writes, &left.reads);
     if read_write {
         if either_requires_revalidation(left, right) {
             return revalidation_decision(context, left, right);
@@ -427,12 +427,7 @@ fn revalidation_decision(
         reasons.push(ReasonCode::DerivedReceiptStale);
     }
     if context.revalidation_available {
-        MergeDecision::new(
-            MergeOutcome::MergeWithRevalidation,
-            reasons,
-            true,
-            false,
-        )
+        MergeDecision::new(MergeOutcome::MergeWithRevalidation, reasons, true, false)
     } else {
         MergeDecision::new(
             MergeOutcome::Unknown,
@@ -527,43 +522,106 @@ mod tests {
     ) -> MergeDecision {
         let decision = analyze_merge(ctx, left, right, &CommutativityRegistry::default());
         assert_eq!(decision.outcome, expected, "{decision:?}");
-        assert!(!decision.commit_permitted, "preflight must never authorize commit");
+        assert!(
+            !decision.commit_permitted,
+            "preflight must never authorize commit"
+        );
         decision
     }
 
     #[test]
     fn m01_independent_parts_are_preflight_compatible() {
-        let left = patch("A", "set_articulation", &["event:A1"], &["event:A1"], &["event:A1.articulation"]);
-        let right = patch("B", "set_velocity", &["event:B1"], &["event:B1"], &["event:B1.velocity"]);
+        let left = patch(
+            "A",
+            "set_articulation",
+            &["event:A1"],
+            &["event:A1"],
+            &["event:A1.articulation"],
+        );
+        let right = patch(
+            "B",
+            "set_velocity",
+            &["event:B1"],
+            &["event:B1"],
+            &["event:B1.velocity"],
+        );
         let decision = assert_outcome(MergeOutcome::SafeAutomaticMerge, context(), &left, &right);
         assert!(decision.candidate_may_be_built);
     }
 
     #[test]
     fn m02_conflicting_writes_to_one_pitch_are_rejected() {
-        let left = patch("A", "set_pitch", &["event:E1"], &["event:E1.pitch"], &["event:E1.pitch"]);
-        let right = patch("B", "set_pitch", &["event:E1"], &["event:E1.pitch"], &["event:E1.pitch"]);
+        let left = patch(
+            "A",
+            "set_pitch",
+            &["event:E1"],
+            &["event:E1.pitch"],
+            &["event:E1.pitch"],
+        );
+        let right = patch(
+            "B",
+            "set_pitch",
+            &["event:E1"],
+            &["event:E1.pitch"],
+            &["event:E1.pitch"],
+        );
         assert_outcome(MergeOutcome::Conflict, context(), &left, &right);
     }
 
     #[test]
     fn m03_same_event_distinct_properties_need_a_qualified_rule() {
-        let left = patch("A", "set_pitch", &["event:E1"], &["event:E1.pitch"], &["event:E1.pitch"]);
-        let right = patch("B", "set_articulation", &["event:E1"], &["event:E1.articulation"], &["event:E1.articulation"]);
+        let left = patch(
+            "A",
+            "set_pitch",
+            &["event:E1"],
+            &["event:E1.pitch"],
+            &["event:E1.pitch"],
+        );
+        let right = patch(
+            "B",
+            "set_articulation",
+            &["event:E1"],
+            &["event:E1.articulation"],
+            &["event:E1.articulation"],
+        );
         assert_outcome(MergeOutcome::Unknown, context(), &left, &right);
     }
 
     #[test]
     fn m04_tempo_and_absolute_onset_dependency_conflicts() {
-        let left = patch("A", "change_tempo_segment", &["tempo:S2"], &["time_map"], &["time_map"]);
-        let right = patch("B", "set_absolute_onset", &["event:E8"], &["time_map", "event:E8.onset_seconds"], &["event:E8.onset_seconds"]);
+        let left = patch(
+            "A",
+            "change_tempo_segment",
+            &["tempo:S2"],
+            &["time_map"],
+            &["time_map"],
+        );
+        let right = patch(
+            "B",
+            "set_absolute_onset",
+            &["event:E8"],
+            &["time_map", "event:E8.onset_seconds"],
+            &["event:E8.onset_seconds"],
+        );
         assert_outcome(MergeOutcome::Conflict, context(), &left, &right);
     }
 
     #[test]
     fn m05_cross_part_harmony_violation_is_a_conflict() {
-        let mut left = patch("A", "change_chord_function", &["chord:C1"], &["harmony:bar:4"], &["harmony:bar:4"]);
-        let mut right = patch("B", "set_pitch", &["event:M1"], &["harmony:bar:4"], &["event:M1.pitch"]);
+        let mut left = patch(
+            "A",
+            "change_chord_function",
+            &["chord:C1"],
+            &["harmony:bar:4"],
+            &["harmony:bar:4"],
+        );
+        let mut right = patch(
+            "B",
+            "set_pitch",
+            &["event:M1"],
+            &["harmony:bar:4"],
+            &["event:M1.pitch"],
+        );
         left.musical_dependencies.insert("harmony:bar:4".into());
         right.musical_dependencies.insert("harmony:bar:4".into());
         right.hard_constraints_satisfied = false;
@@ -572,45 +630,119 @@ mod tests {
 
     #[test]
     fn m06_distinct_motif_branches_preserve_alternatives_for_human_choice() {
-        let mut left = patch("A", "replace_motif_occurrence", &["event:P1a"], &["motif:P1"], &["event:P1a.sequence"]);
-        let mut right = patch("B", "replace_motif_occurrence", &["event:P1b"], &["motif:P1"], &["event:P1b.sequence"]);
-        left.musical_dependencies.insert("motif:P1:recurrence".into());
-        right.musical_dependencies.insert("motif:P1:recurrence".into());
+        let mut left = patch(
+            "A",
+            "replace_motif_occurrence",
+            &["event:P1a"],
+            &["motif:P1"],
+            &["event:P1a.sequence"],
+        );
+        let mut right = patch(
+            "B",
+            "replace_motif_occurrence",
+            &["event:P1b"],
+            &["motif:P1"],
+            &["event:P1b.sequence"],
+        );
+        left.musical_dependencies
+            .insert("motif:P1:recurrence".into());
+        right
+            .musical_dependencies
+            .insert("motif:P1:recurrence".into());
         left.intent_mode = IntentMode::Alternative;
         right.intent_mode = IntentMode::Alternative;
-        assert_outcome(MergeOutcome::HumanDecisionRequired, context(), &left, &right);
+        assert_outcome(
+            MergeOutcome::HumanDecisionRequired,
+            context(),
+            &left,
+            &right,
+        );
     }
 
     #[test]
     fn m07_meter_change_requires_projection_revalidation() {
-        let mut left = patch("A", "change_meter", &["meter:S2"], &["meter:S2"], &["beat_grid:S2"]);
-        let right = patch("B", "set_beat_position", &["event:E22"], &["beat_grid:S2"], &["event:E22.beat"]);
+        let mut left = patch(
+            "A",
+            "change_meter",
+            &["meter:S2"],
+            &["meter:S2"],
+            &["beat_grid:S2"],
+        );
+        let right = patch(
+            "B",
+            "set_beat_position",
+            &["event:E22"],
+            &["beat_grid:S2"],
+            &["event:E22.beat"],
+        );
         left.requires_revalidation = true;
-        let ctx = MergeContext { revalidation_available: true, ..context() };
+        let ctx = MergeContext {
+            revalidation_available: true,
+            ..context()
+        };
         let decision = assert_outcome(MergeOutcome::MergeWithRevalidation, ctx, &left, &right);
         assert!(decision.candidate_may_be_built);
     }
 
     #[test]
     fn m08_missing_scope_rejects_the_operation() {
-        let mut left = patch("A", "replace_motif", &["motif:P1"], &["motif:P1"], &["motif:P1.content"]);
-        let right = patch("B", "set_velocity", &["event:DR1"], &["event:DR1"], &["event:DR1.velocity"]);
+        let mut left = patch(
+            "A",
+            "replace_motif",
+            &["motif:P1"],
+            &["motif:P1"],
+            &["motif:P1.content"],
+        );
+        let right = patch(
+            "B",
+            "set_velocity",
+            &["event:DR1"],
+            &["event:DR1"],
+            &["event:DR1.velocity"],
+        );
         left.authority = AuthorityState::Missing;
         assert_outcome(MergeOutcome::Rejected, context(), &left, &right);
     }
 
     #[test]
     fn m09_stale_base_rejects_the_merge() {
-        let left = patch("A", "set_pitch", &["event:E3"], &["event:E3.pitch"], &["event:E3.pitch"]);
-        let right = patch("B", "set_articulation", &["event:E4"], &["event:E4.articulation"], &["event:E4.articulation"]);
-        let ctx = MergeContext { base_and_branch_heads_match: false, ..context() };
+        let left = patch(
+            "A",
+            "set_pitch",
+            &["event:E3"],
+            &["event:E3.pitch"],
+            &["event:E3.pitch"],
+        );
+        let right = patch(
+            "B",
+            "set_articulation",
+            &["event:E4"],
+            &["event:E4.articulation"],
+            &["event:E4.articulation"],
+        );
+        let ctx = MergeContext {
+            base_and_branch_heads_match: false,
+            ..context()
+        };
         assert_outcome(MergeOutcome::Rejected, ctx, &left, &right);
     }
 
     #[test]
     fn m10_exact_retry_reuses_the_existing_commit() {
-        let left = patch("A", "set_velocity", &["event:E9"], &["event:E9.velocity"], &["event:E9.velocity"]);
-        let right = patch("B", "set_articulation", &["event:E10"], &["event:E10.articulation"], &["event:E10.articulation"]);
+        let left = patch(
+            "A",
+            "set_velocity",
+            &["event:E9"],
+            &["event:E9.velocity"],
+            &["event:E9.velocity"],
+        );
+        let right = patch(
+            "B",
+            "set_articulation",
+            &["event:E10"],
+            &["event:E10.articulation"],
+            &["event:E10.articulation"],
+        );
         let ctx = MergeContext {
             commit_state: CommitState::AlreadyCommittedSameKey,
             idempotency_replay_verified: true,
@@ -623,8 +755,20 @@ mod tests {
 
     #[test]
     fn unverified_idempotency_replay_claim_is_unknown() {
-        let left = patch("A", "set_pitch", &["event:E1"], &["event:E1.pitch"], &["event:E1.pitch"]);
-        let right = patch("B", "set_velocity", &["event:E2"], &["event:E2.velocity"], &["event:E2.velocity"]);
+        let left = patch(
+            "A",
+            "set_pitch",
+            &["event:E1"],
+            &["event:E1.pitch"],
+            &["event:E1.pitch"],
+        );
+        let right = patch(
+            "B",
+            "set_velocity",
+            &["event:E2"],
+            &["event:E2.velocity"],
+            &["event:E2.velocity"],
+        );
         let ctx = MergeContext {
             commit_state: CommitState::AlreadyCommittedSameKey,
             ..context()
@@ -634,41 +778,106 @@ mod tests {
 
     #[test]
     fn m11_valid_but_incompatible_harmonizations_need_human_choice() {
-        let mut left = patch("A", "reharmonize_section", &["section:S3"], &["section:S3"], &["harmony:S3"]);
-        let mut right = patch("B", "reharmonize_section", &["section:S3"], &["section:S3"], &["harmony:S3"]);
+        let mut left = patch(
+            "A",
+            "reharmonize_section",
+            &["section:S3"],
+            &["section:S3"],
+            &["harmony:S3"],
+        );
+        let mut right = patch(
+            "B",
+            "reharmonize_section",
+            &["section:S3"],
+            &["section:S3"],
+            &["harmony:S3"],
+        );
         left.intent_mode = IntentMode::Alternative;
         right.intent_mode = IntentMode::Alternative;
-        assert_outcome(MergeOutcome::HumanDecisionRequired, context(), &left, &right);
+        assert_outcome(
+            MergeOutcome::HumanDecisionRequired,
+            context(),
+            &left,
+            &right,
+        );
     }
 
     #[test]
     fn m12_stale_renderer_receipt_requires_revalidation() {
-        let left = patch("A", "set_pitch", &["event:E12"], &["event:E12.pitch"], &["event:E12.pitch"]);
-        let mut right = patch("B", "set_articulation", &["event:E13"], &["event:E13.articulation"], &["event:E13.articulation"]);
+        let left = patch(
+            "A",
+            "set_pitch",
+            &["event:E12"],
+            &["event:E12.pitch"],
+            &["event:E12.pitch"],
+        );
+        let mut right = patch(
+            "B",
+            "set_articulation",
+            &["event:E13"],
+            &["event:E13.articulation"],
+            &["event:E13.articulation"],
+        );
         right.artifact_integrity = ArtifactIntegrity::StaleDerivedReceipt;
-        let ctx = MergeContext { revalidation_available: true, ..context() };
+        let ctx = MergeContext {
+            revalidation_available: true,
+            ..context()
+        };
         assert_outcome(MergeOutcome::MergeWithRevalidation, ctx, &left, &right);
     }
 
     #[test]
     fn m13_lost_commit_acknowledgement_is_in_doubt() {
-        let left = patch("A", "set_pitch", &["event:E14"], &["event:E14.pitch"], &["event:E14.pitch"]);
-        let right = patch("B", "set_velocity", &["event:E15"], &["event:E15.velocity"], &["event:E15.velocity"]);
-        let ctx = MergeContext { commit_state: CommitState::AcknowledgementLost, ..context() };
+        let left = patch(
+            "A",
+            "set_pitch",
+            &["event:E14"],
+            &["event:E14.pitch"],
+            &["event:E14.pitch"],
+        );
+        let right = patch(
+            "B",
+            "set_velocity",
+            &["event:E15"],
+            &["event:E15.velocity"],
+            &["event:E15.velocity"],
+        );
+        let ctx = MergeContext {
+            commit_state: CommitState::AcknowledgementLost,
+            ..context()
+        };
         assert_outcome(MergeOutcome::InDoubt, ctx, &left, &right);
     }
 
     #[test]
     fn m14_substituted_parent_bytes_remain_unknown() {
-        let mut left = patch("A", "set_pitch", &["event:E16"], &["event:E16.pitch"], &["event:E16.pitch"]);
-        let right = patch("B", "set_velocity", &["event:E17"], &["event:E17.velocity"], &["event:E17.velocity"]);
+        let mut left = patch(
+            "A",
+            "set_pitch",
+            &["event:E16"],
+            &["event:E16.pitch"],
+            &["event:E16.pitch"],
+        );
+        let right = patch(
+            "B",
+            "set_velocity",
+            &["event:E17"],
+            &["event:E17.velocity"],
+            &["event:E17.velocity"],
+        );
         left.artifact_integrity = ArtifactIntegrity::DigestMismatch;
         assert_outcome(MergeOutcome::Unknown, context(), &left, &right);
     }
 
     #[test]
     fn m15_native_rhythm_and_tuning_representations_are_not_coerced() {
-        let left = patch("A", "set_velocity", &["event:E18"], &["event:E18.velocity"], &["event:E18.velocity"]);
+        let left = patch(
+            "A",
+            "set_velocity",
+            &["event:E18"],
+            &["event:E18.velocity"],
+            &["event:E18.velocity"],
+        );
         let right = patch(
             "B",
             "add_non_isochronous_event",
@@ -677,33 +886,67 @@ mod tests {
             &["event:E19"],
         );
         let decision = assert_outcome(MergeOutcome::SafeAutomaticMerge, context(), &left, &right);
-        assert!(decision.reasons.contains(&ReasonCode::DeclaredFootprintsIndependent));
+        assert!(
+            decision
+                .reasons
+                .contains(&ReasonCode::DeclaredFootprintsIndependent)
+        );
         assert!(!decision.commit_permitted);
     }
 
     #[test]
     fn qualified_operation_pair_can_discharge_same_target_unknown() {
-        let left = patch("A", "set_pitch", &["event:E1"], &["event:E1.pitch"], &["event:E1.pitch"]);
-        let right = patch("B", "set_articulation", &["event:E1"], &["event:E1.articulation"], &["event:E1.articulation"]);
+        let left = patch(
+            "A",
+            "set_pitch",
+            &["event:E1"],
+            &["event:E1.pitch"],
+            &["event:E1.pitch"],
+        );
+        let right = patch(
+            "B",
+            "set_articulation",
+            &["event:E1"],
+            &["event:E1.articulation"],
+            &["event:E1.articulation"],
+        );
         let mut registry = CommutativityRegistry::default();
         registry.register_qualified_pair("set_pitch", "set_articulation");
         let decision = analyze_merge(context(), &left, &right, &registry);
         assert_eq!(decision.outcome, MergeOutcome::SafeAutomaticMerge);
-        assert!(decision.reasons.contains(&ReasonCode::QualifiedOperationPair));
+        assert!(
+            decision
+                .reasons
+                .contains(&ReasonCode::QualifiedOperationPair)
+        );
         assert!(!decision.commit_permitted);
     }
 
     #[test]
     fn analyzer_is_symmetric_for_all_frozen_cases() {
         let fixtures = [
-            (patch("a", "x", &["A"], &["a"], &["a1"]), patch("b", "y", &["B"], &["b"], &["b1"])),
-            (patch("a", "x", &["E"], &["p"], &["p"]), patch("b", "x", &["E"], &["p"], &["p"])),
-            (patch("a", "x", &["E"], &["p"], &["p"]), patch("b", "y", &["E"], &["q"], &["q"])),
-            (patch("a", "x", &["T"], &["time"], &["time"]), patch("b", "y", &["E"], &["time"], &["onset"])),
+            (
+                patch("a", "x", &["A"], &["a"], &["a1"]),
+                patch("b", "y", &["B"], &["b"], &["b1"]),
+            ),
+            (
+                patch("a", "x", &["E"], &["p"], &["p"]),
+                patch("b", "x", &["E"], &["p"], &["p"]),
+            ),
+            (
+                patch("a", "x", &["E"], &["p"], &["p"]),
+                patch("b", "y", &["E"], &["q"], &["q"]),
+            ),
+            (
+                patch("a", "x", &["T"], &["time"], &["time"]),
+                patch("b", "y", &["E"], &["time"], &["onset"]),
+            ),
         ];
         for (left, right) in fixtures {
-            let forward = analyze_merge(context(), &left, &right, &CommutativityRegistry::default());
-            let reverse = analyze_merge(context(), &right, &left, &CommutativityRegistry::default());
+            let forward =
+                analyze_merge(context(), &left, &right, &CommutativityRegistry::default());
+            let reverse =
+                analyze_merge(context(), &right, &left, &CommutativityRegistry::default());
             assert_eq!(forward.outcome, reverse.outcome);
             assert_eq!(forward.reasons, reverse.reasons);
         }
@@ -729,7 +972,10 @@ mod tests {
             ("M15", "SafeAutomaticMerge"),
         ];
         for (id, outcome) in expected {
-            assert!(FIXTURE_MANIFEST.contains(&format!("\"id\": \"{id}\"")), "missing fixture {id}");
+            assert!(
+                FIXTURE_MANIFEST.contains(&format!("\"id\": \"{id}\"")),
+                "missing fixture {id}"
+            );
             let case = FIXTURE_MANIFEST
                 .split(&format!("\"id\": \"{id}\""))
                 .nth(1)
@@ -745,8 +991,20 @@ mod tests {
 
     #[test]
     fn missing_revalidation_path_never_promotes_to_safe() {
-        let mut left = patch("A", "change_meter", &["meter:S2"], &["meter:S2"], &["beat_grid:S2"]);
-        let right = patch("B", "set_beat_position", &["event:E22"], &["beat_grid:S2"], &["event:E22.beat"]);
+        let mut left = patch(
+            "A",
+            "change_meter",
+            &["meter:S2"],
+            &["meter:S2"],
+            &["beat_grid:S2"],
+        );
+        let right = patch(
+            "B",
+            "set_beat_position",
+            &["event:E22"],
+            &["beat_grid:S2"],
+            &["event:E22.beat"],
+        );
         left.requires_revalidation = true;
         let decision = analyze_merge(context(), &left, &right, &CommutativityRegistry::default());
         assert_eq!(decision.outcome, MergeOutcome::Unknown);
@@ -755,8 +1013,20 @@ mod tests {
 
     #[test]
     fn unknown_authority_is_not_treated_as_denial_or_approval() {
-        let mut left = patch("A", "set_pitch", &["event:E1"], &["event:E1.pitch"], &["event:E1.pitch"]);
-        let right = patch("B", "set_velocity", &["event:E2"], &["event:E2.velocity"], &["event:E2.velocity"]);
+        let mut left = patch(
+            "A",
+            "set_pitch",
+            &["event:E1"],
+            &["event:E1.pitch"],
+            &["event:E1.pitch"],
+        );
+        let right = patch(
+            "B",
+            "set_velocity",
+            &["event:E2"],
+            &["event:E2.velocity"],
+            &["event:E2.velocity"],
+        );
         left.authority = AuthorityState::Unknown;
         assert_outcome(MergeOutcome::Unknown, context(), &left, &right);
     }
