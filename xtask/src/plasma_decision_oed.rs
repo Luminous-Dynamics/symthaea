@@ -75,6 +75,7 @@ struct Scenario {
     selection_receipt: SelectionReceipt,
     measurements: Vec<Measurement>,
     covariance_models: Vec<CovarianceModel>,
+    substrate_condition: Option<SubstrateCondition>,
     outcomes: Outcomes,
     expected: Expected,
 }
@@ -85,6 +86,8 @@ struct Profile {
     profile_id: String,
     material_family: String,
     requires_barrier_preservation: bool,
+    requires_moisture_measurement: bool,
+    maximum_moisture_measurement_age_hours: Option<f64>,
     min_bond_strength_mpa: f64,
     min_aged_bond_strength_mpa: f64,
     min_retention: f64,
@@ -142,6 +145,24 @@ struct Measurement {
     calibration_status: String,
     uncertainty: f64,
     raw_trace_digest: String,
+    measured_value: Option<f64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SubstrateCondition {
+    condition_id: String,
+    conditioning_protocol_id: String,
+    moisture_content_wt_pct: f64,
+    moisture_measurement_method: String,
+    moisture_measurement_receipt_id: String,
+    moisture_calibration_record_id: String,
+    moisture_measurement_id: String,
+    measured_at_unix_ms: u64,
+    plasma_run_at_unix_ms: u64,
+    conditioning_temperature_c: f64,
+    conditioning_relative_humidity_pct: f64,
+    condition_evidence_digest: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -375,6 +396,17 @@ fn evaluate_scenario(
     {
         rejected.push("barrier-preservation profile lacks finite positive WVTR/OTR limits".to_owned());
     }
+    if profile.requires_moisture_measurement
+        && profile.maximum_moisture_measurement_age_hours
+            .is_none_or(|value| !value.is_finite() || value <= 0.0)
+    {
+        rejected.push("hygroscopic material profile lacks a finite positive moisture-state freshness limit".to_owned());
+    }
+    if !profile.requires_moisture_measurement
+        && profile.maximum_moisture_measurement_age_hours.is_some()
+    {
+        rejected.push("moisture-state freshness limit is declared without requiring moisture measurement".to_owned());
+    }
 
     if !scenario.budget.max_cost_units.is_finite()
         || scenario.budget.max_cost_units < 0.0
@@ -480,6 +512,9 @@ fn evaluate_scenario(
         }
         if !measurement.uncertainty.is_finite() || measurement.uncertainty < 0.0 {
             rejected.push(format!("measurement {} has invalid uncertainty", measurement.measurement_id));
+        }
+        if measurement.measured_value.is_none_or(|value| !value.is_finite() || value < 0.0) {
+            blocked.push(format!("measurement {} lacks a finite non-negative measured value", measurement.measurement_id));
         }
         *measurement_by_action.entry(measurement.action_id.clone()).or_default() += 1;
         dependency_groups
@@ -588,10 +623,77 @@ fn evaluate_scenario(
         required_endpoints.insert("water_vapour_barrier".to_owned());
         required_endpoints.insert("oxygen_barrier".to_owned());
     }
+    if profile.requires_moisture_measurement {
+        required_endpoints.insert("substrate_moisture_state".to_owned());
+    }
     for endpoint in &required_endpoints {
         if !provided.contains(endpoint) {
             blocked.push(format!("selected portfolio does not cover mandatory product endpoint {endpoint}"));
         }
+    }
+
+    if profile.requires_moisture_measurement {
+        match &scenario.substrate_condition {
+            None => blocked.push(
+                "hygroscopic material has no measured substrate-moisture/conditioning record".to_owned()
+            ),
+            Some(condition) => {
+                let condition_fields_valid = !condition.condition_id.trim().is_empty()
+                    && !condition.conditioning_protocol_id.trim().is_empty()
+                    && !condition.moisture_measurement_method.trim().is_empty()
+                    && !condition.moisture_measurement_receipt_id.trim().is_empty()
+                    && !condition.moisture_calibration_record_id.trim().is_empty()
+                    && !condition.condition_evidence_digest.trim().is_empty()
+                    && condition.measured_at_unix_ms > 0
+                    && condition.plasma_run_at_unix_ms > 0
+                    && condition.measured_at_unix_ms <= condition.plasma_run_at_unix_ms
+                    && condition.moisture_content_wt_pct.is_finite()
+                    && (0.0..=100.0).contains(&condition.moisture_content_wt_pct)
+                    && condition.conditioning_temperature_c.is_finite()
+                    && (-80.0..=250.0).contains(&condition.conditioning_temperature_c)
+                    && condition.conditioning_relative_humidity_pct.is_finite()
+                    && (0.0..=100.0).contains(&condition.conditioning_relative_humidity_pct);
+                if !condition_fields_valid {
+                    blocked.push("substrate moisture/conditioning evidence is incomplete or invalid".to_owned());
+                } else if let Some(maximum_age_hours) = profile.maximum_moisture_measurement_age_hours {
+                    let maximum_age_ms = maximum_age_hours * 3_600_000.0;
+                    let state_age_ms =
+                        condition.plasma_run_at_unix_ms - condition.measured_at_unix_ms;
+                    if !maximum_age_ms.is_finite() || state_age_ms as f64 > maximum_age_ms {
+                        blocked.push("substrate moisture measurement is stale at plasma-run time".to_owned());
+                    }
+                }
+                match scenario.measurements.iter().find(|measurement| {
+                    measurement.measurement_id == condition.moisture_measurement_id
+                        && measurement.action_id == "MOISTURE_CONTENT"
+                }) {
+                    None => blocked.push(
+                        "substrate moisture condition does not bind to a selected MOISTURE_CONTENT measurement".to_owned()
+                    ),
+                    Some(measurement) => {
+                        if !measurement.calibration_record_id.is_empty()
+                            && measurement.calibration_record_id
+                                != condition.moisture_calibration_record_id
+                        {
+                            rejected.push(
+                                "substrate condition and moisture measurement calibration identities disagree".to_owned()
+                            );
+                        }
+                        if measurement.measured_value.is_none_or(|value| {
+                            !close_enough(value, condition.moisture_content_wt_pct)
+                        }) {
+                            rejected.push(
+                                "substrate moisture condition does not reconcile with the selected moisture measurement value".to_owned()
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    } else if scenario.substrate_condition.is_some() {
+        blocked.push(
+            "substrate moisture condition supplied for a profile that does not declare moisture-state semantics".to_owned()
+        );
     }
 
     let outcomes = &scenario.outcomes;
@@ -749,11 +851,11 @@ mod tests {
     #[test]
     fn frozen_fixture_matches_all_expected_audit_and_product_dispositions() {
         let report = report();
-        assert_eq!(report.scenario_count, 10);
+        assert_eq!(report.scenario_count, 12);
         assert_eq!(report.mismatched_expectations, 0);
-        assert_eq!(report.matched_expectations, 10);
-        assert_eq!(report.pass_count, 4);
-        assert_eq!(report.blocked_count, 3);
+        assert_eq!(report.matched_expectations, 12);
+        assert_eq!(report.pass_count, 5);
+        assert_eq!(report.blocked_count, 4);
         assert_eq!(report.rejected_count, 3);
         assert!(!report.optimizer_executed);
         assert!(!report.automatic_experiment_execution);
@@ -855,6 +957,46 @@ mod tests {
         let report = audit_fixture_json(&changed.to_string()).expect("mutated fixture parses");
         let result = result_for(&report, "durable-multifidelity-accept-synthetic");
         assert_eq!(result.audit_disposition, AuditDisposition::Rejected);
+    }
+
+    #[test]
+    fn pa6_without_measured_moisture_state_must_abstain() {
+        let report = report();
+        let result = result_for(&report, "pa6-missing-moisture-state-abstain");
+        assert_eq!(result.audit_disposition, AuditDisposition::Blocked);
+        assert_eq!(result.product_decision, ProductDecision::Abstain);
+    }
+
+    #[test]
+    fn pa6_saturated_low_wca_does_not_override_weak_bond() {
+        let report = report();
+        let result = result_for(&report, "pa6-saturated-state-low-wca-reject");
+        assert_eq!(result.audit_disposition, AuditDisposition::Pass);
+        assert_eq!(result.product_decision, ProductDecision::RejectWindow);
+    }
+
+    #[test]
+    fn stale_pa6_moisture_state_forces_abstention() {
+        let value: serde_json::Value = serde_json::from_str(FIXTURE).expect("fixture JSON");
+        let mut changed = value;
+        changed["scenarios"][11]["substrate_condition"]["measured_at_unix_ms"] =
+            serde_json::json!(1794000000000_u64);
+        let report = audit_fixture_json(&changed.to_string()).expect("mutated fixture parses");
+        let result = result_for(&report, "pa6-saturated-state-low-wca-reject");
+        assert_eq!(result.audit_disposition, AuditDisposition::Blocked);
+        assert_eq!(result.product_decision, ProductDecision::Abstain);
+    }
+
+    #[test]
+    fn pa6_moisture_measurement_must_reconcile_to_condition_record() {
+        let value: serde_json::Value = serde_json::from_str(FIXTURE).expect("fixture JSON");
+        let mut changed = value;
+        changed["scenarios"][11]["measurements"][2]["measured_value"] =
+            serde_json::json!(0.1);
+        let report = audit_fixture_json(&changed.to_string()).expect("mutated fixture parses");
+        let result = result_for(&report, "pa6-saturated-state-low-wca-reject");
+        assert_eq!(result.audit_disposition, AuditDisposition::Rejected);
+        assert_eq!(result.product_decision, ProductDecision::Abstain);
     }
 
     #[test]
