@@ -170,7 +170,7 @@ Use non-compensatory evidence semantics:
 - **Meets floor:** full declared-scope coverage and the observed lower bound is at least the authorised threshold.
 - **Breached floor:** full declared-scope coverage and the observed upper bound is below the authorised threshold.
 - **Observed breach:** the covered subset is definitely below the threshold, but coverage is incomplete; do not generalise to the whole scope.
-- **Indeterminate:** evidence, authority, threshold, unit, validity or coverage is incomplete, or the uncertainty interval crosses the threshold.
+- **Indeterminate:** evidence, authority, threshold, unit, validity or coverage is incomplete, the uncertainty interval crosses the threshold, or the evidence/qualification is only synthetic or contract-only. Synthetic fixtures may test the logic but cannot produce a real floor outcome.
 
 Unknown thresholds are never guessed from a global benchmark. Where the applicable legal or community-approved threshold is not confirmed, the result remains indeterminate. The v0.1 fixture uses arbitrary synthetic units and is not a South African water-rights or minimum-service determination.
 
