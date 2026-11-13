@@ -113,6 +113,9 @@ pub struct CorpusRegistrationV1 {
     pub schema: String,
     pub corpus_id: String,
     pub release_id: String,
+    /// Immutable commit, tag, or archive digest. Unknown/mutable revisions
+    /// remain Candidate until pinned.
+    pub source_revision_id: Option<String>,
     pub source_uri: String,
     pub license: CorpusLicenseV1,
     pub use_scope: CorpusUseScopeV1,
@@ -158,6 +161,7 @@ pub enum CorpusQualificationIssueV1 {
     WrongRegistrationSchema,
     EmptyCorpusId,
     EmptyReleaseId,
+    MissingSourceRevision { corpus_id: String },
     InvalidSourceUri,
     InvalidRightsEvidenceUri,
     MissingRightsNotes,
@@ -249,6 +253,15 @@ pub fn validate_corpus_registration(
     }
     if registration.release_id.trim().is_empty() {
         issues.push(CorpusQualificationIssueV1::EmptyReleaseId);
+    }
+    if registration
+        .source_revision_id
+        .as_deref()
+        .is_none_or(|revision| revision.trim().is_empty())
+    {
+        issues.push(CorpusQualificationIssueV1::MissingSourceRevision {
+            corpus_id: registration.corpus_id.clone(),
+        });
     }
     if !is_https_uri(&registration.source_uri) {
         issues.push(CorpusQualificationIssueV1::InvalidSourceUri);
@@ -589,11 +602,12 @@ pub fn candidate_musicxml_corpus_registry_v1() -> Vec<CorpusRegistrationV1> {
             schema: MUSICXML_CORPUS_REGISTRATION_SCHEMA_V1.into(),
             corpus_id: "ossq-omr".into(),
             release_id: "ismir-2026-ossq-omr".into(),
+            source_revision_id: Some("7a17e45cddc0b7064fc3a179b62caeb57595e993".into()),
             source_uri: "https://github.com/MALerLab/ossq-omr".into(),
             license: CorpusLicenseV1::Cc0_1_0,
             use_scope: CorpusUseScopeV1::CommercialAndNonCommercialResearch,
             rights_evidence_status: RightsEvidenceStatusV1::SourceDeclared,
-            rights_evidence_uri: "https://github.com/MALerLab/ossq-omr".into(),
+            rights_evidence_uri: "https://github.com/MALerLab/ossq-omr/blob/7a17e45cddc0b7064fc3a179b62caeb57595e993/LICENSE.txt".into(),
             rights_notes: "The dataset maintainer states CC0-1.0 for source annotations and derived formats. Preserve requested attribution/credit. Verify exact release and all acquired artifacts before use.".into(),
             tracks: vec![
                 CorpusTrackRegistrationV1 {
@@ -632,12 +646,13 @@ pub fn candidate_musicxml_corpus_registry_v1() -> Vec<CorpusRegistrationV1> {
             schema: MUSICXML_CORPUS_REGISTRATION_SCHEMA_V1.into(),
             corpus_id: "asap".into(),
             release_id: "v1.1".into(),
+            source_revision_id: Some("afc815c75c42e83a79c03feb6da8a35e77d4c6b8".into()),
             source_uri: "https://github.com/fosfrancesco/asap-dataset".into(),
             license: CorpusLicenseV1::CcByNcSa_4_0,
             use_scope: CorpusUseScopeV1::NonCommercialResearchOnly,
             rights_evidence_status: RightsEvidenceStatusV1::SourceDeclared,
-            rights_evidence_uri: "https://github.com/fosfrancesco/asap-dataset".into(),
-            rights_notes: "CC BY-NC-SA 4.0. Noncommercial research only; attribution and share-alike obligations apply. Maintainers report 31 performances that are not score-aligned and notation/beat-position limits around embellishments, pickups and rubato; preserve those statuses.".into(),
+            rights_evidence_uri: "https://github.com/fosfrancesco/asap-dataset/blob/afc815c75c42e83a79c03feb6da8a35e77d4c6b8/README.md".into(),
+            rights_notes: "CC BY-NC-SA 4.0. Noncommercial research only; attribution and share-alike obligations apply. The current v1.1 README lists 236 scores, 1,067 performances and 519 audio performances; the original paper reports 222 scores, 1,068 performances and 520 audio performances. Use the pinned v1.1 release manifests, not mixed counts. The README identifies 31 performances that are not score-aligned and notes beat-position limits around embellishments, pickups and rubato; preserve those statuses.".into(),
             tracks: vec![CorpusTrackRegistrationV1 {
                 track_id: "score-performance-alignment".into(),
                 task: CorpusTaskV1::ScorePerformanceAlignment,
@@ -653,6 +668,7 @@ pub fn candidate_musicxml_corpus_registry_v1() -> Vec<CorpusRegistrationV1> {
             schema: MUSICXML_CORPUS_REGISTRATION_SCHEMA_V1.into(),
             corpus_id: "maestro".into(),
             release_id: "v3.0.0".into(),
+            source_revision_id: Some("archive-sha256:6680fea5be2339ea15091a249fbd70e49551246ddbd5ca50f1b2352c08c95291".into()),
             source_uri: "https://magenta.withgoogle.com/datasets/maestro".into(),
             license: CorpusLicenseV1::CcByNcSa_4_0,
             use_scope: CorpusUseScopeV1::NonCommercialResearchOnly,
@@ -674,6 +690,7 @@ pub fn candidate_musicxml_corpus_registry_v1() -> Vec<CorpusRegistrationV1> {
             schema: MUSICXML_CORPUS_REGISTRATION_SCHEMA_V1.into(),
             corpus_id: "mirex-2026-quartets".into(),
             release_id: "mirex-2026-audio-to-score".into(),
+            source_revision_id: None,
             source_uri: "https://music-ir.org/mirex/wiki/2026:Audio-to-Score_Transcription".into(),
             license: CorpusLicenseV1::Unknown,
             use_scope: CorpusUseScopeV1::ExternalEvaluationOnly,
@@ -784,6 +801,23 @@ mod tests {
         assert_eq!(mirex.license, CorpusLicenseV1::Unknown);
         assert_eq!(mirex.use_scope, CorpusUseScopeV1::ExternalEvaluationOnly);
         assert!(mirex.tracks.iter().all(|track| !track.training_allowed && !track.redistribution_allowed));
+    }
+
+ 
+    #[test]
+    fn unpinned_external_task_page_remains_candidate() {
+        let registration = registration("mirex-2026-quartets");
+        assert!(validate_corpus_registration(&registration).iter().any(|issue| {
+            matches!(
+                issue,
+                CorpusQualificationIssueV1::MissingSourceRevision { corpus_id }
+                    if corpus_id == "mirex-2026-quartets"
+            )
+        }));
+        assert_eq!(
+            qualify_corpus_track(&registration, None, None).stage,
+            CorpusQualificationStageV1::Candidate
+        );
     }
 
     #[test]
