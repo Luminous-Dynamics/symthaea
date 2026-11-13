@@ -1100,4 +1100,33 @@ mod tests {
         ));
     }
 
+
+    #[test]
+    fn strong_petz_bound_requires_the_coefficient_induced_channel_to_be_tp() {
+        let code = repetition_code_isometry();
+        let errors = bit_flip_error_set();
+        let diagnostics =
+            compute_error_set_qec_diagnostics(&code, &errors, 1.0e-12).unwrap();
+        // ||0.4 I_4||_F = 0.8 <= 1, but sum F_alpha^dagger F_alpha = 0.64 I.
+        let coefficient = ComplexMatrix::from_real(
+            4,
+            4,
+            &[
+                0.4, 0.0, 0.0, 0.0,
+                0.0, 0.4, 0.0, 0.0,
+                0.0, 0.0, 0.4, 0.0,
+                0.0, 0.0, 0.0, 0.4,
+            ],
+        )
+        .unwrap();
+        assert!(matches!(
+            compute_strongly_controlled_petz_worst_case_bound(
+                &diagnostics,
+                &coefficient,
+                1.0e-12
+            ),
+            Err(ErrorSetQecError::ChannelTracePreservationResidual { .. })
+        ));
+    }
+
 }
