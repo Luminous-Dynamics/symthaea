@@ -61,11 +61,25 @@ Each value carries units, boundary, voltage window, current/power profile, tempe
 | Degradation | Capacitance loss, ESR growth, leakage growth and failure mode versus cycle count and cumulative throughput |
 | Lifetime | Cycle protocol, depth/voltage window, rest periods, temperature and end-of-life criterion |
 | Calendar aging | Time, voltage, temperature and periodic diagnostic protocol |
+| Standby service | Measured usable Wh/W delivered after a declared open-circuit or voltage-hold interval and representative load; include converter/balancer standby loss at system boundary |
 | Thermal behavior | Temperature rise under stated pulse/continuous load; sensor location and uncertainty |
 | Safety | Defined abuse/short-circuit/overvoltage/thermal test, facility, procedure, result and failure observations |
 | Manufacturing | First-pass yield, accepted yield, scrap, rework, batch variability, material utilisation, process energy and cost |
 
 Do not state “cycle life” without the voltage window, current profile, temperature, rest, end-of-life threshold and treatment of failed/invalid devices.
+
+
+## Standby energy availability and voltage-hold reliability
+
+Child experiment: [EDLC-STANDBY-SERVICE-001 #11908](https://github.com/Luminous-Dynamics/symthaea/issues/11908). The primary metric is measured usable energy delivered into a declared load after a specified standby history:
+
+E_available(t_idle, T, V_hold, prior_history)
+
+This is distinct from nominal capacitance, open-circuit voltage retention, and cycle-life retention. Report the complete charge/hold/discharge trace; time to minimum usable voltage; leakage current versus time; open-circuit self-discharge; ESR/EIS evolution; recovery/refresh energy; and lower-tail device/lab/lot distribution. At the installed-system boundary, include converter, balancing, monitoring and protection standby draw.
+
+IEC 62391-2:2025 provides a leakage-current baseline for power-application EDLCs. Its publicly searchable excerpt specifies 20 °C ± 2 °C, rated voltage applied through a protective resistor no greater than 1 000 Ω, at least 12 h discharge before test unless otherwise agreed, and 24 h electrification unless otherwise agreed. The applicable detail specification sets the leakage-current requirement. This is a standardized leakage measurement, not a multi-month standby-life guarantee. Use the controlled standard and manufacturer detail specification for any physical testing; do not use search excerpts as a substitute for the normative document.
+
+A synthetic arithmetic fixture is available at fixtures/energy/electrochemical-capacitor/standby_service_known_answer_v0_1.json. It validates trapezoidal integration of leakage charge and terminal V×I discharge energy only. It is not a physical device, a self-discharge model or lifetime evidence.
 
 ## Explicit mass and volume denominator contract
 
