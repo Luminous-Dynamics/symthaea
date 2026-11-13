@@ -1926,4 +1926,107 @@ mod tests {
         assert!(graph[0].measure_locators[1].non_controlling);
     }
 
+
+    #[test]
+    fn per_part_graph_commits_exact_notation_events_and_replay_rejects_tampering() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>12</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+            <note><pitch><step>C</step><octave>5</octave></pitch><duration>4</duration><voice>1</voice><staff>1</staff><type>eighth</type><time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification><tie type="start"/><notations><tied type="start"/><tuplet type="start" number="1"/></notations></note>
+            <note><rest/><duration>8</duration><voice>1</voice><staff>1</staff></note>
+            <attributes><clef number="2"><sign>F</sign><line>4</line></clef></attributes>
+            <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>36</duration><voice>2</voice><staff>2</staff></note>
+        </measure></part></score-partwise>"#;
+        let graphs = parse_musicxml_part_notation_graph(
+            xml.as_bytes(),
+            "sha256:notation-events",
+            "score-clock",
+        )
+        .unwrap();
+        let graph = &graphs[0];
+        assert_eq!(graph.map.status, MeasureMapStatus::Supported);
+        assert_eq!(
+            graph.notation_events.status,
+            crate::musicxml_notation_events::MusicXmlNotationEventsStatusV1::Supported
+        );
+        assert_eq!(graph.notation_events.note_events.len(), 3);
+        assert_eq!(
+            graph.notation_events.note_events[1].score_offset,
+            RationalBeat::new(1, 3).unwrap()
+        );
+        assert!(matches!(
+            graph.notation_events.note_events[1].kind,
+            crate::musicxml_notation_events::MusicXmlNotationEventKindV1::Rest { .. }
+        ));
+        assert!(matches!(
+            graph.notation_events.note_events[2].kind,
+            crate::musicxml_notation_events::MusicXmlNotationEventKindV1::Unpitched { .. }
+        ));
+        assert_eq!(graph.notation_events.attribute_events.len(), 3);
+        let digest = musicxml_notation_graph_commitment(graph).unwrap();
+        assert_eq!(digest.len(), 64);
+        assert!(validate_musicxml_notation_graph_replay(
+            xml.as_bytes(),
+            "sha256:notation-events",
+            "score-clock",
+            &graphs,
+        )
+        .unwrap());
+
+        let mut tampered = graphs.clone();
+        tampered[0].notation_events.note_events[0].score_offset =
+            RationalBeat::new(1, 1).unwrap();
+        assert!(!validate_musicxml_notation_graph_replay(
+            xml.as_bytes(),
+            "sha256:notation-events",
+            "score-clock",
+            &tampered,
+        )
+        .unwrap());
+    }
+
+    #[test]
+    fn legacy_graph_without_notation_event_layer_keeps_old_serialized_shape() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><rest/><duration>16</duration></note>
+        </measure></part></score-partwise>"#;
+        let mut graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "sha256:legacy-graph", "score-clock"
+        ).unwrap().remove(0);
+        graph.notation_events =
+            crate::musicxml_notation_events::legacy_missing_notation_events();
+        let json = serde_json::to_value(&graph).unwrap();
+        assert!(
+            json.get("notation_events").is_none(),
+            "legacy sentinel must be skipped so old graph commitments remain stable"
+        );
+        let round_trip: MusicXmlPartNotationGraphV1 =
+            serde_json::from_value(json).unwrap();
+        assert!(crate::musicxml_notation_events::is_legacy_missing_notation_events(
+            &round_trip.notation_events
+        ));
+    }
+
+    #[test]
+    fn unresolvable_notation_events_are_unknown_without_partial_event_leakage() {
+        let xml = r#"<score-partwise><part id="P1">
+            <measure number="1">
+                <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></attributes>
+                <note><pitch><step>C</step><octave>4</octave></pitch><duration>8</duration></note>
+                <attributes><time><beats>3</beats><beat-type>4</beat-type></time></attributes>
+                <note><pitch><step>D</step><octave>4</octave></pitch><duration>8</duration></note>
+            </measure>
+        </part></score-partwise>"#;
+        let graph = parse_musicxml_part_notation_graph(
+            xml.as_bytes(), "sha256:midmeasure-meter", "score-clock"
+        ).unwrap().remove(0);
+        assert!(matches!(graph.map.status, MeasureMapStatus::Unknown { .. }));
+        assert!(matches!(
+            graph.notation_events.status,
+            crate::musicxml_notation_events::MusicXmlNotationEventsStatusV1::Unknown { .. }
+        ));
+        assert!(graph.notation_events.note_events.is_empty());
+        assert!(graph.notation_events.attribute_events.is_empty());
+    }
+
 }
