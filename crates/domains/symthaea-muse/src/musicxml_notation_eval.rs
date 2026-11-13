@@ -358,7 +358,9 @@ fn validate_graph(
         .len()
         .saturating_add(graph.notation_events.auxiliary_events.len())
         .saturating_add(graph.notation_events.cursor_moves.len());
-    let total = note_count.saturating_add(other_count);
+    let total = note_count
+        .saturating_add(other_count)
+        .saturating_add(graph.map.measures.len());
     if total > config.maximum_events_per_part {
         return Err(MusicXmlNotationEvaluationErrorV1::EventBudgetExceeded {
             side: side.into(),
