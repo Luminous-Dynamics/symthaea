@@ -567,9 +567,9 @@ fn parse_event_kind(
     let pitched = note.children().find(|node| node.has_tag_name("pitch"));
     let rest = note.children().find(|node| node.has_tag_name("rest"));
     let unpitched = note.children().find(|node| node.has_tag_name("unpitched"));
-    let present = usize::from(pitched.is_some())
-        + usize::from(rest.is_some())
-        + usize::from(unpitched.is_some());
+    let present = (pitched.is_some() as usize)
+        + (rest.is_some() as usize)
+        + (unpitched.is_some() as usize);
     if present != 1 {
         return Err(ParseEventError::Unknown(
             "note must contain exactly one of pitch, rest or unpitched".into(),
@@ -699,4 +699,239 @@ fn next_order(order: usize) -> Result<usize, ParseEventError> {
     order
         .checked_add(1)
         .ok_or_else(|| ParseEventError::Unknown("MusicXML source-order overflow".into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::barline_eval::MeasureKind;
+
+    fn span(start: (i64, i64), end: (i64, i64)) -> MeasureSpan {
+        MeasureSpan {
+            start: RationalBeat::new(start.0, start.1).unwrap(),
+            end: RationalBeat::new(end.0, end.1).unwrap(),
+            kind: MeasureKind::Regular,
+        }
+    }
+
+    fn parse(xml: &str) -> MusicXmlPartNotationEventsV1 {
+        let document = roxmltree::Document::parse(xml).unwrap();
+        let part = document
+            .root_element()
+            .children()
+            .find(|node| node.has_tag_name("part"))
+            .unwrap();
+        let spans = [span((0, 1), (4, 1))];
+        parse_musicxml_part_notation_events(part, "P1", &spans)
+    }
+
+    fn supported(events: &MusicXmlPartNotationEventsV1) {
+        assert_eq!(
+            events.status,
+            MusicXmlNotationEventsStatusV1::Supported
+        );
+    }
+
+    #[test]
+    fn preserves_rests_grace_cue_unpitched_voice_staff_and_instruments() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time><staves>2</staves></attributes>
+            <note><rest measure="yes"/><duration>16</duration><voice>1</voice><staff>1</staff></note>
+            <note><grace slash="yes" steal-time-previous="20"/><pitch><step>D</step><alter>0.5</alter><octave>5</octave></pitch><voice>1</voice><staff>1</staff></note>
+            <note><cue/><pitch><step>G</step><octave>4</octave></pitch><duration>4</duration><instrument id="P1-I2"/><voice>2</voice><staff>2</staff></note>
+            <note><unpitched><display-step>F</display-step><display-octave>4</display-octave></unpitched><duration>12</duration><voice>2</voice><staff>2</staff></note>
+        </measure></part></score-partwise>"#;
+        let events = parse(xml);
+        supported(&events);
+        assert_eq!(events.note_events.len(), 4);
+        assert!(matches!(
+            events.note_events[0].kind,
+            MusicXmlNotationEventKindV1::Rest { measure: true, .. }
+        ));
+        assert_eq!(events.note_events[0].score_offset, RationalBeat::new(0, 1).unwrap());
+        assert_eq!(events.note_events[0].performed_duration, Some(RationalBeat::new(4, 1).unwrap()));
+        assert!(events.note_events[1].is_grace);
+        assert_eq!(events.note_events[1].performed_duration, None);
+        assert_eq!(
+            events.note_events[1].grace.as_ref().and_then(|grace| grace.steal_time_previous.as_deref()),
+            Some("20")
+        );
+        match &events.note_events[1].kind {
+            MusicXmlNotationEventKindV1::Pitched(pitch) => {
+                assert_eq!(pitch.step, "D");
+                assert_eq!(pitch.alter.as_deref(), Some("0.5"));
+                assert_eq!(pitch.octave, 5);
+            }
+            other => panic!("expected written pitch, got {other:?}"),
+        }
+        assert!(events.note_events[2].is_cue);
+        assert_eq!(events.note_events[2].voice.as_deref(), Some("2"));
+        assert_eq!(events.note_events[2].staff.as_deref(), Some("2"));
+        assert_eq!(events.note_events[2].instrument_ids, vec!["P1-I2"]);
+        assert!(matches!(
+            events.note_events[3].kind,
+            MusicXmlNotationEventKindV1::Unpitched { .. }
+        ));
+        assert_eq!(
+            events.note_events[3].performed_duration,
+            Some(RationalBeat::new(3, 1).unwrap())
+        );
+    }
+
+    #[test]
+    fn chord_members_share_base_onset_and_do_not_advance_measure_cursor() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><voice>1</voice></note>
+            <note><chord/><pitch><step>E</step><octave>4</octave></pitch><duration>8</duration><voice>1</voice></note>
+            <note><pitch><step>G</step><octave>4</octave></pitch><duration>8</duration><voice>1</voice></note>
+        </measure></part></score-partwise>"#;
+        let events = parse(xml);
+        supported(&events);
+        assert_eq!(events.note_events.len(), 3);
+        assert_eq!(events.note_events[0].score_offset, RationalBeat::new(0, 1).unwrap());
+        assert_eq!(events.note_events[1].score_offset, RationalBeat::new(0, 1).unwrap());
+        assert!(events.note_events[1].is_chord_member);
+        assert_eq!(events.note_events[1].chord_anchor_source_order, Some(0));
+        assert_eq!(events.note_events[2].score_offset, RationalBeat::new(4, 1).unwrap());
+    }
+
+    #[test]
+    fn triplet_sounding_duration_and_written_type_are_both_preserved() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>12</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>5</octave></pitch><duration>4</duration><voice>1</voice><type>eighth</type><time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes><normal-type>eighth</normal-type><normal-dot/></time-modification><notations><tuplet type="start" number="1" bracket="no"><tuplet-actual><tuplet-number>3</tuplet-number></tuplet-actual><tuplet-normal><tuplet-number>2</tuplet-number></tuplet-normal></tuplet></notations></note>
+            <note><pitch><step>D</step><octave>5</octave></pitch><duration>4</duration><voice>1</voice><type>eighth</type><time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification></note>
+            <note><pitch><step>E</step><octave>5</octave></pitch><duration>4</duration><voice>1</voice><type>eighth</type><time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification><dot/></note>
+        </measure></part></score-partwise>"#;
+        let events = parse(xml);
+        supported(&events);
+        assert_eq!(events.note_events.len(), 3);
+        assert_eq!(events.note_events[0].performed_duration, Some(RationalBeat::new(1, 3).unwrap()));
+        assert_eq!(events.note_events[1].score_offset, RationalBeat::new(1, 3).unwrap());
+        assert_eq!(events.note_events[2].score_offset, RationalBeat::new(2, 3).unwrap());
+        assert_eq!(events.note_events[0].written_type.as_deref(), Some("eighth"));
+        let ratio = events.note_events[0].time_modification.as_ref().unwrap();
+        assert_eq!((ratio.actual_notes, ratio.normal_notes), (3, 2));
+        assert_eq!(ratio.normal_dot_count, 1);
+        assert_eq!(events.note_events[0].tuplet_notations.len(), 1);
+        assert_eq!(
+            events.note_events[0].tuplet_notations[0].attributes,
+            vec![
+                ("type".into(), "start".into()),
+                ("number".into(), "1".into()),
+                ("bracket".into(), "no".into())
+            ]
+        );
+        assert_eq!(events.note_events[2].dot_count, 1);
+    }
+
+    #[test]
+    fn sound_tie_and_visual_tie_are_kept_as_distinct_semantics() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>16</duration><tie type="start"/><notations><tied type="start" number="2"/><slur type="start" number="1"/><articulations><staccato/></articulations></notations></note>
+        </measure></part></score-partwise>"#;
+        let events = parse(xml);
+        supported(&events);
+        let note = &events.note_events[0];
+        assert_eq!(note.sound_ties.len(), 1);
+        assert_eq!(note.sound_ties[0].tie_type.as_deref(), Some("start"));
+        assert_eq!(note.visual_ties.len(), 1);
+        assert_eq!(note.visual_ties[0].tie_type.as_deref(), Some("start"));
+        assert_eq!(note.tuplet_notations.len(), 0);
+        let notations = note
+            .source_note
+            .children
+            .iter()
+            .find(|node| node.element == "notations")
+            .unwrap();
+        assert!(notations.children.iter().any(|node| node.element == "slur"));
+        assert!(notations.children.iter().any(|node| node.element == "articulations"));
+    }
+
+    #[test]
+    fn attributes_are_recorded_at_score_order_positions_with_exact_offsets() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>8</duration></note>
+            <attributes><clef number="2"><sign>F</sign><line>4</line></clef><key><fifths>-2</fifths><mode>minor</mode></key></attributes>
+            <note><pitch><step>D</step><octave>3</octave></pitch><duration>8</duration><staff>2</staff></note>
+        </measure></part></score-partwise>"#;
+        let events = parse(xml);
+        supported(&events);
+        assert_eq!(events.attribute_events.len(), 4);
+        assert_eq!(events.attribute_events[0].source.element, "divisions");
+        assert_eq!(events.attribute_events[2].score_offset, RationalBeat::new(2, 1).unwrap());
+        assert_eq!(events.attribute_events[2].source.element, "clef");
+        assert_eq!(events.attribute_events[3].source.element, "key");
+        assert_eq!(events.note_events[1].score_offset, RationalBeat::new(2, 1).unwrap());
+    }
+
+    #[test]
+    fn backup_and_forward_cursor_moves_preserve_secondary_voice_positions() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>5</octave></pitch><duration>16</duration><voice>1</voice><staff>1</staff></note>
+            <backup><duration>16</duration></backup>
+            <note><pitch><step>C</step><octave>3</octave></pitch><duration>8</duration><voice>2</voice><staff>2</staff></note>
+            <forward><duration>8</duration></forward>
+            <note><rest/><duration>8</duration><voice>2</voice><staff>2</staff></note>
+        </measure></part></score-partwise>"#;
+        let events = parse(xml);
+        supported(&events);
+        assert_eq!(events.note_events.len(), 3);
+        assert_eq!(events.note_events[0].score_offset, RationalBeat::new(0, 1).unwrap());
+        assert_eq!(events.note_events[1].score_offset, RationalBeat::new(0, 1).unwrap());
+        assert_eq!(events.note_events[2].score_offset, RationalBeat::new(2, 1).unwrap());
+        assert_eq!(events.cursor_moves.len(), 2);
+        assert_eq!(events.cursor_moves[0].direction, "backup");
+        assert_eq!(events.cursor_moves[1].direction, "forward");
+    }
+
+    #[test]
+    fn source_order_and_unknown_note_extensions_are_preserved() {
+        let xml = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note id="n-1" time-only="2" attack="1"><pitch><step>F</step><octave>4</octave></pitch><duration>16</duration><future-symbol code="x">opaque</future-symbol></note>
+            <note id="n-2"><rest/><duration>16</duration></note>
+        </measure></part></score-partwise>"#;
+        let events = parse(xml);
+        supported(&events);
+        assert_eq!(events.note_events[0].source_order, 1);
+        assert_eq!(events.note_events[1].source_order, 2);
+        let first = &events.note_events[0].source_note;
+        assert_eq!(first.attributes, vec![
+            ("id".into(), "n-1".into()),
+            ("time-only".into(), "2".into()),
+            ("attack".into(), "1".into())
+        ]);
+        assert!(first.children.iter().any(|node| node.element == "future-symbol"));
+        assert_eq!(
+            first.children.iter().find(|node| node.element == "future-symbol")
+                .and_then(|node| node.text.as_deref()),
+            Some("opaque")
+        );
+    }
+
+    #[test]
+    fn ambiguous_chord_and_invalid_duration_withhold_the_event_layer() {
+        let no_anchor = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><chord/><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration></note>
+        </measure></part></score-partwise>"#;
+        assert!(matches!(
+            parse(no_anchor).status,
+            MusicXmlNotationEventsStatusV1::Unknown { .. }
+        ));
+
+        let invalid_duration = r#"<score-partwise><part id="P1"><measure number="1">
+            <attributes><divisions>4</divisions><time><beats>4</beats><beat-type>4</beat-type></time></attributes>
+            <note><pitch><step>C</step><octave>4</octave></pitch><duration>0</duration></note>
+        </measure></part></score-partwise>"#;
+        assert!(matches!(
+            parse(invalid_duration).status,
+            MusicXmlNotationEventsStatusV1::Unknown { .. }
+        ));
+    }
 }
