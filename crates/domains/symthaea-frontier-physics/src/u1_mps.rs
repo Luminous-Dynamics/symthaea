@@ -486,7 +486,7 @@ mod tests {
         let state = ComplexU1Mps::new(vec![first, second, third], 1, 1.0e-14).unwrap();
         assert_eq!(state.total_charge(), 1);
         assert_eq!(state.maximum_bond_dimension(), 2);
-        assert!(state.norm_squared(1.0e-12).unwrap().sub(1.0).abs() <= 1.0e-12);
+        assert!((state.norm_squared(1.0e-12).unwrap() - 1.0).abs() <= 1.0e-12);
 
         let dense = state.to_dense(4).unwrap();
         let expected = 1.0 / 3.0_f64.sqrt();
