@@ -1,0 +1,46 @@
+name: Vocal pitch benchmark evaluator
+
+on:
+  pull_request:
+    paths:
+      - "tools/vocal-pitch-benchmark-eval/**"
+      - "docs/research/VOCAL_PITCH_TRACKER_BENCHMARK_V1.md"
+      - ".github/workflows/vocal-pitch-benchmark-evaluator.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vocal-pitch-benchmark-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull request revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "VOCAL_PITCH_BENCHMARK_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Format-check pitch benchmark evaluator
+        run: cargo +1.96.0 fmt --check --manifest-path tools/vocal-pitch-benchmark-eval/Cargo.toml
+
+      - name: Generate isolated lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path tools/vocal-pitch-benchmark-eval/Cargo.toml
+
+      - name: Run pitch metric positive and negative controls
+        run: cargo +1.96.0 test --locked --manifest-path tools/vocal-pitch-benchmark-eval/Cargo.toml
