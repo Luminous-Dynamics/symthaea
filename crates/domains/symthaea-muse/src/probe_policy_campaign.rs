@@ -25,7 +25,7 @@ use crate::probe_policy_comparison::{
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 pub const PROBE_POLICY_CAMPAIGN_VERSION: &str =
     "mel-mr-eval-026-paired-multifamily-campaign-v0.1";
@@ -228,7 +228,6 @@ struct GeneratedFixture {
     source_digest: String,
     effect_digest: String,
     support_digest: String,
-    total_frames: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -579,7 +578,6 @@ fn generate_fixture(
         source_digest: sha256_hex(&source_bytes),
         effect_digest: sha256_hex(&effect_bytes),
         support_digest: sha256_hex(&support_bytes),
-        total_frames: frame_count as u64,
     })
 }
 
@@ -962,6 +960,27 @@ mod tests {
             fixture.family == InteractionFamily::IncompleteRouting
                 && fixture.split == CampaignSplit::HeldOutRoutingTopology
         }));
+    }
+
+    #[test]
+    fn all_generator_families_keep_source_and_support_ranges_bounded() {
+        let config = small_config();
+        for family in InteractionFamily::ALL {
+            for composition_index in [0usize, 6] {
+                let fixture = generate_fixture(family, composition_index, &config).unwrap();
+                assert!((2..=8).contains(&fixture.events.len()));
+                for event in &fixture.events {
+                    assert_eq!(event.samples.len(), config.frame_count);
+                }
+                for support in &fixture.supports {
+                    assert_eq!(support.source_event_index < fixture.events.len(), true);
+                    for interval in &support.acoustic_support {
+                        assert!(interval.start_frame < interval.end_frame);
+                        assert!(interval.end_frame <= config.frame_count as u64 + 4);
+                    }
+                }
+            }
+        }
     }
 
     #[test]
