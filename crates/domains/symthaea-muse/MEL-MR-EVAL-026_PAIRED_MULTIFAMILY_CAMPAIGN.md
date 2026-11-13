@@ -51,7 +51,8 @@ These splits are determined by the versioned family map, not chosen after lookin
 - Paired EVAL-019 versus uniform-random and temporal-only recall comparisons at the **same actual total render count**. Requested budgets with different actual costs are explicitly unmatched.
 - Composition-equal weighting: first average the matched seed/budget deltas within each composition, then average composition means.
 - Deterministic composition-cluster bootstrap intervals; no row-, seed-, pair- or frame-level pseudo-replication.
-- Separate null-scene false-discovery summaries, preserving the distinction between undefined recall on zero-positive scenes and zero recall.
+- Separate null-scene diagnostics: pooled pair-level FDP plus composition-macro probability of selecting any pair and composition-macro false-positive pairs per row, each with composition-cluster bootstrap intervals. The pooled FDP is explicitly recognized as 1 whenever any pair is selected on an all-null scene; it is retained for accounting, not used alone to rank policies.
+- Linear-FIR support includes the full L−1 output tail. The final event in each FIR fixture reaches the input-score boundary and its support ends at the oracle's exact output-frame count.
 - Domain-separated SHA-256 campaign receipt and full replay by regenerating the frozen fixture matrix, oracle reports, policy rows and summaries.
 
 The campaign defaults to 70 composition fixtures (10 families × 7 compositions), three policy seeds and seven pair budgets. The module's tests use a smaller four-family matrix while retaining seven independent compositions per included family.
@@ -72,10 +73,10 @@ The first exact-head workflow attempt reached workspace metadata but failed earl
 
 - A policy comparison is called matched-cost only when candidate and baseline have equal **actual** render counts for the same fixture, seed and requested budget.
 - An underfilled policy is not credited with the requested budget.
-- Undefined recall on a zero-positive fixture is not coerced to zero; null-scene false discoveries are reported separately.
+- Undefined recall on a zero-positive fixture is not coerced to zero. The pooled pair-level false-discovery proportion on an all-null fixture is 1 whenever any pair is selected; it is kept as an accounting check, while the more discriminating metrics are the composition-macro probability of any selection and composition-macro false-positive pairs per row. Their bootstrap resamples independent compositions, not repeated seeds/budgets.
 - Contextual four-coalition pair effects remain distinct from unconditional global order-2 and order-3+ Harsanyi structure.
 - Incomplete routing is never treated as proof of independence.
-- The FIR family uses the oracle's rendered output frame count (including the convolution tail) as the support coordinate horizon.
+- The FIR family uses the oracle's rendered output frame count (including the convolution tail) as the support coordinate horizon. A tail fixture asserts the final event reaches the end of the input and its support extends to `input_frames + impulse_response_taps - 1`.
 - A local deterministic bootstrap interval is an uncertainty summary for this frozen synthetic campaign, not a universal safety bound. Multi-family or multiple-comparison claims still require a preregistered primary contrast and independent held-out replication.
 
 ## Proposed qualification targets — not results
@@ -94,13 +95,15 @@ The code preserves all raw policy rows and per-composition clusters so targets c
 
 ## Tests authored
 
-Seven tests cover:
+Nine tests cover:
 1. Event-count/family coverage and the two frozen holdouts.
 2. Paired same-composition / same-seed comparisons and cluster-bootstrap output.
 3. Support-view corruption without changing the factorial oracle input truth.
 4. Incomplete-routing holdout behavior.
 5. Full campaign replay and receipt-tamper rejection.
 6. Duplicate seed, budget and family rejection.
+7. Linear-FIR support reaching the exact oracle convolution-tail boundary.
+8. Composition-macro null-selection and false-positive burden with cluster-bootstrap intervals.
 
 The tests have not yet been compiled or executed. No 0.95 recall, 0.30 cost, confidence interval, FluidSynth result, perceptual-quality result or SOTA improvement is claimed.
 
