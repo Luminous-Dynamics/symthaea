@@ -1,0 +1,1119 @@
+{
+  "corpus_version": "ev-pack-capability-corpus/0.1",
+  "schema_id": "https://luminousdynamics.io/schemas/transport/ev-pack-capability-profile/0.1",
+  "cases": [
+    {
+      "case_id": "positive-complete-cell-population",
+      "expectation": "accept",
+      "profile": {
+        "profile_version": "ev-pack-capability-profile/0.1",
+        "profile_id": "synthetic-pack-example-01",
+        "asset": {
+          "vehicle_ref": "vehicle-synthetic-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack-synthetic-01",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "chemistry": "lfp"
+        },
+        "population": {
+          "comparison_resolution": "cell",
+          "declared_unit_count": 4,
+          "observed_unit_count": 4,
+          "inventory_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "reference_conditions": {
+          "capacity": {
+            "condition_ref": "capacity-ref-25c-0p5c",
+            "temperature_c": 25,
+            "c_rate": 0.5,
+            "lower_cutoff_voltage_v": 2.5,
+            "upper_cutoff_voltage_v": 3.65,
+            "protocol_ref": "synthetic-capacity-protocol",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "resistance": {
+            "condition_ref": "resistance-ref-25c-50soc",
+            "temperature_c": 25,
+            "soc_fraction": 0.5,
+            "pulse_current_a": 3,
+            "pulse_duration_ms": 1000,
+            "protocol_ref": "synthetic-dcir-protocol",
+            "protocol_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "provenance": {
+          "source_batch_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "analysis_method_ref": "pack-capability-profile-audit-v0.1",
+          "analysis_method_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "units": [
+          {
+            "unit_ref": "cell-001",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.94,
+              "uncertainty_ah": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 1.8,
+              "uncertainty_mohm": 0.08,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-002",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.91,
+              "uncertainty_ah": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 1.9,
+              "uncertainty_mohm": 0.08,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-003",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.82,
+              "uncertainty_ah": 0.04,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 2.1,
+              "uncertainty_mohm": 0.09,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-004",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.73,
+              "uncertainty_ah": 0.04,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 2.5,
+              "uncertainty_mohm": 0.1,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "positive-partial-coverage-explicit",
+      "expectation": "accept",
+      "profile": {
+        "profile_version": "ev-pack-capability-profile/0.1",
+        "profile_id": "synthetic-pack-partial-coverage",
+        "asset": {
+          "vehicle_ref": "vehicle-synthetic-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack-synthetic-01",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "chemistry": "lfp"
+        },
+        "population": {
+          "comparison_resolution": "cell",
+          "declared_unit_count": 6,
+          "observed_unit_count": 4,
+          "inventory_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "reference_conditions": {
+          "capacity": {
+            "condition_ref": "capacity-ref-25c-0p5c",
+            "temperature_c": 25,
+            "c_rate": 0.5,
+            "lower_cutoff_voltage_v": 2.5,
+            "upper_cutoff_voltage_v": 3.65,
+            "protocol_ref": "synthetic-capacity-protocol",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "resistance": {
+            "condition_ref": "resistance-ref-25c-50soc",
+            "temperature_c": 25,
+            "soc_fraction": 0.5,
+            "pulse_current_a": 3,
+            "pulse_duration_ms": 1000,
+            "protocol_ref": "synthetic-dcir-protocol",
+            "protocol_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "provenance": {
+          "source_batch_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "analysis_method_ref": "pack-capability-profile-audit-v0.1",
+          "analysis_method_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "units": [
+          {
+            "unit_ref": "cell-001",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.94,
+              "uncertainty_ah": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 1.8,
+              "uncertainty_mohm": 0.08,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-002",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.91,
+              "uncertainty_ah": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 1.9,
+              "uncertainty_mohm": 0.08,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-003",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.82,
+              "uncertainty_ah": 0.04,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 2.1,
+              "uncertainty_mohm": 0.09,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-004",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.73,
+              "uncertainty_ah": 0.04,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 2.5,
+              "uncertainty_mohm": 0.1,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "positive-module-resolution-not-cell-assumption",
+      "expectation": "accept",
+      "profile": {
+        "profile_version": "ev-pack-capability-profile/0.1",
+        "profile_id": "synthetic-module-population",
+        "asset": {
+          "vehicle_ref": "vehicle-synthetic-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack-synthetic-01",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "chemistry": "lfp"
+        },
+        "population": {
+          "comparison_resolution": "module",
+          "declared_unit_count": 2,
+          "observed_unit_count": 2,
+          "inventory_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "reference_conditions": {
+          "capacity": {
+            "condition_ref": "capacity-ref-25c-0p5c",
+            "temperature_c": 25,
+            "c_rate": 0.5,
+            "lower_cutoff_voltage_v": 2.5,
+            "upper_cutoff_voltage_v": 3.65,
+            "protocol_ref": "synthetic-capacity-protocol",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "resistance": {
+            "condition_ref": "resistance-ref-25c-50soc",
+            "temperature_c": 25,
+            "soc_fraction": 0.5,
+            "pulse_current_a": 3,
+            "pulse_duration_ms": 1000,
+            "protocol_ref": "synthetic-dcir-protocol",
+            "protocol_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "provenance": {
+          "source_batch_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "analysis_method_ref": "pack-capability-profile-audit-v0.1",
+          "analysis_method_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "units": [
+          {
+            "unit_ref": "module-001",
+            "nominal_capacity_ah": 80,
+            "capacity": {
+              "value_ah": 76,
+              "uncertainty_ah": 0.8,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 0.42,
+              "uncertainty_mohm": 0.02,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "module-002",
+            "nominal_capacity_ah": 80,
+            "capacity": {
+              "value_ah": 74,
+              "uncertainty_ah": 0.9,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 0.48,
+              "uncertainty_mohm": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "negative-duplicate-unit-identity",
+      "expectation": "reject",
+      "profile": {
+        "profile_version": "ev-pack-capability-profile/0.1",
+        "profile_id": "negative-duplicate-unit-ref",
+        "asset": {
+          "vehicle_ref": "vehicle-synthetic-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack-synthetic-01",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "chemistry": "lfp"
+        },
+        "population": {
+          "comparison_resolution": "cell",
+          "declared_unit_count": 4,
+          "observed_unit_count": 4,
+          "inventory_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "reference_conditions": {
+          "capacity": {
+            "condition_ref": "capacity-ref-25c-0p5c",
+            "temperature_c": 25,
+            "c_rate": 0.5,
+            "lower_cutoff_voltage_v": 2.5,
+            "upper_cutoff_voltage_v": 3.65,
+            "protocol_ref": "synthetic-capacity-protocol",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "resistance": {
+            "condition_ref": "resistance-ref-25c-50soc",
+            "temperature_c": 25,
+            "soc_fraction": 0.5,
+            "pulse_current_a": 3,
+            "pulse_duration_ms": 1000,
+            "protocol_ref": "synthetic-dcir-protocol",
+            "protocol_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "provenance": {
+          "source_batch_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "analysis_method_ref": "pack-capability-profile-audit-v0.1",
+          "analysis_method_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "units": [
+          {
+            "unit_ref": "cell-001",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.94,
+              "uncertainty_ah": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 1.8,
+              "uncertainty_mohm": 0.08,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-002",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.91,
+              "uncertainty_ah": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 1.9,
+              "uncertainty_mohm": 0.08,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-003",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.82,
+              "uncertainty_ah": 0.04,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 2.1,
+              "uncertainty_mohm": 0.09,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-003",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.73,
+              "uncertainty_ah": 0.04,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 2.5,
+              "uncertainty_mohm": 0.1,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "negative-mismatched-reference-condition",
+      "expectation": "reject",
+      "profile": {
+        "profile_version": "ev-pack-capability-profile/0.1",
+        "profile_id": "negative-mismatched-condition",
+        "asset": {
+          "vehicle_ref": "vehicle-synthetic-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack-synthetic-01",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "chemistry": "lfp"
+        },
+        "population": {
+          "comparison_resolution": "cell",
+          "declared_unit_count": 4,
+          "observed_unit_count": 4,
+          "inventory_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "reference_conditions": {
+          "capacity": {
+            "condition_ref": "capacity-ref-25c-0p5c",
+            "temperature_c": 25,
+            "c_rate": 0.5,
+            "lower_cutoff_voltage_v": 2.5,
+            "upper_cutoff_voltage_v": 3.65,
+            "protocol_ref": "synthetic-capacity-protocol",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "resistance": {
+            "condition_ref": "resistance-ref-25c-50soc",
+            "temperature_c": 25,
+            "soc_fraction": 0.5,
+            "pulse_current_a": 3,
+            "pulse_duration_ms": 1000,
+            "protocol_ref": "synthetic-dcir-protocol",
+            "protocol_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "provenance": {
+          "source_batch_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "analysis_method_ref": "pack-capability-profile-audit-v0.1",
+          "analysis_method_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "units": [
+          {
+            "unit_ref": "cell-001",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.94,
+              "uncertainty_ah": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 1.8,
+              "uncertainty_mohm": 0.08,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-002",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.91,
+              "uncertainty_ah": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 1.9,
+              "uncertainty_mohm": 0.08,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-003",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.82,
+              "uncertainty_ah": 0.04,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "different-condition"
+            },
+            "resistance": {
+              "value_mohm": 2.1,
+              "uncertainty_mohm": 0.09,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-004",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.73,
+              "uncertainty_ah": 0.04,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 2.5,
+              "uncertainty_mohm": 0.1,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "negative-observed-count-mismatch",
+      "expectation": "reject",
+      "profile": {
+        "profile_version": "ev-pack-capability-profile/0.1",
+        "profile_id": "negative-observed-count-mismatch",
+        "asset": {
+          "vehicle_ref": "vehicle-synthetic-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack-synthetic-01",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "chemistry": "lfp"
+        },
+        "population": {
+          "comparison_resolution": "cell",
+          "declared_unit_count": 4,
+          "observed_unit_count": 3,
+          "inventory_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "reference_conditions": {
+          "capacity": {
+            "condition_ref": "capacity-ref-25c-0p5c",
+            "temperature_c": 25,
+            "c_rate": 0.5,
+            "lower_cutoff_voltage_v": 2.5,
+            "upper_cutoff_voltage_v": 3.65,
+            "protocol_ref": "synthetic-capacity-protocol",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "resistance": {
+            "condition_ref": "resistance-ref-25c-50soc",
+            "temperature_c": 25,
+            "soc_fraction": 0.5,
+            "pulse_current_a": 3,
+            "pulse_duration_ms": 1000,
+            "protocol_ref": "synthetic-dcir-protocol",
+            "protocol_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "provenance": {
+          "source_batch_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "analysis_method_ref": "pack-capability-profile-audit-v0.1",
+          "analysis_method_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "units": [
+          {
+            "unit_ref": "cell-001",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.94,
+              "uncertainty_ah": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 1.8,
+              "uncertainty_mohm": 0.08,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-002",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.91,
+              "uncertainty_ah": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 1.9,
+              "uncertainty_mohm": 0.08,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-003",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.82,
+              "uncertainty_ah": 0.04,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 2.1,
+              "uncertainty_mohm": 0.09,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-004",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.73,
+              "uncertainty_ah": 0.04,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 2.5,
+              "uncertainty_mohm": 0.1,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "negative-invalid-evidence-digest",
+      "expectation": "reject",
+      "profile": {
+        "profile_version": "ev-pack-capability-profile/0.1",
+        "profile_id": "negative-invalid-evidence-digest",
+        "asset": {
+          "vehicle_ref": "vehicle-synthetic-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack-synthetic-01",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "chemistry": "lfp"
+        },
+        "population": {
+          "comparison_resolution": "cell",
+          "declared_unit_count": 4,
+          "observed_unit_count": 4,
+          "inventory_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "reference_conditions": {
+          "capacity": {
+            "condition_ref": "capacity-ref-25c-0p5c",
+            "temperature_c": 25,
+            "c_rate": 0.5,
+            "lower_cutoff_voltage_v": 2.5,
+            "upper_cutoff_voltage_v": 3.65,
+            "protocol_ref": "synthetic-capacity-protocol",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "resistance": {
+            "condition_ref": "resistance-ref-25c-50soc",
+            "temperature_c": 25,
+            "soc_fraction": 0.5,
+            "pulse_current_a": 3,
+            "pulse_duration_ms": 1000,
+            "protocol_ref": "synthetic-dcir-protocol",
+            "protocol_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "provenance": {
+          "source_batch_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "analysis_method_ref": "pack-capability-profile-audit-v0.1",
+          "analysis_method_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "units": [
+          {
+            "unit_ref": "cell-001",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.94,
+              "uncertainty_ah": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "not-a-sha256-digest",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 1.8,
+              "uncertainty_mohm": 0.08,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-002",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.91,
+              "uncertainty_ah": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 1.9,
+              "uncertainty_mohm": 0.08,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-003",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.82,
+              "uncertainty_ah": 0.04,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 2.1,
+              "uncertainty_mohm": 0.09,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-004",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.73,
+              "uncertainty_ah": 0.04,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 2.5,
+              "uncertainty_mohm": 0.1,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "negative-nonpositive-capacity",
+      "expectation": "reject",
+      "profile": {
+        "profile_version": "ev-pack-capability-profile/0.1",
+        "profile_id": "negative-nonpositive-capacity",
+        "asset": {
+          "vehicle_ref": "vehicle-synthetic-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack-synthetic-01",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "chemistry": "lfp"
+        },
+        "population": {
+          "comparison_resolution": "cell",
+          "declared_unit_count": 4,
+          "observed_unit_count": 4,
+          "inventory_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "reference_conditions": {
+          "capacity": {
+            "condition_ref": "capacity-ref-25c-0p5c",
+            "temperature_c": 25,
+            "c_rate": 0.5,
+            "lower_cutoff_voltage_v": 2.5,
+            "upper_cutoff_voltage_v": 3.65,
+            "protocol_ref": "synthetic-capacity-protocol",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "resistance": {
+            "condition_ref": "resistance-ref-25c-50soc",
+            "temperature_c": 25,
+            "soc_fraction": 0.5,
+            "pulse_current_a": 3,
+            "pulse_duration_ms": 1000,
+            "protocol_ref": "synthetic-dcir-protocol",
+            "protocol_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "provenance": {
+          "source_batch_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "analysis_method_ref": "pack-capability-profile-audit-v0.1",
+          "analysis_method_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "units": [
+          {
+            "unit_ref": "cell-001",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 0,
+              "uncertainty_ah": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 1.8,
+              "uncertainty_mohm": 0.08,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-002",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.91,
+              "uncertainty_ah": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 1.9,
+              "uncertainty_mohm": 0.08,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-003",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.82,
+              "uncertainty_ah": 0.04,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 2.1,
+              "uncertainty_mohm": 0.09,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-004",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.73,
+              "uncertainty_ah": 0.04,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 2.5,
+              "uncertainty_mohm": 0.1,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "case_id": "negative-unvalidated-topology-shortcut",
+      "expectation": "reject",
+      "profile": {
+        "profile_version": "ev-pack-capability-profile/0.1",
+        "profile_id": "negative-unvalidated-topology-shortcut",
+        "asset": {
+          "vehicle_ref": "vehicle-synthetic-01",
+          "vehicle_configuration_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "pack_ref": "pack-synthetic-01",
+          "pack_configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "chemistry": "lfp"
+        },
+        "population": {
+          "comparison_resolution": "cell",
+          "declared_unit_count": 4,
+          "observed_unit_count": 4,
+          "inventory_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "reference_conditions": {
+          "capacity": {
+            "condition_ref": "capacity-ref-25c-0p5c",
+            "temperature_c": 25,
+            "c_rate": 0.5,
+            "lower_cutoff_voltage_v": 2.5,
+            "upper_cutoff_voltage_v": 3.65,
+            "protocol_ref": "synthetic-capacity-protocol",
+            "protocol_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          },
+          "resistance": {
+            "condition_ref": "resistance-ref-25c-50soc",
+            "temperature_c": 25,
+            "soc_fraction": 0.5,
+            "pulse_current_a": 3,
+            "pulse_duration_ms": 1000,
+            "protocol_ref": "synthetic-dcir-protocol",
+            "protocol_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          }
+        },
+        "provenance": {
+          "source_batch_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "analysis_method_ref": "pack-capability-profile-audit-v0.1",
+          "analysis_method_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        "units": [
+          {
+            "unit_ref": "cell-001",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.94,
+              "uncertainty_ah": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 1.8,
+              "uncertainty_mohm": 0.08,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-002",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.91,
+              "uncertainty_ah": 0.03,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 1.9,
+              "uncertainty_mohm": 0.08,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-003",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.82,
+              "uncertainty_ah": 0.04,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 2.1,
+              "uncertainty_mohm": 0.09,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          },
+          {
+            "unit_ref": "cell-004",
+            "nominal_capacity_ah": 3,
+            "capacity": {
+              "value_ah": 2.73,
+              "uncertainty_ah": 0.04,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "condition_ref": "capacity-ref-25c-0p5c"
+            },
+            "resistance": {
+              "value_mohm": 2.5,
+              "uncertainty_mohm": 0.1,
+              "evidence_class": "synthetic_fixture",
+              "method": "synthetic_fixture",
+              "evidence_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "condition_ref": "resistance-ref-25c-50soc"
+            }
+          }
+        ],
+        "topology_energy_kwh": 48
+      }
+    }
+  ]
+}

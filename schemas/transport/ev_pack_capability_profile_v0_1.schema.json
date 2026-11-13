@@ -1,0 +1,327 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/transport/ev-pack-capability-profile/0.1",
+  "title": "EV pack capability profile v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_version",
+    "profile_id",
+    "asset",
+    "population",
+    "reference_conditions",
+    "provenance",
+    "units"
+  ],
+  "properties": {
+    "profile_version": {
+      "const": "ev-pack-capability-profile/0.1"
+    },
+    "profile_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "vehicle_ref",
+        "vehicle_configuration_digest",
+        "pack_ref",
+        "pack_configuration_digest",
+        "chemistry"
+      ],
+      "properties": {
+        "vehicle_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "vehicle_configuration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "pack_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pack_configuration_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "chemistry": {
+          "enum": [
+            "lfp",
+            "lmfp",
+            "nmc",
+            "nca",
+            "lco",
+            "sodium_ion",
+            "other",
+            "unknown"
+          ]
+        }
+      }
+    },
+    "population": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "comparison_resolution",
+        "declared_unit_count",
+        "observed_unit_count",
+        "inventory_digest"
+      ],
+      "properties": {
+        "comparison_resolution": {
+          "enum": [
+            "cell",
+            "parallel_group",
+            "module"
+          ]
+        },
+        "declared_unit_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "observed_unit_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "inventory_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "reference_conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capacity",
+        "resistance"
+      ],
+      "properties": {
+        "capacity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "condition_ref",
+            "temperature_c",
+            "c_rate",
+            "lower_cutoff_voltage_v",
+            "upper_cutoff_voltage_v",
+            "protocol_ref",
+            "protocol_digest"
+          ],
+          "properties": {
+            "condition_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "temperature_c": {
+              "type": "number"
+            },
+            "c_rate": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "lower_cutoff_voltage_v": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "upper_cutoff_voltage_v": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "protocol_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "protocol_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "resistance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "condition_ref",
+            "temperature_c",
+            "soc_fraction",
+            "pulse_current_a",
+            "pulse_duration_ms",
+            "protocol_ref",
+            "protocol_digest"
+          ],
+          "properties": {
+            "condition_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "temperature_c": {
+              "type": "number"
+            },
+            "soc_fraction": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "pulse_current_a": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "pulse_duration_ms": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "protocol_ref": {
+              "type": "string",
+              "minLength": 1
+            },
+            "protocol_digest": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_batch_digest",
+        "analysis_method_ref",
+        "analysis_method_digest"
+      ],
+      "properties": {
+        "source_batch_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "analysis_method_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "analysis_method_digest": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "units": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "unit_ref",
+          "nominal_capacity_ah",
+          "capacity",
+          "resistance"
+        ],
+        "properties": {
+          "unit_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "nominal_capacity_ah": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "capacity": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "value_ah",
+              "uncertainty_ah",
+              "evidence_class",
+              "method",
+              "evidence_digest",
+              "condition_ref"
+            ],
+            "properties": {
+              "value_ah": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "uncertainty_ah": {
+                "type": "number",
+                "minimum": 0
+              },
+              "evidence_class": {
+                "enum": [
+                  "reference_test_measurement",
+                  "derived_estimate",
+                  "model_prediction",
+                  "simulation_output",
+                  "synthetic_fixture",
+                  "vendor_claim"
+                ]
+              },
+              "method": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "condition_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "resistance": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "value_mohm",
+              "uncertainty_mohm",
+              "evidence_class",
+              "method",
+              "evidence_digest",
+              "condition_ref"
+            ],
+            "properties": {
+              "value_mohm": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "uncertainty_mohm": {
+                "type": "number",
+                "minimum": 0
+              },
+              "evidence_class": {
+                "enum": [
+                  "reference_test_measurement",
+                  "derived_estimate",
+                  "model_prediction",
+                  "simulation_output",
+                  "synthetic_fixture",
+                  "vendor_claim"
+                ]
+              },
+              "method": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_digest": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              },
+              "condition_ref": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
