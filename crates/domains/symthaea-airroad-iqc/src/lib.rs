@@ -91,6 +91,11 @@ pub enum MatrixError {
         /// Upper-triangular column.
         col: usize,
     },
+    /// Scaling an entry for Clarabel's PSD triangle produced a non-finite value.
+    NonFinitePackedEntry {
+        /// Index in the packed column-major vector.
+        index: usize,
+    },
     /// A permutation does not contain exactly order indices.
     InvalidPermutationLength {
         /// Required permutation length.
@@ -131,6 +136,9 @@ impl fmt::Display for MatrixError {
             }
             Self::NonSymmetricPair { row, col } => {
                 write!(formatter, "real entry ({row},{col}) is not symmetric")
+            }
+            Self::NonFinitePackedEntry { index } => {
+                write!(formatter, "packed PSD entry {index} is not finite")
             }
             Self::InvalidPermutationLength { expected, actual } => {
                 write!(formatter, "expected permutation length {expected}, received {actual}")
@@ -325,8 +333,19 @@ impl RealSymmetricMatrix {
     /// their Frobenius inner product. This is a packing conversion only: it
     /// does not prove positive semidefiniteness or invoke an SDP solver.
     #[must_use]
-    pub fn to_clarabel_psd_triangle(&self) -> Vec<f64> {
-        let capacity = self.order * (self.order + 1) / 2;
+    pub fn to_clarabel_psd_triangle(&self) -> Result<Vec<f64>, MatrixError> {
+        let next_order = self
+            .order
+            .checked_add(1)
+            .ok_or(MatrixError::DimensionOverflow)?;
+        let (left, right) = if self.order & 1 == 0 {
+            (self.order / 2, next_order)
+        } else {
+            (self.order, next_order / 2)
+        };
+        let capacity = left
+            .checked_mul(right)
+            .ok_or(MatrixError::DimensionOverflow)?;
         let mut packed = Vec::with_capacity(capacity);
         let sqrt_two = std::f64::consts::SQRT_2;
 
@@ -336,10 +355,15 @@ impl RealSymmetricMatrix {
                 if row != col {
                     value *= sqrt_two;
                 }
+                if !value.is_finite() {
+                    return Err(MatrixError::NonFinitePackedEntry {
+                        index: packed.len(),
+                    });
+                }
                 packed.push(value);
             }
         }
-        packed
+        Ok(packed)
     }
 }
 
@@ -493,7 +517,9 @@ mod tests {
             ],
         )
         .expect("symmetric fixture");
-        let packed = matrix.to_clarabel_psd_triangle();
+        let packed = matrix
+            .to_clarabel_psd_triangle()
+            .expect("finite Clarabel PSD vector");
         let expected = [
             1.0,
             2.0_f64.sqrt() * 2.0,
@@ -514,8 +540,12 @@ mod tests {
             .expect("symmetric x");
         let y = RealSymmetricMatrix::try_new(2, vec![4.0, 5.0, 5.0, 6.0])
             .expect("symmetric y");
-        let sx = x.to_clarabel_psd_triangle();
-        let sy = y.to_clarabel_psd_triangle();
+        let sx = x
+            .to_clarabel_psd_triangle()
+            .expect("finite x PSD vector");
+        let sy = y
+            .to_clarabel_psd_triangle()
+            .expect("finite y PSD vector");
         let packed_dot: f64 = sx.iter().zip(&sy).map(|(a, b)| a * b).sum();
         let matrix_inner_product = x
             .as_slice()
@@ -525,6 +555,19 @@ mod tests {
             .sum::<f64>();
         assert!((packed_dot - matrix_inner_product).abs() < 1.0e-12);
         assert!((packed_dot - 42.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn clarabel_triangle_rejects_scaling_overflow() {
+        let matrix = RealSymmetricMatrix::try_new(
+            2,
+            vec![0.0, f64::MAX, f64::MAX, 0.0],
+        )
+        .expect("finite symmetric input");
+        assert_eq!(
+            matrix.to_clarabel_psd_triangle(),
+            Err(MatrixError::NonFinitePackedEntry { index: 1 })
+        );
     }
 
     #[test]
