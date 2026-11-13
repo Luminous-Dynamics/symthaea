@@ -2690,6 +2690,20 @@ pub struct U1TeBDLayer {
 }
 
 /// Result of one TEBD layer, including its output MPS and per-gate error receipts.
+/// Per-gate evidence bundle. Fields are kept together so truncation,
+/// canonical-gauge and gate-quality receipts cannot be detached by index.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDGateReceipt {
+    pub bond_index: usize,
+    pub gate_unitarity_residual: f64,
+    pub gate_charge_conservation_residual: f64,
+    pub gate_quality_error_upper_bound: f64,
+    pub canonical_gauge: U1CanonicalGaugeReceipt,
+    pub truncation: U1TwoSiteTruncationDiagnostics,
+    pub local_projection_error_upper_bound: f64,
+    pub global_l2_error_contribution: Option<f64>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct U1TeBDLayerResult {
     pub state: ComplexU1Mps,
@@ -2697,6 +2711,7 @@ pub struct U1TeBDLayerResult {
     pub bond_indices: Vec<usize>,
     pub gate_truncations: Vec<U1TwoSiteTruncationDiagnostics>,
     pub canonical_gauge_receipts: Vec<U1CanonicalGaugeReceipt>,
+    pub gate_receipts: Vec<U1TeBDGateReceipt>,
     pub truncation_ledger: U1MpsTruncationLedger,
     pub input_norm_squared: f64,
     pub output_norm_squared: f64,
@@ -2789,6 +2804,7 @@ impl U1TeBDLayer {
         let mut truncation_ledger = U1MpsTruncationLedger::default();
         let mut gate_truncations = Vec::with_capacity(self.gates.len());
         let mut canonical_gauge_receipts = Vec::with_capacity(self.gates.len());
+        let mut gate_receipts = Vec::with_capacity(self.gates.len());
 
         for entry in &self.gates {
             let bond = entry.bond_index;
@@ -2800,12 +2816,27 @@ impl U1TeBDLayer {
             )?;
             let evolved_pair = pair.apply_gate(&entry.gate, policy.tolerance)?;
             let truncation = evolved_pair.split_truncated(policy)?;
+            let prior_global_bound = truncation_ledger.global_state_error_bound_upper;
             truncation_ledger.record_with_canonical_gauge_and_gate(
                 &truncation,
                 &gauge_receipt,
                 &entry.gate,
                 policy.tolerance,
             )?;
+            let global_l2_error_contribution = match (
+                prior_global_bound,
+                truncation_ledger.global_state_error_bound_upper,
+            ) {
+                (Some(before), Some(after)) => Some(after - before),
+                (None, Some(after)) => Some(after),
+                _ => None,
+            };
+            let delta = entry.gate.unitarity_residual();
+            let gate_quality_error_upper_bound =
+                (((1.0 + delta).sqrt() - 1.0).max(1.0 - (1.0 - delta).sqrt())
+                    + 10.0_f64.sqrt() * entry.gate.charge_conservation_residual())
+                    * gauge_receipt.input_norm_squared.sqrt();
+            let local_projection_error_upper_bound = truncation.discarded_weight.sqrt();
             state.tensors[bond] = truncation.left_tensor.clone();
             state.tensors[bond + 1] = truncation.right_tensor.clone();
             state = ComplexU1Mps::new(
@@ -2813,7 +2844,17 @@ impl U1TeBDLayer {
                 input_total_charge,
                 policy.tolerance,
             )?;
-            canonical_gauge_receipts.push(gauge_receipt);
+            canonical_gauge_receipts.push(gauge_receipt.clone());
+            gate_receipts.push(U1TeBDGateReceipt {
+                bond_index: bond,
+                gate_unitarity_residual: entry.gate.unitarity_residual(),
+                gate_charge_conservation_residual: entry.gate.charge_conservation_residual(),
+                gate_quality_error_upper_bound,
+                canonical_gauge: gauge_receipt,
+                truncation: truncation.clone(),
+                local_projection_error_upper_bound,
+                global_l2_error_contribution,
+            });
             gate_truncations.push(truncation);
         }
 
@@ -2827,6 +2868,7 @@ impl U1TeBDLayer {
             bond_indices: self.bond_indices(),
             gate_truncations,
             canonical_gauge_receipts,
+            gate_receipts,
             truncation_ledger,
             input_norm_squared,
             output_norm_squared,
@@ -2839,7 +2881,8 @@ impl U1TeBDLayer {
 mod tests {
     use super::{
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor,
-        U1MpsTruncationLedger, U1TeBDGate, U1TeBDLayer, U1TwoSiteGate, U1TwoSiteState,
+        U1MpsTruncationLedger, U1TeBDGate, U1TeBDGateReceipt, U1TeBDLayer, U1TwoSiteGate,
+        U1TwoSiteState,
         U1TwoSiteTruncationPolicy,
     };
     use num_complex::Complex64;
@@ -4096,6 +4139,81 @@ mod tests {
         assert!((actual_error - 0.6).abs() <= 1.0e-10);
         assert!(certified_bound + 1.0e-10 >= actual_error);
         assert!((result.output_norm_squared - 0.64).abs() <= 1.0e-10);
+    }
+
+
+    #[test]
+    fn tebd_rejects_a_gate_constructed_with_a_looser_unitarity_tolerance() {
+        let mut matrix = [[complex_zero(); 4]; 4];
+        for index in 0..4 {
+            matrix[index][index] = Complex64::new(1.0, 0.0);
+        }
+        matrix[1][1] = Complex64::new(1.0 + 1.0e-7, 0.0);
+        let loose_gate = U1TwoSiteGate::new(matrix, 1.0e-6).unwrap();
+        assert!(loose_gate.unitarity_residual() > 1.0e-10);
+        let input = ComplexU1Mps::product_state(&[false, true]).unwrap();
+        let layer = U1TeBDLayer::new(2, 0, vec![U1TeBDGate::new(0, loose_gate)]).unwrap();
+        assert!(matches!(
+            layer.apply(
+                &input,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 2,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-10,
+                }
+            ),
+            Err(U1MpsError::GateUnitarityResidual { .. })
+        ));
+    }
+
+    #[test]
+    fn tebd_global_error_receipt_includes_gate_unitarity_defect() {
+        let epsilon = 2.5e-8;
+        let mut matrix = [[complex_zero(); 4]; 4];
+        for index in 0..4 {
+            matrix[index][index] = Complex64::new(1.0, 0.0);
+        }
+        matrix[1][1] = Complex64::new(1.0 + epsilon, 0.0);
+        let gate = U1TwoSiteGate::new(matrix, 1.0e-6).unwrap();
+        let input = ComplexU1Mps::product_state(&[false, true]).unwrap();
+        let layer = U1TeBDLayer::new(2, 0, vec![U1TeBDGate::new(0, gate)]).unwrap();
+        let result = layer
+            .apply(
+                &input,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: 2,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: 1.0e-6,
+                },
+            )
+            .unwrap();
+        assert!(result.global_l2_bound_qualified);
+        assert_eq!(result.gate_receipts.len(), 1);
+        let receipt: &U1TeBDGateReceipt = &result.gate_receipts[0];
+        assert_eq!(receipt.bond_index, 0);
+        assert!(receipt.gate_unitarity_residual > 0.0);
+        assert!(receipt.gate_quality_error_upper_bound >= epsilon * (1.0 - 1.0e-6));
+        assert!(receipt.global_l2_error_contribution.is_some());
+
+        let before = input.to_dense(4).unwrap();
+        let after = result.state.to_dense(4).unwrap();
+        let actual_error = before
+            .iter()
+            .zip(after.iter())
+            .map(|(left, right)| (*left - *right).norm_sqr())
+            .sum::<f64>()
+            .sqrt();
+        let bound = result
+            .truncation_ledger
+            .global_state_error_bound_upper
+            .unwrap();
+        assert!(bound + 1.0e-12 >= actual_error);
+        assert!(
+            (result.truncation_ledger.cumulative_gate_quality_l2_error_bound
+                - receipt.gate_quality_error_upper_bound)
+                .abs()
+                <= 1.0e-12
+        );
     }
 
     #[test]
