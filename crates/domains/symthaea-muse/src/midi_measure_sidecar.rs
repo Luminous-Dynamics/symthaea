@@ -831,7 +831,7 @@ mod tests {
         midi.extend_from_slice(&1_u16.to_be_bytes());
         midi.extend_from_slice(&480_u16.to_be_bytes());
         midi.extend_from_slice(b"MTrk");
-        midi.extend_from_slice(&22_u32.to_be_bytes());
+        midi.extend_from_slice(&21_u32.to_be_bytes());
         midi.extend_from_slice(&[
             0, 0x90, 60, 64, // channel 0 note on
             0, 0x91, 48, 64, // channel 1 note on
@@ -893,6 +893,42 @@ mod tests {
         assert_eq!(
             parse_midi_measure_sidecar(&midi, &json, "midi-test-clock"),
             Err(MidiMeasureSidecarError::ConflictingTrackChannelCoverage {
+                track_index: 0
+            })
+        );
+    }
+
+
+    #[test]
+    fn channel_specific_sidecar_must_cover_every_note_channel_in_a_track() {
+        let mut midi = Vec::new();
+        midi.extend_from_slice(b"MThd");
+        midi.extend_from_slice(&6_u32.to_be_bytes());
+        midi.extend_from_slice(&0_u16.to_be_bytes());
+        midi.extend_from_slice(&1_u16.to_be_bytes());
+        midi.extend_from_slice(&480_u16.to_be_bytes());
+        midi.extend_from_slice(b"MTrk");
+        midi.extend_from_slice(&21_u32.to_be_bytes());
+        midi.extend_from_slice(&[
+            0, 0x90, 60, 64,
+            0, 0x91, 48, 64,
+            0x83, 0x60, 0x80, 60, 64,
+            0, 0x81, 48, 64,
+            0, 0xFF, 0x2F, 0,
+        ]);
+        let json = sidecar(
+            &midi,
+            480,
+            vec![MidiPartMeasureSidecarV1 {
+                part_id: "Piano".into(),
+                source_track_index: 0,
+                source_channel: Some(0),
+                measures: vec![measure(0, 1920)],
+            }],
+        );
+        assert_eq!(
+            parse_midi_measure_sidecar(&midi, &json, "midi-test-clock"),
+            Err(MidiMeasureSidecarError::MissingTrackMeasureMap {
                 track_index: 0
             })
         );
