@@ -1148,10 +1148,8 @@ mod tests {
         let pixels = vec![128; 16 * 16 * 3];
 
         let mut over_age = observation(&pixels, 1, 10_000, &state);
-        over_age.upstream.delivered_timestamp_us =
-            over_age.upstream.capture_timestamp_us + 1_001;
-        over_age.upstream.receipt_sha256 =
-            over_age.upstream.calculated_receipt_sha256();
+        over_age.upstream.delivered_timestamp_us = over_age.upstream.capture_timestamp_us + 1_001;
+        over_age.upstream.receipt_sha256 = over_age.upstream.calculated_receipt_sha256();
         assert_eq!(
             bridge.observe(over_age).err(),
             Some(BridgeError::UpstreamDeliveryAgeExceeded)
