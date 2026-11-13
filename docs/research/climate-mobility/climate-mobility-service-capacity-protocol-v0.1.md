@@ -193,14 +193,17 @@ Do not use MAPE blindly on sparse/zero flows. Publish sample counts and uncertai
 
 ### 8.2 Baselines and ablations
 
-On identical frozen cases, compare against:
-1. persistence / seasonal-naive baseline;
-2. population-and-economic-trend baseline without climate inputs;
-3. gravity-model baseline;
-4. radiation-model baseline;
-5. climate-only baseline;
-6. service-disruption-only baseline;
-7. integrated model with climate, services, livelihoods and policy context.
+On identical frozen cases, compare against a deliberately broad, low-complexity-first ladder:
+1. last-observation persistence and recent-flow/seasonal averages;
+2. ARIMA and Bayesian ARIMA where the series length and stationarity/seasonality support them;
+3. population-and-economic-trend baseline without climate inputs;
+4. gravity and radiation models for spatial allocation, not as assumed temporal forecasters;
+5. multiplicative-component/spatial-structure models where the origin–destination structure is stable;
+6. gradient-boosted or other machine-learning baselines only after the data volume and leakage controls justify them;
+7. climate-only and service-disruption-only ablations;
+8. integrated climate, services, livelihoods and policy-context model.
+
+A 2026 evaluation of 21 Australian internal-migration forecasts across five method families found no single method consistently best on bias, accuracy and empirical coverage; simple models performed as well as or better than more complex ones in several comparisons. This is not a climate-migration benchmark, but it is a warning against assuming that additional model complexity guarantees better forecasts. Therefore, the integrated model must beat the strongest task-appropriate simple baseline on preregistered, held-out cases and must not worsen calibration or lower-tail service outcomes.
 
 Use rolling-origin temporal evaluation and region/event holdouts. No random row split where nearby times or places leak the same event into train and test. Any calibration set must be separate from evaluation data.
 
