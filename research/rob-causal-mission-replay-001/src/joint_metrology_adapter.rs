@@ -603,7 +603,7 @@ pub fn qualify_joint_metrology(evidence: &JointMetrologyEvidence) -> JointMetrol
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     fn stamp(id: &str, sequence: u64, tick: u64, time_ns: u64) -> super::super::EventStamp {
@@ -621,7 +621,7 @@ mod tests {
         }
     }
 
-    fn valid_evidence() -> JointMetrologyEvidence {
+    pub(crate) fn valid_evidence() -> JointMetrologyEvidence {
         use super::super::{
             ActionChunkRecord, ActuatorApplication, AssuranceDisposition, AssuranceRecord,
             CalibrationDisposition, DecisionRecord, MissionScope, PhysicalTransition,
