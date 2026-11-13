@@ -18,7 +18,7 @@ The Rust function `candidate_musicxml_corpus_registry_v1()` records four candida
 | Corpus | V1 registration | Primary value | Allowed project use |
 |---|---|---|---|
 | OSSQ-OMR / OpenScore String Quartets | Source revision `7a17e45cddc0b7064fc3a179b62caeb57595e993`; CC0-1.0 source evidence | Multi-part quartet notation, MusicXML/MuseScore references, synthetic/scanned score-image OMR | Commercial and non-commercial research, subject to verifying the pinned release and acquired files |
-| ASAP | v1.1, source revision `afc815c75c42e83a79c03feb6da8a35e77d4c6b8`; CC BY-NC-SA 4.0 | MusicXML/quantized MIDI scores and multiple aligned piano performances | Non-commercial research only; attribution/share-alike obligations |
+| ASAP | v1.1 tag, source revision `fad8d1e8078d0ae47ad2f280b5d022bd2de24784`; CC BY-NC-SA 4.0 | MusicXML/quantized MIDI scores and multiple aligned piano performances | Non-commercial research only; attribution/share-alike obligations |
 | MAESTRO | v3.0.0, official archive SHA-256 `6680fea5be2339ea15091a249fbd70e49551246ddbd5ca50f1b2352c08c95291`; CC BY-NC-SA 4.0 | Piano audio/MIDI performance events and fine alignment | Non-commercial research only; not a multi-part MusicXML reference corpus |
 | MIREX 2026 Quartets | External task terms; corpus license left Unknown; task-page revision not yet pinned | External audio-to-score leaderboard with Blind and Staves-Informed tracks | External evaluation only; no training/tuning on held-out excerpts; no redistribution claim |
 
@@ -31,13 +31,14 @@ Sources:
 
 ### Important ASAP version discrepancy
 
-Do not mix the original ASAP paper's statistics with the current v1.1 repository README:
-- original paper: 222 scores, 1,068 performances and 520 audio performances;
-- current v1.1 README: 236 distinct scores, 1,067 performances and 519 audio performances.
+Do not mix the paper, the pinned v1.1 tag and the newer default branch:
+- original ASAP paper: 222 scores, 1,068 performances and 520 audio performances;
+- pinned v1.1 tag (commit fad8d1e8078d0ae47ad2f280b5d022bd2de24784): 236 scores, 1,068 performances and 520 audio performances; the README identifies 29 not-aligned performances;
+- current default branch at the time of registry authoring: 236 scores, 1,067 performances and 519 audio performances; its README identifies 31 not-aligned performances.
 
-Both describe different snapshots/reporting provenance. MUSE's registration uses the v1.1 release and current repository source revision; its rights notes preserve the discrepancy. The exact v1.1 file manifest and sample inventory must be frozen before any score or performance count is reported.
+MUSE's registration uses the immutable v1.1 tag, not the moving default branch. Preserve the three counts as distinct provenance snapshots. The exact v1.1 file manifest and sample inventory must be frozen before any score or performance count is reported.
 
-The current ASAP README also documents 31 performances that are not score-aligned and warns that beat positions can be unresolved for pickups, rubato and complex embellishments. These are data statuses, not examples to silently discard or relabel as correct.
+The pinned v1.1 README also warns that beat positions can be unresolved for pickups, rubato and complex embellishments. These are data statuses, not examples to silently discard or relabel as correct.
 
 ### OSSQ-OMR split strategy
 
