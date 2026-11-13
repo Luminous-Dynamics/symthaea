@@ -260,7 +260,7 @@ impl core::fmt::Display for U1MpsError {
             ),
             Self::InvalidTeBDParity(parity) => {
                 write!(f, "TEBD layer parity must be 0 or 1, got {parity}")
-            }
+            },
             Self::TeBDGateOutOfRange {
                 bond_index,
                 site_count,
@@ -277,7 +277,7 @@ impl core::fmt::Display for U1MpsError {
             ),
             Self::DuplicateTeBDGate { bond_index } => {
                 write!(f, "TEBD layer contains duplicate gate on bond {bond_index}")
-            }
+            },
             Self::TeBDLayerSiteCountMismatch {
                 layer_sites,
                 state_sites,
@@ -1816,6 +1816,8 @@ pub struct U1TeBDLayerResult {
     pub input_total_charge: i32,
     pub output_total_charge: i32,
     pub output_selection_rule_residual: f64,
+    /// False until a mixed-canonical exterior-gauge receipt is available.
+    pub global_l2_bound_qualified: bool,
 }
 
 impl U1TeBDLayer {
@@ -1925,6 +1927,7 @@ impl U1TeBDLayer {
             input_norm_squared,
             output_norm_squared,
             input_total_charge,
+            global_l2_bound_qualified: false,
         })
     }
 }
@@ -2840,6 +2843,7 @@ mod tests {
         assert!((result.output_norm_squared - 1.0).abs() <= 1.0e-10);
         assert_eq!(result.truncation_ledger.gate_count, 2);
         assert_eq!(result.gate_truncations.len(), 2);
+        assert!(!result.global_l2_bound_qualified);
 
         let dense = result.state.to_dense(8).unwrap();
         assert!((dense[5] - Complex64::new(1.0, 0.0)).norm() <= 1.0e-10);
@@ -2874,6 +2878,7 @@ mod tests {
         assert_eq!(result.output_total_charge, 1);
         assert!((result.output_norm_squared - result.input_norm_squared).abs() <= 1.0e-10);
         assert!(result.gate_truncations[0].discarded_weight <= 1.0e-12);
+        assert!(!result.global_l2_bound_qualified);
         let dense = result.state.to_dense(4).unwrap();
         assert!((dense[1] - Complex64::new(1.0, 0.0)).norm() <= 1.0e-10);
     }
