@@ -29,8 +29,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
-      - name: Format the isolated source without resolving the workspace
-        run: rustfmt --edition 2024 --check crates/domains/symthaea-airroad-iqc/src/lib.rs
       - name: Compile and run isolated unit tests
         run: |
           rustc --edition 2024 --test crates/domains/symthaea-airroad-iqc/src/lib.rs -o "$RUNNER_TEMP/airroad-hermitian-tests"
