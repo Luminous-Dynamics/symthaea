@@ -115,6 +115,19 @@ func Verify(bundle Bundle, trust TrustStore, state PolicyState, expected IntentE
 		return Result{}, fmt.Errorf("witness metadata: %w", err)
 	}
 
+	// Receipt IDs are globally unique within a bundle, including the witness.
+	receiptIDs := []string{a.Meta.ReceiptID, i.Meta.ReceiptID, d.Meta.ReceiptID, w.Meta.ReceiptID}
+	if bundle.Effect != nil {
+		receiptIDs = append(receiptIDs, bundle.Effect.Payload.Meta.ReceiptID)
+	}
+	seenReceiptIDs := make(map[string]struct{}, len(receiptIDs))
+	for _, receiptID := range receiptIDs {
+		if _, exists := seenReceiptIDs[receiptID]; exists {
+			return Result{}, fmt.Errorf("%w: duplicate receipt ID %q", ErrJoinMismatch, receiptID)
+		}
+		seenReceiptIDs[receiptID] = struct{}{}
+	}
+
 	if !validID(expected.ExecutionID) || !validID(expected.TaskID) || !validID(expected.PrincipalID) || !validID(expected.Target) || !validSHA256(expected.ActionSHA256) || !validSHA256(expected.ArgumentsSHA256) || !validID(expected.CapabilityID) || !validSHA256(expected.PolicySHA256) {
 		return Result{}, fmt.Errorf("%w: expected task-intent pin is incomplete", ErrInvalidReceipt)
 	}
