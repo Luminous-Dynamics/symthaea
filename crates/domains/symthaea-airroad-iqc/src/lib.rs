@@ -332,20 +332,8 @@ impl RealSymmetricMatrix {
     /// The Euclidean dot product of two packed symmetric matrices equals
     /// their Frobenius inner product. This is a packing conversion only: it
     /// does not prove positive semidefiniteness or invoke an SDP solver.
-    #[must_use]
     pub fn to_clarabel_psd_triangle(&self) -> Result<Vec<f64>, MatrixError> {
-        let next_order = self
-            .order
-            .checked_add(1)
-            .ok_or(MatrixError::DimensionOverflow)?;
-        let (left, right) = if self.order & 1 == 0 {
-            (self.order / 2, next_order)
-        } else {
-            (self.order, next_order / 2)
-        };
-        let capacity = left
-            .checked_mul(right)
-            .ok_or(MatrixError::DimensionOverflow)?;
+        let capacity = checked_triangle(self.order)?;
         let mut packed = Vec::with_capacity(capacity);
         let sqrt_two = std::f64::consts::SQRT_2;
 
@@ -365,6 +353,61 @@ impl RealSymmetricMatrix {
         }
         Ok(packed)
     }
+
+    /// Reconstruct a real symmetric matrix from Clarabel's packed PSD triangle.
+    ///
+    /// The input must follow the same column-major upper-triangle ordering as
+    /// to_clarabel_psd_triangle, including sqrt(2) scaling of off-diagonal
+    /// entries. Non-finite values, zero order, and incorrect vector lengths
+    /// are rejected.
+    pub fn from_clarabel_psd_triangle(
+        order: usize,
+        packed: &[f64],
+    ) -> Result<Self, MatrixError> {
+        let expected = checked_triangle(order)?;
+        if packed.len() != expected {
+            return Err(MatrixError::LengthMismatch {
+                expected,
+                actual: packed.len(),
+            });
+        }
+
+        let mut entries = vec![0.0; checked_square(order)?];
+        let sqrt_two = std::f64::consts::SQRT_2;
+        let mut index = 0;
+
+        for col in 0..order {
+            for row in 0..=col {
+                let encoded = packed[index];
+                if !encoded.is_finite() {
+                    return Err(MatrixError::NonFinitePackedEntry { index });
+                }
+                let value = if row == col {
+                    encoded
+                } else {
+                    encoded / sqrt_two
+                };
+                entries[row * order + col] = value;
+                entries[col * order + row] = value;
+                index += 1;
+            }
+        }
+
+        Self::try_new(order, entries)
+    }
+}
+
+fn checked_triangle(order: usize) -> Result<usize, MatrixError> {
+    if order == 0 {
+        return Err(MatrixError::ZeroDimension);
+    }
+    let next_order = order.checked_add(1).ok_or(MatrixError::DimensionOverflow)?;
+    let (left, right) = if order & 1 == 0 {
+        (order / 2, next_order)
+    } else {
+        (order, next_order / 2)
+    };
+    left.checked_mul(right).ok_or(MatrixError::DimensionOverflow)
 }
 
 fn checked_square(order: usize) -> Result<usize, MatrixError> {
@@ -555,6 +598,41 @@ mod tests {
             .sum::<f64>();
         assert!((packed_dot - matrix_inner_product).abs() < 1.0e-12);
         assert!((packed_dot - 42.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn clarabel_triangle_round_trips_through_the_documented_scaling() {
+        let original = RealSymmetricMatrix::try_new(
+            3,
+            vec![
+                2.0, 1.0, -3.0,
+                1.0, 4.0, 5.0,
+                -3.0, 5.0, 6.0,
+            ],
+        )
+        .expect("symmetric fixture");
+        let packed = original
+            .to_clarabel_psd_triangle()
+            .expect("finite packed triangle");
+        let reconstructed =
+            RealSymmetricMatrix::from_clarabel_psd_triangle(3, &packed)
+                .expect("valid packed triangle");
+        assert_eq!(reconstructed, original);
+    }
+
+    #[test]
+    fn clarabel_triangle_rejects_bad_inverse_inputs() {
+        assert_eq!(
+            RealSymmetricMatrix::from_clarabel_psd_triangle(2, &[1.0]),
+            Err(MatrixError::LengthMismatch {
+                expected: 3,
+                actual: 1,
+            })
+        );
+        assert_eq!(
+            RealSymmetricMatrix::from_clarabel_psd_triangle(1, &[f64::NAN]),
+            Err(MatrixError::NonFinitePackedEntry { index: 0 })
+        );
     }
 
     #[test]
