@@ -112,6 +112,166 @@ This should be a thin, versioned evidence envelope around the generic report—n
 
 ## 7. Claim ceiling
 
-This example is synthetic and unexecuted. No Rust/Cargo result, CI result, real EVSI benefit, laboratory saving, physical PA6 behavior, bond-strength prediction, product acceptance, or experiment authorization is claimed. The PA6 scenario, Jacobians, priors, covariance, costs and budget are invented challenge data.
 
-The next real-data step is to replace the synthetic covariance and linearization with calibrated, lot-held-out observations and an independently reviewed OLI adequacy record, then pass the exact UAP report through PLASMA-OED's application-specific mandatory-endpoint and abstention gate.
+
+
+## 8. Current research frontier and matched baselines
+
+### 8.1 Goal-oriented design is now a direct SOTA comparator
+
+Go et al., *Goal-driven Bayesian Optimal Experimental Design for Robust Decision-Making Under Model Uncertainty* (arXiv preprint, 25 May 2026; arXiv:2605.26093), couples a Bayesian posterior surrogate to a robust downstream decision layer. Its central lesson is that uncertainty in parameter directions irrelevant to the decision can waste experiment budget. It evaluates source localization, epidemic control and pharmacokinetic control; it is not a plasma/materials benchmark.
+
+The fair plasma comparison is therefore:
+- nominal target-marginal EIG using UAP-OED-002;
+- selected-set covariance-aware EIG using UAP-OED-003;
+- robust scenario and open-world model-adequacy controls using CTGP-ROBUST-001 #11262 / OLI #11446;
+- goal/decision-focused EVSI using the reusable decision-aware method family, including REA-RUST-014 #10109, where its utility/likelihood contracts are suitable;
+- expert/standard-mandated testing and fixed DOE controls.
+
+Do not claim novelty or superiority for merely replacing total EIG with a decision score. The research contribution must be the *material-specific, correlated, multifidelity and open-world qualification problem*, with matched baselines and outcome-level regret.
+
+### 8.2 Model discrepancy must be an experimental target, not just a final warning
+
+Yang, Dong & Wu, *Bayesian experimental design for model discrepancy calibration: An auto-differentiable ensemble Kalman inversion approach*, Journal of Computational Physics 545 (15 January 2026), DOI 10.1016/j.jcp.2025.114469, treats discrepancy as a core obstacle to trustworthy Bayesian design.
+
+The plasma programme should distinguish:
+- parameter uncertainty within a registered mechanism;
+- residual/discrepancy uncertainty after conditioning on parameters;
+- model-family disagreement;
+- domain/lot/adhesive/conditioning shift;
+- unknown outcomes outside every registered predictive support.
+
+A candidate that distinguishes M1 from M2 is not valuable if M1 and M2 are both wrong in the held-out adhesive, moisture or storage regime. Reuse CTGP-ROBUST-001 #11262 and the open-world adequacy owner #11181. Keep explicit OTHER and a prospective negative-control panel; do not invent an unknown-model prior or silently renormalize the named mechanisms.
+
+### 8.3 Industry baseline and standards interoperability
+
+The following ASTM catalogue references are useful *method-family anchors* for a laboratory to acquire and apply under its own licensed standards and quality system. This specification does not reproduce normative clauses or claim compliance:
+
+| Standard identifier | Published method family | How the physical campaign should use the reference |
+|---|---|---|
+| ASTM D6105-04(2019) | Electrical-discharge surface activation of plastics for adhesive bonding | Identify the applicable discharge technology and process classification; use the applicable atmospheric-pressure gas-plasma/DBD section |
+| ASTM D3163-01(2023) | Rigid-plastic single-lap shear | Comparative lap-shear path for rigid plastic adherends such as the PA6 fixture family |
+| ASTM D5868-01(2023) | FRP lap-shear adhesion | Use a composite-specific route for fiber-reinforced plastic bonding; do not treat rigid-plastic results as composite qualification |
+| ASTM D2093-03(2025) | Plastic adherend surface preparation | Freeze conventional preparation/control arms and document the exact preparation history |
+| ASTM D1151-00(2022) | Moisture and temperature effects on adhesive bonds | Define applicable continuous humidity/temperature exposure profiles and retained-strength endpoints |
+| ASTM D1183-03(2019) | Cyclic laboratory aging of adhesive bonds | Define applicable cyclic environmental-aging comparisons |
+| ASTM D4896-01(2024) | Interpretation of single-lap-joint results | Preserve the boundary between comparative coupon strength and structural-joint design allowables |
+
+Source catalogue links: [D6105](https://store.astm.org/d6105-04r19.html), [D3163](https://store.astm.org/d3163-01r23.html), [D5868](https://store.astm.org/d5868-01.html), [D2093](https://store.astm.org/standards/d2093), [D1151](https://store.astm.org/d1151-00.html), [D1183](https://store.astm.org/d1183-03r19.html), [D4896](https://store.astm.org/d4896-01r24.html).
+
+The standard references are not an assertion that one standard covers every polymer, adhesive, plasma source or product geometry. A qualified lab must check the current licensed edition, applicability, specimen geometry, conditioning, test method and safety requirements. In particular, ASTM's catalogue cautions against interpreting a small single-lap coupon result as a design allowable for a different structural joint.
+
+### 8.4 Matched competitive benchmark matrix
+
+| Baseline family | What it represents | Expected strength | Blind spot the benchmark should expose |
+|---|---|---|---|
+| Fixed industrial recipe / process window | incumbent production control | simple, low-latency repeatability | brittle when lot, moisture, additive or adhesive shifts |
+| Conventional factorial DOE / response surface | planned process-variable optimization | interpretable factor interactions | expensive when many material/adhesive/storage strata exist |
+| Contact-angle-first heuristic | cheap surface screen | throughput and low specimen use | proxy/product endpoint disagreement |
+| Nominal UAP-OED target EIG | current generic independent-row selector | principled local information gain | common-mode over-credit |
+| UAP-OED selected-set covariance | existing correlated observation engine | corrects declared residual dependence | still conditional on supplied linear-Gaussian models |
+| Goal-driven BOED / EVSI | downstream decision optimization | aligns acquisition with product consequences | depends on trustworthy likelihood, utilities and model coverage |
+| Robust / discrepancy-aware design | finite model ambiguity and open-world challenges | guards against false confidence under known shifts | can over-abstain or become conservative if ambiguity is poorly specified |
+| Best applicable primer / incumbent | industrial alternative to plasma-only treatment | may offer superior durability in some material profiles | applicability is material-, additive- and adhesive-specific |
+
+All compared policies must use the same candidate pool, service profile, costs, sample availability, material/adhesive identities, holdout splits and compute budget. Report all failed, infeasible and abstained campaigns.
+
+## 9. Paradigm shifts and next benchmark programme
+
+### A. From a recipe to an interface state trajectory
+
+Represent the interface as a time-evolving state tied to an exact material, process run and adhesive:
+- bulk moisture/conditioning and additive package;
+- initial surface chemistry and topography;
+- plasma dose, gas, distance, speed, waveform and process telemetry;
+- weak-boundary-layer / damage indicators;
+- time since treatment, storage temperature/RH and handling;
+- adhesive wetting, application, cure and environmental service history;
+- observed failure mode, retained strength and substrate-function loss.
+
+This is an evidence-backed state model, not a claim that all latent variables are already observable. MAT-013 and MAT-INTERFACE remain the canonical lineage/interface authorities.
+
+### B. From in-family parameter fitting to active mechanism falsification
+
+An experiment should sometimes be selected because it can falsify the assumed model family, not because it most improves the posterior within it.
+
+Add sealed worlds where:
+- two registered mechanisms predict almost the same WCA but different aged bond outcomes;
+- a hidden moisture/additive state changes the outcome;
+- a new adhesive changes the ranking;
+- the covariance matrix changes by preparation batch or instrument;
+- all registered hypotheses have poor held-out predictive coverage.
+
+The selected action must preserve an OTHER/ABSTAIN result when the supplied model family is inadequate. Reuse CTGP-ROBUST-001 #11262 and OLI-EXPERIMENT-001 #11446 rather than adding a parallel discrepancy engine.
+
+### C. From one winner to a robust process region
+
+A useful manufacturing result is a *connected, tolerance-aware operating region*, not a single optimum.
+
+For each material/adhesive/storage stratum, estimate:
+- minimum bond and aged-bond constraints;
+- maximum damage / substrate-function degradation;
+- allowable treatment-to-bond delay;
+- sensitivity to moisture, additive and lot variation;
+- uncertainty in process boundaries;
+- distance to a failure boundary under held-out perturbations.
+
+Use robust feasibility and process-capability measures, not only point-optimal strength. A candidate window is not qualified until it survives the preregistered holdout lots and conditions.
+
+### D. From adaptive exploration to protected confirmation
+
+Separate the campaign into:
+1. exploratory design and model challenge;
+2. frozen candidate-window nomination;
+3. independent confirmatory campaign with new lots/days and blinded sample identity;
+4. post-aging / service-profile confirmation;
+5. change-control and drift monitoring.
+
+No exploratory adaptive selection may silently reuse the confirmatory set. Randomization, blocking, specimen exclusions and stopping rules must be preregistered.
+
+### E. From proxy correlation to reliability and failure analysis
+
+The primary outcomes should include not just mean lap-shear:
+- lower-tail / quantile bond strength;
+- failure-mode distribution;
+- aged retention with ratio reconciled to initial and aged values;
+- survival / time-to-failure under declared service profiles where meaningful;
+- creep, fatigue, peel/cleavage or environmental stress outcomes when required by product geometry;
+- substrate-function preservation and damage;
+- batch-to-batch process capability and decision coverage.
+
+Averages must not hide brittle failure modes or low-performing lots.
+
+## 10. Benchmark scorecard and research targets
+
+Targets below are prospective research goals after a pilot freezes difficulty, not current results, product requirements or universal standards.
+
+| Dimension | Proposed target | Qualification condition |
+|---|---|---|
+| False acceptance | Zero false ACCEPT on public known-truth negative controls | All mandatory physical endpoint gates active |
+| Open-world detection | ≥95% detection of planted out-of-family / discrepancy cases at published in-domain coverage | Sealed family holdout; report false-abstention too |
+| Small-set oracle quality | ≤10% decision-regret gap on ≥90% eligible cases | Exact exhaustive oracle; same candidate pool and constraints |
+| Destructive-test efficiency | ≥25% fewer expensive tests than fixed campaign | No rise in false acceptance; no mandatory evidence removed |
+| Predictive calibration | nominal 90% intervals achieve 85–95% empirical coverage in each adequately powered held-out stratum | Report per lot, adhesive, moisture and day; do not pool away subgroup failure |
+| Process-window transfer | no accepted window violates the frozen product floor on the held-out lot/day challenge set | New lots/days, exact article lineage |
+| Reproducibility | deterministic replay for identical frozen source, manifest, seeds and policy | Exact source/candidate/covariance SHA binding |
+| Safety/authority | zero inadmissible experiment proposals and zero automatic actuation | Separate facility authorization and human release |
+
+Do not combine these into one composite leaderboard number. Plot the quality/cost/latency/sample-use/abstention Pareto frontier.
+
+### Mandatory metrics
+
+Report: false accept, false reject, abstention, false adequacy, false abstention, realized decision regret, worst-group regret, lower-tail bond outcomes, interval coverage, calibration, cost-to-decision, tests/specimens per decision, elapsed time, energy, destructive-test count, number of lots/days, process-window width, exact-oracle gap, and runtime/memory.
+
+## 11. Next executable tranche
+
+1. Run the synthetic integration example against the existing UAP-OED API and compare outputs to the independent dense-matrix reference.
+2. Make the selection output bind the action catalogue, scenario/prior manifest, covariance source, selected IDs, budget, UAP code revision and OLI adequacy receipt in a small plasma evidence envelope. Do not create another generic receipt authority.
+3. Extend the benchmark with robust scenario/model-discrepancy and decision-loss cases by consuming CTGP-ROBUST #11262, REA decision-aware #10109 and OLI/unknown-model #11181.
+4. Add standard-profile identifiers and the selected physical test method to each action; keep licensed normative procedure outside this codebase.
+5. Freeze material/adhesive/process/conditioning identities and stratified holdout manifests.
+6. Only after source-side synthetic replay and Rust qualification, request a real external-facility protocol review.
+
+## 12. Claim ceiling
+
+This integration is a synthetic UAP selector-composition demonstration. It does not show better real-world selection, a physically improved PA6 bond, reduced laboratory cost, industrial superiority, ASTM/ISO certification or safe plasma actuation. A selection report is a proposed measurement portfolio, not a product release.
