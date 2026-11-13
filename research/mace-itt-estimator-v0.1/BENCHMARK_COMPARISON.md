@@ -84,3 +84,29 @@ Sources:
 - Current official SkillsBench v1.1 release export (87-task roster; current board): https://huggingface.co/datasets/benchflow/skillsbench-leaderboard
 
 This is a measurement-method update only. No external MACE benchmark reproduction or performance improvement is claimed.
+
+
+## 2026-11-13 update: evaluate composition interactions and effect-evidence joins
+
+The IETF individual Internet-Draft on agent security evaluation profiles (draft-hcf-bpm-agent-security-benchmark-profiles-00, 23 October 2026) adds two important requirements that MACE should adopt as research guidance, not claim as an adopted standard:
+
+1. **Composition interaction effects (§7.3):** assess ordering effects (one layer masks another), state effects (one component changes state affecting later components, such as memory writes), and non-additivity (the composite score is not the sum of component scores). MACE should report all three and avoid assuming independently passing skills compose safely.
+2. **Independent evidence comparison (§8.5):** include observed system calls, API calls, file/network operations, identity and permissions at the time of the operation, and compare system audit records against independently collected harness events.
+
+MACE's evidence architecture should build on existing interoperable formats rather than create parallel telemetry, identity or provenance standards:
+
+- **OpenTelemetry GenAI conventions:** correlate agent and tool spans, including failed tool calls; treat the conventions as evolving telemetry semantics, not proof of a complete or truthful observer.
+- **in-toto Attestation Framework:** use subjects/statements/envelopes/bundles to bind immutable implementation artifacts and authenticated statements. An attestation does not by itself prove that a live runtime loaded or invoked the subject.
+- **SPIFFE Workload API / SPIRE:** obtain portable workload identity material and bind observer/broker/gateway/effect-source roles to configured trust domains. A workload ID alone does not prove administrative independence or process behavior.
+- **External witness/transparency service:** anchor bundle heads and freshness independently; a local hash chain or local signed checkpoint does not establish anti-rollback against an actor controlling the complete local store.
+
+This motivates a new MACE verifier track: exact causal joins from authorization receipt → observed invocation and implementation → gateway dispatch → effect-origin receipt → independently witnessed bundle digest. The verifier checks that every receipt refers to the same task, execution, principal, target, action, arguments, capability, policy generation and idempotency key. It does not replace the #9490 effect-authority kernel or #11741 runtime observer.
+
+References (current snapshots; standards status matters):
+- IETF agent security evaluation profiles, individual Internet-Draft (work in progress; not an RFC): https://datatracker.ietf.org/doc/html/draft-hcf-bpm-agent-security-benchmark-profiles-00
+- OpenTelemetry GenAI semantic conventions (development): https://github.com/open-telemetry/semantic-conventions-genai
+- in-toto Attestation Framework v1.2: https://github.com/in-toto/attestation
+- SPIFFE Workload API: https://github.com/spiffe/spiffe/blob/main/standards/SPIFFE_Workload_API.md
+- NIST agent identity design tenets (27 October 2026): https://www.nist.gov/blogs/cybersecurity-insights/design-tenets-agent-identity-management-systems
+
+No external MACE benchmark reproduction or runtime qualification is claimed by this documentation update.
