@@ -199,7 +199,7 @@ A plausible output is not enough. The stronger result is an output that satisfie
 
 ## 8. Validation and claim boundary
 
-- Twelve Rust unit tests are authored for duplicate IDs, lineage leakage, rights/access evidence, mutable dataset versions, operation coverage and comparison-scope mismatch.
+- Thirteen Rust unit tests are authored for duplicate IDs, lineage leakage, rights/access evidence, mutable dataset versions, operation coverage and comparison-scope mismatch.
 - The standalone workflow is committed; its current status is pending until a fresh exact-head run reports.
 - No dataset was downloaded, no external rights were cleared, and no model/benchmark score was produced by this PR.
 - JSON fixtures can be parsed and validated by the Rust harness; no JSON Schema validator result is claimed.
