@@ -72,9 +72,9 @@ This v0.1 prototype does not ingest OTel spans, verify in-toto envelopes, valida
 
 ## Local evidence
 
-- 29 named tests.
-- `go test ./...`, race detector, `go vet`, gofmt and CLI build pass locally.
-- Join package statement coverage: 76.3%; CLI compiles but has no dedicated CLI test file yet.
+- 37 top-level test functions plus 18 subtest cases, including signature tampering, wrong-role signers, trust-domain collisions, task-intent mismatch, actual invocation-ID mismatch, permit expiry/revocation, retry permit reuse, malformed joins, witness freshness/binding, dispatch-unknown reconciliation, missing terminal effects, strict JSON parsing and CLI negative controls.
+- `go test ./...`, `go test -race ./...`, `go vet ./...`, formatting check and CLI build pass locally.
+- Statement coverage: join package 76.3%; CLI package 66.2%.
 - Five-run verifier microbenchmark median: 371.0 µs/op, 17,168 B/op, 99 allocations/op on Linux/amd64, AMD EPYC 9V74. This is verifier cost only.
 
 No runtime integration, external benchmark reproduction, independent replication, production trust-root qualification or SOTA claim is made.
