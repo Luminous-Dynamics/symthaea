@@ -16,6 +16,10 @@ const EXPECTED_EVIDENCE_CLASS: &str = "SYNTHETIC";
 const SYNTHETIC_LABEL_CLASS: &str = "SYNTHETIC_LABEL";
 const FLOAT_EPSILON: f64 = 1.0e-9;
 
+fn close_enough(a: f64, b: f64) -> bool {
+    (a - b).abs() <= FLOAT_EPSILON * a.abs().max(b.abs()).max(1.0)
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum AuditDisposition {
