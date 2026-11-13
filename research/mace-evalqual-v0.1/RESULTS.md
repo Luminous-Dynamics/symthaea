@@ -87,6 +87,26 @@ A new `oraclelab` package adds snapshot + observer-event checks for the evaluato
 
 This package qualifies neither a production sandbox nor the real observer, and does not prove that the oracle's expected labels are correct. It is a reusable test contract for the next adapter.
 
+
+### Linux filesystem observer experiment
+
+A real local Linux filesystem observer adapter was added alongside the in-memory oracle harness.
+
+- `ObserveDirectory` installs recursive inotify watches on a pinned existing directory tree, captures pre/post content digests, and keeps the mutation event stream as a separate observation.
+- Root device/inode is checked before and after evaluation. Nested paths are compared with the most-specific mount ID from `/proc/self/mountinfo`.
+- The parser uses the 16-byte Linux inotify wire header explicitly. An initial implementation incorrectly used Go's 20-byte `syscall.InotifyEvent` memory size; it corrupted event boundaries and failed transient-write tests. That was corrected before publication.
+- 12 focused filesystem observer tests plus three root/mount hardening tests pass.
+- Cases include read-only, persistent writes, transient write/restore with unchanged final content, transient create/delete, nested file changes, symlinks, dynamic subdirectories, callback panic, root replacement, mountpoint selection and live mount-table parsing.
+- The combined local `oraclelab` package has 34 test functions (19 in-memory non-interference, 12 filesystem observer, 3 root/mount hardening). Go 1.23.2 / Linux amd64:
+  - `go test -count=1 ./...`: pass.
+  - `go test -count=1 -race ./...`: pass.
+  - `go vet ./...`: pass.
+  - `go test -cover ./oraclelab`: 70.0% statement coverage.
+
+The filesystem observer records its limitations in the coverage result: it trusts the host kernel and mount namespace, requires all child writers to be joined before callback return, excludes symlinks/special files/new subdirectories, and does not observe remote service state or privileged host activity outside scope. It is a local OS-event prototype, not a protected independent production witness.
+
+These checks are still standalone package evidence. No combined exact-PR-checkout replay, GitHub Actions run, disposable remote-service adapter, actual database transaction-log comparison or broker experiment is claimed.
+
 ## Claim boundary
 
 This implementation validates a benchmark adapter's declared fixture catalogue, exact input-byte bindings, typed three-axis outcomes and paired metamorphic relations. It does not launch or sandbox tasks; verify grader behavior in a real benchmark; prove task/oracle semantics; authenticate producers; establish oracle independence; observe all OS/API/filesystem/network events; or qualify the durable one-shot broker.
