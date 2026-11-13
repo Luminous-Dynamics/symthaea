@@ -162,6 +162,8 @@ The fair plasma comparison is therefore:
 
 Do not claim novelty or superiority for merely replacing total EIG with a decision score. The research contribution must be the *material-specific, correlated, multifidelity and open-world qualification problem*, with matched baselines and outcome-level regret.
 
+A further metric-sensitivity comparator is Yang, Dong & Wu, *Bayesian Experimental Design for Model Discrepancy Calibration: A Rivalry between Kullback–Leibler Divergence and Wasserstein Distance* (arXiv preprint, 23 January 2026; arXiv:2601.16425). It reports a tradeoff: KL can converge faster without model discrepancy, while Wasserstein-based sequential design can be more robust when discrepancy is non-negligible. The paper also warns that Wasserstein values can reward shifts in posterior location unrelated to information under some support/prior configurations. The plasma benchmark should compare KL, calibrated predictive decision value and Wasserstein only on frozen known-truth controls with explicit metric sanity tests; no distance metric is a universal winner.
+
 ### 7.2 Model discrepancy must be an experimental target, not just a final warning
 
 Yang, Dong & Wu, *Bayesian experimental design for model discrepancy calibration: An auto-differentiable ensemble Kalman inversion approach*, Journal of Computational Physics 545 (15 January 2026), DOI 10.1016/j.jcp.2025.114469, treats discrepancy as a core obstacle to trustworthy Bayesian design.
