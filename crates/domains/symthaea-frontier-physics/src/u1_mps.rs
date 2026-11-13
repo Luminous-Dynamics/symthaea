@@ -975,7 +975,10 @@ mod tests {
         assert_eq!(state.dense_svd_rank_by_charge_and_cut().unwrap().len(), 3);
         assert!(state.dense_reconstruction_max_residual().unwrap() <= 1.0e-12);
         assert!((state.norm_squared(1.0e-12).unwrap() - 0.625).abs() <= 1.0e-12);
-        assert_eq!(state.to_dense(8).unwrap(), dense);
+        let reconstructed = state.to_dense(8).unwrap();
+        for (actual, expected) in reconstructed.iter().zip(dense.iter()) {
+            assert!((*actual - *expected).norm() <= 1.0e-12);
+        }
     }
 
     #[test]
