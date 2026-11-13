@@ -1,0 +1,459 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:loco-joint-metrology-normalized-receipt:0.1.0",
+  "title": "Loco Joint Metrology Normalized Receipt 0.1.0",
+  "description": "Versioned, digest-bound transport envelope for retrospective joint-metrology evidence. It never grants actuation authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "schema_version",
+    "canonicalization",
+    "producer",
+    "payload_sha256",
+    "payload"
+  ],
+  "properties": {
+    "schema_id": {
+      "const": "urn:luminous-dynamics:loco-joint-metrology-normalized-receipt:0.1.0"
+    },
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "canonicalization": {
+      "const": "ld-json-integer-canonical-v1"
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "package", "version"],
+      "properties": {
+        "repository": {"const": "Luminous-Dynamics/symtropy"},
+        "package": {"const": "loco-joint-trace-adapter"},
+        "version": {"type": "string", "minLength": 1}
+      }
+    },
+    "payload_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "payload": {"$ref": "#/$defs/payload"}
+  },
+  "$defs": {
+    "nonEmpty": {"type": "string", "minLength": 1},
+    "timestampInterval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clock_id", "boot_epoch", "lower_ns", "upper_ns"],
+      "properties": {
+        "clock_id": {"$ref": "#/$defs/nonEmpty"},
+        "boot_epoch": {"type": "integer", "minimum": 0},
+        "lower_ns": {"type": "integer", "minimum": 0},
+        "upper_ns": {"type": "integer", "minimum": 0}
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mission_id", "robot_id", "boot_epoch", "scenario_manifest_digest",
+        "source_observation_id", "source_event_sequence", "decision_id",
+        "decision_event_sequence", "proposal_id", "proposal_event_sequence",
+        "assurance_event_id", "assurance_event_sequence", "command_id",
+        "command_event_sequence", "actuator_application_event_id",
+        "actuator_application_event_sequence", "actuator_application_receipt_digest",
+        "source_sensor_calibration_digest", "physical_transition_id",
+        "physical_transition_event_sequence", "terminal_event_id",
+        "terminal_event_sequence", "actuator_id"
+      ],
+      "properties": {
+        "mission_id": {"$ref": "#/$defs/nonEmpty"},
+        "robot_id": {"$ref": "#/$defs/nonEmpty"},
+        "boot_epoch": {"type": "integer", "minimum": 0},
+        "scenario_manifest_digest": {"$ref": "#/$defs/nonEmpty"},
+        "source_observation_id": {"$ref": "#/$defs/nonEmpty"},
+        "source_event_sequence": {"type": "integer", "minimum": 0},
+        "decision_id": {"$ref": "#/$defs/nonEmpty"},
+        "decision_event_sequence": {"type": "integer", "minimum": 0},
+        "proposal_id": {"$ref": "#/$defs/nonEmpty"},
+        "proposal_event_sequence": {"type": "integer", "minimum": 0},
+        "assurance_event_id": {"$ref": "#/$defs/nonEmpty"},
+        "assurance_event_sequence": {"type": "integer", "minimum": 0},
+        "command_id": {"$ref": "#/$defs/nonEmpty"},
+        "command_event_sequence": {"type": "integer", "minimum": 0},
+        "actuator_application_event_id": {"$ref": "#/$defs/nonEmpty"},
+        "actuator_application_event_sequence": {"type": "integer", "minimum": 0},
+        "actuator_application_receipt_digest": {"$ref": "#/$defs/nonEmpty"},
+        "source_sensor_calibration_digest": {"$ref": "#/$defs/nonEmpty"},
+        "physical_transition_id": {"$ref": "#/$defs/nonEmpty"},
+        "physical_transition_event_sequence": {"type": "integer", "minimum": 0},
+        "terminal_event_id": {"$ref": "#/$defs/nonEmpty"},
+        "terminal_event_sequence": {"type": "integer", "minimum": 0},
+        "actuator_id": {"$ref": "#/$defs/nonEmpty"}
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actuator_configuration_digest", "controller_configuration_digest",
+        "policy_digest", "model_digest", "action_domain_digest",
+        "sensor_calibration_digest", "torque_transducer_calibration_digest",
+        "power_analyzer_calibration_digest", "thermal_sensor_calibration_digest",
+        "sampling_spec_digest", "energy_boundary_manifest_digest",
+        "actuator_application_receipt_digest", "executed_prefix_expected_digest",
+        "executed_prefix_observed_digest", "decision_calibration_receipt_digest"
+      ],
+      "properties": {
+        "actuator_configuration_digest": {"$ref": "#/$defs/nonEmpty"},
+        "controller_configuration_digest": {"$ref": "#/$defs/nonEmpty"},
+        "policy_digest": {"$ref": "#/$defs/nonEmpty"},
+        "model_digest": {"$ref": "#/$defs/nonEmpty"},
+        "action_domain_digest": {"$ref": "#/$defs/nonEmpty"},
+        "sensor_calibration_digest": {"$ref": "#/$defs/nonEmpty"},
+        "torque_transducer_calibration_digest": {"$ref": "#/$defs/nonEmpty"},
+        "power_analyzer_calibration_digest": {"$ref": "#/$defs/nonEmpty"},
+        "thermal_sensor_calibration_digest": {"$ref": "#/$defs/nonEmpty"},
+        "sampling_spec_digest": {"$ref": "#/$defs/nonEmpty"},
+        "energy_boundary_manifest_digest": {"$ref": "#/$defs/nonEmpty"},
+        "actuator_application_receipt_digest": {"$ref": "#/$defs/nonEmpty"},
+        "executed_prefix_expected_digest": {"$ref": "#/$defs/nonEmpty"},
+        "executed_prefix_observed_digest": {"$ref": "#/$defs/nonEmpty"},
+        "decision_calibration_receipt_digest": {"$ref": "#/$defs/nonEmpty"}
+      }
+    },
+    "clockRelation": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": {"const": "same_monotonic_clock_verified"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "mapping"],
+          "properties": {
+            "kind": {"const": "bounded_mapping_verified"},
+            "mapping": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "source_clock_id", "target_clock_id", "boot_epoch",
+                "offset_lower_ns", "offset_upper_ns", "mapping_digest"
+              ],
+              "properties": {
+                "source_clock_id": {"$ref": "#/$defs/nonEmpty"},
+                "target_clock_id": {"$ref": "#/$defs/nonEmpty"},
+                "boot_epoch": {"type": "integer", "minimum": 0},
+                "offset_lower_ns": {"type": "integer"},
+                "offset_upper_ns": {"type": "integer"},
+                "mapping_digest": {"$ref": "#/$defs/nonEmpty"}
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {"kind": {"const": "unknown"}}
+        }
+      ]
+    },
+    "decisionInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_id", "model_digest", "action_domain_digest",
+        "calibration_receipt_digest", "regret_upper_units",
+        "epsilon_task_loss_units", "valid_through_tick", "actuator_application_tick"
+      ],
+      "properties": {
+        "decision_id": {"$ref": "#/$defs/nonEmpty"},
+        "model_digest": {"$ref": "#/$defs/nonEmpty"},
+        "action_domain_digest": {"$ref": "#/$defs/nonEmpty"},
+        "calibration_receipt_digest": {"$ref": "#/$defs/nonEmpty"},
+        "regret_upper_units": {"type": "integer", "minimum": 0},
+        "epsilon_task_loss_units": {"type": "integer", "minimum": 0},
+        "valid_through_tick": {"type": "integer", "minimum": 0},
+        "actuator_application_tick": {"type": "integer", "minimum": 0}
+      }
+    },
+    "thermalInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "physical_transition_id", "sensor_calibration_digest", "required_node_ids",
+        "observed_node_ids", "expected_predecessor_digest",
+        "observed_predecessor_digest", "result_digest", "sequence_reset"
+      ],
+      "properties": {
+        "physical_transition_id": {"$ref": "#/$defs/nonEmpty"},
+        "sensor_calibration_digest": {"$ref": "#/$defs/nonEmpty"},
+        "required_node_ids": {"type": "array", "items": {"$ref": "#/$defs/nonEmpty"}, "minItems": 1, "uniqueItems": true},
+        "observed_node_ids": {"type": "array", "items": {"$ref": "#/$defs/nonEmpty"}, "uniqueItems": true},
+        "expected_predecessor_digest": {"$ref": "#/$defs/nonEmpty"},
+        "observed_predecessor_digest": {"$ref": "#/$defs/nonEmpty"},
+        "result_digest": {"$ref": "#/$defs/nonEmpty"},
+        "sequence_reset": {"type": "boolean"}
+      }
+    },
+    "energyInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["boundary_complete", "boundary_manifest_digest", "closure"],
+      "properties": {
+        "boundary_complete": {"type": "boolean"},
+        "boundary_manifest_digest": {"$ref": "#/$defs/nonEmpty"},
+        "closure": {
+          "oneOf": [
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "receipt_digest"],
+              "properties": {
+                "status": {"const": "balanced"},
+                "receipt_digest": {"$ref": "#/$defs/nonEmpty"}
+              }
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "reason"],
+              "properties": {"status": {"const": "inconclusive"}, "reason": {"$ref": "#/$defs/nonEmpty"}}
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status", "reason"],
+              "properties": {"status": {"const": "invalid"}, "reason": {"$ref": "#/$defs/nonEmpty"}}
+            },
+            {
+              "type": "object", "additionalProperties": false,
+              "required": ["status"],
+              "properties": {"status": {"const": "unknown"}}
+            }
+          ]
+        }
+      }
+    },
+    "samplingInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["measured_rate_hz", "required_rate_hz", "specification_digest", "specification_qualified"],
+      "properties": {
+        "measured_rate_hz": {"type": "integer", "minimum": 0},
+        "required_rate_hz": {"type": "integer", "minimum": 0},
+        "specification_digest": {"$ref": "#/$defs/nonEmpty"},
+        "specification_qualified": {"type": "boolean"}
+      }
+    },
+    "nonQualifiedEvidence": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "reason_code"],
+          "properties": {"status": {"const": "unknown"}, "reason_code": {"$ref": "#/$defs/nonEmpty"}}
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "reason_code"],
+          "properties": {
+            "status": {"const": "inconclusive"},
+            "reason_code": {"$ref": "#/$defs/nonEmpty"},
+            "reason_detail": {"type": "string"}
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "reason_code"],
+          "properties": {
+            "status": {"const": "rejected"},
+            "reason_code": {"$ref": "#/$defs/nonEmpty"},
+            "details": {"type": "object"}
+          }
+        }
+      ]
+    },
+    "durationValue": {
+      "type": "object", "additionalProperties": false,
+      "required": ["lower_ns", "upper_ns"],
+      "properties": {
+        "lower_ns": {"type": "integer", "minimum": 0},
+        "upper_ns": {"type": "integer", "minimum": 0}
+      }
+    },
+    "decisionValue": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["disposition", "regret_upper_units"],
+          "properties": {
+            "disposition": {"const": "sufficient"},
+            "regret_upper_units": {"type": "integer", "minimum": 0}
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["disposition", "regret_upper_units", "epsilon_task_loss_units"],
+          "properties": {
+            "disposition": {"const": "insufficient"},
+            "regret_upper_units": {"type": "integer", "minimum": 0},
+            "epsilon_task_loss_units": {"type": "integer", "minimum": 0}
+          }
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["disposition", "valid_through_tick", "application_tick"],
+          "properties": {
+            "disposition": {"const": "expired"},
+            "valid_through_tick": {"type": "integer", "minimum": 0},
+            "application_tick": {"type": "integer", "minimum": 0}
+          }
+        }
+      ]
+    },
+    "thermalValue": {
+      "type": "object", "additionalProperties": false,
+      "required": ["disposition", "node_count", "result_digest"],
+      "properties": {
+        "disposition": {"const": "continuous"},
+        "node_count": {"type": "integer", "minimum": 0},
+        "result_digest": {"$ref": "#/$defs/nonEmpty"}
+      }
+    },
+    "energyValue": {
+      "type": "object", "additionalProperties": false,
+      "required": ["disposition", "first_law_receipt_digest"],
+      "properties": {
+        "disposition": {"const": "balanced"},
+        "first_law_receipt_digest": {"$ref": "#/$defs/nonEmpty"}
+      }
+    },
+    "samplingValue": {
+      "type": "object", "additionalProperties": false,
+      "required": ["disposition", "measured_rate_hz"],
+      "properties": {
+        "disposition": {"const": "meets_declared_specification"},
+        "measured_rate_hz": {"type": "integer", "minimum": 0}
+      }
+    },
+    "causalEdge": {
+      "type": "object", "additionalProperties": false,
+      "required": ["from_event_id", "to_event_id", "from_sequence", "to_sequence"],
+      "properties": {
+        "from_event_id": {"$ref": "#/$defs/nonEmpty"},
+        "to_event_id": {"$ref": "#/$defs/nonEmpty"},
+        "from_sequence": {"type": "integer", "minimum": 0},
+        "to_sequence": {"type": "integer", "minimum": 0}
+      }
+    },
+    "missionClosure": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "unqualified_domains"],
+          "properties": {"status": {"const": "closed"}, "unqualified_domains": {"type": "array", "maxItems": 0}}
+        },
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "unqualified_domains"],
+          "properties": {
+            "status": {"const": "open"},
+            "unqualified_domains": {"type": "array", "items": {"$ref": "#/$defs/nonEmpty"}, "minItems": 1}
+          }
+        }
+      ]
+    },
+    "report": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "mission_id", "robot_id", "actuator_id", "source_to_actuator_aoi",
+        "command_to_motion", "decision", "thermal", "energy", "sampling",
+        "terminal_safe_stop", "causal_edges", "causal_chain_complete",
+        "mission_closure", "actuation_authorized"
+      ],
+      "properties": {
+        "mission_id": {"$ref": "#/$defs/nonEmpty"},
+        "robot_id": {"$ref": "#/$defs/nonEmpty"},
+        "actuator_id": {"$ref": "#/$defs/nonEmpty"},
+        "source_to_actuator_aoi": {
+          "oneOf": [
+            {"type": "object", "additionalProperties": false, "required": ["status", "value"], "properties": {"status": {"const": "qualified"}, "value": {"$ref": "#/$defs/durationValue"}}},
+            {"$ref": "#/$defs/nonQualifiedEvidence"}
+          ]
+        },
+        "command_to_motion": {
+          "oneOf": [
+            {"type": "object", "additionalProperties": false, "required": ["status", "value"], "properties": {"status": {"const": "qualified"}, "value": {"$ref": "#/$defs/durationValue"}}},
+            {"$ref": "#/$defs/nonQualifiedEvidence"}
+          ]
+        },
+        "decision": {
+          "oneOf": [
+            {"type": "object", "additionalProperties": false, "required": ["status", "value"], "properties": {"status": {"const": "qualified"}, "value": {"$ref": "#/$defs/decisionValue"}}},
+            {"$ref": "#/$defs/nonQualifiedEvidence"}
+          ]
+        },
+        "thermal": {
+          "oneOf": [
+            {"type": "object", "additionalProperties": false, "required": ["status", "value"], "properties": {"status": {"const": "qualified"}, "value": {"$ref": "#/$defs/thermalValue"}}},
+            {"$ref": "#/$defs/nonQualifiedEvidence"}
+          ]
+        },
+        "energy": {
+          "oneOf": [
+            {"type": "object", "additionalProperties": false, "required": ["status", "value"], "properties": {"status": {"const": "qualified"}, "value": {"$ref": "#/$defs/energyValue"}}},
+            {"$ref": "#/$defs/nonQualifiedEvidence"}
+          ]
+        },
+        "sampling": {
+          "oneOf": [
+            {"type": "object", "additionalProperties": false, "required": ["status", "value"], "properties": {"status": {"const": "qualified"}, "value": {"$ref": "#/$defs/samplingValue"}}},
+            {"$ref": "#/$defs/nonQualifiedEvidence"}
+          ]
+        },
+        "terminal_safe_stop": {
+          "oneOf": [
+            {"type": "object", "additionalProperties": false, "required": ["status", "value"], "properties": {"status": {"const": "qualified"}, "value": {"const": true}}},
+            {"$ref": "#/$defs/nonQualifiedEvidence"}
+          ]
+        },
+        "causal_edges": {"type": "array", "minItems": 7, "maxItems": 7, "items": {"$ref": "#/$defs/causalEdge"}},
+        "causal_chain_complete": {"type": "boolean"},
+        "mission_closure": {"$ref": "#/$defs/missionClosure"},
+        "actuation_authorized": {"const": false}
+      }
+    },
+    "payload": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "identity", "configuration", "clock_relation", "timestamp_intervals",
+        "decision_input", "thermal_input", "energy_input", "sampling_input",
+        "terminal_safe_stop_qualified", "terminal_reserve_state_digest", "report"
+      ],
+      "properties": {
+        "identity": {"$ref": "#/$defs/identity"},
+        "configuration": {"$ref": "#/$defs/configuration"},
+        "clock_relation": {"$ref": "#/$defs/clockRelation"},
+        "timestamp_intervals": {
+          "type": "object", "additionalProperties": false,
+          "required": ["source_capture", "actuator_application", "motion_onset"],
+          "properties": {
+            "source_capture": {"$ref": "#/$defs/timestampInterval"},
+            "actuator_application": {"$ref": "#/$defs/timestampInterval"},
+            "motion_onset": {"$ref": "#/$defs/timestampInterval"}
+          }
+        },
+        "decision_input": {"$ref": "#/$defs/decisionInput"},
+        "thermal_input": {"$ref": "#/$defs/thermalInput"},
+        "energy_input": {"$ref": "#/$defs/energyInput"},
+        "sampling_input": {"$ref": "#/$defs/samplingInput"},
+        "terminal_safe_stop_qualified": {"type": "boolean"},
+        "terminal_reserve_state_digest": {"$ref": "#/$defs/nonEmpty"},
+        "report": {"$ref": "#/$defs/report"}
+      }
+    }
+  }
+}
