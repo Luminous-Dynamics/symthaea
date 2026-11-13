@@ -73,8 +73,15 @@ jobs:
               "vibration-coherence-characterization",
               "rotation-synchronous-modulation",
           }
+          metric_gates = {
+              "acoustic-maximum-1khz",
+              "acoustic-30-80khz-maximum",
+              "availability-minimum",
+          }
           for candidate in report["candidate_reports"]:
               gates = {gate["gate_id"]: gate["status"] for gate in candidate["gate_results"]}
               assert required <= gates.keys()
               assert all(gates[gate_id] == "unresolved" for gate_id in required)
+              assert metric_gates <= gates.keys()
+              assert all(gates[gate_id] == "pass" for gate_id in metric_gates)
           PY
