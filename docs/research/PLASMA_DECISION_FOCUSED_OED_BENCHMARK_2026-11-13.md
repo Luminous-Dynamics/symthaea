@@ -206,7 +206,7 @@ The twelve scenarios freeze:
 
 Independent source-side JavaScript replay of the exact fetched JSON matched **12/12** audit dispositions and product decisions. In addition to action catalogue membership, cost/latency/specimen closure, calibration and raw-trace identity, lot/device/day group disjointness, covariance receipts, mandatory endpoints, model adequacy / OTHER, and bond/aging/barrier floors, it checks that a hygroscopic material's measured moisture content is tied to a selected moisture-observation action, calibration receipt and timestamp that is fresh at plasma-run time.
 
-Nineteen Rust unit tests are authored.
+Twenty-one Rust unit tests are authored.
 
 The PA6 substrate-condition adapter now requires exact MAT-013 sample-lineage and MAT-INTERFACE subject references in addition to the condition protocol, moisture measurement receipt/calibration, environment, timestamp and digest. Synthetic refs in the fixture are placeholders only; physical promotion must resolve the canonical sample and interface subjects. A missing canonical reference is BLOCKED / ABSTAIN.
  The authoring environment has no Cargo, rustc or rustfmt, so this module has not been compiled, formatted, linted or executed. No hosted CI result is claimed.
