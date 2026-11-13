@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1.0",
   "as_of": "2026-11-13",
-  "note": "Sources are external comparators only. Values retain their original boundary and evidence class. The register is as-of 2026-11-13; forthcoming literature is explicitly identified and is not eligible for the as-of-date SOTA baseline.",
+  "note": "Sources are external comparators only. Values retain their original boundary and evidence class. The register is as-of 2026-11-13; forthcoming literature is explicitly identified and is not eligible for the as-of-date SOTA baseline. New dynamic-load and operando-characterization sources are classified as research comparators, not commercial SOTA or Luminous results.",
   "sources": [
     {
       "id": "IEA-GEVO-2026",
@@ -277,6 +277,28 @@
       "evidence_class": "peer_reviewed_review_forthcoming",
       "permitted_use": "Forward literature watch only: publisher and institutional records specify March 2027 volume publication; abstract describes reliability-by-design and a five-gate 5R readiness framework.",
       "prohibited_inference": "Not published as of the 2026-11-13 benchmark cutoff; do not cite as current SOTA or as an independently validated result. Review reports no generated dataset."
+    },
+    {
+      "id": "SUPERCAP-DYNAMICS-EXPERIMENT-2026",
+      "title": "Experimental investigation of supercapacitor dynamics: charge–discharge performance analysis under system uncertainties",
+      "url": "https://doi.org/10.1080/19397038.2026.2720202",
+      "doi": "10.1080/19397038.2026.2720202",
+      "publisher": "International Journal of Energy Technology and Policy",
+      "published": "2026-08-24",
+      "evidence_class": "peer_reviewed_experimental_study",
+      "permitted_use": "Dynamic-load and uncertainty comparator. The paper reports a tested 54 V pack (20 series-connected 2.7 V, 100 F cells), an approximately 54 V to 33 V open-circuit voltage decline over 24 h at 25 °C in its setup, dynamic load transitions, and effective capacitance of approximately 60–77% of nominal at the highest tested discharge rates.",
+      "prohibited_inference": "Single study and setup; do not use its 24 h decline or 60–77% effective-capacitance range as a universal EDLC decay law, product rating, SOTA value, or matched commercial comparison. Preserve exact load, device, temperature, uncertainty and measurement boundaries."
+    },
+    {
+      "id": "SUPERCAP-DYNAMICS-OPERANDO-REVIEW-2026",
+      "title": "Supercapacitor dynamics: Mechanisms, architectures, and advanced in-situ characterizations for next-generation energy storage",
+      "url": "https://doi.org/10.1016/j.ccr.2025.217268",
+      "doi": "10.1016/j.ccr.2025.217268",
+      "publisher": "Coordination Chemistry Reviews",
+      "published": "2026-02-15",
+      "evidence_class": "peer_reviewed_review",
+      "permitted_use": "Operando and multimodal characterization roadmap spanning optical, electrochemical, magnetic, gravimetric and neutron methods; highlights unresolved standardization, spatiotemporal resolution, high-throughput analysis and industrial translation challenges.",
+      "prohibited_inference": "Review, not a primary EDLC device performance dataset or evidence that any particular Luminous diagnostic stack is validated."
     }
   ]
 }
