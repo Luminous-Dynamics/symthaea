@@ -1016,6 +1016,18 @@ mod tests {
     }
 
     #[test]
+    fn missing_canonical_interface_subject_reference_blocks_pa6_decision() {
+        let value: serde_json::Value = serde_json::from_str(FIXTURE).expect("fixture JSON");
+        let mut changed = value;
+        changed["scenarios"][11]["substrate_condition"]["material_interface_ref"] =
+            serde_json::json!("");
+        let report = audit_fixture_json(&changed.to_string()).expect("mutated fixture parses");
+        let result = result_for(&report, "pa6-saturated-state-low-wca-reject");
+        assert_eq!(result.audit_disposition, AuditDisposition::Blocked);
+        assert_eq!(result.product_decision, ProductDecision::Abstain);
+    }
+
+    #[test]
     fn fixture_cannot_promote_synthetic_outcomes_to_physical() {
         let value: serde_json::Value = serde_json::from_str(FIXTURE).expect("fixture JSON");
         let mut changed = value;
