@@ -6,13 +6,13 @@ on:
       - research/u1-tebd-layer-scheduler-20261113
     paths:
       - crates/domains/symthaea-frontier-physics/src/u1_mps.rs
-      - .github/workflows/u1-two-site-gates.yml
+      - .github/workflows/u1-tebd-layer-scheduler.yml
   pull_request:
     branches:
-      - research/u1-tebd-layer-scheduler-20261113
+      - research/u1-mps-truncation-ledger-20261113
     paths:
       - crates/domains/symthaea-frontier-physics/src/u1_mps.rs
-      - .github/workflows/u1-two-site-gates.yml
+      - .github/workflows/u1-tebd-layer-scheduler.yml
 
 permissions:
   contents: read
