@@ -24,6 +24,19 @@ The synthetic fixture must return INCOMPLETE and must not qualify a candidate fo
 - Dominance requires certainty on every objective and strict separation on at least one. A confirmed trade-off is retained; overlapping/touching intervals do not create a ranking.
 - The output is pairwise relations plus a robust nondominated set with uncertainty status. No single weighted score is generated.
 
+## Marine environmental evidence gates
+
+The scenario can require exact external audit contract/receipt pairs as non-compensable gates. The integrated example now registers:
+- biofouling organism-release control;
+- in-water cleaning authorization and waste capture;
+- acoustic model-to-full-scale transfer review;
+- controlled acoustic source-state contrast;
+- cavitation intermittency distribution;
+- vibration–hydrophone coherence characterization;
+- shaft-rotation-synchronous modulation characterization.
+
+These are evidence-quality gates, not automatic proof that a candidate is environmentally superior. A missing, unresolved or mismatched receipt holds the candidate out of the robust Pareto frontier, irrespective of energy or cost savings. The actual underwater-noise objective and biosecurity thresholds remain separate declared gates. Synthetic fixture receipts are placeholders for known-answer tests only; they do not represent physical evidence.
+
 ## Interpretation limits
 
 The audit tests declared comparison contracts and computes interval relations. It does not authenticate sensor certificates or raw bytes, validate physical measurements, acoustic propagation, ecology, CFD, full-scale transfer or regulatory compliance. A SHA-256 digest is a reference, not proof of authenticity.
